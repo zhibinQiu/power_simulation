@@ -24,7 +24,7 @@ git add .
 if git diff --cached --quiet; then
   echo "    无本地改动，跳过提交"
 else
-  git commit -q -m " 修复若干bug,优化工艺/小组标签显示样式，增加传感器数据系统"
+  git commit -q -m " 修复策略属性面板自动化控制的勾选显示问题"
   echo "    已提交"
 fi
 

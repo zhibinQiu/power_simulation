@@ -61,7 +61,9 @@
           <div class="set-block">
             <div class="set-row">
               <span class="set-label">自动化控制</span>
-              <button class="x sw" :class="{ on: !!st.auto_control }" :disabled="store.busy" @click="toggleAutoControl">{{ st.auto_control ? '已开启' : '未开启' }}</button>
+              <label class="chk">
+                <input type="checkbox" :checked="!!st.auto_control" :disabled="store.busy" @change="toggleAutoControl" />
+              </label>
             </div>
             <div class="note" v-if="st.auto_control">已开启自动化控制：训练获得更优模型时将自动把新版本参数下发到可调设备，无需人工干预。</div>
             <div class="note" v-else>未开启自动化控制：训练取得进展时通过系统提醒引导手动调优。</div>
@@ -529,7 +531,7 @@ textarea.inp { resize: vertical; font-family: inherit; line-height: 1.5; }
 .inp.sel { width: auto; min-width: 108px; flex: 0 0 auto; padding: 3px 6px; font-size: 11px; }
 .inp.time { width: auto; min-width: 86px; flex: 0 0 auto; padding: 3px 6px; font-size: 11px; }
 .chk { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); cursor: pointer; }
-.chk input { accent-color: var(--accent2); }
+.chk input { accent-color: var(--accent2); width: 15px; height: 15px; cursor: pointer; }
 .time-row { justify-content: flex-end; gap: 6px; }
 /* ---- 模型版本 ---- */
 .ver-list { display: flex; flex-direction: column; gap: 8px; }
