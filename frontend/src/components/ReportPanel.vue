@@ -52,7 +52,7 @@
         <label class="rp-check">
           <input v-model="cfg.withAppendix" type="checkbox" />
           <span class="rp-check-box"></span>
-          <span class="rp-check-text">包含「附录：全流程明细」表格</span>
+          <span class="rp-check-text">包含附录（全流程明细表 + 工序核算台账）</span>
         </label>
 
         <button class="rp-btn primary rp-gen-btn" @click="startGenerate">生成报告</button>

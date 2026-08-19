@@ -24,7 +24,7 @@ git add .
 if git diff --cached --quiet; then
   echo "    无本地改动，跳过提交"
 else
-  git commit -q -m " 修复策略属性面板自动化控制的勾选显示问题"
+  git commit -q -m " 增加欢迎页"
   echo "    已提交"
 fi
 

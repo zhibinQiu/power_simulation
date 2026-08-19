@@ -81,6 +81,7 @@ backend/
   │  ├─ report_store.py      # 历史报告持久化
   │  ├─ md_render.py         # Markdown → HTML 分享页渲染
   │  ├─ presets.py           # 默认流程模型与示例策略
+  │  ├─ optimizers.py        # AI 优化模型引擎（GA/PSO/RL 在线训练 + 版本管理）
   │  ├─ specs.py             # 设备规格档位
   │  ├─ store.py             # 策略持久化
   │  └─ models.py            # 前后端数据契约（Pydantic）
@@ -817,7 +818,20 @@ def _noise(v, pct=0.04):
   "steel_output": 0.0,
   "co2_reduction_pct": 12.6     // 减排百分比
 }
-\`\`\``,
+\`\`\`
+
+## 六、扫描 / 审计 / 优化器请求
+
+以下端点使用 \`dict\` 请求体（不经 Pydantic），由后端按需读取：
+
+| 端点 | 请求体字段 |
+| --- | --- |
+| POST /api/scan | param / mode(center\|range\|sweep) / range / density / keep_ratio / exclude_self |
+| POST /api/audit | model（流程）+ 可选 ops |
+| POST /api/optimizers/context | model + factors（训练上下文） |
+| PUT /api/optimizers/{oid}/settings | auto_control / schedule{enabled,interval_h,start,end} / samples |
+| POST /api/optimizers/{oid}/train | steps（训练步数） |
+`,
   },
   {
     id: 'protocol',
@@ -845,6 +859,19 @@ def _noise(v, pct=0.04):
 | POST | /api/strategies | 创建策略；GET/PUT/DELETE /api/strategies/{id}；POST /api/strategies/{id}/apply 应用策略 |
 | POST | /api/scan | 单工序参数敏感性扫描（扫参区间 / 密度 / 保留比例） |
 | POST | /api/audit | 全流程碳素流守恒审计（碳输入 = 排 CO₂ + 固钢 + 入渣 + 捕集 + 产品携出） |
+| POST | /api/optimizers/context | 同步 AI 优化训练上下文（当前流程 + 因子，供优化器建模） |
+| GET | /api/optimizers | 优化模型列表与训练状态（迭代/曲线/最优参数摘要） |
+| GET | /api/optimizers/{oid} | 单个优化器详情（训练轨迹/超参/版本/建议/提醒） |
+| POST | /api/optimizers/{oid}/start | 开启自动训练（后台随实时数据定时迭代） |
+| POST | /api/optimizers/{oid}/stop | 停止自动训练 |
+| POST | /api/optimizers/{oid}/train | 手动训练 N 步（steps 参数） |
+| POST | /api/optimizers/{oid}/reset | 重置模型权重 |
+| PUT | /api/optimizers/{oid}/hyper | 保存算法超参数（GA/PSO/RL） |
+| POST | /api/optimizers/{oid}/apply | 应用最优参数到流程（best → 可调设备） |
+| PUT | /api/optimizers/{oid}/settings | 更新控制与自训练设置（自动化控制/频率/时段/样本量） |
+| POST | /api/optimizers/{oid}/archive | 手动存档当前模型版本 |
+| POST | /api/optimizers/{oid}/switch | 切换到历史版本 |
+| POST | /api/optimizers/{oid}/ack | 确认调优提醒（清除未读标记） |
 | POST | /api/report | 创建报告生成任务（后台线程） |
 | GET | /api/report/task/{id} | 轮询报告进度（done/progress/stage/result） |
 | GET | /api/reports | 历史报告列表（倒序） |
@@ -868,6 +895,59 @@ def _noise(v, pct=0.04):
 ## 四、报告导出
 
 平台支持将当前工况的碳流、碳排、TFT 状态汇总导出为 Markdown 分析报告，并渲染为可分享的 HTML 页面（文件 → 导出分析报告）。`,
+  },
+  {
+    id: 'optimizer',
+    title: 'AI 优化模型引擎',
+    body: `## AI 优化模型引擎
+
+后端 \`optimizers.py\` 提供三套在线自学习优化模型（**遗传算法 GA / 粒子群 PSO / 强化学习 RL**），随流程运行与实时传感器数据后台持续训练，输出碳强度最优的设备参数建议，并支持版本管理与自动化控制。
+
+## 一、模型架构
+
+| 组件 | 职责 |
+| --- | --- |
+| OptimizerBase | 优化器基类：归一化状态、适应度求值、训练循环、版本/提醒管理 |
+| GeneticOptimizer | 遗传算法（GA）：选择 / 交叉 / 变异算子 |
+| ParticleSwarmOptimizer | 粒子群（PSO）：惯性权重 + 个体/全局最优引导 |
+| RLQOptimizer | 强化学习（Q-Learning 表）：以离散动作 Q 表驱动寻优 |
+| TrainingScheduler | 后台调度线程：按配置频率定时迭代全部活跃优化器 |
+
+## 二、优化空间与上下文
+
+- 优化目标是 **单位产品碳强度（kgCO₂/t）** 最小化；
+- 可优化参数来自 \`/api/optimizers/context\` 同步的当前流程模型（各工序可调设备参数）与排放因子；
+- 状态输入为**归一化实时遥测读数**（映射到 [0,1] 区间），保证跨设备可比；
+- 适应度（fitness）= 基于当前流程计算出的碳强度，训练越久越接近流程最优参数组合。
+
+## 三、训练与更新机制
+
+- **自动训练**：\`POST /api/optimizers/{oid}/start\` 开启后，后台 \`TrainingScheduler\` 按自训练设置（频率/时段/样本量）随实时数据定时迭代；
+- **手动训练**：\`POST /api/optimizers/{oid}/train\` 单步推进，便于观察收敛过程；
+- 每次取得更优解即记录**最优参数建议**与**强度提升百分比**，前端轮询 \`GET /api/optimizers\` 展示「模型逐渐变优」。
+
+## 四、控制模式与提醒
+
+- **自动化控制**（\`settings.auto_control\` 开启）：模型变优后由后端直接下发最优参数到可调设备，命令行输出应用日志；
+- **手动模式**：仅生成调优提醒（reminder），在策略属性面板确认（ack）后可手动应用（apply）；
+- 提醒包含最优强度、较上版提升百分比，按需展示。
+
+## 五、版本管理
+
+- 每次取得阶段性更优解自动存档版本（含超参数、权重、最优参数、时间）；
+- 手动存档 \`POST /api/optimizers/{oid}/archive\`、切换历史版本 \`POST /api/optimizers/{oid}/switch\`、重置权重 \`POST /api/optimizers/{oid}/reset\`；
+- 超参数（GA/PSO/RL 各自模板）经 \`PUT /api/optimizers/{oid}/hyper\` 持久化。
+
+## 六、数据契约
+
+优化器 API 使用 \`dict\` 请求体（不经 Pydantic），主要字段：
+\`\`\`json
+// settings
+{ "auto_control": true, "schedule": { "enabled": true, "interval_h": 1, "start": "09:00", "end": "18:00" }, "samples": 60 }
+// train
+{ "steps": 5 }
+\`\`\`
+状态响应（GET /api/optimizers/{oid}）包含：\`status / iteration / best_fitness / best_params / history(曲线) / versions / reminder / hyper / settings\`。`,
   },
   {
     id: 'viz',
@@ -925,6 +1005,8 @@ def _noise(v, pct=0.04):
 | 碳素流守恒审计 | 工具菜单 → 碳素流守恒审计 | 逐工序核算碳输入/输出五项平衡，输出偏差与守恒率（POST /api/audit） |
 | 高炉数值分析（TftAnalysisDialog） | 仿真菜单 → 高炉数值分析（Alt+T） | 全厂高炉 TFT 数值总览、鼓风/喷煤调参推演，复用 utils/tft.js 焓平衡 |
 | 平台配置（PlatformConfigDialog） | 工具菜单 → 平台配置… | 工艺规模档位 / 设备量程 / 参数运行空间，保存后编辑器、设备面板与 3D 标注自动生效（backend/config/platform_config.json） |
+| AI 优化模型（策略详情面板） | 左侧「策略 → AI优化模型」点击模型 | GA/PSO/RL 在线训练面板：状态/迭代/曲线/最优参数建议，支持训练控制、应用最优参数、版本管理与提醒确认（/api/optimizers/*） |
+| 数据视图（DataView） | 视图菜单 → 数据 | 全屏传感器历史数据表格：设备页签 + 实时读数/均值/峰值/谷值/超限状态 + 时序表格 |
 
 ## 七、命令行窗口（CommandConsole）
 

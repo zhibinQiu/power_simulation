@@ -366,16 +366,16 @@ button b, button strong,
 .tch:active { background: var(--sel); }
 .tch.on { background: var(--sel); color: var(--accent-d); }
 .tch.sub { padding-left: 8px; }
-.tch.sub .tch-tt { font-size: 13px; font-weight: 500; }
+.tch.sub .tch-tt { font-size: 12px; font-weight: 500; }
 
 /* VS Code 资源树 section header（分组标题）：小号弱色，hover 变深 */
 .tch.hdr {
   height: 24px; padding: 0 10px 0 8px; gap: 6px;
-  font-size: 11px; font-weight: 600; letter-spacing: .8px;
+  font-size: 10px; font-weight: 600; letter-spacing: .8px;
   color: var(--muted);
 }
 .tch.hdr:hover { background: transparent; color: var(--text); }
-.tch.hdr .tch-tt { font-size: 11px; font-weight: 600; letter-spacing: .8px; color: inherit; }
+.tch.hdr .tch-tt { font-size: 10px; font-weight: 600; letter-spacing: .8px; color: inherit; }
 .tch.hdr .twisty { width: 14px; opacity: .5; }
 .tch.hdr .tch-count { opacity: .8; }
 
@@ -390,14 +390,14 @@ button b, button strong,
 .twisty svg { display: block; }
 
 .tch-ic { width: 18px; display: grid; place-items: center; color: var(--accent2); flex: 0 0 auto; opacity: .78; }
-.tch-tt { flex: 1; min-width: 0; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .15px; }
+.tch-tt { flex: 1; min-width: 0; font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .15px; }
 
 /* 子级缩进（VS Code：纯层次缩进，无虚线 / 边框线） */
 .tchildren { padding-left: 24px; overflow: hidden; }
 
 .tchild {
   display: flex; align-items: center; gap: 6px; padding: 0 10px 0 16px; height: 25px;
-  cursor: default; position: relative; font-size: 13px; border-radius: 0;
+  cursor: default; position: relative; font-size: 12px; border-radius: 0;
 }
 /* 带展开箭头的行：箭头自身占位，去掉补偿缩进，保证文字与无箭头叶子对齐 */
 .tchild:has(.twisty) { padding-left: 0; }
@@ -412,7 +412,7 @@ button b, button strong,
 .tchild.drag:hover { background: var(--accent-l); }
 
 .tc-tt {
-  flex: 1; min-width: 0; font-size: 13px; color: var(--text);
+  flex: 1; min-width: 0; font-size: 12px; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
   letter-spacing: .08px;
 }

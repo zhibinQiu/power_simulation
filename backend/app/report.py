@@ -89,6 +89,19 @@ def _sim_ctx(sim: Optional[SimResult]) -> Optional[Dict[str, Any]]:
             "heat": _snap(u.heat),
             "elec": _snap(u.elec),
             "fuel_energy": _snap(u.fuel_energy),
+            "breakdown": [
+                {
+                    "item": it.item,
+                    "qty": _snap(it.qty, 3),
+                    "qty_unit": it.qty_unit,
+                    "basis": it.basis,
+                    "formula": it.formula,
+                    "co2": _snap(it.co2, 3),
+                    "scope": it.scope,
+                }
+                for it in u.breakdown
+            ],
+            "notes": list(u.notes or []),
         })
     return {
         "totals": {
@@ -279,6 +292,28 @@ def _render_markdown(ctx: Dict[str, Any], analysis: Dict[str, str],
             L.append(f"- 进入炉渣固碳：**{_fmt(to_slag, 1)} tC/h**（占比 {_pct(to_slag, carbon_in)}）；")
             L.append(f"- 被捕集（含利用）：**{_fmt(captured, 1)} tC/h**（占比 {_pct(captured, carbon_in)}）。")
             L.append("")
+        L.append("### 2.4 能耗结构与能流分析")
+        es_rows = _energy_structure_rows(b_ctx)
+        if es_rows:
+            L.append(f"基线情景下全厂综合能耗 **{_fmt(b.get('energy_total'))} GJ/h**"
+                     f"（其中外购电 **{_fmt(b.get('elec'))} MWh/h**、燃料能耗 **{_fmt(b.get('fuel_energy'))} GJ/h**），结构如下：")
+            L.append("")
+            L.append("| 能耗构成 | 数值（GJ/h） | 占比 |")
+            L.append("|---|---|---|")
+            for r in es_rows:
+                L.append(f"| {r['label']} | {_fmt(r['value'], 1)} | {r['pct']} |")
+            L.append("")
+        eu_rows = _unit_energy_rows(b_ctx)
+        if eu_rows:
+            L.append("各工序能耗分布（按综合能耗降序）：")
+            L.append("")
+            L.append("| 工序 | 类型 | 产量（t/h） | 电耗（MWh/h） | 燃料能耗（GJ/h） | 综合能耗（GJ/h） | 单位能耗（kgce/t） |")
+            L.append("|---|---|---|---|---|---|---|")
+            for u in eu_rows:
+                L.append(f"| {u['name']} | {u['type']} | {_fmt(u.get('steel_output'))} | "
+                         f"{_fmt(u.get('elec'), 2)} | {_fmt(u.get('fuel_energy'))} | "
+                         f"{_fmt(u.get('energy_total'))} | {_fmt(u.get('energy_intensity'))} |")
+            L.append("")
     L.append(analysis.get("baseline_insight", ""))
     L.append("")
 
@@ -353,13 +388,34 @@ def _render_markdown(ctx: Dict[str, Any], analysis: Dict[str, str],
 
     # 6 附录
     if with_appendix:
-        L.append("## 附录：全流程明细")
-        rows = _unit_rows_ctx(b_ctx)
-        L.append("| 工序 | 类型 | 直接排放（tCO₂/h） | 间接排放（tCO₂/h） | 合计（tCO₂/h） | 单位能耗（kgce/t） |")
-        L.append("|---|---|---|---|---|---|")
-        for r in rows:
-            L.append(f"| {r['name']} | {r['type']} | {_fmt(r['co2_direct'])} | {_fmt(r['co2_indirect'])} | {_fmt(r['co2_total'])} | {_fmt(r.get('energy_intensity'))} |")
+        L.append("## 附录一：全流程排放与能耗明细")
+        rows = _appendix_rows(b_ctx)
+        L.append("（按合计排放量降序排列）")
         L.append("")
+        L.append(_APPENDIX_HEADER)
+        L.append(_APPENDIX_SEP)
+        for r in rows:
+            L.append(_appendix_line(r))
+        L.append("")
+        if has_strategy and s_ctx:
+            L.append("### 附录一之二：策略应用后全流程明细")
+            s_rows = _appendix_rows(s_ctx)
+            L.append(_APPENDIX_HEADER)
+            L.append(_APPENDIX_SEP)
+            for r in s_rows:
+                L.append(_appendix_line(r))
+            L.append("")
+        ledger_md = _ledger_md(b_ctx)
+        if ledger_md:
+            L.append("## 附录二：工序碳排放核算台账")
+            L.append("各工序逐项核算明细（含排放因子与计算公式），可追溯、可复现：")
+            L.append("")
+            L.append(ledger_md)
+        if has_strategy and s_ctx:
+            s_ledger_md = _ledger_md(s_ctx)
+            if s_ledger_md:
+                L.append("## 附录二之二：策略应用后工序核算台账")
+                L.append(s_ledger_md)
     L.append("---")
     L.append("> 本报告由数字孪生平台自动生成，分析段落由大语言模型基于仿真数据撰写，仅供参考。")
     return "\n".join(L)
@@ -371,6 +427,103 @@ def _unit_rows_ctx(b_ctx) -> List[Dict[str, Any]]:
     rows = list(b_ctx["units"])
     rows.sort(key=lambda u: u["co2_total"] or 0, reverse=True)
     return rows
+
+
+def _energy_structure_rows(b_ctx) -> List[Dict[str, Any]]:
+    """全厂能耗结构：外购电力（1 MWh = 3.6 GJ 折标）与燃料能耗占比。"""
+    if not b_ctx:
+        return []
+    t = b_ctx["totals"]
+    elec_gj = (t.get("elec") or 0) * 3.6
+    fuel = t.get("fuel_energy") or 0
+    total = t.get("energy_total") or 0
+    rows = [
+        {"label": "外购电力（按 1 MWh = 3.6 GJ 折标）", "value": elec_gj, "unit": "GJ/h",
+         "pct": _pct(elec_gj, total)},
+        {"label": "燃料能耗（固体/液体/气体燃料）", "value": fuel, "unit": "GJ/h",
+         "pct": _pct(fuel, total)},
+    ]
+    rows.sort(key=lambda r: r["value"] or 0, reverse=True)
+    return rows
+
+
+def _unit_energy_rows(b_ctx) -> List[Dict[str, Any]]:
+    """各工序能耗分布（按综合能耗降序），含电耗 / 燃料能耗 / 单位能耗。"""
+    if not b_ctx:
+        return []
+    rows = list(b_ctx["units"])
+    rows.sort(key=lambda u: u["energy_total"] or 0, reverse=True)
+    return rows
+
+
+def _carbon_route(u: Dict[str, Any]) -> str:
+    """工序碳去向摘要：固钢 / 渣 / 捕集（均为 0 时显示 '-'）。"""
+    parts = []
+    if u.get("carbon_to_steel"):
+        parts.append(f"固钢{_fmt(u['carbon_to_steel'], 1)}")
+    if u.get("carbon_to_slag"):
+        parts.append(f"渣{_fmt(u['carbon_to_slag'], 1)}")
+    if u.get("carbon_captured"):
+        parts.append(f"捕集{_fmt(u['carbon_captured'], 1)}")
+    return "、".join(parts) if parts else "-"
+
+
+_APPENDIX_HEADER = (
+    "| 工序 | 类型 | 产量（t/h） | 直接排放（tCO₂/h） | 间接排放（tCO₂/h） | 合计（tCO₂/h） | "
+    "电耗（MWh/h） | 燃料（GJ/h） | 综合能耗（GJ/h） | 单位能耗（kgce/t） | 碳去向（tC/h） |"
+)
+_APPENDIX_SEP = "|---|---|---|---|---|---|---|---|---|---|---|"
+
+
+def _appendix_rows(b_ctx) -> List[Dict[str, Any]]:
+    """全流程明细行（按合计排放降序）。"""
+    if not b_ctx:
+        return []
+    rows = list(b_ctx["units"])
+    rows.sort(key=lambda u: u["co2_total"] or 0, reverse=True)
+    return rows
+
+
+def _appendix_line(r: Dict[str, Any]) -> str:
+    return (f"| {r['name']} | {r['type']} | {_fmt(r.get('steel_output'))} | "
+            f"{_fmt(r.get('co2_direct'))} | {_fmt(r.get('co2_indirect'))} | {_fmt(r.get('co2_total'))} | "
+            f"{_fmt(r.get('elec'), 2)} | {_fmt(r.get('fuel_energy'))} | "
+            f"{_fmt(r.get('energy_total'))} | {_fmt(r.get('energy_intensity'))} | "
+            f"{_carbon_route(r)} |")
+
+
+def _ledger_md(ctx_units: Optional[Dict[str, Any]]) -> str:
+    """渲染「工序核算台账」章节：每个工序的排放核算明细与工艺说明。"""
+    if not ctx_units:
+        return ""
+    L: List[str] = []
+    for u in ctx_units["units"]:
+        bd = u.get("breakdown") or []
+        if not bd:
+            continue
+        L.append(f"### {u['name']}（{u['type']}）")
+        L.append(f"该工序每小时排放 CO₂ **{_fmt(u.get('co2_total'))} t**"
+                 f"（直接 {_fmt(u.get('co2_direct'))} t / 间接 {_fmt(u.get('co2_indirect'))} t），核算明细如下：")
+        L.append("")
+        L.append("| 核算项 | 用量 | 单位 | 核算依据 | CO₂ 当量（tCO₂/h） | 范围 |")
+        L.append("|---|---|---|---|---|---|")
+        for it in bd:
+            qty_s = _fmt(it.get("qty"), 3) if it.get("qty") else "-"
+            unit_s = it.get("qty_unit") or "-"
+            co2_s = _fmt(it.get("co2"), 1)
+            if it.get("co2") and it.get("co2") < 0:
+                co2_s = f"{co2_s}（减排）"
+            scope_s = "范围一（直接）" if it.get("scope") == "direct" else "范围二（间接）"
+            basis = it.get("basis") or "-"
+            if it.get("formula"):
+                basis = f"{basis}；{it['formula']}"
+            L.append(f"| {it.get('item') or '-'} | {qty_s} | {unit_s} | {basis} | {co2_s} | {scope_s} |")
+        notes = u.get("notes") or []
+        if notes:
+            L.append("")
+            L.append(f"> 备注：{'；'.join(notes)}")
+        L.append("")
+    return "\n".join(L)
 
 
 # ---------------------------------------------------------------------------
@@ -444,7 +597,8 @@ def _llm_analysis(ctx: Dict[str, Any], depth: str = "standard",
         ("summary", "执行摘要",
          "一句话概述整体能耗与排放水平与最关键发现，可给出综合能耗、总排放与强度水平结论。", 8, 25),
         ("baseline_insight", "基线数据分析洞察",
-         "解读排放结构（直接/间接占比）、主要排放工序与贡献、强度与能耗效率、能流与碳流向特征，指出主要节能与减排机会点。", 28, 45),
+         "解读排放结构（直接/间接占比）、主要排放工序与贡献、能耗结构（外购电力与燃料占比）与主要能耗工序、"
+         "强度与能耗效率、能流与碳流向特征，指出主要节能与减排机会点。", 28, 45),
         ("strategy_eval", "策略效果评估", strategy_inst, 48, 65),
         ("suggestions", "结论与优化建议",
          "给出 3~5 条具体、可落地的后续节能减碳建议（可结合工序类型、碳流向、能流与能耗结构等），"
@@ -482,11 +636,22 @@ def _fallback_analysis(ctx: Dict[str, Any]) -> Dict[str, str]:
         f"基线情景下全厂总排放为 **{_fmt(b.get('co2_total'))} tCO₂/h**，"
         f"吨钢碳排放强度 **{_fmt(b.get('intensity'))} kgCO₂/t**。{top}"
     )
+    energy_note = ""
+    if b_ctx:
+        t = b_ctx["totals"]
+        e_top = sorted(b_ctx["units"], key=lambda u: u["energy_total"] or 0, reverse=True)
+        if e_top and e_top[0].get("energy_total"):
+            energy_note = (
+                f"综合能耗为 **{_fmt(t.get('energy_total'))} GJ/h**，其中燃料能耗占 "
+                f"{_pct(t.get('fuel_energy'), t.get('energy_total'))}、外购电力折标占 "
+                f"{_pct((t.get('elec') or 0) * 3.6, t.get('energy_total'))}；"
+                f"能耗最大的工序为 **{e_top[0]['name']}**（{_fmt(e_top[0].get('energy_total'))} GJ/h）。"
+            )
     baseline_insight = (
         f"直接排放占全厂 {_pct(b.get('co2_direct'), b.get('co2_total'))}、间接排放占 "
         f"{_pct(b.get('co2_indirect'), b.get('co2_total'))}；碳利用率 "
-        f"{b.get('carbon_utilization') * 100 if b.get('carbon_utilization') else 0:.2f}%。"
-        f"{top}建议后续围绕主要排放工序推进余热回收、燃料替代与能效优化。"
+        f"{b.get('carbon_utilization') * 100 if b.get('carbon_utilization') else 0:.2f}%。{energy_note}"
+        f"{top}建议后续围绕主要排放与能耗工序推进余热回收、燃料替代与能效优化。"
     )
     if has_strategy:
         s = s_ctx["totals"]

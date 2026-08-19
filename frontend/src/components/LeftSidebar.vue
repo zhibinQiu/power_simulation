@@ -470,7 +470,7 @@ function onStratContext(e, s) {
 
 /* 分类计数徽章（VS Code badge：灰底圆角小数字） */
 .tch-count {
-  font-size: 10px; color: var(--muted); background: rgba(128,128,128,.12);
+  font-size: 9px; color: var(--muted); background: rgba(128,128,128,.12);
   min-width: 16px; height: 16px; padding: 0 5px; border-radius: 8px;
   font-weight: 500; line-height: 16px; text-align: center;
   flex: 0 0 auto; font-variant-numeric: tabular-nums;
@@ -486,14 +486,14 @@ function onStratContext(e, s) {
 .dev-leaf .tc-tt { font-weight: 400; }
 
 /* 策略分类二级分组（内置 → 工艺）：tchildren 已提供缩进，箭头自身占位；
-   字号 13px、颜色 var(--text)、字重 400、字距 .08px，与工艺/物料树叶子条目（.tc-tt）完全一致，
+   字号 12px、颜色 var(--text)、字重 400、字距 .08px，与工艺/物料树叶子条目（.tc-tt）完全一致，
    避免同一工艺词在三个树中字号、颜色与字重不一 */
 .tch.sub2 { padding-left: 0; height: 24px; gap: 6px; }
-.tch.sub2 .tch-tt { font-size: 13px; font-weight: 400; letter-spacing: .08px; color: var(--text); }
+.tch.sub2 .tch-tt { font-size: 12px; font-weight: 400; letter-spacing: .08px; color: var(--text); }
 .tch.sub2 .twisty { width: 14px; opacity: .5; }
 
 /* 策略来源标签（内置 / 自定义） */
-.tc-tag { font-size: 9.5px; color: #fff; padding: 1px 5px; border-radius: 4px; white-space: nowrap; flex: 0 0 auto; }
+.tc-tag { font-size: 9px; color: #fff; padding: 1px 5px; border-radius: 4px; white-space: nowrap; flex: 0 0 auto; }
 .tc-tag.pre { background: var(--accent); }
 .tc-tag.saved { background: var(--green); }
 .tc-tag.ai { background: var(--purple, #7c5cff); }
@@ -508,5 +508,5 @@ function onStratContext(e, s) {
 .strat-del:hover { color: var(--red); background: rgba(209,75,75,.12); }
 
 /* 空列表提示 */
-.empty-hint { font-size: 11px; color: var(--faint); padding: 10px 14px; line-height: 1.6; }
+.empty-hint { font-size: 10px; color: var(--faint); padding: 10px 14px; line-height: 1.6; }
 </style>

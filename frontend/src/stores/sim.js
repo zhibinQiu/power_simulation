@@ -140,6 +140,7 @@ export const useSimStore = defineStore('sim', {
     brightness: 0.95,       // 画面亮度（映射到 renderer.toneMappingExposure）：默认 0.95，范围 0.3 ~ 2.5
     live: null,
     ready: false,
+    entered: false,      // 欢迎页是否已进入（打开项目后置 true，进入主界面）
     busy: false,
     feedStatus: 'init',
     toast: '',
@@ -1448,6 +1449,35 @@ export const useSimStore = defineStore('sim', {
       this.scheme = buildScheme(route)
       this.compileSchemeToModel()
       this.autoLayout()
+    },
+    // 欢迎页打开项目：按流程路线（long 长流程 / short 短流程）重建方案并进入主界面
+    openProject(route) {
+      if (this.editMode) this.exitEdit()
+      this.processRoute = route
+      this.scheme = buildScheme(route)
+      if (!this.scheme.groups) this.scheme.groups = []
+      if (this.scheme.activeGroupId == null) this.scheme.activeGroupId = null
+      this.deviceSetpoints = {}          // 新项目不带旧项目的设备设定
+      this.deviceExtraSetpoints = {}
+      this.selectedUnitId = null
+      this._saveScheme()                 // 持久化项目路线，刷新后保持
+      this.compileSchemeToModel()
+      this.autoLayout()
+      this.refresh()
+      this.sceneRev++                    // 触发 3D 孪生按新方案重建
+      this.entered = true
+      const label = route === 'short' ? '钢铁企业 · 短流程' : '钢铁企业 · 长流程'
+      this.toast = '已打开项目：' + label
+      this.pushCmd('已打开项目：' + label + '，已按全流程重建数字孪生。', 'cmd')
+    },
+    // 等待初始化完成（欢迎页进入前兜底，避免 init 未就绪时操作方案）
+    async waitReady() {
+      if (this.ready) return
+      await new Promise((resolve) => {
+        const iv = setInterval(() => {
+          if (this.ready) { clearInterval(iv); resolve() }
+        }, 80)
+      })
     },
     clearScheme() {
       this._histCapture('clear_' + uid('h'))

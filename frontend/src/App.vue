@@ -34,6 +34,9 @@
     <TftAnalysisDialog v-if="showTftAnalysis" @close="showTftAnalysis = false" />
     <ContextMenu />
     <SensitivityDialog />
+
+    <!-- 欢迎页：进入前覆盖主界面，选择项目后进入数字孪生 -->
+    <WelcomeScreen v-if="!store.entered" @open="onOpenProject" />
   </div>
 </template>
 
@@ -48,6 +51,7 @@ import LeftSidebar from './components/LeftSidebar.vue'
 import ActivityBar from './components/ActivityBar.vue'
 import RightInspector from './components/RightInspector.vue'
 import SceneViewer from './components/SceneViewer.vue'
+import WelcomeScreen from './components/WelcomeScreen.vue'
 import DataView from './components/DataView.vue'
 import FlowEditor from './components/FlowEditor.vue'
 import { usePanelSizes } from './composables/usePanelSizes'
@@ -230,4 +234,10 @@ onMounted(() => {
   store.pushCmd('行业能碳仿真平台已就绪。输入 help 查看命令，或直接点击顶栏与工具条操作。', 'guide')
   store.pushCmd('提示：左侧资产树选工序，中间 3D 点击聚焦，右栏检视器看属性。', 'guide')
 })
+
+// 欢迎页选择项目后进入：等待初始化完成，再按所选流程路线打开项目
+async function onOpenProject(route) {
+  await store.waitReady()
+  store.openProject(route)
+}
 </script>
