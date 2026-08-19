@@ -229,6 +229,92 @@ function buildConveyor(type, bodyMat, anim) {
   return g
 }
 
+// 供电系统（全厂主变电站）造型 —— 主变压器 + 高压套管 + 散热片 + 配电楼 + 输电铁塔 + 电流脉冲
+function buildPowerStation(type, bodyMat, anim) {
+  const g = new THREE.Group()
+  addSkid(g, 24, 17)
+  const cy = 5
+  // 主变压器（中央大型箱体）
+  const trafo = new THREE.Mesh(new THREE.BoxGeometry(10, 8, 8), mat(0x3d4f63, { metalness: 0.5, roughness: 0.45 }))
+  trafo.position.set(-2, cy + 4, 0)
+  g.add(trafo)
+  // 散热片（两侧波纹散热器）
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < 3; i++) {
+      const fin = boxMesh(0.9, 5.5, 5.5, mat(0x2d3d50, { metalness: 0.55 }))
+      fin.position.set(-2 + s * 5.6, cy + 4, (i - 1) * 2.4)
+      g.add(fin)
+    }
+  }
+  // 变压器油枕（顶部横筒）
+  const conservator = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 7, 12), mat(0x556070, { metalness: 0.6 }))
+  conservator.rotation.z = Math.PI / 2
+  conservator.position.set(-2, cy + 8.6, 0)
+  g.add(conservator)
+  // 高压套管（顶部斜插 3 根绝缘子）
+  for (let i = -1; i <= 1; i++) {
+    const bush = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 4.4, 10), mat(0x9aa4ad, { metalness: 0.45 }))
+    bush.rotation.z = 0.28
+    bush.position.set(-2 + i * 2.6, cy + 8.4, 0)
+    g.add(bush)
+  }
+  // 配电楼（低压侧，带发光窗户）
+  const house = boxMesh(8, 6.5, 6, mat(0x6a7a8a, { metalness: 0.2, roughness: 0.75 }))
+  house.position.set(5.5, cy + 3.25, 0)
+  g.add(house)
+  for (let i = -1; i <= 1; i++) {
+    const win = boxMesh(1.8, 1.6, 0.3, new THREE.MeshStandardMaterial({ color: 0x1a2f42, emissive: 0x66ccff, emissiveIntensity: 0.6 }))
+    win.position.set(5.5 + i * 2.6, cy + 4.6, 3.2)
+    g.add(win)
+  }
+  // 输电铁塔（后侧高塔，双回路横担 + 避雷针）
+  const tower = new THREE.Group()
+  const legMat = mat(0x44515f, { metalness: 0.6, roughness: 0.5 })
+  for (let i = -1; i <= 1; i += 2) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.9, 17, 0.9), legMat)
+    leg.position.set(i * 3.2, cy + 9, -5)
+    tower.add(leg)
+  }
+  for (let i = 0; i < 3; i++) {
+    const bar = boxMesh(9.2, 0.8, 0.8, legMat)
+    bar.position.set(0, cy + 5 + i * 5, -5)
+    tower.add(bar)
+  }
+  const spike = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.5, 3.4, 8), mat(0x8a94a0, { metalness: 0.6 }))
+  spike.position.set(0, cy + 17, -5)
+  tower.add(spike)
+  g.add(tower)
+  // 输电导线（铁塔顶 → 变压器顶，3 相斜拉线）
+  const fromTop = new THREE.Vector3(-4.5, cy + 12.5, -4)
+  const UP = new THREE.Vector3(0, 1, 0)
+  for (let i = -1; i <= 1; i++) {
+    const p1 = new THREE.Vector3(1.5 + i * 2.2, cy + 9, 0.5)
+    const dir = new THREE.Vector3().subVectors(p1, fromTop)
+    const len = dir.length()
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, len, 6), new THREE.MeshBasicMaterial({ color: 0x3a4a5a, transparent: true, opacity: 0.6 }))
+    w.position.copy(fromTop).addScaledVector(dir, 0.5)
+    w.quaternion.setFromUnitVectors(UP, dir.clone().normalize())
+    g.add(w)
+  }
+  // 电流脉冲（发光球沿导线流动）
+  const pulses = []
+  for (let i = -1; i <= 1; i++) {
+    const from = new THREE.Vector3(-4.5, cy + 12.5, -4)
+    const to = new THREE.Vector3(1.5 + i * 2.2, cy + 9, 0.5)
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), new THREE.MeshStandardMaterial({ color: 0x99ddff, emissive: 0x3399ff, emissiveIntensity: 2.2 }))
+    p.position.copy(from)
+    p._from = from
+    p._to = to
+    p._off = (i + 1) * 0.34
+    p._t = 0
+    g.add(p)
+    pulses.push(p)
+  }
+  g.userData.topY = cy + 18
+  g.userData._powerPulses = pulses
+  return g
+}
+
 // 空分制气造型（制氧机） —— 多座并排精馏塔 + 冷箱
 function buildTowerPlant(type, bodyMat, anim) {
   const g = new THREE.Group()
@@ -272,6 +358,7 @@ const DISPATCH = {
   cool_pump: buildConveyor,
   electrode_reg: buildConveyor,
   oxy_plant: buildTowerPlant,
+  power_supply: buildPowerStation,
 }
 
 export function buildAuxiliary(type, bodyMat, anim = {}) {

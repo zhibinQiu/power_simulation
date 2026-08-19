@@ -62,6 +62,20 @@ export const api = {
   listReports: () => jget('/reports'),
   getReport: (id) => jget('/report/' + id),
   deleteReport: (id) => fetch(BASE + '/reports/' + id, { method: 'DELETE' }).then(r => r.json()),
+  // AI 优化模型（GA / PSO / RL 在线训练）
+  optimizerContext: (model, factors = null) => jpost('/optimizers/context', { model, factors }),
+  listOptimizers: () => jget('/optimizers'),
+  getOptimizer: (id) => jget('/optimizers/' + id),
+  startOptimizer: (id) => jpost('/optimizers/' + id + '/start', {}),
+  stopOptimizer: (id) => jpost('/optimizers/' + id + '/stop', {}),
+  trainOptimizer: (id, steps = 1) => jpost('/optimizers/' + id + '/train', { steps }),
+  resetOptimizer: (id) => jpost('/optimizers/' + id + '/reset', {}),
+  setOptimizerHyper: (id, patch) => jput('/optimizers/' + id + '/hyper', patch),
+  applyOptimizer: (id) => jpost('/optimizers/' + id + '/apply', {}),
+  setOptimizerSettings: (id, patch) => jput('/optimizers/' + id + '/settings', patch),
+  archiveOptimizer: (id) => jpost('/optimizers/' + id + '/archive', {}),
+  switchOptimizerVersion: (id, versionId) => jpost('/optimizers/' + id + '/switch', { version_id: versionId }),
+  ackOptimizer: (id) => jpost('/optimizers/' + id + '/ack', {}),
 }
 
 // WebSocket 模拟遥测（url 省略则连接内置模拟 /api/ws/feed）

@@ -9,6 +9,16 @@ import { PARK } from '../data/park'
 import { OP_PARAM_KEYS, DIRECT_PARAM_KEYS, EDITABLE_PARAMS, UNIT_TYPES, CATEGORY_ORDER, TECHS } from '../data/processMeta'
 export { OP_PARAM_KEYS, DIRECT_PARAM_KEYS, EDITABLE_PARAMS, UNIT_TYPES, CATEGORY_ORDER, TECHS }
 
+// AI 优化模型：左侧「策略 → AI优化模型」目录（强化学习 / 遗传算法 / 粒子群）。
+// 随实时传感器数据持续采集，后端调度线程定时训练，模型迭代次数与最优强度逐步提升
+// （属性面板轮询后端状态实时展示「逐渐变优」过程，训练结果可一键应用到流程）。
+export const AI_MODELS = [
+  { id: 'ai::rl', name: '强化学习优化', tag: 'RL', desc: '在线策略梯度：随实时传感器数据持续更新参数策略，先探索后利用，越训越优。' },
+  { id: 'ai::ga', name: '遗传算法优化', tag: 'GA', desc: '种群进化寻优：对喷煤比、焦比、废钢比等关键工艺参数组合做选择/交叉/变异，全局搜索最低碳排配置。' },
+  { id: 'ai::pso', name: '粒子群优化', tag: 'PSO', desc: '群体智能寻优：粒子在参数空间协同飞行，快速逼近最优运行点，适合实时在线寻优。' },
+]
+export const AI_MODEL_MAP = Object.fromEntries(AI_MODELS.map((m) => [m.id, m]))
+
 let _idc = 0
 const uid = (p) => `${p}_${Date.now().toString(36)}${(_idc++).toString(36)}`
 // 数值展示：保留 2 位小数并去掉末尾多余的 0
@@ -168,6 +178,7 @@ export const useSimStore = defineStore('sim', {
     rightOpen: true,          // 右侧栏（检视器）是否展开
     bottomOpen: true,
     fullscreenOn: false,      // 全屏模式：隐藏左/右/底栏，仅保留 3D 场景
+    dataViewOn: false,        // 数据视图：中间 3D 场景替换为传感器历史数据表格（顶栏「视图 → 数据视图」切换）
     inspectorView: 'auto',    // 右侧检视器显式视图：'auto'（按选中推导）| 'park' 园区构成 | 'materials' 原料库 | 'strategy' 减排策略 | 'report' 报告面板         // 底栏（命令行窗口 + 状态条）是否展开
     reportPayload: null,      // 「导出报告」请求载荷（baseline/strategy/ops/...），供右侧报告面板消费
     selectedStrategyId: null, // 左侧策略库选中的策略
@@ -176,6 +187,11 @@ export const useSimStore = defineStore('sim', {
     deviceSetpoints: {},      // 可调设备设定值覆盖：devId -> number（视图态/编辑态统一存储，驱动实时读数与碳引擎折算）
     deviceExtraSetpoints: {}, // 可调设备附加可调项（如鼓风机鼓风湿度）：devId -> { key: number }
     deviceMeta: {},           // 设备元数据（后端 /api/devices/history 的 meta）
+    // AI 优化模型（GA/PSO/RL 在线训练）：后端状态缓存 id -> state，轮询刷新展示「逐渐变优」
+    optimizers: {},
+    optimizerPolling: false,  // 是否已在轮询（模块级 timer 防重）
+    optimizerAutoApplying: {},       // id -> bool：自动化控制下发中（防并发重复下发）
+    optimizerSeenReminders: {},      // id:reminderId -> true：手动调优提醒去重（仅提醒一次）
     viewResetNonce: 0,   // 触发中间 3D 场景重置视角
     patrolOn: false,      // 虚拟巡视：小机器人沿工艺旁地面巡视完整流程
     // 工艺级策略管理：每个工序可绑定独立策略（自然语言 → 解析 → 测试 → 保存 → 绑定）
@@ -351,6 +367,10 @@ export const useSimStore = defineStore('sim', {
         const p = s.presets[i]
         if (p) return { id: s.selectedStrategyId, name: p.name || '未命名策略', description: p.text || '', raw_text: p.text || '', ops: [], applied: !!p.applied, source: 'preset' }
       }
+      if (typeof s.selectedStrategyId === 'string' && s.selectedStrategyId.startsWith('ai::')) {
+        const m = AI_MODEL_MAP[s.selectedStrategyId]
+        if (m) return { id: s.selectedStrategyId, name: m.name, description: m.desc, source: 'ai' }
+      }
       return null
     },
     // 选中的物料库条目（来自 MATERIAL_MAP）
@@ -456,6 +476,9 @@ export const useSimStore = defineStore('sim', {
         await this.loadStrategies()
         this.ready = true
         this._startFeed()
+        // AI 优化模型：同步训练上下文并轮询状态（后台定时训练由后端调度，前端展示「逐渐变优」）
+        this.syncOptimizerContext().then(() => this.refreshOptimizers())
+        this.startOptimizerPolling()
       } catch (e) {
         this.toast = '初始化失败：' + e.message
       }
@@ -552,6 +575,178 @@ export const useSimStore = defineStore('sim', {
         this._simLog('strategy', '清除策略', '恢复当前参数下的基线结果')
       }
       this.sceneRev++   // 切换回基线后，孪生平台同步恢复
+    },
+    // ==================== AI 优化模型（GA / PSO / RL 在线训练） ====================
+    // 把当前流程（含设备桥接参数）同步为后端训练上下文；流程实质变化时后端自动重建训练任务。
+    async syncOptimizerContext() {
+      try {
+        await api.optimizerContext(this._applyDeviceOpParams(this.model), this.factors)
+      } catch (e) { /* 后端未就绪时静默，后续操作会再同步 */ }
+    },
+    // 拉取全部优化模型训练状态（轮询用，展示迭代/曲线/最优参数随实时数据逐渐变优）
+    async refreshOptimizers() {
+      try {
+        const r = await api.listOptimizers()
+        if (!r || !Array.isArray(r.models)) return
+        const map = {}
+        for (const m of r.models) map[m.id] = m
+        this.optimizers = map
+        // ---- 控制模式副作用：自动化控制自动下发 / 手动模式系统提醒 ----
+        for (const m of r.models) {
+          if (m.auto_control && m.pending_auto_apply && !this.optimizerAutoApplying[m.id]) {
+            this._autoApplyOptimizer(m.id)   // 后台异步下发，不阻塞轮询
+          } else if (!m.auto_control && m.reminder && m.reminder.id) {
+            const rk = `${m.id}:${m.reminder.id}`
+            if (!this.optimizerSeenReminders[rk]) {
+              this.optimizerSeenReminders = { ...this.optimizerSeenReminders, [rk]: true }
+              this.toast = `「${(AI_MODEL_MAP[m.id] || {}).name || '优化模型'}」训练取得新进展：最优强度 ${m.reminder.best_fitness} kgCO₂/t（较上版提升 ${m.reminder.improvement_pct}%）。已生成调优提醒，可在属性面板手动应用优化参数`
+            }
+          }
+        }
+      } catch (e) { /* 后端未就绪时静默，下轮重试 */ }
+    },
+    // 自动化控制：模型变优后自动把新版本参数下发到可调设备（一次轮询仅触发一次）
+    async _autoApplyOptimizer(id) {
+      if (this.optimizerAutoApplying[id]) return
+      this.optimizerAutoApplying = { ...this.optimizerAutoApplying, [id]: true }
+      try {
+        const r = await api.applyOptimizer(id)
+        if (r && r.model) {
+          this.model = r.model
+          this.baseline = r.sim
+          this.clearExperiment()
+          this.parsed = null
+          this.toast = `AI 自动化控制：已按「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」最新版本自动下发参数到可调设备`
+          this.pushCmd(`AI 自动化控制已下发：应用「${r.name || id}」版本参数（最优 ${(r.best_fitness ?? 0).toFixed(2)} kgCO₂/t，提升 ${r.improvement_pct ?? 0}%）`, 'sim')
+          this._pushModelToFeed()
+          await this._runRefresh()
+        }
+      } catch (e) {
+        this.toast = 'AI 自动化控制下发失败：' + e.message
+      }
+      try { await api.ackOptimizer(id) } catch (e) { /* 忽略确认失败 */ }
+      this.optimizerAutoApplying = { ...this.optimizerAutoApplying, [id]: false }
+      await this.refreshOptimizers()
+    },
+    startOptimizerPolling(ms = 3000) {
+      if (this.optimizerPolling) return
+      this.optimizerPolling = true
+      this._optTimer = setInterval(() => this.refreshOptimizers(), ms)
+    },
+    stopOptimizerPolling() {
+      if (this._optTimer) { clearInterval(this._optTimer); this._optTimer = null }
+      this.optimizerPolling = false
+    },
+    async startOptimizer(id) {
+      await this.syncOptimizerContext()   // 训练对象始终是最新流程
+      try {
+        const r = await api.startOptimizer(id)
+        if (r) this.toast = `已开启「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」自动训练：后台将随实时传感器数据定时迭代`
+      } catch (e) {
+        this.toast = '开启自动训练失败：' + e.message
+      }
+      await this.refreshOptimizers()
+    },
+    async stopOptimizer(id) {
+      try {
+        const r = await api.stopOptimizer(id)
+        if (r) this.toast = `已暂停「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」自动训练`
+      } catch (e) {
+        this.toast = '暂停训练失败：' + e.message
+      }
+      await this.refreshOptimizers()
+    },
+    async trainOptimizer(id, steps = 1) {
+      try {
+        await api.trainOptimizer(id, steps)
+      } catch (e) {
+        this.toast = '训练失败：' + e.message
+      }
+      await this.refreshOptimizers()
+    },
+    async resetOptimizer(id) {
+      await this.syncOptimizerContext()
+      try {
+        const r = await api.resetOptimizer(id)
+        if (r) this.toast = `「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」已重置`
+      } catch (e) {
+        this.toast = '重置失败：' + e.message
+      }
+      await this.refreshOptimizers()
+    },
+    async setOptimizerHyper(id, patch) {
+      try {
+        const r = await api.setOptimizerHyper(id, patch)
+        if (r) this.toast = '算法超参数已保存，下一轮训练生效'
+      } catch (e) {
+        this.toast = '保存超参数失败：' + e.message
+      }
+      await this.refreshOptimizers()
+    },
+    // 应用最优参数：后端返回应用后的流程模型 + 仿真，替换当前模型并重算（仿照 applyStrategy）
+    async applyOptimizer(id) {
+      await this.syncOptimizerContext()   // 确保训练上下文与当前流程一致
+      let r = null
+      try {
+        r = await api.applyOptimizer(id)
+      } catch (e) {
+        this.toast = '应用最优参数失败：' + e.message
+        return
+      }
+      this.model = r.model
+      this.baseline = r.sim
+      this.clearExperiment()
+      this.parsed = null
+      this.toast = `已将「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」最优参数应用到流程`
+      this.pushCmd(`已应用 AI 优化模型「${r.name || id}」最优参数：强度 ${(r.best_fitness ?? 0).toFixed(2)} kgCO₂/t，较初始 ${r.improvement_pct ?? 0}%`, 'sim')
+      this._pushModelToFeed()
+      await this._runRefresh()
+      await this.refreshOptimizers()
+    },
+    // 保存控制与自训练设置：{ auto_control?: bool, schedule?: { interval?, window? } }
+    async setOptimizerSettings(id, patch) {
+      try {
+        const r = await api.setOptimizerSettings(id, patch)
+        if (r && typeof r.auto_control === 'boolean') {
+          this.toast = r.auto_control
+            ? `已开启「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」自动化控制：模型变优后自动下发参数到可调设备`
+            : `已关闭「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」自动化控制：改为系统提醒手动调优`
+        }
+      } catch (e) {
+        this.toast = '保存控制设置失败：' + e.message
+      }
+      await this.refreshOptimizers()
+    },
+    // 把当前最优参数保存为模型版本（仅优于当前版本才替换生效）
+    async archiveOptimizer(id) {
+      let r = null
+      try {
+        r = await api.archiveOptimizer(id)
+      } catch (e) {
+        this.toast = '保存版本失败：' + e.message
+        return
+      }
+      this.toast = r.promoted
+        ? '已保存为新版本并替换为当前版本（历史版本仍保留）'
+        : '已保存为候选版本（未超过当前版本，未替换）'
+      await this.refreshOptimizers()
+    },
+    // 在历史模型版本间切换（旧版本保留，可随时切回）
+    async switchOptimizerVersion(id, versionId) {
+      try {
+        await api.switchOptimizerVersion(id, versionId)
+        this.toast = '已切换模型版本'
+      } catch (e) {
+        this.toast = '切换版本失败：' + e.message
+      }
+      await this.refreshOptimizers()
+    },
+    // 确认提醒：清除手动调优提醒 / 自动控制待下发标记
+    async ackOptimizer(id) {
+      try {
+        await api.ackOptimizer(id)
+      } catch (e) { /* 忽略 */ }
+      await this.refreshOptimizers()
     },
     // 仿真模式变更记录：供右上角「仿真前后对比」窗口左侧展示本次改了哪些内容。
     // mergeKey：同一变更项（同设备/参数/策略）反复调整时合并为一条，只刷新为「仿真前值 → 当前值」。
@@ -750,6 +945,10 @@ export const useSimStore = defineStore('sim', {
     toggleLeft() { this.leftOpen = !this.leftOpen },
     toggleRight() { this.rightOpen = !this.rightOpen },
     toggleBottom() { this.bottomOpen = !this.bottomOpen },
+    // 数据视图：中间 3D 场景 ↔ 传感器历史数据表格（顶栏「视图 → 数据视图」切换）
+    toggleDataView() {
+      this.dataViewOn = !this.dataViewOn
+    },
     toggleFullscreen() {
       this.fullscreenOn = !this.fullscreenOn
       if (this.fullscreenOn) {

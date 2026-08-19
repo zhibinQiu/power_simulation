@@ -184,7 +184,7 @@
       >
         <p class="sec-desc">展示与该工序实际连线绑定的工辅设备（鼓风机/热风炉等），由编排连线动态推导。</p>
         <div class="card list-card" v-if="relatedDevices.length">
-          <div v-for="d in relatedDevices" :key="d.type" class="lrow" :class="{ click: !!d.devId }" @click="d.devId && store.openDeviceDetail(d.devId)">
+          <div v-for="d in relatedDevices" :key="d.type" class="lrow" :class="{ click: !!(d.devId || d.groupId) }" @click="d.groupId ? store.selectFlowGroup(d.groupId) : (d.devId && store.openDeviceDetail(d.devId))">
             <div class="l-stack">
               <span class="l-tt">{{ d.label }}</span>
               <span class="l-sub">{{ d.measures }}</span>
@@ -380,7 +380,24 @@ const adjustable = computed(() => {
 const relatedDevices = computed(() => {
   const u = unit.value
   if (!u) return []
-  return store.linkedAuxOfUnit(u.id).map((dt) => buildDevRow(dt, u))
+  const scheme = store.scheme
+  return store.linkedAuxOfUnit(u.id).map((dt) => {
+    const d = buildDevRow(dt, u)
+    // 同类型工辅在编排中聚为小组（多台）时，显示为「××机组」并点击进入小组属性（与直接点击场景中的工辅组保持一致）
+    const n = ((scheme && scheme.nodes) || []).find((x) => x.type === dt)
+    if (n && n.groupId) {
+      const g = ((scheme && scheme.groups) || []).find((x) => x.id === n.groupId)
+      if (g) {
+        return {
+          ...d,
+          label: (DEVICE_MAP[dt] ? DEVICE_MAP[dt].label : dt) + '组',
+          measures: g.members.length + ' 台设备 · ' + (d.measures || ''),
+          groupId: g.id,
+        }
+      }
+    }
+    return d
+  })
 })
 
 const maxAbs = computed(() => {

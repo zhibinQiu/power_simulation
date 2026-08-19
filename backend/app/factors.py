@@ -24,7 +24,7 @@ def _clamp(v, lo, hi):
 
 # 能耗换算常数（节能减碳主题：先能后碳）
 # 燃料单位热值含碳量（tC/GJ），用于由燃烧碳反推燃料低位热值 GJ
-CC_FUEL = {"coke": 0.0295, "coal": 0.0262, "ng": 0.0153}
+CC_FUEL = {"coke": 0.0295, "coal": 0.0262, "ng": 0.0153, "biomass": 0.0275}
 GJ_PER_MWH = 3.6                # 1 MWh = 3.6 GJ
 KGCE_PER_GJ = 34.12             # 1 GJ = 34.12 kgce（标准煤）
 
@@ -61,8 +61,8 @@ DEFAULT_FACTORS: Dict[str, object] = {
 }
 
 # 燃料中文标签（桑基图节点），固定不随配置变化
-FUEL_LABEL = {"coke": "焦炭碳", "coal": "煤碳", "ng": "天然气碳", "elec": "外购电碳",
-              "steel_c": "铁水碳", "electrode": "电极碳", "carburizer": "增碳剂碳"}
+FUEL_LABEL = {"coke": "焦炭碳", "coal": "煤碳", "ng": "天然气碳", "biomass": "生物质碳",
+              "elec": "外购电碳", "steel_c": "钢铁料碳", "electrode": "电极碳", "carburizer": "增碳剂碳"}
 
 
 def default_factors() -> Dict[str, object]:
@@ -111,7 +111,7 @@ def _energy_of(res: Dict) -> Dict[str, float]:
 
     - 电耗(MWh/h)：台账中所有用量单位为 MWh/h 的条目求和（外购电/电解制氢电耗等）。
     - 燃料能耗(GJ/h)：由各类燃料燃烧碳（tC/h）÷ 该燃料单位热值含碳量反推低位热值之和。
-      对 coke_oven 等以煤为焦原料的工序为近似（按焦炭 CC 折算），教学/演示量级合理。
+      coke_oven 以「炼焦煤」碳流反推（按煤 CC 折算），与碳素流一致。
     - 综合能耗(GJ/h) = 燃料能耗 + 电耗×3.6。
     - 单位产品综合能耗(kgce/t) = 综合能耗×34.12 / 主产物产量。
     """

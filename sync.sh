@@ -24,7 +24,7 @@ git add .
 if git diff --cached --quiet; then
   echo "    无本地改动，跳过提交"
 else
-  git commit -q -m "sync: $(date '+%Y-%m-%d %H:%M') 清理无效配置文件，更新技术文档/操作手册"
+  git commit -q -m " 修复若干bug,优化工艺/小组标签显示样式，增加传感器数据系统"
   echo "    已提交"
 fi
 

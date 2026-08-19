@@ -8,10 +8,11 @@
     <!-- 左侧栏：园区资产（工艺 / 设备 / 原料 / 策略） -->
     <LeftSidebar @rsz="startLeftResize" />
 
-    <!-- 中间：仿真数字孪生（仿真态） / 流程编排画布（编辑态） -->
+    <!-- 中间：仿真数字孪生（仿真态） / 流程编排画布（编辑态） / 数据视图（传感器历史数据表格） -->
     <!-- SceneViewer 始终挂载，不销毁 WebGL 上下文，大幅提升切换速度并避免重建空白 -->
     <main class="stage">
-      <SceneViewer v-show="!store.editMode" />
+      <SceneViewer v-show="!store.editMode && !store.dataViewOn" />
+      <DataView v-if="store.dataViewOn && !store.editMode" />
       <FlowEditor v-if="store.editMode" />
     </main>
 
@@ -47,6 +48,7 @@ import LeftSidebar from './components/LeftSidebar.vue'
 import ActivityBar from './components/ActivityBar.vue'
 import RightInspector from './components/RightInspector.vue'
 import SceneViewer from './components/SceneViewer.vue'
+import DataView from './components/DataView.vue'
 import FlowEditor from './components/FlowEditor.vue'
 import { usePanelSizes } from './composables/usePanelSizes'
 import { useGlobalShortcuts } from './composables/useGlobalShortcuts'
@@ -128,7 +130,6 @@ function addGroupBtn() { ensureEdit(); const id = store.addFlowGroup(); pushCmd(
 function duplicateGroupBtn() { ensureEdit(); const id = store.duplicateFlowGroup(store.selectedGroupId); if (id) pushCmd('已复制小组。', 'out') }
 function flowZoomBtn(f) { store.flowZoom(f) }
 function flowFit() { store.flowZoomFit() }
-function onScenario(e) { store.setScenario(e.target.value); pushCmd(`切换仿真情景 → ${store.scenarios.find((s) => s.id === store.scenario)?.label || store.scenario}。`, 'cmd') }
 function onEnvChange(e) { store.setEnvMode(e.target.value); pushCmd(`外围景观 → ${store.envModes.find((m) => m.id === store.envMode)?.label || store.envMode}。`, 'cmd') }
 // 导出 AI 分析报告：基线数据分析 + 使用的策略 + 策略前后对比，由后端大模型生成 Markdown
 function onExport() {
@@ -177,11 +178,11 @@ const menus = [
     } },
   ] },
   { id: 'view', label: '视图', items: [
-    { sub: true, label: '情景', items: () => store.scenarios.map(s => ({ id: s.id, label: s.label, checked: s.id === store.scenario, run: () => onScenario({ target: { value: s.id } }) })) },
-    { sub: true, label: '环境', items: () => store.envModes.map(e => ({ id: e.id, label: e.label, checked: e.id === store.envMode, run: () => onEnvChange({ target: { value: e.id } }) })) },
+    { sub: true, label: '数字孪生', items: () => [
+      { sub: true, label: '环境', items: () => store.envModes.map(e => ({ id: e.id, label: e.label, checked: e.id === store.envMode, run: () => onEnvChange({ target: { value: e.id } }) })) },
+    ] },
     { sep: true },
-    { label: '刷新数据', act: onRefresh },
-    { label: '自动布局工序', hide: () => !store.editMode, act: onAutoLayout },
+    { label: '数据', toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
   ] },
   { id: 'edit', label: '编辑', items: [
     { label: store.editMode ? '完成编排' : '进入流程编排', act: onToggleEdit },
@@ -195,7 +196,6 @@ const menus = [
     { label: '自动布局', hide: () => !store.editMode, act: () => autoLayoutScheme() },
     { sep: true, hide: () => !store.editMode },
     { label: '新建小组', hide: () => !store.editMode, act: () => addGroupBtn() },
-    { label: '进入子编排', hide: () => !store.editMode, disabled: () => !store.selectedGroupId, act: () => store.enterGroup(store.selectedGroupId) },
     { label: '复制小组', hide: () => !store.editMode, disabled: () => !store.selectedGroupId, act: () => duplicateGroupBtn() },
     { label: '删除小组', hide: () => !store.editMode, disabled: () => !store.selectedGroupId, act: () => store.removeFlowGroup(store.selectedGroupId) },
     { sep: true, hide: () => !store.editMode },

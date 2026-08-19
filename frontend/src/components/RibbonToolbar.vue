@@ -16,14 +16,14 @@
         <template v-if="!store.editMode">
           <span class="rdiv"></span>
           <div class="rbtns">
+            <button class="rbtn" @click="actions.onResetView()" title="刷新视角：重置为园区俯瞰">
+              <Icon name="target"/><span>刷新视角</span>
+            </button>
             <button class="rbtn" :class="{ on: store.autoRotate }" @click="actions.toggleAuto()" title="相机自动环绕旋转">
               <Icon name="rotate"/><span>自动环视</span>
             </button>
             <button class="rbtn" :class="{ on: store.patrolOn }" @click="actions.togglePatrol()" title="虚拟巡视">
               <Icon name="patrol"/><span>虚拟巡视</span>
-            </button>
-            <button class="rbtn" @click="actions.onResetView()" title="刷新视角：重置为园区俯瞰">
-              <Icon name="target"/><span>刷新视角</span>
             </button>
             <button class="rbtn" :class="{ on: store.fullscreenOn }" @click="store.toggleFullscreen()" title="全屏显示">
               <Icon name="fullscreen"/><span>{{ store.fullscreenOn ? '退出全屏' : '全屏' }}</span>

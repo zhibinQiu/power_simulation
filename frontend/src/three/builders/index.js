@@ -63,4 +63,5 @@ export const builderMap = {
   aux_boiler: (m, a) => buildAuxiliary('aux_boiler', m, a),
   oxy_plant: (m, a) => buildAuxiliary('oxy_plant', m, a),
   oxy_supply: (m, a) => buildAuxiliary('oxy_plant', m, a), // 全厂供氧系统：复用空分制氧塔造型（规模更大）
+  power_supply: (m, a) => buildAuxiliary('power_supply', m, a), // 全厂供电系统：主变电站造型
 }

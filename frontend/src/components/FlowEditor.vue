@@ -634,7 +634,6 @@ function duplicateGroup(g) {
 function onGroupContext(e, g) {
   e.preventDefault()
   const items = [
-    { label: '进入子编排', icon: 'folder-open', action: () => store.enterGroup(g.id) },
     { label: '选中 / 聚焦小组', icon: 'target', action: () => store.selectFlowGroup(g.id) },
     { sep: true },
     { label: '重命名', icon: 'pencil', accel: 'F2', action: () => startGroupRename(g) },

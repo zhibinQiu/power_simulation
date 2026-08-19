@@ -1,6 +1,6 @@
 <template>
-  <div class="panel">
-    <svg :viewBox="`0 0 ${W} ${vbH}`" width="100%" style="display:block">
+  <div ref="el" class="panel">
+    <svg :viewBox="`0 0 ${W} ${vbH}`" style="display:block; width:100%">
       <!-- links -->
       <path v-for="(l, i) in paths" :key="'p' + i" :d="l.d" :fill="l.color" opacity="0.45" />
       <!-- nodes -->
@@ -17,12 +17,23 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useSimStore } from '../stores/sim'
 
 const store = useSimStore()
-const W = 372, H = 340, NODE_W = 14
-const COL_X = [12, 172, 330]
+const H = 340, NODE_W = 14
+
+// 画布宽度跟随容器（右侧属性面板可拖拽调宽）：ResizeObserver 实时同步，避免横向滚动条
+const el = ref(null)
+const W = ref(560)
+let ro = null
+onMounted(() => {
+  ro = new ResizeObserver(() => {
+    if (el.value) W.value = Math.max(300, Math.round(el.value.clientWidth))
+  })
+  if (el.value) ro.observe(el.value)
+})
+onBeforeUnmount(() => { if (ro) ro.disconnect() })
 
 function hcolor(h) {
   if (h == null) return '#8b95a1'
@@ -37,52 +48,62 @@ const layout = computed(() => {
   const sk = store.resultForView && store.resultForView.sankey
   if (!sk || !sk.nodes || !sk.nodes.length) return null
   const nodes = sk.nodes, links = sk.links
-  const cols = { 0: [], 1: [], 2: [] }
+  // 多列布局：列由后端 col 决定（0=源，1..=工序，小数=中间产品，末列=去向）
+  const colKeys = [...new Set(nodes.map((n) => n.col))].sort((a, b) => a - b)
+  const cols = {}
+  colKeys.forEach((c) => (cols[c] = []))
   nodes.forEach((n) => cols[n.col].push(n))
+  const lastCol = colKeys[colKeys.length - 1]
   const outSum = {}, inSum = {}
   links.forEach((l) => { outSum[l.source] = (outSum[l.source] || 0) + l.value; inSum[l.target] = (inSum[l.target] || 0) + l.value })
   const val = {}
   nodes.forEach((n) => {
-    if (n.col === 0) val[n.id] = outSum[n.id] || 0
-    else if (n.col === 2) val[n.id] = inSum[n.id] || 0
+    if (n.col === colKeys[0]) val[n.id] = outSum[n.id] || 0
+    else if (n.col === lastCol) val[n.id] = inSum[n.id] || 0
     else val[n.id] = Math.max(outSum[n.id] || 0, inSum[n.id] || 0)
   })
   const top = 16, avail = H - top - 12
-  const colTotal = { 0: 0, 1: 0, 2: 0 }
+  const colTotal = {}
+  colKeys.forEach((c) => (colTotal[c] = 0))
   Object.keys(cols).forEach((c) => cols[c].forEach((n) => (colTotal[c] += val[n.id])))
-  const maxTotal = Math.max(colTotal[0], colTotal[1], colTotal[2], 1)
+  const maxTotal = Math.max(...Object.values(colTotal), 1)
   const gap = 10
   const scale = (avail - gap * 8) / maxTotal
+  const span = W.value - 24 - 24 - NODE_W
+  const colX = {}
+  colKeys.forEach((c, i) => (colX[c] = 24 + (colKeys.length === 1 ? 0 : (span * i) / (colKeys.length - 1))))
   const pos = {}
   let bottom = 0
-  Object.keys(cols).forEach((c) => {
+  colKeys.forEach((c) => {
     const arr = cols[c]
     const used = arr.reduce((s, n) => s + val[n.id], 0) * scale + gap * (arr.length - 1)
     let y = top + Math.max(0, (avail - used) / 2)
     arr.forEach((n) => {
       const h = Math.max(5, val[n.id] * scale)
-      pos[n.id] = { x: COL_X[c], y, h, val: val[n.id] }
+      pos[n.id] = { x: colX[c], y, h, val: val[n.id] }
       y += h + gap
       bottom = Math.max(bottom, y - gap)
     })
   })
   const vbH = Math.ceil(bottom + 12)
-  return { nodes, links, pos, val, scale, vbH }
+  return { nodes, links, pos, val, scale, vbH, lastCol }
 })
 
 const vbH = computed(() => (layout.value ? layout.value.vbH : H))
 
 const drawnNodes = computed(() => {
   if (!layout.value) return []
+  const lastCol = layout.value.lastCol
   return layout.value.nodes.map((n) => {
     const p = layout.value.pos[n.id]
-    const isProcess = n.col === 1
+    const isProcess = n.kind === 'process'
     const res = store.resultForView && store.resultForView.units && store.resultForView.units.find((u) => 'u:' + u.id === n.id)
     const color = n.kind === 'sink'
-      ? (n.id === 'co2' ? '#D14B4B' : n.id === 'steel' ? '#2E9E63' : '#0072BD')
-      : isProcess ? hcolor(res ? res.heat : 0.3) : '#ED7D31'
-    const anchor = n.col === 2 ? 'end' : 'start'
-    const labelX = n.col === 2 ? p.x - 4 : p.x + NODE_W + 4
+      ? (n.id === 'co2' ? '#D14B4B' : n.id === 'steel' ? '#2E9E63' : n.id === 'slag' ? '#7B5FA6' : '#0072BD')
+      : isProcess ? hcolor(res ? res.heat : 0.3)
+        : n.kind === 'mid' ? '#2CA6A4' : '#ED7D31'
+    const anchor = n.col === lastCol ? 'end' : 'start'
+    const labelX = n.col === lastCol ? p.x - 4 : p.x + NODE_W + 4
     return { ...n, ...p, color, anchor, labelX }
   })
 })
@@ -102,8 +123,8 @@ const paths = computed(() => {
     const x0 = s.x + NODE_W, x1 = t.x
     const mx = (x0 + x1) / 2
     const color = t.kind === 'sink'
-      ? (t.id === 'co2' ? '#D14B4B' : t.id === 'steel' ? '#2E9E63' : '#0072BD')
-      : (s.kind === 'fuel' ? '#ED7D31' : '#8b95a1')
+      ? (t.id === 'co2' ? '#D14B4B' : t.id === 'steel' ? '#2E9E63' : t.id === 'slag' ? '#7B5FA6' : '#0072BD')
+      : (s.kind === 'fuel' ? '#ED7D31' : (s.kind === 'mid' || t.kind === 'mid') ? '#2CA6A4' : '#8b95a1')
     const d = `M ${x0} ${y0} C ${mx} ${y0}, ${mx} ${y1}, ${x1} ${y1} L ${x1} ${y1 + w} C ${mx} ${y1 + w}, ${mx} ${y0 + w}, ${x0} ${y0 + w} Z`
     out.push({ d, color })
   })

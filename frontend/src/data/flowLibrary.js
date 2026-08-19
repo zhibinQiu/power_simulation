@@ -1039,27 +1039,14 @@ const SCHEME_AUX = {
     ['oxy_supply', 'blower', 0],
     ['oxy_supply', 'blower', 1],
     ['oxy_supply', 'blower', 2],
-    // 全厂供电系统：汇集外购电与自发电，向主要用电工序供给并承载绿电抵扣
-    ['power_supply', 'blast_furnace', 0],
-    ['power_supply', 'bof', 0],
-    ['power_supply', 'ladle_furnace', 0],
-    ['power_supply', 'rh_vacuum', 0],
-    ['power_supply', 'caster', 0],
-    ['power_supply', 'rolling_mill', 0],
   ],
   short: [
-    // 短流程以废钢 + 直接还原铁(DRI)为双原料，细化上游 DRI 竖炉(Midrex)供热/供气/供电
+    // 短流程以废钢 + 直接还原铁(DRI)为双原料，细化上游 DRI 竖炉(Midrex)供热/供气
     ['dri_midrex', 'eaf', 0],
     ['oxy_supply', 'eaf', 0],
-    ['power_supply', 'eaf', 0],
-    ['power_supply', 'dri_midrex', 0],
     ['electrode_reg', 'eaf', 0],
     ['oxy_supply', 'ladle_furnace', 0],
-    ['power_supply', 'ladle_furnace', 0],
     ['oxy_supply', 'rh_vacuum', 0],
-    ['power_supply', 'rh_vacuum', 0],
-    ['power_supply', 'caster', 0],
-    ['power_supply', 'rolling_mill', 0],
   ],
 }
 export function buildScheme(route) {

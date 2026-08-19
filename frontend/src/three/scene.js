@@ -129,6 +129,7 @@ const UNIT_META = {
   waste_heat: { label: '余热回收', shape: 'utility' },
   ccs: { label: '碳捕集', shape: 'utility' },
   oxy_supply: { label: '供氧系统', shape: 'utility' },
+  power_supply: { label: '供电系统', shape: 'utility' },
 }
 
 const SCALE = 1 // 世界单位 = 米（示意）
@@ -159,7 +160,10 @@ function boxMesh(w, h, d, material) {
 // 画布按「逻辑尺寸 × LABEL_SS」超采样绘制，再由 sRGB 纹理下采样呈现，保证文字锐利。
 const LABEL_W = 165             // 逻辑宽（绘制坐标系）
 const LABEL_H = 46              // 逻辑高（单行小铭牌）
-const LABEL_SS = 3              // 超采样倍率（清晰度关键）
+const UNIT_LABEL_H = 64         // 工艺标签逻辑高（两行：工序名 + 实时能耗/碳排）
+const LABEL_SS = 4              // 超采样倍率（清晰度关键：4x 保证远处放大 5.2x 后文字仍锐利）
+const LABEL_PARENT_REF = 4.6    // 工艺标签世界尺寸基准：工艺模型父级缩放代表值，所有标签以此为统一大小
+const LABEL_AUX_GAIN = 0.72     // 工辅/小组标签相对工艺标签的小一号系数（0.85→0.72 再小一号）
 const LABEL_SCALE = 6.5         // 世界坐标下的铭牌宽度：工序标签与管道/轨道连接标签统一尺寸
 const LABEL_ASPECT = LABEL_H / LABEL_W
 const LABEL_FOCUS_GAIN = 1.2    // 聚焦时的放大倍率
@@ -174,8 +178,9 @@ function _fmtMetric(v) {
 // 标签底板：light=true 时绘制 VS Code 浅色扁平卡片（白底/浅灰边框/聚焦蓝描边）；
 // 否则绘制深色毛玻璃铭牌（半透明面板、亚光边框、聚焦时蓝色辉光）。
 // 简约风：无名称左侧竖线、无选中态上方横线，仅以边框/描边区分选中。
-function _drawLabelCard(ctx, focused, role, slim, main, light) {
-  const W = LABEL_W, H = LABEL_H
+// h 为可选卡片高度（工艺标签为两行 UNIT_LABEL_H，其余保持单行 LABEL_H）
+function _drawLabelCard(ctx, focused, role, slim, main, light, h = LABEL_H) {
+  const W = LABEL_W, H = h
   const r = 9
 
   ctx.save()
@@ -2293,8 +2298,9 @@ export class TwinScene {
           for (const [d, ids] of levelNodes) {
             ids.forEach((id, idx) => {
               const cz = sideV * (d + 1) * ZSTEP
-              // 根节点(d=0)紧贴主干正前/正后；更深层沿该侧水平方向铺开，避免同层兄弟重叠
-              const cx = d === 0 ? px : px + sideH * (colCursor + idx) * COLSTEP3
+              // 根节点(d=0)紧贴主干正前/正后；不同根子树沿该侧水平方向错开（colCursor 留一列间隔），
+              // 更深层同层兄弟同样沿 X 铺开 —— 保证同一侧多个根/兄弟互不重叠
+              const cx = px + sideH * (colCursor + idx) * COLSTEP3
               const c = nodeById.get(id)
               if (c.members) {
                 // 全辅组：组中心位于分支落位点（Z=cz，水平沿 X 错开），成员在 X-Z 平面网格展开
@@ -2451,7 +2457,7 @@ export class TwinScene {
       caster: 4.6, slab_caster: 4.6, rolling_mill: 4.6,
       sinter_plant: 4.6, pelletizing: 4.6, coke_oven: 4.6,
       hot_metal_pretreat: 4.2, ingot_casting: 4.2,
-      reheating_furnace: 4.2, gas_power: 3.8, waste_heat: 3.5, ccs: 3.5, oxy_supply: 3.8
+      reheating_furnace: 4.2, gas_power: 3.8, waste_heat: 3.5, ccs: 3.5, oxy_supply: 3.8, power_supply: 3.8
     }
     // 进入小组子场景后，成员模型大小与普通工艺保持一致（不再整体放大 GROUP_SCENE_GAIN 倍）
     const gsGain = 1
@@ -2484,7 +2490,7 @@ export class TwinScene {
       caster: 1.45, slab_caster: 1.45, rolling_mill: 1.45,
       sinter_plant: 1.4, pelletizing: 1.4, coke_oven: 1.4,
       hot_metal_pretreat: 1.5, ingot_casting: 1.45,
-      reheating_furnace: 1.5, gas_power: 1.3, waste_heat: 1.3, ccs: 1.3, oxy_supply: 1.3
+      reheating_furnace: 1.5, gas_power: 1.3, waste_heat: 1.3, ccs: 1.3, oxy_supply: 1.3, power_supply: 1.3
     }
     const yStretch = Y_STRETCH[unit.type] || 1.0
     if (yStretch !== 1.0) {
@@ -2651,15 +2657,16 @@ export class TwinScene {
 
     // 唯一标签（角色 + 名称 + 先能后碳；碳数字按其排放占比着色）
     const label = this._makeLabel(unit.name, res ? res.co2_total : null, res ? res.energy_total : null, role, co2Css)
-    // 主工艺标签略高于工辅，减少全景俯瞰时的遮挡；main/slim 标志用于层级控制
+    // 工艺/工辅标签样式统一、大小一致：同一两行卡片布局、同一悬浮位置，main 仅标记主工艺层级
     const isMain = unit.route !== 'aux' && unit.route !== 'util'
     // 工序标签悬浮在设备顶部正上方（与管道/轨道连接标签的悬浮位置形式一致）
     label.position.set(0, (body.userData.topY || 0) + 5.5, 0)
     label.userData.unitId = unit.id
     label.userData.kind = 'unit'   // 可由 3D 标签直接点击聚焦（替代点击工艺本体）
     label.userData.labelObj.main = isMain
-    label.userData.labelObj.slim = isMain
-    if (isMain) { label.userData.labelObj._key = null; this._drawLabel(label.userData.labelObj) }
+    // 创建时统一绘制（工艺/工辅一致），_key 置空以让 main 标志生效
+    label.userData.labelObj._key = null
+    this._drawLabel(label.userData.labelObj)
     group.add(label)
 
     // 选中高亮环：悬浮式圆环替代原来的地面光斑选中标记
@@ -2788,11 +2795,11 @@ export class TwinScene {
     return { group, ...group.userData }
   }
 
-  // 小组标签：组名 + 「×N」倍数 + 汇总能耗/碳排（与普通工序标签风格一致，仅多一个倍数标识）
+  // 小组标签：组名 + 「×N」倍数 + 汇总能耗/碳排（尺寸与普通工艺标签一致，两行布局）
   _makeGroupLabel(name, count, co2, energy) {
     const canvas = document.createElement('canvas')
     canvas.width = LABEL_W * LABEL_SS
-    canvas.height = LABEL_H * LABEL_SS
+    canvas.height = UNIT_LABEL_H * LABEL_SS
     const ctx = canvas.getContext('2d')
     const tex = new THREE.CanvasTexture(canvas)
     tex.colorSpace = THREE.SRGBColorSpace
@@ -2800,7 +2807,7 @@ export class TwinScene {
     tex.magFilter = THREE.LinearFilter
     tex.generateMipmaps = false
     const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }))
-    spr.scale.set(LABEL_SCALE, LABEL_SCALE * LABEL_ASPECT, 1)
+    spr.scale.set(LABEL_SCALE, LABEL_SCALE * (UNIT_LABEL_H / LABEL_W), 1)
     spr.renderOrder = 11
     const obj = { canvas, ctx, tex, sprite: spr, name, count, co2, energy, isGroup: true, _key: null }
     spr.userData.labelObj = obj
@@ -2818,11 +2825,11 @@ export class TwinScene {
     obj._key = key
     obj.co2 = co2; obj.energy = energy
     ctx.setTransform(LABEL_SS, 0, 0, LABEL_SS, 0, 0)
-    ctx.clearRect(0, 0, LABEL_W, LABEL_H)
+    ctx.clearRect(0, 0, LABEL_W, UNIT_LABEL_H)
 
     const light = this.envMode === 'industrial'
-    // 背景卡片（与 _drawLabelCard 同款：工业浅色 / 其余深色毛玻璃）
-    _roundRect(ctx, 1, 1, LABEL_W - 2, LABEL_H - 2, 9)
+    // 背景卡片（与工艺标签同高同款：工业浅色 / 其余深色毛玻璃）
+    _roundRect(ctx, 1, 1, LABEL_W - 2, UNIT_LABEL_H - 2, 9)
     if (light) {
       ctx.fillStyle = 'rgba(255,255,255,0.97)'
       ctx.fill()
@@ -2837,12 +2844,11 @@ export class TwinScene {
       ctx.stroke()
     }
 
-    // 组名 + 「×N」倍数徽章（蓝灰，系统强调色）
+    // 第一行：组名 + 「×N」倍数徽章（蓝灰，系统强调色），右侧「点击 ▸」提示
     ctx.textBaseline = 'middle'
     ctx.textAlign = 'left'
-    const cy = LABEL_H / 2
     let x = 14
-    ctx.font = `bold 15px ${LABEL_FONT}`
+    ctx.font = `bold 16px ${LABEL_FONT}`
     ctx.fillStyle = light ? '#1f2733' : 'rgba(255,255,255,0.95)'
     const nameW = LABEL_W - 30 - 64   // 预留 ×N 徽章与「点击 ▸」空间
     let nm = name
@@ -2850,35 +2856,35 @@ export class TwinScene {
       while (nm.length > 1 && ctx.measureText(nm + '…').width > nameW) nm = nm.slice(0, -1)
       nm += '…'
     }
-    ctx.fillText(nm, x, cy)
+    ctx.fillText(nm, x, 21)
     x += ctx.measureText(nm).width + 6
 
     const tagText = `×${count}`
     ctx.font = `bold 14px ${LABEL_FONT}`
     const tw = ctx.measureText(tagText).width
     const padX = 6
-    _roundRect(ctx, x, cy - 11, tw + padX * 2, 22, 7)
+    _roundRect(ctx, x, 21 - 11, tw + padX * 2, 22, 7)
     ctx.fillStyle = 'rgba(0,90,147,0.12)'
     ctx.fill()
     ctx.fillStyle = '#0072BD'
-    ctx.fillText(tagText, x + padX, cy + 1)
-    x += tw + padX * 2 + 10
-
-    // 汇总能耗 / 碳排（先能后碳）
-    if (energy != null || co2 != null) {
-      ctx.font = `13px ${LABEL_FONT}`
-      ctx.fillStyle = light ? '#6b7682' : 'rgba(160,180,200,0.9)'
-      const parts = []
-      if (energy != null) parts.push('⚡' + fmtShort(energy))
-      if (co2 != null) parts.push('☁' + fmtShort(co2))
-      ctx.fillText(parts.join('  '), x, cy)
-    }
+    ctx.fillText(tagText, x + padX, 21 + 1)
 
     // 右侧「点击 ▸」提示（可交互暗示）
     ctx.textAlign = 'right'
-    ctx.font = `600 10px ${LABEL_FONT}`
+    ctx.font = `600 11px ${LABEL_FONT}`
     ctx.fillStyle = light ? '#0072BD' : '#6ecfff'
-    ctx.fillText('点击 ▸', LABEL_W - 13, cy)
+    ctx.fillText('点击 ▸', LABEL_W - 13, 21)
+
+    // 第二行：汇总能耗 ⚡ 左对齐 / 碳排 ☁ 右对齐（与工艺标签一致）
+    ctx.textAlign = 'left'
+    ctx.font = `600 14px ${LABEL_FONT}`
+    ctx.fillStyle = light ? '#5a6472' : 'rgba(170,190,210,0.95)'
+    const enStr = energy != null ? fmtShort(energy) : '—'
+    ctx.fillText('⚡ ' + enStr, 14, 46)
+    ctx.textAlign = 'right'
+    const co2Str = co2 != null ? fmtShort(co2) : '—'
+    ctx.fillStyle = light ? '#0072BD' : '#6ecfff'
+    ctx.fillText('☁ ' + co2Str, LABEL_W - 15, 46)
 
     tex.needsUpdate = true
   }
@@ -2895,7 +2901,7 @@ export class TwinScene {
   _makeLabel(name, co2, energy, role, co2Css) {
     const canvas = document.createElement('canvas')
     canvas.width = LABEL_W * LABEL_SS
-    canvas.height = LABEL_H * LABEL_SS
+    canvas.height = UNIT_LABEL_H * LABEL_SS
     const ctx = canvas.getContext('2d')
     ctx.setTransform(LABEL_SS, 0, 0, LABEL_SS, 0, 0)   // 之后统一按逻辑坐标绘制
     const tex = new THREE.CanvasTexture(canvas)
@@ -2905,7 +2911,7 @@ export class TwinScene {
     tex.magFilter = THREE.LinearFilter
     tex.generateMipmaps = false
     const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }))
-    spr.scale.set(LABEL_SCALE, LABEL_SCALE * LABEL_ASPECT, 1)
+    spr.scale.set(LABEL_SCALE, LABEL_SCALE * (UNIT_LABEL_H / LABEL_W), 1)
     spr.renderOrder = 12
     const obj = { canvas, ctx, tex, sprite: spr, name, role, co2Css, focused: false }
     this._drawLabel(obj, co2, energy, role, co2Css)
@@ -2915,82 +2921,90 @@ export class TwinScene {
 
   // 低端机优化：各向异性过滤 8→4，纹理采样带宽减半，远距离斜视时差异在工业场景中几乎不可见
   _maxAniso() {
-    try { return Math.min(4, this.renderer.capabilities.getMaxAnisotropy()) } catch (e) { return 2 }
+    try { return Math.min(8, this.renderer.capabilities.getMaxAnisotropy()) } catch (e) { return 2 }
   }
 
   // 传 undefined 的字段表示「沿用上次值」，便于实时帧只刷新变化的指标。
-  // 小铭牌只展示工序名 + 角色色点，具体数据由右侧工序实例属性面板呈现。
+  // 工艺标签两行布局：第一行工序名 + 角色色点，第二行实时能耗 ⚡ / 碳排 ☁（先能后碳），无需点击即可直接查看。
   _drawLabel(obj, co2, energy, role, co2Css) {
     if (obj && obj.isGroup) { this._drawGroupLabel(obj, energy != null ? energy : obj.energy, co2 != null ? co2 : obj.co2); return }
     const { ctx, tex } = obj
     if (role !== undefined) obj.role = role
+    if (co2Css !== undefined) obj.co2Css = co2Css
+    if (co2 !== undefined) obj.co2 = co2
+    if (energy !== undefined) obj.energy = energy
+    const c = obj.co2
+    const e = obj.energy
     const focused = !!obj.focused
-    const key = [obj.name, obj.role, focused, obj.main === true].join('|')
+    const key = [obj.name, obj.role, focused, obj.main === true, c, e, obj.co2Css, this.envMode].join('|')
     if (obj._key === key) return
     obj._key = key
-    // industrial 模式（VS Code 浅色环境）：与管道标签（_drawFlowLabel）样式完全一致——
-    // 白底浅灰卡片、无角色圆点/彩色侧条，左侧深色工序名 + 右侧蓝色小字
+    // industrial 模式（VS Code 浅色环境）：与管道标签（_drawFlowLabel）样式一致——
+    // 白底浅灰卡片、无角色圆点/彩色侧条，左侧深色工序名，下方数据行
     const light = this.envMode === 'industrial'
 
-    ctx.clearRect(0, 0, LABEL_W, LABEL_H)
+    ctx.clearRect(0, 0, LABEL_W, UNIT_LABEL_H)
 
     if (light) {
-      _drawLabelCard(ctx, focused, undefined, undefined, undefined, true)
+      _drawLabelCard(ctx, focused, undefined, undefined, undefined, true, UNIT_LABEL_H)
       ctx.textBaseline = 'middle'
       // 工序名（深色，与管道标签物料名同款；过长自动截断）
       ctx.textAlign = 'left'
-      ctx.font = `bold 15px ${LABEL_FONT}`
+      ctx.font = `bold 16px ${LABEL_FONT}`
       ctx.fillStyle = focused ? '#005A93' : '#1C1C1C'
-      const maxNameW = LABEL_W - 15 - 62   // 右侧预留蓝色小字区（与管道标签一致）
+      const maxNameW = LABEL_W - 30
       let text = obj.name
       if (ctx.measureText(text).width > maxNameW) {
         while (text.length > 1 && ctx.measureText(text + '…').width > maxNameW) text = text.slice(0, -1)
         text += '…'
       }
-      ctx.fillText(text, 15, LABEL_H / 2)
-      // 右侧蓝色小字（与管道标签「速度」同款样式），工艺无速率，保留「点击 ▸」交互提示
+      ctx.fillText(text, 15, 21)
+      // 第二行：实时能耗 ⚡ 左对齐 / 碳排 ☁ 右对齐（碳排按排放占比着色，长数字也不会重叠）
+      ctx.font = `600 14px ${LABEL_FONT}`
+      ctx.fillStyle = '#5a6472'
+      ctx.fillText('⚡ ' + fmtShort(e), 15, 46)
       ctx.textAlign = 'right'
-      ctx.font = `600 10px ${LABEL_FONT}`
-      ctx.fillStyle = '#0072BD'
-      ctx.fillText(focused ? '查看数据 ▸' : '点击 ▸', LABEL_W - 15, LABEL_H / 2)
+      ctx.fillStyle = obj.co2Css || '#0072BD'
+      ctx.fillText('☁ ' + fmtShort(c), LABEL_W - 15, 46)
       ctx.shadowBlur = 0; ctx.shadowOffsetY = 0
       tex.needsUpdate = true
       return
     }
 
     // ===== 深色毛玻璃铭牌（非 industrial 场景：虚空/沙漠/城市/海滩） =====
-    _drawLabelCard(ctx, focused, obj.role, true, obj.main, false)
+    _drawLabelCard(ctx, focused, obj.role, true, obj.main, false, UNIT_LABEL_H)
 
     ctx.textBaseline = 'middle'
 
-    // 角色色点（霓虹色，与深色底板强对比）
+    // 角色色点（霓虹色，与深色底板强对比）：工艺/工辅统一中性灰蓝，仅起点/终点/隔离保留语义色
     const roleColor = obj.role === 'start' ? '#3ddc84'
       : obj.role === 'end' ? '#00a8ff'
       : obj.role === 'iso' ? '#ffcc3d'
-      : obj.main === true ? '#00a8ff'
-      : '#8aa2b3'
+      : '#7a93a6'
     ctx.fillStyle = roleColor
     ctx.beginPath()
-    ctx.arc(17, LABEL_H / 2, 3.4, 0, Math.PI * 2)
+    ctx.arc(17, 21, 3.4, 0, Math.PI * 2)
     ctx.fill()
 
     // 工序名（高亮文字，过长自动截断）
     ctx.textAlign = 'left'
-    ctx.font = `bold 15px ${LABEL_FONT}`
+    ctx.font = `bold 16px ${LABEL_FONT}`
     ctx.fillStyle = focused ? '#ffffff' : 'rgba(255,255,255,0.92)'
-    const maxNameW = LABEL_W - 30 - 78   // 右侧预留「点击 ▸」提示区
+    const maxNameW = LABEL_W - 30 - 10
     let text = obj.name
     if (ctx.measureText(text).width > maxNameW) {
       while (text.length > 1 && ctx.measureText(text + '…').width > maxNameW) text = text.slice(0, -1)
       text += '…'
     }
-    ctx.fillText(text, 30, LABEL_H / 2)
+    ctx.fillText(text, 30, 21)
 
-    // 右侧「点击查看」小箭头（淡蓝，可交互暗示）
+    // 第二行：实时能耗 ⚡ 左对齐 / 碳排 ☁ 右对齐（碳排按排放占比着色，长数字也不会重叠）
+    ctx.font = `600 14px ${LABEL_FONT}`
+    ctx.fillStyle = 'rgba(170,190,210,0.95)'
+    ctx.fillText('⚡ ' + fmtShort(e), 30, 46)
     ctx.textAlign = 'right'
-    ctx.font = `600 10px ${LABEL_FONT}`
-    ctx.fillStyle = '#6ecfff'
-    ctx.fillText(focused ? '查看数据 ▸' : '点击 ▸', LABEL_W - 13, LABEL_H / 2)
+    ctx.fillStyle = obj.co2Css || 'rgba(170,190,210,0.95)'
+    ctx.fillText('☁ ' + fmtShort(c), LABEL_W - 15, 46)
 
     ctx.shadowBlur = 0; ctx.shadowOffsetY = 0
     tex.needsUpdate = true
@@ -3146,13 +3160,13 @@ export class TwinScene {
 
     // 物料名（与工序标签一致：浅色场景深色文字、深色场景白色文字）
     ctx.textAlign = 'left'
-    ctx.font = `bold 15px ${LABEL_FONT}`
+    ctx.font = `bold 16px ${LABEL_FONT}`
     ctx.fillStyle = light ? '#1C1C1C' : 'rgba(255,255,255,0.92)'
     ctx.fillText(name, 15, LABEL_H / 2)
 
     // 运输速度（浅色场景 MATLAB 蓝小字；深色场景亮青，与工序标签「点击 ▸」同款）
     ctx.textAlign = 'right'
-    ctx.font = `600 10px ${LABEL_FONT}`
+    ctx.font = `600 11px ${LABEL_FONT}`
     ctx.fillStyle = light ? (color || '#0072BD') : '#6ecfff'
     ctx.fillText(speed + ' m/s', LABEL_W - 15, LABEL_H / 2)
 
@@ -4549,6 +4563,15 @@ export class TwinScene {
           }
         })
       }
+      // 供电系统：电流脉冲沿输电导线流动（铁塔 → 变压器）
+      if (g._powerPulses) {
+        g._powerPulses.forEach((p) => {
+          p._t = (p._t + dt * 0.5) % 1
+          const u = (p._t + p._off) % 1
+          p.position.lerpVectors(p._from, p._to, u)
+          p.material.emissiveIntensity = 1.6 + 1.6 * Math.sin(u * Math.PI)
+        })
+      }
     })
     this.flows.forEach((f) => {
       f.t = (f.t + dt * f.speed) % 1
@@ -4690,6 +4713,7 @@ export class TwinScene {
     const REF = 35          // 距摄像机此距离内使用基准尺寸
     const MAX_FACTOR = 5.2  // 最大放大倍数：汇报视角仍要清晰识别主工艺名称
     // 工序标签：与管道/轨道连接标签完全一致的展示形式——恒定显示、无悬浮动画、同尺寸同缩放
+    const parentScale = this._labelParentScale || (this._labelParentScale = new THREE.Vector3())
     this.unitGroups.forEach((g) => {
       const lo = g.labelObj
       if (!lo || !lo.sprite) return
@@ -4698,7 +4722,12 @@ export class TwinScene {
       const factor = Math.min(dist / REF, MAX_FACTOR)
       lo.sprite.material.opacity = 1
       const sf = LABEL_SCALE * factor * (lo.focused ? LABEL_FOCUS_GAIN : 1)
-      lo.sprite.scale.set(sf, sf * LABEL_ASPECT, 1)
+      // 世界尺寸基准：工艺标签 = sf × LABEL_PARENT_REF；工辅/小组标签在此基础上小一号（× LABEL_AUX_GAIN）。
+      // 再除以各自父级世界缩放换算为局部 scale（工艺模型父级 4~5、工辅 3.5~3.8、小组外层 1），
+      // 归一化后消除继承父级缩放造成的尺寸差异，且三类标签呈现明确的层级大小关系。
+      const ps = lo.sprite.parent ? lo.sprite.parent.getWorldScale(parentScale) : parentScale.set(1, 1, 1)
+      const base = sf * LABEL_PARENT_REF * (lo.isGroup || lo.main !== true ? LABEL_AUX_GAIN : 1)
+      lo.sprite.scale.set(base / ps.x, (base * (UNIT_LABEL_H / LABEL_W)) / ps.y, 1)
     })
 
     // 工艺间连接线标签

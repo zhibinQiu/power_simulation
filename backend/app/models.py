@@ -100,8 +100,8 @@ class UnitResult(BaseModel):
 class SankeyNode(BaseModel):
     id: str
     label: str
-    col: int                         # 列 0=燃料源 1=工序 2=去向
-    kind: str                        # fuel / process / sink
+    col: float                       # 列 0=外部源 1..=工序(按链深) 小数=中间产品 末列=去向
+    kind: str                        # fuel / process / mid / sink
 
 
 class SankeyLink(BaseModel):

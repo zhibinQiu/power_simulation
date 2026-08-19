@@ -31,6 +31,7 @@ from .param_schema import TECHS_INFO, UNIT_TYPES_INFO
 from .store import store
 from . import platform_config
 from . import realtime
+from . import optimizers
 from .carbon_engine import parameter_scan, conservation_audit
 
 app = FastAPI(title="行业能碳仿真平台", version="0.1.0")
@@ -389,6 +390,145 @@ def chat(req: ChatRequest):
         return {"ok": False, "mode": req.mode,
                 "reply": "（模型未配置或未连通：请在后端设置 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL 后重启）"}
     return {"ok": True, "mode": req.mode, "reply": reply}
+
+
+# ------------------------- AI 优化模型（GA / PSO / RL 在线训练） -------------------------
+# 训练上下文同步：前端在流程模型变化/进入策略面板时调用；模型变更自动重建各优化器。
+# 后台定时训练由 optimizers.TrainingScheduler 常驻线程驱动（无需前端轮询触发训练）。
+
+@app.post("/api/optimizers/context")
+def set_optimizer_context(model: ProcessModel = Body(...),
+                          factors: Optional[Dict[str, Any]] = Body(None)):
+    """同步 AI 优化训练上下文（当前流程模型 + 排放因子）。"""
+    return optimizers.set_context(model, factors)
+
+
+@app.get("/api/optimizers")
+def list_optimizers():
+    """AI 优化模型列表与训练状态（前端每数秒轮询，展示随实时数据逐渐变优）。"""
+    return {"models": [o.state() for o in optimizers.all_optimizers()]}
+
+
+@app.get("/api/optimizers/{oid}")
+def get_optimizer(oid: str):
+    o = optimizers.get_optimizer(oid)
+    if o is None:
+        raise HTTPException(404, "未知的优化模型")
+    return o.state(full=True)
+
+
+@app.post("/api/optimizers/{oid}/start")
+def start_optimizer(oid: str):
+    """开启自动训练：后台调度线程将随实时传感器数据定时迭代。"""
+    o = optimizers.get_optimizer(oid)
+    if o is None:
+        raise HTTPException(404, "未知的优化模型")
+    if not o.ready:
+        raise HTTPException(400, "训练上下文未就绪：请先同步流程模型（/api/optimizers/context）")
+    o.running = True
+    o.next_train_at = time.time() + 1.0   # 开启后立即安排首次迭代
+    o._log("自动训练已开启：后台定时训练，随实时传感器数据持续优化")
+    return {"ok": True, **o.state()}
+
+
+@app.post("/api/optimizers/{oid}/stop")
+def stop_optimizer(oid: str):
+    o = optimizers.get_optimizer(oid)
+    if o is None:
+        raise HTTPException(404, "未知的优化模型")
+    o.running = False
+    o._log("自动训练已暂停")
+    return {"ok": True, **o.state()}
+
+
+@app.post("/api/optimizers/{oid}/train")
+def train_optimizer(oid: str, steps: int = Body(1, ge=1, le=50, embed=True)):
+    """手动触发训练（steps 步），用于无自动调度时的即时迭代。"""
+    o = optimizers.get_optimizer(oid)
+    if o is None:
+        raise HTTPException(404, "未知的优化模型")
+    if not o.ready:
+        raise HTTPException(400, "训练上下文未就绪")
+    for _ in range(int(steps)):
+        o.step()
+    return {"ok": True, **o.state()}
+
+
+@app.post("/api/optimizers/{oid}/reset")
+def reset_optimizer(oid: str):
+    o = optimizers.get_optimizer(oid)
+    if o is None:
+        raise HTTPException(404, "未知的优化模型")
+    o.reset()
+    return {"ok": True, **o.state()}
+
+
+@app.put("/api/optimizers/{oid}/hyper")
+def set_optimizer_hyper(oid: str, patch: Dict[str, float] = Body(...)):
+    o = optimizers.get_optimizer(oid)
+    if o is None:
+        raise HTTPException(404, "未知的优化模型")
+    o.set_hyper(patch)
+    return {"ok": True, **o.state()}
+
+
+@app.post("/api/optimizers/{oid}/apply")
+def apply_optimizer(oid: str):
+    """把「当前生效版本」的最优参数应用到流程（返回新模型 + 仿真结果）。"""
+    o = optimizers.get_optimizer(oid)
+    if o is None:
+        raise HTTPException(404, "未知的优化模型")
+    try:
+        m2, sim = o.apply()
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+    return {"model": m2, "sim": sim, **o.state()}
+
+
+@app.put("/api/optimizers/{oid}/settings")
+def set_optimizer_settings(oid: str, patch: Dict[str, Any] = Body(...)):
+    """更新控制与自训练设置：{auto_control?: bool, schedule?: {interval?, window?}}。"""
+    o = optimizers.get_optimizer(oid)
+    if o is None:
+        raise HTTPException(404, "未知的优化模型")
+    o.set_settings(patch)
+    return {"ok": True, **o.state()}
+
+
+@app.post("/api/optimizers/{oid}/archive")
+def archive_optimizer(oid: str):
+    """把当前最优参数保存为模型版本（仅优于当前版本才替换生效）。"""
+    o = optimizers.get_optimizer(oid)
+    if o is None:
+        raise HTTPException(404, "未知的优化模型")
+    try:
+        r = o.archive(force=True)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, "promoted": r["promoted"], "version": r["version"], **o.state()}
+
+
+@app.post("/api/optimizers/{oid}/switch")
+def switch_optimizer_version(oid: str, version_id: str = Body(..., embed=True)):
+    """在历史模型版本间切换（旧版本保留，可随时切回）。"""
+    o = optimizers.get_optimizer(oid)
+    if o is None:
+        raise HTTPException(404, "未知的优化模型")
+    try:
+        o.switch_version(version_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, **o.state()}
+
+
+@app.post("/api/optimizers/{oid}/ack")
+def ack_optimizer(oid: str):
+    """确认提醒：清除手动调优提醒 / 自动控制待下发标记。"""
+    o = optimizers.get_optimizer(oid)
+    if o is None:
+        raise HTTPException(404, "未知的优化模型")
+    o.ack()
+    return {"ok": True, **o.state()}
 
 
 # ------------------------- 实时遥测（WebSocket + 设备历史） -------------------------

@@ -286,140 +286,365 @@ def simulate(model: ProcessModel, factors: Dict = None) -> SimResult:
         elec=round(totals["elec"], 1),
         fuel_energy=round(totals["fuel_energy"], 1),
     )
-    sankey = build_sankey(raw)
-    sankey_energy = build_energy_sankey(raw, cfg)
+    flows = list(getattr(model, "flows", None) or [])
+    sankey = build_sankey(raw, flows)
+    sankey_energy = build_energy_sankey(raw, cfg, flows)
     return SimResult(totals=t, units=units_out, sankey=sankey, sankey_energy=sankey_energy)
 
 
-def build_sankey(raw) -> Dict[str, object]:
-    """生成碳素流桑基图：燃料源 -> 工序 -> 去向(CO2/固碳/捕集)。单位 tC/h。"""
+# ==================== 跨工序中间产品碳（按系统实际物料连线追踪） ====================
+# 说明：钢铁长流程的碳素流是「链式」的——焦炭碳离开焦炉后应流入高炉，铁水碳离开高炉后应
+# 流入转炉，钢水碳经精炼/连铸/轧钢最终固结于钢材。旧实现把所有「未排放碳」丢入一个
+# 「碳产品/固定碳」死胡同节点，把中间产品碳误当成外售固定碳产品，且高炉焦炭仍显示为
+# 外购源，造成双重口径问题。此处改为：由各工序实际产物碳（carbon_to_product /
+# carbon_to_steel 等）出发，沿模型 flows 的物料连线（material 匹配）路由到接收工序，
+# 接收工序对应源（焦炭/煤/铁水/炉料）减去内部供给，差额才显示为外部采购；真正外售的
+# 中间产品（无下游接收的焦炭/生物炭/DRI/铁水等）才进入「外售中间产品碳」节点。
+_STEEL_MATS = {"crude_steel", "refined_steel", "billet", "steel_product"}
+_HM_MATS = {"hot_metal", "pre_hm"}
+_MID_LABEL = {"coke": "焦炭碳", "biochar": "生物炭碳", "dri": "DRI碳", "hot_metal": "铁水碳"}
+# 钢水碳链路涉及的工序类型（钢水沿链传递，最终固碳于成品）
+_STEEL_CHAIN_TYPES = {
+    "bof", "eaf", "aod", "ladle_furnace", "rh_vacuum", "vd_vacuum",
+    "caster", "ingot_casting", "reheating_furnace", "rolling_mill", "cold_rolling",
+}
+# 中间产品 -> 接收工序的源槽位（其碳计入接收工序的哪个外部源）
+_SLOT_OF_MID = {"coke": "coke", "biochar": "coal", "hot_metal": "steel_c", "dri": "charge"}
+
+
+def _chain_layout(raw, flows) -> Tuple[set, Dict[str, list], Dict[str, int]]:
+    """由模型物料连线计算工序链深度（列位）与邻接表。
+
+    返回 (ids, fadj, depth)：ids 为参与计算的工序 id 集合；
+    fadj[src] = [(dst, material)] 覆盖全部 flows（含无核算规则的中间工序，如铁水预处理）；
+    depth[pid] 为该工序在物料链中的深度（源侧为 0），用于桑基列位。
+    """
+    ids = {u.id for u, _r, _p in raw}
+    fadj: Dict[str, list] = {}
+    for f in flows or []:
+        fadj.setdefault(f.from_unit, []).append((f.to_unit, f.material))
+    # 深度需覆盖全部流程节点（含无核算规则的中转工序，如铁水预处理），
+    # 否则 bof 这类经中转工序连入的工序会被错误地排到与高炉同列。
+    all_flow_ids = set(ids) | set(fadj.keys())
+    for vs in fadj.values():
+        all_flow_ids.update(d for d, _m in vs)
+    depth = {pid: 0 for pid in all_flow_ids}
+    changed = True
+    while changed:
+        changed = False
+        for s in all_flow_ids:
+            for t, _m in fadj.get(s, []):
+                if depth[t] < depth[s] + 1:
+                    depth[t] = depth[s] + 1
+                    changed = True
+    return ids, fadj, depth
+
+
+def _route(fadj, start: str, mats: set, targets: set) -> List[str]:
+    """BFS 沿物料连线从 start 找一条到任一 target 的最短路径（可经过无核算的中间工序）。"""
+    if start in targets:
+        return [start]
+    from collections import deque
+    prev = {start: None}
+    q = deque([start])
+    while q:
+        cur = q.popleft()
+        for nxt, m in fadj.get(cur, []):
+            if m in mats and nxt not in prev:
+                prev[nxt] = cur
+                if nxt in targets:
+                    path = [nxt]
+                    while prev[path[-1]] is not None:
+                        path.append(prev[path[-1]])
+                    return path[::-1]
+                q.append(nxt)
+    return []
+
+
+def _alloc(supply: Dict[str, float], demand: Dict[str, float]) -> Tuple[Dict[str, float], float]:
+    """按需求比例分配中间产品碳。返回 (received_by_consumer, 剩余外售量)。"""
+    s = sum(supply.values())
+    d = sum(demand.values())
+    received = {}
+    if s <= 1e-9 or d <= 1e-9:
+        return received, s
+    ratio = min(1.0, s / d)
+    for cid, amt in demand.items():
+        received[cid] = amt * ratio
+    return received, max(s - d, 0.0)
+
+
+def _steel_pass_edges(fadj, ids: set, mid_prod: Dict[str, float]) -> Tuple[Dict[tuple, float], Dict[str, float]]:
+    """钢水碳沿钢链传递：返回 (edge_value, terminal_value)。
+
+    edge_value[(a,b)] = 流经 a→b 的钢水碳；terminal_value[pid] = 最终固碳于钢材的钢水碳。
+    每条路径从各产钢工序出发，沿 STEEL_MATS 连线走到链末（无出钢线）为止。
+    """
+    edges: Dict[tuple, float] = {}
+    terminal: Dict[str, float] = {}
+    for pid, val in mid_prod.items():
+        if val <= 1e-9:
+            continue
+        cur, seen, carried = pid, {pid}, val
+        while True:
+            nxts = [d for d, m in fadj.get(cur, []) if m in _STEEL_MATS and d in ids and d not in seen]
+            if not nxts:
+                break
+            nxt = nxts[0]
+            seen.add(nxt)
+            edges[(cur, nxt)] = edges.get((cur, nxt), 0.0) + carried
+            cur = nxt
+        terminal[cur] = terminal.get(cur, 0.0) + carried
+    return edges, terminal
+
+
+def build_sankey(raw, flows=None) -> Dict[str, object]:
+    """生成碳素流桑基图：外部源 -> 工序（含中间产品碳沿物料链跨工序传递）-> 去向。
+
+    列位：0=外部源，1..=工序（按物料链深度），小数=中间产品节点，末列=去向。
+    单位 tC/h。守恒：每个工序 入 = 出；全图 源列合计 = 去向列合计。
+    """
+    ids, fadj, depth = _chain_layout(raw, flows)
+    res_by_id = {u.id: res for u, res, _p in raw}
+    u_by_id = {u.id: u for u, _r, _p in raw}
+    p_by_id = {u.id: p for u, _r, p in raw}
+
     nodes: List[SankeyNode] = []
     links: List[SankeyLink] = []
     node_ids = set()
+    sink_col = float(max(depth.values()) + 2) if depth else 2.0
 
-    sink_ids = {"co2": "CO₂排放碳", "steel": "钢中固碳", "captured": "捕集碳", "product": "碳产品/固定碳"}
+    sink_ids = {"co2": "CO₂排放碳", "steel": "钢中固碳", "captured": "捕集碳",
+                "slag": "炉渣碳", "product": "外售中间产品碳"}
     for sid, slab in sink_ids.items():
-        nodes.append(SankeyNode(id=sid, label=slab, col=2, kind="sink"))
+        nodes.append(SankeyNode(id=sid, label=slab, col=sink_col, kind="sink"))
         node_ids.add(sid)
 
-    for u, res, _params in raw:
+    def _node(nid: str, label: str, col: float, kind: str) -> str:
+        if nid not in node_ids:
+            nodes.append(SankeyNode(id=nid, label=label, col=col, kind=kind))
+            node_ids.add(nid)
+        return nid
+
+    # ---- 1. 识别各工序产出的中间产品碳 ----
+    mid_prod: Dict[str, Dict[str, float]] = {}
+    for u, res, _p in raw:
+        mat = None
+        amt = 0.0
+        t = u.type
+        if t == "coke_oven":
+            mat, amt = "coke", res.get("carbon_to_product", 0.0)
+        elif t == "biochar_injection":
+            mat, amt = "biochar", res.get("carbon_to_product", 0.0)
+        elif t in ("dri_midrex", "h2_dri"):
+            mat, amt = "dri", res.get("carbon_to_product", 0.0)
+        elif t in ("blast_furnace", "hydrogen_bf"):
+            mat, amt = "hot_metal", res.get("carbon_to_steel", 0.0)
+        elif t in _STEEL_CHAIN_TYPES:
+            mat, amt = "steel", res.get("carbon_to_steel", 0.0)
+        if mat and amt > 1e-9:
+            mid_prod.setdefault(mat, {})[u.id] = amt
+
+    # ---- 2. 识别各工序对中间产品碳的需求 ----
+    mid_demand: Dict[str, Dict[str, float]] = {}
+    for u, res, p in raw:
         cbf = res.get("carbon_by_fuel", {}) or {}
-        fuel_carbon = 0.0
+        d: Dict[str, float] = {}
+        if u.type == "blast_furnace":
+            d["coke"] = cbf.get("coke", 0.0)
+            d["biochar"] = cbf.get("coal", 0.0)      # 生物炭替代喷吹煤
+        elif u.type == "bof":
+            d["hot_metal"] = p.get("hot_metal_in", 0.0) * METAL_C["hot_metal"]
+        elif u.type == "eaf":
+            d["dri"] = p.get("dri", 0.0) * METAL_C["dri"]
+        d = {k: v for k, v in d.items() if v > 1e-9}
+        if d:
+            mid_demand[u.id] = d
+
+    proc_col = {pid: float(depth[pid] + 1) for pid in ids}
+    # 每个工序各源槽位被内部中间产品碳冲抵的量
+    slot_reduce: Dict[str, Dict[str, float]] = {}
+    # 中间产品节点：material -> (mid_id, 总传递量)
+    mid_node_of: Dict[str, str] = {}
+
+    # ---- 3. 焦炭/生物炭/DRI/铁水：分配并建立跨工序中间产品节点与连线 ----
+    for mat in ("coke", "biochar", "dri", "hot_metal"):
+        supply = mid_prod.get(mat)
+        demand = {}
+        for cid, dm in mid_demand.items():
+            if mat in dm:
+                demand[cid] = dm[mat]
+        if not supply:
+            continue
+        received, surplus = _alloc(supply, demand)
+        mid_total = sum(received.values())
+        s_total = sum(supply.values())
+        # 有下游接收 -> 建立中间产品节点
+        if mid_total > 1e-9:
+            producer_cols = [proc_col[pid] for pid in supply]
+            consumer_cols = [proc_col[cid] for cid in received]
+            mid_col = (sum(producer_cols) / len(producer_cols) + sum(consumer_cols) / len(consumer_cols)) / 2
+            mid_id = _node(f"m:{mat}", _MID_LABEL[mat], mid_col, "mid")
+            mid_node_of[mat] = mid_id
+            for pid, amt in supply.items():
+                share = amt * (mid_total / s_total)
+                if share > 1e-6:
+                    links.append(SankeyLink(source=f"u:{pid}", target=mid_id, value=round(share, 3)))
+            for cid, amt in received.items():
+                if amt > 1e-6:
+                    links.append(SankeyLink(source=mid_id, target=f"u:{cid}", value=round(amt, 3)))
+                    slot = _SLOT_OF_MID[mat]
+                    slot_reduce.setdefault(cid, {}).setdefault(slot, 0.0)
+                    slot_reduce[cid][slot] += amt
+        # 无下游接收的中间产品 -> 外售
+        if surplus > 1e-9:
+            for pid, amt in supply.items():
+                share = amt * (surplus / s_total)
+                if share > 1e-6:
+                    links.append(SankeyLink(source=f"u:{pid}", target="product", value=round(share, 3)))
+
+    # ---- 4. 钢水碳沿钢链传递 ----
+    steel_edges, steel_terminal = _steel_pass_edges(fadj, ids, mid_prod.get("steel", {}))
+    for (a, b), v in steel_edges.items():
+        if v <= 1e-6:
+            continue
+        mid_id = _node(f"m:steel:{b}", "钢水碳", proc_col[b] - 0.5, "mid")
+        links.append(SankeyLink(source=f"u:{a}", target=mid_id, value=round(v, 3)))
+        links.append(SankeyLink(source=mid_id, target=f"u:{b}", value=round(v, 3)))
+    for pid, v in steel_terminal.items():
+        if v > 1e-6:
+            links.append(SankeyLink(source=f"u:{pid}", target="steel", value=round(v, 3)))
+
+    # ---- 5. 逐工序生成外部源与去向连线（扣除内部供给后） ----
+    for u, res, p in raw:
+        cbf = res.get("carbon_by_fuel", {}) or {}
+        fuel_raw = 0.0            # 扣除内部供给前的燃料碳（不含外购电）
         fuel_links: List[tuple] = []
         for fk, fv in cbf.items():
             if fk == "elec":
                 continue  # 外购电为间接碳，不计入碳素流(直接碳)桑基图，交由能流图展示
+            fuel_raw += fv
             if fv <= 1e-6:
                 continue
-            fuel_links.append((fk, fv))
-            fuel_carbon += fv
-        # 炉料/熔剂带入碳：钢铁料(铁水/废钢/海绵铁)与熔剂本身携带的碳，
-        # 最终进入「钢中固碳」或氧化为 CO₂，但未计入燃料源，故补为统一源节点，保证碳流守恒。
-        charge_carbon = (res.get("carbon_in", 0.0) or 0.0) - fuel_carbon
+            fv_out = fv - (slot_reduce.get(u.id, {}).get(fk, 0.0))
+            if fv_out > 1e-6:
+                fuel_links.append((fk, fv_out))
+        charge_carbon = (res.get("carbon_in", 0.0) or 0.0) - fuel_raw
+        charge_carbon -= slot_reduce.get(u.id, {}).get("charge", 0.0)
         carbon_out = res["carbon_to_co2"] + res["carbon_to_steel"] + res["carbon_captured"]
         carried = (res.get("carbon_in", 0.0) or 0.0) - carbon_out
-        # 无任何碳流入/流出的工序（如引风机、鼓风机等不涉碳工辅）不在碳素流中体现
-        if fuel_carbon <= 1e-9 and charge_carbon <= 1e-9 and carbon_out <= 1e-6 and carried <= 1e-6:
+        fuel_out = sum(fv for _fk, fv in fuel_links)
+        if fuel_out <= 1e-9 and charge_carbon <= 1e-9 and carbon_out <= 1e-6 and carried <= 1e-6:
             continue
         pid = f"u:{u.id}"
-        if pid not in node_ids:
-            nodes.append(SankeyNode(id=pid, label=u.name, col=1, kind="process"))
-            node_ids.add(pid)
+        _node(pid, u.name, proc_col[u.id], "process")
         for fk, fv in fuel_links:
-            fid = f"f:{fk}"
-            if fid not in node_ids:
-                nodes.append(SankeyNode(id=fid, label=FUEL_LABEL.get(fk, fk), col=0, kind="fuel"))
-                node_ids.add(fid)
+            fid = _node(f"f:{fk}", FUEL_LABEL.get(fk, fk), 0.0, "fuel")
             links.append(SankeyLink(source=fid, target=pid, value=round(fv, 3)))
         if charge_carbon > 1e-9:
-            fid = "f:charge"
-            if fid not in node_ids:
-                nodes.append(SankeyNode(id=fid, label="炉料/熔剂碳", col=0, kind="fuel"))
-                node_ids.add(fid)
+            fid = _node("f:charge", "炉料/熔剂碳", 0.0, "fuel")
             links.append(SankeyLink(source=fid, target=pid, value=round(charge_carbon, 3)))
         # 工序 -> 去向
         if res["carbon_to_co2"] > 1e-6:
             links.append(SankeyLink(source=pid, target="co2", value=round(res["carbon_to_co2"], 3)))
-        if res["carbon_to_steel"] > 1e-6:
-            links.append(SankeyLink(source=pid, target="steel", value=round(res["carbon_to_steel"], 3)))
         if res["carbon_captured"] > 1e-6:
             links.append(SankeyLink(source=pid, target="captured", value=round(res["carbon_captured"], 3)))
-        # 碳产品/固定碳：未排放也未固结于钢水的碳（如焦化工序焦炭本身携带的碳），
-        # 以守恒方式吸收差额，保证桑基图左右流量平衡。
-        if carried > 1e-6:
-            links.append(SankeyLink(source=pid, target="product", value=round(carried, 3)))
+        c_slag = min(res.get("carbon_to_slag", 0.0) or 0.0, max(carried, 0.0))
+        if c_slag > 1e-6:
+            links.append(SankeyLink(source=pid, target="slag", value=round(c_slag, 3)))
     return {"nodes": [n.model_dump() for n in nodes], "links": [l.model_dump() for l in links]}
 
 
-# 产品有效能系数：产品(钢)带走有效能占综合能耗的比例（钢铁行业典型参考值，演示口径）
-STEEL_EFF_EFFICIENCY = 0.30
+# 产品有效能系数：产品（钢水/铁水/焦炭等）带走有效能占综合能耗的比例（行业典型参考值，演示口径）
+# 说明：不同工序热力学效率差异较大——电弧炉电→钢水有效能高（~0.65）、高炉化学能→铁水中等（~0.52）、
+# 烧结/精炼等偏低（~0.35）；若统一用 30% 会系统性高估「烟气/散热损失」。
+EFF_EFFICIENCY = {
+    "sinter_plant":        0.35,   # 烧结热效率低，大量烟气/环冷损失
+    "pelletizing":         0.40,   # 球团焙烧热效率中等
+    "coke_oven":           0.45,   # 焦炭带走大部分化学能
+    "blast_furnace":       0.52,   # 高炉热效率较高（化学能→铁水+副产煤气）
+    "hot_metal_pretreat":  0.55,   # 铁水显热保留为主
+    "bof":                 0.55,   # 铁水显热+氧化热保留
+    "eaf":                 0.65,   # 电弧炉电能→钢水有效能较高
+    "ladle_furnace":       0.50,
+    "rh_vacuum":           0.45,
+    "vd_vacuum":           0.45,
+    "aod":                 0.55,
+    "caster":              0.55,   # 钢水显热保留
+    "ingot_casting":       0.50,
+    "rolling_mill":        0.50,
+    "cold_rolling":        0.45,
+    "reheating_furnace":   0.60,
+    "hydrogen_bf":         0.50,
+    "h2_dri":              0.45,
+    "dri_midrex":          0.50,
+    "smelting_reduction":  0.45,
+    "biochar_injection":   0.40,
+}
+DEF_EFF_EFFICIENCY = 0.30          # 默认（工辅/未列明工序）
 
 # 能源视角的源标签（区别于碳素流 FUEL_LABEL）
 _ENERGY_SOURCE_LABEL = {"coke": "焦炭", "coal": "煤/煤粉", "ng": "天然气", "biomass": "生物质", "elec": "外购电"}
 
 
-def build_energy_sankey(raw, cfg: Dict) -> Dict[str, object]:
+def build_energy_sankey(raw, cfg: Dict, flows=None) -> Dict[str, object]:
     """生成能流桑基图：能源源 -> 工序 -> 去向(产品有效能/余热回收/损失)。单位 GJ/h。
 
-    设计说明（节能减碳并重）：
+    设计说明（节能减碳并重，并追踪系统内部能源转移）：
     - 能源源按「外购电 + 各燃料」拆分：外购电 = elec×3.6 GJ/h；燃料能量由燃烧碳反推（碳量/单位热值含碳量）。
+    - 内部转移：自产焦炭/生物炭的化学能不再当作「外购焦炭/煤」全部计入高炉外源，而是经中间节点由
+      焦炉/生物质工序直接流入高炉（高炉侧对应外源相应扣减），体现长流程真实的能源链。
     - 去向侧单独展示「余热回收利用」（由台账余热回收节电的减排量反推回收能量），突出节能流向；
       其余按行业典型有效能效率拆分「产品有效能」与「烟气/散热损失」。
     """
+    ids, _fadj, depth = _chain_layout(raw, flows)
+    proc_col = {pid: float(depth[pid] + 1) for pid in ids}
+    sink_col = float(max(depth.values()) + 2) if depth else 2.0
+
     nodes: List[SankeyNode] = []
     links: List[SankeyLink] = []
     node_ids = set()
 
     # 去向节点
     for sid, slab in (("es:product", "产品有效能"), ("es:recovery", "余热回收利用"), ("es:loss", "烟气/散热损失")):
-        nodes.append(SankeyNode(id=sid, label=slab, col=2, kind="sink"))
+        nodes.append(SankeyNode(id=sid, label=slab, col=sink_col, kind="sink"))
         node_ids.add(sid)
-
     # 外购电能源源
-    nodes.append(SankeyNode(id="ef:elec", label=_ENERGY_SOURCE_LABEL["elec"], col=0, kind="source"))
+    nodes.append(SankeyNode(id="ef:elec", label=_ENERGY_SOURCE_LABEL["elec"], col=0.0, kind="source"))
     node_ids.add("ef:elec")
+
+    def _node(nid: str, label: str, col: float, kind: str) -> str:
+        if nid not in node_ids:
+            nodes.append(SankeyNode(id=nid, label=label, col=col, kind=kind))
+            node_ids.add(nid)
+        return nid
 
     grid_ef = float(cfg.get("grid_ef") or 0.5)   # tCO2/MWh
     fuels_cfg = cfg.get("fuels", {}) or {}
 
-    per_unit: Dict[str, Dict[str, float]] = {}
+    per_unit: Dict[str, Dict[str, object]] = {}
     for u, res, _params in raw:
         pid = f"eu:{u.id}"
-        # 外购电 -> 工序
         elec_gj = res.get("elec", 0.0) * GJ_PER_MWH
-        # 燃料 -> 工序（碳量反推低位发热量）
         cbf = res.get("carbon_by_fuel", {}) or {}
-        fuel_gj = 0.0
-        fuel_links: List[tuple] = []
+        fuel: Dict[str, float] = {}
         for fk, fv in cbf.items():
-            if fk == "elec":
+            if fk == "elec" or fv <= 1e-6:
                 continue  # 外购电能量由 ef:elec 统一按 elec×3.6 GJ/h 处理
-            if fv <= 1e-6:
-                continue
             cc = CC_FUEL.get(fk) or (fuels_cfg.get(fk) or {}).get("cc") or 0.0
             if not cc:
                 continue
             gj = fv / cc
-            if gj <= 1e-6:
-                continue
-            fuel_links.append((fk, gj))
-            fuel_gj += gj
+            if gj > 1e-6:
+                fuel[fk] = gj
         energy_total = res.get("energy_total", 0.0) or 0.0
         # 既无能量流入也无综合能耗的工序（孤立节点，无实际能流）不在能流中体现
-        if elec_gj <= 1e-6 and fuel_gj <= 1e-6 and energy_total <= 1e-6:
+        if elec_gj <= 1e-6 and not fuel and energy_total <= 1e-6:
             continue
-        if pid not in node_ids:
-            nodes.append(SankeyNode(id=pid, label=u.name, col=1, kind="process"))
-            node_ids.add(pid)
-        if elec_gj > 1e-6:
-            links.append(SankeyLink(source="ef:elec", target=pid, value=round(elec_gj, 2)))
-        for fk, gj in fuel_links:
-            fid = f"ef:{fk}"
-            if fid not in node_ids:
-                nodes.append(SankeyNode(id=fid, label=_ENERGY_SOURCE_LABEL.get(fk, fk), col=0, kind="source"))
-                node_ids.add(fid)
-            links.append(SankeyLink(source=fid, target=pid, value=round(gj, 2)))
-        per_unit[pid] = {"energy_total": energy_total, "recovery_gj": 0.0}
+        _node(pid, u.name, proc_col[u.id], "process")
+        per_unit[pid] = {"energy_total": energy_total, "elec_gj": elec_gj, "fuel": fuel,
+                         "recovery_gj": 0.0, "internal_out": 0.0, "type": u.type,
+                         "eff": EFF_EFFICIENCY.get(u.type, DEF_EFF_EFFICIENCY)}
 
     # 余热回收能量：由台账「余热回收(节电)」减排量(tCO2/h)反推节电量 -> GJ/h
     for u, res, _params in raw:
@@ -432,15 +657,55 @@ def build_energy_sankey(raw, cfg: Dict) -> Dict[str, object]:
                 per_unit[pid]["recovery_gj"] = max(red_gj, 0.0)
                 break
 
-    # 工序 -> 去向
+    # 内部能源转移：自产焦炭/生物炭的化学能由焦炉/生物质工序直接流入高炉
+    # （高炉对应外购焦炭/煤源扣减，避免把内部中间产品当外购能源重复计数）
+    bf_ids = [pid for pid, info in per_unit.items() if info["type"] == "blast_furnace"]
+    transfers: List[tuple] = []
+    for src_t, src_type, tgt_key in (("coke_oven", "coke_oven", "coke"),
+                                     ("biochar_injection", "biochar_injection", "coal")):
+        for pid, info in per_unit.items():
+            if info["type"] != src_type:
+                continue
+            if not bf_ids:
+                continue
+            prod_eff = info["energy_total"] * info["eff"]   # 中间产品带走有效能
+            for bf in bf_ids:
+                demand = float(per_unit[bf]["fuel"].get(tgt_key, 0.0))
+                v = min(prod_eff, demand)
+                if v <= 1e-6:
+                    continue
+                transfers.append((pid, bf, v, tgt_key))
+                per_unit[bf]["fuel"][tgt_key] -= v
+                per_unit[pid]["internal_out"] = per_unit[pid]["internal_out"] + v
+
+    # 外部能源源 -> 工序（扣除内部转移后）
     for pid, info in per_unit.items():
-        e = info["energy_total"]
+        if float(info["elec_gj"]) > 1e-6:
+            links.append(SankeyLink(source="ef:elec", target=pid, value=round(float(info["elec_gj"]), 2)))
+        for fk, gj in (info["fuel"] or {}).items():
+            if gj <= 1e-6:
+                continue
+            fid = _node(f"ef:{fk}", _ENERGY_SOURCE_LABEL.get(fk, fk), 0.0, "source")
+            links.append(SankeyLink(source=fid, target=pid, value=round(gj, 2)))
+
+    # 中间产品有效能内部转移节点与连线（焦炭化学能/生物炭化学能 -> 高炉）
+    for src, tgt, v, tgt_key in transfers:
+        mid_col = (proc_col[src.replace("eu:", "")] + proc_col[tgt.replace("eu:", "")]) / 2
+        mid_id = _node(f"me:{tgt_key}", "焦炭化学能" if tgt_key == "coke" else "生物炭化学能", mid_col, "mid")
+        links.append(SankeyLink(source=src, target=mid_id, value=round(v, 2)))
+        links.append(SankeyLink(source=mid_id, target=tgt, value=round(v, 2)))
+
+    # 工序 -> 去向（产品有效能 = 总有效能 − 内部转移给下游的部分）
+    for pid, info in per_unit.items():
+        e = float(info["energy_total"])
         if e <= 1e-6:
             continue
-        r = min(info["recovery_gj"], e)
-        p = e * STEEL_EFF_EFFICIENCY
+        r = min(float(info["recovery_gj"]), e)
+        p = e * float(info["eff"])
         loss = max(e - p - r, 0.0)
-        links.append(SankeyLink(source=pid, target="es:product", value=round(p, 2)))
+        p_ext = max(p - float(info["internal_out"]), 0.0)
+        if p_ext > 1e-6:
+            links.append(SankeyLink(source=pid, target="es:product", value=round(p_ext, 2)))
         if r > 1e-6:
             links.append(SankeyLink(source=pid, target="es:recovery", value=round(r, 2)))
         if loss > 1e-6:

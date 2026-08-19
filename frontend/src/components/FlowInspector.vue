@@ -3,9 +3,6 @@
     <!-- 工艺设备小组属性（优先于节点/总览） -->
     <template v-if="group">
       <CollapseSection title="工艺设备小组" tone="blue">
-        <template #actions>
-          <button class="inst-btn" title="进入子编排" @click="store.enterGroup(group.id)">⇲ 进入子编排</button>
-        </template>
         <div class="card">
           <div class="kv2"><span>名称</span><input class="gname-in" :value="group.name" @input="store.renameFlowGroup(group.id, $event.target.value)" /></div>
           <div class="kv2"><span>成员设备</span><b>{{ group.members.length }} 台</b></div>

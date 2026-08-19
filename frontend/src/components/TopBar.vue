@@ -17,11 +17,26 @@
               <span class="arrow">›</span>
               <div v-if="openSub === i" class="menu-drop sub">
                 <template v-for="(c, ci) in it.items()" :key="ci">
+                  <template v-if="!(c.hide && c.hide())">
                   <div v-if="c.sep" class="sep"></div>
+                  <div v-else-if="c.sub" class="mi mi-sub" @mouseenter="openSub2 = ci" @mouseleave="openSub2 = null">
+                    <span class="tx">{{ c.label }}</span>
+                    <span class="arrow">›</span>
+                    <div v-if="openSub2 === ci" class="menu-drop sub">
+                      <template v-for="(g, gi) in c.items()" :key="gi">
+                        <div v-if="g.sep" class="sep"></div>
+                        <div v-else class="mi" :class="{ checked: g.checked }" @click="onSubSubItem(g)">
+                          <span class="tick">{{ g.checked ? '✓' : '' }}</span>
+                          <span class="tx">{{ g.label }}</span>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
                   <div v-else class="mi" :class="{ checked: c.checked }" @click="onSubItem(c)">
                     <span class="tick">{{ c.checked ? '✓' : '' }}</span>
                     <span class="tx">{{ c.label }}</span>
                   </div>
+                  </template>
                 </template>
               </div>
             </div>
@@ -62,17 +77,22 @@ defineEmits(['export', 'help'])
 const store = useSimStore()
 const openMenu = ref(null)
 const openSub = ref(null)
+const openSub2 = ref(null)
 
-function toggleMenu(id) { openMenu.value = openMenu.value === id ? null : id; openSub.value = null }
-function closeMenus() { openMenu.value = null; openSub.value = null }
+function toggleMenu(id) { openMenu.value = openMenu.value === id ? null : id; openSub.value = null; openSub2.value = null }
+function closeMenus() { openMenu.value = null; openSub.value = null; openSub2.value = null }
 function onMenuItem(m, it) {
   if (it.disabled && it.disabled()) return
   if (it.act) it.act()
-  openMenu.value = null; openSub.value = null
+  openMenu.value = null; openSub.value = null; openSub2.value = null
 }
 function onSubItem(c) {
   if (c.run) c.run()
-  openMenu.value = null; openSub.value = null
+  openMenu.value = null; openSub.value = null; openSub2.value = null
+}
+function onSubSubItem(g) {
+  if (g.run) g.run()
+  openMenu.value = null; openSub.value = null; openSub2.value = null
 }
 
 // 点击顶栏以外区域关闭菜单

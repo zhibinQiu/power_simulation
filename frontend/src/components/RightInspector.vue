@@ -6,7 +6,7 @@
       <span class="ttl">{{ headTitle }}</span>
       <span class="spacer"></span>
       <span class="mono mode-tag">{{ modeTag }}</span>
-      <button v-if="mode !== 'overview'" class="x-btn" title="返回总览" @click="store.closeInspector()">✕</button>
+      <button v-if="mode !== 'overview' || store.selectedGroupId || store.selectedFlowId" class="x-btn" title="返回总览" @click="store.closeInspector()">✕</button>
     </div>    <div class="inspector-body" :class="{ scrolling }" @scroll="onScroll">
       <!-- 报告面板（工具条「数据 → 报告 → 导出报告」，含历史报告管理） -->
       <ReportPanel v-if="mode === 'report'" />

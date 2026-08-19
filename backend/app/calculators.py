@@ -92,7 +92,7 @@ def calc_coke(p, cfg=DEFAULT_FACTORS):
     r = _base()
     r.update(co2_direct=direct, co2_indirect=indirect, carbon_in=c_in,
              carbon_to_co2=c_to_co2, carbon_to_product=c_to_coke,
-             steel_output=coke_out, carbon_by_fuel={"coke": c_in})
+             steel_output=coke_out, carbon_by_fuel={"coal": c_in})
     r["ledger"] = [
         _led("入炉煤(干馏排放碳)", c_to_co2, "tC/h", "煤碳 − 焦炭固碳", direct, "direct",
              formula=f"{c_to_co2:.1f} tC（入炉煤碳 {c_in:.1f} − 焦炭固碳 {c_to_coke:.1f}）× 3.667 = {direct:.0f} tCO₂/h"),
@@ -101,8 +101,8 @@ def calc_coke(p, cfg=DEFAULT_FACTORS):
         _led("外购电力", elec, "MWh/h", f"电网因子 {cfg['grid_ef']} tCO₂/MWh", indirect, "indirect",
              formula=_elec_formula(elec, indirect, cfg)),
     ]
-    r["notes"] = ["焦炉约 75% 的碳进入焦炭(后续入高炉)，作为中间产品碳离开本工序，物料平衡须单独计入 product 节点",
-                  "审计残差现已包含焦炭产品碳；高炉侧需经物料连线接收该碳流方为真正闭环"]
+    r["notes"] = ["焦炉约 75% 的碳进入焦炭(后续入高炉)，作为中间产品碳离开本工序",
+                  "焦炭产品碳已按物料连线流入高炉（焦炭碳节点 → 高炉），构成 煤→焦炉→高炉 碳素流闭环；高炉焦炭外源仅含自产不足部分"]
     return r
 
 
@@ -303,18 +303,27 @@ def calc_dri(p, cfg=DEFAULT_FACTORS):
     direct = fuel_carbon(ng_m3, "ng", cfg)
     elec = p.get("electricity", dri * 0.15)                  # 150 kWh/t-DRI（压缩/换热/传动）
     indirect = elec * cfg["grid_ef"]
+    # DRI 产品固碳：天然气重整气中约 0.18% 碳固结于 DRI 金属（中间产品碳，随物料链流入电炉），
+    # 其余碳以 CO₂ 排出。固碳部分不再计入本工序排放，避免碳素流中「产品碳无来源」的失衡。
+    dri_c = dri * METAL_C["dri"]
+    c_ng = direct / CO2_PER_C
+    c_to_co2 = max(c_ng - dri_c, 0.0)
+    co2_direct = c_to_co2 * CO2_PER_C
     r = _base()
-    r.update(co2_direct=direct, co2_indirect=indirect, carbon_in=direct / CO2_PER_C,
-             carbon_to_co2=direct / CO2_PER_C, steel_output=dri,
-             carbon_by_fuel={"ng": direct / CO2_PER_C})
+    r.update(co2_direct=co2_direct, co2_indirect=indirect, carbon_in=c_ng,
+             carbon_to_co2=c_to_co2, carbon_to_product=dri_c, steel_output=dri,
+             carbon_by_fuel={"ng": c_ng})
     r["ledger"] = [
         _led("天然气(重整还原气)", ng_m3, "m³/h", "NCV×CC×44/12", direct, "direct",
              formula=_fuel_formula("ng", ng_m3, direct, cfg)),
+        _led("DRI固碳(中间产品)", dri, "t/h", f"含碳 {METAL_C['dri']*100:.1f}%，自天然气碳中扣减", -dri_c * CO2_PER_C,
+             "direct", formula=f"{dri:.0f} × {METAL_C['dri']} × 44/12 = {dri_c * CO2_PER_C:.1f}"),
         _led("外购电力(压缩/换热)", elec, "MWh/h", f"电网因子 {cfg['grid_ef']} tCO₂/MWh", indirect, "indirect",
              formula=_elec_formula(elec, indirect, cfg)),
     ]
     r["notes"] = ["DRI 以天然气重整气还原铁氧化物；若改用绿氢则直接碳排近零",
-                  "所得 DRI 通常供电炉炼钢，构成短流程低碳路线"]
+                  "所得 DRI 通常供电炉炼钢，构成短流程低碳路线",
+                  f"DRI 产品固碳 {dri_c:.1f} tC/h 作为中间产品碳随物料连线流入电炉，不重复计入本工序排放"]
     return r
 
 
@@ -345,17 +354,22 @@ def calc_biochar(p, cfg=DEFAULT_FACTORS):
     biomass = p.get("biomass_rate", 0.0)
     elec = p.get("electricity", biomass * 0.1)               # 100 kWh/t（破碎/输送/喷吹）
     indirect = elec * cfg["grid_ef"]
+    # 生物质碳（tC/h）：按 NCV×CC 计，源自大气 CO₂ 光合固碳，生命周期净零（不计入直接排放）
+    bf = cfg["fuels"]["biomass"]
+    bio_c = biomass * bf["ncv"] * bf["cc"]
     r = _base()
-    r.update(co2_direct=0.0, co2_indirect=indirect, carbon_in=0.0,
-             carbon_to_co2=0.0, steel_output=biomass, carbon_by_fuel={})
+    r.update(co2_direct=0.0, co2_indirect=indirect, carbon_in=bio_c,
+             carbon_to_co2=0.0, carbon_to_product=bio_c, steel_output=biomass,
+             carbon_by_fuel={"biomass": bio_c, "elec": indirect / CO2_PER_C})
     r["ledger"] = [
         _led("生物质碳(碳中性)", biomass, "t/h", "源自大气 CO₂ 光合固碳，生命周期净零", 0.0, "direct",
-             formula="源自大气 CO₂ 光合固碳，生命周期净零"),
+             formula=f"{biomass:.1f} t × {bf['ncv']:.2f} GJ/t × {bf['cc']:.4f} tC/GJ = {bio_c:.1f} tC/h（不排放）"),
         _led("外购电力", elec, "MWh/h", f"电网因子 {cfg['grid_ef']} tCO₂/MWh", indirect, "indirect",
              formula=_elec_formula(elec, indirect, cfg)),
     ]
     r["notes"] = ["生物质碳来自大气 CO₂ 光合固碳，生命周期视为净零，可抵消等量化石碳排",
-                  "属未来减排工艺（BECCS 思路）"]
+                  "属未来减排工艺（BECCS 思路）",
+                  "生物质碳/能量已计入碳素流与能流桑基图（源：生物质碳/生物质），碳排放按 0 计"]
     return r
 
 

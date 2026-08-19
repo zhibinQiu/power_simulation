@@ -94,7 +94,7 @@
         </div>
       </div>
 
-      <!-- 策略：直接展示 内置（各工艺策略 + 系统预置）/ 自定义（仿真模式下保存的策略） -->
+      <!-- 策略：直接展示 内置（各工艺策略 + 系统预置）/ AI优化模型（系统缺省）/ 自定义（仿真模式下保存的策略） -->
       <div v-else>
 
           <!-- 内置：按工艺分组展示各工艺策略（含系统预置策略，归入对应工艺） -->
@@ -132,6 +132,26 @@
               </div>
               <div v-if="!greenGroups.length" class="empty-hint">暂无工艺策略</div>
 
+            </div>
+          </div>
+
+          <!-- AI优化模型：系统缺省（默认）AI 优化模型，位于「自定义」上方 -->
+          <div class="tnode">
+            <div class="tch sub hdr" @click="toggle('g_strat_ai')">
+              <span class="twisty" :class="{ open: expanded.g_strat_ai }">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </span>
+              <span class="tch-tt">AI优化模型</span>
+              <span class="tch-count">{{ AI_MODELS.length }}</span>
+            </div>
+            <div class="tchildren" v-show="expanded.g_strat_ai">
+              <div v-for="m in AI_MODELS" :key="m.id" class="tchild leaf flat click"
+                   :class="{ active: store.selectedStrategyId === m.id }"
+                   :title="'点击查看 AI 优化模型「' + m.name + '」训练面板'"
+                   @click="onAiClick(m)">
+                <span class="tc-tt">{{ m.name }}</span>
+                <span class="tc-tag ai">AI</span>
+              </div>
             </div>
           </div>
 
@@ -175,7 +195,7 @@
 
 <script setup>
 import { reactive, ref, computed, watch, nextTick } from 'vue'
-import { useSimStore } from '../stores/sim'
+import { useSimStore, AI_MODELS } from '../stores/sim'
 import { MATERIALS, PRODUCTS, ROUTE_GROUPS, PROCESS_TEMPLATES, PROCESS_ADJUSTABLE, DEVICE_MAP, PROCESS_MAP } from '../data/flowLibrary'
 import Icon from './Icon.vue'
 import { openContextMenu } from '../composables/contextMenu'
@@ -361,7 +381,7 @@ watch(() => store.deviceDetailId, async (id) => {
 const expanded = reactive({
   process: true, g_steel: true, g_aux: true,
   aux: false, material: false, g_mat_raw: true, g_mat_mid: true, g_mat_prod: true,
-  strategy: false, g_strat_builtin: true, g_strat_custom: true,
+  strategy: false, g_strat_builtin: true, g_strat_ai: true, g_strat_custom: true,
 })
 // 工艺/策略目录不再有右侧专属属性面板（工序顺序已下线），切换时右侧显示总览
 const viewMap = { process: 'overview', aux: 'park', material: 'materials', strategy: 'overview' }
@@ -375,6 +395,12 @@ function onPresetClick(s) {
   if (store.busy) return
   store.selectStrategy(s.id)
   store.toast = `已打开内置策略「${s.name || '未命名'}」属性：点击底部「策略仿真」进入仿真模式解析测试`
+}
+// 点击 AI 优化模型：打开右侧「策略属性」训练面板（随实时数据后台定时训练、模型逐渐变优）
+function onAiClick(m) {
+  if (store.busy) return
+  store.selectStrategy(m.id)
+  store.toast = `已打开 AI 优化模型「${m.name}」训练面板：可开始自动训练/训练一轮/应用最优参数`
 }
 // 点击工艺策略（某工艺对应的绿色策略）：打开右侧「策略属性」面板（只读 + 启用/停用开关 + 查看工艺）
 function onGreenClick(g, gs) {
@@ -460,15 +486,17 @@ function onStratContext(e, s) {
 .dev-leaf .tc-tt { font-weight: 400; }
 
 /* 策略分类二级分组（内置 → 工艺）：tchildren 已提供缩进，箭头自身占位；
-   字体排版与工艺/物料分组标题（.tch.hdr）保持一致：小号 11px、弱色宽字距、无粗体 */
-.tch.sub2 { padding-left: 0; height: 24px; gap: 6px; color: var(--muted); }
-.tch.sub2 .tch-tt { font-size: 11px; font-weight: 400; letter-spacing: .8px; color: inherit; }
+   字号 13px、颜色 var(--text)、字重 400、字距 .08px，与工艺/物料树叶子条目（.tc-tt）完全一致，
+   避免同一工艺词在三个树中字号、颜色与字重不一 */
+.tch.sub2 { padding-left: 0; height: 24px; gap: 6px; }
+.tch.sub2 .tch-tt { font-size: 13px; font-weight: 400; letter-spacing: .08px; color: var(--text); }
 .tch.sub2 .twisty { width: 14px; opacity: .5; }
 
 /* 策略来源标签（内置 / 自定义） */
 .tc-tag { font-size: 9.5px; color: #fff; padding: 1px 5px; border-radius: 4px; white-space: nowrap; flex: 0 0 auto; }
 .tc-tag.pre { background: var(--accent); }
 .tc-tag.saved { background: var(--green); }
+.tc-tag.ai { background: var(--purple, #7c5cff); }
 
 /* 自定义策略条目：hover / 选中时显示删除按钮（VS Code 行内操作按钮） */
 .strat-del {
