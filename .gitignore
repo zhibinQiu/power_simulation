@@ -31,6 +31,9 @@ backend/strategies.json
 .DS_Store
 .playwright-cli/
 
+# ===== 内部工具状态（助手记忆等，非项目源码，不进版本库） =====
+.workbuddy/
+
 # ===== 图片/截图类中间产物（如需纳入版本管理请移除对应行） =====
 *.png
 !frontend/public/**/*.png
