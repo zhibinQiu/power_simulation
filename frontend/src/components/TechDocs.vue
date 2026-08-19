@@ -65,19 +65,27 @@ frontend/src/
   ├─ api/client.js        # REST / WebSocket 客户端
   └─ components/          # 检视器、TFT面板、桑基图、报告等 UI 组件
 
-backend/app/
-  ├─ main.py              # FastAPI 路由（REST + WebSocket + SPA 托管）
-  ├─ carbon_engine.py     # 碳素流仿真引擎（RULES 注册表 + 缓存）
-  ├─ factors.py           # 排放因子表与能耗折算
-  ├─ devices.py           # 监测设备库（活动数据来源）
-  ├─ realtime.py          # WebSocket 遥测推送 + 历史 ring buffer
-  ├─ nl_parser.py         # 自然语言 → 策略操作（启发式）
-  ├─ llm_strategy.py      # LLM 策略解析/对话（可选，无 Key 自动回退）
-  ├─ report.py            # AI 报告生成（骨架本地 + 分析 LLM）
-  ├─ presets.py           # 默认流程模型与示例策略
-  ├─ store.py             # 策略持久化
-  ├─ param_schema.py      # 工序参数分级元数据
-  └─ models.py            # 前后端数据契约（Pydantic）
+backend/
+  ├─ app/
+  │  ├─ main.py              # FastAPI 路由（REST + WebSocket + SPA 托管）
+  │  ├─ carbon_engine.py     # 碳素流仿真引擎（RULES 注册表 + 缓存）
+  │  ├─ calculators.py       # 能耗折算与排放因子计算
+  │  ├─ factors.py           # 排放因子表
+  │  ├─ devices.py           # 监测设备库（活动数据来源）
+  │  ├─ realtime.py          # WebSocket 遥测推送 + 历史 ring buffer
+  │  ├─ nl_parser.py         # 自然语言 → 策略操作（启发式）
+  │  ├─ llm_strategy.py      # LLM 策略解析/对话（可选，无 Key 自动回退）
+  │  ├─ param_schema.py      # 工序参数分级元数据
+  │  ├─ platform_config.py   # 平台可配置项（规模/量程/参数空间）
+  │  ├─ report.py            # AI 报告生成（骨架本地 + 分析 LLM）
+  │  ├─ report_store.py      # 历史报告持久化
+  │  ├─ md_render.py         # Markdown → HTML 分享页渲染
+  │  ├─ presets.py           # 默认流程模型与示例策略
+  │  ├─ specs.py             # 设备规格档位
+  │  ├─ store.py             # 策略持久化
+  │  └─ models.py            # 前后端数据契约（Pydantic）
+  ├─ config/                 # 统一配置目录：requirements.txt / run.sh / .env（LLM 密钥，不入库）/ platform_config.json / strategies.json
+  └─ data/reports/           # 历史报告输出
 
 ## 三、数据流
 
@@ -185,7 +193,7 @@ scope:   direct
 - **余热回收**：回收热量折抵燃料燃烧排放；
 - **富氢喷吹**：氢替代部分碳，降低碳素消耗，按氢还原份额折算减排量。
 
-平台在「数据」工具条的检视器 / 报告中展示各分项碳流占比与排放强度趋势。`,
+平台在右侧检视器 / 分析报告中展示各分项碳流占比与排放强度趋势。`,
   },
   {
     id: 'energy',
@@ -827,10 +835,16 @@ def _noise(v, pct=0.04):
 | GET | /api/factors | 默认排放因子表 |
 | GET | /api/param-schema | 工序参数分级元数据（config/optim、label、单位、参考范围） |
 | GET | /api/devices | 内置监测设备库（设备元数据 + 工序规格） |
+| GET | /api/devices/history | 设备历史时序（内存环形缓冲） |
+| GET | /api/platform-config | 平台可配置项（工艺规模 / 设备量程 / 参数运行空间） |
+| PUT | /api/platform-config | 保存平台可配置项（持久化到 backend/config/platform_config.json） |
+| POST | /api/platform-config/reset | 恢复平台配置默认值 |
 | POST | /api/parse | 自然语言 → 策略操作（LLM/启发式双引擎） |
 | POST | /api/simulate | 仿真（baseline + 可选策略对比 delta） |
 | POST | /api/apply | 直接对流程应用一组操作 |
 | POST | /api/strategies | 创建策略；GET/PUT/DELETE /api/strategies/{id}；POST /api/strategies/{id}/apply 应用策略 |
+| POST | /api/scan | 单工序参数敏感性扫描（扫参区间 / 密度 / 保留比例） |
+| POST | /api/audit | 全流程碳素流守恒审计（碳输入 = 排 CO₂ + 固钢 + 入渣 + 捕集 + 产品携出） |
 | POST | /api/report | 创建报告生成任务（后台线程） |
 | GET | /api/report/task/{id} | 轮询报告进度（done/progress/stage/result） |
 | GET | /api/reports | 历史报告列表（倒序） |
@@ -866,7 +880,7 @@ def _noise(v, pct=0.04):
 
 - **工序模型库 UNIT_META**：烧结机、球团、焦炉、高炉、转炉、电炉、精炼炉、连铸机、热轧机等 20+ 种工艺，按实际规模差异化缩放（高炉巨大、转炉中等、精炼偏小）；
 - **赛博朋克材质工厂**：高金属感、低粗糙度、蓝黑基底；
-- **环境模式 ENV**：四种可切换场景——void 赛博虚空（深空背景 + 霓虹网格）、desert 沙漠、city 城市（远景建筑群）、coast 海滩（水面 + 椰树），各有独立天空渐变、地表色与雾效；
+- **环境模式 ENV**：五种可切换场景——void 赛博虚空（深空背景 + 霓虹网格）、industrial 工业（厂房与管道剪影）、desert 沙漠、city 城市（远景建筑群）、coast 海滩（水面 + 椰树），各有独立天空渐变、地表色与雾效；
 - **平台地坪与网格**：随环境模式切换配色与霓虹网格（void 模式）；
 - **聚焦/选中高亮**：点击工序聚焦相机并高亮唯一标签与选中环，\`focus\`/框架视图（\`frameAll\`）一键复位。
 
@@ -901,7 +915,20 @@ def _noise(v, pct=0.04):
 
 ## 五、桑基图（碳流可视化）
 
-仿真结果生成 Sankey 图数据（燃料源 → 工序 → 去向，链路值 tC/h），可视化展示碳素流分配、固碳与捕集去向。`,
+仿真结果生成 Sankey 图数据（燃料源 → 工序 → 去向，链路值 tC/h），可视化展示碳素流分配、固碳与捕集去向。
+
+## 六、分析类面板
+
+| 面板 | 入口 | 说明 |
+| --- | --- | --- |
+| 参数敏感性扫描（SensitivityDialog） | 画布节点 / 左侧策略库工序右键 → 参数敏感性扫描 | 对单工序指定参数扫参，生成敏感性曲线与建议调节方向（POST /api/scan） |
+| 碳素流守恒审计 | 工具菜单 → 碳素流守恒审计 | 逐工序核算碳输入/输出五项平衡，输出偏差与守恒率（POST /api/audit） |
+| 高炉数值分析（TftAnalysisDialog） | 仿真菜单 → 高炉数值分析（Alt+T） | 全厂高炉 TFT 数值总览、鼓风/喷煤调参推演，复用 utils/tft.js 焓平衡 |
+| 平台配置（PlatformConfigDialog） | 工具菜单 → 平台配置… | 工艺规模档位 / 设备量程 / 参数运行空间，保存后编辑器、设备面板与 3D 标注自动生效（backend/config/platform_config.json） |
+
+## 七、命令行窗口（CommandConsole）
+
+底部命令行为交互中枢：聊天 / 代码 / 规划三模式 + 孪生控制命令（run/sim/stop/reset/overview/home/patrol/view/edit/done/clear），走 \`POST /api/chat\`；内置策略与工序策略的自然语言输入则走 \`POST /api/parse\`（LLM 优先、启发式回退）。`,
   },
 ]
 

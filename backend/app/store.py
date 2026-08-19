@@ -12,7 +12,7 @@ from typing import Dict, List, Optional
 
 from .models import Strategy
 
-_DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "strategies.json")
+_DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "config", "strategies.json")
 
 
 class StrategyStore:

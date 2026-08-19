@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # 仅拷贝并安装依赖；应用源码由挂载卷提供
-COPY backend/requirements.txt /tmp/requirements.txt
+COPY backend/config/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 EXPOSE 8010

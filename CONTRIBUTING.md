@@ -84,16 +84,7 @@ refactor: 合并冗余计算器
 git pull --rebase origin <你的分支>
 git push origin <你的分支>
 ```
-
-> **不要**直接用 `sync.sh`：`sync.sh` 是 owner 的**部署脚本**，内含服务器 IP 与部署凭据，会把代码 rsync 到生产服务器，协作者无需也无法运行。
-
 ---
-
-## 6. 部署（协作者无需参与）
-
-服务器部署由仓库 owner 负责：从 Gitee 拉取干净的 `master`，再 `rsync` 到生产服务器（`172.19.134.45:/root/qzb/jianpai`，对外 `40014→8010`）。
-
-若你希望「推送到 Gitee 即自动上服务器」，请联系 owner 配置 Gitee Webhook → 自动部署（不在本文档范围）。
 
 ---
 

@@ -23,9 +23,10 @@ backend/1necho
 *.log
 backend/server*.log
 
-# ===== 本地配置覆盖（按需自行保留） =====
-backend/platform_config.json
-backend/strategies.json
+# ===== 本地配置覆盖（按需自行保留，统一位于 backend/config/） =====
+backend/config/platform_config.json
+backend/config/strategies.json
+backend/config/.env
 
 # ===== macOS / 浏览器调试残留 =====
 .DS_Store

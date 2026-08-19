@@ -24,9 +24,13 @@ from .param_schema import PARAM_SCHEMA, TECHS_INFO, UNIT_TYPES_INFO
 
 def _load_dotenv():
     """本地直接运行（run.sh / uvicorn）时，docker-compose 注入的 LLM_* 不会进入进程环境；
-    这里从 backend/.env 与项目根 .env 读取并补进 os.environ，保证本地启动也能拿到配置。"""
+    这里从 backend/config/.env 与项目根 .env 读取并补进 os.environ，保证本地启动也能拿到配置。"""
     here = os.path.dirname(__file__)
-    for cand in (os.path.join(here, "..", ".env"), os.path.join(here, "..", "..", ".env")):
+    for cand in (
+        os.path.join(here, "..", "config", ".env"),
+        os.path.join(here, "..", ".env"),
+        os.path.join(here, "..", "..", ".env"),
+    ):
         if os.path.isfile(cand):
             try:
                 with open(cand, "r", encoding="utf-8") as f:

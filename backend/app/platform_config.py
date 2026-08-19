@@ -5,7 +5,7 @@
   - device_ranges（设备量程）：各设备类型的量程 min/max/unit
   - param_ranges（参数运行空间）：各工序参数的 min/max/step
 
-配置持久化到 backend/platform_config.json（仅存用户覆盖项），
+配置持久化到 backend/config/platform_config.json（仅存用户覆盖项），
 GET /api/param-schema 与 /api/devices 返回时叠加用户配置，
 前端编辑器 / 设备面板 / 3D 标注自动使用配置后的范围。
 """
@@ -21,7 +21,7 @@ from .param_schema import PARAM_SCHEMA
 from .devices import DEVICE_LIBRARY, library_payload
 from .specs import PROCESS_SPECS
 
-_DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "platform_config.json")
+_DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "config", "platform_config.json")
 
 # 每个工序的「规模参数」key（产量/入炉量，决定产线规模档位）
 PROCESS_SCALE_KEYS: Dict[str, str] = {
