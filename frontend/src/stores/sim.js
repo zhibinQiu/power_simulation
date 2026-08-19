@@ -21,7 +21,7 @@ function _adjDevice(u, dt, setpoints, extraSetpoints) {
   if (!tmpl) return null
   const sid = `${u.id}::${dt}`
   const sp = (setpoints && setpoints[sid] != null) ? setpoints[sid] : (tmpl.setpoint ? tmpl.setpoint.def : null)
-  // 附加可调项（如鼓风机喷氧量）：合并用户设定值，未设则取模板默认
+  // 附加可调项（如鼓风机鼓风湿度）：合并用户设定值，未设则取模板默认
   const esStore = (extraSetpoints && extraSetpoints[sid]) || {}
   const extraSetpointsMerged = {}
   if (tmpl.extraSetpoints && tmpl.extraSetpoints.length) {
@@ -174,7 +174,7 @@ export const useSimStore = defineStore('sim', {
     deviceHistory: {},        // 各设备历史读数序列：devId -> [{t, v}]
     deviceLive: {},           // 各设备实时读数：devId -> number
     deviceSetpoints: {},      // 可调设备设定值覆盖：devId -> number（视图态/编辑态统一存储，驱动实时读数与碳引擎折算）
-    deviceExtraSetpoints: {}, // 可调设备附加可调项（如鼓风机喷氧量）：devId -> { key: number }
+    deviceExtraSetpoints: {}, // 可调设备附加可调项（如鼓风机鼓风湿度）：devId -> { key: number }
     deviceMeta: {},           // 设备元数据（后端 /api/devices/history 的 meta）
     viewResetNonce: 0,   // 触发中间 3D 场景重置视角
     patrolOn: false,      // 虚拟巡视：小机器人沿工艺旁地面巡视完整流程
@@ -250,7 +250,7 @@ export const useSimStore = defineStore('sim', {
         if (!tmpl) return null
         const sp = (s.deviceSetpoints && s.deviceSetpoints[devId] != null) ? s.deviceSetpoints[devId]
           : (tmpl.setpoint ? tmpl.setpoint.def : null)
-        // 附加可调项（如鼓风机喷氧量）
+        // 附加可调项（如鼓风机鼓风湿度）
         const esStore = (s.deviceExtraSetpoints && s.deviceExtraSetpoints[devId]) || {}
         const extraSetpoints = {}
         if (tmpl.extraSetpoints && tmpl.extraSetpoints.length) {
@@ -1658,11 +1658,11 @@ export const useSimStore = defineStore('sim', {
       this._saveScheme()   // 设定值随方案持久化，刷新后不丢失
       this.refresh()
     },
-    // 附加可调项设定（如鼓风机喷氧量）：devId + 可调项 key -> 数值
+    // 附加可调项设定（如鼓风机鼓风湿度）：devId + 可调项 key -> 数值
     setDeviceExtraSetpoint(deviceId, key, val) {
       this._histCapture('des_' + deviceId)   // 同设备附加设定滑动在合并窗口内合成一步
       const v = Number(val)
-      // 仿真模式：记录附加可调项变更（如鼓风机喷氧量）。
+      // 仿真模式：记录附加可调项变更（如鼓风机鼓风湿度）。
       // 同设备同项反复调整合并为一条，文案始终为「仿真前值 → 当前值」。
       if (this.simMode) {
         const d = this.scheme.devices.find((x) => x.id === deviceId)
@@ -1679,7 +1679,7 @@ export const useSimStore = defineStore('sim', {
       this.deviceExtraSetpoints = { ...this.deviceExtraSetpoints, [deviceId]: { ...cur, [key]: v } }
       const d = this.scheme.devices.find((x) => x.id === deviceId)
       if (d) d.extraSetpoints = { ...(d.extraSetpoints || {}), [key]: v }
-      // 附加可调项（喷氧量）同样桥接为高炉操作参数（富氧率），需重算同步
+      // 附加可调项（鼓风湿度）同样桥接为高炉操作参数（鼓风含湿），需重算同步
       this._saveScheme()   // 设定值随方案持久化，刷新后不丢失
       this.refresh()
     },

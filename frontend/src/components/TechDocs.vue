@@ -681,7 +681,7 @@ deriveProcessOpParams(unitType, devices, baseParams) → overrides
 | --- | --- | --- |
 | 热风炉 · 风温 | hot_blast_temp | 直接决定鼓风显热 |
 | 鼓风机 · 风量 | wind_rate | 改变比风量，影响 TFT 与煤气量 |
-| 鼓风机 · 喷氧量 | oxygen_enrich / o2_inj | 提高氧浓度，加快燃烧、提升 TFT |
+| 鼓风机 · 鼓风湿度 | blast_humidity | 鼓风含湿（加湿/脱湿）参与水分分解吸热，湿度↑→TFT↓、焦比↑ |
 | 喷吹系统 · 喷煤量 | coal_inj | 增加燃料量，但受鼓风氧限制 |
 
 ## 三、TFT 设备探测（TFT_DEVICE_PROBES）
@@ -692,7 +692,7 @@ TFT 策略模块通过**设备级探测**评估每个可调设备的调节效果
 const TFT_DEVICE_PROBES = [
   { type: 'hot_blast_stove', label: '热风炉·风温',   step: 30,  unit: '℃' },
   { type: 'blower',           label: '鼓风机·风量',   step: 520, unit: 'm³/h' },
-  { type: 'blower',           label: '鼓风机·喷氧量', step: 5, unit: 'kNm³/h', extraKey: 'o2_inj' },
+  { type: 'blower',           label: '鼓风机·鼓风湿度', step: 1, unit: 'g/Nm³', extraKey: 'humidity', def: 10 },
   { type: 'injector',         label: '喷吹系统·喷煤量', step: 20, unit: 'kg/h' },
 ]
 \`\`\`

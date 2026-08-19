@@ -34,7 +34,7 @@
                :title="`当前 ${f(setpointVal)} ${sp.unit || ''}`" />
         <div class="pr-hint">参考范围 {{ f(sp.min) }} – {{ f(sp.max) }} {{ sp.unit || '' }}</div>
       </div>
-      <!-- 附加可调项（如鼓风机喷氧量） -->
+      <!-- 附加可调项（如鼓风机鼓风湿度） -->
       <div v-for="es in extraSps" :key="es.key" class="param-row extra-row">
         <div class="pr-top"><span>{{ es.label }}</span><b>{{ f(extraVal(es.key)) }} <span class="u">{{ es.unit }}</span></b></div>
         <input type="number" :min="es.min" :max="es.max" :step="es.step || 1"
@@ -73,7 +73,7 @@
     </CollapseSection>
 
     <!-- ===== 4. 其他内容 ===== -->
-    <!-- 附加可调项联动指标（如富氧率）：展示推导公式，透明可审计 -->
+    <!-- 附加可调项联动指标（如高炉鼓风含湿）：展示推导公式，透明可审计 -->
     <template v-if="multiIndicators.length">
       <CollapseSection :title="'衍生指标 · ' + (multiIndicators[0] ? multiIndicators[0].label : '')" tone="amber" :show-more="false">
       <div class="couple-box">
@@ -81,10 +81,10 @@
           <div class="couple-top">
             <span class="cb-badge m">机理</span>
             <span class="cb-target">指标：<b>{{ ind.label }}</b></span>
-            <span class="cb-val">{{ f(ind.value) }}<i>%</i></span>
+            <span class="cb-val">{{ f(ind.value) }}<i>{{ ind.unit }}</i></span>
           </div>
           <p class="cb-basis"><b>公式：</b>{{ ind.formula }}</p>
-          <p class="cb-basis2">当前 风量 {{ f(setpointVal) }} m³/h、喷氧量 {{ f(extraVal(ind.key)) }} Nm³/h</p>
+          <p class="cb-basis2">当前 风量 {{ f(setpointVal) }} m³/h、{{ ind.label }} {{ f(extraVal(ind.key)) }} {{ ind.unit }}</p>
           <p class="cb-basis2" v-if="ind.basis">{{ ind.basis }}</p>
         </div>
       </div>
@@ -177,7 +177,7 @@ const spLabel = computed(() => {
   if (dev.value && dev.value.measures) return dev.value.measures
   return '设定值'
 })
-// 附加可调项（如鼓风机喷氧量）：模板定义列表
+// 附加可调项（如鼓风机鼓风湿度）：模板定义列表
 const extraSps = computed(() => {
   const t = dev.value && DEVICE_MAP[dev.value.type]
   return (t && t.extraSetpoints) || []
@@ -211,7 +211,7 @@ const baseParams = computed(() => {
   const u = store.model.units.find((x) => x.id === info.value.unitId)
   return u ? (u.params || {}) : {}
 })
-// TFT 策略提示：仅高炉（blast_furnace）热制度相关可调设备展示（风量/喷氧、风温、喷煤）
+// TFT 策略提示：仅高炉（blast_furnace）热制度相关可调设备展示（风量/湿度、风温、喷煤）
 const TFT_DEVICES = ['blower', 'hot_blast_stove', 'injector']
 // TFT 实时参数：工序基础参数 + 当前工序全部热制度设备实际设定折算（拖动滑块实时联动 TFT 与建议）
 const tftParams = computed(() => {
@@ -237,7 +237,7 @@ const derivedNow = computed(() => {
   const ov = deriveProcessOpParams(info.value.unitType, [{ type: dev.value.type, setpoint: setpointVal.value }], baseParams.value)
   return ov || {}
 })
-// 附加可调项联动指标（如鼓风机喷氧量 → 富氧率）：由耦合注册表 multi 配置推导，属性面板展示指标与公式
+// 附加可调项联动指标（如鼓风机鼓风湿度 → 高炉鼓风含湿）：由耦合注册表 multi 配置推导，属性面板展示指标与公式
 const multiIndicators = computed(() => {
   const c = coupling.value
   if (!c || !c.multi || !dev.value) return []
@@ -248,7 +248,7 @@ const multiIndicators = computed(() => {
       const ov = m.derive(extraVal(key), setpointVal.value, baseParams.value)
       value = ov && ov[m.target] != null ? ov[m.target] : null
     } catch (e) { value = null }
-    out.push({ key, label: paramLabel(m.target), value, formula: m.formula || '', basis: m.basis || '' })
+    out.push({ key, label: paramLabel(m.target), value, formula: m.formula || '', basis: m.basis || '', unit: m.unit || '%' })
   }
   return out
 })

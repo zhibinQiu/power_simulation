@@ -29,7 +29,8 @@ export const EDITABLE_PARAMS = {
     { key: 'flux', label: '熔剂比', unit: 'kg/t', min: 0, max: 250, step: 5, mode: 'direct' },
     { key: 'wind_rate', label: '风量', unit: 'kNm³/h', min: 100, max: 900, step: 10, mode: 'aux', auxType: 'blower', auxNote: '由分支辅助工艺·鼓风机供风量驱动，点击实例跳转配置' },
     { key: 'hot_blast_temp', label: '热风温度', unit: '℃', min: 950, max: 1300, step: 10, mode: 'aux', auxType: 'hot_blast_stove', auxNote: '由分支辅助工艺·热风炉送风温度驱动，点击实例跳转配置' },
-    { key: 'oxygen_enrich', label: '富氧率', unit: '%', min: 0, max: 14, step: 0.5, mode: 'derived', auxType: 'blower', auxNote: '由鼓风机·喷氧量自动算出（富氧增量，相对空气 21%），相关配置在鼓风机中' },
+    { key: 'oxygen_enrich', label: '富氧率', unit: '%', min: 0, max: 14, step: 0.5, mode: 'derived', auxType: 'oxy_supply', auxNote: '由全厂供氧系统·供氧量自动算出（富氧增量，相对空气 21%），相关配置在供氧系统中' },
+    { key: 'blast_humidity', label: '鼓风湿度', unit: 'g/Nm³', min: 0, max: 30, step: 1, mode: 'derived', auxType: 'blower', auxNote: '由鼓风机·鼓风湿度设定驱动，水分在风口分解吸热，影响高炉热制度（TFT）' },
   ],
   hydrogen_bf: [
     { key: 'hot_metal', label: '铁水产量', unit: 't/h', min: 200, max: 2000, step: 50 },

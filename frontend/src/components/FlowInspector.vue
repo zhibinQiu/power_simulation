@@ -199,7 +199,7 @@
                    :value="node.setpoint" @input="store.setDeviceSetpoint(node.id, $event.target.value)" />
             <div class="pr-hint">范围 {{ dSp(node).min }}–{{ dSp(node).max }} {{ dSp(node).unit }}</div>
           </div>
-          <!-- 附加可调项（如鼓风机喷氧量） -->
+          <!-- 附加可调项（如鼓风机鼓风湿度） -->
           <div v-for="es in dExtra(node)" :key="es.key" class="param-row">
             <div class="pr-top"><span>{{ es.label }}</span><b>{{ extraValOf(node, es.key) }} <span class="u">{{ es.unit }}</span></b></div>
             <input type="number" :min="es.min" :max="es.max" :step="es.step||1" class="num"

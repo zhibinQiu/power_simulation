@@ -265,12 +265,12 @@ export const PROCESS_TEMPLATES = [
   // efDirect = 0（不直接产碳）；电耗由运行参数折算为范围二排放。
   { type: 'blower', label: '鼓风机', route: 'aux', mainIn: null, mainOut: 'blast_air',
     efDirect: 0.0, efIndirect: 0.0, yield: 0,
-    // oxygen: 全厂供氧系统富氧鼓风喷氧（o2_inj 喷氧量的实物来源）
+    // oxygen: 全厂供氧系统集中供氧（富氧率由供氧系统·供氧量驱动，鼓风机不再单独喷氧）
     inputs: ['oxygen'], outputs: ['blast_air'],
-    // power: 配套电机功率 MW；air_rate: 实际供风量 kNm³/h；o2_inj: 喷氧量 kNm³/h（富氧率指标的配置项）
+    // power: 配套电机功率 MW；air_rate: 实际供风量 kNm³/h；humidity: 鼓风湿度 g/Nm³（加湿/脱湿调节，影响风口热制度）
     params: [{ key: 'power', label: '电机功率', unit: 'MW', min: 10, max: 80, step: 1, def: 36 },
              { key: 'air_rate', label: '供风量', unit: 'kNm³/h', min: 100, max: 900, step: 10, def: 600 },
-             { key: 'o2_inj', label: '喷氧量', unit: 'kNm³/h', min: 0, max: 120, step: 5, def: 30 },
+             { key: 'humidity', label: '鼓风湿度', unit: 'g/Nm³', min: 0, max: 30, step: 1, def: 10 },
              { key: 'pressure', label: '出口风压', unit: 'kPa', min: 200, max: 600, step: 10, def: 420 }],
     // 高炉 wind_rate 为绝对供风量（kNm³/h），与鼓风机 air_rate 同量纲，连线直接写入。
     // 与设备折算同一基准：设备设定 def 5200（m³/h）↔ 600 kNm³/h → LEGACY scale 600 → air_rate 600 kNm³/h。
@@ -439,7 +439,7 @@ export const DEVICE_TEMPLATES = [
   // 可调设备（可设定）
   // response: 设定值→测定值 响应特性（bias: 稳态偏差率, noise: 测量噪声幅度）。设定值(SP)由
   // 操作/策略调节，经设备响应产生测定值(PV)，二者存在差异；平台核算一律以测定值为准。
-  { type: 'blower', label: '鼓风机', kind: 'adjustable', unit: 'm³/h', setpoint: { min: 3000, max: 9000, def: 5200, unit: 'm³/h', label: '风量' }, extraSetpoints: [{ key: 'o2_inj', label: '喷氧量', unit: 'kNm³/h', min: 0, max: 120, def: 30, step: 5, powerPerUnit: 0.00002 }], powerPerUnit: 0.00006, effType: 'blower', measures: '风量', response: { bias: 0.03, noise: 0.01 }, desc: '本工序的可调设备，其风量设定经碳引擎折算为鼓风电耗与间接排放；风量↑→风口燃烧带活性↑、允许更高喷煤，是减排策略的作用对象。' },
+  { type: 'blower', label: '鼓风机', kind: 'adjustable', unit: 'm³/h', setpoint: { min: 3000, max: 9000, def: 5200, unit: 'm³/h', label: '风量' }, extraSetpoints: [{ key: 'humidity', label: '鼓风湿度', unit: 'g/Nm³', min: 0, max: 30, def: 10, step: 1, powerPerUnit: 0 }], powerPerUnit: 0.00006, effType: 'blower', measures: '风量', response: { bias: 0.03, noise: 0.01 }, desc: '本工序的可调设备，其风量设定经碳引擎折算为鼓风电耗与间接排放；风量↑→风口燃烧带活性↑、允许更高喷煤，是减排策略的作用对象；鼓风湿度（加湿/脱湿）参与高炉热制度（TFT）计算，湿度↑→理论燃烧温度↓。' },
   { type: 'id_fan', label: '引风机', kind: 'adjustable', unit: 'm³/h', setpoint: { min: 2000, max: 8000, def: 4000, unit: 'm³/h' }, powerPerUnit: 0.00004, effType: 'none', measures: '烟气抽力', response: { bias: 0.04, noise: 0.012 }, desc: '本工序的可调设备，其设定值经碳引擎折算为运行电耗与间接排放，是减排策略的作用对象。' },
   { type: 'belt_conv', label: '皮带机', kind: 'adjustable', unit: 'm/s', setpoint: { min: 0.5, max: 4, def: 2, unit: 'm/s' }, powerPerUnit: 0.8, effType: 'feeder', measures: '带速/给料量', response: { bias: 0.02, noise: 0.008 }, desc: '本工序的可调设备，控制物料输送带速与给料量，其设定值经碳引擎折算为传动电耗与间接排放，是减排策略的作用对象。' },
   { type: 'feeder', label: '给料机', kind: 'adjustable', unit: 't/h', setpoint: { min: 10, max: 500, def: 200, unit: 't/h' }, powerPerUnit: 0.01, effType: 'feeder', measures: '给料速率', response: { bias: 0.03, noise: 0.01 }, desc: '本工序的可调设备，控制矿、燃料、熔剂等给料速率，其设定值经碳引擎折算为给料电耗与间接排放，是减排策略的作用对象。' },
@@ -457,8 +457,8 @@ export const DEVICE_TEMPLATES = [
   // 全厂级工辅（供氧/供电）自身的可调设备：作为独立实体挂在工辅工艺下，
   // 供氧量/供电负荷设定对应工艺参数（oxygen_rate/power），经物料连线供给各用氧/用电工序。
   // 电耗由工辅单元参数 power 计入（compute.js 对 route:'aux' 已统一核算），此处 powerPerUnit=0 避免重复计电。
-  { type: 'oxy_supply', label: '制氧机组', kind: 'adjustable', unit: 'kNm³/h', setpoint: { min: 20, max: 1500, def: 600, unit: 'kNm³/h', label: '供氧量' }, powerPerUnit: 0, effType: 'none', measures: '供氧量', response: { bias: 0.02, noise: 0.01 }, desc: '全厂供氧系统（空分制氧机组）的可调设备，供氧量设定对应供氧系统工艺参数，经连线集中供给高炉富氧鼓风、转炉吹炼、铁水预处理喷吹与精炼等用氧工序，是富氧强化冶炼减排策略的作用对象。' },
-  { type: 'power_supply', label: '变配电所', kind: 'adjustable', unit: 'MW', setpoint: { min: 1, max: 600, def: 200, unit: 'MW', label: '供电负荷' }, powerPerUnit: 0, effType: 'none', measures: '供电负荷', response: { bias: 0.01, noise: 0.005 }, desc: '全厂供电系统（总降/主变电站）的可调设备，汇集外购电、自发电（BFG/CDQ/余热）与绿电统一分配，供电负荷设定对应全厂范围二电耗，是提升绿电/自发电占比减排策略的作用对象。' },
+  { type: 'oxy_supply', label: '供氧系统', kind: 'adjustable', unit: 'kNm³/h', setpoint: { min: 20, max: 1500, def: 600, unit: 'kNm³/h', label: '供氧量' }, powerPerUnit: 0, effType: 'none', measures: '供氧量', response: { bias: 0.02, noise: 0.01 }, desc: '全厂供氧系统（空分制氧机组）的可调设备，供氧量设定对应供氧系统工艺参数，经连线集中供给高炉富氧鼓风、转炉吹炼、铁水预处理喷吹与精炼等用氧工序，是富氧强化冶炼减排策略的作用对象。' },
+  { type: 'power_supply', label: '供电系统', kind: 'adjustable', unit: 'MW', setpoint: { min: 1, max: 600, def: 200, unit: 'MW', label: '供电负荷' }, powerPerUnit: 0, effType: 'none', measures: '供电负荷', response: { bias: 0.01, noise: 0.005 }, desc: '全厂供电系统（总降/主变电站）的可调设备，汇集外购电、自发电（BFG/CDQ/余热）与绿电统一分配，供电负荷设定对应全厂范围二电耗，是提升绿电/自发电占比减排策略的作用对象。' },
 ]
 export const DEVICE_MAP = Object.fromEntries(DEVICE_TEMPLATES.map((d) => [d.type, d]))
 export const DEVICE_GROUPS = {
@@ -488,23 +488,16 @@ export const DEVICE_COUPLE_REGISTRY = {
   blast_furnace: {
     blower: {
       target: 'wind_rate', effect: 'reduce', source: 'mechanism',
-      basis: '鼓风量正比于鼓风机风量设定；风量↑→风口燃烧带活性↑、允许更高喷煤。附加可调项「喷氧量」：富氧鼓风，喷氧量↑→富氧率↑→风口理论燃烧温度↑、焦比↓',
+      basis: '鼓风量正比于鼓风机风量设定；风量↑→风口燃烧带活性↑、允许更高喷煤。附加可调项「鼓风湿度」：加湿/脱湿调节鼓风含湿量，湿度↑→水分分解吸热、理论燃烧温度↓、焦比↑',
       nominal: 5200, uncertainty: '±5%',
       derive: (s) => ({ wind_rate: Math.round(Number(s) / 5200 * 600) }), // 设备设定 m³/h（def 5200）↔ 风量 kNm³/h（def 600）
-      // 附加可调项联动：喷氧量 → 富氧率（混合氧浓度公式，属性面板展示）
+      // 附加可调项联动：鼓风湿度 → 高炉鼓风含湿（TFT 热制度输入，属性面板展示）
       multi: {
-        o2_inj: {
-          target: 'oxygen_enrich', source: 'mechanism', uncertainty: '±3%',
-          formula: '富氧率(%) = 0.79 × 喷氧量 ÷ (供风量 + 喷氧量)',
-          basis: '富氧鼓风机理：鼓风空气含氧 21%（占比 0.21），掺入纯氧（含氧 100%）后，混合气体氧浓度相对空气的提升量即富氧率（富氧增量）= 0.79 × 喷氧量 ÷ (供风量 + 喷氧量)；供风量取工序口径 air_rate（kNm³/h），喷氧量与其同量纲相配，避免量纲错配导致富氧率失真；喷氧量↑→富氧率↑→风口温度↑、焦比↓、产量↑',
-          derive: (o2, wind, base) => {
-            // 供风量（kNm³/h）取鼓风机工辅参数 air_rate，缺失时回退 600（模板默认）
-            const air = Number(base && base.air_rate) > 0 ? Number(base.air_rate) : 600
-            const o = Number(o2) > 0 ? Number(o2) : 0 // 喷氧量 kNm³/h
-            const v = 0.79 * o / (air + o) * 100
-            // 富氧率为鼓风富氧增量（相对空气 21% 的提升量），钳制到系统参数范围 0~14%
-            return { oxygen_enrich: Math.min(14, Math.max(0, v)) }
-          },
+        humidity: {
+          target: 'blast_humidity', unit: 'g/Nm³', source: 'mechanism', uncertainty: '±5%',
+          formula: '鼓风湿度(g/Nm³) = 鼓风机湿度设定',
+          basis: '鼓风含湿：鼓风机加湿/脱湿装置调节出口鼓风携带的水分（g/Nm³）；水分在风口分解（C+H₂O→CO+H₂）吸热，湿度↑→理论燃烧温度（TFT）↓、焦比↑（风口热补偿需求增加）；高炉 TFT 面板直接读取该值参与焓平衡计算',
+          derive: (h) => ({ blast_humidity: Math.max(0, Math.min(30, Number(h) || 0)) }),
         },
       },
     },
@@ -783,7 +776,7 @@ export function loadCalibrations() {
 // 由一组设备(类型+设定值)推导某工序应注入的工序参数覆盖对象。
 // devices: [{ type, setpoint, extraSetpoints }]，base = 该工序当前参数（相对推导，避免跳变）。
 // 仅在设备类型属于该工序注册表且设定值有效时输出。
-// extraSetpoints：设备附加可调项（如鼓风机「喷氧量」），走耦合注册表 multi 配置联动推导（如富氧率）。
+// extraSetpoints：设备附加可调项（如鼓风机「鼓风湿度」），走耦合注册表 multi 配置联动推导（如高炉鼓风含湿）。
 export function deriveProcessOpParams(processType, devices, base = {}) {
   const out = {}
   const reg = DEVICE_COUPLE_REGISTRY[processType]
@@ -797,7 +790,7 @@ export function deriveProcessOpParams(processType, devices, base = {}) {
       const overrides = cfg.derive(eff, base)
       if (overrides && typeof overrides === 'object') Object.assign(out, overrides)
     }
-    // 附加可调项：如鼓风机喷氧量 → 富氧率（multi 配置）；基准主设定值同样以设定值为准
+    // 附加可调项：如鼓风机鼓风湿度 → 高炉鼓风含湿（multi 配置）；基准主设定值同样以设定值为准
     if (cfg.multi && d.extraSetpoints && typeof d.extraSetpoints === 'object') {
       for (const [key, val] of Object.entries(d.extraSetpoints)) {
         const m = cfg.multi[key]
@@ -997,10 +990,10 @@ export function migrateLegacyDevices(scheme) {
     // 旧设定值(相对倍率 0-2) -> 绝对值写入 src 参数
     const sp = (typeof d.setpoint === 'number') ? d.setpoint : 1
     aux.params = { ...aux.params, [map.srcKey]: Math.round(sp * map.scale) }
-    // 附加可调项（如喷氧量）原样带入；旧版喷氧量为 Nm³/h（如 800），新版统一为 kNm³/h（÷1000 折算）
+    // 附加可调项（鼓风湿度）原样带入；旧版喷氧量已移交供氧系统接管，不再随鼓风机迁移
     if (d.extraSetpoints && typeof d.extraSetpoints === 'object') {
       Object.assign(aux.params, d.extraSetpoints)
-      if (aux.params.o2_inj != null) aux.params.o2_inj = Math.max(0, Math.round(aux.params.o2_inj / 1000))
+      if (aux.params.o2_inj != null) delete aux.params.o2_inj
     }
     newNodes.push(aux)
     removeIds.add(d.id)
@@ -1040,7 +1033,7 @@ const SCHEME_AUX = {
     ['id_fan', 'sinter_plant', 0],
     ['id_fan', 'pelletizing', 0],
     ['injector', 'blast_furnace', 0],
-    // 全厂供氧系统：向铁水预处理喷吹、转炉吹氧集中供氧，并为鼓风机富氧鼓风（喷氧 o2_inj）供氧
+    // 全厂供氧系统：向铁水预处理喷吹、转炉吹氧集中供氧，并集中供给高炉富氧鼓风（富氧率由供氧量驱动）
     ['oxy_supply', 'hot_metal_pretreat', 0],
     ['oxy_supply', 'bof', 0],
     ['oxy_supply', 'blower', 0],

@@ -2683,7 +2683,8 @@ export class TwinScene {
     })
 
     group.userData = {
-      unitId: unit.id, groupId: unit.groupId || null, body, bodyMat, bodyMats, label, labelObj: label.userData.labelObj, ring,
+      unitId: unit.id, unitType: unit.type, route: unit.route || null,
+      groupId: unit.groupId || null, body, bodyMat, bodyMats, label, labelObj: label.userData.labelObj, ring,
       topY: body.userData.topY, share: share || 0, shareCss: co2Css,
       ioY: { in: io.inY * yStretch, out: io.outY * yStretch },   // 模型空间输入/输出口高度
       yStretch,   // Y轴拉伸系数
@@ -4145,6 +4146,11 @@ export class TwinScene {
     this._setFocus(gid)
   }
 
+  // 设备聚焦：优先定位「设备本体」位置。
+  // 可调设备（工辅设备）在 3D 场景中以工辅工艺实例 / 小组聚合模型呈现，传入的合成 id 形式：
+  //   - unitId::auxType   （工辅实例自身，或「绑定工序实例::工辅类型」视角）
+  //   - tpl::unitType::devType（非部署工艺的模板设备）
+  // 相机应聚焦到该工辅类型在场景中的实例本体，而不是其绑定工序的整体位置。
   focusDevice(id) {
     const grp = this.deviceMap.get(id)
     if (grp) {
@@ -4153,8 +4159,36 @@ export class TwinScene {
       this.focusOn(v, 16)
       return
     }
-    const uid = id.split('::')[0]
-    this.focusUnit(uid)
+    const parts = id.split('::')
+    if (parts.length >= 2) {
+      // 非部署工艺模板设备：聚焦该工艺类型在场景中的首个已部署实例
+      if (parts[0] === 'tpl' && parts.length === 3) {
+        const g = this._findUnitByType(parts[1])
+        if (g) this.focusUnit(g.id)
+        return
+      }
+      const unitId = parts[0]
+      const auxType = parts[1]
+      // unitId 本身就是该工辅类型的实例（未连线绑定路径）→ 直接聚焦该实例
+      const gu = this.unitGroups.get(unitId)
+      if (gu && gu.unitType === auxType) { this.focusUnit(unitId); return }
+      // 否则聚焦该工辅类型在场景中的实例本体（设备实际所在位置）
+      const g = this._findUnitByType(auxType)
+      if (g) { this.focusUnit(g.id); return }
+      // 兜底：聚焦绑定工序实例
+      this.focusUnit(unitId)
+      return
+    }
+    this.focusUnit(id)
+  }
+
+  // 查找场景中指定工艺类型的首个已部署实例（含小组聚合模型：成员包含该类型的组模型）
+  _findUnitByType(type) {
+    for (const [uid, g] of this.unitGroups) {
+      if (g.unitType === type) return { id: uid }
+      if (g.memberUnits && g.memberUnits.some((u) => u.type === type)) return { id: uid }
+    }
+    return null
   }
 
   // 点击工艺间连接标签 → 将相机平滑聚焦到标签位置（连线中点上方）

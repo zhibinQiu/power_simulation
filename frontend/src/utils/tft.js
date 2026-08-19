@@ -2,7 +2,7 @@
 // 高炉多燃料通用 TFT（理论燃烧温度）焓平衡算法 —— 前端策略提示模块
 // 与后端 Python calc_tft_enthalpy_full 逻辑完全对齐，覆盖固/液/气三类风口燃料。
 //
-// 用途：针对高炉可调设备（鼓风机·风量/喷氧、热风炉·风温、喷吹系统·喷煤）的操作策略提示：
+// 用途：针对高炉可调设备（鼓风机·风量/湿度、热风炉·风温、喷吹系统·喷煤）的操作策略提示：
 //   1) 实时计算当前工况 TFT 并判定热状态（正常 / 偏低 / 偏高）；
 //   2) 预览设备调节对 TFT 的影响方向与幅度（走设备耦合推导，与系统 refresh 一致）；
 //   3) 依据算法真值给出可执行的操作建议。
@@ -28,6 +28,7 @@ export const TFT_PARAM_DEFAULTS = {
   hot_blast_temp: 1250,   // 热风温度 ℃
   wind_rate: 600,         // 风量 kNm³/h（绝对供风量）
   oxygen_enrich: 0,       // 富氧率（富氧增量，相对空气 21%）%
+  blast_humidity: 10,     // 鼓风湿度 g/Nm³（鼓风机加湿/脱湿后的鼓风含湿，供氧系统富氧不改变湿度）
   hot_metal: 8000,        // 铁水产量 t/h（系统实际值）
   coke_rate: 360,         // 焦比 kg/tFe
   coal_inj: 150,          // 喷煤比 kg/tFe
@@ -132,8 +133,14 @@ export function collectTftInputs(params = {}, config = DEFAULT_TFT_CONFIG) {
   const N2_blow = 1.0 - O2_blow
   // 鼓风显热按空气比热 cpAir 计算（炉腹煤气比热 cp 仅用于焓→温度换算）
   const Q_sensible_air = B * num(config.cpAir, 0.0013) * tg        // MJ/tFe
+  // 鼓风湿度（g/Nm³）：水分在风口分解（C+H₂O→CO+H₂）吸热、消耗碳并增加煤气量
+  const H = Math.max(0, Math.min(30, num(p.blast_humidity, TFT_PARAM_DEFAULTS.blast_humidity)))
+  const h2oVolFrac = H * 1.244 / 1000       // 每 Nm³ 鼓风含水蒸气体积 Nm³（1 kg H2O ≈ 1.244 Nm³）
+  const dry_air = Math.max(0, B * (1 - h2oVolFrac)) // 干风量 Nm³/tFe（湿分不供氧、不产热，仅携显热）
+  const m_h2o = B * H / 1000                // 鼓风水分 kg/tFe
+  const Q_h2o_decomp = m_h2o * 10.8         // 水分分解吸热 MJ/tFe（C+H₂O→CO+H₂ 约 10.8 MJ/kg H2O）
   const fuel_list = buildFuelList(p, config)
-  return { tg, wind, QB, PFe, hot_metal: hotMetal, B, wO, O2_blow, N2_blow, Q_sensible_air, fuel_list }
+  return { tg, wind, QB, PFe, hot_metal: hotMetal, B, wO, O2_blow, N2_blow, Q_sensible_air, blast_humidity: H, dry_air, m_h2o, Q_h2o_decomp, fuel_list }
 }
 
 // ---- 3. 核心算法：与 Python calc_tft_enthalpy_full 完全对齐 ----
@@ -141,7 +148,7 @@ export function collectTftInputs(params = {}, config = DEFAULT_TFT_CONFIG) {
 // 氧限制：鼓风氧是燃烧耗氧的唯一来源，燃料碳氢中超出鼓风氧供给能力的部分视为未燃，
 //         不计入放热与产气（避免 TFT 虚高，如全部碳按 1.867 Nm³/kgC 产气时总量被高估）。
 export function calcTFT(inputs, config = DEFAULT_TFT_CONFIG) {
-  const { B, O2_blow, N2_blow, Q_sensible_air, fuel_list } = inputs
+  const { B, O2_blow, N2_blow, Q_sensible_air, fuel_list, dry_air = B, m_h2o = 0, Q_h2o_decomp = 0 } = inputs
   if (!(B > 0)) throw new Error('比风量异常：生铁产量/鼓风量无效，无法计算')
 
   const useElem = !!config.useElementCarbon
@@ -184,31 +191,37 @@ export function calcTFT(inputs, config = DEFAULT_TFT_CONFIG) {
   }
 
   // ---- 风口碳受鼓风氧限制 ----
-  // 鼓风氧 Nm³/tFe：B × O2_blow。
+  // 鼓风氧 Nm³/tFe：干风量 dry_air × O2_blow（湿分 H2O 不供氧，仅携显热）。
   // 氢按 hc 比例烧成 H2O（每 Nm³ H2O 耗 0.5 Nm³ O2，即每 kgH 耗 5.6 Nm³ O2）；
   // 剩余氧供碳 C→CO（每 kgC 生成 1.867 Nm³ CO 耗 0.9333 Nm³ O2），
   // 超出鼓风氧供给能力的碳视为未燃，不计放热与产气。
-  const V_O2_blast = B * O2_blow
+  // 鼓风水分（C+H₂O→CO+H₂）：每 kg H2O 消耗 0.667 kg C，该部分碳不参与 C→CO 燃烧放热，
+  // 但产气 CO/H2 由下方 V_h2o_prod_* 单独计入，总产气口径保持一致。
+  const V_O2_blast = dry_air * O2_blow
   const O2_for_H = 0.5 * V_H2O_solid * hc
   const O2_for_C_avail = Math.max(0, V_O2_blast - O2_for_H)
   const C_burnable = O2_for_C_avail / 0.9333
-  const C_burn = Math.min(C_total, C_burnable)
+  const C_h2o = m_h2o * 0.667
+  const C_eff = Math.max(0, C_total - C_h2o)
+  const C_burn = Math.min(C_eff, C_burnable)
   const burnRatio = C_total > 0 ? C_burn / C_total : 0
 
-  // 放热（按实际燃烧份额）：C→CO + 氢部分燃烧 H→H2O - 热解吸热 + 气体放热
-  const sum_heat = C_burn * TFT_CONST.Q_C_CO + H_total * TFT_CONST.Q_H_H2O * hc - decomp_heat + gas_heat
+  // 放热（按实际燃烧份额）：C→CO + 氢部分燃烧 H→H2O - 热解吸热 + 气体放热 - 水分分解吸热
+  const sum_heat = C_burn * TFT_CONST.Q_C_CO + H_total * TFT_CONST.Q_H_H2O * hc - decomp_heat + gas_heat - Q_h2o_decomp
 
-  // 产气：CO/H2O 按燃烧份额；未燃 H2 与惰性组分直接并入炉腹煤气
-  const sum_VCO = V_CO_solid * burnRatio + V_CO_gas
+  // 产气：CO/H2O 按燃烧份额；水煤气 CO/H2 单独计入；未燃 H2 与惰性组分直接并入炉腹煤气
+  const V_h2o_prod_CO = m_h2o * 1.244       // 水煤气反应 CO 产气 Nm³/tFe（每 kg H2O 产 1.244 Nm³）
+  const V_h2o_prod_H2 = m_h2o * 1.244       // 水煤气反应 H2 产气 Nm³/tFe（每 kg H2O 产 1.244 Nm³）
+  const sum_VCO = V_CO_solid * burnRatio + V_CO_gas + V_h2o_prod_CO
   const sum_VH2O = V_H2O_solid * hc + V_H2O_gas
-  const sum_VH2 = V_H2O_solid * (1 - hc)
-  const V_N2_blast = B * N2_blow
+  const sum_VH2 = V_H2O_solid * (1 - hc) + V_h2o_prod_H2
+  const V_N2_blast = dry_air * N2_blow
   const V_gas_total = sum_VCO + sum_VH2O + sum_VH2 + V_inert + V_N2_blast
   if (!(V_gas_total > 0)) throw new Error('炉腹煤气总量异常，不能≤0')
 
   const Q_total_in = Q_sensible_air + sum_heat
   const TFT = Q_total_in / (V_gas_total * config.cp)
-  return { TFT, sum_heat, sum_VCO, sum_VH2O, sum_VH2, sum_Vinert: V_inert, V_N2_blast, V_gas_total, Q_sensible_air, Q_total_in, C_total, C_burn, V_O2_blast }
+  return { TFT, sum_heat, sum_VCO, sum_VH2O, sum_VH2, sum_Vinert: V_inert, V_N2_blast, V_gas_total, Q_sensible_air, Q_total_in, C_total, C_burn, V_O2_blast, blast_humidity: inputs.blast_humidity, dry_air, m_h2o, C_h2o, Q_h2o_decomp }
 }
 
 // ---- 4. 热状态判定（文档 §6：TFT 阈值判定规则）----
@@ -250,7 +263,7 @@ export function previewDeviceChange(unitType, deviceType, setpoint, extraSetpoin
 export const TFT_DEVICE_PROBES = [
   { type: 'hot_blast_stove', label: '热风炉·风温', step: 30, unit: '℃' },
   { type: 'blower', label: '鼓风机·风量', step: 520, unit: 'm³/h' },
-  { type: 'blower', label: '鼓风机·喷氧量', step: 5, unit: 'kNm³/h', extraKey: 'o2_inj' },
+  { type: 'blower', label: '鼓风机·鼓风湿度', step: 1, unit: 'g/Nm³', extraKey: 'humidity', def: 10 },
   { type: 'injector', label: '喷吹系统·喷煤量', step: 20, unit: 'kg/h' },
 ]
 
@@ -261,12 +274,12 @@ export function inferDeviceSetpoints(params = {}, config = DEFAULT_TFT_CONFIG, o
   const setpoints = {
     hot_blast_stove: num(p.hot_blast_temp, 1250),
     blower: wind * 5200 / 600,         // 风量 kNm³/h（def 600）→ 设备设定 m³/h（def 5200）
-    blower_o2: 30,                     // 喷氧量名义基准 kNm³/h
+    blower_humidity: 10,               // 鼓风湿度名义基准 g/Nm³
     injector: 120,                     // 喷煤速率名义基准 kg/h
   }
   if (overrides.hot_blast_stove != null) setpoints.hot_blast_stove = num(overrides.hot_blast_stove, 1250)
   if (overrides.blower != null) setpoints.blower = num(overrides.blower, 5200)
-  if (overrides.blower_o2 != null) setpoints.blower_o2 = num(overrides.blower_o2, 30)
+  if (overrides.blower_humidity != null) setpoints.blower_humidity = num(overrides.blower_humidity, 10)
   if (overrides.injector != null) setpoints.injector = num(overrides.injector, 120)
   return setpoints
 }
@@ -278,8 +291,9 @@ function probeDeviceAdvice(pr, params, config, wantCool, sp) {
   const target = wantCool ? -1 : 1
   let curSet, extra = {}
   if (pr.extraKey) {
-    curSet = sp.blower
-    extra = { [pr.extraKey]: sp.blower_o2 }
+    const skey = `blower_${pr.extraKey}` // 如 blower_humidity
+    curSet = sp[skey] != null ? sp[skey] : (pr.def != null ? pr.def : 0)
+    extra = { [pr.extraKey]: curSet }
   } else {
     curSet = sp[pr.type] != null ? sp[pr.type] : (pr.type === 'blower' ? sp.blower : 120)
   }

@@ -6,7 +6,8 @@ const RIGHT_W_KEY = 'sim.rightw'
 const CMD_H_KEY = 'sim.cmdwin.h'
 
 // 通用拖拽：vertical 为 true 时按 Y 轴（高度，向上增大），否则按 X 轴
-function startDrag(e, { vertical, initial, clamp, onDone }) {
+// invert 为 true 时方向取反（用于面板锚定在屏幕另一侧、手柄在面板边缘的场景，保证手柄跟手）
+function startDrag(e, { vertical, invert = false, initial, clamp, onDone }) {
   const startPos = vertical ? e.clientY : e.clientX
   const startVal = initial.value
   const extent = vertical ? window.innerHeight : window.innerWidth
@@ -14,7 +15,8 @@ function startDrag(e, { vertical, initial, clamp, onDone }) {
   const onMove = (ev) => {
     if (raf.id) return
     raf.id = requestAnimationFrame(() => {
-      const delta = vertical ? startPos - ev.clientY : ev.clientX - startPos
+      const rawDelta = vertical ? startPos - ev.clientY : ev.clientX - startPos
+      const delta = invert ? -rawDelta : rawDelta
       const nv = clamp(startVal + delta, extent)
       initial.value = Math.round(nv)
       raf.id = null
@@ -56,7 +58,7 @@ export function usePanelSizes() {
     document.body.style.userSelect = 'none'
     document.body.style.cursor = 'ew-resize'
     startDrag(e, {
-      vertical: false, initial: rw,
+      vertical: false, invert: true, initial: rw,
       clamp: (v, vw) => Math.max(200, Math.min(v, Math.round(vw * 0.5))),
       onDone: (v) => { rResizing.value = false; localStorage.setItem(RIGHT_W_KEY, String(v)) },
     })

@@ -147,7 +147,7 @@ export function computeScheme(scheme, factors, factorsDefault, overrides) {
     if (dt.setpoint && d.setpoint != null && dt.powerPerUnit) {
       deviceEnergy += Math.abs(d.setpoint) * dt.powerPerUnit
     }
-    // 附加可调项（如鼓风机喷氧量）同样计入运行电耗
+    // 附加可调项（如鼓风机鼓风湿度）同样计入运行电耗
     if (dt.extraSetpoints && d.extraSetpoints && typeof d.extraSetpoints === 'object') {
       for (const es of dt.extraSetpoints) {
         const v = d.extraSetpoints[es.key]

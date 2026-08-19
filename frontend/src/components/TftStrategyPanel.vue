@@ -36,8 +36,12 @@
           <b>{{ fmt(ctx.res.Q_sensible_air) }} MJ/tFe</b>
         </div>
         <div class="tft-calc-row">
-          <span>Σ 燃料净放热 Q<sub>fuel</sub></span>
+          <span>Σ 燃料净放热 Q<sub>fuel</sub>（含水分解）</span>
           <b>{{ fmt(ctx.res.sum_heat) }} MJ/tFe</b>
+        </div>
+        <div class="tft-calc-row">
+          <span>其中 鼓风水分分解吸热 Q<sub>h2o</sub>（湿度 {{ fmt(ctx.res.blast_humidity) }} g/Nm³）×</span>
+          <b>−{{ fmt(ctx.res.Q_h2o_decomp) }} MJ/tFe</b>
         </div>
         <div class="tft-calc-row">
           <span>炉腹煤气量 V<sub>gas</sub> = CO + H<sub>2</sub>O + H<sub>2</sub> + N<sub>2</sub> + 惰性</span>
@@ -55,6 +59,8 @@
         <div class="tft-g"><span>铁水产量</span><b>{{ fmt(ctx.inputs.hot_metal) }} t/h</b></div>
         <div class="tft-g"><span>比风量</span><b>{{ fmt(ctx.inputs.B) }} Nm³/tFe</b></div>
         <div class="tft-g"><span>富氧率</span><b>{{ fmt(ctx.inputs.wO) }} %</b></div>
+        <div class="tft-g"><span>鼓风湿度</span><b>{{ fmt(ctx.inputs.blast_humidity) }} g/Nm³</b></div>
+        <div class="tft-g"><span>干风量</span><b>{{ fmt(ctx.inputs.dry_air) }} Nm³/tFe</b></div>
       </div>
 
       <!-- 燃料分解（用量 + 单燃料净放热） -->
@@ -93,7 +99,7 @@
 
       <div class="tft-note">
         焓平衡真值：TFT = (鼓风显热 + Σ燃料净放热) ÷ (炉腹煤气总量 × cp)。cp = {{ cfg.cp }} MJ/(Nm³·℃)。
-        工况参数直接取自系统实际值（铁水产量/风量/风温/富氧/焦比/喷煤，随可调设备设定实时折算）；
+        工况参数直接取自系统实际值（铁水产量/风量/风温/富氧/鼓风湿度/焦比/喷煤，随可调设备设定实时折算）；
         判定区间、比风量基准、燃料基础参数为可配置超参数（算法文档 §9.1）。
       </div>
     </div>
@@ -136,9 +142,9 @@ const status = computed(() => (ctx.value ? ctx.value.status : null))
 const spOverride = computed(() => {
   const o = {}
   if (props.devType && props.setpoint != null) o[props.devType] = Number(props.setpoint)
-  // 附加可调项（如鼓风机喷氧量）作为 blower_o2 探测基准
-  if (props.devType === 'blower' && props.extraSetpoints && props.extraSetpoints.o2_inj != null) {
-    o.blower_o2 = Number(props.extraSetpoints.o2_inj)
+  // 附加可调项（如鼓风机鼓风湿度）作为 blower_humidity 探测基准
+  if (props.devType === 'blower' && props.extraSetpoints && props.extraSetpoints.humidity != null) {
+    o.blower_humidity = Number(props.extraSetpoints.humidity)
   }
   return o
 })
@@ -172,7 +178,11 @@ const devImpact = computed(() => {
   const out = []
   for (const pr of probes) {
     let baseSet, extra = {}
-    if (pr.extraKey) { baseSet = sp.blower; extra = { [pr.extraKey]: sp.blower_o2 } }
+    if (pr.extraKey) {
+      const skey = `blower_${pr.extraKey}` // 如 blower_humidity
+      baseSet = sp[skey] != null ? sp[skey] : (pr.def != null ? pr.def : 0)
+      extra = { [pr.extraKey]: baseSet }
+    }
     else baseSet = pr.type === 'blower' ? sp.blower : (sp[pr.type] != null ? sp[pr.type] : 120)
     for (const [dir, sgn] of [['提高', 1], ['降低', -1]]) {
       const ns = baseSet + sgn * pr.step
