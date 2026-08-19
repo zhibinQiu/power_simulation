@@ -1,0 +1,8 @@
+# 不进入 docker 构建上下文（仅 COPY 了 requirements.txt，这里主要是避免无谓传输）
+backend/.venv
+frontend/node_modules
+__pycache__
+*.pyc
+.git
+.DS_Store
+*.log

@@ -1,0 +1,36 @@
+# ===== 依赖 / 构建产物 =====
+node_modules/
+frontend/node_modules/
+frontend/dist/
+*.egg-info/
+
+# ===== Python 运行残留 =====
+__pycache__/
+*.pyc
+*.pyo
+backend/**/__pycache__/
+
+# ===== 前端 Vite 构建临时配置（vite.config.js.timestamp-*.mjs） =====
+frontend/vite.config.js.timestamp-*.mjs
+
+# ===== 临时/调试脚本 =====
+frontend/_rtest5.mjs
+frontend/tft_verify.mjs
+frontend/.serve_check.mjs
+backend/1necho
+
+# ===== 运行日志 =====
+*.log
+backend/server*.log
+
+# ===== 本地配置覆盖（按需自行保留） =====
+backend/platform_config.json
+backend/strategies.json
+
+# ===== macOS / 浏览器调试残留 =====
+.DS_Store
+.playwright-cli/
+
+# ===== 图片/截图类中间产物（如需纳入版本管理请移除对应行） =====
+*.png
+!frontend/public/**/*.png

@@ -1,0 +1,395 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]: 钢铁碳监测数字孪生
+    - navigation [ref=e7]:
+      - generic [ref=e8] [cursor=pointer]: 文件
+      - generic [ref=e9] [cursor=pointer]:
+        - text: 仿真
+        - generic [ref=e428]:
+          - generic [ref=e429]:
+            - generic [ref=e430]: 运行仿真
+            - generic [ref=e431]: Ctrl+Enter
+          - generic [ref=e432]: 停止
+          - generic [ref=e435]: 重置仿真参数
+          - generic [ref=e437]: 应用当前情景
+      - generic [ref=e10] [cursor=pointer]: 视图
+      - generic [ref=e11] [cursor=pointer]: 编辑
+      - generic [ref=e12] [cursor=pointer]: 工具
+      - generic [ref=e13] [cursor=pointer]: 帮助
+    - generic [ref=e15]:
+      - button "导出" [ref=e16] [cursor=pointer]
+      - button "使用指南 (F1)" [ref=e21] [cursor=pointer]
+      - button "收起左侧栏" [ref=e26] [cursor=pointer]
+      - button "收起右侧栏" [ref=e29] [cursor=pointer]
+      - button "收起底栏（命令行窗口 + 状态条）" [ref=e33] [cursor=pointer]
+  - generic [ref=e36]:
+    - generic [ref=e37]:
+      - generic [ref=e38] [cursor=pointer]: 主页
+      - generic [ref=e39] [cursor=pointer]: 视图
+      - generic [ref=e40] [cursor=pointer]: 数据
+      - generic [ref=e41] [cursor=pointer]: 编排
+    - generic [ref=e43]:
+      - generic [ref=e44]:
+        - generic [ref=e45]: 仿真控制
+        - button "运行" [ref=e47] [cursor=pointer]
+      - generic [ref=e51]:
+        - generic [ref=e52]: 操作
+        - generic [ref=e53]:
+          - button "撤销" [disabled] [ref=e54]
+          - button "重做" [disabled] [ref=e59]
+          - button "刷新" [ref=e64] [cursor=pointer]
+  - complementary [ref=e70]:
+    - generic "拖拽调整宽度" [ref=e71]
+    - generic [ref=e72]: 资源管理器
+    - generic [ref=e76]:
+      - generic [ref=e77] [cursor=pointer]: 工艺
+      - generic [ref=e84] [cursor=pointer]: 工辅
+      - generic [ref=e88] [cursor=pointer]: 物料
+      - generic [ref=e93] [cursor=pointer]: 策略
+    - generic [ref=e98]:
+      - generic [ref=e99] [cursor=pointer]: 工艺
+      - generic [ref=e110]:
+        - generic [ref=e111]:
+          - generic [ref=e112] [cursor=pointer]:
+            - generic [ref=e116]: 长流程炼钢
+            - generic [ref=e117]: "10"
+          - generic [ref=e118]:
+            - generic [ref=e119]:
+              - generic [ref=e120] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e439]
+                - generic [ref=e124]: 烧结机
+                - generic [ref=e125]: "8"
+              - generic [ref=e126]:
+                - generic [ref=e440] [cursor=pointer]: 皮带秤·原料
+                - generic [ref=e442] [cursor=pointer]: 皮带秤·燃料
+                - generic [ref=e444] [cursor=pointer]: 智能电表·烧结主抽
+                - generic [ref=e446] [cursor=pointer]: 成分分析仪·烧结矿
+                - generic [ref=e448] [cursor=pointer]: 引风机
+                - generic [ref=e450] [cursor=pointer]: 皮带机
+                - generic [ref=e452] [cursor=pointer]: 给料机
+                - generic [ref=e454] [cursor=pointer]: 变频器
+            - generic [ref=e135]:
+              - generic [ref=e136] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e456]
+                - generic [ref=e140]: 球团
+                - generic [ref=e141]: "7"
+              - generic [ref=e142]:
+                - generic [ref=e457] [cursor=pointer]: 皮带秤·精矿
+                - generic [ref=e459] [cursor=pointer]: 皮带秤·燃料
+                - generic [ref=e461] [cursor=pointer]: 智能电表·造球辊
+                - generic [ref=e463] [cursor=pointer]: 成分分析仪·球团
+                - generic [ref=e465] [cursor=pointer]: 引风机
+                - generic [ref=e467] [cursor=pointer]: 皮带机
+                - generic [ref=e469] [cursor=pointer]: 给料机
+            - generic [ref=e149]:
+              - generic [ref=e150] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e471]
+                - generic [ref=e154]: 焦炉
+                - generic [ref=e155]: "6"
+              - generic [ref=e156]:
+                - generic [ref=e472] [cursor=pointer]: 皮带秤·洗煤
+                - generic [ref=e474] [cursor=pointer]: 气体流量计·焦炉煤气
+                - generic [ref=e476] [cursor=pointer]: 智能电表·炼焦
+                - generic [ref=e478] [cursor=pointer]: 引风机
+                - generic [ref=e480] [cursor=pointer]: 鼓风机
+                - generic [ref=e482] [cursor=pointer]: 皮带机
+            - generic [ref=e163]:
+              - generic [ref=e164] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e484]
+                - generic [ref=e168]: 高炉
+                - generic [ref=e169]: "16"
+              - generic [ref=e170]:
+                - generic [ref=e485] [cursor=pointer]: 皮带秤·炉料
+                - generic [ref=e487] [cursor=pointer]: 皮带秤·焦炭
+                - generic [ref=e489] [cursor=pointer]: 失重秤·喷吹煤
+                - generic [ref=e491] [cursor=pointer]: 料斗秤·熔剂
+                - generic [ref=e493] [cursor=pointer]: 铁水秤
+                - generic [ref=e495] [cursor=pointer]: 气体流量计·高炉煤气
+                - generic [ref=e497] [cursor=pointer]: 智能电表·鼓风/除尘
+                - generic [ref=e499] [cursor=pointer]: 成分分析仪·焦炭
+                - generic [ref=e501] [cursor=pointer]: CEMS·高炉烟囱
+                - generic [ref=e503] [cursor=pointer]: 鼓风机
+                - generic [ref=e505] [cursor=pointer]: 引风机
+                - generic [ref=e507] [cursor=pointer]: 除尘风机
+                - generic [ref=e509] [cursor=pointer]: 喷吹系统
+                - generic [ref=e511] [cursor=pointer]: 冷却水泵
+                - generic [ref=e513] [cursor=pointer]: 变频器
+                - generic [ref=e515] [cursor=pointer]: 热风炉
+            - generic [ref=e185]:
+              - generic [ref=e186] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e517]
+                - generic [ref=e190]: 铁水预处理
+                - generic [ref=e191]: "2"
+              - generic [ref=e192]:
+                - generic [ref=e193] [cursor=pointer]: 氧枪
+                - generic [ref=e195] [cursor=pointer]: 变频器
+            - generic [ref=e197]:
+              - generic [ref=e198] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e518]
+                - generic [ref=e202]: 转炉
+                - generic [ref=e203]: "9"
+              - generic [ref=e204]:
+                - generic [ref=e519] [cursor=pointer]: 钢水秤·铁水/废钢
+                - generic [ref=e521] [cursor=pointer]: 料斗秤·造渣熔剂
+                - generic [ref=e523] [cursor=pointer]: 气体流量计·转炉煤气
+                - generic [ref=e525] [cursor=pointer]: 智能电表·吹炼
+                - generic [ref=e527] [cursor=pointer]: 副枪·终点碳
+                - generic [ref=e529] [cursor=pointer]: 氧枪
+                - generic [ref=e531] [cursor=pointer]: 除尘风机
+                - generic [ref=e533] [cursor=pointer]: 冷却水泵
+                - generic [ref=e535] [cursor=pointer]: 变频器
+            - generic [ref=e213]:
+              - generic [ref=e214] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e537]
+                - generic [ref=e218]: LF精炼
+                - generic [ref=e219]: "5"
+              - generic [ref=e220]:
+                - generic [ref=e538] [cursor=pointer]: 钢水秤·钢水
+                - generic [ref=e540] [cursor=pointer]: 智能电表·精炼
+                - generic [ref=e542] [cursor=pointer]: 成分分析仪·合金
+                - generic [ref=e544] [cursor=pointer]: 电极调节器
+                - generic [ref=e546] [cursor=pointer]: 变频器
+            - generic [ref=e225]:
+              - generic [ref=e226] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e548]
+                - generic [ref=e230]: RH精炼
+                - generic [ref=e231]: "2"
+              - generic [ref=e232]:
+                - generic [ref=e549] [cursor=pointer]: 变频器
+                - generic [ref=e551] [cursor=pointer]: 冷却水泵
+            - generic [ref=e237]:
+              - generic [ref=e238] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e553]
+                - generic [ref=e242]: 连铸机
+                - generic [ref=e243]: "5"
+              - generic [ref=e244]:
+                - generic [ref=e554] [cursor=pointer]: 铸坯秤
+                - generic [ref=e556] [cursor=pointer]: 智能电表·结晶/拉矫
+                - generic [ref=e558] [cursor=pointer]: 皮带机
+                - generic [ref=e560] [cursor=pointer]: 冷却水泵
+                - generic [ref=e562] [cursor=pointer]: 变频器
+            - generic [ref=e251]:
+              - generic [ref=e252] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e564]
+                - generic [ref=e256]: 热轧机
+                - generic [ref=e257]: "7"
+              - generic [ref=e258]:
+                - generic [ref=e565] [cursor=pointer]: 钢材秤·钢坯
+                - generic [ref=e567] [cursor=pointer]: 气体流量计·加热炉煤气
+                - generic [ref=e569] [cursor=pointer]: 智能电表·轧制
+                - generic [ref=e571] [cursor=pointer]: 燃烧器
+                - generic [ref=e573] [cursor=pointer]: 冷却水泵
+                - generic [ref=e575] [cursor=pointer]: 变频器
+                - generic [ref=e577] [cursor=pointer]: 皮带机
+        - generic [ref=e267]:
+          - generic [ref=e268] [cursor=pointer]:
+            - generic [ref=e272]: 短流程炼钢
+            - generic [ref=e273]: "1"
+          - generic [ref=e275]:
+            - generic [ref=e276] [cursor=pointer]:
+              - generic [ref=e280]: 电炉
+              - generic [ref=e281]: "5"
+            - generic [ref=e282]:
+              - generic [ref=e283] [cursor=pointer]: 电极调节器
+              - generic [ref=e285] [cursor=pointer]: 鼓风机
+              - generic [ref=e287] [cursor=pointer]: 除尘风机
+              - generic [ref=e289] [cursor=pointer]: 冷却水泵
+              - generic [ref=e291] [cursor=pointer]: 变频器
+  - main [ref=e293]
+  - complementary [ref=e297]:
+    - generic [ref=e298]:
+      - generic [ref=e299]: 检视器 · 总览
+      - generic [ref=e300]: 总览
+    - generic [ref=e301]:
+      - generic [ref=e302]:
+        - button "▾ 全厂总览" [expanded] [ref=e303] [cursor=pointer]:
+          - generic [ref=e304]: ▾
+          - generic [ref=e305]: 全厂总览
+        - generic [ref=e306]:
+          - generic [ref=e307]:
+            - generic [ref=e308]:
+              - generic [ref=e309]: 综合能耗
+              - generic [ref=e310]: "680.7"
+              - generic [ref=e311]: kgce/t
+            - generic [ref=e312]:
+              - generic [ref=e313]: 总排放
+              - generic [ref=e314]: 16,389.2
+              - generic [ref=e315]: tCO₂/h
+            - generic [ref=e316]:
+              - generic [ref=e317]: 吨钢强度
+              - generic [ref=e318]: 1,967.5
+              - generic [ref=e319]: kg/t
+            - generic [ref=e320]:
+              - generic [ref=e321]: 钢产量
+              - generic [ref=e322]: 8,600
+              - generic [ref=e323]: t/h
+            - generic [ref=e324]:
+              - generic [ref=e325]: 碳利用率
+              - generic [ref=e326]: 7.3%
+              - generic [ref=e327]: 固碳/输入
+          - generic [ref=e332]:
+            - generic [ref=e333]: 直接 13,686.9 (84%)
+            - generic [ref=e334]: 间接 263.2 (16%)
+      - generic [ref=e335]:
+        - button "▾ 园区构成" [expanded] [ref=e336] [cursor=pointer]:
+          - generic [ref=e337]: ▾
+          - generic [ref=e338]: 园区构成
+        - generic [ref=e339]:
+          - generic [ref=e340]: 主工艺线 10 工序 · 工辅 9 座 · 在运 19
+          - generic [ref=e341]:
+            - generic [ref=e579] [cursor=pointer]:
+              - generic [ref=e580]: 烧结机1
+              - generic [ref=e582]: 原料准备
+              - generic [ref=e583]: 694.4 tCO₂/h
+            - generic [ref=e584] [cursor=pointer]:
+              - generic [ref=e585]: RH精炼1
+              - generic [ref=e587]: 精炼
+              - generic [ref=e588]: 2.4 tCO₂/h
+            - generic [ref=e342] [cursor=pointer]:
+              - generic [ref=e343]: 发电厂
+              - generic [ref=e345]: 发电厂
+              - generic [ref=e346]: 工辅
+            - generic [ref=e347] [cursor=pointer]:
+              - generic [ref=e348]: 原料场
+              - generic [ref=e350]: 堆场
+              - generic [ref=e351]: 工辅
+            - generic [ref=e589] [cursor=pointer]:
+              - generic [ref=e590]: 球团1
+              - generic [ref=e592]: 原料准备
+              - generic [ref=e593]: 139.4 tCO₂/h
+            - generic [ref=e594] [cursor=pointer]:
+              - generic [ref=e595]: LF精炼1
+              - generic [ref=e597]: 精炼
+              - generic [ref=e598]: 3.7 tCO₂/h
+            - generic [ref=e599] [cursor=pointer]:
+              - generic [ref=e600]: 连铸机1
+              - generic [ref=e602]: 连铸
+              - generic [ref=e603]: 1.2 tCO₂/h
+            - generic [ref=e352] [cursor=pointer]:
+              - generic [ref=e353]: 制氧厂
+              - generic [ref=e355]: 制氧
+              - generic [ref=e356]: 工辅
+            - generic [ref=e357] [cursor=pointer]:
+              - generic [ref=e358]: 焦化厂
+              - generic [ref=e360]: 焦化
+              - generic [ref=e361]: 工辅
+            - generic [ref=e362] [cursor=pointer]:
+              - generic [ref=e363]: 水处理厂
+              - generic [ref=e365]: 水处理
+              - generic [ref=e366]: 工辅
+            - generic [ref=e367] [cursor=pointer]:
+              - generic [ref=e368]: 办公楼
+              - generic [ref=e370]: 办公
+              - generic [ref=e371]: 工辅
+            - generic [ref=e372] [cursor=pointer]:
+              - generic [ref=e373]: 烧结厂
+              - generic [ref=e375]: 烧结
+              - generic [ref=e376]: 工辅
+            - generic [ref=e377] [cursor=pointer]:
+              - generic [ref=e378]: 铁路站场
+              - generic [ref=e380]: 铁路
+              - generic [ref=e381]: 工辅
+            - generic [ref=e604] [cursor=pointer]:
+              - generic [ref=e605]: 焦炉1
+              - generic [ref=e607]: 原料准备
+              - generic [ref=e608]: 518.8 tCO₂/h
+            - generic [ref=e609] [cursor=pointer]:
+              - generic [ref=e610]: 转炉1
+              - generic [ref=e612]: 炼钢
+              - generic [ref=e613]: 1,402.3 tCO₂/h
+            - generic [ref=e614] [cursor=pointer]:
+              - generic [ref=e615]: 热轧机1
+              - generic [ref=e617]: 轧制
+              - generic [ref=e618]: 3.5 tCO₂/h
+            - generic [ref=e382] [cursor=pointer]:
+              - generic [ref=e383]: 球团厂
+              - generic [ref=e385]: 球团
+              - generic [ref=e386]: 工辅
+            - generic [ref=e619] [cursor=pointer]:
+              - generic [ref=e620]: 高炉1
+              - generic [ref=e622]: 炼铁
+              - generic [ref=e623]: 11,184.4 tCO₂/h
+            - generic [ref=e624] [cursor=pointer]:
+              - generic [ref=e625]: 铁水预处理1
+              - generic [ref=e627]: 工序
+              - generic [ref=e628]: — tCO₂/h
+      - generic [ref=e387]:
+        - button "▾ 碳素流桑基图" [expanded] [ref=e388] [cursor=pointer]:
+          - generic [ref=e389]: ▾
+          - generic [ref=e390]: 碳素流桑基图
+        - img [ref=e394]:
+          - generic [ref=e648]: CO₂排放碳
+          - generic [ref=e651]: 钢中固碳
+          - generic [ref=e654]: 捕集碳
+          - generic [ref=e657]: 烧结机1
+          - generic [ref=e660]: 煤碳
+          - generic [ref=e663]: 球团1
+          - generic [ref=e666]: 焦炉1
+          - generic [ref=e669]: 焦炭碳
+          - generic [ref=e672]: 高炉1
+          - generic [ref=e675]: 转炉1
+          - generic [ref=e678]: 铁水碳
+          - generic [ref=e681]: LF精炼1
+          - generic [ref=e684]: 外购电碳
+          - generic [ref=e687]: RH精炼1
+          - generic [ref=e690]: 连铸机1
+          - generic [ref=e693]: 热轧机1
+          - generic [ref=e696]: 天然气碳
+      - generic [ref=e395]:
+        - button "▾ 排放最高工序" [expanded] [ref=e396] [cursor=pointer]:
+          - generic [ref=e397]: ▾
+          - generic [ref=e398]: 排放最高工序
+        - generic [ref=e399]:
+          - generic [ref=e699] [cursor=pointer]:
+            - generic [ref=e700]:
+              - generic [ref=e701]: 高炉1
+              - generic [ref=e702]: 高炉
+            - generic [ref=e705]: 11,184.4 tCO₂/h
+            - generic [ref=e706]: 80.2%
+          - generic [ref=e707] [cursor=pointer]:
+            - generic [ref=e708]:
+              - generic [ref=e709]: 转炉1
+              - generic [ref=e710]: 转炉
+            - generic [ref=e713]: 1,402.3 tCO₂/h
+            - generic [ref=e714]: 10.1%
+          - generic [ref=e715] [cursor=pointer]:
+            - generic [ref=e716]:
+              - generic [ref=e717]: 烧结机1
+              - generic [ref=e718]: 烧结机
+            - generic [ref=e721]: 694.4 tCO₂/h
+            - generic [ref=e722]: 5.0%
+          - generic [ref=e723] [cursor=pointer]:
+            - generic [ref=e724]:
+              - generic [ref=e725]: 焦炉1
+              - generic [ref=e726]: 焦炉
+            - generic [ref=e729]: 518.8 tCO₂/h
+            - generic [ref=e730]: 3.7%
+  - generic [ref=e400]:
+    - generic "拖拽调整高度" [ref=e401]
+    - generic [ref=e402]:
+      - generic [ref=e404]: 命令行窗口
+      - button "清空" [ref=e405] [cursor=pointer]
+      - button "帮助" [ref=e406] [cursor=pointer]
+    - generic [ref=e407]:
+      - generic [ref=e408]: 钢铁碳监测数字孪生平台已就绪。输入 help 查看命令，或直接点击顶栏与工具条操作。
+      - generic [ref=e409]: ">> 提示：左侧资产树选工序，中间 3D 点击聚焦，右栏检视器看属性。"
+    - generic [ref=e410]:
+      - generic [ref=e411]: ">>"
+      - textbox "直接聊天，或 /code /plan 切换模式（/help 查看）" [ref=e412]
+  - contentinfo [ref=e413]:
+    - generic [ref=e414]:
+      - text: 实时链路
+      - generic [ref=e416]: 已连接
+    - generic [ref=e417]:
+      - text: 流程模型 ·
+      - generic [ref=e418]: 10 工序
+      - text: /
+      - generic [ref=e419]: 10 物流
+    - generic [ref=e420]:
+      - text: 监测点位
+      - generic [ref=e421]: "33"
+    - generic [ref=e422]:
+      - text: 可调约束
+      - generic [ref=e423]: "67"
+    - generic [ref=e425]: 基线情景
+    - generic [ref=e426]: 2026-08-12 13:24:55

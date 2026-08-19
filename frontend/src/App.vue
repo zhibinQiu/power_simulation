@@ -1,0 +1,233 @@
+<template>
+  <div class="app" :class="{ 'left-collapsed': !store.leftOpen, 'right-collapsed': !store.rightOpen, 'bottom-collapsed': !store.bottomOpen, 'sim-dark': store.simMode }"
+       :style="{ '--cmd-h': cmdH + 'px', '--lw': store.leftOpen ? lw + 'px' : '0px', '--rw': store.rightOpen ? rw + 'px' : '0px' }">
+    <TopBar :menus="menus" ref="topBarRef" @export="onExport" @help="onHelp" />
+
+    <!-- 最左侧活动栏（VS Code 式）：资源管理器 / 搜索 / 场景 / 连接 -->
+    <ActivityBar />
+    <!-- 左侧栏：园区资产（工艺 / 设备 / 原料 / 策略） -->
+    <LeftSidebar @rsz="startLeftResize" />
+
+    <!-- 中间：仿真数字孪生（仿真态） / 流程编排画布（编辑态） -->
+    <!-- SceneViewer 始终挂载，不销毁 WebGL 上下文，大幅提升切换速度并避免重建空白 -->
+    <main class="stage">
+      <SceneViewer v-show="!store.editMode" />
+      <FlowEditor v-if="store.editMode" />
+    </main>
+
+    <RibbonToolbar :actions="ribbonActions" @panorama="showPanorama = true" />
+
+    <!-- 右侧栏：上下文检视器 -->
+    <RightInspector @rsz="startRightResize" />
+
+    <CommandConsole :actions="twinActions" :resizing="resizing" :start-resize="startResize" ref="consoleRef" />
+
+    <StatusBar />
+
+    <DataSourceDialog v-if="showDataSource" @close="showDataSource = false" />
+    <PlatformConfigDialog v-if="showPlatformConfig" @close="showPlatformConfig = false" />
+    <SystemSettingsDialog v-if="showSettings" @close="showSettings = false" />
+    <TechDocs v-if="showTechDocs" @close="showTechDocs = false" />
+    <UserManual v-if="showManual" @close="showManual = false" />
+    <PanoramaDataDialog v-if="showPanorama" @close="showPanorama = false" />
+    <TftAnalysisDialog v-if="showTftAnalysis" @close="showTftAnalysis = false" />
+    <ContextMenu />
+    <SensitivityDialog />
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, defineAsyncComponent } from 'vue'
+import { useSimStore } from './stores/sim'
+import TopBar from './components/TopBar.vue'
+import RibbonToolbar from './components/RibbonToolbar.vue'
+import CommandConsole from './components/CommandConsole.vue'
+import StatusBar from './components/StatusBar.vue'
+import LeftSidebar from './components/LeftSidebar.vue'
+import ActivityBar from './components/ActivityBar.vue'
+import RightInspector from './components/RightInspector.vue'
+import SceneViewer from './components/SceneViewer.vue'
+import FlowEditor from './components/FlowEditor.vue'
+import { usePanelSizes } from './composables/usePanelSizes'
+import { useGlobalShortcuts } from './composables/useGlobalShortcuts'
+import { openAuditDialog } from './stores/scan'
+
+// 对话框类组件按需懒加载：首屏不加载其代码，打开时才请求，降低首包体积与内存占用
+const DataSourceDialog = defineAsyncComponent(() => import('./components/DataSourceDialog.vue'))
+const PlatformConfigDialog = defineAsyncComponent(() => import('./components/PlatformConfigDialog.vue'))
+const SystemSettingsDialog = defineAsyncComponent(() => import('./components/SystemSettingsDialog.vue'))
+const TechDocs = defineAsyncComponent(() => import('./components/TechDocs.vue'))
+const UserManual = defineAsyncComponent(() => import('./components/UserManual.vue'))
+const PanoramaDataDialog = defineAsyncComponent(() => import('./components/PanoramaDataDialog.vue'))
+const TftAnalysisDialog = defineAsyncComponent(() => import('./components/TftAnalysisDialog.vue'))
+const ContextMenu = defineAsyncComponent(() => import('./components/ContextMenu.vue'))
+const SensitivityDialog = defineAsyncComponent(() => import('./components/SensitivityDialog.vue'))
+
+const store = useSimStore()
+const topBarRef = ref(null)
+const consoleRef = ref(null)
+
+const showDataSource = ref(false)
+const showPlatformConfig = ref(false)
+const showSettings = ref(false)
+const showTechDocs = ref(false)
+const showManual = ref(false)
+const showPanorama = ref(false)
+const showTftAnalysis = ref(false)
+
+const { lw, rw, cmdH, resizing, startLeftResize, startRightResize, startResize } = usePanelSizes()
+
+/* ---------------- 动作 ---------------- */
+function pushCmd(t, k = 'out') { store.pushCmd(t, k) }
+function onRun() {
+  const hasStrategies = Object.values(store.unitStrategies).some(s => s.enabled)
+  if (hasStrategies) store.runAllEnabledStrategies()
+  else store.refresh()
+  pushCmd('simulate >> 重新运行仿真，已刷新全厂碳素流、能流与排放。', 'cmd')
+}
+function onSimToggle() {
+  if (store.simMode) {
+    store.exitSim()
+    pushCmd('已退出仿真模式，数字孪生环境已切换为工业。', 'tip')
+  } else {
+    store.enterSim()
+    pushCmd('已进入仿真模式：所有修改仅预览，退出后自动恢复。仿真模式下可直接输入自然语言指令（如“降低焦比 10%”），由智能体解析并应用（规划中）。', 'guide')
+    consoleRef.value && consoleRef.value.focusInput()
+  }
+}
+function onResetParams() { store.refresh(); pushCmd('已重置仿真参数并重新计算。', 'out') }
+function onRefresh() { store.resetView(); store.refresh(); pushCmd('已重置视角并同步数据。', 'cmd') }
+function onResetView() { store.resetView(); pushCmd('视图 >> 相机视角已重置为园区俯瞰。', 'cmd') }
+function toggleAuto() { store.setAutoRotate(!store.autoRotate); pushCmd('自动环视 ' + (store.autoRotate ? '开启' : '关闭') + '。', 'out') }
+function togglePatrol() {
+  store.togglePatrol()
+  pushCmd(store.patrolOn ? '视图 >> 虚拟巡视：机器狗已部署，W/S/A/D 移动、Z/X 原地转向、Shift 加速；建筑与工艺不可穿越。' : '视图 >> 虚拟巡视已结束。', 'cmd')
+}
+function focusSel(mode) {
+  if (!store.selectedUnitId) { pushCmd('未选中工序：请先在左侧资产树或 3D 孪生中点选工序。', 'warn'); return }
+  store.viewUnit(store.selectedUnitId, mode)
+  const map = { top: '俯视', front: '正视', side: '侧视', focus: '聚焦', overview: '全景' }
+  pushCmd(`视图 >> ${map[mode] || mode}（${store.selectedUnitId}）。`, 'cmd')
+}
+function onOverview() {
+  store.viewUnit('__overview__', 'overview')
+  pushCmd('视图 >> 已切换到全场景俯瞰视角。', 'cmd')
+}
+function onAutoLayout() {
+  store.autoLayout()
+  store.refresh()
+  store.sceneRev++
+  pushCmd('视图 >> 已重新自动布局工序。', 'cmd')
+}
+function onToggleEdit() { if (store.editMode) store.exitEdit(); else store.enterEdit(); pushCmd(store.editMode ? '已退出流程编排。' : '进入流程编排：可从左侧「资源管理器」拖拽条目到画布，节点参数在右侧编排属性中调整。', store.editMode ? 'out' : 'guide') }
+function ensureEdit() { if (!store.editMode) store.enterEdit() }
+function loadExample(route) { ensureEdit(); store.loadTemplate(route); pushCmd(route === 'short' ? '已载入短流程炼钢示例。' : '已载入长流程炼钢示例。', 'out') }
+function clearScheme() { ensureEdit(); store.clearScheme(); pushCmd('已清空编排画布。', 'out') }
+function autoLayoutScheme() { ensureEdit(); store.autoLayoutScheme(); pushCmd('已自动布局编排节点：主工艺横向排列（一行 3-4 个），工辅排在各自主工艺下方，互不重叠。', 'out') }
+function addGroupBtn() { ensureEdit(); const id = store.addFlowGroup(); pushCmd(id ? '已新建小组，可将设备拖入其中。' : '新建小组失败。', 'out') }
+function duplicateGroupBtn() { ensureEdit(); const id = store.duplicateFlowGroup(store.selectedGroupId); if (id) pushCmd('已复制小组。', 'out') }
+function flowZoomBtn(f) { store.flowZoom(f) }
+function flowFit() { store.flowZoomFit() }
+function onScenario(e) { store.setScenario(e.target.value); pushCmd(`切换仿真情景 → ${store.scenarios.find((s) => s.id === store.scenario)?.label || store.scenario}。`, 'cmd') }
+function onEnvChange(e) { store.setEnvMode(e.target.value); pushCmd(`外围景观 → ${store.envModes.find((m) => m.id === store.envMode)?.label || store.envMode}。`, 'cmd') }
+// 导出 AI 分析报告：基线数据分析 + 使用的策略 + 策略前后对比，由后端大模型生成 Markdown
+function onExport() {
+  if (!store.baseline) { pushCmd('暂无仿真数据：请先运行仿真或应用情景后再导出报告。', 'tip'); store.toast = '请先运行仿真再导出报告'; return }
+  const sel = store.selectedStrategy
+  store.openReportPanel({
+    baseline: store.baseline,
+    strategy: store.strategy,
+    strategy_name: sel?.name || (store.parsed ? '自定义策略' : ''),
+    strategy_text: store.parsedText || sel?.raw_text || sel?.description || '',
+    ops: store.parsed?.ops || sel?.ops || [],
+    understood: store.parsed?.understood || [],
+    scenario: store.scenarios.find((s) => s.id === store.scenario)?.label || store.scenario,
+  })
+  pushCmd('已打开右侧报告面板：请配置标题、引擎与分析深度后点击「生成报告」。', 'guide')
+}
+function onHelp() { pushCmd('使用指南：① 顶栏「视图」切换相机（俯视/正视/侧视/聚焦/全景）；② 左侧「资源管理器」切换 工艺/物料/策略，点击条目后右栏显示属性与实时数据；③ 中间 3D 孪生点击工序或设备即可聚焦并查看属性；④ 「编排」工具条可把左侧条目拖入画布组建流程；⑤ 左侧「策略」资源中点击内置/自定义策略，进入仿真模式并实时对比节能减碳效果。输入 help 查看全部命令。', 'guide'); store.toast = '左:资产树  中:3D孪生  右:检视器' }
+function onAbout() { pushCmd('行业能碳仿真平台 · Web 版工业数字孪生（MATLAB 风格）。', 'sys') }
+
+// 供命令窗口调用的孪生控制动作
+const twinActions = { onSimToggle, onResetView, onOverview, togglePatrol, focusSel, onToggleEdit }
+// 供工具条调用的动作
+const ribbonActions = { onSimToggle, onToggleEdit, toggleAuto, togglePatrol, onResetView, autoLayoutScheme, flowZoomBtn, flowFit, loadExample, clearScheme }
+
+/* ---------------- 经典菜单条（文件 / 仿真 / 视图 / 编辑 / 工具 / 帮助） ---------------- */
+const menus = [
+  { id: 'file', label: '文件', items: [
+    { label: '新建方案', act: () => pushCmd('新建方案：已清空当前编排（原型占位）。','out') },
+    { label: '打开方案…', act: () => pushCmd('打开方案：请在左侧「策略」中载入已存方案（原型占位）。','guide') },
+    { sep: true },
+    { label: '保存方案', accel: 'Ctrl+S', act: () => pushCmd('方案已保存至本地工作区。','out') },
+    { label: '连接数据源…', act: () => { showDataSource.value = true } },
+    { label: '导出分析报告', act: onExport },
+    { sep: true },
+    { label: '设置…', act: () => { showSettings.value = true } },
+  ] },
+  { id: 'sim', label: '仿真', items: [
+    { label: '运行仿真', accel: 'Ctrl+Enter', act: onRun },
+    { sep: true },
+    { label: '重置仿真参数', act: onResetParams },
+    { label: '应用当前情景', act: () => { store.refresh(); pushCmd('已应用当前仿真情景并重新计算。','cmd') } },
+    { sep: true },
+    { label: '高炉数值分析', accel: 'Alt+T', act: () => {
+      if (store.simMode) showTftAnalysis.value = true
+      else store.toast = '高炉数值分析仅限仿真模式使用：请先开启仿真模式'
+    } },
+  ] },
+  { id: 'view', label: '视图', items: [
+    { sub: true, label: '情景', items: () => store.scenarios.map(s => ({ id: s.id, label: s.label, checked: s.id === store.scenario, run: () => onScenario({ target: { value: s.id } }) })) },
+    { sub: true, label: '环境', items: () => store.envModes.map(e => ({ id: e.id, label: e.label, checked: e.id === store.envMode, run: () => onEnvChange({ target: { value: e.id } }) })) },
+    { sep: true },
+    { label: '刷新数据', act: onRefresh },
+    { label: '自动布局工序', hide: () => !store.editMode, act: onAutoLayout },
+  ] },
+  { id: 'edit', label: '编辑', items: [
+    { label: store.editMode ? '完成编排' : '进入流程编排', act: onToggleEdit },
+    { sep: true },
+    { label: '撤销', accel: 'Ctrl+Z', disabled: () => !store.canUndo, act: () => store.undo() },
+    { label: '重做', accel: 'Ctrl+Y', disabled: () => !store.canRedo, act: () => store.redo() },
+    { sep: true, hide: () => !store.editMode },
+    { label: '放大画布', hide: () => !store.editMode, act: () => flowZoomBtn(1.1) },
+    { label: '缩小画布', hide: () => !store.editMode, act: () => flowZoomBtn(0.9) },
+    { label: '适配视图', hide: () => !store.editMode, act: () => flowFit() },
+    { label: '自动布局', hide: () => !store.editMode, act: () => autoLayoutScheme() },
+    { sep: true, hide: () => !store.editMode },
+    { label: '新建小组', hide: () => !store.editMode, act: () => addGroupBtn() },
+    { label: '进入子编排', hide: () => !store.editMode, disabled: () => !store.selectedGroupId, act: () => store.enterGroup(store.selectedGroupId) },
+    { label: '复制小组', hide: () => !store.editMode, disabled: () => !store.selectedGroupId, act: () => duplicateGroupBtn() },
+    { label: '删除小组', hide: () => !store.editMode, disabled: () => !store.selectedGroupId, act: () => store.removeFlowGroup(store.selectedGroupId) },
+    { sep: true, hide: () => !store.editMode },
+    { label: '长流程示例', hide: () => !store.editMode, act: () => loadExample('long') },
+    { label: '短流程示例', hide: () => !store.editMode, act: () => loadExample('short') },
+    { label: '清空画布', hide: () => !store.editMode, act: () => clearScheme() },
+  ] },
+  { id: 'tools', label: '工具', items: [
+    { label: '平台配置…', act: () => { showPlatformConfig.value = true } },
+    { sep: true },
+    { label: '碳素流守恒审计', accel: '', act: () => openAuditDialog() },
+    { label: '参数优化', act: () => pushCmd('参数优化：切换至「数据」工具条 → 策略生成，使用自然语言描述目标。','guide') },
+    { label: '数据校准', act: () => pushCmd('数据校准：在右侧检视器选中设备查看实时/历史读数。','guide') },
+  ] },
+  { id: 'help', label: '帮助', items: [
+    { label: '使用指南', accel: 'F1', act: onHelp },
+    { label: '使用手册', act: () => { showManual.value = true } },
+    { label: '技术文档', act: () => { showTechDocs.value = true } },
+    { label: '快捷键', act: () => pushCmd('快捷键：Ctrl+Enter 运行 · Ctrl+Z 撤销 · Ctrl+Y 重做 · F 聚焦选中工序 · 右键节点/资源打开上下文菜单（选中/参数扫描/重命名/复制/删除）· 编排态 F2 重命名、Ctrl+D 复制节点、Del 删除。','out') },
+    { sep: true },
+    { label: '关于本平台', act: onAbout },
+  ] },
+]
+
+useGlobalShortcuts({
+  store, onRun, focusSel,
+  onMenuEsc: () => topBarRef.value && topBarRef.value.closeMenus(),
+})
+
+onMounted(() => {
+  store.init()
+  store.pushCmd('行业能碳仿真平台已就绪。输入 help 查看命令，或直接点击顶栏与工具条操作。', 'guide')
+  store.pushCmd('提示：左侧资产树选工序，中间 3D 点击聚焦，右栏检视器看属性。', 'guide')
+})
+</script>

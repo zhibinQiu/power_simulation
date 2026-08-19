@@ -1,0 +1,275 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]: 钢铁碳监测数字孪生
+    - navigation [ref=e7]:
+      - generic [ref=e8] [cursor=pointer]: 文件
+      - generic [ref=e9] [cursor=pointer]: 仿真
+      - generic [ref=e10] [cursor=pointer]: 视图
+      - generic [ref=e11] [cursor=pointer]: 编辑
+      - generic [ref=e12] [cursor=pointer]: 工具
+      - generic [ref=e13] [cursor=pointer]: 帮助
+    - generic [ref=e15]:
+      - button "导出" [ref=e16] [cursor=pointer]
+      - button "使用指南 (F1)" [ref=e21] [cursor=pointer]
+      - button "收起左侧栏" [ref=e26] [cursor=pointer]
+      - button "收起右侧栏" [ref=e29] [cursor=pointer]
+      - button "收起底栏（命令行窗口 + 状态条）" [ref=e33] [cursor=pointer]
+  - generic [ref=e36]:
+    - generic [ref=e37]:
+      - generic [ref=e38] [cursor=pointer]: 主页
+      - generic [ref=e39] [cursor=pointer]: 视图
+      - generic [ref=e40] [cursor=pointer]: 数据
+      - generic [ref=e41] [cursor=pointer]: 编排
+    - generic [ref=e759]:
+      - generic [ref=e760]: 报告
+      - button "导出报告" [active] [ref=e762] [cursor=pointer]
+  - complementary [ref=e70]:
+    - generic "拖拽调整宽度" [ref=e71]
+    - generic [ref=e72]: 资源管理器
+    - generic [ref=e76]:
+      - generic [ref=e77] [cursor=pointer]: 工艺
+      - generic [ref=e84] [cursor=pointer]: 工辅
+      - generic [ref=e88] [cursor=pointer]: 物料
+      - generic [ref=e93] [cursor=pointer]: 策略
+    - generic [ref=e98]:
+      - generic [ref=e99] [cursor=pointer]: 工艺
+      - generic [ref=e110]:
+        - generic [ref=e111]:
+          - generic [ref=e112] [cursor=pointer]:
+            - generic [ref=e116]: 长流程炼钢
+            - generic [ref=e117]: "10"
+          - generic [ref=e118]:
+            - generic [ref=e119]:
+              - generic [ref=e120] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e457]
+                - generic [ref=e124]: 烧结机
+                - generic [ref=e125]: "8"
+              - generic [ref=e126]:
+                - generic [ref=e458] [cursor=pointer]: 皮带秤·原料
+                - generic [ref=e460] [cursor=pointer]: 皮带秤·燃料
+                - generic [ref=e462] [cursor=pointer]: 智能电表·烧结主抽
+                - generic [ref=e464] [cursor=pointer]: 成分分析仪·烧结矿
+                - generic [ref=e466] [cursor=pointer]: 引风机
+                - generic [ref=e468] [cursor=pointer]: 皮带机
+                - generic [ref=e470] [cursor=pointer]: 给料机
+                - generic [ref=e472] [cursor=pointer]: 变频器
+            - generic [ref=e135]:
+              - generic [ref=e136] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e474]
+                - generic [ref=e140]: 球团
+                - generic [ref=e141]: "7"
+              - generic [ref=e142]:
+                - generic [ref=e475] [cursor=pointer]: 皮带秤·精矿
+                - generic [ref=e477] [cursor=pointer]: 皮带秤·燃料
+                - generic [ref=e479] [cursor=pointer]: 智能电表·造球辊
+                - generic [ref=e481] [cursor=pointer]: 成分分析仪·球团
+                - generic [ref=e483] [cursor=pointer]: 引风机
+                - generic [ref=e485] [cursor=pointer]: 皮带机
+                - generic [ref=e487] [cursor=pointer]: 给料机
+            - generic [ref=e149]:
+              - generic [ref=e150] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e489]
+                - generic [ref=e154]: 焦炉
+                - generic [ref=e155]: "6"
+              - generic [ref=e156]:
+                - generic [ref=e490] [cursor=pointer]: 皮带秤·洗煤
+                - generic [ref=e492] [cursor=pointer]: 气体流量计·焦炉煤气
+                - generic [ref=e494] [cursor=pointer]: 智能电表·炼焦
+                - generic [ref=e496] [cursor=pointer]: 引风机
+                - generic [ref=e498] [cursor=pointer]: 鼓风机
+                - generic [ref=e500] [cursor=pointer]: 皮带机
+            - generic [ref=e163]:
+              - generic [ref=e164] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e502]
+                - generic [ref=e168]: 高炉
+                - generic [ref=e169]: "16"
+              - generic [ref=e170]:
+                - generic [ref=e503] [cursor=pointer]: 皮带秤·炉料
+                - generic [ref=e505] [cursor=pointer]: 皮带秤·焦炭
+                - generic [ref=e507] [cursor=pointer]: 失重秤·喷吹煤
+                - generic [ref=e509] [cursor=pointer]: 料斗秤·熔剂
+                - generic [ref=e511] [cursor=pointer]: 铁水秤
+                - generic [ref=e513] [cursor=pointer]: 气体流量计·高炉煤气
+                - generic [ref=e515] [cursor=pointer]: 智能电表·鼓风/除尘
+                - generic [ref=e517] [cursor=pointer]: 成分分析仪·焦炭
+                - generic [ref=e519] [cursor=pointer]: CEMS·高炉烟囱
+                - generic [ref=e521] [cursor=pointer]: 鼓风机
+                - generic [ref=e523] [cursor=pointer]: 引风机
+                - generic [ref=e525] [cursor=pointer]: 除尘风机
+                - generic [ref=e527] [cursor=pointer]: 喷吹系统
+                - generic [ref=e529] [cursor=pointer]: 冷却水泵
+                - generic [ref=e531] [cursor=pointer]: 变频器
+                - generic [ref=e533] [cursor=pointer]: 热风炉
+            - generic [ref=e185]:
+              - generic [ref=e186] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e535]
+                - generic [ref=e190]: 铁水预处理
+                - generic [ref=e191]: "2"
+              - generic [ref=e192]:
+                - generic [ref=e193] [cursor=pointer]: 氧枪
+                - generic [ref=e195] [cursor=pointer]: 变频器
+            - generic [ref=e197]:
+              - generic [ref=e198] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e536]
+                - generic [ref=e202]: 转炉
+                - generic [ref=e203]: "9"
+              - generic [ref=e204]:
+                - generic [ref=e537] [cursor=pointer]: 钢水秤·铁水/废钢
+                - generic [ref=e539] [cursor=pointer]: 料斗秤·造渣熔剂
+                - generic [ref=e541] [cursor=pointer]: 气体流量计·转炉煤气
+                - generic [ref=e543] [cursor=pointer]: 智能电表·吹炼
+                - generic [ref=e545] [cursor=pointer]: 副枪·终点碳
+                - generic [ref=e547] [cursor=pointer]: 氧枪
+                - generic [ref=e549] [cursor=pointer]: 除尘风机
+                - generic [ref=e551] [cursor=pointer]: 冷却水泵
+                - generic [ref=e553] [cursor=pointer]: 变频器
+            - generic [ref=e213]:
+              - generic [ref=e214] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e555]
+                - generic [ref=e218]: LF精炼
+                - generic [ref=e219]: "5"
+              - generic [ref=e220]:
+                - generic [ref=e556] [cursor=pointer]: 钢水秤·钢水
+                - generic [ref=e558] [cursor=pointer]: 智能电表·精炼
+                - generic [ref=e560] [cursor=pointer]: 成分分析仪·合金
+                - generic [ref=e562] [cursor=pointer]: 电极调节器
+                - generic [ref=e564] [cursor=pointer]: 变频器
+            - generic [ref=e225]:
+              - generic [ref=e226] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e566]
+                - generic [ref=e230]: RH精炼
+                - generic [ref=e231]: "2"
+              - generic [ref=e232]:
+                - generic [ref=e567] [cursor=pointer]: 变频器
+                - generic [ref=e569] [cursor=pointer]: 冷却水泵
+            - generic [ref=e237]:
+              - generic [ref=e238] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e571]
+                - generic [ref=e242]: 连铸机
+                - generic [ref=e243]: "5"
+              - generic [ref=e244]:
+                - generic [ref=e572] [cursor=pointer]: 铸坯秤
+                - generic [ref=e574] [cursor=pointer]: 智能电表·结晶/拉矫
+                - generic [ref=e576] [cursor=pointer]: 皮带机
+                - generic [ref=e578] [cursor=pointer]: 冷却水泵
+                - generic [ref=e580] [cursor=pointer]: 变频器
+            - generic [ref=e251]:
+              - generic [ref=e252] [cursor=pointer]:
+                - generic "已部署至场景" [ref=e582]
+                - generic [ref=e256]: 热轧机
+                - generic [ref=e257]: "7"
+              - generic [ref=e258]:
+                - generic [ref=e583] [cursor=pointer]: 钢材秤·钢坯
+                - generic [ref=e585] [cursor=pointer]: 气体流量计·加热炉煤气
+                - generic [ref=e587] [cursor=pointer]: 智能电表·轧制
+                - generic [ref=e589] [cursor=pointer]: 燃烧器
+                - generic [ref=e591] [cursor=pointer]: 冷却水泵
+                - generic [ref=e593] [cursor=pointer]: 变频器
+                - generic [ref=e595] [cursor=pointer]: 皮带机
+        - generic [ref=e267]:
+          - generic [ref=e268] [cursor=pointer]:
+            - generic [ref=e272]: 短流程炼钢
+            - generic [ref=e273]: "1"
+          - generic [ref=e275]:
+            - generic [ref=e276] [cursor=pointer]:
+              - generic [ref=e280]: 电炉
+              - generic [ref=e281]: "5"
+            - generic [ref=e282]:
+              - generic [ref=e283] [cursor=pointer]: 电极调节器
+              - generic [ref=e285] [cursor=pointer]: 鼓风机
+              - generic [ref=e287] [cursor=pointer]: 除尘风机
+              - generic [ref=e289] [cursor=pointer]: 冷却水泵
+              - generic [ref=e291] [cursor=pointer]: 变频器
+        - generic [ref=e293]:
+          - generic [ref=e294] [cursor=pointer]:
+            - generic [ref=e298]: 节能减碳
+            - generic [ref=e299]: "3"
+          - generic [ref=e300]:
+            - generic [ref=e301]: 煤气发电
+            - generic [ref=e307]: 余热回收
+            - generic [ref=e313]: 碳捕集
+  - main [ref=e319]:
+    - generic [ref=e597]:
+      - generic [ref=e598]:
+        - generic [ref=e599]: 仿真对比
+        - generic [ref=e600]: 仿真模式
+      - generic [ref=e601]: 尚未执行前后对比：点击左侧策略，在属性面板使用「策略仿真」测试
+      - button "保存策略" [ref=e602] [cursor=pointer]
+  - complementary [ref=e323]:
+    - generic "拖拽调整宽度" [ref=e324]
+    - generic [ref=e325]:
+      - generic [ref=e326]: 报告面板
+      - generic [ref=e327]: 报告
+      - button "✕" [ref=e768] [cursor=pointer]
+    - generic [ref=e769]:
+      - generic [ref=e770]:
+        - button "当前报告" [ref=e771] [cursor=pointer]
+        - button "历史记录" [ref=e772] [cursor=pointer]
+      - generic [ref=e774]:
+        - generic [ref=e775]: 报告参数配置
+        - generic [ref=e776]: 配置生成参数后点击「生成报告」开始生成，可选择 AI 分析深度与报告范围。
+        - generic [ref=e777]:
+          - generic [ref=e778]: 报告标题
+          - textbox "报告标题" [ref=e779]:
+            - /placeholder: 自定义报告标题
+            - text: 钢铁
+        - generic [ref=e780]:
+          - generic [ref=e781]: 生成引擎
+          - generic [ref=e782] [cursor=pointer]:
+            - radio "自动 有 AI 则 AI，否则模板" [checked] [ref=e783]
+            - generic [ref=e784]:
+              - generic [ref=e785]: 自动
+              - generic [ref=e786]: 有 AI 则 AI，否则模板
+          - generic [ref=e787] [cursor=pointer]:
+            - radio "AI 生成 强制大语言模型撰写" [ref=e788]
+            - generic [ref=e789]:
+              - generic [ref=e790]: AI 生成
+              - generic [ref=e791]: 强制大语言模型撰写
+          - generic [ref=e792] [cursor=pointer]:
+            - radio "本地模板 确定性文案，生成最快" [ref=e793]
+            - generic [ref=e794]:
+              - generic [ref=e795]: 本地模板
+              - generic [ref=e796]: 确定性文案，生成最快
+        - generic [ref=e797]:
+          - generic [ref=e798]: 分析深度
+          - combobox "分析深度" [ref=e799] [cursor=pointer]:
+            - option "精简（每段 80~150 字）"
+            - option "标准（每段 150~300 字）" [selected]
+            - option "深入（每段 300~500 字）"
+        - generic [ref=e800] [cursor=pointer]:
+          - checkbox "包含「附录：全流程明细」表格" [checked] [ref=e801]
+          - generic [ref=e802]: 包含「附录：全流程明细」表格
+        - button "生成报告" [ref=e803] [cursor=pointer]
+  - generic [ref=e427]:
+    - generic "拖拽调整高度" [ref=e428]
+    - generic [ref=e429]:
+      - generic [ref=e431]: 命令行窗口（仿真模式）
+      - generic [ref=e755]: 仿真中
+      - button "清空" [ref=e432] [cursor=pointer]
+      - button "帮助" [ref=e433] [cursor=pointer]
+    - generic [ref=e434]:
+      - generic [ref=e435]: 钢铁碳监测数字孪生平台已就绪。输入 help 查看命令，或直接点击顶栏与工具条操作。
+      - generic [ref=e436]: ">> 提示：左侧资产树选工序，中间 3D 点击聚焦，右栏检视器看属性。"
+      - generic [ref=e756]: 已进入仿真模式：所有修改仅预览，退出后自动恢复。仿真模式下可直接输入自然语言指令（如“降低焦比 10%”），由智能体解析并应用（规划中）。
+      - generic [ref=e757]: 已进入仿真模式：所有修改仅预览，退出后自动恢复
+      - generic [ref=e804]: 已打开右侧报告面板：请配置标题、引擎与分析深度后点击「生成报告」。
+    - generic [ref=e437]:
+      - generic [ref=e438]: ">>"
+      - textbox "仿真模式：可输入自然语言指令（如“焦比降低10%”），由智能体解析并应用（规划中），或 /help 查看命令" [ref=e758]
+  - contentinfo [ref=e440]:
+    - generic [ref=e441]:
+      - text: 实时链路
+      - generic [ref=e443]: 已连接
+    - generic [ref=e444]:
+      - text: 流程模型 ·
+      - generic [ref=e445]: 10 工序
+      - text: /
+      - generic [ref=e446]: 10 物流
+    - generic [ref=e447]:
+      - text: 监测点位
+      - generic [ref=e448]: "33"
+    - generic [ref=e449]:
+      - text: 可调约束
+      - generic [ref=e450]: "67"
+    - generic [ref=e452]: 基线情景
+    - generic [ref=e453]: 2026-08-13 09:58:58

@@ -1,0 +1,28 @@
+# 钢铁碳监测数字孪生平台
+# 用法（在映射目录 /root/qzb/jianpai 下）：
+#   docker compose build
+#   docker compose up -d
+# 访问：http://<服务器IP>:40013
+#
+# 源码映射：整个项目挂到容器 /app，修改 backend/ 下任意 .py 文件，
+# 容器内的 uvicorn --reload 会自动重启生效。
+# 注意：前端改动需先在本机/映射目录执行 `npm run build`（frontend/dist 由后端静态托管）。
+
+services:
+  steel-twin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: steel-carbon-twin
+    working_dir: /app
+    volumes:
+      - .:/app                      # 源码映射进容器，改动即生效
+    ports:
+      - "40014:8010"               # 主机端口 40014 -> 容器 8010
+    environment:
+      - PYTHONUNBUFFERED=1
+      # 大模型策略拆解（OpenAI 兼容接口）。无 LLM_API_KEY 时自动回退到规则解析。
+      - LLM_BASE_URL=https://api.deepseek.com/v1
+      - LLM_API_KEY=sk-f431be74819a4b7f82fd04f06977a039
+      - LLM_MODEL=deepseek-v4-pro
+    restart: unless-stopped

@@ -1,0 +1,1052 @@
+:root {
+  /* ===== MATLAB 工业风 · 浅色 · 克制蓝灰体系（无怪异配色） ===== */
+  --bg: #ECECEC;            /* 应用背景（MATLAB 浅灰桌面） */
+  --panel: #FFFFFF;         /* 面板（白） */
+  --panel-2: #F4F4F4;       /* 二级面板底（浅灰） */
+  --panel-3: #EAEAEA;       /* 三级/分区条底 */
+  --bar: #F6F6F6;           /* 工具条底（浅灰，非蓝） */
+  --bar-d: #E9E9E9;         /* 菜单条底（比工具条深一档，用于深浅分层） */
+  --border: #D0D0D0;        /* 边框/分隔线 */
+  --line: #D0D0D0;
+  --text: #1C1C1C;          /* 主文字（近黑） */
+  --muted: #6A6A6A;         /* 次要文字 */
+  --faint: #9A9A9A;         /* 更弱文字 */
+  --accent: #0072BD;        /* MATLAB 蓝（选中/关键数值/激活，全局唯一强调色） */
+  --accent-d: #005A93;      /* 深蓝 */
+  --accent2: #5F8294;       /* 次级中性石板色（图标/次要标识，冷静工业感） */
+  --accent-l: #E4EFF8;      /* 蓝浅底（选中行/分区底/悬停） */
+  --sel: #D2E6F6;           /* 列表选中行底 */
+  --green: #2E9E63;         /* 成功/直接排放（仅状态语义使用） */
+  --yellow: #C99A2E;        /* 警告/范围二 */
+  --red: #D14B4B;           /* 危险/高排放 */
+  --orange: #C0732A;        /* 赭橙（范围一/未连接） */
+  --rail: #243240;          /* 深色面（toast/3D 降级），中性深石板色，非蓝品牌 */
+  --gas: #2F9BB0;           /* 气体/能源管道（与固体物料区分，沉静青） */
+  --shadow: 0 1px 3px rgba(0,0,0,.14), 0 6px 18px rgba(0,0,0,.10);
+  /* VS Code 风格字体栈：UI 用系统无衬线；数值/命令用等宽（Cascadia Code / JetBrains Mono 优先） */
+  --mono: "Cascadia Code", "JetBrains Mono", Menlo, "SF Mono", Monaco, Consolas, "Courier New", monospace;
+  --ui: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+
+  /* 右侧属性面板统一间距令牌：所有分区/卡片/行/提示共用，保证对齐 */
+  --sp-section: 14px;   /* 模块(section)之间的间距 */
+  --sp-card: 12px;      /* 卡片之间的间距 */
+  --sp-row: 10px;       /* 同一模块内参数行之间的间距 */
+  --sp-hint: 8px;       /* 提示文字与上方元素的间距 */
+}
+
+/* ===== 仿真模式 · 黑色主题（覆盖全部 CSS 变量，UI 整体变黑） ===== */
+.app.sim-dark {
+  --bg: #0E1116;
+  --panel: #161B22;
+  --panel-2: #1D242E;
+  --panel-3: #232C38;
+  --bar: #131A22;
+  --bar-d: #0D1219;
+  --border: #2A3342;
+  --line: #2A3342;
+  --text: #E6EDF3;
+  --muted: #9AA7B4;
+  --faint: #6B7683;
+  --accent: #3DA5FF;
+  --accent-d: #2F86CC;
+  --accent2: #7C93A8;
+  --accent-l: #1C2B3D;
+  --sel: #1E3A52;
+  --green: #3ECF8E;
+  --yellow: #E0B64B;
+  --red: #F06A6A;
+  --orange: #E08A45;
+  --rail: #1A212B;
+  --gas: #38B8D0;
+
+  /* 属性面板风格（Blender 深色玻璃） */
+  --input: #0B111A;        /* 输入框底色（比面板更深） */
+  --sec-bg: #161B22;       /* section 标题底 */
+  --sec-bg-o: #1F2733;     /* section 展开时底 */
+  --sec-line: #2A3342;     /* section 边框 / 分割线 */
+
+  --shadow: 0 1px 3px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.45);
+}
+/* 仿真模式：对少数硬编码浅色的兜底修补 */
+.app.sim-dark .topbar { background: #1D242E; }
+.app.sim-dark .mbar-item:hover, .app.sim-dark .mbar-item.open { background: #2A3342; }
+.app.sim-dark .menu-drop { background: #161B22; border-color: #2A3342; box-shadow: 0 4px 16px rgba(0,0,0,.5); }
+.app.sim-dark .menu-drop .mi:hover { background: #1E3A52; }
+.app.sim-dark .ribbon { background: #161B22; }
+.app.sim-dark .cmdwin-head { background: #1D242E; }
+.app.sim-dark .tab.active { background: #161B22; }
+.app.sim-dark .sidebar-head, .app.sim-dark .inspector-head { background: #161B22; }
+.app.sim-dark .cmd-log { color: #C9D4DE; }
+.app.sim-dark .cmd-log .ln.cmd { color: var(--accent); }
+.app.sim-dark .cmd-log .ln.bot { color: #86B5DD; }
+.app.sim-dark .cmd-log .ln.bot::before { color: #86B5DD; }
+.app.sim-dark input[type="range"] { accent-color: var(--accent); }
+/* 输入框：Blender 深色玻璃感（比面板更深、圆角 4px） */
+.app.sim-dark .num, .app.sim-dark .num-input {
+  background: var(--input);
+  border-color: #20262F;
+  color: var(--text);
+}
+.app.sim-dark .num:focus, .app.sim-dark .num-input:focus {
+  background: #0F1620;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(61,165,255,.25);
+}
+.app.sim-dark select {
+  background-color: var(--input);
+  border-color: #20262F;
+  color: var(--text);
+}
+.app.sim-dark .pv-cell .pv-tag { border-color: #20262F; }
+.app.sim-dark .pv-cell .pv-x { color: #F08585; background: rgba(240,133,133,.14); }
+.app.sim-dark .pv-cell .pv-y { color: #8FCE6E; background: rgba(143,206,110,.14); }
+.app.sim-dark .pv-cell .pv-z { color: #6BB6FF; background: rgba(107,182,255,.14); }
+.app.sim-dark .pv-cell .pv-btn { background: #1A212B; border-color: #20262F; color: #9AA7B4; }
+.app.sim-dark .pv-cell .pv-btn:hover { background: rgba(61,165,255,.18); color: #6AB0F2; }
+.app.sim-dark .tiny-btn { background: transparent; border-color: #20262F; color: #9AA7B4; }
+.app.sim-dark .tiny-btn:hover { background: rgba(61,165,255,.18); color: #E6EDF3; border-color: var(--accent); }
+.app.sim-dark .sub-label { color: #9AA7B4; }
+.app.sim-dark .sub-label::before { background: var(--accent); opacity: .75; }
+.app.sim-dark .chip2 { background: #1A212B; border-color: #2A3342; }
+.app.sim-dark .note-box { background: transparent; border: none; color: #8B99AC; }
+.app.sim-dark .mode-tag { background: var(--accent-l); border-color: var(--accent); color: var(--accent); }
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; }
+body {
+  font-family: var(--ui);
+  font-size: 12px; color: var(--text);
+  -webkit-font-smoothing: antialiased; background: var(--bg);
+}
+b, strong { font-weight: 400; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+/* 按钮内文本保持中等字重用作交互暗示 */
+button b, button strong,
+.rbtn b, .rbtn strong,
+.mbar-item b, .mbar-item strong,
+.tbtn b, .tbtn strong { font-weight: 500; }
+
+/* =========================================================
+   顶层栅格（VS Code 布局）：标题栏 / 工具栏 / 左·中·右 / 底部面板 / 状态栏
+   ========================================================= */
+.app {
+  display: grid;
+  grid-template-columns: 48px var(--lw, 286px) 1fr var(--rw, 372px);
+  grid-template-rows: 34px 35px 1fr var(--cmd-h, 132px) 22px;
+  /* 命令行窗口（cmd）与中间数字孪生（stage）同列同宽；工具栏宽度与数字孪生一致（仅占中间列），左右侧栏/活动栏顶到顶部（延伸至工具栏行），VSCode 面板式布局 */
+  grid-template-areas:
+    "topbar topbar topbar topbar"
+    "act    left   toolbar right"
+    "act    left   stage  right"
+    "act    left   cmd    right"
+    "status status status status";
+  height: 100vh; gap: 0; background: var(--bg); color: var(--text);
+}
+.app.left-collapsed { --lw: 0px; }
+.app.right-collapsed { --rw: 0px; }
+/* 底栏（命令行窗口 + 状态条）收起：仅隐藏命令行窗口，蓝色系统状态条保留 */
+.app.bottom-collapsed { grid-template-rows: 34px 35px 1fr 0 22px; }
+.app.bottom-collapsed .cmdwin { display: none; }
+
+/* ============ 顶栏：VS Code 标题栏 + 菜单栏（浅色，扁平，无图标菜单） ============ */
+.topbar {
+  grid-area: topbar; display: flex; align-items: stretch; height: 34px;
+  background: var(--panel-2); color: var(--text); position: relative; z-index: 60;
+  border-bottom: 1px solid var(--border);
+}
+.topbar .brand { display: flex; align-items: center; gap: 8px; padding: 0 16px 0 12px; font-size: 12.5px;
+  color: var(--text); letter-spacing: .2px; white-space: nowrap; border-right: 1px solid var(--border); height: 100%; font-weight: 500; }
+.topbar .brand .lg { width: 15px; height: 15px; border-radius: 3px; background: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+/* 菜单条（VS Code：文本菜单，hover 高亮圆角） */
+.menubar { display: flex; align-items: center; gap: 2px; height: 100%; padding: 0 6px; }
+.mbar-item { position: relative; display: flex; align-items: center; padding: 0 12px; height: 26px; font-size: 13px; color: var(--text);
+  cursor: pointer; font-family: var(--ui); background: transparent; user-select: none; border-radius: 5px;
+  transition: background .1s; }
+.mbar-item:hover { background: var(--panel-3); }
+.mbar-item.open { background: var(--panel-3); }
+/* 菜单下拉（VS Code 式：圆角、浅阴影、hover 高亮） */
+.menu-drop { position: absolute; top: calc(100% + 4px); left: 0; min-width: 220px; background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); box-shadow: 0 4px 16px rgba(0,0,0,.14); padding: 4px; z-index: 80; border-radius: 6px; }
+.menu-drop .mi { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 12.5px; cursor: pointer; white-space: nowrap; border-radius: 4px; }
+.menu-drop .mi:hover { background: var(--accent-l); }
+.menu-drop .mi.disabled { color: var(--faint); cursor: default; }
+.menu-drop .mi.disabled:hover { background: none; }
+.menu-drop .mi .tick { width: 14px; text-align: center; font-size: 10px; color: var(--muted); }
+.menu-drop .mi .tx { flex: 1; }
+.menu-drop .mi .accel { color: var(--muted); font-size: 11px; font-family: var(--mono); margin-left: 24px; }
+.menu-drop .sep { height: 1px; background: var(--border); margin: 4px 2px; }
+.menu-drop .mi-sel { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 12.5px; white-space: nowrap; }
+.menu-drop .mi-sel .tx { color: var(--muted); letter-spacing: .3px; font-size: 10px; }
+.menu-drop .mi-select { flex: 1; min-width: 120px; font-size: 12px; color: var(--text); background: var(--input, #fff);
+  border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; cursor: pointer; outline: none; }
+.menu-drop .mi-select:focus { border-color: var(--accent); }
+/* 二级级联子菜单 */
+.menu-drop .mi-sub { position: relative; }
+.menu-drop .mi-sub .arrow { margin-left: auto; color: var(--muted); font-size: 14px; line-height: 1; }
+.menu-drop .mi.checked .tx { color: var(--accent-d); }
+.menu-drop.sub { position: absolute; top: -4px; left: calc(100% + 4px);
+  min-width: 180px; box-shadow: 0 4px 16px rgba(0,0,0,.16); z-index: 60; }
+.topbar .spacer { flex: 1; }
+.top-actions { display: flex; align-items: center; gap: 3px; padding: 0 10px; height: 100%; }
+.tdiv { width: 1px; height: 15px; background: var(--border); margin: 0 3px; }
+.tbtn { display: flex; align-items: center; gap: 5px; height: 21px; padding: 0 8px; font-size: 12px;
+  background: transparent; border: 1px solid transparent; color: var(--text); border-radius: 4px;
+  cursor: pointer; white-space: nowrap; font-family: var(--ui);
+  transition: background .12s, color .12s, border-color .12s; }
+.tbtn:hover { background: var(--panel-3); color: var(--text); }
+.tbtn:active { background: var(--sel); }
+.tbtn.on { color: var(--accent-d); background: var(--accent-l); }
+.tbtn:disabled, .tbtn.disabled { color: var(--faint); cursor: default; opacity: .55; }
+.tbtn:disabled:hover, .tbtn.disabled:hover { background: transparent; color: var(--faint); }
+.tbtn .ui-icon { width: 15px; height: 15px; }
+
+/* ============ 工具条（独立行：顶部菜单条下方、3D 视图/编排画布上方，横贯全宽，顶边与左右侧栏对齐） ============ */
+.ribbon { grid-area: toolbar; height: 35px;
+  display: flex; flex-direction: row; align-items: center; overflow: visible;
+  background: var(--panel); border-bottom: 1px solid var(--border); padding: 0 8px;
+  border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+.rdiv { width: 1px; height: 16px; background: var(--line); margin: 0 4px; flex: 0 0 auto; }
+.ribbon-body { flex: 1; display: flex; align-items: center; overflow-x: auto; overflow-y: hidden; padding: 0; gap: 3px; min-width: 0; }
+.ribbon-body::-webkit-scrollbar { height: 4px; }
+.rbtns { display: flex; align-items: center; gap: 2px; }
+/* 亮度：点击按钮弹出滑条 */
+.bright-wrap { position: relative; display: flex; align-items: center; flex: 0 0 auto; padding: 0 3px; }
+.bright-pop { position: absolute; top: calc(100% + 8px); right: 0; min-width: 220px; z-index: 90;
+  background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 4px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.24); padding: 10px 12px; }
+.bright-pop .bp-title { font-size: 10px; color: var(--muted); letter-spacing: .5px; margin-bottom: 9px; }
+.bright-pop .bp-row { display: flex; align-items: center; gap: 6px; }
+.bright-pop .rslider { width: 130px; }
+/* 工具条按钮（Blender 风水平按钮：图标 + 文字同行）：悬停/激活/选中态与全局按钮体系（.tbtn/.act-btn/.pv-btn/.tiny-btn）统一，共用 CSS 变量，深色主题自动适配 */
+.rbtn { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px;
+  background: transparent; border: 1px solid transparent; border-radius: 4px;
+  cursor: pointer; color: var(--text); font-size: 11px; font-family: var(--ui); white-space: nowrap; line-height: 1;
+  transition: background .1s, color .1s, border-color .1s; }
+.rbtn svg { flex: 0 0 auto; }
+.rbtn:hover { background: var(--panel-3); color: var(--text); }
+.rbtn:active { background: var(--sel); }
+.rbtn.on { background: var(--accent-l); color: var(--accent-d); }
+.rbtn.disabled, .rbtn:disabled { color: var(--faint); cursor: default; opacity: 0.55; }
+.rbtn.disabled:hover, .rbtn:disabled:hover { background: transparent; border-color: transparent; }
+/* 主操作按钮（运行仿真 / 流程编排）：VS Code 式实心主色按钮 —— 主题蓝底白字、hover 深一档 */
+.rbtn.primary {
+  height: 24px; padding: 0 14px; font-size: 11.5px; font-weight: 600;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.rbtn.primary:hover { background: var(--accent-d); border-color: var(--accent-d); color: #fff; }
+.rbtn.primary:active { background: var(--accent-d); }
+.rbtn.primary.on { background: var(--accent-d); border-color: var(--accent-d); color: #fff; }
+/* 仿真模式（深色主题）：主按钮亮蓝底白字 */
+.app.sim-dark .rdiv { background: rgba(255, 255, 255, 0.12); }
+.app.sim-dark .rbtn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.app.sim-dark .rbtn.primary:hover { background: var(--accent-d); border-color: var(--accent-d); color: #fff; }
+.app.sim-dark .rbtn.primary.on { background: var(--accent-d); border-color: var(--accent-d); color: #fff; }
+.app.sim-dark .group-scene-bar { background: rgba(11, 18, 32, 0.72); border-color: rgba(127, 200, 230, 0.35); }
+.app.sim-dark .gs-title { color: #EAF1F7; }
+.rsel { display: flex; flex-direction: column; gap: 2px; justify-content: center; }
+.rsel label { font-size: 10px; color: var(--muted); letter-spacing: .4px; text-transform: uppercase; white-space: nowrap; }
+.rsel select { width: 150px; padding: 3px 6px; font-size: 12px; background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 4px; }
+.rslider-row { display: flex; align-items: center; gap: 4px; }
+.rslider { width: 90px; height: 4px; margin: 0; cursor: pointer; accent-color: var(--accent); }
+.rslider-label { font-size: 9px; color: var(--faint); flex: 0 0 auto; }
+.rslider-val { font-size: 10px; color: var(--muted); min-width: 32px; text-align: right; }
+/* （旧 Teleport 目标已移除） */
+
+/* ============ 舞台（中间孪生） ============ */
+.stage { grid-area: stage; position: relative; background: #ECECEC; overflow: hidden; min-width: 0;
+  border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+.area-scene { position: absolute; inset: 0; background: #ECECEC; overflow: hidden; }
+.area-side { grid-area: side; background: var(--panel); overflow-y: auto; display: flex; flex-direction: column; }
+
+/* ============ 侧栏通用（MATLAB 浅灰面板头） ============ */
+.sidebar, .inspector { background: var(--panel); overflow: hidden; min-width: 0; display: flex; flex-direction: column; }
+.sidebar { grid-area: left; position: relative; }
+.inspector { grid-area: right; position: relative; }
+
+/* ============ 活动栏（与顶栏同底色，按钮 hover/选中用 accent 蓝） ============ */
+.activitybar {
+  grid-area: act; position: relative; min-width: 0; overflow: hidden;
+  background: var(--panel-2); color: var(--text);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 4px 0; gap: 2px;
+}
+.act-btn {
+  width: 40px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: none; border-radius: 0;
+  color: var(--muted); cursor: pointer; position: relative;
+  transition: background .12s, color .12s;
+}
+.act-btn svg { width: 20px; height: 20px; }
+.act-btn:hover { background: var(--panel-3); color: var(--text); }
+.act-btn:active { background: var(--panel-3); }
+.act-btn.on { color: var(--accent); }
+.act-btn.on::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: var(--accent);
+}
+.act-badge {
+  position: absolute; right: 3px; top: 4px; min-width: 15px; height: 15px;
+  padding: 0 4px; border-radius: 6px; background: #E06C4F; color: #fff;
+  font-size: 9px; line-height: 15px; text-align: center;
+}
+.act-sp { flex: 1; }
+.act-bottom { display: flex; flex-direction: column; align-items: center; }
+/* 全高活动栏：底部工具区与主按钮区之间细分隔线（VSCode 主题惯例） */
+.act-bottom::before {
+  content: ''; display: block; width: 26px; height: 1px;
+  margin: 4px 0 2px; background: var(--border);
+}
+.act-bottom .act-btn { margin: 4px 0; }
+/* 左侧栏宽度拖拽手柄（右侧边缘细条，鼠标移入显示抓取提示） */
+.sidebar-rsz { position: absolute; top: 0; right: 0; width: 6px; height: 100%; cursor: ew-resize; z-index: 6; }
+.sidebar-rsz:hover, .sidebar-rsz.dragging { background: rgba(20, 110, 180, .25); }
+/* 右侧栏宽度拖拽手柄（左侧边缘细条，与左侧栏对称） */
+.inspector-rsz { position: absolute; top: 0; left: 0; width: 6px; height: 100%; cursor: ew-resize; z-index: 6; }
+.inspector-rsz:hover, .inspector-rsz.dragging { background: rgba(20, 110, 180, .25); }
+.sidebar-head, .inspector-head {
+  display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--border);
+  font-size: 11px; color: var(--text); background: var(--panel); flex: 0 0 auto;
+  height: 35px; font-weight: 600; letter-spacing: .4px;
+}
+.sidebar-head .ttl, .inspector-head .ttl { font-size: 11px; color: var(--text); letter-spacing: .4px; }
+.sidebar-body, .inspector-body { flex: 1; overflow-y: auto; padding: 4px 0 12px; }
+/* 属性面板内容与左右边界留白：仅右侧面板，保证标题/分组/控件不贴边 */
+.inspector-body { padding: 4px 8px 12px; }
+
+/* —— Blender 风格属性面板容器 —— */
+.inspector { background: var(--panel); }
+.inspector-head {
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  padding: 0 10px;
+}
+.inspector .insp-head { margin-bottom: 4px; padding: 0 4px; }
+.inspector-body > .csec + .csec { margin-top: 4px; }
+
+/* 右侧属性面板：全部常规字重，通过字号区分层级 */
+.inspector b, .inspector strong { font-weight: 400; }
+.inspector .ctitle { font-size: 11px; color: var(--text); font-weight: 600; letter-spacing: .4px; }
+.inspector .ttl { font-size: 12px; color: var(--text); }
+.inspector .insp-title { font-size: 13px; color: var(--text); font-weight: 600; letter-spacing: .2px; }
+
+/* —— 暗黑仿真模式属性面板 ——：深色玻璃沉浸感 */
+.app.sim-dark .inspector { background: #161B22; }
+.app.sim-dark .inspector-head { background: #161B22; border-bottom-color: #20262F; }
+
+/* 左侧面板 Tab 条（VS Code 编辑器 tab 风格：激活白底 + 顶部主题色指示条） */
+.tabbar { display: flex; border-bottom: 1px solid var(--border); flex: 0 0 auto; background: var(--panel-2); }
+.tab {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; position: relative;
+  height: 34px; font-size: 12px; color: var(--muted); cursor: pointer;
+  user-select: none; letter-spacing: .2px; transition: color .15s, background .15s;
+}
+.tab:hover { color: var(--text); background: var(--panel-3); }
+.tab.active { color: var(--accent-d); background: var(--panel); font-weight: 500; }
+.tab.active::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--accent);
+}
+.tab:last-child { border-right: none; }
+.tab .ic { font-size: 12px; }
+.tab svg { flex: 0 0 auto; transition: opacity .15s; }
+
+/* ============ 左侧「园区资产浏览器」文件树（VS Code 资源管理器风格） ============ */
+.tree { padding: 4px 0 8px; font-size: 13px; }
+.tnode { margin-bottom: 0; }
+
+/* 树节点行（可折叠分组 / 工序行）：紧凑、直角、全宽悬停 */
+.tch {
+  display: flex; align-items: center; gap: 4px; padding: 0 10px 0 8px; height: 25px;
+  cursor: pointer; user-select: none; position: relative; border-radius: 0;
+}
+.tch:hover { background: var(--panel-3); }
+.tch:active { background: var(--sel); }
+.tch.on { background: var(--sel); color: var(--accent-d); }
+.tch.sub { padding-left: 8px; }
+.tch.sub .tch-tt { font-size: 13px; font-weight: 500; }
+
+/* VS Code 资源树 section header（分组标题）：小号弱色，hover 变深 */
+.tch.hdr {
+  height: 24px; padding: 0 10px 0 8px; gap: 6px;
+  font-size: 11px; font-weight: 600; letter-spacing: .8px;
+  color: var(--muted);
+}
+.tch.hdr:hover { background: transparent; color: var(--text); }
+.tch.hdr .tch-tt { font-size: 11px; font-weight: 600; letter-spacing: .8px; color: inherit; }
+.tch.hdr .twisty { width: 14px; opacity: .5; }
+.tch.hdr .tch-count { opacity: .8; }
+
+/* Twisty 箭头（VS Code chevron：横向闭合、旋转 90° 展开） */
+.twisty {
+  width: 16px; height: 20px; display: grid; place-items: center;
+  color: var(--muted); flex: 0 0 auto; cursor: pointer;
+  opacity: .6; transition: transform .15s ease, opacity .15s, color .15s;
+}
+.twisty:hover { opacity: 1; color: var(--text); }
+.twisty.open { transform: rotate(90deg); }
+.twisty svg { display: block; }
+
+.tch-ic { width: 18px; display: grid; place-items: center; color: var(--accent2); flex: 0 0 auto; opacity: .78; }
+.tch-tt { flex: 1; min-width: 0; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .15px; }
+
+/* 子级缩进（VS Code：纯层次缩进，无虚线 / 边框线） */
+.tchildren { padding-left: 24px; overflow: hidden; }
+
+.tchild {
+  display: flex; align-items: center; gap: 6px; padding: 0 10px 0 16px; height: 25px;
+  cursor: default; position: relative; font-size: 13px; border-radius: 0;
+}
+/* 带展开箭头的行：箭头自身占位，去掉补偿缩进，保证文字与无箭头叶子对齐 */
+.tchild:has(.twisty) { padding-left: 0; }
+.tchild:hover { background: var(--panel-3); }
+.tchild:active { background: var(--sel); }
+.tchild.active { background: var(--sel); color: var(--accent-d); }
+.tchild.click { cursor: pointer; }
+.tchild.leaf { padding-left: 16px; }
+/* 编排态：资源条目可拖入画布 */
+.tchild.drag { cursor: grab; }
+.tchild.drag:active { cursor: grabbing; }
+.tchild.drag:hover { background: var(--accent-l); }
+
+.tc-tt {
+  flex: 1; min-width: 0; font-size: 13px; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+  letter-spacing: .08px;
+}
+.tc-sq { width: 9px; height: 9px; border-radius: 3px; flex: 0 0 auto; }
+.t-scene { width: 13px; height: 13px; color: var(--accent2); flex: 0 0 auto; margin-left: 5px; opacity: .85; }
+
+/* ============ 命令行窗口（VS Code 面板风，底部） ============ */
+.cmdwin { grid-area: cmd; background: var(--panel); display: flex; flex-direction: column; overflow: hidden; position: relative;
+  border-top: 1px solid var(--border); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+/* 命令行窗口高度拖拽手柄（顶部细条，鼠标移入显示抓取提示） */
+.cmd-rsz { flex: 0 0 auto; height: 6px; cursor: ns-resize; position: relative; z-index: 6; }
+.cmdwin-head { display: flex; align-items: center; gap: 8px; height: 27px; padding: 0 12px; background: var(--panel-2);
+  border-bottom: 1px solid var(--border); flex: 0 0 auto; }
+.cmdwin-head .tt { font-size: 11px; color: var(--muted); letter-spacing: 1.2px; text-transform: uppercase; font-weight: 600; }
+.cmdwin-head .mode-badge { font-size: 10px; padding: 1px 7px; border-radius: 10px; color: #fff; letter-spacing: .3px; }
+.cmdwin-head .mode-badge.mb-chat { background: #2e9e63; }
+.cmdwin-head .mode-badge.mb-code { background: #2f8fbf; }
+.cmdwin-head .mode-badge.mb-plan { background: #d39e00; }
+.cmdwin-head .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+.cmdwin-head .sp { flex: 1; }
+/* 仿真模式：底部命令行绿色标识闪烁 */
+@keyframes simBlink {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(62,207,142,.55); }
+  50% { opacity: .2; box-shadow: 0 0 9px 3px rgba(62,207,142,.3); }
+}
+.cmdwin-head.sim .dot { background: var(--green); animation: simBlink 1s ease-in-out infinite; }
+.cmdwin-head.sim .tt { color: var(--green); }
+.cmdwin-head .mode-badge.mb-sim { background: #2E9E63; animation: simBlink 1.2s ease-in-out infinite; }
+.cmdwin-head .ctool { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 4px;
+  font-size: 10px; padding: 1px 8px; cursor: pointer; }
+.cmdwin-head .ctool:hover { color: var(--text); border-color: var(--accent); }
+.cmd-log { flex: 1; overflow-y: auto; padding: 6px 10px; font-family: var(--mono); font-size: 12px; line-height: 1.55; color: #243240; }
+.cmd-log .ln { white-space: pre-wrap; word-break: break-word; }
+.cmd-log .ln.cmd { color: var(--accent); }
+.cmd-log .ln.cmd::before { content: ">> "; color: var(--accent); }
+/* 系统信息按类型区分颜色：一般信息=绿 · 引导用户输入/操作=黑 · 提醒=黄 · 警告/报错=红 */
+.cmd-log .ln.sys, .cmd-log .ln.out, .cmd-log .ln.sim { color: var(--green); }
+.cmd-log .ln.guide { color: var(--text); }
+.cmd-log .ln.tip { color: var(--yellow); }
+.cmd-log .ln.warn, .cmd-log .ln.err { color: var(--red); }
+.cmd-log .ln.bot { color: #3F6D8F; }
+.cmd-log .ln.bot::before { content: "▸ "; color: #3F6D8F; }
+.cmd-log .ln.sim::before { content: "[仿真] "; color: var(--green); font-weight: 600; }
+.cmd-input-row { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-top: 1px solid var(--border); background: var(--panel); }
+.cmd-input-row .pmt { color: var(--accent); font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.cmd-input { flex: 1; border: none; outline: none; background: transparent; font-family: var(--mono); font-size: 12px; color: var(--text); }
+
+/* ============ 底栏状态条（VS Code 式：主题蓝底、白字、hover 提亮） ============ */
+.statusbar { grid-area: status; display: flex; align-items: stretch; height: 22px;
+  background: var(--accent); border-top: none; font-size: 10.5px; color: rgba(255,255,255,.85); font-family: var(--mono); letter-spacing: .1px; }
+.statusbar .st { display: flex; align-items: center; gap: 5px; padding: 0 10px; border-right: 1px solid rgba(255,255,255,.18); white-space: nowrap; cursor: default; }
+.statusbar .st:hover { background: rgba(255,255,255,.1); }
+.statusbar .st .v { color: #fff; font-weight: 600; }
+.statusbar .st.spacer { flex: 1; border-right: none; }
+.statusbar .st.spacer:hover { background: none; }
+.statusbar .ok { color: #B7F7D0; } .statusbar .err { color: #FFC2B8; } .statusbar .warnc { color: #FFE0A3; }
+.statusbar .mono { font-family: var(--mono); }
+.feed-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,.25); }
+.feed-open { background: #58D68D; } .feed-closed { background: #FF8C75; } .feed-init { background: rgba(255,255,255,.45); }
+/* 深色仿真模式：状态栏改用亮蓝底，白字保持 */
+.app.sim-dark .statusbar { background: #2E7FB8; }
+
+/* ============ 通用控件 ============ */
+button { background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 4px; padding: 5px 9px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: var(--ui); }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+button.primary:hover { background: var(--accent-d); }
+button.danger:hover { border-color: var(--red); color: var(--red); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+select, input, textarea { background: var(--panel); color: var(--text); border: 1px solid var(--border);
+  border-radius: 4px; padding: 4px 7px; font-size: 11.5px; width: 100%; font-family: var(--ui); transition: border-color .12s, box-shadow .12s; }
+select:focus, input:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-l); }
+textarea { resize: vertical; font-family: inherit; min-height: 56px; }
+.app.sim-dark select, .app.sim-dark input, .app.sim-dark textarea {
+  background: var(--input, #0B111A);
+  border-color: #20262F;
+  color: var(--text);
+}
+.app.sim-dark select:focus, .app.sim-dark input:focus, .app.sim-dark textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(61,165,255,.25);
+}
+.app.sim-dark .sec { color: #9AA7B4; }
+.app.sim-dark .sec::before { background: var(--accent); opacity: .75; }
+.app.sim-dark .card { background: transparent; border: none; }
+
+/* 全局细滑动条 */
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 3px;
+  border-radius: 3px; background: var(--panel-3); outline: none; margin: 9px 0 5px; cursor: pointer; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px;
+  border-radius: 50%; background: #fff; border: 2px solid var(--accent); cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.28); }
+input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%;
+  background: #fff; border: 2px solid var(--accent); cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.28); }
+input[type=range]::-moz-range-track { height: 3px; border-radius: 3px; background: var(--panel-3); }
+
+/* 通用分区标题（左侧面板内）：MATLAB 风，无竖线，弱化粗体 */
+/* 右侧属性面板 · 通用排版：模块(section)/卡片(card)/参数行(row)间距全部对齐 */
+.sec {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  font-weight: 500;
+  margin: var(--sp-section) 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sec:first-child { margin-top: 0; }
+/* 模块之间统一间距，避免忽近忽远 */
+.sec + .sec { margin-top: var(--sp-section); }
+.sec::before {
+  content: '';
+  width: 3px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--accent2);
+  opacity: .55;
+}
+/* —— VS Code 属性面板卡片：扁平无边框，行间用分隔线 —— */
+.card {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+/* 卡片之间统一间距 */
+.card + .card { margin-top: var(--sp-card); }
+
+.kv2 { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; font-size: 11px; align-items: baseline; }
+.kv2 + .kv2 { border-top: 1px solid var(--line); }
+.kv2 span { color: var(--muted); } .kv2 b { color: var(--text); text-align: right; font-weight: 400; font-variant-numeric: tabular-nums; }
+.chips { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+.chip2 {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 7px;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+.chip2 span { font-size: 10px; color: var(--muted); white-space: nowrap; flex: 0 0 auto; }
+.chip2 b { font-size: 11px; color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chip2 i { font-size: 10px; color: var(--muted); font-style: normal; white-space: nowrap; }
+
+/* ============ 右侧检查器面板：Blender 风格参数输入 / 行 / 标签 ============ */
+/* —— 数值输入（所有面板共用）—— 圆角 4px、紧凑高度 22px、贴合 Blender 字距 */
+.num,
+.num-input {
+  box-sizing: border-box;
+  background: var(--input, var(--bg));
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 3px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--ui);
+  outline: none;
+  text-align: right;
+  transition: border-color .12s, box-shadow .12s, background .12s;
+  width: 100%;
+  min-width: 0;
+}
+.num:focus,
+.num-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-l);
+  background: var(--panel);
+}
+.num:disabled,
+.num-input:disabled { opacity: .5; cursor: default; }
+
+/* 输入+单位水平布局（单位紧贴输入框右侧） */
+.num-row { display: flex; align-items: center; gap: 5px; }
+.num-row .num,
+.num-row .num-input { flex: 1 1 auto; min-width: 0; }
+.num-row > .num-unit { flex: 0 0 auto; }
+.num-unit {
+  font-size: 10.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  letter-spacing: .2px;
+  font-style: normal;
+}
+.num-unit.right { margin-left: -3px; }
+/* 数字输入框右侧叠加单位的小标签（Blender 风格：单位置于框内右下角） */
+.num-with-unit { position: relative; }
+.num-with-unit .num,
+.num-with-unit .num-input { padding-right: 22px; }
+.num-with-unit .num-unit {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 9.5px;
+  pointer-events: none;
+  color: var(--muted);
+}
+.kv-edit { display: inline-flex; align-items: center; gap: 6px; }
+.kv-edit .num { width: 92px; text-align: right; }
+
+/* —— Blender 风 X/Y/Z 三参数行 —— 同一行多参数；参数标签前置 */
+.pv-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 5px;
+  margin-bottom: 5px;
+}
+.pv-row:last-child { margin-bottom: 0; }
+.pv-cell {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.pv-cell .pv-tag {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--accent-d);
+  background: var(--accent-l);
+  border-radius: 3px 0 0 3px;
+  margin-right: -1px;
+  letter-spacing: .3px;
+  border: 1px solid var(--line);
+  border-right: none;
+}
+.pv-cell .pv-x { color: #B23B3B; background: rgba(178,59,59,.10); }
+.pv-cell .pv-y { color: #5A8C3A; background: rgba(90,140,58,.10); }
+.pv-cell .pv-z { color: #2A72BD; background: rgba(42,114,189,.10); }
+.pv-cell .num,
+.pv-cell .num-input {
+  flex: 1 1 auto;
+  border-radius: 0 4px 4px 0;
+  min-width: 0;
+}
+.pv-cell .pv-unit {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--muted);
+  font-style: normal;
+  margin-left: 3px;
+}
+.pv-cell .pv-btn {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: none;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.pv-cell .pv-btn:last-child { border-radius: 0 4px 4px 0; border-left: none; }
+.pv-cell .pv-btn:hover { background: var(--accent-l); color: var(--accent-d); }
+.pv-cell .pv-btn.on { color: var(--accent-d); background: var(--accent-l); }
+.pv-cell .pv-drag {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  color: var(--faint);
+  font-size: 10px;
+  cursor: grab;
+  user-select: none;
+}
+.pv-cell .pv-drag:hover { color: var(--muted); }
+
+/* —— 标题级别：Blender 风分组小标题（弱化但保留 9px 字距感）—— */
+.sub-label {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .4px;
+  text-transform: none;
+  margin: 8px 0 4px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sub-label::before {
+  content: '';
+  width: 3px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--accent2);
+  opacity: .55;
+}
+
+/* 参数行：标签+当前值+滑块/输入。模块内相邻参数行间距统一 */
+.param-row { margin-bottom: 6px; }
+.param-row:last-child { margin-bottom: 0; }
+.pr-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+.pr-top span { color: var(--muted); }
+.pr-top b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 500; }
+.pr-hint { font-size: 10px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+
+/* —— select 下拉：Blender 风格（紧凑 22px、圆角 4px、箭头内嵌）—— */
+select {
+  background: var(--input, var(--bg));
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 4px;
+  height: 22px;
+  padding: 0 22px 0 7px;
+  font-size: 11.5px;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 11px) center, calc(100% - 7px) center;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  transition: border-color .12s, background-color .12s;
+}
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-l);
+  background-color: var(--panel);
+}
+
+/* 通用辅助类：右侧面板顶部类型标签，柔和蓝（呼应主色，低调不刺眼） */
+.mode-tag {
+  font-size: 10px;
+  color: var(--accent-d);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 1px 8px;
+  background: var(--accent-l);
+  white-space: nowrap;
+  letter-spacing: .2px;
+}
+
+/* 统一「面板说明块」：属性面板内一段介绍文字 */
+.note-box {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.65;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px 9px;
+  margin: 2px 0 7px;
+  white-space: pre-wrap;
+}
+
+/* 通用按钮组（面板内操作按钮） */
+.x { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 4px; cursor: pointer; padding: 2px 7px; font-size: 12px; }
+.x:hover { color: var(--red); border-color: var(--red); }
+.add { background: var(--panel-2); border: 1px solid var(--line); color: var(--accent2); border-radius: 4px; cursor: pointer; padding: 5px 10px; font-size: 12px; width: 100%; margin-top: 4px; }
+.add:hover { border-color: var(--accent2); }
+.add:disabled { opacity: .4; cursor: default; }
+.reset { background: var(--panel-2); border: 1px solid var(--line); color: var(--accent2); border-radius: 4px; cursor: pointer; padding: 5px 10px; font-size: 12px; margin-top: 8px; }
+.reset:hover { border-color: var(--accent2); }
+.del-node { margin-top: 10px; background: var(--panel-2); border: 1px solid var(--red); color: var(--red); border-radius: 4px; padding: 8px; cursor: pointer; font-size: 12px; width: 100%; }
+.del-node:hover { background: rgba(199,90,82,.12); }
+
+/* 检查器面板统一头部：标题 + 副标题 + 描述 */
+.insp-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; padding: 0 4px; }
+.insp-title { font-size: 13px; font-weight: 600; letter-spacing: .2px; }
+.insp-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+/* slider / range 统一 —— Blender 风 3px 滑轨 + 12px 圆头 */
+input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; margin: 0; height: 12px; }
+input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; background: var(--line); border-radius: 2px;
+  border: none;
+}
+input[type=range]::-moz-range-track { height: 3px; background: var(--line); border-radius: 2px; border: none; }
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 11px; height: 11px;
+  background: var(--accent); border-radius: 50%;
+  margin-top: -4px; cursor: pointer;
+  border: 1px solid var(--accent-d);
+}
+input[type=range]::-moz-range-thumb { width: 11px; height: 11px; background: var(--accent); border-radius: 50%; cursor: pointer; border: 1px solid var(--accent-d); }
+
+/* Blender 风超紧凑按钮组：用于属性面板的「展开/收起/编辑/删除」 */
+.tiny-btn {
+  width: 18px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.tiny-btn:hover { background: var(--accent-l); color: var(--accent-d); border-color: var(--accent); }
+.tiny-btn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tiny-btn.danger:hover { background: rgba(199,90,82,.12); color: var(--red); border-color: var(--red); }
+.tiny-btn-row { display: inline-flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+
+/* Blender 紧凑三列键值对行（label / input / unit）：与原 .kv2 并存，
+   使用 .kv2-row（grid 子元素）避免与现有 .kv2（flex）冲突 */
+.kv2c {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+}
+.kv2c > .kv2-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+}
+.kv2c .kv2-row .k { color: var(--muted); white-space: nowrap; }
+.kv2c .kv2-row .v { min-width: 0; }
+.kv2c .kv2-row .u { color: var(--muted); font-size: 10px; font-style: normal; }
+
+.u { font-style: normal; color: var(--muted); font-size: 10px; }
+
+/* ============ 统一列表（园区资产浏览器 / 检视器，MATLAB 简约列表风） ============ */
+/* 所有列表（工艺流程 / 设备 / 原料 / 策略 / 园区构成 / Top 工序 / 编排节点）共用同一套行样式 */
+.lview { display: flex; flex-direction: column; }
+.lrow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; min-height: 30px;
+  background: transparent; cursor: pointer; user-select: none;
+  font-size: 12px; color: var(--text);
+  transition: background-color .08s ease;
+}
+.lrow + .lrow { border-top: 1px solid var(--line); }
+.lrow.click:hover { background: var(--panel-2); }
+.lrow.active { background: var(--sel); }
+.lrow .l-ic { width: 18px; height: 18px; flex: 0 0 auto; display: grid; place-items: center; color: var(--accent2); font-size: 12px; }
+.lrow .l-sq { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+.lrow .l-stack { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.lrow .l-tt { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lrow .l-sub { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lrow .l-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.lrow .l-dot.run { background: var(--green); }
+.lrow .l-dot.stop { background: var(--muted); }
+.lrow .l-seq { width: 18px; height: 18px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center;
+  font-size: 10px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); }
+.lrow .l-handle { color: var(--muted); font-size: 12px; cursor: grab; flex: 0 0 auto; user-select: none; }
+.lrow .l-tag { font-size: 10px; line-height: 1; padding: 2px 7px; border-radius: 4px; flex: 0 0 auto;
+  background: var(--panel-2); color: var(--muted); white-space: nowrap; }
+.lrow .l-tag.on { color: var(--green); background: rgba(46,158,99,.12); }
+.lrow .l-tag.iso { color: var(--yellow); background: rgba(201,154,46,.14); }
+.lrow .l-trail { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; flex: 0 0 auto; text-align: right; }
+.lrow .l-badge { font-size: 10px; line-height: 1; padding: 2px 6px; border-radius: 4px; flex: 0 0 auto; white-space: nowrap; }
+.lrow .l-badge.adj { background: rgba(0,114,189,.12); color: var(--accent); }
+.lrow .l-badge.met { background: rgba(106,106,106,.14); color: var(--muted); }
+.lrow.dragging { opacity: .45; }
+.lrow.drop-before { box-shadow: 0 -2px 0 0 var(--accent); }
+/* 旧类兼容别名（逐步移除） */
+.kind-badge { display: inline-block; font-size: 10px; line-height: 1; padding: 2px 5px; border-radius: 4px; flex: 0 0 auto; }
+.badge-met { background: rgba(107,119,133,.16); color: var(--muted); }
+.badge-adj { background: rgba(14,108,194,.14); color: var(--accent); }
+.group-h { display: flex; align-items: center; gap: 7px; margin: 10px 0 6px; font-size: 12px; color: var(--text); }
+.group-h:first-of-type { margin-top: 4px; }
+.group-h .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.group-h .cnt { margin-left: auto; font-size: 10px; color: var(--muted); font-weight: 400; }
+
+/* 角色 / 分类药丸 */
+.role { font-size: 10px; padding: 0 6px; border-radius: 4px; flex: 0 0 auto; }
+.role.start { background: rgba(46,158,99,.14); color: #1f7d50; border: 1px solid rgba(46,158,99,.4); }
+.role.end { background: rgba(14,108,194,.12); color: #0a4f93; border: 1px solid rgba(14,108,194,.35); }
+.role.iso { background: rgba(201,154,46,.14); color: #9a731f; border: 1px solid rgba(201,154,46,.42); }
+.tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); }
+.live-badge { display: inline-block; font-size: 10px; padding: 0 5px; border-radius: 4px;
+  background: rgba(46,158,99,.14); color: var(--green); border: 1px solid rgba(46,158,99,.4); }
+.muted { color: var(--muted); font-size: 10px; }
+.note { font-size: 10px; color: var(--muted); line-height: 1.6; font-weight: 400; margin-top: 6px; }
+.warn { color: var(--yellow); font-size: 10px; }
+.op { font-size: 10px; padding: 3px 7px; background: var(--panel-2); border-radius: 4px; }
+.empty { text-align: center; color: var(--muted); font-size: 10px; padding: 26px 10px; line-height: 1.6; }
+.link-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 10px; padding: 2px 0; }
+.link-btn:hover { text-decoration: underline; }
+.mini-tools { display: flex; gap: 5px; flex-wrap: wrap; }
+.x-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  transition: background .12s, color .12s, border-color .12s;
+  line-height: 1;
+}
+.x-btn:hover { color: var(--text); background: var(--accent-l); border-color: var(--accent); }
+.app.sim-dark .x-btn:hover { color: #fff; background: rgba(61,165,255,.18); border-color: var(--accent); }
+.bar-cmp { height: 4px; border-radius: 2px; background: var(--panel-2); overflow: hidden; }
+.bar-cmp > i { display: block; height: 100%; }
+.trend { width: 100%; display: block; border: 1px solid var(--border); border-radius: 4px; background: var(--panel); }
+.kv { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; }
+.kv b { color: var(--text); font-weight: 400; }
+
+/* ============ 3D 视口叠加层（图例 / 热力色阶等） ============ */
+.legend { background: rgba(255,255,255,.94); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; font-size: 10px; color: var(--text); backdrop-filter: blur(3px); box-shadow: var(--shadow); }
+.legend-title { margin-bottom: 4px; font-size: 10px; }
+.legend-scale { display: flex; gap: 6px; align-items: center; }
+.scale-bar { flex: 1; height: 11px; border-radius: 4px; background: linear-gradient(to right, #3d6e8c 0%, #c9a23b 50%, #c0564c 100%); }
+.scale-min, .scale-max { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 18px; }
+.scale-ticks { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: 2px; }
+.legend-sub { margin-top: 8px; color: var(--muted); font-size: 10px; letter-spacing: .4px; }
+.legend-item { display: flex; align-items: center; gap: 7px; margin-top: 3px; line-height: 1.4; font-size: 10px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+.sw-co2 { background: #c0564c; border-radius: 50%; } .sw-smoke { background: #9aa3ad; } .sw-ball { background: #b07a4a; border-radius: 50%; }
+.sw-glow { background: #b08a2e; border-radius: 50%; } .sw-label { background: #6f97b5; } .sw-start { background: var(--green); }
+.sw-end { background: #6f97b5; } .sw-iso { background: var(--yellow); }
+.legend-feed { margin-top: 8px; padding-top: 5px; border-top: 1px solid var(--border); }
+
+/* ============ 园区构成（右侧总览·资产清单） ============ */
+.scope { margin-top: 10px; }
+.scope-bar { height: 4px; border-radius: 2px; overflow: hidden; display: flex; background: var(--panel-2); }
+.scope-direct { background: var(--red); min-width: 2px; } .scope-indirect { background: var(--accent2); min-width: 2px; }
+.scope-legend { display: flex; justify-content: space-between; margin-top: 6px; font-size: 10px; color: var(--muted); }
+.scope-legend .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+.scope-legend .dot.d { background: var(--red); } .scope-legend .dot.i { background: var(--accent2); }
+
+/* ============ Toast / 场景降级 ============ */
+.toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--rail); color: #EAF1F7;
+  padding: 9px 16px; border-radius: 4px; z-index: 200; font-size: 12px; box-shadow: var(--shadow); max-width: 80vw; }
+.scene-fallback { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); padding: 30px; text-align: center; background: #0f1620; }
+.scene-fallback .fb-title { font-size: 14px; color: #e6edf3; }
+.scene-fallback .fb-msg { font-size: 12px; color: #6fb0e6; max-width: 520px; word-break: break-word; }
+.scene-fallback .fb-hint { font-size: 12px; color: #9aa6b2; max-width: 480px; }
+.scene-fallback .fb-retry { margin-top: 6px; padding: 6px 18px; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 4px; cursor: pointer; font-size: 12px; }
+
+/* ============ 滚动条（工业风细条） ============ */
+/* 左侧资源管理 / 右侧属性面板滚动条更细（3px），停止滚动 2s 后自动隐藏（见 LeftSidebar.vue / RightInspector.vue 的 .scrolling） */
+.sidebar-body, .inspector-body { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.sidebar-body.scrolling, .inspector-body.scrolling { scrollbar-color: rgba(170,180,190,.7) transparent; }
+.sidebar ::-webkit-scrollbar, .inspector ::-webkit-scrollbar { width: 3px; height: 3px; }
+.sidebar ::-webkit-scrollbar-track, .inspector ::-webkit-scrollbar-track { background: transparent; }
+.sidebar ::-webkit-scrollbar-thumb, .inspector ::-webkit-scrollbar-thumb { background: transparent; border-radius: 1.5px; }
+.sidebar-body.scrolling ::-webkit-scrollbar-thumb, .inspector-body.scrolling ::-webkit-scrollbar-thumb { background: rgba(170,180,190,.7); }
+.panel-scroll ::-webkit-scrollbar,
+.cmd-log::-webkit-scrollbar, .ribbon-body::-webkit-scrollbar { width: 8px; height: 8px; }
+.panel-scroll ::-webkit-scrollbar-thumb,
+.cmd-log::-webkit-scrollbar-thumb, .ribbon-body::-webkit-scrollbar-thumb { background: #c3d0dc; border-radius: 4px; }
+.cmd-log::-webkit-scrollbar-track { background: transparent; }
+.app.sim-dark .panel-scroll ::-webkit-scrollbar-thumb,
+.app.sim-dark .cmd-log::-webkit-scrollbar-thumb, .app.sim-dark .ribbon-body::-webkit-scrollbar-thumb { background: #2A3342; }
+
+/* ============ 交互动画（统一、克制：淡入/弹入/滑入） ============ */
+/* 用法：在要过渡的单个根元素外包 <transition name="fade|pop|slide">，元素需带 v-if */
+.fade-enter-active, .fade-leave-active { transition: opacity .18s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+/* 模态弹窗：遮罩淡入 + 卡片轻微上移放大，给出「打开」的层次感 */
+.pop-enter-active { transition: opacity .2s ease, transform .2s cubic-bezier(.2,.8,.3,1); }
+.pop-leave-active { transition: opacity .15s ease, transform .15s ease; }
+.pop-enter-from, .pop-leave-to { opacity: 0; }
+.pop-enter-from .modal, .pop-leave-to .modal { transform: translateY(8px) scale(.98); }
+
+/* 侧栏/面板内容切换：轻微左滑淡入 */
+.slide-enter-active { transition: opacity .2s ease, transform .2s ease; }
+.slide-leave-active { transition: opacity .12s ease, transform .12s ease; }
+.slide-enter-from { opacity: 0; transform: translateX(-8px); }
+.slide-leave-to { opacity: 0; transform: translateX(8px); }
+
+/* 列表项出现：轻微上浮淡入（用于设备/工序列表、台账条目） */
+.rise-enter-active { transition: opacity .22s ease, transform .22s ease; }
+.rise-enter-from { opacity: 0; transform: translateY(6px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-enter-active, .fade-leave-active,
+  .pop-enter-active, .pop-leave-active,
+  .slide-enter-active, .slide-leave-active,
+  .rise-enter-active { transition: none; }
+  .pop-enter-from .modal, .pop-leave-to .modal { transform: none; }
+  .slide-enter-from, .slide-leave-to { transform: none; }
+  .rise-enter-from { transform: none; }
+}
+
+/* =========================================================
+   VS Code / MATLAB 工业风 · 全局增强（字体、聚焦、滚动条、表单）
+   ========================================================= */
+/* 全局聚焦态：VS Code 式 1px 主题色描边（键盘可达性 + 统一交互暗示） */
+:focus-visible { outline: 1.5px solid var(--accent); outline-offset: -1px; border-radius: 2px; }
+select:focus-visible, button:focus-visible, input:focus-visible { outline: none; }
+input[type="text"]:focus, input[type="number"]:focus, input[type="password"]:focus,
+input:not([type]):focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-l); outline: none; }
+
+/* 全局细滚动条（VS Code 风格：细窄、隐藏轨道、hover 才明显） */
+* { scrollbar-width: thin; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: rgba(120,130,140,.35); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(120,130,140,.55); border: 2px solid transparent; background-clip: content-box; }
+.app.sim-dark *::-webkit-scrollbar-thumb { background: rgba(140,155,170,.3); border: 2px solid transparent; background-clip: content-box; }
+.app.sim-dark *::-webkit-scrollbar-thumb:hover { background: rgba(140,155,170,.5); border: 2px solid transparent; background-clip: content-box; }
+
+/* 数值输入与文本输入统一为紧凑工业表单（高 22px、圆角 4px、tabular 数字） */
+input[type="text"], input[type="number"], input[type="password"], input:not([type]), textarea {
+  font-family: var(--ui); font-size: 11.5px; color: var(--text);
+  background: var(--input, var(--bg)); border: 1px solid var(--line); border-radius: 4px;
+  height: 22px; padding: 0 6px; transition: border-color .12s, box-shadow .12s, background-color .12s;
+}
+textarea { height: auto; padding: 4px 6px; resize: vertical; line-height: 1.5; }
+input[type="number"] { font-variant-numeric: tabular-nums; }
+input[type="range"] { accent-color: var(--accent); cursor: pointer; }
+
+/* 高频 3D 视图区域：独立渲染层，避免布局抖动影响周边（性能） */
+.stage { contain: layout paint; }
+/* 按钮统一过渡（减少无效动画，只过渡颜色类属性，提升响应速度） */
+button, .rbtn, .tbtn, .mi, .act-btn, .tiny-btn { transition-timing-function: ease; will-change: auto; }
+
+/* 面板间分割：避免选中文本拖蓝，仅拖拽条区域允许选中 */
+.app .rsz-l, .app .rsz-r, .app .cmd-rsz { user-select: none; touch-action: none; }
+
+
