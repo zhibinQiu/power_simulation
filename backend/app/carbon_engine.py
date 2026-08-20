@@ -300,7 +300,6 @@ def simulate(model: ProcessModel, factors: Dict = None) -> SimResult:
 # carbon_to_steel 等）出发，沿模型 flows 的物料连线（material 匹配）路由到接收工序，
 # 接收工序对应源（焦炭/煤/铁水/炉料）减去内部供给，差额才显示为外部采购；真正外售的
 # 中间产品（无下游接收的焦炭/生物炭/DRI/铁水等）才进入「外售中间产品碳」节点。
-_STEEL_MATS = {"crude_steel", "refined_steel", "billet", "steel_product"}
 _HM_MATS = {"hot_metal", "pre_hm"}
 _MID_LABEL = {"coke": "焦炭碳", "biochar": "生物炭碳", "dri": "DRI碳", "hot_metal": "铁水碳"}
 # 钢水碳链路涉及的工序类型（钢水沿链传递，最终固碳于成品）
@@ -374,37 +373,13 @@ def _alloc(supply: Dict[str, float], demand: Dict[str, float]) -> Tuple[Dict[str
     return received, max(s - d, 0.0)
 
 
-def _steel_pass_edges(fadj, ids: set, mid_prod: Dict[str, float]) -> Tuple[Dict[tuple, float], Dict[str, float]]:
-    """钢水碳沿钢链传递：返回 (edge_value, terminal_value)。
-
-    edge_value[(a,b)] = 流经 a→b 的钢水碳；terminal_value[pid] = 最终固碳于钢材的钢水碳。
-    每条路径从各产钢工序出发，沿 STEEL_MATS 连线走到链末（无出钢线）为止。
-    """
-    edges: Dict[tuple, float] = {}
-    terminal: Dict[str, float] = {}
-    for pid, val in mid_prod.items():
-        if val <= 1e-9:
-            continue
-        cur, seen, carried = pid, {pid}, val
-        while True:
-            nxts = [d for d, m in fadj.get(cur, []) if m in _STEEL_MATS and d in ids and d not in seen]
-            if not nxts:
-                break
-            nxt = nxts[0]
-            seen.add(nxt)
-            edges[(cur, nxt)] = edges.get((cur, nxt), 0.0) + carried
-            cur = nxt
-        terminal[cur] = terminal.get(cur, 0.0) + carried
-    return edges, terminal
-
-
 def build_sankey(raw, flows=None) -> Dict[str, object]:
     """生成碳素流桑基图：外部源 -> 工序（含中间产品碳沿物料链跨工序传递）-> 去向。
 
     列位：0=外部源，1..=工序（按物料链深度），小数=中间产品节点，末列=去向。
     单位 tC/h。守恒：每个工序 入 = 出；全图 源列合计 = 去向列合计。
     """
-    ids, fadj, depth = _chain_layout(raw, flows)
+    ids, _fadj, depth = _chain_layout(raw, flows)
     res_by_id = {u.id: res for u, res, _p in raw}
     u_by_id = {u.id: u for u, _r, _p in raw}
     p_by_id = {u.id: p for u, _r, p in raw}
@@ -503,17 +478,14 @@ def build_sankey(raw, flows=None) -> Dict[str, object]:
                 if share > 1e-6:
                     links.append(SankeyLink(source=f"u:{pid}", target="product", value=round(share, 3)))
 
-    # ---- 4. 钢水碳沿钢链传递 ----
-    steel_edges, steel_terminal = _steel_pass_edges(fadj, ids, mid_prod.get("steel", {}))
-    for (a, b), v in steel_edges.items():
-        if v <= 1e-6:
+    # ---- 4. 钢水碳：仅由产钢工序（转炉/电炉/AOD等）产出，直接固结于成品钢。
+    # 精炼/连铸/轧制只是物理承运钢水（碳量不变、carbon_to_steel=0），不再逐段重复建「钢水碳」节点 ----
+    for pid, val in mid_prod.get("steel", {}).items():
+        if val <= 1e-9:
             continue
-        mid_id = _node(f"m:steel:{b}", "钢水碳", proc_col[b] - 0.5, "mid")
-        links.append(SankeyLink(source=f"u:{a}", target=mid_id, value=round(v, 3)))
-        links.append(SankeyLink(source=mid_id, target=f"u:{b}", value=round(v, 3)))
-    for pid, v in steel_terminal.items():
-        if v > 1e-6:
-            links.append(SankeyLink(source=f"u:{pid}", target="steel", value=round(v, 3)))
+        mid_id = _node(f"m:steel:{pid}", "钢水碳", proc_col[pid] + 0.5, "mid")
+        links.append(SankeyLink(source=f"u:{pid}", target=mid_id, value=round(val, 3)))
+        links.append(SankeyLink(source=mid_id, target="steel", value=round(val, 3)))
 
     # ---- 5. 逐工序生成外部源与去向连线（扣除内部供给后） ----
     for u, res, p in raw:

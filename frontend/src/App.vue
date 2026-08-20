@@ -8,11 +8,12 @@
     <!-- 左侧栏：园区资产（工艺 / 设备 / 原料 / 策略） -->
     <LeftSidebar @rsz="startLeftResize" />
 
-    <!-- 中间：仿真数字孪生（仿真态） / 流程编排画布（编辑态） / 数据视图（传感器历史数据表格） -->
+    <!-- 中间：仿真数字孪生（仿真态） / 流程编排画布（编辑态） / 数据视图（传感器历史数据表格） / 碳市场视图（实时行情） -->
     <!-- SceneViewer 始终挂载，不销毁 WebGL 上下文，大幅提升切换速度并避免重建空白 -->
     <main class="stage">
-      <SceneViewer v-show="!store.editMode && !store.dataViewOn" />
+      <SceneViewer v-show="!store.editMode && !store.dataViewOn && !store.carbonMarketOn" />
       <DataView v-if="store.dataViewOn && !store.editMode" />
+      <CarbonMarketView v-if="store.carbonMarketOn && !store.editMode" />
       <FlowEditor v-if="store.editMode" />
     </main>
 
@@ -53,6 +54,7 @@ import RightInspector from './components/RightInspector.vue'
 import SceneViewer from './components/SceneViewer.vue'
 import WelcomeScreen from './components/WelcomeScreen.vue'
 import DataView from './components/DataView.vue'
+import CarbonMarketView from './components/CarbonMarketView.vue'
 import FlowEditor from './components/FlowEditor.vue'
 import { usePanelSizes } from './composables/usePanelSizes'
 import { useGlobalShortcuts } from './composables/useGlobalShortcuts'
@@ -187,6 +189,7 @@ const menus = [
     ] },
     { sep: true },
     { label: '数据', toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
+    { label: '碳市场', toggle: () => store.carbonMarketOn, act: () => store.toggleCarbonMarket() },
   ] },
   { id: 'edit', label: '编辑', items: [
     { label: store.editMode ? '完成编排' : '进入流程编排', act: onToggleEdit },

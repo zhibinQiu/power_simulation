@@ -47,8 +47,12 @@ function hcolor(h) {
 const layout = computed(() => {
   const sk = store.resultForView && store.resultForView.sankey
   if (!sk || !sk.nodes || !sk.nodes.length) return null
-  const nodes = sk.nodes, links = sk.links
-  // 多列布局：列由后端 col 决定（0=源，1..=工序，小数=中间产品，末列=去向）
+  // 三段式布局：左侧物料(原料) | 中间工艺 | 右侧物料(产物，含中间产品)，避免横向列多导致标签重叠
+  const kindOf = {}
+  sk.nodes.forEach((n) => (kindOf[n.id] = n.kind))
+  const nodes = sk.nodes.map((n) => ({ ...n, col: (n.kind === 'sink' || n.kind === 'mid') ? 2 : n.kind === 'fuel' ? 0 : 1 }))
+  // 工艺之间不连线：只保留「物料→工艺」「工艺→物料」，过滤「中间产品→工艺」的流转线
+  const links = (sk.links || []).filter((l) => !(kindOf[l.source] === 'mid' && kindOf[l.target] === 'process'))
   const colKeys = [...new Set(nodes.map((n) => n.col))].sort((a, b) => a - b)
   const cols = {}
   colKeys.forEach((c) => (cols[c] = []))
@@ -125,7 +129,10 @@ const paths = computed(() => {
     const color = t.kind === 'sink'
       ? (t.id === 'co2' ? '#D14B4B' : t.id === 'steel' ? '#2E9E63' : t.id === 'slag' ? '#7B5FA6' : '#0072BD')
       : (s.kind === 'fuel' ? '#ED7D31' : (s.kind === 'mid' || t.kind === 'mid') ? '#2CA6A4' : '#8b95a1')
-    const d = `M ${x0} ${y0} C ${mx} ${y0}, ${mx} ${y1}, ${x1} ${y1} L ${x1} ${y1 + w} C ${mx} ${y1 + w}, ${mx} ${y0 + w}, ${x0} ${y0 + w} Z`
+    // 工艺与中间产品同列：改为向右的小弧线，避免水平反向弯曲重叠
+    const d = Math.abs(x0 - x1) <= NODE_W + 1
+      ? `M ${x1} ${y0} C ${x1 + 9} ${y0}, ${x1 + 9} ${y1}, ${x1} ${y1} L ${x1} ${y1 + w} C ${x1 + 9} ${y1 + w}, ${x1 + 9} ${y0 + w}, ${x1} ${y0 + w} Z`
+      : `M ${x0} ${y0} C ${mx} ${y0}, ${mx} ${y1}, ${x1} ${y1} L ${x1} ${y1 + w} C ${mx} ${y1 + w}, ${mx} ${y0 + w}, ${x0} ${y0 + w} Z`
     out.push({ d, color })
   })
   return out

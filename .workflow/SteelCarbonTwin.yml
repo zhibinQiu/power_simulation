@@ -1,0 +1,56 @@
+# 行业能碳仿真平台 - Windows exe 自动打包流水线（Gitee Go）
+#
+# 原理：
+#   Gitee Go 云构建机仅提供 Linux 环境，而 PyInstaller 不支持交叉编译，
+#   因此本流水线通过「自有主机组」把打包任务下发到一台 Windows 机器上执行。
+#
+# 前置条件（一次性配置，见 README 打包章节）：
+#   1. 开通 Gitee Go 并完成实名认证；
+#   2. 准备一台常开的 Windows 机器，安装 Python 3.10+ / Node.js 18+（均加入 PATH）；
+#   3. 在「仓库 → 管理 → Gitee Go → 主机管理」中添加该 Windows 机器（需安装 agent）；
+#   4. 将下面的 hostGroupID 换成实际主机组 ID，artifactRepository 换成实际制品库名。
+#
+# 触发：push 到 master 分支后自动运行；也可在流水线页面手动运行。
+
+version: '1.0'
+name: steel-twin-windows-build
+displayName: Windows exe 打包
+
+triggers:
+  push:
+    branches:
+      precise:
+        - master
+
+stages:
+  # ---------------- 阶段一：在自有 Windows 主机上执行打包 ----------------
+  - stage: build
+    displayName: 构建
+    strategy: fast
+    trigger: auto
+    steps:
+      - step: shell@agent
+        name: run_windows_build
+        displayName: 执行 build_windows.bat
+        # 替换为你自己的 Windows 主机组 ID（仓库 → 管理 → Gitee Go → 主机管理）
+        hostGroupID: my-windows-hosts
+        script: |
+          cmd /c call backend\build_windows.bat
+        artifacts:
+          - name: EXE_BUNDLE
+            path:
+              - dist/SteelCarbonTwin/**
+
+  # ---------------- 阶段二：把 exe 产物上传到制品库 ----------------
+  - stage: publish
+    displayName: 上传产物
+    strategy: fast
+    trigger: auto
+    steps:
+      - step: publish@general_artifacts
+        name: upload_exe
+        displayName: 上传 exe 到制品库
+        dependArtifact: EXE_BUNDLE
+        # 替换为你自己的制品库名（默认一般为 default）
+        artifactRepository: default
+        artifactName: steel-carbon-twin-exe

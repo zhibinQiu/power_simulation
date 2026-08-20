@@ -24,8 +24,8 @@ git add .
 if git diff --cached --quiet; then
   echo "    无本地改动，跳过提交"
 else
-  git commit -q -m " 增加欢迎页"
-  echo "    已提交"
+  git commit -q -m " 增加低栏行业快讯，增加碳市场相关逻辑,优化能碳流显示"
+  echo "已提交"
 fi
 
 echo "==> [3/3] 推送到 gitee 云端仓库"

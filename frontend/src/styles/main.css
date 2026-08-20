@@ -468,12 +468,72 @@ button b, button strong,
 .statusbar .st .v { color: #fff; font-weight: 600; }
 .statusbar .st.spacer { flex: 1; border-right: none; }
 .statusbar .st.spacer:hover { background: none; }
+/* 市场快讯滚动条 */
+.statusbar .news-ticker { min-width: 0; overflow: hidden; gap: 0; }
+.statusbar .nt-label { display: inline-flex; align-items: center; gap: 5px; flex: none; padding-right: 8px; white-space: nowrap; font-family: var(--ui); }
+.statusbar .news-scroll { flex: 1; min-width: 0; overflow: hidden; position: relative; height: 100%; display: flex; align-items: center; }
+.statusbar .news-track { display: inline-flex; align-items: center; white-space: nowrap;
+  transform: translate3d(0,0,0); backface-visibility: hidden; will-change: transform;
+  animation: news-marquee var(--news-dur, 60s) linear infinite; }
+.statusbar .news-track:hover { animation-play-state: paused; }
+.statusbar .news-list { display: inline-flex; align-items: center; }
+.statusbar .news-item { padding-right: 22px; font-size: 11px; font-family: var(--ui); -webkit-font-smoothing: antialiased; }
+.statusbar .news-item .news-time { color: #fff; font-weight: 700; margin-right: 7px; font-family: var(--mono); }
+.statusbar .nt-empty { color: rgba(255,255,255,.6); padding-left: 4px; font-family: var(--ui); }
+@keyframes news-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 .statusbar .ok { color: #B7F7D0; } .statusbar .err { color: #FFC2B8; } .statusbar .warnc { color: #FFE0A3; }
 .statusbar .mono { font-family: var(--mono); }
 .feed-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,.25); }
 .feed-open { background: #58D68D; } .feed-closed { background: #FF8C75; } .feed-init { background: rgba(255,255,255,.45); }
 /* 深色仿真模式：状态栏改用亮蓝底，白字保持 */
 .app.sim-dark .statusbar { background: #2E7FB8; }
+
+/* ============ 底栏通知按钮（仿 VS Code 铃铛） ============ */
+.statusbar .st-notif { position: relative; padding: 0 12px; border-right: none; cursor: pointer; }
+.statusbar .st-notif svg { width: 15px; height: 15px; fill: rgba(255,255,255,.92); display: block; }
+.statusbar .st-notif .ntf-badge { position: absolute; top: 2px; right: 4px; min-width: 14px; height: 14px; padding: 0 3px;
+  background: var(--red); color: #fff; border-radius: 8px; font-size: 9px; font-weight: 700; font-family: var(--ui);
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1.5px var(--accent); }
+.statusbar .st-notif.open { background: rgba(255,255,255,.15); }
+/* ============ 系统通知中心（仿 VS Code 通知中心） ============ */
+.notif-center { position: fixed; right: 8px; bottom: 30px; width: 372px; max-width: calc(100vw - 16px);
+  background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: var(--shadow); z-index: 150; display: flex; flex-direction: column; overflow: hidden;
+  font-family: var(--ui); font-size: 12px; animation: ntf-in .16s ease; }
+@keyframes ntf-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.notif-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--panel-2);
+  border-bottom: 1px solid var(--border); }
+.notif-head .ntf-title { font-size: 12px; font-weight: 600; letter-spacing: .3px; flex: 1; }
+.notif-head .ntf-actions { display: flex; gap: 6px; }
+.notif-head .ntf-btn { background: transparent; border: 1px solid var(--border); border-radius: 4px; color: var(--muted);
+  font-size: 11px; padding: 2px 8px; cursor: pointer; }
+.notif-head .ntf-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+.notif-head .ntf-btn:disabled { opacity: .4; cursor: default; }
+.notif-list { max-height: 300px; overflow-y: auto; padding: 4px; }
+.notif-list::-webkit-scrollbar { width: 8px; }
+.notif-list::-webkit-scrollbar-thumb { background: #c3d0dc; border-radius: 4px; }
+.app.sim-dark .notif-list::-webkit-scrollbar-thumb { background: #2A3342; }
+.ntf-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 10px; color: var(--faint); }
+.ntf-empty svg { width: 26px; height: 26px; fill: currentColor; opacity: .55; }
+.ntf-item { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 5px; cursor: default;
+  border: 1px solid transparent; }
+.ntf-item:hover { background: var(--panel-2); border-color: var(--border); }
+.ntf-item.unread { background: var(--accent-l); border-color: transparent; }
+.ntf-item .ntf-dot { flex: none; width: 8px; height: 8px; margin-top: 4px; border-radius: 50%; background: var(--faint); }
+.ntf-item.lv-info .ntf-dot { background: var(--accent); }
+.ntf-item.lv-success .ntf-dot { background: var(--green); }
+.ntf-item.lv-warn .ntf-dot { background: var(--yellow); }
+.ntf-item.lv-error .ntf-dot { background: var(--red); }
+.ntf-item .ntf-main { flex: 1; min-width: 0; }
+.ntf-item .ntf-row { display: flex; align-items: baseline; gap: 8px; }
+.ntf-item .ntf-title2 { font-weight: 600; font-size: 12px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ntf-item .ntf-time { color: var(--faint); font-size: 10.5px; font-family: var(--mono); flex: none; }
+.ntf-item .ntf-body { margin-top: 2px; color: var(--muted); font-size: 11.5px; line-height: 1.5; word-break: break-word; }
+.ntf-item .ntf-x { flex: none; width: 18px; height: 18px; border: none; background: transparent; color: var(--faint);
+  font-size: 14px; line-height: 1; border-radius: 4px; padding: 0; cursor: pointer; display: none;
+  align-items: center; justify-content: center; }
+.ntf-item:hover .ntf-x { display: flex; }
+.ntf-item .ntf-x:hover { color: var(--red); background: var(--panel-3); }
 
 /* ============ 通用控件 ============ */
 button { background: var(--panel-2); color: var(--text); border: 1px solid var(--border);

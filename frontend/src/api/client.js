@@ -76,6 +76,14 @@ export const api = {
   archiveOptimizer: (id) => jpost('/optimizers/' + id + '/archive', {}),
   switchOptimizerVersion: (id, versionId) => jpost('/optimizers/' + id + '/switch', { version_id: versionId }),
   ackOptimizer: (id) => jpost('/optimizers/' + id + '/ack', {}),
+  // 碳市场实时行情（CEA / CCER）
+  carbonMarketQuotes: () => jget('/carbon-market/quotes'),
+  carbonMarketChart: (instrument = 'cea', kind = 'daily') =>
+    jget('/carbon-market/chart?instrument=' + instrument + '&kind=' + kind),
+  carbonMarketForecast: (instrument = 'cea', days = 10) =>
+    jget('/carbon-market/forecast?instrument=' + instrument + '&days=' + days),
+  // 市场快讯（中国煤炭交易网）
+  marketNews: (page = 1) => jget('/market-news?page=' + page),
 }
 
 // WebSocket 模拟遥测（url 省略则连接内置模拟 /api/ws/feed）

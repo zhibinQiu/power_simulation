@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 import time
 import uuid
@@ -19,6 +20,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import presets
+from .carbon_market import fetch_chart, fetch_quotes, forecast_series
+from .market_news import fetch_news
 from .carbon_engine import cached_simulate, sim_cache_stats, default_factors
 from .models import (ParseResult, ParseRequest, ParsedOp, ProcessModel, SimulateRequest,
                      SimulateResponse, SimResult, Strategy)
@@ -42,7 +45,17 @@ app.add_middleware(
     allow_methods=["*"], allow_headers=["*"],
 )
 
-FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
+def _frontend_dist_dir() -> str:
+    """前端构建产物目录。
+
+    PyInstaller 打包后数据文件位于 sys._MEIPASS/frontend/dist（单文件模式为解包临时目录，
+    单目录模式为 _internal 目录）；开发环境回退到仓库内相对路径。
+    """
+    base = getattr(sys, "_MEIPASS", os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+    return os.path.join(base, "frontend", "dist")
+
+
+FRONTEND_DIST = _frontend_dist_dir()
 
 
 # ----------------------------- REST -----------------------------
@@ -529,6 +542,35 @@ def ack_optimizer(oid: str):
         raise HTTPException(404, "未知的优化模型")
     o.ack()
     return {"ok": True, **o.state()}
+
+
+# ------------------------- 碳市场实时行情（CEA / CCER） -------------------------
+
+@app.get("/api/carbon-market/quotes")
+def carbon_market_quotes():
+    """实时碳市场报价：CEA（上海环交所）+ CCER 最新成交、涨跌幅、月均价聚合。
+    数据由 carbon_market 模块拉取并做 60s TTL 缓存；外网不可用时降级为模拟行情。"""
+    return fetch_quotes()
+
+
+@app.get("/api/carbon-market/chart")
+def carbon_market_chart(instrument: str = "cea", kind: str = "daily"):
+    """碳市场图表序列：cea → 日K线蜡烛数据，ccer → 成交均价折线数据。"""
+    return fetch_chart(instrument, kind)
+
+
+@app.get("/api/carbon-market/forecast")
+def carbon_market_forecast(instrument: str = "cea", days: int = 10):
+    """碳市场走势预测：基于历史收盘价线性回归外推未来 N 个交易日价格与置信区间。"""
+    return forecast_series(instrument, days)
+
+
+@app.get("/api/market-news")
+def market_news(page: int = 1):
+    """市场快讯：爬取中国煤炭交易网「市场快讯」栏目（60s TTL 缓存）。
+
+    外网不可用时返回 ok=False + 空列表，前端优雅降级隐藏滚动条。"""
+    return fetch_news(page)
 
 
 # ------------------------- 实时遥测（WebSocket + 设备历史） -------------------------

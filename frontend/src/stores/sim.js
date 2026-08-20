@@ -178,8 +178,10 @@ export const useSimStore = defineStore('sim', {
     leftOpen: true,           // 左侧栏是否展开
     rightOpen: true,          // 右侧栏（检视器）是否展开
     bottomOpen: true,
+    newsTickerOn: (() => { try { return localStorage.getItem('sim.newsTickerOn') !== '0' } catch (e) { return true } })(),  // 底栏快讯是否显示（默认开，localStorage 持久化）
     fullscreenOn: false,      // 全屏模式：隐藏左/右/底栏，仅保留 3D 场景
     dataViewOn: false,        // 数据视图：中间 3D 场景替换为传感器历史数据表格（顶栏「视图 → 数据视图」切换）
+    carbonMarketOn: false,    // 碳市场视图：中间 3D 场景替换为碳市场实时行情（顶栏「视图 → 碳市场」切换）
     inspectorView: 'auto',    // 右侧检视器显式视图：'auto'（按选中推导）| 'park' 园区构成 | 'materials' 原料库 | 'strategy' 减排策略 | 'report' 报告面板         // 底栏（命令行窗口 + 状态条）是否展开
     reportPayload: null,      // 「导出报告」请求载荷（baseline/strategy/ops/...），供右侧报告面板消费
     selectedStrategyId: null, // 左侧策略库选中的策略
@@ -239,8 +241,12 @@ export const useSimStore = defineStore('sim', {
     historyFuture: [],      // 重做快照
     // 命令行窗口日志（全局共享：App 顶栏/按钮、ReportPanel 报告进度等均可推送）
     cmdLog: [],             // [{ t, k }] k: cmd|out|sys|guide|tip|warn|err|bot|sim
+    // 系统通知中心（底栏铃铛）：{ id, level: 'info'|'success'|'warn'|'error', title, body, time, read }
+    notifications: [],
   }),
   getters: {
+    // 未读系统通知数（底栏铃铛徽标）
+    unreadNotifs: (s) => s.notifications.filter((n) => !n.read).length,
     selectedUnit: (s) => s.model.units.find((u) => u.id === s.selectedUnitId) || null,
     selectedResult: (s) => {
       if (!s.selectedUnitId || !s.baseline) return null
@@ -425,6 +431,21 @@ export const useSimStore = defineStore('sim', {
     // 命令行窗口：追加一条日志（k：cmd 命令回显 / out·sys 一般信息 / guide 引导输入 / tip 提醒 / warn·err 警告报错 / bot 聊天 / sim 仿真记录）
     pushCmd(t, k = 'out') { this.cmdLog.push({ t, k }) },
     clearCmdLog() { this.cmdLog = [] },
+    // —— 系统通知中心（底栏铃铛）——
+    // 新增一条系统通知，自动附带 toast 提示；列表最多保留 50 条
+    notify(level = 'info', title = '', body = '') {
+      const n = { id: uid('ntf'), level, title, body, time: Date.now(), read: false }
+      this.notifications.push(n)
+      if (this.notifications.length > 50) this.notifications.splice(0, this.notifications.length - 50)
+      return n.id
+    },
+    markNotificationRead(id) {
+      const n = this.notifications.find((x) => x.id === id)
+      if (n) n.read = true
+    },
+    markAllNotificationsRead() { this.notifications.forEach((n) => { n.read = true }) },
+    removeNotification(id) { this.notifications = this.notifications.filter((x) => x.id !== id) },
+    clearNotifications() { this.notifications = [] },
     async init() {
       try {
         loadCalibrations()   // 启动即恢复本厂标定耦合（localStorage），否则用默认机理/经验系数
@@ -476,12 +497,14 @@ export const useSimStore = defineStore('sim', {
         await this._runRefresh()  // 首屏立即重算（不走防抖），保证 KPI 就绪
         await this.loadStrategies()
         this.ready = true
+        this.notify('success', '系统就绪', `数字孪生已载入 ${this.model.units.length} 个工序、${this.model.flows.length} 条物流，实时链路与优化模型已就绪。`)
         this._startFeed()
         // AI 优化模型：同步训练上下文并轮询状态（后台定时训练由后端调度，前端展示「逐渐变优」）
         this.syncOptimizerContext().then(() => this.refreshOptimizers())
         this.startOptimizerPolling()
       } catch (e) {
         this.toast = '初始化失败：' + e.message
+        this.notify('error', '初始化失败', e.message)
       }
     },
     // 把"合成可调设备"的设定值按 DEVICE_COUPLE_REGISTRY 推导为各工序参数，
@@ -601,6 +624,7 @@ export const useSimStore = defineStore('sim', {
             if (!this.optimizerSeenReminders[rk]) {
               this.optimizerSeenReminders = { ...this.optimizerSeenReminders, [rk]: true }
               this.toast = `「${(AI_MODEL_MAP[m.id] || {}).name || '优化模型'}」训练取得新进展：最优强度 ${m.reminder.best_fitness} kgCO₂/t（较上版提升 ${m.reminder.improvement_pct}%）。已生成调优提醒，可在属性面板手动应用优化参数`
+              this.notify('info', `「${(AI_MODEL_MAP[m.id] || {}).name || '优化模型'}」训练新进展`, `最优强度 ${m.reminder.best_fitness} kgCO₂/t，较上版提升 ${m.reminder.improvement_pct}%。可在属性面板手动应用优化参数。`)
             }
           }
         }
@@ -618,12 +642,14 @@ export const useSimStore = defineStore('sim', {
           this.clearExperiment()
           this.parsed = null
           this.toast = `AI 自动化控制：已按「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」最新版本自动下发参数到可调设备`
+          this.notify('success', 'AI 自动化控制', `已按「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」最新版本自动下发参数到可调设备。`)
           this.pushCmd(`AI 自动化控制已下发：应用「${r.name || id}」版本参数（最优 ${(r.best_fitness ?? 0).toFixed(2)} kgCO₂/t，提升 ${r.improvement_pct ?? 0}%）`, 'sim')
           this._pushModelToFeed()
           await this._runRefresh()
         }
       } catch (e) {
         this.toast = 'AI 自动化控制下发失败：' + e.message
+        this.notify('error', 'AI 自动化控制下发失败', e.message)
       }
       try { await api.ackOptimizer(id) } catch (e) { /* 忽略确认失败 */ }
       this.optimizerAutoApplying = { ...this.optimizerAutoApplying, [id]: false }
@@ -692,6 +718,7 @@ export const useSimStore = defineStore('sim', {
         r = await api.applyOptimizer(id)
       } catch (e) {
         this.toast = '应用最优参数失败：' + e.message
+        this.notify('error', '应用最优参数失败', e.message)
         return
       }
       this.model = r.model
@@ -699,6 +726,7 @@ export const useSimStore = defineStore('sim', {
       this.clearExperiment()
       this.parsed = null
       this.toast = `已将「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」最优参数应用到流程`
+      this.notify('success', '已应用最优参数', `已将「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」最优参数应用到流程，强度 ${(r.best_fitness ?? 0).toFixed(2)} kgCO₂/t。`)
       this.pushCmd(`已应用 AI 优化模型「${r.name || id}」最优参数：强度 ${(r.best_fitness ?? 0).toFixed(2)} kgCO₂/t，较初始 ${r.improvement_pct ?? 0}%`, 'sim')
       this._pushModelToFeed()
       await this._runRefresh()
@@ -946,9 +974,20 @@ export const useSimStore = defineStore('sim', {
     toggleLeft() { this.leftOpen = !this.leftOpen },
     toggleRight() { this.rightOpen = !this.rightOpen },
     toggleBottom() { this.bottomOpen = !this.bottomOpen },
+    // 底栏快讯显示开关（localStorage 持久化，刷新后保持）
+    toggleNewsTicker() {
+      this.newsTickerOn = !this.newsTickerOn
+      try { localStorage.setItem('sim.newsTickerOn', this.newsTickerOn ? '1' : '0') } catch (e) {}
+    },
     // 数据视图：中间 3D 场景 ↔ 传感器历史数据表格（顶栏「视图 → 数据视图」切换）
     toggleDataView() {
       this.dataViewOn = !this.dataViewOn
+      if (this.dataViewOn) this.carbonMarketOn = false
+    },
+    // 碳市场视图：中间 3D 场景 ↔ 碳市场实时行情（顶栏「视图 → 碳市场」切换）
+    toggleCarbonMarket() {
+      this.carbonMarketOn = !this.carbonMarketOn
+      if (this.carbonMarketOn) this.dataViewOn = false
     },
     toggleFullscreen() {
       this.fullscreenOn = !this.fullscreenOn
@@ -2155,10 +2194,25 @@ export const useSimStore = defineStore('sim', {
     },
     _refreshFeedStatus() {
       const sts = Object.values(this.sourceStatus)
-      if (!sts.length) { this.feedStatus = 'init'; return }
-      this.feedStatus = sts.includes('open') ? 'open'
+      let next
+      if (!sts.length) next = 'init'
+      else next = sts.includes('open') ? 'open'
         : (sts.includes('init') ? 'init'
           : (sts.includes('error') ? 'error' : 'closed'))
+      const prev = this.feedStatus
+      if (next !== prev) {
+        this.feedStatus = next
+        // 链路状态变化通知（跳过初始连接阶段的 init 过渡，防抖 1.5s 避免 open/init 抖动刷屏）
+        if (prev !== 'init' && next !== 'init') {
+          clearTimeout(this._feedNotifTimer)
+          this._feedNotifTimer = setTimeout(() => {
+            if (this.feedStatus !== next) return
+            if (next === 'open') this.notify('success', '实时链路已恢复', '实时数据链路已重新连接，监测数据持续更新。')
+            else if (next === 'error') this.notify('error', '实时链路异常', '实时数据链路异常，请检查数据源配置。')
+            else if (next === 'closed') this.notify('warn', '实时链路已断开', '实时数据链路已断开，仿真将基于最近一次数据继续运行。')
+          }, 1500)
+        }
+      }
     },
     _pushModelToFeed() {
       for (const c of this._conns || []) {
