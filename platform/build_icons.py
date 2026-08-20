@@ -47,6 +47,13 @@ def build_ico() -> None:
 
 
 def main() -> None:
+    # 兼容 GitHub Actions Windows runner：默认控制台编码(cp1252)无法输出中文，
+    # 强制将 stdout/stderr 切到 UTF-8，避免 'charmap' codec can't encode 报错。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--icns", action="store_true", help="仅生成 macOS .icns")

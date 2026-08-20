@@ -13,6 +13,10 @@ REM ============================================================
 cd /d "%~dp0.."
 setlocal
 
+REM 强制所有 Python 输出使用 UTF-8，避免 GitHub Actions 控制台编码不支持中文报错
+set PYTHONIOENCODING=utf-8
+chcp 65001 >nul
+
 echo [1/4] 安装 Python 依赖（pip + pyinstaller + pywebview + Pillow）...
 python -m pip install --upgrade pip
 python -m pip install -r backend\config\requirements.txt
