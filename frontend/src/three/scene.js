@@ -4083,14 +4083,14 @@ export class TwinScene {
     this.focusUnit(id)
   }
 
-  focusOn(target, focusDist = 30) {
+  focusOn(target, focusDist = 45) {
     const fromPos = this.camera.position.clone()
     const fromTgt = this.controls.target.clone()
     const dir = fromPos.clone().sub(fromTgt)
     if (dir.lengthSq() < 1e-4) dir.set(0, 0.5, 1)
     dir.normalize()
     const toPos = target.clone().add(dir.multiplyScalar(focusDist))
-    toPos.y = Math.max(toPos.y, target.y + 12)
+    toPos.y = Math.max(toPos.y, target.y + 16)
     this._focus = {
       fromPos, toPos,
       fromTgt, toTgt: target.clone(),
@@ -4115,8 +4115,8 @@ export class TwinScene {
     const vfov = (cam.fov || 48) * Math.PI / 180
     const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect)
     const fit = (half, fov) => (half / Math.tan(fov / 2)) * 1.14
-    let dist = Math.max(fit(hx, hfov), fit(hy, vfov)) * 2.2 + 55
-    dist = Math.min(Math.max(dist, 55), 200)
+    let dist = Math.max(fit(hx, hfov), fit(hy, vfov)) * 2.8 + 85
+    dist = Math.min(Math.max(dist, 90), 260)
     // 聚焦目标设为标签位置（工序上方），而非工艺几何体中心
     const labelWorld = new THREE.Vector3(0, (g.topY || 0) + 4 + (g.lift || 0), 0)
     g.group.localToWorld(labelWorld)
@@ -4151,8 +4151,8 @@ export class TwinScene {
     const vfov = (cam.fov || 48) * Math.PI / 180
     const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect)
     const fit = (half, fov) => (half / Math.tan(fov / 2)) * 1.14
-    let dist = Math.max(fit(hx, hfov), fit(hy, vfov)) * 2.2 + 55
-    dist = Math.min(Math.max(dist, 55), 200)
+    let dist = Math.max(fit(hx, hfov), fit(hy, vfov)) * 2.8 + 85
+    dist = Math.min(Math.max(dist, 90), 260)
     // 聚焦到组标签位置（组顶上方），与工序聚焦行为一致
     const labelWorld = new THREE.Vector3(0, (g.topY || 0) + 4, 0)
     g.group.localToWorld(labelWorld)
@@ -4170,7 +4170,7 @@ export class TwinScene {
     if (grp) {
       const v = new THREE.Vector3()
       grp.getWorldPosition(v)
-      this.focusOn(v, 16)
+      this.focusOn(v, 30)
       return
     }
     const parts = id.split('::')
@@ -4213,7 +4213,7 @@ export class TwinScene {
     const mid = fl.from.clone().add(fl.to).multiplyScalar(0.5)
     mid.y = fl.labelY || fl.y             // 聚焦到标签高度，可以更好看到标签内容
     const len = fl.to.clone().sub(fl.from).length()
-    const dist = Math.max(30, Math.min(len * 0.45 + 28, 90))
+    const dist = Math.max(45, Math.min(len * 0.55 + 42, 120))
     this.focusOn(mid, dist)
   }
 

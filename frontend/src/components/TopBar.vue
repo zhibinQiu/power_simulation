@@ -1,8 +1,6 @@
 <template>
   <!-- ============ 顶栏：经典 MATLAB 式菜单条（浅色，不作蓝色底） ============ -->
   <header class="topbar" @keydown.esc="closeMenus">
-    <div class="brand"><span class="lg"></span>行业能碳仿真平台</div>
-
     <!-- 经典菜单条：文件 / 仿真 / 视图 / 编辑 / 工具 / 帮助（点击展开下拉，文本式，无图标，贴近 MATLAB） -->
     <nav class="menubar">
       <div v-for="m in menus" :key="m.id" class="mbar-item" :class="{ open: openMenu === m.id }"

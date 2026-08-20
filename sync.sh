@@ -24,7 +24,7 @@ git add .
 if git diff --cached --quiet; then
   echo "    无本地改动，跳过提交"
 else
-  git commit -q -m " 增加低栏行业快讯，增加碳市场相关逻辑,优化能碳流显示"
+  git commit -q -m " 增加windows/mac打包代码"
   echo "已提交"
 fi
 
