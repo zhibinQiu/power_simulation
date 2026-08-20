@@ -22,8 +22,6 @@ export const PAL = {
   stackBand: 0x00b4d8,
 }
 
-export const SCALE = 1
-
 /** 标准材质工厂 */
 export function mat(color, o = {}) {
   return new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.48, metalness: 0.42 }, o))
@@ -49,50 +47,6 @@ export function _makeCanvasTex(w, h, draw, repeat = null) {
 }
 
 /* ========== 纹理生成 ========== */
-
-let _grassTexCache = null
-export function grassTex() {
-  if (_grassTexCache) return _grassTexCache
-  const SZ = 2048
-  const t = _makeCanvasTex(SZ, SZ, (ctx, w, h) => {
-    ctx.fillStyle = '#5c6e40'; ctx.fillRect(0, 0, w, h)
-    const img = ctx.getImageData(0, 0, w, h)
-    const d = img.data
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const idx = (y * w + x) * 4
-        const rn = Math.random()
-        let rv, gv, bv
-        if (rn < 0.28) { rv = 58 + Math.random() * 14; gv = 102 + Math.random() * 18; bv = 38 + Math.random() * 10 }
-        else if (rn < 0.52) { rv = 74 + Math.random() * 16; gv = 126 + Math.random() * 20; bv = 48 + Math.random() * 12 }
-        else if (rn < 0.70) { rv = 96 + Math.random() * 18; gv = 148 + Math.random() * 22; bv = 56 + Math.random() * 14 }
-        else if (rn < 0.83) { rv = 120 + Math.random() * 20; gv = 148 + Math.random() * 20; bv = 62 + Math.random() * 16 }
-        else if (rn < 0.92) { rv = 155 + Math.random() * 25; gv = 142 + Math.random() * 20; bv = 72 + Math.random() * 18 }
-        else { rv = 150 + Math.random() * 30; gv = 132 + Math.random() * 28; bv = 82 + Math.random() * 22 }
-        d[idx] = rv; d[idx + 1] = gv; d[idx + 2] = bv; d[idx + 3] = 255
-      }
-    }
-    ctx.putImageData(img, 0, 0)
-    for (let i = 0; i < 60000; i++) {
-      const cx = Math.floor(Math.random() * w), cy = Math.floor(Math.random() * h)
-      const bladeH = 2 + Math.floor(Math.random() * 12)
-      const alpha = 0.06 + Math.random() * 0.14
-      const r = 100 + Math.random() * 50, g = 130 + Math.random() * 50, bB = 40 + Math.random() * 20
-      ctx.strokeStyle = Math.random() < 0.5
-        ? `rgba(${Math.floor(r * 0.55)},${Math.floor(g * 0.55)},${Math.floor(bB * 0.55)},${alpha})`
-        : `rgba(${r},${g},${bB},${alpha})`
-      ctx.lineWidth = 0.6 + Math.random() * 1.0
-      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + (Math.random() - 0.5) * 2.5, cy - bladeH); ctx.stroke()
-    }
-    for (let i = 0; i < 900; i++) {
-      const fx = Math.random() * w, fy = Math.random() * h
-      ctx.fillStyle = Math.random() < 0.5 ? 'rgba(248,248,225,0.15)' : 'rgba(255,245,160,0.15)'
-      ctx.beginPath(); ctx.arc(fx, fy, 0.7 + Math.random() * 0.8, 0, Math.PI * 2); ctx.fill()
-    }
-  }, [24, 24])
-  _grassTexCache = t
-  return t
-}
 
 let _steelTexCache = null
 export function steelTex() {
@@ -200,58 +154,4 @@ export function wallPanelTex() {
   return t
 }
 
-let _rollerTexCache = null
-export function rollerTex() {
-  if (_rollerTexCache) return _rollerTexCache
-  const t = _makeCanvasTex(128, 128, (ctx, w, h) => {
-    ctx.fillStyle = '#8b95a1'; ctx.fillRect(0, 0, w, h)
-    ctx.fillStyle = '#586070'
-    for (let i = -128; i < 128; i += 28) ctx.fillRect(i, 0, 14, 128)
-  }, [1, 3])
-  _rollerTexCache = t
-  return t
-}
 
-export function makeSkyTex(stops) {
-  const c = document.createElement('canvas')
-  c.width = 16; c.height = 256
-  const ctx = c.getContext('2d')
-  const grad = ctx.createLinearGradient(0, 0, 0, 256)
-  grad.addColorStop(0.0, stops[0]); grad.addColorStop(0.5, stops[1]); grad.addColorStop(1.0, stops[2])
-  ctx.fillStyle = grad; ctx.fillRect(0, 0, 16, 256)
-  const tex = new THREE.CanvasTexture(c)
-  tex.colorSpace = THREE.SRGBColorSpace
-  return tex
-}
-
-/* ========== 标签绘制辅助 ========== */
-export const LABEL_W = 300
-export const LABEL_H = 132
-export const LABEL_SS = 3
-export const LABEL_SCALE = 13
-export const LABEL_ASPECT = LABEL_H / LABEL_W
-export const LABEL_FONT = '"PingFang SC","Microsoft YaHei",-apple-system,sans-serif'
-
-export function fmtMetric(v) {
-  if (v == null || Number.isNaN(Number(v))) return '—'
-  return Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 1 })
-}
-
-export function labelRow(ctx, tag, tagColor, value, unit, valueColor, y) {
-  ctx.textAlign = 'left'; ctx.font = `bold 14px ${LABEL_FONT}`
-  ctx.fillStyle = tagColor; ctx.fillText(tag, 28, y)
-  ctx.textAlign = 'right'
-  ctx.fillStyle = valueColor; ctx.fillText(value, LABEL_W - 56, y)
-  ctx.font = `12px ${LABEL_FONT}`
-  ctx.fillStyle = '#8899aa'; ctx.fillText(unit, LABEL_W - 16, y)
-}
-
-export function drawLabelCard(ctx, focused) {
-  const bg = ctx.createLinearGradient(0, 0, 0, LABEL_H)
-  bg.addColorStop(0, focused ? 'rgba(22,32,48,0.97)' : 'rgba(13,20,32,0.95)')
-  bg.addColorStop(1, focused ? 'rgba(16,24,38,0.97)' : 'rgba(8,14,26,0.95)')
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, LABEL_W, LABEL_H)
-  ctx.strokeStyle = focused ? '#00e5ff' : 'rgba(0,180,216,0.20)'
-  ctx.lineWidth = focused ? 1.5 : 1
-  ctx.strokeRect(0.5, 0.5, LABEL_W - 1, LABEL_H - 1)
-}

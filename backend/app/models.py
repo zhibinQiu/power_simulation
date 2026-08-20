@@ -40,7 +40,6 @@ class ProcessModel(BaseModel):
 class ParsedOp(BaseModel):
     action: str                      # replace_type / set_param / add_unit / remove_unit / apply_tech
     target: Optional[str] = None     # 命中的工序名或类型
-    unit_id: Optional[str] = None    # 解析后置位，由引擎回填
     to_type: Optional[str] = None
     param: Optional[str] = None
     value: Optional[float] = None
@@ -155,7 +154,6 @@ class ParseRequest(BaseModel):
 class SimulateRequest(BaseModel):
     model: ProcessModel
     ops: List[ParsedOp] = Field(default_factory=list)   # 可选，应用策略后再仿真
-    label: str = "strategy"
     factors: Optional[Dict[str, Any]] = None            # 可选，覆盖默认排放因子（燃料 NCV/CC、电网因子、碳酸盐/电极因子）
 
 

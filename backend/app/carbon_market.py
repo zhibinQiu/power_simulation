@@ -18,20 +18,17 @@ import logging
 import math
 import random
 import re
-import threading
 import time
 from datetime import date, datetime, timedelta, timezone
 from html import unescape
-from typing import Any, Callable
+from typing import Any
+
+from .netutil import UA, TtlCache, fetch_json, fetch_text, now_iso
 
 logger = logging.getLogger(__name__)
 
-_UA = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-)
 _HEADERS = {
-    "User-Agent": _UA,
+    "User-Agent": UA,
     "Referer": "https://www.cneeex.com/",
     "Accept": "application/json,text/plain,*/*",
 }
@@ -47,75 +44,6 @@ CCER_WP_HISTORY_URL = (
 PRIMARY_MARKET_URL = "https://www.ccn.ac.cn/cets"
 
 CACHE_TTL = 60.0  # 秒
-
-
-# ── HTTP 获取（优先 httpx，缺失时回退 urllib） ─────────────────
-
-
-def _http_client() -> Any:
-    try:
-        import httpx
-
-        return httpx.Client(
-            timeout=httpx.Timeout(15.0, connect=5.0),
-            verify=False,
-            follow_redirects=True,
-            headers=_HEADERS,
-        )
-    except Exception:  # noqa: BLE001
-        return None
-
-
-def _fetch_json(url: str, timeout: float = 15.0) -> Any | None:
-    try:
-        import httpx
-
-        with httpx.Client(
-            timeout=httpx.Timeout(timeout, connect=min(5.0, timeout)),
-            verify=False,
-            follow_redirects=True,
-            headers=_HEADERS,
-        ) as client:
-            resp = client.get(url)
-            resp.raise_for_status()
-            return resp.json()
-    except Exception:  # noqa: BLE001
-        pass
-    try:
-        import urllib.request
-
-        req = urllib.request.Request(url, headers=_HEADERS)
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
-            return json.loads(resp.read().decode("utf-8", "replace"))
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("carbon market json fetch failed url=%s err=%s", url, exc)
-        return None
-
-
-def _fetch_text(url: str, timeout: float = 15.0) -> str | None:
-    try:
-        import httpx
-
-        with httpx.Client(
-            timeout=httpx.Timeout(timeout, connect=min(5.0, timeout)),
-            verify=False,
-            follow_redirects=True,
-            headers={"User-Agent": _UA},
-        ) as client:
-            resp = client.get(url)
-            resp.raise_for_status()
-            return resp.text
-    except Exception:  # noqa: BLE001
-        pass
-    try:
-        import urllib.request
-
-        req = urllib.request.Request(url, headers={"User-Agent": _UA})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
-            return resp.read().decode("utf-8", "replace")
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("carbon market text fetch failed url=%s err=%s", url, exc)
-        return None
 
 
 # ── 数值/日期工具 ──────────────────────────────────────────────
@@ -243,7 +171,8 @@ def fetch_cea_series() -> dict[str, Any]:
     """拉取环交所 CEA 日线 + 分时，返回日序列、最新行情与月聚合。"""
     daily_url = f"{CNEEEX_DAILY_URL}?{int(time.time() * 1000)}"
     intra_url = f"{CNEEEX_INTRADAY_URL}?{int(time.time() * 1000)}"
-    daily_raw, intra_raw = _fetch_json(daily_url), _fetch_json(intra_url)
+    daily_raw = fetch_json(daily_url, extra_headers=_HEADERS)
+    intra_raw = fetch_json(intra_url, extra_headers=_HEADERS)
     points = parse_cneeex_daily_bars(daily_raw if isinstance(daily_raw, list) else [])
     intra = parse_cneeex_intraday_latest(intra_raw if isinstance(intra_raw, list) else [])
     if intra and intra.get("price"):
@@ -358,7 +287,7 @@ def parse_ccn_ccer_history_table(text: str, *, source: str = "") -> list[dict[st
 
 def fetch_ccer_quote() -> dict[str, Any] | None:
     """HTML 兜底解析 CCER 最新成交均价。"""
-    html = _fetch_text(PRIMARY_MARKET_URL, timeout=12.0)
+    html = fetch_text(PRIMARY_MARKET_URL, timeout=12.0)
     if not html:
         return None
     return parse_ccn_ccer_quote(html_to_text(html))
@@ -375,7 +304,7 @@ def fetch_ccer_series() -> dict[str, Any]:
             timeout=httpx.Timeout(20.0, connect=6.0),
             verify=False,
             follow_redirects=True,
-            headers={"User-Agent": _UA, "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"},
+            headers={"User-Agent": UA, "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"},
         ) as client:
             client.get(CCER_HOME_URL)
             resp = client.get(
@@ -414,7 +343,7 @@ def fetch_ccer_series() -> dict[str, Any]:
                             timeout=httpx.Timeout(12.0, connect=5.0),
                             verify=False,
                             follow_redirects=True,
-                            headers={"User-Agent": _UA, "Referer": CCER_SOURCE_PAGE},
+                            headers={"User-Agent": UA, "Referer": CCER_SOURCE_PAGE},
                         ) as c:
                             r = await c.get(detail_url)
                             r.raise_for_status()
@@ -436,7 +365,7 @@ def fetch_ccer_series() -> dict[str, Any]:
     source_name = "全国温室气体自愿减排交易系统 · 北京绿色交易所"
     source_api = CCER_DAILY_LIST_URL
     if not quotes:
-        html = _fetch_text(CCER_WP_HISTORY_URL, timeout=20.0)
+        html = fetch_text(CCER_WP_HISTORY_URL, timeout=20.0)
         if html:
             try:
                 posts = json.loads(html)
@@ -523,29 +452,7 @@ def _sim_quote(points: list[dict[str, Any]]) -> dict[str, Any]:
 # ── 对外服务（TTL 缓存） ───────────────────────────────────────
 
 
-class _TtlCache:
-    def __init__(self, ttl: float = CACHE_TTL) -> None:
-        self.ttl = ttl
-        self._lock = threading.Lock()
-        self._data: dict[str, tuple[float, Any]] = {}
-
-    def get_or(self, key: str, fetch: Callable[[], Any]) -> Any:
-        now = time.monotonic()
-        with self._lock:
-            hit = self._data.get(key)
-            if hit and now - hit[0] < self.ttl:
-                return hit[1]
-        value = fetch()
-        with self._lock:
-            self._data[key] = (time.monotonic(), value)
-        return value
-
-
-_cache = _TtlCache(CACHE_TTL)
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+_cache = TtlCache(CACHE_TTL)
 
 
 def fetch_quotes() -> dict[str, Any]:
@@ -587,7 +494,7 @@ def fetch_quotes() -> dict[str, Any]:
         return {
             "ok": True,
             "simulated": simulated,
-            "queried_at": _now_iso(),
+            "queried_at": now_iso(),
             "sources_tried": sources_tried,
             "cea": latest,
             "ccer": ccer,
@@ -620,7 +527,7 @@ def fetch_chart(instrument: str = "cea", kind: str = "daily") -> dict[str, Any]:
                 "unit": "元/吨",
                 "source_name": "上海环境能源交易所 · 全国碳市场",
                 "source_page": "https://www.cneeex.com/zhhq/quotshown.html?area=0",
-                "queried_at": _now_iso(),
+                "queried_at": now_iso(),
                 "points": points,
             }
         pack = fetch_ccer_series()
@@ -635,7 +542,7 @@ def fetch_chart(instrument: str = "cea", kind: str = "daily") -> dict[str, Any]:
             "unit": "元/吨",
             "source_name": pack.get("source_name") or "全国温室气体自愿减排交易系统",
             "source_page": CCER_SOURCE_PAGE,
-            "queried_at": _now_iso(),
+            "queried_at": now_iso(),
             "points": points,
         }
 

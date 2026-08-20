@@ -74,7 +74,6 @@ export const MATERIAL_FAMILY = {
   oxy_supply: 'oxy_supply',
 }
 export function materialFamily(id) { return MATERIAL_FAMILY[id] || id }
-export const MATERIAL_CATS = ['原料', '中间产物', '能源', '副产品']
 
 // 编排节点几何（FlowEditor 与 store 共用，避免放大/缩小时高度计算漂移）
 export const NODE_NW = 196, NODE_HEADER = 32, NODE_PORT_Y0 = 46, NODE_GAP = 24
@@ -414,7 +413,6 @@ export const PROCESS_MAP = Object.fromEntries(PROCESS_TEMPLATES.map((t) => [t.ty
 // 工艺分组：炼钢(长/短流程统一) + 工辅。
 // 注：util(煤气发电/余热回收/碳捕集)类属节能减碳范畴，按设计统一在「策略」中展示，
 // 不纳入左侧工艺资源管理树，仅保留模板供 3D 孪生与策略引用。
-export const ROUTE_ORDER = { steel: '炼钢', aux: '工辅' }
 export const ROUTE_GROUPS = {
   steel: PROCESS_TEMPLATES.filter((t) => t.route === 'steel'),
   // 工辅分组 = 工辅路线 + 公用/节能减碳（煤气发电/余热回收/碳捕集），保证系统现有工辅在资源管理列表中可见
@@ -461,10 +459,6 @@ export const DEVICE_TEMPLATES = [
   { type: 'power_supply', label: '供电系统', kind: 'adjustable', unit: 'MW', setpoint: { min: 1, max: 600, def: 200, unit: 'MW', label: '供电负荷' }, powerPerUnit: 0, effType: 'none', measures: '供电负荷', response: { bias: 0.01, noise: 0.005 }, desc: '全厂供电系统（总降/主变电站）的可调设备，汇集外购电、自发电（BFG/CDQ/余热）与绿电统一分配，供电负荷设定对应全厂范围二电耗，是提升绿电/自发电占比减排策略的作用对象。' },
 ]
 export const DEVICE_MAP = Object.fromEntries(DEVICE_TEMPLATES.map((d) => [d.type, d]))
-export const DEVICE_GROUPS = {
-  metering: DEVICE_TEMPLATES.filter((d) => d.kind === 'metering'),
-  adjustable: DEVICE_TEMPLATES.filter((d) => d.kind === 'adjustable'),
-}
 
 // ---------- 设定值(SP) → 测定值(PV) 响应模型 ----------
 // 可调设备存在「设定值 / 测定值」两个值：设定值由操作/策略调节，经设备响应特性
@@ -864,9 +858,6 @@ const PROCESS_ADJUSTABLE_BASE = {
   reheating_furnace: ['burner', 'vfd'],
 }
 
-// 工辅类型集合（独立耗能、影响被服务工艺的工序）
-export const AUX_TYPES = PROCESS_TEMPLATES.filter((t) => t.route === 'aux').map((t) => t.type)
-
 // 每个工艺的可调设备 = 基础清单（仅变频/除尘风机等非工辅设备）。
 // 工辅不再按工艺类型静态并入：工辅实例与工序实例的绑定关系由编排连线动态推导，
 // 见 stores/sim.js 的 linkedAuxTypesFor（连线存在才作为该工序的可调设备）。
@@ -880,16 +871,6 @@ export const PROCESS_ADJUSTABLE = (() => {
   }
   return Object.freeze(m)
 })()
-
-// 同类型「可调设备」在不同工艺下视为不同设备，名称带「工艺前缀」以区分。
-// 例：烧结机·引风机（sinter_plant::id_fan）与 球团·引风机（pelletizing::id_fan）。
-// 设备 id 本身已是 工序::类型 唯一，这里仅统一展示名，避免在资源树/属性面板重名混淆。
-export function adjDeviceName(processType, deviceType) {
-  const p = PROCESS_MAP[processType]
-  const d = DEVICE_MAP[deviceType]
-  if (!p || !d) return (d && d.label) || deviceType
-  return `${p.label}·${d.label}`
-}
 
 let _idc = 0
 export function uid(p) { return `${p}_${Date.now().toString(36)}${(_idc++).toString(36)}` }

@@ -300,7 +300,6 @@ def simulate(model: ProcessModel, factors: Dict = None) -> SimResult:
 # carbon_to_steel 等）出发，沿模型 flows 的物料连线（material 匹配）路由到接收工序，
 # 接收工序对应源（焦炭/煤/铁水/炉料）减去内部供给，差额才显示为外部采购；真正外售的
 # 中间产品（无下游接收的焦炭/生物炭/DRI/铁水等）才进入「外售中间产品碳」节点。
-_HM_MATS = {"hot_metal", "pre_hm"}
 _MID_LABEL = {"coke": "焦炭碳", "biochar": "生物炭碳", "dri": "DRI碳", "hot_metal": "铁水碳"}
 # 钢水碳链路涉及的工序类型（钢水沿链传递，最终固碳于成品）
 _STEEL_CHAIN_TYPES = {
@@ -337,27 +336,6 @@ def _chain_layout(raw, flows) -> Tuple[set, Dict[str, list], Dict[str, int]]:
                     depth[t] = depth[s] + 1
                     changed = True
     return ids, fadj, depth
-
-
-def _route(fadj, start: str, mats: set, targets: set) -> List[str]:
-    """BFS 沿物料连线从 start 找一条到任一 target 的最短路径（可经过无核算的中间工序）。"""
-    if start in targets:
-        return [start]
-    from collections import deque
-    prev = {start: None}
-    q = deque([start])
-    while q:
-        cur = q.popleft()
-        for nxt, m in fadj.get(cur, []):
-            if m in mats and nxt not in prev:
-                prev[nxt] = cur
-                if nxt in targets:
-                    path = [nxt]
-                    while prev[path[-1]] is not None:
-                        path.append(prev[path[-1]])
-                    return path[::-1]
-                q.append(nxt)
-    return []
 
 
 def _alloc(supply: Dict[str, float], demand: Dict[str, float]) -> Tuple[Dict[str, float], float]:

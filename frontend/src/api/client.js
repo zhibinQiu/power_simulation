@@ -65,7 +65,6 @@ export const api = {
   // AI 优化模型（GA / PSO / RL 在线训练）
   optimizerContext: (model, factors = null) => jpost('/optimizers/context', { model, factors }),
   listOptimizers: () => jget('/optimizers'),
-  getOptimizer: (id) => jget('/optimizers/' + id),
   startOptimizer: (id) => jpost('/optimizers/' + id + '/start', {}),
   stopOptimizer: (id) => jpost('/optimizers/' + id + '/stop', {}),
   trainOptimizer: (id, steps = 1) => jpost('/optimizers/' + id + '/train', { steps }),

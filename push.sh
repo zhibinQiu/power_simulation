@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# 协作者推送脚本（纯 git，不含服务器部署）。
+# 协作者推送脚本。
+#
 # 用法：
-#   ./push.sh              仅推送（要求工作树已提交）
-#   ./push.sh "fix: xxx"   先把所有改动提交，再推送
-# 流程：拉取远端最新并 rebase -> 推送到 GitHub 当前分支。
+#   ./push.sh                          仅推送（要求工作树已提交）
+#   ./push.sh "fix: xxx"               提交 + 推送
+#   ./push.sh "fix: xxx" --tag v1.0.0  提交 + 打 tag + 推送（触发 GitHub Actions 打包发布 Release）
+#
+# 流程：拉取远端最新并 rebase -> 推送到 GitHub 当前分支 -> （可选）推 tag 触发打包。
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -15,16 +18,47 @@ if ! git remote | grep -qx "$GIT_REMOTE"; then
   exit 1
 fi
 
+# ---- 解析参数：MSG 为提交信息，--tag <版本> 触发打包发布 ----
+MSG=""
+TAG=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --tag)
+      if [ $# -lt 2 ]; then
+        echo "❌ --tag 需要一个版本号，如：./push.sh \"msg\" --tag v1.0.0"
+        exit 1
+      fi
+      TAG="$2"
+      shift 2
+      ;;
+    *)
+      MSG="$1"
+      shift
+      ;;
+  esac
+done
+
+if [ -n "$TAG" ]; then
+  if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "❌ tag 格式应为 v1.2.3，当前: $TAG"
+    exit 1
+  fi
+  if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+    echo "❌ tag '$TAG' 已存在（本地），如需覆盖请先手动删除：git tag -d $TAG"
+    exit 1
+  fi
+fi
+
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 echo "==> 当前分支: $BRANCH"
 
-# 若带提交信息参数：先 stage + commit
-if [ -n "${1:-}" ]; then
+# ---- 提交 ----
+if [ -n "$MSG" ]; then
   git add -A
-  git commit -q -m "$1"
-  echo "    已提交: $1"
+  git commit -q -m "$MSG"
+  echo "    已提交: $MSG"
 else
-  # 无参数：要求工作树已提交，避免把半成品推上去
+  # 无提交信息：要求工作树已提交，避免把半成品推上去
   if ! git diff --quiet || ! git diff --cached --quiet; then
     echo "⚠️ 工作树有未提交改动。请先 'git commit'，或用 './push.sh \"提交信息\"' 一键提交并推送。"
     git status --short
@@ -32,6 +66,7 @@ else
   fi
 fi
 
+# ---- 拉取远端最新并 rebase ----
 echo "==> 拉取远端最新并 rebase"
 git fetch "$GIT_REMOTE"
 if git rebase "$GIT_REMOTE/$BRANCH"; then
@@ -41,6 +76,17 @@ else
   exit 1
 fi
 
+# ---- 推代码 ----
 echo "==> 推送到 GitHub ($BRANCH)"
 git push "$GIT_REMOTE" "$BRANCH"
-echo "✅ 推送完成。若是功能分支，请到 GitHub 发起 Pull Request 合并到 master。"
+
+# ---- 可选：打 tag 并推送，触发 GitHub Actions 自动打包发布 ----
+if [ -n "$TAG" ]; then
+  echo "==> 打 tag $TAG 并推送（将触发 GitHub Actions 打包并发布 Release）"
+  git tag "$TAG"
+  git push "$GIT_REMOTE" "$TAG"
+  echo "✅ 已推送 tag $TAG。约 10-15 分钟后可在仓库 Release 页面下载安装包。"
+else
+  echo "✅ 推送完成。若是功能分支，请到 GitHub 发起 Pull Request 合并到 master。"
+  echo "   （需要打包发布时加 --tag，如：./push.sh \"msg\" --tag v1.0.0）"
+fi

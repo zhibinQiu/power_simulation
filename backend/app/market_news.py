@@ -20,58 +20,18 @@ from __future__ import annotations
 
 import logging
 import re
-import threading
-import time
-from datetime import datetime, timezone
 from html import unescape
 from typing import Any
 
+from .netutil import TtlCache, fetch_text, now_iso
+
 logger = logging.getLogger(__name__)
 
-_UA = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-)
 FLASH_LIST_URL = (
     "https://www.ctctc.cn/main/news/flashnewlist.jspx?nodeid=323&kw=&tag=&pageNumber={page}"
 )
 SOURCE_NAME = "中国煤炭交易网 · 市场快讯"
 CACHE_TTL = 60.0  # 秒
-
-
-def _decode(raw: bytes) -> str:
-    for enc in ("utf-8", "gbk"):
-        try:
-            return raw.decode(enc)
-        except (UnicodeDecodeError, LookupError):
-            continue
-    return raw.decode("utf-8", "replace")
-
-
-def _fetch_text(url: str, timeout: float = 15.0) -> str | None:
-    try:
-        import httpx
-
-        with httpx.Client(
-            timeout=httpx.Timeout(timeout, connect=min(5.0, timeout)),
-            verify=False,
-            follow_redirects=True,
-            headers={"User-Agent": _UA},
-        ) as client:
-            resp = client.get(url)
-            resp.raise_for_status()
-            return resp.text
-    except Exception:  # noqa: BLE001
-        pass
-    try:
-        import urllib.request
-
-        req = urllib.request.Request(url, headers={"User-Agent": _UA})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
-            return _decode(resp.read())
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("market news fetch failed url=%s err=%s", url, exc)
-        return None
 
 
 def _strip_tags(html: str) -> str:
@@ -120,29 +80,7 @@ def parse_flash_news(html: str) -> list[dict[str, Any]]:
     return items
 
 
-class _TtlCache:
-    def __init__(self, ttl: float = CACHE_TTL) -> None:
-        self.ttl = ttl
-        self._lock = threading.Lock()
-        self._data: dict[str, tuple[float, Any]] = {}
-
-    def get_or(self, key: str, fetch) -> Any:
-        now = time.monotonic()
-        with self._lock:
-            hit = self._data.get(key)
-            if hit and now - hit[0] < self.ttl:
-                return hit[1]
-        value = fetch()
-        with self._lock:
-            self._data[key] = (time.monotonic(), value)
-        return value
-
-
-_cache = _TtlCache(CACHE_TTL)
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+_cache = TtlCache(CACHE_TTL)
 
 
 def fetch_news(page: int = 1) -> dict[str, Any]:
@@ -151,13 +89,13 @@ def fetch_news(page: int = 1) -> dict[str, Any]:
     url = FLASH_LIST_URL.format(page=page)
 
     def _fetch() -> dict[str, Any]:
-        html = _fetch_text(url, timeout=15.0)
+        html = fetch_text(url, timeout=15.0)
         items = parse_flash_news(html) if html else []
         return {
             "ok": bool(items),
             "source": url,
             "source_name": SOURCE_NAME,
-            "queried_at": _now_iso(),
+            "queried_at": now_iso(),
             "items": items,
         }
 

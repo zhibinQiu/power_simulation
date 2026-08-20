@@ -1,34 +1,30 @@
 # ============================================================
 # 桌面端自动打包流水线（GitHub Actions）
 #
-# 触发与行为：
-#   1. push 普通代码到 master/main  -> 只构建 Windows x64 setup.exe（秒级排队）
-#   2. 手动运行（Run workflow）      -> Windows + macOS arm64 dmg 都构建
-#   3. 打 tag（如 v1.0.0）           -> Windows + macOS arm64 都构建，并自动发布
-#      GitHub Release 附带两个安装包
+# 触发方式：仅推送 tag（如 v1.0.0）时触发，普通 push 不构建。
+# 流程：打包 Windows x64 安装程序 -> 自动发布 GitHub Release。
+#
+# 用法：
+#   git tag v1.0.0 && git push github v1.0.0
+#   或在仓库根目录执行：./push.sh "fix: xxx" --tag v1.0.0
 #
 # 说明：
-#   - macOS runner 在免费/Pro 计划下是稀缺资源，排队 1-2 小时常见，
-#     因此普通 push 不触发 macOS 构建，避免每次提交都空排队。
-#   - 复用 platform/build_mac.sh 与 platform/build_windows.bat。
-#   - 产物未签名/未公证：Windows 首次运行有 SmartScreen 提示，macOS 需右键 -> 打开。
+#   - 复用 platform/build_windows.bat（内含前端构建 + PyInstaller）。
+#   - 产物未签名：Windows 首次运行有 SmartScreen 提示。
 # ============================================================
 name: 桌面端自动打包
 
 on:
-  workflow_dispatch:            # 手动触发
   push:
-    branches: [master, main]    # 普通 push：仅 Windows
     tags:
-      - 'v*'                    # 打 tag：双平台 + 发布 Release
+      - 'v*'                    # 仅 tag 触发（v1.0.0 / v1.1.0 ...）
 
 permissions:
   contents: write
 
 jobs:
-  # ---------------- Windows x64：每次 push 都构建 ----------------
-  build-windows:
-    name: Windows (x64)
+  build-release:
+    name: Windows x64 打包并发布 Release
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
@@ -43,14 +39,18 @@ jobs:
         with:
           python-version: '3.11'
 
-      # ---- 提取版本号：tag 取 v 后面数字，无 tag 默认 1.0.0 ----
+      # ---- 提取版本号：tag 去 v 前缀，如 v1.2.3 -> 1.2.3 ----
       - name: 提取版本号
         id: version
         shell: bash
         run: |
           VER="${GITHUB_REF_NAME#v}"
-          if [[ ! "$VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then VER="1.0.0"; fi
+          if [[ ! "$VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "⚠️ tag 格式应为 v1.2.3，当前: $GITHUB_REF_NAME，使用默认 1.0.0"
+            VER="1.0.0"
+          fi
           echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "当前版本: $VER"
 
       - name: 执行打包脚本 (Windows)
         shell: cmd
@@ -67,68 +67,10 @@ jobs:
           if (-not $iscc) { throw "ISCC.exe 未找到，Inno Setup 安装失败" }
           & $iscc.FullName /DAppVersion=$env:APP_VERSION platform\steelcarbon_twin.iss
 
-      - name: 上传构建产物
-        uses: actions/upload-artifact@v7
-        with:
-          name: SteelCarbonTwin-windows-x64
-          path: SteelCarbonTwin-windows-x64-setup.exe
-          if-no-files-found: error
-
-  # ---------------- macOS arm64：仅手动触发或打 tag 时构建 ----------------
-  build-mac:
-    name: macOS (Apple Silicon arm64)
-    runs-on: macos-15-arm64
-    # 普通 push 跳过（macOS runner 稀缺、排队久），手动/打 tag 才构建
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: 安装 Node.js 20
-        uses: actions/setup-node@v5
-        with:
-          node-version: 20
-
-      - name: 安装 Python 3.11
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
-
-      - name: 执行打包脚本 (macOS)
-        run: bash platform/build_mac.sh app
-
-      # ---- 把 .app 打成 dmg 镜像（内含 /Applications 拖拽安装）----
-      - name: 生成 macOS DMG 安装镜像
-        run: |
-          mkdir -p dmg-root
-          cp -R "dist/SteelCarbonTwin.app" dmg-root/
-          ln -s /Applications dmg-root/Applications
-          hdiutil create -volname "SteelCarbonTwin" -srcfolder dmg-root -ov -format UDZO "SteelCarbonTwin-macos-arm64.dmg"
-
-      - name: 上传构建产物
-        uses: actions/upload-artifact@v7
-        with:
-          name: SteelCarbonTwin-macos-arm64
-          path: SteelCarbonTwin-macos-arm64.dmg
-          if-no-files-found: error
-
-  # ---------------- 打 tag 时：发布 GitHub Release ----------------
-  release:
-    name: 发布 GitHub Release
-    needs: [build-windows, build-mac]
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: 下载全部构建产物
-        uses: actions/download-artifact@v8
-        with:
-          path: release-assets
-          merge-multiple: true
-
-      - name: 创建 Release 并上传安装包
+      # ---- 发布 GitHub Release，附件为纯 exe（免 zip 包裹）----
+      - name: 发布 GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          files: release-assets/*
+          files: SteelCarbonTwin-windows-x64-setup.exe
           overwrite: true
           generate_release_notes: true

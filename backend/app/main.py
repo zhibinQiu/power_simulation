@@ -377,7 +377,7 @@ def do_audit(model: ProcessModel = Body(...)):
 # ------------------------- 命令行窗口：自然语言聊天（复用已配置的 LLM） -------------------------
 class ChatRequest(BaseModel):
     text: str
-    history: List = []          # [[role, content], ...]
+    history: List = Field(default_factory=list)  # [[role, content], ...]
     mode: str = "chat"          # chat | code | plan
 
 
