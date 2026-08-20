@@ -1,7 +1,7 @@
 <template>
   <div class="app" :class="{ 'left-collapsed': !store.leftOpen, 'right-collapsed': !store.rightOpen, 'bottom-collapsed': !store.bottomOpen, 'sim-dark': store.simMode }"
        :style="{ '--cmd-h': cmdH + 'px', '--lw': store.leftOpen ? lw + 'px' : '0px', '--rw': store.rightOpen ? rw + 'px' : '0px' }">
-    <TopBar :menus="menus" ref="topBarRef" @export="onExport" @help="onHelp" />
+    <TopBar :menus="menus" ref="topBarRef" @export="onExport" @help="openPromo" />
 
     <!-- 最左侧活动栏（VS Code 式）：资源管理器 / 搜索 / 场景 / 连接 -->
     <ActivityBar />
@@ -31,6 +31,7 @@
     <SystemSettingsDialog v-if="showSettings" @close="showSettings = false" />
     <TechDocs v-if="showTechDocs" @close="showTechDocs = false" />
     <UserManual v-if="showManual" @close="showManual = false" />
+    <PromoManual v-if="showPromo" @close="showPromo = false" />
     <PanoramaDataDialog v-if="showPanorama" @close="showPanorama = false" />
     <TftAnalysisDialog v-if="showTftAnalysis" @close="showTftAnalysis = false" />
     <ContextMenu />
@@ -66,6 +67,7 @@ const PlatformConfigDialog = defineAsyncComponent(() => import('./components/Pla
 const SystemSettingsDialog = defineAsyncComponent(() => import('./components/SystemSettingsDialog.vue'))
 const TechDocs = defineAsyncComponent(() => import('./components/TechDocs.vue'))
 const UserManual = defineAsyncComponent(() => import('./components/UserManual.vue'))
+const PromoManual = defineAsyncComponent(() => import('./components/PromoManual.vue'))
 const PanoramaDataDialog = defineAsyncComponent(() => import('./components/PanoramaDataDialog.vue'))
 const TftAnalysisDialog = defineAsyncComponent(() => import('./components/TftAnalysisDialog.vue'))
 const ContextMenu = defineAsyncComponent(() => import('./components/ContextMenu.vue'))
@@ -80,6 +82,7 @@ const showPlatformConfig = ref(false)
 const showSettings = ref(false)
 const showTechDocs = ref(false)
 const showManual = ref(false)
+const showPromo = ref(false)
 const showPanorama = ref(false)
 const showTftAnalysis = ref(false)
 
@@ -152,7 +155,7 @@ function onExport() {
   })
   pushCmd('已打开右侧报告面板：请配置标题、引擎与分析深度后点击「生成报告」。', 'guide')
 }
-function onHelp() { pushCmd('使用指南：① 顶栏「视图」切换相机（俯视/正视/侧视/聚焦/全景）；② 左侧「资源管理器」切换 工艺/物料/策略，点击条目后右栏显示属性与实时数据；③ 中间 3D 孪生点击工序或设备即可聚焦并查看属性；④ 「编排」工具条可把左侧条目拖入画布组建流程；⑤ 左侧「策略」资源中点击内置/自定义策略，进入仿真模式并实时对比节能减碳效果。输入 help 查看全部命令。', 'guide'); store.toast = '左:资产树  中:3D孪生  右:检视器' }
+function openPromo() { showPromo.value = true }
 function onAbout() { pushCmd('行业能碳仿真平台 · Web 版工业数字孪生（MATLAB 风格）。', 'sys') }
 
 // 供命令窗口调用的孪生控制动作
@@ -218,7 +221,7 @@ const menus = [
     { label: '数据校准', act: () => pushCmd('数据校准：在右侧检视器选中设备查看实时/历史读数。','guide') },
   ] },
   { id: 'help', label: '帮助', items: [
-    { label: '使用指南', accel: 'F1', act: onHelp },
+    { label: '宣传手册', accel: 'F1', act: () => { showPromo.value = true } },
     { label: '使用手册', act: () => { showManual.value = true } },
     { label: '技术文档', act: () => { showTechDocs.value = true } },
     { label: '快捷键', act: () => pushCmd('快捷键：Ctrl+Enter 运行 · Ctrl+Z 撤销 · Ctrl+Y 重做 · F 聚焦选中工序 · 右键节点/资源打开上下文菜单（选中/参数扫描/重命名/复制/删除）· 编排态 F2 重命名、Ctrl+D 复制节点、Del 删除。','out') },

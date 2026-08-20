@@ -54,7 +54,7 @@
     <!-- 顶栏右侧快捷操作（浅色图标按钮，与工具条统一） -->
     <div class="top-actions">
       <button class="tbtn" @click="$emit('export')" title="导出分析报告"><Icon name="export"/><span>导出</span></button>
-      <button class="tbtn" @click="$emit('help')" title="使用指南 (F1)"><Icon name="help"/></button>
+      <button class="tbtn" @click="$emit('help')" title="宣传手册 (F1)"><Icon name="help"/></button>
       <span class="tdiv"></span>
       <button class="tbtn" :class="{ on: store.leftOpen }" :title="store.leftOpen ? '收起左侧栏' : '展开左侧栏'" @click="store.toggleLeft()"><Icon name="panelLeft"/></button>
       <button class="tbtn" :class="{ on: store.rightOpen }" :title="store.rightOpen ? '收起右侧栏' : '展开右侧栏'" @click="store.toggleRight()"><Icon name="panelRight"/></button>

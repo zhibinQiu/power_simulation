@@ -82,7 +82,7 @@ if [ -n "$TAG" ]; then
   echo "==> 打 tag $TAG 并推送（将触发 GitHub Actions 打包并发布 Release）"
   git tag "$TAG"
   git push "$GIT_REMOTE" "$TAG"
-  echo "✅ 已推送 tag $TAG。约 10-15 分钟后可在仓库 Release 页面下载安装包。"
+  echo "✅ 已推送 tag。约 10-15 分钟后可在仓库 Release 页面下载安装包。"
 fi
 
 echo "==> 全部完成。"
