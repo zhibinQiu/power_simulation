@@ -13,10 +13,14 @@ REM ============================================================
 cd /d "%~dp0.."
 setlocal
 
-echo [1/4] 安装 Python 依赖（pip + pyinstaller + pywebview）...
+echo [1/4] 安装 Python 依赖（pip + pyinstaller + pywebview + Pillow）...
 python -m pip install --upgrade pip
 python -m pip install -r backend\config\requirements.txt
-python -m pip install pyinstaller pywebview
+python -m pip install pyinstaller pywebview Pillow
+if errorlevel 1 goto :fail
+
+echo [1.5/4] 生成 Windows 图标 (.ico)...
+python platform\build_icons.py --ico
 if errorlevel 1 goto :fail
 
 echo [2/4] 构建前端静态资源...
@@ -30,6 +34,7 @@ cd ..
 echo [3/4] PyInstaller 打包（windowed，无控制台窗口）...
 python -m PyInstaller --noconfirm --clean --onedir --windowed ^
   --name SteelCarbonTwin ^
+  --icon "%CD%\platform\icon.ico" ^
   --collect-all uvicorn --collect-all websockets ^
   --collect-all webview --collect-all pythonnet --hidden-import clr ^
   --add-data "%CD%\frontend\dist;frontend\dist" ^

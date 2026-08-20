@@ -27,10 +27,13 @@ echo "使用 Python: $($PY --version)"
 # 这里统一清除后执行 pip / PyInstaller。
 RUNPY=(env -u PYTHONPATH -u PYTHONHOME "$PY")
 
-echo "[1/4] 安装 Python 依赖 + PyInstaller + pywebview..."
+echo "[1/4] 安装 Python 依赖 + PyInstaller + pywebview + Pillow..."
 "${RUNPY[@]}" -m pip install --upgrade pip -q
 "${RUNPY[@]}" -m pip install -r backend/config/requirements.txt -q
-"${RUNPY[@]}" -m pip install pyinstaller pywebview -q
+"${RUNPY[@]}" -m pip install pyinstaller pywebview Pillow -q
+
+echo "[1.5/4] 生成 macOS 图标 (.icns)..."
+"${RUNPY[@]}" platform/build_icons.py --icns
 
 echo "[2/4] 构建前端静态资源..."
 (cd frontend && npm install --silent && npm run build 2>&1 | tail -3)
@@ -57,6 +60,7 @@ esac
 
 "${RUNPY[@]}" -m PyInstaller --noconfirm --clean --onedir \
   --name SteelCarbonTwin \
+  --icon "$(pwd)/platform/icon.icns" \
   --collect-all uvicorn --collect-all websockets --collect-all webview \
   --add-data "$(pwd)/frontend/dist:frontend/dist" \
   --paths backend \

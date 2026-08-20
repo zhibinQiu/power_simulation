@@ -25,6 +25,7 @@ SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=lowest
 UninstallDisplayIcon={app}\SteelCarbonTwin.exe
+SetupIconFile=..\platform\icon.ico
 WizardStyle=modern
 
 [Tasks]

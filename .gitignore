@@ -44,3 +44,5 @@ backend/config/.env
 # ===== 图片/截图类中间产物（如需纳入版本管理请移除对应行） =====
 *.png
 !frontend/public/**/*.png
+!icon.png
+!platform/icon.ico
