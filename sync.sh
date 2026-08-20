@@ -54,15 +54,15 @@ if [ -z "$MSG" ]; then
   MSG="sync: 更新代码"
 fi
 
-echo "==> [1/3] rsync 源码 + 构建产物到服务器 $SERVER:$SERVER_DIR"
-rsync -az \
-  -e "ssh -p 22 -o StrictHostKeyChecking=no -o BatchMode=yes" \
-  --exclude='.DS_Store' --exclude='node_modules' --exclude='.playwright-cli' \
-  --exclude='.venv' --exclude='__pycache__' --exclude='*.pyc' --exclude='.workbuddy' \
-  --exclude='outputs' --exclude='generated-images' --exclude='*.log' \
-  --exclude='chrome_*' --exclude='diag_scene.png' --exclude='void_industrial.png' \
-  ./ "$SERVER:$SERVER_DIR/"
-echo "    rsync 完成"
+# echo "==> [1/3] rsync 源码 + 构建产物到服务器 $SERVER:$SERVER_DIR"
+# rsync -az \
+#   -e "ssh -p 22 -o StrictHostKeyChecking=no -o BatchMode=yes" \
+#   --exclude='.DS_Store' --exclude='node_modules' --exclude='.playwright-cli' \
+#   --exclude='.venv' --exclude='__pycache__' --exclude='*.pyc' --exclude='.workbuddy' \
+#   --exclude='outputs' --exclude='generated-images' --exclude='*.log' \
+#   --exclude='chrome_*' --exclude='diag_scene.png' --exclude='void_industrial.png' \
+#   ./ "$SERVER:$SERVER_DIR/"
+# echo "    rsync 完成"
 
 echo "==> [2/3] git 提交本地改动（源码进 GitHub，构建产物 dist 已被 .gitignore 忽略）"
 git add .
