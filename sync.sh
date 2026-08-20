@@ -85,4 +85,4 @@ if [ -n "$TAG" ]; then
   echo "✅ 已推送 tag $TAG。约 10-15 分钟后可在仓库 Release 页面下载安装包。"
 fi
 
-echo "==> 全部完成。服务器: http://<服务器IP>:40014  云端: https://github.com/zhibinQiu/power_simulation"
+echo "==> 全部完成。"
