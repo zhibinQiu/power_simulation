@@ -57,13 +57,15 @@ const sections = [
 
 \`\`\`text
 frontend/src/
-  ├─ App.vue              # 主界面：顶栏菜单 / 3D 场景 / 检视器
-  ├─ stores/sim.js        # Pinia 全局状态（流程、仿真、实验、撤销重做）
+  ├─ App.vue              # 主界面：顶栏菜单 / 活动栏 / 状态栏 / 3D 场景 / 检视器
+  ├─ stores/sim.js        # Pinia 全局状态（流程、仿真、实验、撤销重做、活动栏/数据源/视图开关）
+  ├─ stores/scan.js       # 参数扫描与守恒审计状态
   ├─ utils/               # tft.js TFT算法 / energy.js 能耗 / markdown.js 渲染
   ├─ data/flowLibrary.js  # 设备耦合推导 deriveProcessOpParams
   ├─ three/scene.js       # TwinScene 3D 场景（环境/巡检/热力图/物流动画）
   ├─ api/client.js        # REST / WebSocket 客户端
-  └─ components/          # 检视器、TFT面板、桑基图、报告等 UI 组件
+  ├─ composables/         # useGlobalShortcuts 全局快捷键 / contextMenu 上下文菜单
+  └─ components/          # 界面组件（见「前端可视化与交互」章节完整清单）
 
 backend/
   ├─ app/
@@ -77,6 +79,8 @@ backend/
   │  ├─ llm_strategy.py      # LLM 策略解析/对话（可选，无 Key 自动回退）
   │  ├─ param_schema.py      # 工序参数分级元数据
   │  ├─ platform_config.py   # 平台可配置项（规模/量程/参数空间）
+  │  ├─ carbon_market.py     # 碳市场行情服务（CEA/CCER 拉取 + TTL 缓存 + 价格预测）
+  │  ├─ market_news.py       # 市场快讯服务（中国煤炭交易网爬取 + TTL 缓存）
   │  ├─ report.py            # AI 报告生成（骨架本地 + 分析 LLM）
   │  ├─ report_store.py      # 历史报告持久化
   │  ├─ md_render.py         # Markdown → HTML 分享页渲染
@@ -831,6 +835,17 @@ def _noise(v, pct=0.04):
 | POST /api/optimizers/context | model + factors（训练上下文） |
 | PUT /api/optimizers/{oid}/settings | auto_control / schedule{enabled,interval_h,start,end} / samples |
 | POST /api/optimizers/{oid}/train | steps（训练步数） |
+
+## 七、碳市场 / 快讯契约
+
+| 模型 | 说明 |
+| --- | --- |
+| Quote | \`{ t, price/close, change_pct, source }\`；CEA / CCER 各一组 |
+| MarketQuotes | \`{ ok, simulated, queried_at, cea, ccer, cea_monthly[], daily_count, intraday }\` |
+| ChartPoint | \`{ t, open?, high?, low?, close, volume? }\`（K 线）或 \`{ t, price/close }\`（折线） |
+| ChartSeries | \`{ ok, instrument, kind, title, unit, source_name, source_page, queried_at, points[] }\` |
+| ForecastPoint | \`{ t, price, high, low }\`（high/low = ±1.65σ 置信带）；ForecastSeries 含 method/confidence/slope/base_date/history_tail/forecast[] |
+| NewsItem | \`{ id, time, content, tags[], views }\`；返回 \`{ ok, items[], source, source_name, queried_at }\`，ok=false 表示抓取失败 |
 `,
   },
   {
@@ -878,6 +893,10 @@ def _noise(v, pct=0.04):
 | GET | /api/report/{rid} | 单个历史报告详情（Markdown 原文） |
 | DELETE | /api/reports/{rid} | 删除历史报告 |
 | POST | /api/chat | 命令行窗口自然语言对话（LLM，无 Key 兜底提示） |
+| GET | /api/carbon-market/quotes | 碳市场实时报价（CEA/CCER 最新价 + 涨跌幅 + 月聚合，60s 缓存） |
+| GET | /api/carbon-market/chart?instrument=cea\|ccer | 图表序列：CEA 日K线 / CCER 成交均价折线（60s 缓存） |
+| GET | /api/carbon-market/forecast?instrument=cea\|ccer&days=10 | 价格预测：线性回归外推 + ±1.65σ 置信带 |
+| GET | /api/market-news | 市场快讯列表（中国煤炭交易网抓取 + 60s 缓存，失败返回 ok=false 与空列表） |
 | GET | /report/{rid} | 报告分享页（独立 HTML，新标签查看/打印） |
 
 ## 二、WebSocket 遥测
@@ -895,6 +914,65 @@ def _noise(v, pct=0.04):
 ## 四、报告导出
 
 平台支持将当前工况的碳流、碳排、TFT 状态汇总导出为 Markdown 分析报告，并渲染为可分享的 HTML 页面（文件 → 导出分析报告）。`,
+  },
+  {
+    id: 'carbon-market',
+    title: '碳市场行情服务',
+    body: `## 碳市场行情服务
+
+后端 \`carbon_market.py\` 提供 CEA（全国碳市场配额）与 CCER（自愿减排量）两类碳资产的行情数据服务：实时报价、K 线/折线序列、价格预测，供前端「碳市场视图」与底部状态栏使用。
+
+## 一、数据来源与降级策略
+
+- **CEA**：从上海环境能源交易所公开行情页解析（日 K 序列 + 最新价 + 月聚合）；
+- **CCER**：优先从全国温室气体自愿减排交易系统（北京绿色交易所）日行情列表拉取，失败回退碳中和网整理的历史表 + 最新报价解析；
+- 任一环节失败（网络不可用 / 超时 / 解析失败）时，自动回退到**内置模拟行情**（按分钟确定性随机游走生成，保证轮询时数值持续变化），并在响应中标注来源 \`simulated\`，前端据此显示「模拟」徽标；
+- 全接口采用 **60 秒 TTL 缓存**（\`_TtlCache\` + 线程锁）：首次请求后缓存 60 秒，期间请求直接命中缓存，避免高频打外网。
+
+## 二、API 契约
+
+| 接口 | 返回要点 |
+| --- | --- |
+| GET /api/carbon-market/quotes | \`{ ok, simulated, queried_at, cea, ccer, cea_monthly[], daily_count, intraday }\`；cea/ccer 含 \`t\`/价格/\`change_pct\`（涨跌幅）/来源；\`simulated\` 标识是否模拟数据 |
+| GET /api/carbon-market/chart?instrument=cea\|ccer&kind=daily | \`{ ok, instrument, kind, title, unit, source_name, source_page, queried_at, points[] }\`；CEA 返回日K线（t/开/高/低/收/量），CCER 返回成交均价折线；无外网时生成模拟序列兜底 |
+| GET /api/carbon-market/forecast?instrument=cea\|ccer&days=10 | \`{ ok, instrument, days, method, confidence, slope, base_date, source_name, history_tail[], forecast[] }\`；forecast 中每点带 \`t/price/high/low\`（high/low 为 ±1.65σ 置信带），days 默认 10，上限 30 |
+
+## 三、预测算法（forecast_series）
+
+- 取最近 **90 个历史点**做最小二乘线性回归 \\(y = a + b\\,x\\)（\`_ols\`），\\(b\\) 即价格趋势斜率；
+- 残差标准差 \\(s=\\sqrt{\\sum r_i^2/(n-2)}\\)，置信带带宽按 \\(1.65\\,s\\,\\sqrt{1+i/n}\\) 随外推天数 \\(i\\) 递增（约 90% 置信）；
+- 未来日期按历史平均间隔推进并跳过周六/周日（\`_next_trade_date\`）；
+- 该算法定位为**趋势参考**而非精确预测；前端在图上以虚线（预测线）与阴影带（high/low 区间）呈现。
+
+## 四、前端集成
+
+- \`CarbonMarketView.vue\`：行情卡片（CEA 最新价/涨跌幅/成交量/今开/最高/最低/昨收 + CCER 最新均价/成交量/基准参考）、CEA 蜡烛图（30 日 OHLCV）与 CCER 折线页签切换、预测叠加与置信带（±1.65σ）；15 秒轮询，断开自动停止；「实时数据 / 模拟行情」徽标来自 quotes.simulated；
+- \`StatusBar.vue\`：底部滚动播报快讯摘要（与「市场快讯服务」联动），鼠标悬停暂停滚动。`,
+  },
+  {
+    id: 'market-news',
+    title: '市场快讯服务',
+    body: `## 市场快讯服务
+
+后端 \`market_news.py\` 定时从**中国煤炭交易网「市场快讯」栏目**抓取行业资讯（煤炭 / 碳市场相关动态），转换为结构化的快讯列表供前端展示。
+
+## 一、抓取与缓存
+
+- 首次请求时发起抓取，成功后缓存 **60 秒（TTL）**（\`_TtlCache\` + 线程锁），期间后续请求直接返回缓存，避免频繁请求外网；
+- 编码兼容 UTF-8 / GBK，请求带浏览器 UA 头；失败（网络不可用 / 目标页结构变化 / 超时）时返回 \`ok=false\` 与空列表，前端显示「快讯暂不可用」，不阻断其它功能；
+- 返回字段：\`ok\`（是否成功）、\`items\`（快讯数组，含 \`id\` / \`time\` / \`content\` / \`tags\` / \`views\`）、\`source\` / \`source_name\`（来源标识与名称）、\`queried_at\`（查询时间）。
+
+## 二、API 契约
+
+| 接口 | 返回要点 |
+| --- | --- |
+| GET /api/market-news?page=1 | \`{ ok, items: [{ id, time, content, tags, views }], source, source_name, queried_at }\`；page 默认 1 |
+
+## 三、前端集成
+
+- \`StatusBar.vue\`：左侧「市场快讯」滚动条持续轮播（每条约 18s 滚动周期，自适应条数），鼠标悬停暂停滚动；每 5 分钟自动刷新一次；
+- 快讯的显隐由系统设置「布局」页签「快讯滚动条」开关控制（\`newsTickerOn\`，存于 Pinia）；
+- 快讯与碳市场视图相互独立：快讯常驻状态栏，碳市场视图需「视图 → 碳市场」打开。`,
   },
   {
     id: 'optimizer',
@@ -1007,8 +1085,29 @@ def _noise(v, pct=0.04):
 | 平台配置（PlatformConfigDialog） | 工具菜单 → 平台配置… | 工艺规模档位 / 设备量程 / 参数运行空间，保存后编辑器、设备面板与 3D 标注自动生效（backend/config/platform_config.json） |
 | AI 优化模型（策略详情面板） | 左侧「策略 → AI优化模型」点击模型 | GA/PSO/RL 在线训练面板：状态/迭代/曲线/最优参数建议，支持训练控制、应用最优参数、版本管理与提醒确认（/api/optimizers/*） |
 | 数据视图（DataView） | 视图菜单 → 数据 | 全屏传感器历史数据表格：设备页签 + 实时读数/均值/峰值/谷值/超限状态 + 时序表格 |
+| 碳市场行情（CarbonMarketView） | 视图菜单 → 碳市场 | 行情卡片 + CEA 蜡烛图 / CCER 折线 + 线性回归预测与置信带；15s 轮询，详情见「碳市场行情服务」章节 |
+| 数据校准（CalibrationWizard） | 工具菜单 → 数据校准 | 选择设备 → 输入标准/读数标定点 → 线性回归拟合校准曲线 → 预览误差 → 应用/重置（校准系数持久化） |
 
-## 七、命令行窗口（CommandConsole）
+## 七、系统级 UI 组件（欢迎页 / 活动栏 / 状态栏）
+
+面向整体工作台的壳层组件，承载模式选择、面板切换与全局信息展示：
+
+| 组件 | 职责 |
+| --- | --- |
+| WelcomeScreen | 启动欢迎页：展示平台功能特性与能力链路，选择项目模板（钢铁长流程 / 短流程）进入系统 |
+| ActivityBar | 类 VS Code 活动栏：资源管理器 / 搜索 / 场景 / 连接 四个入口，切换左侧面板 |
+| StatusBar | 底部状态栏：实时链路状态、工序/物流计数、监测点位、市场快讯滚动（点击弹详情）、策略情景、时钟与通知 |
+| SearchPanel | 全局搜索：按名称模糊匹配工序 / 物料 / 策略 / 设备，点击结果联动检视器、资源管理器与 3D 聚焦 |
+| ScenePanel | 场景控制：环境主题切换、显示图层开关（网格/轴向/标签/连线/热力图）、视角工具 |
+| ConnectionsPanel | 连接面板：三种数据源（模拟/WebSocket/HTTP）运行状态展示与在线启停，入口直达数据源配置 |
+
+## 八、数据源管理与系统设置
+
+- **DataSourceDialog**（文件 → 连接数据源…）：配置三种实时数据来源——模拟（内置随机发生器）、WebSocket（ws:// 服务器）、HTTP 轮询（REST 接口）；每项支持启停、采样间隔与「测试连接」；配置持久化到本地，重启自动应用；
+- **SystemSettingsDialog**（文件 → 设置…）：按页签分组——布局（面板显隐）、场景（仿真情景 / 环境）、实时链路（数据源启停）、LLM（模型名 / API 密钥 / API 地址，可选，未配置自动回退本地规则与本地模板报告）；
+- 两种对话框状态存于 Pinia（\`showDataSource\` / \`showSettings\`），数据源配置与连接面板共享同一状态源。
+
+## 九、命令行窗口（CommandConsole）
 
 底部命令行为交互中枢：聊天 / 代码 / 规划三模式 + 孪生控制命令（run/sim/stop/reset/overview/home/patrol/view/edit/done/clear），走 \`POST /api/chat\`；内置策略与工序策略的自然语言输入则走 \`POST /api/parse\`（LLM 优先、启发式回退）。`,
   },

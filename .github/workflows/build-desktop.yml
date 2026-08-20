@@ -39,15 +39,15 @@ jobs:
             install_file: SteelCarbonTwin-macos-arm64.dmg
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: 安装 Node.js 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
 
       - name: 安装 Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -94,7 +94,7 @@ jobs:
 
       # ---- 上传安装包（Actions 页面可直接下载）----
       - name: 上传构建产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.install_file }}
@@ -110,13 +110,13 @@ jobs:
       contents: write
     steps:
       - name: 下载全部构建产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: release-assets
           merge-multiple: true
 
       - name: 创建 Release 并上传安装包
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: release-assets/*
           overwrite: true

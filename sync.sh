@@ -30,7 +30,7 @@ git add .
 if git diff --cached --quiet; then
   echo "    无本地改动，跳过提交"
 else
-  git commit -q -m " 增加windows/mac打包代码"
+  git commit -q -m " 更新wrokflow逻辑，更新文档"
   echo "已提交"
 fi
 
