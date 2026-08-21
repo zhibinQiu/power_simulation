@@ -22,6 +22,9 @@
             <button class="rbtn" :class="{ on: store.autoRotate }" @click="actions.toggleAuto()" title="相机自动环绕旋转">
               <Icon name="rotate"/><span>自动环视</span>
             </button>
+            <button class="rbtn" :class="{ on: store.patrolOn }" @click="actions.togglePatrol()" title="虚拟巡视：机器狗沿工艺旁地面巡视完整流程">
+              <Icon name="patrol"/><span>虚拟巡视</span>
+            </button>
             <button class="rbtn" :class="{ on: store.fullscreenOn }" @click="store.toggleFullscreen()" title="全屏显示">
               <Icon name="fullscreen"/><span>{{ store.fullscreenOn ? '退出全屏' : '全屏' }}</span>
             </button>

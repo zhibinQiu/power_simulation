@@ -194,9 +194,9 @@ const menus = [
       { sub: true, label: '环境', items: () => store.envModes.map(e => ({ id: e.id, label: e.label, checked: e.id === store.envMode, run: () => onEnvChange({ target: { value: e.id } }) })) },
     ] },
     { sep: true },
-    { label: '传感器数据', toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
-    { label: '虚拟巡视', toggle: () => store.patrolOn, act: () => togglePatrol() },
-    { label: '碳市场', toggle: () => store.carbonMarketOn, act: () => store.toggleCarbonMarket() },
+    { label: '监测数据查看', toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
+    { label: 'CEA&CCER行情', toggle: () => store.carbonMarketOn, act: () => store.toggleCarbonMarket() },
+    { label: '能碳一体机管理', act: () => pushCmd('能碳一体机管理：功能缺省，敬请期待。','guide') },
   ] },
   { id: 'edit', label: '编辑', items: [
     { label: store.editMode ? '完成编排' : '进入流程编排', act: onToggleEdit },
