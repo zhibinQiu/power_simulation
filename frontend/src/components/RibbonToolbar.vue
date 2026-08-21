@@ -22,14 +22,8 @@
             <button class="rbtn" :class="{ on: store.autoRotate }" @click="actions.toggleAuto()" title="相机自动环绕旋转">
               <Icon name="rotate"/><span>自动环视</span>
             </button>
-            <button class="rbtn" :class="{ on: store.patrolOn }" @click="actions.togglePatrol()" title="虚拟巡视">
-              <Icon name="patrol"/><span>虚拟巡视</span>
-            </button>
             <button class="rbtn" :class="{ on: store.fullscreenOn }" @click="store.toggleFullscreen()" title="全屏显示">
               <Icon name="fullscreen"/><span>{{ store.fullscreenOn ? '退出全屏' : '全屏' }}</span>
-            </button>
-            <button class="rbtn" :disabled="!store.resultForView" @click="$emit('panorama')" title="全景数据：多标准碳核算结果对比">
-              <Icon name="panorama"/><span>全景数据</span>
             </button>
           </div>
         </template>
@@ -100,7 +94,6 @@ import Icon from './Icon.vue'
 const props = defineProps({
   actions: { type: Object, required: true },
 })
-defineEmits(['panorama'])
 
 const store = useSimStore()
 const showBrightness = ref(false)

@@ -30,10 +30,10 @@ from .llm_strategy import llm_parse, chat_completion
 from .report import generate_report
 from . import report_store
 from .md_render import render_report_page
-from .param_schema import TECHS_INFO, UNIT_TYPES_INFO
+from .param_schema import PARAM_SCHEMA, TECHS_INFO, UNIT_TYPES_INFO
 from .store import store
-from . import platform_config
 from . import realtime
+from .devices import library_payload
 from . import optimizers
 from .carbon_engine import parameter_scan, conservation_audit
 
@@ -100,9 +100,9 @@ def parse(req: ParseRequest):
 @app.get("/api/param-schema")
 def get_param_schema():
     """返回工序参数分级元数据（config/optim、label、单位、参考范围），供前端编辑器渲染。
-    返回前叠加「平台配置」中的参数运行空间覆盖。"""
+    参考范围为工艺默认边界；编排模式节点可在属性面板中按需自定义（随方案持久化）。"""
     return {
-        "schema": platform_config.apply_to_schema(),
+        "schema": PARAM_SCHEMA,
         "unit_types": UNIT_TYPES_INFO,
         "techs": TECHS_INFO,
         "kinds": {
@@ -114,31 +114,9 @@ def get_param_schema():
 
 @app.get("/api/devices")
 def get_devices():
-    """内置监测设备库：设备类型元数据 + 各工序设备规格（挂载方位/实测量/喂给引擎的输入）。
-    返回前叠加「平台配置」中的设备量程覆盖。"""
-    return platform_config.apply_to_devices()
-
-
-# ------------------------- 平台可配置项 -------------------------
-
-@app.get("/api/platform-config")
-def get_platform_config():
-    """返回平台可配置项：工艺规模档位、设备量程、参数运行空间（含默认值与档位预设）。"""
-    return platform_config.config_payload()
-
-
-@app.put("/api/platform-config")
-def put_platform_config(cfg: dict = Body(...)):
-    """保存平台可配置项覆盖（全量提交，未提供的字段回落默认）。"""
-    platform_config.save_config(cfg)
-    return {"ok": True}
-
-
-@app.post("/api/platform-config/reset")
-def reset_platform_config():
-    """恢复平台可配置项出厂默认。"""
-    platform_config.reset_config()
-    return {"ok": True}
+    """内置监测设备库：设备类型元数据 + 各工序设备规格（挂载方位/实测量/喂给引擎的输入）
+    + 工序设备规格档位库（供编排模式节点规格选择与范围/量程联动）。"""
+    return library_payload()
 
 
 @app.post("/api/simulate", response_model=SimulateResponse)

@@ -1,9 +1,11 @@
-"""平台可配置项（工艺规模档位、设备量程、参数运行空间）。
+"""平台可配置项（设备量程、参数运行空间）。
 
 为不同钢厂/产线提供通用性：管理员可通过「平台配置」面板调整
-  - process_scales（工艺规模档位）：各工序规模参数（产量/入炉量）的 min/max/step + 档位预设
   - device_ranges（设备量程）：各设备类型的量程 min/max/unit
   - param_ranges（参数运行空间）：各工序参数的 min/max/step
+
+工艺规模档位已由「设备规格」（specs.py）统一承载：规格在流程编排的
+工序节点上选择，选中后联动该节点的默认参数与可调范围。
 
 配置持久化到 backend/config/platform_config.json（仅存用户覆盖项），
 GET /api/param-schema 与 /api/devices 返回时叠加用户配置，
@@ -22,30 +24,6 @@ from .devices import DEVICE_LIBRARY, library_payload
 from .specs import PROCESS_SPECS
 
 _DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "config", "platform_config.json")
-
-# 每个工序的「规模参数」key（产量/入炉量，决定产线规模档位）
-PROCESS_SCALE_KEYS: Dict[str, str] = {
-    "sinter_plant": "ore_rate",
-    "pelletizing": "ore_rate",
-    "coke_oven": "coal_rate",
-    "reheating_furnace": "steel_in",
-    "blast_furnace": "hot_metal",
-    "hydrogen_bf": "hot_metal",
-    "h2_dri": "dri_out",
-    "dri_midrex": "pellet_rate",
-    "smelting_reduction": "ore_rate",
-    "biochar_injection": "biomass_rate",
-    "bof": "hot_metal_in",
-    "eaf": "scrap",
-    "ladle_furnace": "steel_in",
-    "rh_vacuum": "steel_in",
-    "vd_vacuum": "steel_in",
-    "aod": "steel_in",
-    "caster": "steel_in",
-    "ingot_casting": "steel_in",
-    "rolling_mill": "steel_in",
-    "cold_rolling": "steel_in",
-}
 
 # 量程字符串解析：如 "0–6000 t/h"、"0–5e6 m³/h"、"—"
 _RANGE_RE = re.compile(r"^([\d.eE+\-]+)\s*[–—-]\s*([\d.eE+\-]+)\s*(.*)$")
@@ -82,23 +60,6 @@ def _fmt_range(mn, mx, unit: str = "") -> str:
     return s
 
 
-def _default_process_scales() -> Dict[str, Any]:
-    out: Dict[str, Any] = {}
-    for ut, key in PROCESS_SCALE_KEYS.items():
-        for p in PARAM_SCHEMA.get(ut, []):
-            if p["key"] == key:
-                out[ut] = {
-                    "key": key,
-                    "label": p.get("label", key),
-                    "unit": p.get("unit", ""),
-                    "min": p.get("min", 0),
-                    "max": p.get("max", 100),
-                    "step": p.get("step", 1),
-                }
-                break
-    return out
-
-
 def _default_device_ranges() -> Dict[str, Any]:
     out: Dict[str, Any] = {}
     for dev, meta in DEVICE_LIBRARY.items():
@@ -128,7 +89,6 @@ def _default_param_ranges() -> Dict[str, Any]:
 def default_config() -> Dict[str, Any]:
     """内置默认配置（与平台出厂值一致）。"""
     return {
-        "process_scales": _default_process_scales(),
         "device_ranges": _default_device_ranges(),
         "param_ranges": _default_param_ranges(),
     }
@@ -158,6 +118,10 @@ class PlatformConfigStore:
             if os.path.exists(_DATA_FILE):
                 with open(_DATA_FILE, "r", encoding="utf-8") as f:
                     self._data = json.load(f)
+                # 清理旧版本遗留的 process_scales（工艺规模档位已由设备规格承载）
+                if "process_scales" in self._data:
+                    self._data.pop("process_scales", None)
+                    self._save()
         except Exception:
             self._data = {}
 
@@ -184,25 +148,10 @@ class PlatformConfigStore:
 config = PlatformConfigStore()
 
 
-def _with_tiers(scales: Dict[str, Any]) -> Dict[str, Any]:
-    """为每个工艺规模附加「小型/中型/大型」档位预设（按默认范围三等分）。"""
-    out = copy.deepcopy(scales)
-    for ut, s in out.items():
-        mn, mx = float(s.get("min", 0)), float(s.get("max", 100))
-        span = (mx - mn) / 3.0
-        s["tiers"] = [
-            {"id": "small", "label": "小型", "min": round(mn, 2), "max": round(mn + span, 2)},
-            {"id": "mid", "label": "中型", "min": round(mn + span, 2), "max": round(mn + 2 * span, 2)},
-            {"id": "large", "label": "大型", "min": round(mn + 2 * span, 2), "max": round(mx, 2)},
-        ]
-    return out
-
-
 def config_payload() -> Dict[str, Any]:
-    """供 /api/platform-config 使用的完整负载（含档位预设，可直接渲染面板）。"""
+    """供 /api/platform-config 使用的完整负载（可直接渲染面板）。"""
     cfg = config.effective()
     cfg = copy.deepcopy(cfg)
-    cfg["process_scales"] = _with_tiers(cfg["process_scales"])
     # 工序设备规格档位库（内置，供前端规格选择器与范围/量程联动）
     cfg["process_specs"] = PROCESS_SPECS
     return cfg
@@ -219,21 +168,11 @@ def reset_config():
 def apply_to_schema() -> Dict[str, Any]:
     """返回叠加用户配置后的 PARAM_SCHEMA（副本），min/max/step 被覆盖。
 
-    覆盖来源：param_ranges（参数运行空间）+ process_scales（工艺规模档位，
-    会同步到对应规模参数，保证高炉规模等档位生效）。
+    覆盖来源：param_ranges（参数运行空间）。
+    工艺规模的取值范围由「设备规格」（specs.py）的 ranges 在节点级联动覆盖。
     """
     cfg = config.effective()
     pr = copy.deepcopy(cfg.get("param_ranges", {}))
-    # 工艺规模档位 → 同步覆盖到对应规模参数的运行空间
-    for ut, s in cfg.get("process_scales", {}).items():
-        key = s.get("key")
-        if not key:
-            continue
-        pr.setdefault(ut, {})[key] = {
-            "min": s.get("min"),
-            "max": s.get("max"),
-            "step": s.get("step"),
-        }
     schema = copy.deepcopy(PARAM_SCHEMA)
     for ut, params in schema.items():
         overrides = pr.get(ut, {})

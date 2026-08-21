@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from .specs import PROCESS_SPECS
+
 # ----------------------- 设备类型元数据（内置库） -----------------------
 # color 用于在 3D 图与 UI 中区分设备种类。
 DEVICE_LIBRARY: Dict[str, Dict[str, Any]] = {
@@ -299,7 +301,7 @@ def compute_device_readings(unit: Any, params: Dict[str, float] = None) -> List[
 
 
 def library_payload() -> Dict[str, Any]:
-    """供前端 /api/devices 使用的负载：设备库 + 各工序设备规格摘要。"""
+    """供前端 /api/devices 使用的负载：设备库 + 各工序设备规格摘要 + 工序设备规格档位库。"""
     specs_summary = {
         ut: [
             {"dev": s["dev"], "mount": s["mount"], "label": s["label"],
@@ -308,4 +310,4 @@ def library_payload() -> Dict[str, Any]:
         ]
         for ut, specs in _UNIT_DEVICE_SPECS.items()
     }
-    return {"library": DEVICE_LIBRARY, "unit_specs": specs_summary}
+    return {"library": DEVICE_LIBRARY, "unit_specs": specs_summary, "process_specs": PROCESS_SPECS}

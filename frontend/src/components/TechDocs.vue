@@ -78,7 +78,6 @@ backend/
   │  ├─ nl_parser.py         # 自然语言 → 策略操作（启发式）
   │  ├─ llm_strategy.py      # LLM 策略解析/对话（可选，无 Key 自动回退）
   │  ├─ param_schema.py      # 工序参数分级元数据
-  │  ├─ platform_config.py   # 平台可配置项（规模/量程/参数空间）
   │  ├─ carbon_market.py     # 碳市场行情服务（CEA/CCER 拉取 + TTL 缓存 + 价格预测）
   │  ├─ market_news.py       # 市场快讯服务（中国煤炭交易网爬取 + TTL 缓存）
   │  ├─ report.py            # AI 报告生成（骨架本地 + 分析 LLM）
@@ -89,7 +88,7 @@ backend/
   │  ├─ specs.py             # 设备规格档位
   │  ├─ store.py             # 策略持久化
   │  └─ models.py            # 前后端数据契约（Pydantic）
-  ├─ config/                 # 统一配置目录：requirements.txt / run.sh / .env（LLM 密钥，不入库）/ platform_config.json / strategies.json
+  ├─ config/                 # 统一配置目录：requirements.txt / run.sh / .env（LLM 密钥，不入库）/ strategies.json
   └─ data/reports/           # 历史报告输出
 
 ## 三、数据流
@@ -863,11 +862,8 @@ def _noise(v, pct=0.04):
 | GET | /api/presets/strategies | 内置示例策略（一键体验） |
 | GET | /api/factors | 默认排放因子表 |
 | GET | /api/param-schema | 工序参数分级元数据（config/optim、label、单位、参考范围） |
-| GET | /api/devices | 内置监测设备库（设备元数据 + 工序规格） |
+| GET | /api/devices | 内置监测设备库（设备元数据 + 工序规格 + 设备规格档位库） |
 | GET | /api/devices/history | 设备历史时序（内存环形缓冲） |
-| GET | /api/platform-config | 平台可配置项（工艺规模 / 设备量程 / 参数运行空间） |
-| PUT | /api/platform-config | 保存平台可配置项（持久化到 backend/config/platform_config.json） |
-| POST | /api/platform-config/reset | 恢复平台配置默认值 |
 | POST | /api/parse | 自然语言 → 策略操作（LLM/启发式双引擎） |
 | POST | /api/simulate | 仿真（baseline + 可选策略对比 delta） |
 | POST | /api/apply | 直接对流程应用一组操作 |
@@ -1082,7 +1078,7 @@ def _noise(v, pct=0.04):
 | 参数敏感性扫描（SensitivityDialog） | 画布节点 / 左侧策略库工序右键 → 参数敏感性扫描 | 对单工序指定参数扫参，生成敏感性曲线与建议调节方向（POST /api/scan） |
 | 碳素流守恒审计 | 工具菜单 → 碳素流守恒审计 | 逐工序核算碳输入/输出五项平衡，输出偏差与守恒率（POST /api/audit） |
 | 高炉数值分析（TftAnalysisDialog） | 仿真菜单 → 高炉数值分析（Alt+T） | 全厂高炉 TFT 数值总览、鼓风/喷煤调参推演，复用 utils/tft.js 焓平衡 |
-| 平台配置（PlatformConfigDialog） | 工具菜单 → 平台配置… | 工艺规模档位 / 设备量程 / 参数运行空间，保存后编辑器、设备面板与 3D 标注自动生效（backend/config/platform_config.json） |
+| 参数范围/设备量程内化 | 编排模式工序/设备节点属性面板 | 节点属性面板直接编辑参数运行空间（min/max/step）与设备量程，随方案持久化，无需全局配置（优先级：节点自定义 > 设备规格 ranges > 默认） |
 | AI 优化模型（策略详情面板） | 左侧「策略 → AI优化模型」点击模型 | GA/PSO/RL 在线训练面板：状态/迭代/曲线/最优参数建议，支持训练控制、应用最优参数、版本管理与提醒确认（/api/optimizers/*） |
 | 数据视图（DataView） | 视图菜单 → 数据 | 全屏传感器历史数据表格：设备页签 + 实时读数/均值/峰值/谷值/超限状态 + 时序表格 |
 | 碳市场行情（CarbonMarketView） | 视图菜单 → 碳市场 | 行情卡片 + CEA 蜡烛图 / CCER 折线 + 线性回归预测与置信带；15s 轮询，详情见「碳市场行情服务」章节 |

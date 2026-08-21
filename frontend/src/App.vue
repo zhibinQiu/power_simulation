@@ -8,16 +8,18 @@
     <!-- 左侧栏：园区资产（工艺 / 设备 / 原料 / 策略） -->
     <LeftSidebar @rsz="startLeftResize" />
 
-    <!-- 中间：仿真数字孪生（仿真态） / 流程编排画布（编辑态） / 数据视图（传感器历史数据表格） / 碳市场视图（实时行情） -->
+    <!-- 中间：仿真数字孪生（仿真态） / 流程编排画布（编辑态） / 传感器数据视图 / 碳市场视图 / 碳排核算视图 / 能流分析视图 -->
     <!-- SceneViewer 始终挂载，不销毁 WebGL 上下文，大幅提升切换速度并避免重建空白 -->
     <main class="stage">
-      <SceneViewer v-show="!store.editMode && !store.dataViewOn && !store.carbonMarketOn" />
+      <SceneViewer v-show="!store.editMode && !store.dataViewOn && !store.carbonMarketOn && !store.carbonCalcOn && !store.energyFlowOn" />
       <DataView v-if="store.dataViewOn && !store.editMode" />
       <CarbonMarketView v-if="store.carbonMarketOn && !store.editMode" />
+      <CarbonCalcView v-if="store.carbonCalcOn && !store.editMode" />
+      <EnergyFlowView v-if="store.energyFlowOn && !store.editMode" />
       <FlowEditor v-if="store.editMode" />
     </main>
 
-    <RibbonToolbar :actions="ribbonActions" @panorama="showPanorama = true" />
+    <RibbonToolbar :actions="ribbonActions" />
 
     <!-- 右侧栏：上下文检视器 -->
     <RightInspector @rsz="startRightResize" />
@@ -27,12 +29,11 @@
     <StatusBar />
 
     <DataSourceDialog v-if="showDataSource" @close="showDataSource = false" />
-    <PlatformConfigDialog v-if="showPlatformConfig" @close="showPlatformConfig = false" />
     <SystemSettingsDialog v-if="showSettings" @close="showSettings = false" />
     <TechDocs v-if="showTechDocs" @close="showTechDocs = false" />
     <UserManual v-if="showManual" @close="showManual = false" />
     <PromoManual v-if="showPromo" @close="showPromo = false" />
-    <PanoramaDataDialog v-if="showPanorama" @close="showPanorama = false" />
+    <AboutDialog v-if="showAbout" @close="showAbout = false" />
     <TftAnalysisDialog v-if="showTftAnalysis" @close="showTftAnalysis = false" />
     <ContextMenu />
     <SensitivityDialog />
@@ -56,6 +57,8 @@ import SceneViewer from './components/SceneViewer.vue'
 import WelcomeScreen from './components/WelcomeScreen.vue'
 import DataView from './components/DataView.vue'
 import CarbonMarketView from './components/CarbonMarketView.vue'
+import CarbonCalcView from './components/CarbonCalcView.vue'
+import EnergyFlowView from './components/EnergyFlowView.vue'
 import FlowEditor from './components/FlowEditor.vue'
 import { usePanelSizes } from './composables/usePanelSizes'
 import { useGlobalShortcuts } from './composables/useGlobalShortcuts'
@@ -63,12 +66,11 @@ import { openAuditDialog } from './stores/scan'
 
 // 对话框类组件按需懒加载：首屏不加载其代码，打开时才请求，降低首包体积与内存占用
 const DataSourceDialog = defineAsyncComponent(() => import('./components/DataSourceDialog.vue'))
-const PlatformConfigDialog = defineAsyncComponent(() => import('./components/PlatformConfigDialog.vue'))
 const SystemSettingsDialog = defineAsyncComponent(() => import('./components/SystemSettingsDialog.vue'))
 const TechDocs = defineAsyncComponent(() => import('./components/TechDocs.vue'))
 const UserManual = defineAsyncComponent(() => import('./components/UserManual.vue'))
 const PromoManual = defineAsyncComponent(() => import('./components/PromoManual.vue'))
-const PanoramaDataDialog = defineAsyncComponent(() => import('./components/PanoramaDataDialog.vue'))
+const AboutDialog = defineAsyncComponent(() => import('./components/AboutDialog.vue'))
 const TftAnalysisDialog = defineAsyncComponent(() => import('./components/TftAnalysisDialog.vue'))
 const ContextMenu = defineAsyncComponent(() => import('./components/ContextMenu.vue'))
 const SensitivityDialog = defineAsyncComponent(() => import('./components/SensitivityDialog.vue'))
@@ -78,12 +80,11 @@ const topBarRef = ref(null)
 const consoleRef = ref(null)
 
 const showDataSource = ref(false)
-const showPlatformConfig = ref(false)
 const showSettings = ref(false)
 const showTechDocs = ref(false)
 const showManual = ref(false)
 const showPromo = ref(false)
-const showPanorama = ref(false)
+const showAbout = ref(false)
 const showTftAnalysis = ref(false)
 
 const { lw, rw, cmdH, resizing, startLeftResize, startRightResize, startResize } = usePanelSizes()
@@ -156,7 +157,7 @@ function onExport() {
   pushCmd('已打开右侧报告面板：请配置标题、引擎与分析深度后点击「生成报告」。', 'guide')
 }
 function openPromo() { showPromo.value = true }
-function onAbout() { pushCmd('行业能碳仿真平台 · Web 版工业数字孪生（MATLAB 风格）。', 'sys') }
+function onAbout() { showAbout.value = true }
 
 // 供命令窗口调用的孪生控制动作
 const twinActions = { onSimToggle, onResetView, onOverview, togglePatrol, focusSel, onToggleEdit }
@@ -185,13 +186,16 @@ const menus = [
       if (store.simMode) showTftAnalysis.value = true
       else store.toast = '高炉数值分析仅限仿真模式使用：请先开启仿真模式'
     } },
+    { label: '参数优化', act: () => pushCmd('参数优化：切换至「数据」工具条 → 策略生成，使用自然语言描述目标。','guide') },
+    { label: '数据校准', act: () => pushCmd('数据校准：在右侧检视器选中设备查看实时/历史读数。','guide') },
   ] },
   { id: 'view', label: '视图', items: [
     { sub: true, label: '数字孪生', items: () => [
       { sub: true, label: '环境', items: () => store.envModes.map(e => ({ id: e.id, label: e.label, checked: e.id === store.envMode, run: () => onEnvChange({ target: { value: e.id } }) })) },
     ] },
     { sep: true },
-    { label: '数据', toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
+    { label: '传感器数据', toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
+    { label: '虚拟巡视', toggle: () => store.patrolOn, act: () => togglePatrol() },
     { label: '碳市场', toggle: () => store.carbonMarketOn, act: () => store.toggleCarbonMarket() },
   ] },
   { id: 'edit', label: '编辑', items: [
@@ -214,11 +218,13 @@ const menus = [
     { label: '清空画布', hide: () => !store.editMode, act: () => clearScheme() },
   ] },
   { id: 'tools', label: '工具', items: [
-    { label: '平台配置…', act: () => { showPlatformConfig.value = true } },
-    { sep: true },
-    { label: '碳素流守恒审计', accel: '', act: () => openAuditDialog() },
-    { label: '参数优化', act: () => pushCmd('参数优化：切换至「数据」工具条 → 策略生成，使用自然语言描述目标。','guide') },
-    { label: '数据校准', act: () => pushCmd('数据校准：在右侧检视器选中设备查看实时/历史读数。','guide') },
+    { sub: true, label: '低碳', items: () => [
+      { label: '碳素流守恒审计', run: () => openAuditDialog() },
+      { label: '全景碳核查', run: () => store.toggleCarbonCalc() },
+    ] },
+    { sub: true, label: '能源', items: () => [
+      { label: '能流分析', run: () => store.toggleEnergyFlow() },
+    ] },
   ] },
   { id: 'help', label: '帮助', items: [
     { label: '宣传手册', accel: 'F1', act: () => { showPromo.value = true } },

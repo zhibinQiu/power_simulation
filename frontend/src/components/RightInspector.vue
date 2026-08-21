@@ -72,24 +72,6 @@
           </CollapseSection>
 
           <CollapseSection
-            v-else-if="sid === 'sankey'"
-            title="能碳流桑基图"
-            tone="teal"
-            drag-id="sankey"
-            v-model="layout.state.open[sid]"
-            @drop="layout.move($event.from, $event.to, $event.position)"
-          >
-            <div class="sankey-tabs">
-              <button :class="{ on: skTab === 'carbon' }" @click="skTab = 'carbon'">碳素流</button>
-              <button :class="{ on: skTab === 'energy' }" @click="skTab = 'energy'">能流</button>
-            </div>
-            <div class="sk-wrap">
-              <CarbonSankey v-if="skTab === 'carbon'" />
-              <EnergySankey v-else />
-            </div>
-          </CollapseSection>
-
-          <CollapseSection
             v-else-if="sid === 'top'"
             title="排放最高工序"
             tone="red"
@@ -134,8 +116,6 @@ import { computed, ref } from 'vue'
 import { energyOf } from '../utils/energy'
 import { useSimStore, UNIT_TYPES } from '../stores/sim'
 import { MATERIALS } from '../data/flowLibrary'
-import CarbonSankey from './CarbonSankey.vue'
-import EnergySankey from './EnergySankey.vue'
 import UnitCarbonDetail from './UnitCarbonDetail.vue'
 import DeviceDetail from './DeviceDetail.vue'
 import FlowInspector from './FlowInspector.vue'
@@ -149,8 +129,8 @@ import { useDragLayout } from '../composables/useDragSort'
 const ovLayoutKey = ref('insp-layout:overview')
 const layout = useDragLayout(
   ovLayoutKey,
-  ['plant', 'strategy', 'sankey', 'top'],
-  { plant: true, strategy: true, sankey: true, top: true },
+  ['plant', 'strategy', 'top'],
+  { plant: true, strategy: true, top: true },
 )
 
 /* 宽度拖拽手柄：将事件转发给 App.vue 处理（与左侧栏一致） */
@@ -228,8 +208,6 @@ const plantElec = computed(() => {
   for (const u of units) sum += energyOf(u).elec
   return sum
 })
-const skTab = ref('carbon')
-
 // 策略节能减碳效果（基线 vs 策略）：节能与减碳并重
 const stratCmp = computed(() => {
   const b = store.baseline && store.baseline.totals
@@ -285,18 +263,10 @@ function fmt(n) { return (n == null ? '—' : Number(n).toLocaleString('zh-CN', 
 .chip2.c { background: rgba(46,158,99,.055); border-color: rgba(46,158,99,.18); }
 .app.sim-dark .chip2.e { background: rgba(61,165,255,.10); border-color: rgba(61,165,255,.26); }
 .app.sim-dark .chip2.c { background: rgba(62,207,142,.10); border-color: rgba(62,207,142,.26); }
-.sk-wrap { padding: 6px 0; }
 .te-row { align-items: flex-start; padding-top: 9px; padding-bottom: 9px; }
 .te-bar { display: block; height: 4px; border-radius: 2px; background: var(--panel-2); overflow: hidden; margin-top: 5px; }
 .te-bar > i { display: block; height: 100%; border-radius: 2px; }
 .te-pct { flex: 0 0 44px; text-align: right; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
-.sankey-tabs { display: flex; gap: 6px; padding: 2px 0 4px; }
-.sankey-tabs button {
-  flex: 1; padding: 3px 0; font-size: 11px; cursor: pointer;
-  border: 1px solid var(--line); border-radius: 4px;
-  background: transparent; color: var(--muted);
-}
-.sankey-tabs button.on { background: var(--accent-soft, rgba(0,114,189,.12)); color: var(--accent, #0072BD); border-color: var(--accent2); }
 .strat-cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px 0; }
 .sc-item {
   border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px;

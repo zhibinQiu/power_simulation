@@ -165,8 +165,7 @@ export const useSimStore = defineStore('sim', {
     factors: null,            // 当前排放因子配置（燃料 NCV/CC、电网因子、碳酸盐/电极因子），null 表示用后端默认
     factorsDefault: null,      // 排放因子默认基线（init 时快照），用于编辑态估算的偏移归零，保证未编辑时基线不变
     paramSchema: null,        // 工序参数分级元数据（后端 /api/param-schema）：config/optim + 参考范围
-    deviceLibrary: null,      // 内置监测设备库（后端 /api/devices）：设备类型元数据 + 各工序设备规格
-    platformConfig: null,     // 平台可配置项（工艺规模档位/设备量程/参数运行空间），后端持久化
+    deviceLibrary: null,      // 内置监测设备库（后端 /api/devices）：设备类型元数据 + 各工序设备规格 + 设备规格档位库
     deviceDetailId: null,     // 当前打开详情的设备 id（3D 图点设备或工序设备列表触发）
     focusNonce: 0,         // 触发中间 3D 相机聚焦（任意选中均发起）
     focusKind: null,        // 'unit' | 'device'
@@ -182,6 +181,8 @@ export const useSimStore = defineStore('sim', {
     fullscreenOn: false,      // 全屏模式：隐藏左/右/底栏，仅保留 3D 场景
     dataViewOn: false,        // 数据视图：中间 3D 场景替换为传感器历史数据表格（顶栏「视图 → 数据视图」切换）
     carbonMarketOn: false,    // 碳市场视图：中间 3D 场景替换为碳市场实时行情（顶栏「视图 → 碳市场」切换）
+    carbonCalcOn: false,      // 碳排核算视图：中间 3D 场景替换为多标准碳核算结果对比（工具 → 低碳 → 全景碳核查切换）
+    energyFlowOn: false,      // 能流分析视图：中间 3D 场景替换为能流桑基图（工具 → 能源 → 能流分析切换）
     inspectorView: 'auto',    // 右侧检视器显式视图：'auto'（按选中推导）| 'park' 园区构成 | 'materials' 原料库 | 'strategy' 减排策略 | 'report' 报告面板         // 底栏（命令行窗口 + 状态条）是否展开
     reportPayload: null,      // 「导出报告」请求载荷（baseline/strategy/ops/...），供右侧报告面板消费
     selectedStrategyId: null, // 左侧策略库选中的策略
@@ -450,9 +451,9 @@ export const useSimStore = defineStore('sim', {
       try {
         loadCalibrations()   // 启动即恢复本厂标定耦合（localStorage），否则用默认机理/经验系数
         this._loadDataSource() // 恢复上次设置的实时数据源（内置模拟/自定义WS/HTTP）
-        const [m, presets, factors, schema, devs, hist, pcfg] = await Promise.all([
+        const [m, presets, factors, schema, devs, hist] = await Promise.all([
           api.presetModel(), api.presetStrategies(), api.getFactors(), api.getParamSchema(),
-          api.getDevices(), api.getDeviceHistory(), api.getPlatformConfig(),
+          api.getDevices(), api.getDeviceHistory(),
         ])
         this.model = m
         // 优先恢复上次保存的编排方案（exitEdit/loadTemplate 等已持久化）；
@@ -487,8 +488,7 @@ export const useSimStore = defineStore('sim', {
         this.factors = factors   // 默认排放因子，供详情弹窗与因子配置面板使用
         this.factorsDefault = factors   // 快照默认基线，供编辑态估算偏移归零
         this.paramSchema = schema   // 工序参数分级元数据，供流程编排编辑器分组与参考范围展示
-        this.deviceLibrary = devs   // 内置监测设备库，供 3D 设备标记与设备详情面板使用
-        this.platformConfig = pcfg  // 平台可配置项（工艺规模档位/设备量程/参数运行空间）
+        this.deviceLibrary = devs   // 内置监测设备库，供 3D 设备标记、设备详情面板与规格档位联动
         // 设备历史时序（首屏即带趋势）
         if (hist && hist.history) this.deviceHistory = hist.history
         if (hist && hist.meta) this.deviceMeta = hist.meta
@@ -798,24 +798,6 @@ export const useSimStore = defineStore('sim', {
     async loadStrategies() {
       this.strategies = await api.listStrategies()
     },
-    // ---- 平台可配置项（工艺规模档位/设备量程/参数运行空间）----
-    async reloadPlatformConfig() {
-      this.platformConfig = await api.getPlatformConfig()
-      // 配置影响参数范围与设备量程：同步重拉 schema / 设备库，保证编辑器与设备面板使用新范围
-      const [schema, devs] = await Promise.all([api.getParamSchema(), api.getDevices()])
-      this.paramSchema = schema
-      this.deviceLibrary = devs
-    },
-    async savePlatformConfig(cfg) {
-      await api.savePlatformConfig(cfg)
-      this.toast = '平台配置已保存，参数范围与设备量程已同步更新'
-      await this.reloadPlatformConfig()
-    },
-    async resetPlatformConfig() {
-      await api.resetPlatformConfig()
-      this.toast = '平台配置已恢复出厂默认'
-      await this.reloadPlatformConfig()
-    },
     async saveStrategy(name) {
       if (!this.parsed || !this.parsed.ops.length) return
       await api.createStrategy(name || '未命名策略', '', this.parsedText, this.parsed.ops)
@@ -979,15 +961,25 @@ export const useSimStore = defineStore('sim', {
       this.newsTickerOn = !this.newsTickerOn
       try { localStorage.setItem('sim.newsTickerOn', this.newsTickerOn ? '1' : '0') } catch (e) {}
     },
-    // 数据视图：中间 3D 场景 ↔ 传感器历史数据表格（顶栏「视图 → 数据视图」切换）
+    // 数据视图：中间 3D 场景 ↔ 传感器历史数据表格（顶栏「视图 → 传感器数据」切换）
     toggleDataView() {
       this.dataViewOn = !this.dataViewOn
-      if (this.dataViewOn) this.carbonMarketOn = false
+      if (this.dataViewOn) { this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false }
     },
     // 碳市场视图：中间 3D 场景 ↔ 碳市场实时行情（顶栏「视图 → 碳市场」切换）
     toggleCarbonMarket() {
       this.carbonMarketOn = !this.carbonMarketOn
-      if (this.carbonMarketOn) this.dataViewOn = false
+      if (this.carbonMarketOn) { this.dataViewOn = false; this.carbonCalcOn = false; this.energyFlowOn = false }
+    },
+    // 碳排核算视图：中间 3D 场景 ↔ 多标准碳核算结果对比（工具 → 低碳 → 全景碳核查切换）
+    toggleCarbonCalc() {
+      this.carbonCalcOn = !this.carbonCalcOn
+      if (this.carbonCalcOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.energyFlowOn = false }
+    },
+    // 能流分析视图：中间 3D 场景 ↔ 能流桑基图（工具 → 能源 → 能流分析切换）
+    toggleEnergyFlow() {
+      this.energyFlowOn = !this.energyFlowOn
+      if (this.energyFlowOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false }
     },
     toggleFullscreen() {
       this.fullscreenOn = !this.fullscreenOn
@@ -1837,7 +1829,7 @@ export const useSimStore = defineStore('sim', {
       const n = this.scheme.nodes.find((x) => x.id === id)
       if (!n) return
       n.spec = specKey || ''
-      const specs = (this.platformConfig && this.platformConfig.process_specs) || {}
+      const specs = (this.deviceLibrary && this.deviceLibrary.process_specs) || {}
       const list = specs[n.type] || []
       const sp = list.find((s) => s.key === specKey)
       if (sp && sp.defaults) {
@@ -1847,6 +1839,52 @@ export const useSimStore = defineStore('sim', {
         const t = PROCESS_MAP[n.type]
         if (t) n.params = { ...Object.fromEntries((t.params || []).map((p) => [p.key, p.def])) }
       }
+      this._saveScheme()
+    },
+    // ---- 节点级参数范围 / 设备量程（内化「平台配置」为编排模式工艺属性，随方案持久化）----
+    setFlowParamRange(id, key, patch) {
+      this._histCapture('fr_' + id + key)
+      const n = this.scheme.nodes.find((x) => x.id === id)
+      if (!n) return
+      const num = (v) => (v === '' || v == null ? undefined : Number(v))
+      const next = {}
+      for (const k of ['min', 'max', 'step']) {
+        const v = num(patch[k])
+        if (v !== undefined) next[k] = v
+      }
+      if (!Object.keys(next).length) return
+      const cur = (n.ranges && n.ranges[key]) || {}
+      n.ranges = { ...(n.ranges || {}), [key]: { ...cur, ...next } }
+      this._saveScheme()
+    },
+    resetFlowParamRange(id, key) {
+      this._histCapture('fr_' + id + key)
+      const n = this.scheme.nodes.find((x) => x.id === id)
+      if (!n || !n.ranges) return
+      const next = { ...n.ranges }
+      delete next[key]
+      if (Object.keys(next).length) n.ranges = next
+      else delete n.ranges
+      this._saveScheme()
+    },
+    setFlowDeviceRange(id, patch) {
+      this._histCapture('dr_' + id)
+      const n = this.scheme.nodes.find((x) => x.id === id)
+      if (!n) return
+      const num = (v) => (v === '' || v == null ? undefined : Number(v))
+      const next = {}
+      for (const k of ['min', 'max', 'step']) {
+        const v = num(patch[k])
+        if (v !== undefined) next[k] = v
+      }
+      if (!Object.keys(next).length) return
+      n.range = { ...(n.range || {}), ...next }
+      this._saveScheme()
+    },
+    resetFlowDeviceRange(id) {
+      this._histCapture('dr_' + id)
+      const n = this.scheme.nodes.find((x) => x.id === id)
+      if (n && n.range) delete n.range
       this._saveScheme()
     },
     setFlowRecipeRatio(id, idx, ratio) {

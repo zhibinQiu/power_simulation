@@ -104,6 +104,10 @@
             </div>
           </div>
           <div v-if="audit" class="sm-note">{{ audit.note }}</div>
+          <div v-if="audit && hasSankey" class="sm-sankey">
+            <div class="sm-sankey-title">碳素流桑基图</div>
+            <CarbonSankey />
+          </div>
         </div>
       </div>
     </div>
@@ -117,6 +121,7 @@ import { scanState, closeScanDialog } from '../stores/scan'
 import { api } from '../api/client'
 import TrendChart from './TrendChart.vue'
 import Icon from './Icon.vue'
+import CarbonSankey from './CarbonSankey.vue'
 
 const store = useSimStore()
 const state = scanState
@@ -135,6 +140,8 @@ const currentValue = ref(0)
 const audit = ref(null)
 const auditErr = ref('')
 const loadingA = ref(false)
+
+const hasSankey = computed(() => !!(store.resultForView && store.resultForView.sankey && store.resultForView.sankey.nodes && store.resultForView.sankey.nodes.length))
 
 const paramLabel = computed(() => {
   const p = paramOptions.value.find((x) => x.key === selKey.value)
@@ -261,4 +268,7 @@ watch(() => state.tab, (t) => { if (t === 'audit' && !audit.value) runAudit() })
 .sm-tr.sm-total { background: var(--panel-3); font-weight: 500; }
 .sm-note { font-size: 10px; color: var(--muted); line-height: 1.6; background: var(--panel-2);
   border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+.sm-sankey { margin-top: 10px; background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px; }
+.sm-sankey-title { font-size: 11px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
 </style>

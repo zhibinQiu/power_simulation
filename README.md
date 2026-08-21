@@ -18,7 +18,7 @@
 - **实时遥测**：WebSocket 推送设备读数（模拟数据源 / 自定义 WebSocket / HTTP 轮询三种数据源），约 10 分钟环形缓冲 + 历史趋势；
 - **命令行交互中枢**：聊天 / 代码 / 规划三模式 + 孪生控制命令（run / sim / stop / patrol / view / edit …）；
 - **AI 分析报告**：AI 生成或本地模板双引擎，报告标题、分析深度（精简/标准/深入）、附录表格可选，输出 Markdown + 分享页 HTML；
-- **平台配置**：工艺规模档位、设备量程、参数运行空间可配置，保存后参数编辑器、设备面板与 3D 标注自动生效；
+- **工艺属性内化配置**：参数运行空间（min/max/step）、设备量程、设备规格档位均在编排模式节点属性面板中直接调整，随方案持久化（节点自定义范围 > 设备规格 ranges > 默认范围），无独立全局配置入口；
 - **欢迎页与活动栏**：启动欢迎页选择工作模式；类 VS Code 活动栏（资源管理器 / 搜索 / 场景 / 连接）快速切换左侧面板；
 - **全局搜索**：按名称模糊搜索工序、物料、策略与设备，一键选中并联动检视器与 3D 聚焦；
 - **连接管理**：连接面板集中展示各数据链路（模拟 / WebSocket / HTTP）的运行状态，可在线启停；
@@ -31,7 +31,7 @@
 | 前端 | Vue 3（Composition API）+ Vite + Pinia + Three.js |
 | 后端 | Python + FastAPI + Uvicorn |
 | 通信 | REST API + WebSocket（`/api/ws/feed`） |
-| 存储 | 内存缓存 + 本地文件（策略库、平台配置、历史报告） |
+| 存储 | 内存缓存 + 本地文件（策略库、历史报告） |
 
 ## 快速开始
 
@@ -79,7 +79,6 @@ npx vite build         # 产物输出至 dist/，由后端 Catch-all 路由托�
 | `requirements.txt` | Python 依赖清单 |
 | `run.sh` | 后端启动脚本（自动建 venv + 安装依赖 + 启动 uvicorn） |
 | `.env` | LLM 密钥等本地环境配置（**不提交版本库**） |
-| `platform_config.json` | 平台可配置项覆盖：工艺规模档位 / 设备量程 / 参数运行空间（本地持久化，不提交） |
 | `strategies.json` | 策略库持久化（自定义策略保存于此，不提交） |
 
 > 运行所需 LLM 密钥：在 `backend/config/.env` 中按 `LLM_API_KEY=...`、`LLM_BASE_URL=...` 配置；未配置时策略解析与报告分析自动回退到本地确定性引擎，核心功能不受影响。
@@ -99,7 +98,6 @@ npx vite build         # 产物输出至 dist/，由后端 Catch-all 路由托�
 │   │   ├── nl_parser.py        # 自然语言 → 策略操作（启发式引擎）
 │   │   ├── llm_strategy.py     # LLM 策略解析 / 命令行对话（可选）
 │   │   ├── param_schema.py     # 工序参数分级元数据
-│   │   ├── platform_config.py  # 平台可配置项（规模/量程/参数空间）
 │   │   ├── carbon_market.py    # 碳市场行情服务（CEA/CCER 行情拉取 + 缓存 + 预测）
 │   │   ├── market_news.py      # 市场快讯服务（中国煤炭交易网爬取 + TTL 缓存）
 │   │   ├── report.py           # AI 报告生成（骨架本地 + 分析 LLM）

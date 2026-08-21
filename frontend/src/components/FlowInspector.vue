@@ -164,7 +164,18 @@
           </div>
           <input type="number" :min="p.min" :max="p.max" :step="p.step" :value="node.params[p.key] ?? p.def" class="num"
                  @input="store.setFlowParam(node.id, p.key, $event.target.value)" />
-          <div class="pr-hint">范围 {{ p.min }}–{{ p.max }} {{ p.unit }}</div>
+          <div class="pr-hint pr-range-row">
+            <span>范围</span>
+            <input type="number" class="rg-in" :value="p.min" title="下限"
+                   @input="store.setFlowParamRange(node.id, p.key, { min: $event.target.value })" />
+            <span class="rg-dash">–</span>
+            <input type="number" class="rg-in" :value="p.max" title="上限"
+                   @input="store.setFlowParamRange(node.id, p.key, { max: $event.target.value })" />
+            <span class="rg-unit">{{ p.unit }}</span>
+            <input type="number" class="rg-in rg-step" :value="p.step" title="步长"
+                   @input="store.setFlowParamRange(node.id, p.key, { step: $event.target.value })" />
+            <button v-if="hasNodeRange(p.key)" class="rg-reset" title="恢复默认范围" @click="store.resetFlowParamRange(node.id, p.key)">↺</button>
+          </div>
         </div>
         <div v-if="!directParams.length" class="pr-hint">该工艺无直接录入的参数设定。</div>
       </div>
@@ -194,7 +205,18 @@
             <div class="pr-top"><span>设定</span><b>{{ node.setpoint }} <span class="u">{{ dSp(node).unit }}</span></b></div>
             <input type="number" :min="dSp(node).min" :max="dSp(node).max" :step="dSp(node).step||1" class="num"
                    :value="node.setpoint" @input="store.setDeviceSetpoint(node.id, $event.target.value)" />
-            <div class="pr-hint">范围 {{ dSp(node).min }}–{{ dSp(node).max }} {{ dSp(node).unit }}</div>
+            <div class="pr-hint pr-range-row">
+              <span>量程</span>
+              <input type="number" class="rg-in" :value="dSp(node).min" title="下限"
+                     @input="store.setFlowDeviceRange(node.id, { min: $event.target.value })" />
+              <span class="rg-dash">–</span>
+              <input type="number" class="rg-in" :value="dSp(node).max" title="上限"
+                     @input="store.setFlowDeviceRange(node.id, { max: $event.target.value })" />
+              <span class="rg-unit">{{ dSp(node).unit }}</span>
+              <input type="number" class="rg-in rg-step" :value="dSp(node).step||1" title="步长"
+                     @input="store.setFlowDeviceRange(node.id, { step: $event.target.value })" />
+              <button v-if="node.range" class="rg-reset" title="恢复默认量程" @click="store.resetFlowDeviceRange(node.id)">↺</button>
+            </div>
           </div>
           <!-- 附加可调项（如鼓风机鼓风湿度） -->
           <div v-for="es in dExtra(node)" :key="es.key" class="param-row">
@@ -283,28 +305,34 @@ const tpl = computed(() => (node.value ? PROCESS_MAP[node.value.type] : null))
 const routeLabel = computed(() => { const r = tpl.value && tpl.value.route; return r === 'aux' ? '工辅' : '炼钢' })
 // 设备规格：该工序类型的规格档位（后端规格库），以及当前节点所选规格
 const specOptions = computed(() => {
-  const specs = (store.platformConfig && store.platformConfig.process_specs) || {}
+  const specs = (store.deviceLibrary && store.deviceLibrary.process_specs) || {}
   return (node.value && specs[node.value.type]) || []
 })
 const currentSpec = computed(() => {
   const key = node.value && node.value.spec
   return specOptions.value.find((s) => s.key === key) || null
 })
-// 参数范围：规格档位的 ranges 覆盖模板默认范围（min/max/step）
+// 参数范围：节点自定义范围（ranges）> 规格档位 ranges > 模板默认范围（min/max/step）
 // 抽为通用函数，供本节点与上游联动节点共同使用
 function effParamsOf(n, t) {
   const base = (t && t.params) || []
-  const specs = (store.platformConfig && store.platformConfig.process_specs) || {}
+  const specs = (store.deviceLibrary && store.deviceLibrary.process_specs) || {}
   const sp = n ? (specs[n.type] || []).find((s) => s.key === n.spec) : null
   const ranged = sp && sp.ranges ? base.map((p) => {
     const r = sp.ranges[p.key]
     return r ? { ...p, min: r.min ?? p.min, max: r.max ?? p.max, step: r.step ?? p.step } : p
   }) : base
+  // 节点级自定义范围（编排模式「工艺参数」内直接调整运行空间，随方案持久化）
+  const nr = (n && n.ranges) || {}
+  const withNode = ranged.map((p) => {
+    const r = nr[p.key]
+    return r ? { ...p, min: r.min ?? p.min, max: r.max ?? p.max, step: r.step ?? p.step } : p
+  })
   // 合并展示模式元数据（mode: direct 直接录值 / aux 跳转辅助工艺 / derived 指标自动算）
   const metas = {}
   const mp = n ? EDITABLE_PARAMS[n.type] : null
   if (mp) for (const m of mp) metas[m.key] = m
-  return ranged.map((p) => {
+  return withNode.map((p) => {
     const m = metas[p.key]
     return m ? { ...p, mode: m.mode || 'direct', auxType: m.auxType, auxNote: m.auxNote } : p
   })
@@ -358,7 +386,14 @@ const matUnit = computed(() => (MATERIAL_MAP[node.value.type] && MATERIAL_MAP[no
 const matCarbon = computed(() => (MATERIAL_MAP[node.value.type] && MATERIAL_MAP[node.value.type].carbon) ?? '—')
 const devIcon = (type) => (DEVICE_MAP[type] && DEVICE_MAP[type].icon) || 'gauge'
 const devMeasures = computed(() => (DEVICE_MAP[node.value.type] && DEVICE_MAP[node.value.type].measures) || '—')
-const dSp = (d) => (DEVICE_MAP[d.type] && DEVICE_MAP[d.type].setpoint) || { min: 0, max: 100, step: 1, unit: '' }
+// 设备设定值量程：节点自定义量程（range，随方案持久化）> 设备库默认设定范围
+const dSp = (d) => {
+  const base = (DEVICE_MAP[d.type] && DEVICE_MAP[d.type].setpoint) || { min: 0, max: 100, step: 1, unit: '' }
+  const r = (d && d.range) || {}
+  return { ...base, ...r }
+}
+// 节点是否对该参数自定义过范围（用于显示「恢复默认」按钮）
+const hasNodeRange = (k) => !!(node.value && node.value.ranges && node.value.ranges[k])
 const dExtra = (d) => (DEVICE_MAP[d.type] && DEVICE_MAP[d.type].extraSetpoints) || []
 const extraValOf = (d, key) => {
   if (d && d.extraSetpoints && d.extraSetpoints[key] != null) return d.extraSetpoints[key]
@@ -440,5 +475,13 @@ function bindToProcess(pid) {
 .gio-row .ratio-in::-webkit-outer-spin-button, .gio-row .ratio-in::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .gio-row .ratio-in { -moz-appearance: textfield; appearance: textfield; }
 .muted-note { font-size: 11px; color: var(--muted); margin-bottom: 8px; line-height: 1.6; }
+/* 参数范围 / 设备量程内联编辑（编排模式内化平台配置） */
+.pr-range-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.rg-in { width: 52px; border: 1px solid var(--line); background: var(--panel2); color: var(--text); border-radius: 3px; padding: 1px 4px; font-size: 11px; }
+.rg-in:focus { border-color: var(--accent); outline: none; }
+.rg-step { width: 46px; }
+.rg-dash, .rg-unit { color: var(--muted); font-size: 10px; }
+.rg-reset { border: 1px solid var(--line); background: var(--panel2); color: var(--accent); border-radius: 3px; cursor: pointer; padding: 0 5px; font-size: 10px; line-height: 1.5; }
+.rg-reset:hover { border-color: var(--accent); }
 /* 可调分支（上游链路） */
 </style>

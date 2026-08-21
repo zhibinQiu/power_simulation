@@ -14,29 +14,10 @@
 
       <div class="pc-body">
         <p class="pc-tip">
-          为不同工艺/设备调整通用性配置：工艺规模档位（如高炉规模）、设备量程、参数运行空间。
+          为不同钢厂/产线调整通用性配置：设备量程、参数运行空间。
           保存后参数编辑器、设备面板与 3D 标注自动使用新范围。
           「设备规格」为内置档位，在流程编排的工序节点上选择后，该节点按规格的默认参数与范围参与仿真。
         </p>
-
-        <!-- 工艺规模档位 -->
-        <div v-if="tab === 'scale'" class="pc-list">
-          <div v-for="(s, ut) in form.process_scales" :key="ut" class="pc-row">
-            <div class="pc-row-head">
-              <span class="pc-ut">{{ unitLabel(ut) }}</span>
-              <span class="pc-param">{{ s.label }} <em>{{ s.unit }}</em></span>
-              <span class="sp"></span>
-              <span class="pc-tier" v-for="t in s.tiers || []" :key="t.id"
-                    :class="{ on: isTierOn(s, t) }" @click="applyTier(s, t)">{{ t.label }}</span>
-            </div>
-            <div class="pc-row-fields">
-              <label>下限 <input type="number" v-model.number="s.min" /></label>
-              <label>上限 <input type="number" v-model.number="s.max" /></label>
-              <label>步长 <input type="number" v-model.number="s.step" /></label>
-            </div>
-          </div>
-          <div v-if="!Object.keys(form.process_scales || {}).length" class="pc-empty">暂无工艺规模配置</div>
-        </div>
 
         <!-- 设备量程 -->
         <div v-if="tab === 'device'" class="pc-list">
@@ -104,32 +85,21 @@ const store = useSimStore()
 const emit = defineEmits(['close'])
 
 const tabs = [
-  { id: 'scale', label: '工艺规模档位' },
   { id: 'device', label: '设备量程' },
   { id: 'param', label: '参数运行空间' },
   { id: 'spec', label: '设备规格' },
 ]
-const tab = ref('scale')
+const tab = ref('device')
 const saving = ref(false)
-const form = reactive({ process_scales: {}, device_ranges: {}, param_ranges: {}, process_specs: {} })
+const form = reactive({ device_ranges: {}, param_ranges: {}, process_specs: {} })
 
 function unitLabel(ut) {
   const info = (store.paramSchema?.unit_types || []).find((u) => u.type === ut)
   return info?.label || ut
 }
 
-function isTierOn(s, t) {
-  return Math.abs(Number(s.min) - Number(t.min)) < 1e-6 && Math.abs(Number(s.max) - Number(t.max)) < 1e-6
-}
-
-function applyTier(s, t) {
-  s.min = Number(t.min)
-  s.max = Number(t.max)
-}
-
 function syncForm() {
   const cfg = store.platformConfig || {}
-  Object.assign(form.process_scales, JSON.parse(JSON.stringify(cfg.process_scales || {})))
   Object.assign(form.device_ranges, JSON.parse(JSON.stringify(cfg.device_ranges || {})))
   Object.assign(form.param_ranges, JSON.parse(JSON.stringify(cfg.param_ranges || {})))
   Object.assign(form.process_specs, JSON.parse(JSON.stringify(cfg.process_specs || {})))
@@ -138,13 +108,7 @@ function syncForm() {
 async function save() {
   saving.value = true
   try {
-    // 仅提交可编辑字段，剥离后端派生的档位预设（tiers）
-    const process_scales = {}
-    for (const [ut, s] of Object.entries(form.process_scales)) {
-      process_scales[ut] = { key: s.key, label: s.label, unit: s.unit, min: s.min, max: s.max, step: s.step }
-    }
     await store.savePlatformConfig({
-      process_scales,
       device_ranges: form.device_ranges,
       param_ranges: form.param_ranges,
     })
@@ -193,9 +157,6 @@ onMounted(syncForm)
 .pc-ut { font-size: 12px; font-weight: 700; }
 .pc-param { font-size: 11px; color: var(--muted); }
 .pc-param em { font-style: normal; color: var(--faint); margin-left: 4px; }
-.pc-tier { padding: 3px 9px; border: 1px solid var(--border); border-radius: 12px; font-size: 10px; color: var(--muted); cursor: pointer; }
-.pc-tier:hover { border-color: var(--accent); }
-.pc-tier.on { background: var(--accent-l); border-color: var(--accent); color: var(--accent-d); font-weight: 600; }
 .pc-row-fields { display: flex; gap: 10px; }
 .pc-row-fields.inline { gap: 8px; }
 .pc-row-fields label { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted); }
