@@ -50,6 +50,7 @@
                 <div v-if="tip && tip.key === a.key" class="tad-tip" :style="{ left: tip.px + 'px', top: tip.py + 'px' }">
                   <div class="t1">{{ a.label }} = {{ fmt(tip.pt.x) }} {{ a.unit }}</div>
                   <div class="t2">TFT = <b>{{ tip.pt.tft.toFixed(0) }} ℃</b></div>
+                  <div class="t2" v-if="tip.pt.co2 != null">CO₂ = <b>{{ tip.pt.co2.toFixed(0) }} kg/tHM</b></div>
                 </div>
               </div>
             </div>
@@ -102,19 +103,38 @@
                 <div class="cg-item"><span class="cg-k">热风温度</span><b class="mono">{{ fmt(baseParams.hot_blast_temp) }} ℃</b></div>
                 <div class="cg-item"><span class="cg-k">富氧率</span><b class="mono">{{ fmt(baseParams.oxygen_enrich) }} %</b></div>
               </div>
-              <div class="cond-tip">焦比是结果量：由风温/富氧/喷煤等操作参数经系统耦合推导，不可直接设定；调节旋钮联动仿真后焦比随之更新。</div>
+              <!-- CO2 排放：随配料比（焦比/喷煤比）联动同步展示 -->
+              <div class="cond-co2">
+                <div class="co2-main">
+                  <span class="co2-k">CO₂ 排放</span>
+                  <span class="co2-val mono">{{ fmt(co2.CO2_emit) }}</span>
+                  <span class="co2-unit">kg CO₂/tHM</span>
+                  <span class="cond-st" :style="{ color: co2.level.color }">
+                    <i class="st-dot" :style="{ background: co2.level.color }"></i>{{ co2.level.label }}
+                  </span>
+                </div>
+                <div class="co2-grid">
+                  <div class="cg-item"><span class="cg-k">入炉碳 C_in</span><b class="mono">{{ fmt(co2.C_in) }} kg C/t</b></div>
+                  <div class="cg-item"><span class="cg-k">铁水溶碳 C_HM</span><b class="mono">{{ fmt(co2.C_HM) }} kg C/t</b></div>
+                  <div class="cg-item"><span class="cg-k">排放碳 C_emit</span><b class="mono">{{ fmt(co2.C_emit) }} kg C/t</b></div>
+                  <div class="cg-item"><span class="cg-k">风口 / 非风口</span><b class="mono">{{ fmt(co2.CO2_from_raceway) }} / {{ fmt(co2.CO2_from_other) }}</b></div>
+                </div>
+                <div class="co2-tip">{{ (co2.level && co2.level.desc) || '碳平衡口径：CO₂ = (入炉碳 − 铁水溶碳) × 44.009/12.011；炉尘碳计入排放。' }}</div>
+              </div>
+              <div class="cond-tip">焦比是结果量：由风温/富氧/喷煤等操作参数经系统耦合推导，不可直接设定；调节旋钮联动仿真后焦比随之更新，CO₂ 排放同步刷新。</div>
             </div>
 
             <div class="tad-sec-title">灵敏度总览</div>
             <table class="tad-table">
               <thead>
-                <tr><th>操作参数</th><th>当前值</th><th>ΔTFT</th><th>趋势</th></tr>
+                <tr><th>操作参数</th><th>当前值</th><th>ΔTFT</th><th>ΔCO₂</th><th>趋势</th></tr>
               </thead>
               <tbody>
                 <tr v-for="a in axes" :key="a.key" :class="{ on: a.key === ax.key }" @click="axKey = a.key">
                   <td class="c-name">{{ a.label }}</td>
                   <td class="mono">{{ fmt(baseParams[a.key]) }} {{ a.unit }}</td>
                   <td class="mono">{{ (axisStats[a.key] || {}).spreadText || '—' }}</td>
+                  <td class="mono">{{ (axisStats[a.key] || {}).co2SpreadText || '—' }}</td>
                   <td>
                     <span class="trend" :class="(axisStats[a.key] || {}).trendCls">
                       <i class="td-dot"></i>{{ (axisStats[a.key] || {}).trend }}
@@ -145,6 +165,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { PROCESS_MAP } from '../data/flowLibrary'
 import { collectTftContext, DEFAULT_TFT_CONFIG } from '../utils/tft'
+import { collectSimContext } from '../utils/co2'
 
 const emit = defineEmits(['close'])
 const store = useSimStore()
@@ -156,6 +177,8 @@ const AXIS_META = {
   oxygen_enrich: { label: '富氧率', hint: '富氧↑ → 压缩 N2 稀释、供氧↑，为降焦/提煤腾出 TFT' },
   wind_rate: { label: '风量', hint: '供氧与 N2 同步变化近抵消，是产量通道，不减碳' },
   coal_inj: { label: '喷煤比', hint: '喷煤↑替代焦炭（焦比联动↓）减碳，但热解吸热 + 产 H2O 稀释使 TFT↓' },
+  // coke_rate: {label:'焦比', hint: '焦比↑导致TFT温度↑，高炉温度稳定，CO2排放↑'},
+  blast_humidity: {label:'鼓风湿度', hint: '湿度是炼铁环节努力减小的输入，湿度↑TFT下降，湿度↓TFT上升' }
 }
 
 const cfg = DEFAULT_TFT_CONFIG
@@ -264,16 +287,17 @@ function onRestore() {
   if (snapshot.value[ax.value.key] != null) localVal.value = snapshot.value[ax.value.key]
 }
 
-// 扫描某轴全范围 → TFT 序列
+// 扫描某轴全范围 → TFT / CO2 序列
 function scanAxis(a) {
   const pts = []
   const n = Math.max(2, Math.ceil((a.max - a.min) / a.step))
   for (let i = 0; i <= n; i++) {
     const v = a.min + ((a.max - a.min) * i) / n
     try {
-      pts.push({ x: v, tft: collectTftContext({ ...baseParams.value, [a.key]: v }).tft })
+      const ctx = collectSimContext({ ...baseParams.value, [a.key]: v })
+      pts.push({ x: v, tft: ctx.tft, co2: ctx.co2 ? ctx.co2.CO2_emit : null })
     } catch (e) {
-      pts.push({ x: v, tft: null })
+      pts.push({ x: v, tft: null, co2: null })
     }
   }
   return pts
@@ -286,14 +310,17 @@ const seriesMap = computed(() => {
   return m
 })
 
-// 当前工况上下文（跟随滑块设定值预览）
+// 当前工况上下文（跟随滑块设定值预览）：TFT + CO2 排放同步计算
 const cur = computed(() => {
   try {
-    return collectTftContext({ ...baseParams.value, [ax.value.key]: curX.value })
+    return collectSimContext({ ...baseParams.value, [ax.value.key]: curX.value })
   } catch (e) {
-    return { tft: 0, status: { code: 'err', label: '异常', color: '#8a8a8a' } }
+    return { tft: 0, status: { code: 'err', label: '异常', color: '#8a8a8a' }, co2: { CO2_emit: 0, CO2_t: 0, C_in: 0, C_HM: 0, C_emit: 0, CO2_from_raceway: 0, CO2_from_other: 0, level: { code: 'err', label: '—', color: '#8a8a8a' } } }
   }
 })
+
+// CO2 排放上下文（当前工况）
+const co2 = computed(() => cur.value.co2 || {})
 
 // 轴当前显示值：当前轴用滑块预览值，其他轴用模型当前值
 function curValOf(a) {
@@ -367,14 +394,22 @@ const axisStats = computed(() => {
   const out = {}
   for (const a of axes.value) {
     const pts = seriesMap.value[a.key] || []
-    if (!pts.length) { out[a.key] = { spreadText: '—', trend: '—', trendCls: '' }; continue }
+    if (!pts.length) { out[a.key] = { spreadText: '—', co2SpreadText: '—', trend: '—', trendCls: '' }; continue }
     const mn = Math.min(...pts.map((p) => p.tft))
     const mx = Math.max(...pts.map((p) => p.tft))
     const d = pts[pts.length - 1].tft - pts[0].tft
     let trend = '近水平', trendCls = 'flat'
     if (d > 3) { trend = '升温'; trendCls = 'up' }
     else if (d < -3) { trend = '降温'; trendCls = 'down' }
-    out[a.key] = { spreadText: `${(mx - mn).toFixed(1)} ℃`, trend, trendCls }
+    // CO2 全范围跨度（配料比等碳相关参数联动时最直观）
+    const c2s = pts.map((p) => p.co2).filter((v) => v != null && Number.isFinite(v))
+    const c2mn = c2s.length ? Math.min(...c2s) : null
+    const c2mx = c2s.length ? Math.max(...c2s) : null
+    out[a.key] = {
+      spreadText: `${(mx - mn).toFixed(1)} ℃`,
+      co2SpreadText: c2s.length ? `${(c2mx - c2mn).toFixed(0)} kg` : '—',
+      trend, trendCls,
+    }
   }
   return out
 })
@@ -399,18 +434,29 @@ const note = computed(() => {
     text = `曲线${slope > 0 ? '上升' : '下降'}（每 +1% 约 TFT ${(slope * 1).toFixed(0)}℃）：富氧同时压缩 N2 分母并提升供氧，是突破降焦/提煤 TFT 瓶颈的兜底手段，注意富氧耗电的间接排放。`
   } else if (a.key === 'coal_inj') {
     text = `曲线${slope < 0 ? '缓降' : '上升'}（每 +10 kg/tFe 约 TFT ${(slope * 10).toFixed(0)}℃）：喷煤替代焦炭可减碳，但热解吸热与产 H2O 稀释压低 TFT，需风温/富氧补偿。`
-  } else {
+  }else if(a.key == 'blast_humidity'){
+    text = `曲线${slope < 0 ? '线性上升' : '上升'}（每+1g/Nm³） TFT 约下降 ${(6).toFixed(0)}℃）：鼓风湿度上升会带来高炉内部反应H2的比例上升，可以一定程度降低直接还原度，但是收益抵不过水分解的吸热损失，因此要尽量减少。 `
+  }else {
     text = `该轴全范围 TFT 变化 ${spread.toFixed(1)}℃。`
   }
   if (st.code === 'low') text += ' 注意：当前 TFT 偏低，应先升温（风温/富氧）恢复热制度，再实施减碳。'
   if (st.code === 'high') text += ' 注意：当前 TFT 偏高，本身即是减碳信号，可优先降焦比。'
+  const c2 = cur.value.co2
+  if (c2 && Number.isFinite(c2.CO2_emit)) {
+    text += ` 当前工况 CO₂ ${c2.CO2_emit.toFixed(0)} kg/tHM（${c2.CO2_t.toFixed(3)} t/tHM，${c2.level.label}）。`
+  }
   return { kind: st.code, text }
 })
 
 // 策略建议
 const advices = computed(() => {
   const st = cur.value.status
+  const c2 = cur.value.co2
   const list = []
+  // 碳排现状（配料比 → CO2 同步结论）
+  if (c2 && Number.isFinite(c2.CO2_emit)) {
+    list.push({ level: c2.level.code === 'high' ? 'w' : 'g', text: `当前 CO₂ 排放 ${c2.CO2_emit.toFixed(0)} kg/tHM（${c2.CO2_t.toFixed(3)} t/tHM，${c2.level.label}）：排放随配料比联动——喷煤↑置换焦炭↓可减碳，TFT 回落到下限即该工况的碳排最优解。` })
+  }
   if (st.code === 'low') {
     list.push({ level: 'w', text: `当前 TFT ${cur.value.tft.toFixed(0)}℃ 偏低：先恢复热制度再谈减碳——首选提升热风温度（免费显热），其次提高富氧率（压缩 N2），可少量降低喷煤比（减少热解吸热）。` })
   } else if (st.code === 'high') {
@@ -688,6 +734,23 @@ function fmt(v) {
 .cond-tip {
   font-size: 10.5px; line-height: 1.5; color: #7a7a7a;
   background: #252526; border: 1px solid #2e2e2e; border-radius: 2px; padding: 5px 7px;
+}
+
+/* ---- CO2 排放卡（随配料比联动） ---- */
+.cond-co2 {
+  border-top: 1px solid #2e2e2e; padding-top: 6px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.co2-main { display: flex; align-items: baseline; gap: 6px; }
+.co2-k { font-size: 10.5px; color: #8a8a8a; font-weight: 600; letter-spacing: 0.4px; white-space: nowrap; }
+.co2-val { font-size: 20px; font-weight: 700; color: #e6e6e6; line-height: 1; }
+.co2-unit { font-size: 11px; color: #8a8a8a; white-space: nowrap; }
+.co2-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px;
+}
+.co2-tip {
+  font-size: 10px; line-height: 1.45; color: #6f8f7a;
+  background: #14231a; border: 1px solid #1f4d33; border-radius: 2px; padding: 4px 7px;
 }
 
 /* ---- 右栏标题（MATLAB 工具条小标题风格） ---- */

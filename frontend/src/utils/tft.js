@@ -8,6 +8,9 @@
 //   3) 依据算法真值给出可执行的操作建议。
 //
 // 文档依据：《高炉多燃料通用TFT计算算法介绍》（焓平衡，缺氧不完全燃烧）
+//
+// 更新：cp（炉腹煤气平均比热容）从固定常数 0.0015 改为基于实际煤气组分与
+//       温度的加权平均比热容（gas_mean_cp 多项式），迭代求解 TFT。
 // ============================================================================
 
 import { deriveProcessOpParams } from '../data/flowLibrary'
@@ -23,20 +26,63 @@ export const TFT_CONST = {
   Q_H2: 10.80,           // H2 燃烧热 MJ/Nm³
 }
 
+// ---- 1.1 气体平均比热容多项式系数（文档 §9.3：热力学基准）----
+// gas_mean_cp(gas_type, T) = a + b*T + c*T² + d*T³  [kJ/(Nm³·℃)]
+// 表示气体在 0~T ℃ 范围内的平均比热容，用于焓 = V·cp_mean·T 计算。
+// 系数与后端 Python gas_mean_cp 完全一致。
+export const GAS_CP_COEFFICIENTS = {
+  CO:  [1.2993, 1.068e-4, -2.93e-8,  4.11e-12],
+  N2:  [1.2987, 9.65e-5,  -2.35e-8,  3.30e-12],
+  H2:  [1.2783, 6.12e-5,  -1.03e-8,  1.18e-12],
+  O2:  [1.3065, 1.59e-4,  -4.03e-8,  5.59e-12],
+  air: [1.2987, 1.05e-4,  -2.69e-8,  3.78e-12],
+  H2O: [1.4935, 9.82e-5,  -2.08e-8,  2.67e-12],
+  CO2: [1.6602, 3.49e-4,  -8.42e-8,  1.04e-11],
+}
+
+// 计算气体在 0~T ℃ 范围内的平均比热容 kJ/(Nm³·℃)
+// 与后端 Python gas_mean_cp 完全对齐
+export function gasMeanCp(gasType, T) {
+  const coeffs = GAS_CP_COEFFICIENTS[gasType] || GAS_CP_COEFFICIENTS.air
+  const [a, b, c, d] = coeffs
+  return a + b * T + c * T * T + d * T * T * T
+}
+
+// 计算炉腹煤气混合物在 0~T ℃ 范围内的组分加权平均比热容
+// gasVolumes: { V_CO, V_H2O, V_H2, V_N2, V_CO2 }  各组分体积 Nm³/tFe
+// 返回值单位: MJ/(Nm³·℃)（内部 kJ→MJ 除以 1000）
+export function calcBoshGasCp(gasVolumes, T) {
+  const { V_CO = 0, V_H2O = 0, V_H2 = 0, V_N2 = 0, V_CO2 = 0 } = gasVolumes
+  const total = V_CO + V_H2O + V_H2 + V_N2 + V_CO2
+  if (!(total > 0)) return 0.0015 // 兜底：退回固定常数
+  const cp_kJ = (
+    V_CO  * gasMeanCp('CO',  T) +
+    V_H2O * gasMeanCp('H2O', T) +
+    V_H2  * gasMeanCp('H2',  T) +
+    V_N2  * gasMeanCp('N2',  T) +
+    V_CO2 * gasMeanCp('CO2', T)
+  ) / total
+  return cp_kJ / 1000 // kJ→MJ
+}
+
 // 系统工序参数兜底默认值（从系统取不到该参数时使用；数值与系统模板 PROCESS_TEMPLATES 一致）
 export const TFT_PARAM_DEFAULTS = {
-  hot_blast_temp: 1250,   // 热风温度 ℃
-  wind_rate: 600,         // 风量 kNm³/h（绝对供风量）
-  oxygen_enrich: 0,       // 富氧率（富氧增量，相对空气 21%）%
-  blast_humidity: 10,     // 鼓风湿度 g/Nm³（鼓风机加湿/脱湿后的鼓风含湿，供氧系统富氧不改变湿度）
-  hot_metal: 8000,        // 铁水产量 t/h（系统实际值）
-  coke_rate: 360,         // 焦比 kg/tFe
-  coal_inj: 150,          // 喷煤比 kg/tFe
+  hot_blast_temp: 1200,   // 热风温度 ℃
+  wind_rate: 1000,         // 风量 kNm³/h（绝对供风量）
+  oxygen_enrich: 2,       // 富氧率（富氧增量，相对空气 21%）%
+  blast_humidity: 15,     // 鼓风湿度 g/Nm³（鼓风机加湿/脱湿后的鼓风含湿，供氧系统富氧不改变湿度）
+  hot_metal: 200,        // 铁水产量 t/h（系统实际值）
+  coke_rate: 340,         // 焦比 kg/tFe
+  coal_inj: 180,          // 喷煤比 kg/tFe
 }
 
 // ---- 2. 可配置超参数（文档 §9.1：后台可配置 / 人工微调，物理基准不变）----
-//  cp              ：炉腹煤气定压比热 MJ/(Nm³·℃)，默认 0.0015，可随煤气组分小幅微调
-//  cpAir           ：鼓风（空气）定压比热 MJ/(Nm³·℃)，用于鼓风显热
+//  cp              ：炉腹煤气定压比热容 MJ/(Nm³·℃)，【已弃用为常数】改为温度相关加权计算；
+//                    此字段保留为迭代失败时的兜底回退值。
+//  cpAir           ：鼓风（空气）定压比热容 MJ/(Nm³·℃)，【已弃用为常数】改为 gasMeanCp('air', tg)；
+//                    此字段保留为迭代失败时的兜底回退值。
+//  useTempDependentCp：是否启用温度相关比热容计算（默认 true）。
+//                    false 时退回使用 cp / cpAir 固定常数（用于对比验证）。
 //  hCombRatio      ：缺氧不完全燃烧下氢的燃烧比例（其余氢以 H2 进入炉缸煤气）
 //  tftLow/tftHigh  ：TFT 合规判定区间 ℃，默认 2050~2250，可随炉役/冶炼品种配置
 //  useElementCarbon：false=常规模式(基于固定碳FC) / true=高精度模式(基于元素碳Celem)
@@ -50,6 +96,7 @@ export const TFT_PARAM_DEFAULTS = {
 export const DEFAULT_TFT_CONFIG = {
   cp: 0.0015,
   cpAir: 0.0013,
+  useTempDependentCp: true,
   hCombRatio: 0.6,
   tftLow: 2050,
   tftHigh: 2250,
@@ -116,7 +163,7 @@ export function buildFuelList(params, config = DEFAULT_TFT_CONFIG) {
   return fuels
 }
 
-// 采集基础工况：风温 / 鼓风量 / 产量 / 富氧率 → 比风量、鼓风氧氮占比、显热
+// 采集基础工况：风温 / 鼓风量 / 产量 / 富氧率 / 鼓风湿度 → 比风量、鼓风氧氮占比、显热
 export function collectTftInputs(params = {}, config = DEFAULT_TFT_CONFIG) {
   const p = { ...TFT_PARAM_DEFAULTS, ...params }
   const tg = num(p.hot_blast_temp, TFT_PARAM_DEFAULTS.hot_blast_temp)
@@ -131,8 +178,15 @@ export function collectTftInputs(params = {}, config = DEFAULT_TFT_CONFIG) {
   const wO = Math.min(14, Math.max(0, num(p.oxygen_enrich, TFT_PARAM_DEFAULTS.oxygen_enrich)))
   const O2_blow = 0.21 + 0.01 * wO // 鼓风绝对氧浓度 = 空气氧 21% + 富氧增量
   const N2_blow = 1.0 - O2_blow
-  // 鼓风显热按空气比热 cpAir 计算（炉腹煤气比热 cp 仅用于焓→温度换算）
-  const Q_sensible_air = B * num(config.cpAir, 0.0013) * tg        // MJ/tFe
+  // 鼓风显热：使用温度相关空气平均比热容 gasMeanCp('air', tg)
+  //   H_air = B · cp_air(0→tg) · tg   [MJ/tFe]
+  //   cp_air 单位 kJ/(Nm³·℃) → 除以 1000 转 MJ/(Nm³·℃)
+  //   useTempDependentCp=false 时退回固定 cpAir
+  const useTD = config.useTempDependentCp !== false
+  const cpAir = useTD
+    ? gasMeanCp('air', tg) / 1000
+    : num(config.cpAir, 0.0013)
+  const Q_sensible_air = B * cpAir * tg                        // MJ/tFe
   // 鼓风湿度（g/Nm³）：水分在风口分解（C+H₂O→CO+H₂）吸热、消耗碳并增加煤气量
   const H = Math.max(0, Math.min(30, num(p.blast_humidity, TFT_PARAM_DEFAULTS.blast_humidity)))
   const h2oVolFrac = H * 1.244 / 1000       // 每 Nm³ 鼓风含水蒸气体积 Nm³（1 kg H2O ≈ 1.244 Nm³）
@@ -140,13 +194,18 @@ export function collectTftInputs(params = {}, config = DEFAULT_TFT_CONFIG) {
   const m_h2o = B * H / 1000                // 鼓风水分 kg/tFe
   const Q_h2o_decomp = m_h2o * 10.8         // 水分分解吸热 MJ/tFe（C+H₂O→CO+H₂ 约 10.8 MJ/kg H2O）
   const fuel_list = buildFuelList(p, config)
-  return { tg, wind, QB, PFe, hot_metal: hotMetal, B, wO, O2_blow, N2_blow, Q_sensible_air, blast_humidity: H, dry_air, m_h2o, Q_h2o_decomp, fuel_list }
+  return { tg, wind, QB, PFe, hot_metal: hotMetal, B, wO, O2_blow, N2_blow, cpAir, Q_sensible_air, blast_humidity: H, dry_air, m_h2o, Q_h2o_decomp, fuel_list }
 }
 
 // ---- 3. 核心算法：与 Python calc_tft_enthalpy_full 完全对齐 ----
 // 边界假设：风口回旋区缺氧不完全燃烧，烃类产物为 CO + H2O，燃料原生 CO 不参与二次燃烧。
 // 氧限制：鼓风氧是燃烧耗氧的唯一来源，燃料碳氢中超出鼓风氧供给能力的部分视为未燃，
 //         不计入放热与产气（避免 TFT 虚高，如全部碳按 1.867 Nm³/kgC 产气时总量被高估）。
+//
+// 【更新】炉腹煤气比热容 cp 从固定常数改为组分加权 + 温度相关多项式：
+//   TFT = Q_total_in / (V_gas_total · cp_bosh(TFT))
+//   cp_bosh(T) = Σ(Vi · gasMeanCp(gas_i, T)) / V_gas_total   [MJ/(Nm³·℃)]
+//   由于 cp 依赖 TFT（循环依赖），采用不动点迭代求解，通常 5~10 次收敛。
 export function calcTFT(inputs, config = DEFAULT_TFT_CONFIG) {
   const { B, O2_blow, N2_blow, Q_sensible_air, fuel_list, dry_air = B, m_h2o = 0, Q_h2o_decomp = 0 } = inputs
   if (!(B > 0)) throw new Error('比风量异常：生铁产量/鼓风量无效，无法计算')
@@ -162,7 +221,8 @@ export function calcTFT(inputs, config = DEFAULT_TFT_CONFIG) {
   let V_H2O_solid = 0        // 固/液燃料 H→H2O 理论产气 Nm³/tFe
   let V_CO_gas = 0
   let V_H2O_gas = 0
-  let V_inert = 0            // 燃料自带 N2、CO2 等惰性组分 Nm³/tFe
+  let V_CO2_fuel = 0         // 燃料自带 CO2 Nm³/tFe（单独追踪用于 cp 加权）
+  let V_N2_fuel = 0          // 燃料自带 N2 Nm³/tFe（单独追踪用于 cp 加权）
 
   for (const fuel of fuel_list) {
     const ft = fuel.fuel_type
@@ -184,7 +244,9 @@ export function calcTFT(inputs, config = DEFAULT_TFT_CONFIG) {
       // 烃裂解：CH4→CO+2H2O；C2H6→2CO+3H2O；H2→H2O；原生 CO 保留
       V_CO_gas += fuel.CH4 * v * 1.0 + fuel.C2H6 * v * 2.0 + fuel.CO * v
       V_H2O_gas += fuel.CH4 * v * 2.0 + fuel.C2H6 * v * 3.0 + fuel.H2 * v * 1.0 + fuel.H2O * v
-      V_inert += (fuel.CO2 + fuel.N2) * v
+      // 惰性组分 CO2、N2 分别追踪（不再合并为 V_inert）
+      V_CO2_fuel += fuel.CO2 * v
+      V_N2_fuel += fuel.N2 * v
     } else {
       throw new Error(`不支持的燃料类型：${ft}`)
     }
@@ -216,12 +278,45 @@ export function calcTFT(inputs, config = DEFAULT_TFT_CONFIG) {
   const sum_VH2O = V_H2O_solid * hc + V_H2O_gas
   const sum_VH2 = V_H2O_solid * (1 - hc) + V_h2o_prod_H2
   const V_N2_blast = dry_air * N2_blow
-  const V_gas_total = sum_VCO + sum_VH2O + sum_VH2 + V_inert + V_N2_blast
+  const V_N2_total = V_N2_blast + V_N2_fuel   // 鼓风氮 + 燃料氮
+  const V_inert = V_CO2_fuel + V_N2_fuel       // 兼容旧字段（CO2+N2 合计）
+  const V_gas_total = sum_VCO + sum_VH2O + sum_VH2 + V_CO2_fuel + V_N2_fuel + V_N2_blast
   if (!(V_gas_total > 0)) throw new Error('炉腹煤气总量异常，不能≤0')
 
   const Q_total_in = Q_sensible_air + sum_heat
-  const TFT = Q_total_in / (V_gas_total * config.cp)
-  return { TFT, sum_heat, sum_VCO, sum_VH2O, sum_VH2, sum_Vinert: V_inert, V_N2_blast, V_gas_total, Q_sensible_air, Q_total_in, C_total, C_burn, V_O2_blast, blast_humidity: inputs.blast_humidity, dry_air, m_h2o, C_h2o, Q_h2o_decomp }
+
+  // ---- TFT 求解：组分加权温度相关 cp 不动点迭代 ----
+  //   TFT = Q_total_in / (V_gas_total · cp_bosh(TFT))
+  //   cp_bosh(T) = Σ(Vi · gasMeanCp(gas_i, T)) / V_gas_total / 1000  [MJ/(Nm³·℃)]
+  //   迭代收敛条件：|ΔT| < 1℃，最多 30 次（|f'|≈0.05，收敛极快）
+  const useTD = config.useTempDependentCp !== false
+  let TFT, cp_eff
+  if (useTD) {
+    const gasVolumes = { V_CO: sum_VCO, V_H2O: sum_VH2O, V_H2: sum_VH2, V_N2: V_N2_total, V_CO2: V_CO2_fuel }
+    let T_guess = 2000  // 初始猜测值（TFT 典型区间 2050~2250）
+    cp_eff = num(config.cp, 0.0015) // 兜底
+    for (let i = 0; i < 30; i++) {
+      cp_eff = calcBoshGasCp(gasVolumes, T_guess)
+      const T_new = Q_total_in / (V_gas_total * cp_eff)
+      if (Math.abs(T_new - T_guess) < 1) { T_guess = T_new; break }
+      T_guess = T_guess + (T_new - T_guess) * 0.5 // 阻尼因子 0.5，保证收敛稳定性
+    }
+    TFT = Q_total_in / (V_gas_total * cp_eff)
+  } else {
+    // 兼容模式：使用固定常数 cp（用于对比验证）
+    cp_eff = num(config.cp, 0.0015)
+    TFT = Q_total_in / (V_gas_total * cp_eff)
+  }
+
+  return {
+    TFT, sum_heat, sum_VCO, sum_VH2O, sum_VH2, sum_Vinert: V_inert,
+    V_N2_blast, V_N2_fuel, V_CO2_fuel, V_gas_total,
+    Q_sensible_air, Q_total_in,
+    C_total, C_burn, V_O2_blast,
+    blast_humidity: inputs.blast_humidity, dry_air, m_h2o, C_h2o, Q_h2o_decomp,
+    cp_eff, // 实际使用的炉腹煤气平均比热容 MJ/(Nm³·℃)
+    cp_air: inputs.cpAir, // 实际使用的鼓风平均比热容 MJ/(Nm³·℃)
+  }
 }
 
 // ---- 4. 热状态判定（文档 §6：TFT 阈值判定规则）----
