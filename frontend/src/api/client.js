@@ -80,9 +80,29 @@ export const api = {
     jget('/carbon-market/forecast?instrument=' + instrument + '&days=' + days),
   // 市场快讯（中国煤炭交易网）
   marketNews: (page = 1) => jget('/market-news?page=' + page),
+  // 实时数据源状态（MQTT 连接状态 / 订阅主题 / 最近消息，参照参考项目数据链路）
+  realtimeSource: () => jget('/realtime/source'),
+  // 云端设备 <-> 仿真设备实例关联：仅关联后云端读数才同步到对应设备实例
+  linkMqttDevice: (cloudId, localId) => jput('/realtime/link', { cloud_id: cloudId, local_id: localId }),
+  unlinkMqttDevice: (cloudId) =>
+    fetch(BASE + '/realtime/link/' + encodeURIComponent(cloudId), { method: 'DELETE' }).then(r => r.json()),
+  // 能碳一体机管理台（参照参考项目 yunduan1 console + dashboard 全部功能）
+  boxOverview: () => jget('/box/overview'),
+  boxDevices: () => jget('/box/devices'),
+  boxCreateDevice: (payload) => jpost('/box/devices', payload),
+  boxDeleteDevice: (kind, name, namespace = 'default') =>
+    jpost('/box/devices/delete', { kind, name, namespace }),
+  boxDevicesRealtime: () => jget('/box/devices/realtime'),
+  boxOnboard: (hostname, cloudIP, boxIP) =>
+    jpost('/box/nodes/onboard', { hostname, cloudIP, boxIP }),
+  boxStats: () => jget('/box/stats'),
+  boxPublish: (topic, payload) => jpost('/box/publish', { topic, payload }),
+  // 云端 Broker 配置（前端配置化：能碳一体机管理 -> 总览 -> 云端数据链路「配置」，免手工编辑 mqtt.yaml）
+  boxConfig: () => jget('/box/config'),
+  boxConfigSave: (payload) => jpost('/box/config', payload),
 }
 
-// WebSocket 模拟遥测（url 省略则连接内置模拟 /api/ws/feed）
+// WebSocket 遥测（url 省略则连接平台实时数据 /api/ws/feed，数据来自 MQTT 订阅）
 export function openFeed(onMessage, onStatus, url) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
   const target = url || `${proto}://${location.host}/api/ws/feed`

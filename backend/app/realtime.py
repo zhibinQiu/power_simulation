@@ -3,23 +3,27 @@
 把"长连接推送"与"设备历史采样"这一传输/状态关切从 main.py 的 REST 路由中拆出，
 main.py 只需调用 register_realtime(app) 即可挂载，保持路由层精简。
 
+数据来源：设备读数不再生成模拟数据，一律来自 MQTT 实时数据
+（参照参考项目 yunduan1 的数据获取方式：订阅云端 Broker 的 data/#、alarm、results/# 主题，
+见 mqtt_source.py；Broker 配置在「能碳一体机管理」视图前端配置，免手工编辑配置文件）。
+
 职责：
 - FeedManager：维护当前活跃 WebSocket 连接。
 - DEVICE_HISTORY / DEVICE_META：每个监测设备最近读数的内存环形缓冲（约 10 分钟）。
-- ws_feed：客户端连接后发送 {type:'model'} 设定当前流程，服务端每秒推送带噪声的实时遥测。
-- seed_history：流程变更/启动时回填设备历史基线，保证前端首屏即有趋势数据。
+- ws_feed：客户端连接后发送 {type:'model'} 设定当前流程，服务端每秒推送实时遥测帧。
+- seed_history：流程变更/启动时按 MQTT 真实读数回填设备历史（无上报则保持为空）。
 """
 from __future__ import annotations
 
 import asyncio
 import json
-import random
 import time
 from collections import defaultdict
 from typing import Any, Dict, List
 
 from fastapi import WebSocket, WebSocketDisconnect
 
+from . import mqtt_source
 from .carbon_engine import cached_simulate
 from .models import ProcessModel
 from .presets import default_model
@@ -42,14 +46,11 @@ manager = FeedManager()
 
 # --------------------- 监测设备历史时序（内存 ring buffer） ---------------------
 # 每个设备维护一条最近读数序列（秒级采样），用于前端「历史数据 / 实时变化」图表。
-# 设备读数 = 由活动数据算出的基准读数 × 时间噪声（模拟真实仪表抖动）。
+# 设备读数 = MQTT 实时数据源（mqtt_source.py）获取的真实读数，不生成模拟数据；
+# MQTT 未上报的设备不产生读数（前端显示为无数据）。
 DEVICE_HISTORY: Dict[str, List[Dict[str, float]]] = defaultdict(list)  # dev_id -> [{t, v}]
 DEVICE_META: Dict[str, Dict[str, Any]] = {}                            # dev_id -> 设备元数据
 HISTORY_MAX = 600                                                     # 约 10 分钟（1Hz）
-
-
-def _noise(v: float, pct: float = 0.04) -> float:
-    return max(0.0, v * (1 + random.uniform(-pct, pct)))
 
 
 def _device_meta(unit_id: str, unit_name: str, unit_type: str, d: Dict[str, Any]) -> Dict[str, Any]:
@@ -62,32 +63,38 @@ def _device_meta(unit_id: str, unit_name: str, unit_type: str, d: Dict[str, Any]
 
 
 def seed_history(model: "ProcessModel") -> None:
-    """为当前流程的所有内置设备回填一段历史（启动时/流程变更时调用）。"""
+    """为当前流程的所有内置设备回填真实读数历史（启动时/流程变更时调用）。
+
+    读数一律来自 MQTT 实时数据（参照参考项目 yunduan1 的数据获取配置），
+    不生成模拟数据；MQTT 未上报的设备历史保留为空。
+    """
     sim = cached_simulate(model)
     now = time.time()
     for u in sim.units:
-        base_readings = {d["id"]: (d.get("reading") or 0.0) for d in (u.devices or [])}
         for d in (u.devices or []):
             did = d["id"]
-            base = base_readings[did]
-            pts = []
-            for i in range(180, 0, -1):
-                v = max(0.0, base * (1 + random.uniform(-0.05, 0.05)))
-                pts.append({"t": now - i, "v": round(v, 3)})
-            pts.append({"t": now, "v": round(base, 3)})
-            DEVICE_HISTORY[did] = pts[-HISTORY_MAX:]
+            v = mqtt_source.resolve_reading(did)
+            if v is None:
+                DEVICE_HISTORY.pop(did, None)
+                DEVICE_META.pop(did, None)
+                continue
+            DEVICE_HISTORY[did] = [{"t": now, "v": round(v, 3)}]
             DEVICE_META[did] = _device_meta(u.id, u.name, u.type, d)
 
 
 def _record_devices(sim: "Any") -> List[Dict[str, Any]]:
-    """每个遥测 tick：采样设备读数、追加历史、返回本 tick 的实时设备读数。"""
+    """每个遥测 tick：从 MQTT 采样设备真实读数、追加历史、返回本 tick 的实时设备读数。
+
+    不生成模拟读数：MQTT 中暂未上报的设备不推送（前端显示为无数据）。
+    """
     out: List[Dict[str, Any]] = []
     now = time.time()
     for u in sim.units:
         for d in (u.devices or []):
             did = d["id"]
-            base = d.get("reading") or 0.0
-            v = max(0.0, base * (1 + random.uniform(-0.04, 0.04)))
+            v = mqtt_source.resolve_reading(did)
+            if v is None:
+                continue
             buf = DEVICE_HISTORY[did]
             buf.append({"t": now, "v": round(v, 3)})
             if len(buf) > HISTORY_MAX:
@@ -101,7 +108,7 @@ def _record_devices(sim: "Any") -> List[Dict[str, Any]]:
 
 
 async def ws_feed(ws: WebSocket):
-    """实时遥测 WebSocket：客户端设定流程后，每秒推送带噪声的遥测帧。"""
+    """实时遥测 WebSocket：客户端设定流程后，每秒推送实时遥测帧（设备读数来自 MQTT）。"""
     await manager.connect(ws)
     model = default_model()
     try:
@@ -120,12 +127,12 @@ async def ws_feed(ws: WebSocket):
             device_readings = _record_devices(sim)
             payload = {
                 "type": "telemetry",
-                "total_co2": _noise(sim.totals.co2_total),
-                "intensity": _noise(sim.totals.intensity),
+                "total_co2": sim.totals.co2_total,
+                "intensity": sim.totals.intensity,
                 "steel_output": sim.totals.steel_output,
                 "units": [
-                    {"id": u.id, "name": u.name, "co2_total": _noise(u.co2_total),
-                     "energy_total": _noise(u.energy_total),   # 3D 标签「先能后碳」需实时能耗
+                    {"id": u.id, "name": u.name, "co2_total": u.co2_total,
+                     "energy_total": u.energy_total,   # 3D 标签「先能后碳」需实时能耗
                      "heat": u.heat, "type": u.type}
                     for u in sim.units
                 ],

@@ -146,6 +146,9 @@ button b, button strong,
 /* 底栏（命令行窗口 + 状态条）收起：仅隐藏命令行窗口，蓝色系统状态条保留 */
 .app.bottom-collapsed { grid-template-rows: 34px 35px 1fr 0 22px; }
 .app.bottom-collapsed .cmdwin { display: none; }
+/* 非数字孪生独立视图（监测数据 / CEA 行情 / 碳排核算 / 能流分析 / 能碳一体机）沉浸模式：
+   隐藏左/右/下侧边栏与状态条，中间视图占满剩余空间 */
+.app.view-immersive { grid-template-rows: 34px 35px 1fr 0 0; }
 
 /* ============ 顶栏：VS Code 标题栏 + 菜单栏（浅色，扁平，无图标菜单） ============ */
 .topbar {

@@ -1,0 +1,42 @@
+# 实时设备数据获取配置
+# ------------------------------------------------------------------------------
+# 【重要】本文件已由前端配置接管，无需手工编辑：
+#   配置入口 = 能碳一体机管理视图 → 总览 →「云端数据链路」→「配置 Broker」，
+#   保存后写入 config/box_config.json（优先级高于本文件），并热更新重连。
+#   本文件仅作向后兼容默认值 seed（配置缺失时回退）。
+#
+# 参照参考项目 yunduan1 的数据获取方式：
+#   - broker.yaml：云端自建 MQTT Broker（amqtt）监听 TCP 1883 / WS 8083，
+#     运行时部署端口 41883 / 41083（见 deploy_pkg/broker.yaml）。
+#   - deploy_pkg/collect_sensor_data.py：订阅端通过环境变量
+#     BROKER_HOST / BROKER_PORT / MQTT_TOPICS 连接 Broker 获取真实设备数据。
+#
+# 数据链路：边缘盒子（能碳一体机）eKuiper（Modbus 传感器采集）
+#        → 转发到云端 Broker 的 data/#、alarm、results/# 主题
+#        → 本平台作为订阅端按 topic 获取真实数据。
+#
+# 说明：本平台不再生成模拟读数，设备读数一律来自 MQTT 真实数据。
+# 优先级：环境变量（BROKER_HOST / BROKER_PORT / MQTT_TOPICS）> box_config.json > 本文件。
+# ------------------------------------------------------------------------------
+
+broker:
+  host: 127.0.0.1
+  port: 41883
+  username: ""
+  password: ""
+  client_id: carbon-sim-collector
+  keepalive: 60
+  qos: 0
+
+# 订阅主题（支持 MQTT 通配符 + / #）。
+# 注意：amqtt 0.12 对 'data/#' 这类带前缀通配符的路由有缺陷，收不到跨客户端消息；
+# 因此参照参考项目 collect_sensor_data.py 默认订阅 '#' 抓取全部业务主题，
+# 再在 on_message 里过滤掉 '$SYS' 系统主题。
+topics:
+  - "#"
+
+# 可选：MQTT 消息数值字段 -> 平台监测设备 id 的静态关联（mapping 字段名视为云端设备）。
+# 设备 id 形如：blast_furnace::belt_scale_0（工序 id :: 设备类型_序号）。
+# 动态关联：在「能碳一体机管理」视图中手动关联云端设备 <-> 仿真设备实例，
+# 关联表保存在 config/links.json，优先级高于此处 mapping（运行时覆盖）。
+mapping: {}

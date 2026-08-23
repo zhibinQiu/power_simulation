@@ -11,6 +11,32 @@
       </button>
     </div>
 
+    <!-- MQTT 实时数据源状态（平台默认数据源：后端订阅云端 Broker 获取真实设备读数，参照参考项目 yunduan1 数据链路） -->
+    <div class="cn-mqtt" :class="{ on: mqttConnected }">
+      <div class="cn-mqtt-head">
+        <span class="cn-mqtt-title">Mqtt 实时数据源</span>
+        <span class="cn-mqtt-status" :class="{ on: mqttConnected }">{{ mqttStatusText }}</span>
+      </div>
+      <div class="cn-mqtt-row">
+        <span>Broker</span>
+        <code>{{ mqttBroker }}</code>
+        <template v-if="store.mqttSource">
+          <span class="cn-sep">·</span>
+          <span>已收 {{ store.mqttSource.message_count || 0 }} 条</span>
+        </template>
+      </div>
+      <div class="cn-mqtt-row" v-if="mqttTopics.length">
+        <span>订阅</span>
+        <code v-for="t in mqttTopics" :key="t">{{ t }}</code>
+      </div>
+      <div v-if="mqttRecentMsg" class="cn-mqtt-msg">
+        <span>最近消息</span>
+        <code class="cn-mqtt-topic">{{ mqttRecentMsg.topic }}</code>
+        <div class="cn-mqtt-payload">{{ mqttRecentMsg.payload }}</div>
+      </div>
+      <div class="cn-mqtt-note">设备读数由后端订阅 MQTT 获取（Broker 配置在「能碳一体机管理」视图前端配置），不再生成模拟数据。</div>
+    </div>
+
     <!-- 新建 / 编辑表单 -->
     <div v-if="formOpen" class="cn-form">
       <div class="cn-form-title">{{ editingId ? '编辑数据源' : '新建数据源' }}</div>
@@ -21,7 +47,7 @@
       <label class="cn-fld">
         <span>类型</span>
         <select v-model="form.type">
-          <option value="sim">内置模拟数据</option>
+          <option value="sim">Mqtt 实时数据</option>
           <option value="ws">WebSocket</option>
           <option value="http">HTTP 轮询</option>
         </select>
@@ -122,10 +148,28 @@ import Icon from './Icon.vue'
 const store = useSimStore()
 
 const TYPE_META = {
-  sim: { label: '内置模拟' },
+  sim: { label: 'Mqtt 实时' },
   ws: { label: 'WebSocket' },
   http: { label: 'HTTP 轮询' },
 }
+// MQTT 实时数据源状态（store.mqttSource 由 /api/realtime/source 轮询得到）
+const mqttConnected = computed(() => !!(store.mqttSource && store.mqttSource.connected))
+const mqttStatusText = computed(() => {
+  const s = store.mqttSource
+  if (!s) return '获取中…'
+  if (s.connected) return '已连接'
+  return s.last_error ? '异常' : '未连接'
+})
+const mqttBroker = computed(() => {
+  const s = store.mqttSource
+  return s ? `${s.broker_host}:${s.broker_port}` : '—'
+})
+const mqttTopics = computed(() => (store.mqttSource && store.mqttSource.topics) || [])
+const mqttRecentMsg = computed(() => {
+  const s = store.mqttSource
+  const recs = s && s.recent_messages
+  return recs && recs.length ? recs[recs.length - 1] : null
+})
 const STATUS_META = {
   init: { label: '连接中', color: '#c9a24b' },
   open: { label: '已连接', color: '#3a9d5d' },
@@ -247,6 +291,33 @@ function onScroll() {
   border-radius: 5px; padding: 4px 9px; cursor: pointer; transition: opacity .15s;
 }
 .cn-new:hover { opacity: .88; }
+
+/* ---- MQTT 实时数据源状态 ---- */
+.cn-mqtt {
+  flex: 0 0 auto; margin: 8px 10px 0; padding: 8px 10px; border: 1px solid var(--border);
+  border-radius: 8px; background: var(--panel-2); display: flex; flex-direction: column; gap: 5px;
+}
+.cn-mqtt.on { border-color: rgba(58,157,93,.5); background: rgba(58,157,93,.06); }
+.cn-mqtt-head { display: flex; align-items: center; gap: 8px; }
+.cn-mqtt-title { font-size: 11.5px; font-weight: 600; color: var(--text); }
+.cn-mqtt-status {
+  margin-left: auto; font-size: 10px; padding: 1px 8px; border-radius: 8px;
+  color: var(--muted); background: var(--panel); border: 1px solid var(--border);
+}
+.cn-mqtt-status.on { color: #2e8b57; background: rgba(58,157,93,.12); border-color: rgba(58,157,93,.35); }
+.cn-mqtt-row { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--muted); flex-wrap: wrap; }
+.cn-mqtt-row code {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 4px;
+  padding: 1px 6px; font-size: 10px; color: var(--accent2);
+}
+.cn-mqtt-msg { display: flex; align-items: flex-start; gap: 6px; font-size: 10px; color: var(--muted); flex-direction: column; }
+.cn-mqtt-msg .cn-mqtt-topic { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; color: var(--accent2); }
+.cn-mqtt-payload {
+  width: 100%; max-height: 56px; overflow: hidden; font-size: 10px; line-height: 1.5;
+  color: var(--faint); background: var(--panel); border-radius: 4px; padding: 4px 6px;
+  word-break: break-all; font-family: var(--mono, ui-monospace, monospace);
+}
+.cn-mqtt-note { font-size: 10px; color: var(--faint); line-height: 1.5; }
 
 /* ---- 表单 ---- */
 .cn-form { flex: 0 0 auto; padding: 10px; border-bottom: 1px solid var(--border); background: var(--panel-2); max-height: 55%; overflow-y: auto; }

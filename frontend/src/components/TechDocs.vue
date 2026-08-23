@@ -763,9 +763,23 @@ def _noise(v, pct=0.04):
 ## 五、数据源支持
 
 平台支持三种数据源（文件 → 连接数据源…）：
-1. **内置模拟**：由引擎按流程生成读数；
+1. **Mqtt 实时**：默认数据源，后端订阅云端 MQTT Broker（Broker 配置前端化：能碳一体机管理 → 总览 → 配置 Broker；参照参考项目 yunduan1 数据链路：边缘盒子（能碳一体机）eKuiper → Broker \`data/#\` 等主题）获取真实设备读数，不生成模拟数据；读数同步采用**关联制**（视图 → 能碳一体机管理）：自动识别云端设备并按盒子分组，须与仿真设备实例手动关联后（\`config/links.json\`）才同步到该设备实例；
 2. **自定义 WebSocket**：外部系统推送（接入真实工厂时使用）；
-3. **HTTP 轮询**：REST 拉取。`,
+3. **HTTP 轮询**：REST 拉取。
+
+### 能碳一体机管理台 API（参照参考项目 yunduan1 console + dashboard）
+
+| 接口 | 返回要点 |
+| --- | --- |
+| GET /api/box/overview | 概览：\`{ broker:{connected,stats($SYS 真实统计)}, cloudcore(仿真演示), nodes(识别到的盒子), ports(CloudHub 10001-10004), certs, token }\` |
+| GET /api/box/devices | \`{ models[], devices[], cloud_devices }\`（DeviceModel/Device 列表 + 云端识别设备，本地持久化 \`config/box_devices.json\`） |
+| POST /api/box/devices | 创建设备/模型：\`mode=dryRun\` 返回三协议（Modbus/OPC-UA/Bluetooth）YAML 预览；\`mode=apply\` 保存到模拟集群；body 含 protocol/modelName/deviceName/nodeName/properties/comm/opcua/bluetooth |
+| POST /api/box/devices/delete | 删除：\`{kind: device\|model\|both, name, namespace}\` |
+| GET /api/box/devices/realtime | \`{ devices:[{name,state,lastOnlineTime,twins:[{propertyName,reported,observedDesired,timestamp,unit}],history}] }\`，reported 读数一律来自 MQTT 链路 |
+| POST /api/box/nodes/onboard | 盒子接入：\`{hostname,cloudIP,boxIP}\` → \`{edgecore, token, caHash, commands}\`（模板 \`config/edgecore.template.yaml\`，token/caHash 仿真演示） |
+| GET /api/box/stats | \`{ stats, messages }\`：Broker $SYS 统计 + 最近 100 条实时消息流 |
+| POST /api/box/publish | 发测试消息：\`{topic, payload}\`，向云端 Broker 发布（实时仪表盘调试） |
+  `,
   },
   {
     id: 'contract',
@@ -899,7 +913,7 @@ def _noise(v, pct=0.04):
 
 - 路径：\`/api/ws/feed\`；
 - 协议见「实时遥测系统」章节；
-- 支持内置模拟、自定义 WebSocket、HTTP 轮询三种数据源（文件 → 连接数据源…）。
+- 支持 Mqtt 实时（默认，后端订阅云端 MQTT Broker 获取真实读数）、自定义 WebSocket、HTTP 轮询三种数据源（文件 → 连接数据源…）。
 
 ## 三、SPA 托管
 
@@ -1096,10 +1110,11 @@ def _noise(v, pct=0.04):
 | SearchPanel | 全局搜索：按名称模糊匹配工序 / 物料 / 策略 / 设备，点击结果联动检视器、资源管理器与 3D 聚焦 |
 | ScenePanel | 场景控制：环境主题切换、显示图层开关（网格/轴向/标签/连线/热力图）、视角工具 |
 | ConnectionsPanel | 连接面板：三种数据源（模拟/WebSocket/HTTP）运行状态展示与在线启停，入口直达数据源配置 |
+| CarbonBoxView | 能碳一体机管理（视图 → 能碳一体机管理）：集成参考项目 yunduan1 全部能力，六页签——总览（Broker $SYS 统计 + 节点/CloudCore/证书，仿真演示）、设备管理（DeviceModel/Device 三协议 CRUD + YAML 生成，config/box_devices.json）、设备关联（云端设备 ↔ 仿真设备实例，config/links.json）、盒子接入（edgecore.yaml 模板渲染 + token/caHash + 部署命令）、实时数据（twins 真实读数 + 趋势 + 消息流 + 发测试消息）、接入指引（eKuiper 规则 / 盒子采集 / 部署包 / 诊断工具） |
 
 ## 八、数据源管理与系统设置
 
-- **DataSourceDialog**（文件 → 连接数据源…）：配置三种实时数据来源——模拟（内置随机发生器）、WebSocket（ws:// 服务器）、HTTP 轮询（REST 接口）；每项支持启停、采样间隔与「测试连接」；配置持久化到本地，重启自动应用；
+- **DataSourceDialog**（文件 → 连接数据源…）：配置三种实时数据来源——Mqtt 实时（默认，读数来自后端 MQTT 订阅，Broker 在「能碳一体机管理」视图前端配置）、WebSocket（ws:// 服务器）、HTTP 轮询（REST 接口）；每项支持启停、采样间隔与「测试连接」；配置持久化到本地，重启自动应用；
 - **SystemSettingsDialog**（文件 → 设置…）：按页签分组——布局（面板显隐）、场景（仿真情景 / 环境）、实时链路（数据源启停）、LLM（模型名 / API 密钥 / API 地址，可选，未配置自动回退本地规则与本地模板报告）；
 - 两种对话框状态存于 Pinia（\`showDataSource\` / \`showSettings\`），数据源配置与连接面板共享同一状态源。
 

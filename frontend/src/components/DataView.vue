@@ -20,27 +20,19 @@
 
     <!-- 右侧：信息条 + 历史数据表格 -->
     <div class="dv-main">
-      <!-- 顶部：当前传感器信息条 -->
-      <div class="dv-toolbar">
-        <div class="dv-cur">
+      <!-- 表格上方统计行（关闭/刷新等操作已由顶栏工具栏提供） -->
+      <div class="dv-stats">
+        <span class="dv-cur-name">
           <span class="dv-dot" :style="{ background: curDev.color || '#0072BD' }"></span>
           <b>{{ curDev.label || curDev.id }}</b>
           <span class="dv-sub">{{ curDev.unitName }} · {{ curDev.unitType }}</span>
           <span class="dv-range" v-if="curDev.range">{{ curDev.range }}</span>
-        </div>
-        <div class="dv-live">
-          <span class="dv-live-lb">实时</span>
-          <b class="dv-live-v">{{ fmt(curLive) }}</b>
-          <span class="dv-unit">{{ curDev.unit }}</span>
-        </div>
-        <div class="dv-stats">
-          <span>采样点数 <b>{{ rows.length }}</b></span>
-          <span>均值 <b>{{ fmt(avg) }}</b></span>
-          <span>峰值 <b>{{ fmt(max) }}</b></span>
-          <span>谷值 <b>{{ fmt(min) }}</b></span>
-        </div>
-        <!-- 右上角关闭按钮：退出数据视图，返回数字孪生 -->
-        <button class="dv-close" title="关闭数据视图，返回数字孪生" @click="close">✕</button>
+        </span>
+        <span class="dv-live2">实时 <b class="dv-live-v">{{ fmt(curLive) }}</b> {{ curDev.unit }}</span>
+        <span>采样点数 <b>{{ rows.length }}</b></span>
+        <span>均值 <b>{{ fmt(avg) }}</b></span>
+        <span>峰值 <b>{{ fmt(max) }}</b></span>
+        <span>谷值 <b>{{ fmt(min) }}</b></span>
       </div>
 
       <!-- 中间：历史数据表格 -->
@@ -76,12 +68,21 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useSimStore } from '../stores/sim'
+import { api } from '../api/client'
 
 const store = useSimStore()
 const curId = ref(null)
 
 // 关闭数据视图，返回数字孪生
 const close = () => store.toggleDataView()
+
+// 重新拉取设备历史数据（供视图工具栏「刷新数据」按钮调用）
+async function refresh() {
+  try {
+    const hist = await api.getDeviceHistory()
+    if (hist && hist.history) store.deviceHistory = hist.history
+  } catch (e) { console.warn('刷新监测数据失败：', e) }
+}
 
 // 有历史数据的设备（计量/监测传感器）作为 sheet 页签
 const sheetDevs = computed(() =>
@@ -149,6 +150,8 @@ const statusText = (v) => {
   return '正常'
 }
 const statusCls = (v) => (statusText(v) === '超限' ? 'warn' : 'ok')
+
+defineExpose({ close, refresh })
 </script>
 
 <style scoped>
@@ -159,36 +162,25 @@ const statusCls = (v) => (statusText(v) === '超限' ? 'warn' : 'ok')
   color: var(--text);
   user-select: none;
 }
-/* ---- 右侧主区域（信息条 + 表格） ---- */
+/* ---- 右侧主区域（统计行 + 表格） ---- */
 .dv-main { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
-/* ---- 顶部信息条 ---- */
-.dv-toolbar {
-  display: flex; align-items: center; gap: 18px;
-  padding: 8px 14px;
+/* ---- 表格上方统计行（关闭/刷新等操作已由顶栏工具栏提供） ---- */
+.dv-stats {
+  display: flex; align-items: center; gap: 16px;
+  padding: 7px 14px;
   background: var(--bar);
   border-bottom: 1px solid var(--border);
   flex: 0 0 auto;
+  color: var(--muted); font-size: 11px;
 }
-.dv-cur { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dv-stats b { color: var(--text); font-family: var(--mono); margin-left: 2px; }
+.dv-cur-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .dv-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
-.dv-cur b { font-size: 13px; }
+.dv-cur-name b { font-size: 13px; color: var(--text); }
 .dv-sub { color: var(--muted); font-size: 11px; }
 .dv-range { color: var(--muted); font-size: 11px; padding: 2px 8px; background: var(--panel-3); border: 1px solid var(--border); border-radius: 10px; }
-.dv-live { display: flex; align-items: baseline; gap: 6px; margin-left: auto; }
-.dv-live-lb { color: var(--muted); font-size: 11px; }
-.dv-live-v { font-size: 20px; font-weight: 500; color: var(--accent); font-family: var(--mono); }
-.dv-unit { color: var(--muted); font-size: 11px; }
-.dv-stats { display: flex; gap: 14px; color: var(--muted); font-size: 11px; }
-.dv-stats b { color: var(--text); font-family: var(--mono); margin-left: 2px; }
-/* ---- 右上角关闭按钮 ---- */
-.dv-close {
-  display: flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; margin-left: 4px;
-  border: 1px solid var(--border); border-radius: 4px;
-  background: transparent; color: var(--muted);
-  font-size: 12px; cursor: pointer; flex: 0 0 auto;
-}
-.dv-close:hover { color: var(--red); border-color: var(--red); background: rgba(209, 75, 75, .1); }
+.dv-live2 { display: flex; align-items: baseline; gap: 4px; margin-left: auto; }
+.dv-live-v { font-size: 16px; font-weight: 500; color: var(--accent); font-family: var(--mono); }
 /* ---- 表格 ---- */
 .dv-table-wrap { flex: 1 1 auto; overflow: auto; background: var(--panel); }
 .dv-table { width: 100%; border-collapse: collapse; font-size: 12px; }

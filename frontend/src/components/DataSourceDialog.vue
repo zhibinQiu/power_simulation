@@ -8,8 +8,9 @@
 
       <div class="ds-body">
         <p class="ds-tip">
-          平台支持多个实时数据源并存（可分别启用/停用）。遥测数据形如
-          <code>{ devices: [{ id, reading }], units?: [...] }</code>；
+          平台支持多个实时数据源并存（可分别启用/停用）。「Mqtt 实时」为平台默认数据源：
+          后端订阅云端 MQTT Broker（参照参考项目 yunduan1 数据链路；Broker 配置在「能碳一体机管理」视图前端配置）获取真实设备读数。
+          遥测数据形如 <code>{ devices: [{ id, reading }], units?: [...] }</code>；
           通过「字段对齐」可把外部遥测字段名映射为场景内传感器/设备 id，实现数值对齐。
         </p>
 
@@ -19,7 +20,7 @@
           <select class="ds-input" v-model="editingId" @change="loadFromSource">
             <option value="">＋ 新建数据源</option>
             <option v-for="s in store.dataSources" :key="s.id" :value="s.id">
-              {{ s.name || s.id }}{{ s.type === 'sim' ? '（内置模拟）' : '' }}{{ s.enabled === false ? '（已停用）' : '' }}
+              {{ s.name || s.id }}{{ s.type === 'sim' ? '（Mqtt 实时）' : '' }}{{ s.enabled === false ? '（已停用）' : '' }}
             </option>
           </select>
         </div>
@@ -91,7 +92,7 @@ const store = useSimStore()
 const emit = defineEmits(['close'])
 
 const types = [
-  { id: 'sim', label: '内置模拟' },
+  { id: 'sim', label: 'Mqtt 实时' },
   { id: 'ws', label: '自定义 WebSocket' },
   { id: 'http', label: '自定义 HTTP 轮询' },
 ]
@@ -135,7 +136,7 @@ function testConn() {
   testText.value = '连接中…'
   if (form.type === 'sim') {
     fetch('/api/health').then((r) => {
-      if (r.ok) { testState.value = 'ok'; testText.value = '内置模拟数据可用' }
+      if (r.ok) { testState.value = 'ok'; testText.value = 'Mqtt 实时数据可用' }
       else { testState.value = 'err'; testText.value = '后端不可用 (' + r.status + ')' }
     }).catch(() => { testState.value = 'err'; testText.value = '无法连接后端' })
     return
@@ -185,7 +186,7 @@ function apply() {
     type: form.type,
     url: form.url,
     interval: Number(form.interval) || 1000,
-    name: form.name || (form.type === 'sim' ? '内置模拟数据' : form.url),
+    name: form.name || (form.type === 'sim' ? 'Mqtt 实时数据' : form.url),
     mapping,
   }
   if (editingId.value) {

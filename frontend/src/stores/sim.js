@@ -183,6 +183,7 @@ export const useSimStore = defineStore('sim', {
     carbonMarketOn: false,    // 碳市场视图：中间 3D 场景替换为碳市场实时行情（顶栏「视图 → 碳市场」切换）
     carbonCalcOn: false,      // 碳排核算视图：中间 3D 场景替换为多标准碳核算结果对比（工具 → 低碳 → 全景碳核查切换）
     energyFlowOn: false,      // 能流分析视图：中间 3D 场景替换为能流桑基图（工具 → 能源 → 能流分析切换）
+    boxManageOn: false,       // 能碳一体机管理视图：中间 3D 场景替换为云端设备识别 + 设备关联管理（视图 → 能碳一体机管理切换）
     inspectorView: 'auto',    // 右侧检视器显式视图：'auto'（按选中推导）| 'park' 园区构成 | 'materials' 原料库 | 'strategy' 减排策略 | 'report' 报告面板         // 底栏（命令行窗口 + 状态条）是否展开
     reportPayload: null,      // 「导出报告」请求载荷（baseline/strategy/ops/...），供右侧报告面板消费
     selectedStrategyId: null, // 左侧策略库选中的策略
@@ -201,8 +202,10 @@ export const useSimStore = defineStore('sim', {
     // 工艺级策略管理：每个工序可绑定独立策略（自然语言 → 解析 → 测试 → 保存 → 绑定）
     unitStrategies: {},     // { [unitId]: { enabled, text, parsed, delta, scenarioName } }
     processStrategyEnabled: {},  // { [processType]: boolean } — 在左侧工艺列表中勾选
-    // 实时数据源配置（文件菜单「连接数据源」设置，支持内置模拟/自定义WebSocket/HTTP轮询）
-    dataSource: { type: 'sim', url: '', interval: 1000, name: '内置模拟数据' },
+    // 实时数据源配置（文件菜单「连接数据源」设置：平台 MQTT 实时数据 / 自定义 WebSocket / HTTP 轮询）
+    dataSource: { type: 'sim', url: '', interval: 1000, name: 'Mqtt 实时数据' },
+    // MQTT 实时数据源状态（来自 /api/realtime/source，参照参考项目 yunduan1 数据链路）
+    mqttSource: null,
     // ---- 左侧活动栏（VS Code 式）与多数据源管理 ----
     activityView: 'explorer',   // 活动面板：'explorer' 资源 | 'search' 搜索 | 'scene' 场景 | 'connections' 连接
     dataSources: [],            // 多数据源列表，每个含 { id,type,url,interval,name,enabled,mapping }
@@ -246,6 +249,9 @@ export const useSimStore = defineStore('sim', {
     notifications: [],
   }),
   getters: {
+    // 视图模式：非数字孪生的独立视图（监测数据 / CEA 行情 / 碳排核算 / 能流分析 / 能碳一体机）激活时，
+    // 界面进入沉浸模式——隐藏左/右/下侧边栏，顶栏工具栏按当前视图渲染
+    viewModeOn: (s) => s.dataViewOn || s.carbonMarketOn || s.carbonCalcOn || s.energyFlowOn || s.boxManageOn,
     // 未读系统通知数（底栏铃铛徽标）
     unreadNotifs: (s) => s.notifications.filter((n) => !n.read).length,
     selectedUnit: (s) => s.model.units.find((u) => u.id === s.selectedUnitId) || null,
@@ -450,7 +456,8 @@ export const useSimStore = defineStore('sim', {
     async init() {
       try {
         loadCalibrations()   // 启动即恢复本厂标定耦合（localStorage），否则用默认机理/经验系数
-        this._loadDataSource() // 恢复上次设置的实时数据源（内置模拟/自定义WS/HTTP）
+        this._loadDataSource() // 恢复上次设置的实时数据源（平台 MQTT 实时 / 自定义 WS / HTTP）
+        this._startMqttPolling() // 定时拉取 MQTT 数据源状态（连接状态/订阅主题/最近消息）
         const [m, presets, factors, schema, devs, hist] = await Promise.all([
           api.presetModel(), api.presetStrategies(), api.getFactors(), api.getParamSchema(),
           api.getDevices(), api.getDeviceHistory(),
@@ -964,22 +971,27 @@ export const useSimStore = defineStore('sim', {
     // 数据视图：中间 3D 场景 ↔ 传感器历史数据表格（顶栏「视图 → 传感器数据」切换）
     toggleDataView() {
       this.dataViewOn = !this.dataViewOn
-      if (this.dataViewOn) { this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false }
+      if (this.dataViewOn) { this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false }
     },
     // 碳市场视图：中间 3D 场景 ↔ 碳市场实时行情（顶栏「视图 → 碳市场」切换）
     toggleCarbonMarket() {
       this.carbonMarketOn = !this.carbonMarketOn
-      if (this.carbonMarketOn) { this.dataViewOn = false; this.carbonCalcOn = false; this.energyFlowOn = false }
+      if (this.carbonMarketOn) { this.dataViewOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false }
     },
     // 碳排核算视图：中间 3D 场景 ↔ 多标准碳核算结果对比（工具 → 低碳 → 全景碳核查切换）
     toggleCarbonCalc() {
       this.carbonCalcOn = !this.carbonCalcOn
-      if (this.carbonCalcOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.energyFlowOn = false }
+      if (this.carbonCalcOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.energyFlowOn = false; this.boxManageOn = false }
     },
     // 能流分析视图：中间 3D 场景 ↔ 能流桑基图（工具 → 能源 → 能流分析切换）
     toggleEnergyFlow() {
       this.energyFlowOn = !this.energyFlowOn
-      if (this.energyFlowOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false }
+      if (this.energyFlowOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.boxManageOn = false }
+    },
+    // 能碳一体机管理视图：中间 3D 场景 ↔ 云端设备识别 + 设备关联管理（视图 → 能碳一体机管理切换）
+    toggleBoxManage() {
+      this.boxManageOn = !this.boxManageOn
+      if (this.boxManageOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false }
     },
     toggleFullscreen() {
       this.fullscreenOn = !this.fullscreenOn
@@ -1220,7 +1232,7 @@ export const useSimStore = defineStore('sim', {
       this._connectFeed()
     },
     removeDataSource(id) {
-      if (id === 'sim') { this.toast = '内置模拟数据源不可删除'; return }
+      if (id === 'sim') { this.toast = '平台 Mqtt 实时数据源不可删除'; return }
       const idx = this.dataSources.findIndex((s) => s.id === id)
       if (idx < 0) return
       this.dataSources.splice(idx, 1)
@@ -1281,7 +1293,7 @@ export const useSimStore = defineStore('sim', {
         } catch (e) {}
       }
       if (!this.dataSources.length) {
-        this.dataSources = [{ id: 'sim', type: 'sim', url: '', interval: 1000, name: '内置模拟数据', enabled: true, mapping: {} }]
+        this.dataSources = [{ id: 'sim', type: 'sim', url: '', interval: 1000, name: 'Mqtt 实时数据', enabled: true, mapping: {} }]
       }
       const active = this.dataSources.find((s) => s.id === this.activeDataSourceId)
         || this.dataSources.find((s) => s.enabled) || this.dataSources[0]
@@ -2136,17 +2148,37 @@ export const useSimStore = defineStore('sim', {
       }
     },
 
-    // ---- 实时数据源（内置模拟 / 自定义 WebSocket / HTTP 轮询，支持多源并存）----
+    // ---- 实时数据源（平台 MQTT 实时 / 自定义 WebSocket / HTTP 轮询，支持多源并存）----
     _startFeed() { this._connectFeed() },
+    // MQTT 数据源状态轮询：连接状态 / 订阅主题 / 最近消息（参照参考项目 yunduan1 数据链路）
+    _startMqttPolling() {
+      if (this._mqttTimer) return
+      const poll = () => {
+        api.realtimeSource().then((s) => { this.mqttSource = s }).catch(() => {})
+      }
+      poll()
+      this._mqttTimer = setInterval(poll, 3000)
+    },
+    // 云端设备 <-> 仿真设备实例关联：仅关联后云端读数才同步到对应设备实例
+    async linkMqttDevice(cloudId, localId) {
+      await api.linkMqttDevice(cloudId, localId)
+      this.mqttSource = await api.realtimeSource()   // 重新拉取完整状态（含关联表与云端设备）
+      this.toast = `已关联：${cloudId} → ${localId}，数据开始同步`
+    },
+    async unlinkMqttDevice(cloudId) {
+      await api.unlinkMqttDevice(cloudId)
+      this.mqttSource = await api.realtimeSource()
+      this.toast = `已解除关联：${cloudId}，数据停止同步`
+    },
     _connectFeed() {
       // 关闭旧连接（各数据源的 WebSocket 或 HTTP 轮询定时器）
       for (const c of this._conns || []) { try { c.close && c.close() } catch (e) {} }
       this._conns = []
       this.sourceStatus = {}
-      // 仅连接启用的数据源；若全部停用/为空，则保底回落到内置模拟源
+      // 仅连接启用的数据源；若全部停用/为空，则保底回落到平台 Mqtt 实时数据源
       let sources = (this.dataSources || []).filter((s) => s.enabled !== false)
       if (!sources.length) {
-        const sim = { id: 'sim', type: 'sim', url: '', interval: 1000, name: '内置模拟数据', enabled: true, mapping: {} }
+        const sim = { id: 'sim', type: 'sim', url: '', interval: 1000, name: 'Mqtt 实时数据', enabled: true, mapping: {} }
         this.dataSources = [sim]
         this.activeDataSourceId = 'sim'
         this.dataSource = sim
@@ -2164,7 +2196,7 @@ export const useSimStore = defineStore('sim', {
       this._refreshFeedStatus()
       this._pushModelToFeed()
     },
-    // 建立单个数据源连接（ws：内置模拟/自定义 WebSocket；http：按 interval 轮询 JSON）
+    // 建立单个数据源连接（ws：平台 Mqtt 实时/自定义 WebSocket；http：按 interval 轮询 JSON）
     _connectOne(ds) {
       const sid = ds.id || 'sim'
       const onMsg = (msg) => this._onFeedMsg(ds, msg)
@@ -2185,7 +2217,7 @@ export const useSimStore = defineStore('sim', {
         tick()
         return { close: () => { alive = false; clearTimeout(timer) } }
       }
-      // WebSocket：内置模拟（默认 /api/ws/feed）或自定义 url
+      // WebSocket：平台 Mqtt 实时数据（默认 /api/ws/feed）或自定义 url
       const url = ds.type === 'ws' && ds.url ? ds.url : undefined
       const ws = openFeed(onMsg, onStatus, url)
       return { ws, close: () => { try { ws.close() } catch (e) {} } }
@@ -2206,7 +2238,7 @@ export const useSimStore = defineStore('sim', {
       }
       for (const d of src.devices) {
         // 字段对齐：若 mapping 配置了「外部字段 -> 内部传感器 id」，读数落入内部传感器；
-        // 未配置的字段沿用自身 id（内置模拟源字段本身就是内部 id，天然对齐）
+        // 未配置的字段沿用自身 id（平台 Mqtt 数据源的字段即内部 id，天然对齐）
         const internalId = mapping[d.id] || d.id
         this.deviceLive[internalId] = d.reading
         const buf = this.deviceHistory[internalId] || (this.deviceHistory[internalId] = [])

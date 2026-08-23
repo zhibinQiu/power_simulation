@@ -1,16 +1,7 @@
 <template>
   <!-- ============ 碳排核算视图：中间 3D 场景替换为多标准碳核算结果对比 ============ -->
   <div class="cc-view">
-    <!-- 顶部工具条 -->
-    <div class="cc-toolbar">
-      <div class="cc-title">
-        <svg class="cc-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><circle cx="8" cy="10" r="2"/><path d="m2 16 5-5 4 4 6-6 5 5"/></svg>
-        <b>碳排核算</b>
-        <span class="cc-sub">多标准碳核算结果对比</span>
-      </div>
-      <button class="cc-close" title="关闭碳排核算，返回数字孪生" @click="close">✕</button>
-    </div>
-
+    <!-- 关闭/返回等操作已由顶栏工具栏提供 -->
     <div class="cc-body">
       <div v-if="!result" class="cc-empty">
         暂无仿真结果，请先运行一次仿真后查看碳排核算。
@@ -274,27 +265,6 @@ const close = () => store.toggleCarbonCalc()
   color: var(--text);
   user-select: none;
 }
-/* ---- 顶部工具条 ---- */
-.cc-toolbar {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 8px 14px;
-  background: var(--bar);
-  border-bottom: 1px solid var(--border);
-  flex: 0 0 auto;
-}
-.cc-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.cc-title b { font-size: 13px; font-weight: 600; }
-.cc-title-icon { width: 16px; height: 16px; color: var(--accent2); flex: none; }
-.cc-sub { color: var(--muted); font-size: 11px; margin-left: 2px; white-space: nowrap; }
-.cc-close {
-  display: flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px;
-  border: 1px solid var(--border); border-radius: 4px;
-  background: transparent; color: var(--muted);
-  font-size: 12px; cursor: pointer; flex: 0 0 auto;
-}
-.cc-close:hover { color: var(--red); border-color: var(--red); background: rgba(209, 75, 75, .1); }
-
 .cc-body { flex: 1 1 auto; padding: 14px; overflow: auto; }
 .cc-empty { text-align: center; color: var(--muted); font-size: 12px; padding: 60px 20px; }
 

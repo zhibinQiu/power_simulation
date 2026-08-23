@@ -219,31 +219,14 @@ onMounted(() => {
 })
 onUnmounted(() => clearInterval(timer))
 watch(instrument, () => reloadChart())
+
+// 暴露给视图工具栏（RibbonToolbar）：刷新行情 / 切换品种 / 预测开关 / 当前品种与预测状态
+defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn })
 </script>
 
 <template>
   <div class="carbon-market-view" @click.stop>
-    <div class="cm-header">
-      <div class="cm-title">
-        <span class="cm-logo">碳</span>
-        <div>
-          <h2>碳市场 · 实时行情</h2>
-          <p class="cm-sub">
-            {{ sourceName || '全国碳市场' }}
-            <template v-if="queriedAt"> · 更新于 {{ formatTime(queriedAt) }}</template>
-            <span v-if="quotes?.simulated" class="cm-badge cm-badge-sim">模拟行情</span>
-            <span v-else class="cm-badge">实时数据</span>
-          </p>
-        </div>
-      </div>
-      <div class="cm-actions">
-        <button class="cm-btn" :disabled="loading" @click="loadAll">
-          <span class="cm-btn-icon" :class="{ spinning: loading }">↻</span> 刷新
-        </button>
-        <button class="cm-close" title="关闭碳市场视图，返回数字孪生" @click="close">✕</button>
-      </div>
-    </div>
-
+    <!-- 刷新 / 关闭 / 品种切换 / 预测开关等操作已由顶栏工具栏提供 -->
     <div v-if="error" class="cm-error">{{ error }}</div>
 
     <!-- 行情卡片 -->
@@ -294,18 +277,11 @@ watch(instrument, () => reloadChart())
     <!-- 走势图 -->
     <div class="cm-chart-box">
       <div class="cm-chart-head">
-        <div class="cm-tabs">
-          <button :class="{ active: instrument === 'cea' }" @click="switchInstrument('cea')">CEA 日K线</button>
-          <button :class="{ active: instrument === 'ccer' }" @click="switchInstrument('ccer')">CCER 均价</button>
-        </div>
         <div class="cm-chart-meta">
           <span class="cm-chart-name">
             {{ chart?.title || '' }}
             <template v-if="forecastOn && fcDays"> + 未来 {{ fcDays }} 日预测</template>
           </span>
-          <button class="cm-fc-toggle" :class="{ on: forecastOn }" @click="toggleForecast" :title="forecast?.ok ? forecast.method : ''">
-            <span class="cm-fc-dot" /> 预测 {{ forecastOn ? '开' : '关' }}
-          </button>
         </div>
       </div>
 
@@ -357,6 +333,9 @@ watch(instrument, () => reloadChart())
       <span>
         实时行情每 {{ POLL_MS / 1000 }} 秒自动刷新 · 数据源：
         {{ sourceName || '全国碳市场' }}
+        <template v-if="queriedAt"> · 更新于 {{ formatTime(queriedAt) }}</template>
+        <span v-if="quotes?.simulated" class="cm-badge cm-badge-sim">模拟行情</span>
+        <span v-else class="cm-badge">实时数据</span>
         <a v-if="chart?.source_page" :href="chart.source_page" target="_blank" rel="noopener">查看官方页面 ↗</a>
       </span>
     </div>
@@ -379,25 +358,6 @@ watch(instrument, () => reloadChart())
   font-family: var(--ui);
 }
 
-/* —— 头部（VS Code 面板头：紧凑、下边框分隔） —— */
-.cm-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--line);
-}
-.cm-title { display: flex; align-items: center; gap: 10px; }
-.cm-logo {
-  width: 26px; height: 26px; border-radius: 4px;
-  display: grid; place-items: center;
-  font-size: 13px; font-weight: 600; color: #fff;
-  background: var(--accent);
-}
-.cm-title h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .3px; }
-.cm-sub { margin: 2px 0 0; font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-
 /* 徽章：模式标签（与 .mode-tag 同体系） */
 .cm-badge {
   font-size: 10px; padding: 1px 8px; border-radius: 3px;
@@ -409,33 +369,6 @@ watch(instrument, () => reloadChart())
   background: rgba(201, 154, 46, 0.12); color: var(--yellow);
   border-color: rgba(201, 154, 46, 0.4);
 }
-
-/* 刷新按钮：与工具条按钮（.rbtn/.tbtn）同体系 */
-.cm-actions { display: flex; gap: 8px; align-items: center; }
-.cm-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  height: 24px; padding: 0 12px; border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--panel); color: var(--text);
-  font-size: 11.5px; font-family: var(--ui); cursor: pointer;
-  transition: background .12s, color .12s, border-color .12s;
-}
-.cm-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-d); background: var(--accent-l); }
-.cm-btn:disabled { opacity: .5; cursor: default; }
-.cm-btn-icon { display: inline-block; }
-.cm-btn-icon.spinning { animation: cmSpin 0.8s linear infinite; }
-@keyframes cmSpin { to { transform: rotate(360deg); } }
-
-/* 关闭按钮：与 DataView .dv-close 同体系（右上角） */
-.cm-close {
-  display: flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; flex: 0 0 auto;
-  border: 1px solid var(--border); border-radius: 4px;
-  background: transparent; color: var(--muted);
-  font-size: 12px; cursor: pointer;
-  transition: color .12s, border-color .12s, background .12s;
-}
-.cm-close:hover { color: var(--red); border-color: var(--red); background: rgba(209, 75, 75, .1); }
 
 .cm-error {
   padding: 6px 10px; border-radius: 4px; font-size: 12px; color: var(--red);
@@ -498,43 +431,7 @@ watch(instrument, () => reloadChart())
 }
 .cm-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .cm-chart-meta { display: flex; align-items: center; gap: 10px; }
-
-/* Tab 切换：VS Code 分段控件（面板底 + 激活项下缘主题色条） */
-.cm-tabs {
-  display: flex; overflow: hidden;
-  border: 1px solid var(--border); border-radius: 4px;
-  background: var(--panel-2);
-}
-.cm-tabs button {
-  padding: 3px 12px; font-size: 11px; cursor: pointer;
-  border: none; border-right: 1px solid var(--border);
-  background: transparent; color: var(--muted);
-  font-family: var(--ui);
-  transition: background .12s, color .12s;
-}
-.cm-tabs button:last-child { border-right: none; }
-.cm-tabs button:hover { color: var(--text); background: var(--panel-3); }
-.cm-tabs button.active {
-  background: var(--panel); color: var(--accent-d); font-weight: 600;
-  box-shadow: inset 0 -2px 0 var(--accent);
-}
 .cm-chart-name { font-size: 11px; color: var(--muted); }
-
-/* 预测开关：胶囊小按钮 */
-.cm-fc-toggle {
-  display: inline-flex; align-items: center; gap: 5px;
-  height: 20px; padding: 0 9px; border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--panel-2); color: var(--muted);
-  font-size: 10.5px; font-family: var(--ui); cursor: pointer;
-  transition: background .12s, color .12s, border-color .12s;
-}
-.cm-fc-toggle:hover { border-color: var(--yellow); }
-.cm-fc-toggle.on { color: var(--yellow); border-color: rgba(201, 154, 46, .45); background: rgba(201, 154, 46, .1); }
-.cm-fc-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: currentColor; opacity: .8;
-}
 
 /* 图例 */
 .cm-legend { display: flex; gap: 16px; font-size: 10px; color: var(--muted); align-items: center; }

@@ -1,32 +1,34 @@
 <template>
-  <div class="app" :class="{ 'left-collapsed': !store.leftOpen, 'right-collapsed': !store.rightOpen, 'bottom-collapsed': !store.bottomOpen, 'sim-dark': store.simMode }"
-       :style="{ '--cmd-h': cmdH + 'px', '--lw': store.leftOpen ? lw + 'px' : '0px', '--rw': store.rightOpen ? rw + 'px' : '0px' }">
+  <div class="app" :class="{ 'left-collapsed': !store.leftOpen || store.viewModeOn, 'right-collapsed': !store.rightOpen || store.viewModeOn, 'bottom-collapsed': !store.bottomOpen || store.viewModeOn, 'sim-dark': store.simMode, 'view-immersive': store.viewModeOn }"
+       :style="{ '--cmd-h': (store.bottomOpen && !store.viewModeOn) ? cmdH + 'px' : '0px', '--lw': (store.leftOpen && !store.viewModeOn) ? lw + 'px' : '0px', '--rw': (store.rightOpen && !store.viewModeOn) ? rw + 'px' : '0px' }">
     <TopBar :menus="menus" ref="topBarRef" @export="onExport" @help="openPromo" />
 
     <!-- 最左侧活动栏（VS Code 式）：资源管理器 / 搜索 / 场景 / 连接 -->
     <ActivityBar />
-    <!-- 左侧栏：园区资产（工艺 / 设备 / 原料 / 策略） -->
-    <LeftSidebar @rsz="startLeftResize" />
+    <!-- 左侧栏：园区资产（工艺 / 设备 / 原料 / 策略）；非数字孪生视图沉浸模式隐藏 -->
+    <LeftSidebar v-show="!store.viewModeOn" @rsz="startLeftResize" />
 
-    <!-- 中间：仿真数字孪生（仿真态） / 流程编排画布（编辑态） / 传感器数据视图 / 碳市场视图 / 碳排核算视图 / 能流分析视图 -->
+    <!-- 中间：仿真数字孪生（仿真态） / 流程编排画布（编辑态） / 传感器数据视图 / 碳市场视图 / 碳排核算视图 / 能流分析视图 / 能碳一体机管理 -->
     <!-- SceneViewer 始终挂载，不销毁 WebGL 上下文，大幅提升切换速度并避免重建空白 -->
     <main class="stage">
-      <SceneViewer v-show="!store.editMode && !store.dataViewOn && !store.carbonMarketOn && !store.carbonCalcOn && !store.energyFlowOn" />
-      <DataView v-if="store.dataViewOn && !store.editMode" />
-      <CarbonMarketView v-if="store.carbonMarketOn && !store.editMode" />
+      <SceneViewer v-show="!store.editMode && !store.dataViewOn && !store.carbonMarketOn && !store.carbonCalcOn && !store.energyFlowOn && !store.boxManageOn" />
+      <DataView v-if="store.dataViewOn && !store.editMode" ref="dataViewRef" />
+      <CarbonMarketView v-if="store.carbonMarketOn && !store.editMode" ref="marketViewRef" />
       <CarbonCalcView v-if="store.carbonCalcOn && !store.editMode" />
       <EnergyFlowView v-if="store.energyFlowOn && !store.editMode" />
+      <CarbonBoxView v-if="store.boxManageOn && !store.editMode" ref="boxViewRef" />
       <FlowEditor v-if="store.editMode" />
     </main>
 
     <RibbonToolbar :actions="ribbonActions" />
 
-    <!-- 右侧栏：上下文检视器 -->
-    <RightInspector @rsz="startRightResize" />
+    <!-- 右侧栏：上下文检视器；非数字孪生视图沉浸模式隐藏 -->
+    <RightInspector v-show="!store.viewModeOn" @rsz="startRightResize" />
 
-    <CommandConsole :actions="twinActions" :resizing="resizing" :start-resize="startResize" ref="consoleRef" />
+    <!-- 下侧栏：命令控制台 + 状态条；非数字孪生视图沉浸模式隐藏 -->
+    <CommandConsole v-show="!store.viewModeOn" :actions="twinActions" :resizing="resizing" :start-resize="startResize" ref="consoleRef" />
 
-    <StatusBar />
+    <StatusBar v-show="!store.viewModeOn" />
 
     <DataSourceDialog v-if="showDataSource" @close="showDataSource = false" />
     <SystemSettingsDialog v-if="showSettings" @close="showSettings = false" />
@@ -59,6 +61,7 @@ import DataView from './components/DataView.vue'
 import CarbonMarketView from './components/CarbonMarketView.vue'
 import CarbonCalcView from './components/CarbonCalcView.vue'
 import EnergyFlowView from './components/EnergyFlowView.vue'
+import CarbonBoxView from './components/CarbonBoxView.vue'
 import FlowEditor from './components/FlowEditor.vue'
 import { usePanelSizes } from './composables/usePanelSizes'
 import { useGlobalShortcuts } from './composables/useGlobalShortcuts'
@@ -78,6 +81,10 @@ const SensitivityDialog = defineAsyncComponent(() => import('./components/Sensit
 const store = useSimStore()
 const topBarRef = ref(null)
 const consoleRef = ref(null)
+// 视图组件引用：供各视图工具栏（RibbonToolbar）调用其内部动作（刷新行情 / 刷新数据等）
+const dataViewRef = ref(null)
+const marketViewRef = ref(null)
+const boxViewRef = ref(null)
 
 const showDataSource = ref(false)
 const showSettings = ref(false)
@@ -159,10 +166,35 @@ function onExport() {
 function openPromo() { showPromo.value = true }
 function onAbout() { showAbout.value = true }
 
+// 关闭当前视图，返回数字孪生场景（供各视图工具栏「返回数字孪生」按钮调用）
+function closeView() {
+  if (store.dataViewOn) store.toggleDataView()
+  else if (store.carbonMarketOn) store.toggleCarbonMarket()
+  else if (store.carbonCalcOn) store.toggleCarbonCalc()
+  else if (store.energyFlowOn) store.toggleEnergyFlow()
+  else if (store.boxManageOn) store.toggleBoxManage()
+  pushCmd('已返回数字孪生场景。', 'out')
+}
+// 监测数据视图：重新拉取历史数据（DataView 暴露的 refresh）
+function dataRefresh() { if (dataViewRef.value && dataViewRef.value.refresh) dataViewRef.value.refresh() }
+// CEA 行情视图：刷新行情（CarbonMarketView 暴露的 loadAll）
+function marketRefresh() { if (marketViewRef.value && marketViewRef.value.loadAll) marketViewRef.value.loadAll() }
+// 能碳一体机视图：刷新概览 / 设备 / 实时数据（CarbonBoxView 暴露的 refreshAll）
+function boxRefresh() { if (boxViewRef.value && boxViewRef.value.refreshAll) boxViewRef.value.refreshAll() }
+// CEA 行情视图：切换品种（CEA / CCER）与预测叠加开关（CarbonMarketView 暴露）
+const marketSwitch = (v) => { if (marketViewRef.value) marketViewRef.value.switchInstrument(v) }
+const marketForecast = () => { if (marketViewRef.value) marketViewRef.value.toggleForecast() }
+// 状态以函数形式传入工具栏，避免普通对象内的 computed 不自动解包；函数在工具栏渲染时求值并建立响应式依赖
+const marketInstrument = () => marketViewRef.value?.instrument || 'cea'
+const marketForecastOn = () => !!(marketViewRef.value?.forecastOn)
+// 能碳一体机视图：切换页签（CarbonBoxView 暴露的 switchTab）与当前页签
+const boxSwitchTab = (id) => { if (boxViewRef.value) boxViewRef.value.switchTab(id) }
+const boxTabOn = () => boxViewRef.value?.tab || 'overview'
+
 // 供命令窗口调用的孪生控制动作
 const twinActions = { onSimToggle, onResetView, onOverview, togglePatrol, focusSel, onToggleEdit }
 // 供工具条调用的动作
-const ribbonActions = { onSimToggle, onToggleEdit, toggleAuto, togglePatrol, onResetView, autoLayoutScheme, flowZoomBtn, flowFit, loadExample, clearScheme }
+const ribbonActions = { onSimToggle, onToggleEdit, toggleAuto, togglePatrol, onResetView, autoLayoutScheme, flowZoomBtn, flowFit, loadExample, clearScheme, closeView, dataRefresh, marketRefresh, boxRefresh, marketSwitch, marketForecast, marketInstrument, marketForecastOn, boxSwitchTab, boxTabOn }
 
 /* ---------------- 经典菜单条（文件 / 仿真 / 视图 / 编辑 / 工具 / 帮助） ---------------- */
 const menus = [
@@ -196,7 +228,7 @@ const menus = [
     { sep: true },
     { label: '监测数据查看', toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
     { label: 'CEA&CCER行情', toggle: () => store.carbonMarketOn, act: () => store.toggleCarbonMarket() },
-    { label: '能碳一体机管理', act: () => pushCmd('能碳一体机管理：功能缺省，敬请期待。','guide') },
+    { label: '能碳一体机管理', toggle: () => store.boxManageOn, act: () => store.toggleBoxManage() },
   ] },
   { id: 'edit', label: '编辑', items: [
     { label: store.editMode ? '完成编排' : '进入流程编排', act: onToggleEdit },

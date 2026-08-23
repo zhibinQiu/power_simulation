@@ -7,6 +7,8 @@
 """
 from __future__ import annotations
 
+from typing import Dict
+
 from .factors import (
     CO2_PER_C,            # 碳转 CO2 系数（44/12）
     DEFAULT_FACTORS,      # 默认排放因子表（燃料 NCV/CC、电网因子、碳酸盐/电极）

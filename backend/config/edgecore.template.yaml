@@ -1,0 +1,38 @@
+# 能碳一体机（边缘盒子）edgecore.yaml 模板
+# 占位符: {{HOSTNAME}} 盒子主机名 / {{TOKEN}} 云端共享 token / {{CLOUDIP}} 云端 CloudCore IP
+# 本模板参照参考项目 yunduan1 console 的 edgecore.template.yaml 结构，按 KubeEdge 标准配置裁剪。
+apiVersion: edgecore.config.kubeedge.io/v1alpha2
+kind: EdgeCore
+modules:
+  cloudHub:
+    server: {{CLOUDIP}}:10002
+    token: {{TOKEN}}
+    tlsCaFile: /etc/kubeedge/ca/rootCA.crt
+    tlsCertFile: /etc/kubeedge/certs/server.crt
+    tlsPrivateKeyFile: /etc/kubeedge/certs/server.key
+    quic:
+      maxIncomingStreams: 10000
+    websocket:
+      enable: true
+  edgeHub:
+    heartbeat: 15
+    messageTimeout: 30
+    serviceBus:
+      enable: false
+  eventBus:
+    enable: true
+    mqttMode: 2
+  edged:
+    registerNodeNamespace: default
+    hostnameOverride: {{HOSTNAME}}
+    clusterDNS: 10.96.0.10
+    clusterDomain: cluster.local
+    runtimeType: docker
+    remoteRuntimeEndpoint: unix:///var/run/dockershim.sock
+    nodeIP: ""
+  db:
+    driver: sqlite
+    dataSource: /etc/kubeedge/edgecore.db
+  metaManager:
+    metaServer:
+      enable: false

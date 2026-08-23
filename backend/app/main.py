@@ -22,7 +22,8 @@ from pydantic import BaseModel, Field
 from . import presets
 from .carbon_market import fetch_chart, fetch_quotes, forecast_series
 from .market_news import fetch_news
-from .carbon_engine import cached_simulate, sim_cache_stats, default_factors
+from .carbon_engine import cached_simulate, sim_cache_stats
+from .factors import default_factors
 from .models import (ParseResult, ParseRequest, ParsedOp, ProcessModel, SimulateRequest,
                      SimulateResponse, SimResult, Strategy)
 from .nl_parser import apply_ops, parse_strategy
@@ -33,6 +34,8 @@ from .md_render import render_report_page
 from .param_schema import PARAM_SCHEMA, TECHS_INFO, UNIT_TYPES_INFO
 from .store import store
 from . import realtime
+from . import mqtt_source
+from . import box_console
 from .devices import library_payload
 from . import optimizers
 from .carbon_engine import parameter_scan, conservation_audit
@@ -555,6 +558,161 @@ def market_news(page: int = 1):
 realtime.register_realtime(app)
 
 
+# ------------------------- 实时数据源（MQTT，参照参考项目 yunduan1 数据链路） -------------------------
+
+@app.get("/api/realtime/source")
+def realtime_source_status():
+    """实时数据源状态：MQTT 连接状态 / 订阅主题 / 最近消息 / 字段映射
+    + 云端识别设备列表（cloud_devices）与设备关联表（links）。
+
+    数据链路参照参考项目 yunduan1：边缘盒子 eKuiper → 云端 MQTT Broker（Broker 配置在
+    「能碳一体机管理」视图前端配置，免手工编辑配置文件）→ 本平台订阅获取真实设备读数（不再生成模拟数据）。
+
+    关联制：云端设备必须与仿真系统中的设备实例手动关联（见 /api/realtime/link），
+    未关联的设备读数不会同步到仿真系统。"""
+    return mqtt_source.get_status()
+
+
+class RealtimeLinkRequest(BaseModel):
+    """云端设备 <-> 仿真设备实例关联请求。"""
+    cloud_id: str = Field(..., description="云端识别设备 id（能碳一体机盒子下的设备）")
+    local_id: str = Field(..., description="仿真系统设备实例 id（如 blast_furnace::belt_scale_0）")
+
+
+@app.get("/api/realtime/link")
+def realtime_links():
+    """关联列表 + 云端识别设备（供连接面板渲染关联 UI）。"""
+    return mqtt_source.get_links()
+
+
+@app.put("/api/realtime/link")
+def realtime_set_link(req: RealtimeLinkRequest):
+    """建立/更新关联：把云端设备的数据同步到指定的仿真设备实例（一对一）。
+
+    只有建立关联的云端设备，其读数才会经实时遥测同步到仿真系统对应设备实例。"""
+    try:
+        mqtt_source.set_link(req.cloud_id, req.local_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, **mqtt_source.get_links()}
+
+
+@app.delete("/api/realtime/link/{cloud_id}")
+def realtime_unlink(cloud_id: str):
+    """解除关联：该云端设备数据不再同步到任何仿真设备实例。"""
+    mqtt_source.remove_link(cloud_id)
+    return {"ok": True, **mqtt_source.get_links()}
+
+
+# ------------------------- 能碳一体机管理台（参照参考项目 yunduan1 console + dashboard 全部功能） -------------------------
+
+class BoxDeviceRequest(BaseModel):
+    """设备/模型创建请求（Modbus / OPC-UA / Bluetooth 三协议，YAML 生成参照 yunduan1 console）。"""
+    mode: str = "apply"                # dryRun | apply
+    protocol: str = "modbus"
+    modelName: str = "box-metric-model"
+    deviceName: str = "box-device"
+    namespace: str = "default"
+    nodeName: str = "edge-node"
+    collectCycle: int = 1000
+    desc: str = ""
+    comm: Dict[str, Any] = Field(default_factory=dict)    # modbus: {commType, slaveID, tcpIP...}
+    opcua: Dict[str, Any] = Field(default_factory=dict)   # opcua: {url, userName...}
+    bluetooth: Dict[str, Any] = Field(default_factory=dict)  # bluetooth: {macAddress}
+    cloudDevice: str = ""                                  # 可选：绑定云端识别设备 id（实时匹配优先）
+    properties: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class BoxDeleteRequest(BaseModel):
+    kind: str = "device"   # device | model | both
+    name: str
+    namespace: str = "default"
+
+
+class BoxOnboardRequest(BaseModel):
+    hostname: str = "edge-box"
+    cloudIP: str = ""
+    boxIP: str = ""
+
+
+class BoxPublishRequest(BaseModel):
+    topic: str
+    payload: str = ""
+
+
+class BoxConfigRequest(BaseModel):
+    """云端 Broker 配置（前端「能碳一体机管理」配置弹窗提交，配置化免手工编辑 yaml）。"""
+    broker: Dict[str, Any] = Field(default_factory=dict)      # {host, port, username, password, client_id...}
+    topics: List[str] = Field(default_factory=list)
+    mapping: Dict[str, str] = Field(default_factory=dict)     # mqtt 字段 -> 平台设备 id（静态关联 seed）
+
+
+@app.get("/api/box/config")
+def box_get_config():
+    """能碳一体机管理 - 云端 Broker 配置（前端配置化，password 脱敏）。"""
+    return box_console.get_config()
+
+
+@app.post("/api/box/config")
+def box_update_config(req: BoxConfigRequest):
+    """保存云端 Broker 配置并热更新（前端配置化，持久化到 box_config.json，无需手工编辑配置文件）。"""
+    try:
+        return box_console.update_config(req.model_dump())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/box/overview")
+def box_overview():
+    """能碳一体机管理台 - 概览：Broker 实时统计（真实 $SYS）+ cloudcore/节点/端口/证书/token（仿真演示）。"""
+    return box_console.box_overview()
+
+
+@app.get("/api/box/devices")
+def box_devices():
+    """设备管理：DeviceModel/Device 列表 + 云端识别设备（真实读数）。"""
+    return box_console.list_devices()
+
+
+@app.post("/api/box/devices")
+def box_create_device(req: BoxDeviceRequest):
+    """创建设备：mode=dryRun 返回三协议 YAML 预览；mode=apply 保存到模拟集群。"""
+    p = req.model_dump()
+    try:
+        return box_console.create_device(p)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/box/devices/delete")
+def box_delete_device(req: BoxDeleteRequest):
+    return box_console.delete_device(req.kind, req.name, req.namespace)
+
+
+@app.get("/api/box/devices/realtime")
+def box_devices_realtime():
+    """实时数据：Device.status.twins 上报值（真实 MQTT 链路）+ 趋势历史。"""
+    return box_console.realtime_devices()
+
+
+@app.post("/api/box/nodes/onboard")
+def box_onboard(req: BoxOnboardRequest):
+    """盒子接入：edgecore.yaml 模板渲染 + 共享 token + caHash + 部署命令。"""
+    return box_console.onboard_node(req.model_dump())
+
+
+@app.get("/api/box/stats")
+def box_stats():
+    """云端 Broker 实时统计（$SYS）+ 最近消息流（实时仪表盘数据源）。"""
+    return {"stats": box_console.broker_stats(), "messages": box_console.recent_messages()}
+
+
+@app.post("/api/box/publish")
+def box_publish(req: BoxPublishRequest):
+    """发测试消息（向云端 Broker 发布，供仪表盘调试）。"""
+    return box_console.publish_test(req.model_dump())
+
+
 # ------------------------- 报告分享页 -------------------------
 
 
@@ -589,7 +747,12 @@ if os.path.isdir(FRONTEND_DIST):
         return {"detail": "frontend not built"}
 
 
-# 启动时为默认流程预填设备历史，保证前端首屏即有趋势数据
+# 启动实时数据源（MQTT 订阅，参照参考项目 yunduan1 数据链路）：
+# 后台线程连接云端 MQTT Broker 订阅主题（Broker 配置前端化：能碳一体机管理 -> 总览 -> 配置 Broker，
+# 保存后热更新重连并持久化到 box_config.json），设备读数一律来自该真实数据源。
+mqtt_source.start()
+
+# 启动时为默认流程按 MQTT 真实读数预填设备历史（未上报的设备保持为空，不生成模拟数据）
 try:
     realtime.seed_history(presets.default_model())
 except Exception as _e:  # pragma: no cover

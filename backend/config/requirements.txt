@@ -4,3 +4,6 @@ httpx>=0.27
 pydantic>=2.5
 websockets>=12.0
 python-multipart>=0.0.9
+# 实时数据获取：MQTT 订阅（参照参考项目 yunduan1 数据链路）
+paho-mqtt>=2.0
+pyyaml>=6.0

@@ -1,0 +1,24 @@
+{
+  "models": [
+    {
+      "name": "belt_scale-test-model",
+      "namespace": "default",
+      "protocol": "modbus",
+      "properties": [
+        {
+          "name": "weight",
+          "type": "float",
+          "accessMode": "r",
+          "registerType": "holdingRegister",
+          "register": 0,
+          "scale": 1,
+          "unit": "t",
+          "desc": "test"
+        }
+      ],
+      "yaml": "apiVersion: devices.kubeedge.io/v1alpha2\nkind: DeviceModel\nmetadata:\n  name: belt_scale-test-model\n  namespace: default\nspec:\n  properties:\n        - name: weight\n          description: test\n          type: {\n            float: {}\n          }\n          accessMode: ReadOnly\n          protocolCommonConfig: {\n            collectCycle: 1000\n          }\n          registerType: holdingRegister\n          register: 0\n          limit: \n          scale: 1\n          isSwap: False\n          isRegisterSwap: False\n          unit: t\n",
+      "created_at": 1787506373
+    }
+  ],
+  "devices": []
+}

@@ -24,16 +24,16 @@ from __future__ import annotations
 
 import json
 from collections import OrderedDict
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from .models import ProcessModel, SimResult, SimTotals, UnitResult, SankeyNode, SankeyLink, LedgerItem
 from .devices import compute_device_readings
 from .calculators import RULES
 from .specs import spec_defaults
 from .factors import (
-    CO2_PER_C, _clamp, CC_FUEL, GJ_PER_MWH, KGCE_PER_GJ,
-    METAL_C, DEFAULT_FACTORS, FUEL_LABEL, default_factors, _merge_factors,
-    fuel_carbon, _energy_of, _led, _base,
+    CO2_PER_C, CC_FUEL, GJ_PER_MWH, KGCE_PER_GJ,
+    METAL_C, FUEL_LABEL, _merge_factors,
+    _energy_of, _led, _base,
 )
 
 
@@ -358,9 +358,6 @@ def build_sankey(raw, flows=None) -> Dict[str, object]:
     单位 tC/h。守恒：每个工序 入 = 出；全图 源列合计 = 去向列合计。
     """
     ids, _fadj, depth = _chain_layout(raw, flows)
-    res_by_id = {u.id: res for u, res, _p in raw}
-    u_by_id = {u.id: u for u, _r, _p in raw}
-    p_by_id = {u.id: p for u, _r, p in raw}
 
     nodes: List[SankeyNode] = []
     links: List[SankeyLink] = []
