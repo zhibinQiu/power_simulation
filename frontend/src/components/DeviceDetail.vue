@@ -71,7 +71,7 @@
       :extra-setpoints="extraSetpointsNow"
     />
     <!-- 高炉数值仿真分析入口：全厂高炉 TFT 数值总览与调参推演（原仿真菜单入口迁移至此） -->
-    <button v-if="showTftPanel" class="tft-entry-btn" @click="openTftAnalysis">高炉数值仿真分析</button>
+    <button v-if="showTftPanel && store.simMode" class="tft-entry-btn" @click="openTftAnalysis">高炉数值仿真分析</button>
     </CollapseSection>
 
     <!-- ===== 4. 其他内容 ===== -->

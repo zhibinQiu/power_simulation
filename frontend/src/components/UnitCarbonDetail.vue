@@ -123,7 +123,7 @@
           <div class="chip2"><span>实时排放</span><b>{{ f(liveData != null ? liveData : res.co2_total) }}</b><i>tCO₂/h</i></div>
         </div>
         <!-- 高炉数值仿真分析入口：全厂高炉 TFT 数值总览与调参推演（原仿真菜单入口迁移至此） -->
-        <button v-if="unit.type === 'blast_furnace'" class="tft-entry-btn" @click="openTftAnalysis">高炉数值仿真分析</button>
+        <button v-if="unit.type === 'blast_furnace' && store.simMode" class="tft-entry-btn" @click="openTftAnalysis">高炉数值仿真分析</button>
       </CollapseSection>
 
       <CollapseSection
