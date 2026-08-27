@@ -1,0 +1,158 @@
+{
+  "dmiSocket": "/etc/kubeedge/dmi.sock",
+  "mapperSocket": "/tmp/box-mapper.sock",
+  "mapperName": "box-multi-mapper",
+  "mapperVersion": "1.3.0",
+  "apps": {
+    "dir": "/opt/box-apps"
+  },
+  "apiVersion": "v1beta1",
+  "protocol": "nengtan-iot",
+  "cache": {
+    "db": "/opt/weight-bridge/twin_cache.db",
+    "max": 200000,
+    "flushBatch": 100
+  },
+  "mqtt": {
+    "enabled": true,
+    "boxId": "box-nt001",
+    "broker": {
+      "host": "172.19.134.45",
+      "port": 41883,
+      "username": "",
+      "password": ""
+    }
+  },
+  "devices": [
+    {
+      "name": "weight_scale_001",
+      "namespace": "default",
+      "protocol": "modbus-rtu",
+      "interval": 1.0,
+      "serial": {
+        "port": "/dev/ttyUSB4",
+        "baudrate": 9600,
+        "databits": 8,
+        "parity": "N",
+        "stopbits": 1
+      },
+      "modbus": {
+        "slaveId": 1,
+        "byteOrder": "2143"
+      },
+      "points": [
+        {
+          "property": "weight",
+          "registerAddr": 0,
+          "registerCount": 2,
+          "type": "float32",
+          "scale": 1.0
+        }
+      ]
+    },
+    {
+      "name": "dcs_energy_001",
+      "namespace": "default",
+      "protocol": "modbus-tcp",
+      "interval": 2.0,
+      "tcp": {
+        "host": "192.168.1.10",
+        "port": 502,
+        "timeout": 3.0
+      },
+      "modbus": {
+        "slaveId": 1,
+        "byteOrder": "1234"
+      },
+      "points": [
+        {
+          "property": "power",
+          "registerAddr": 0,
+          "registerCount": 2,
+          "type": "float32",
+          "scale": 1.0
+        },
+        {
+          "property": "flow_gas",
+          "registerAddr": 10,
+          "registerCount": 2,
+          "type": "float32",
+          "scale": 0.1
+        }
+      ]
+    },
+    {
+      "name": "dcs_opcua_001",
+      "namespace": "default",
+      "protocol": "opcua",
+      "interval": 3.0,
+      "opcua": {
+        "url": "opc.tcp://192.168.1.20:4840",
+        "username": "",
+        "password": "",
+        "securityMode": "None"
+      },
+      "points": [
+        {
+          "property": "blast_temp",
+          "nodeId": "ns=2;s=BlastFurnace.Temp",
+          "scale": 1.0
+        },
+        {
+          "property": "coal_flow",
+          "nodeId": "ns=2;s=BlastFurnace.CoalFlow",
+          "scale": 1.0
+        }
+      ]
+    },
+    {
+      "name": "lora_temp_001",
+      "namespace": "default",
+      "protocol": "lora",
+      "interval": 5.0,
+      "lora": {
+        "broker": "127.0.0.1",
+        "port": 1883,
+        "applicationID": "1",
+        "devEUI": "0011223344556677",
+        "appKey": "",
+        "region": "CN470",
+        "dataRate": "SF7BW125"
+      },
+      "points": [
+        {
+          "property": "temperature",
+          "payloadKey": "temperature",
+          "scale": 1.0
+        },
+        {
+          "property": "humidity",
+          "payloadKey": "env.humidity",
+          "scale": 1.0
+        }
+      ]
+    },
+    {
+      "name": "modem_5g_001",
+      "namespace": "default",
+      "protocol": "cellular",
+      "interval": 10.0,
+      "cellular": {
+        "serialPort": "/dev/ttyUSB2",
+        "baudRate": 115200,
+        "apn": "cmnet",
+        "iface": "wwan0"
+      },
+      "points": [
+        { "property": "signal", "kind": "signal" },
+        { "property": "rsrp",   "kind": "rsrp" },
+        { "property": "rsrq",   "kind": "rsrq" },
+        { "property": "sinr",   "kind": "sinr" },
+        { "property": "iccid",  "kind": "iccid" },
+        { "property": "reg",    "kind": "reg" },
+        { "property": "rx_rate", "kind": "rx_rate" },
+        { "property": "tx_rate", "kind": "tx_rate" }
+      ]
+    }
+  ]
+}

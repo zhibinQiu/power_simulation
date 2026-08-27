@@ -1,41 +1,38 @@
-"""策略库（内存存储）。
+"""策略库（仓储模式实现，存储底座由 core.storage.JsonRepository 提供）。
 
-生产环境可替换为数据库；此处用进程内 dict + 文件持久化，便于演示与重启保留。
+生产环境可替换为数据库；此处用进程内 dict + JSON 文件持久化，便于演示与重启保留。
+存储格式向后兼容：config/strategies.json 保持 [Strategy 序列化列表]。
 """
 from __future__ import annotations
 
-import json
-import os
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
 
+from .core.config import config_path
+from .core.storage import JsonRepository
 from .models import Strategy
 
-_DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "config", "strategies.json")
+_DATA_FILE = config_path("strategies.json")
 
 
 class StrategyStore:
     def __init__(self):
-        self._data: Dict[str, Strategy] = {}
-        self._load()
+        self._repo = JsonRepository(_DATA_FILE, default=[])
+        self._data: Dict[str, Strategy] = self._load()
 
-    def _load(self):
-        try:
-            if os.path.exists(_DATA_FILE):
-                with open(_DATA_FILE, "r", encoding="utf-8") as f:
-                    for item in json.load(f):
-                        s = Strategy(**item)
-                        self._data[s.id] = s
-        except Exception:
-            self._data = {}
+    def _load(self) -> Dict[str, Strategy]:
+        data: Dict[str, Strategy] = {}
+        for item in self._repo.read():
+            try:
+                s = Strategy(**item)
+                data[s.id] = s
+            except Exception:  # noqa: BLE001 —— 单条损坏时跳过，不拖垮整库
+                continue
+        return data
 
-    def _save(self):
-        try:
-            with open(_DATA_FILE, "w", encoding="utf-8") as f:
-                json.dump([s.model_dump() for s in self._data.values()], f, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
+    def _save(self) -> None:
+        self._repo.write([s.model_dump() for s in self._data.values()])
 
     def list(self) -> List[Strategy]:
         return list(self._data.values())

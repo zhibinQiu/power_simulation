@@ -1,0 +1,15 @@
+[Unit]
+Description=NengTan Cloud Sensor Data Collector (subscribe #, dump to disk)
+After=network.target nengtan-cloud-broker.service
+
+[Service]
+Type=simple
+ExecStart=__VENV__/bin/python -u __DATA_DIR__/collector.py
+Restart=always
+RestartSec=5
+WorkingDirectory=__DATA_DIR__
+Environment=BROKER_HOST=127.0.0.1
+Environment=BROKER_PORT=41883
+
+[Install]
+WantedBy=multi-user.target

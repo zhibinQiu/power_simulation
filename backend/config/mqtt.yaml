@@ -11,8 +11,8 @@
 #   - deploy_pkg/collect_sensor_data.py：订阅端通过环境变量
 #     BROKER_HOST / BROKER_PORT / MQTT_TOPICS 连接 Broker 获取真实设备数据。
 #
-# 数据链路：边缘盒子（能碳一体机）eKuiper（Modbus 传感器采集）
-#        → 转发到云端 Broker 的 data/#、alarm、results/# 主题
+# 数据链路：边缘盒子（能碳一体机）box-mapper（Modbus/OPC-UA 仪表采集）
+#        → 实时发布到云端 Broker 的 data/# 等主题
 #        → 本平台作为订阅端按 topic 获取真实数据。
 #
 # 说明：本平台不再生成模拟读数，设备读数一律来自 MQTT 真实数据。

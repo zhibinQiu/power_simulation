@@ -80,26 +80,46 @@ export const api = {
     jget('/carbon-market/forecast?instrument=' + instrument + '&days=' + days),
   // 市场快讯（中国煤炭交易网）
   marketNews: (page = 1) => jget('/market-news?page=' + page),
-  // 实时数据源状态（MQTT 连接状态 / 订阅主题 / 最近消息，参照参考项目数据链路）
+  // 实时数据源状态（MQTT 连接状态 / 订阅主题 / 最近消息）
   realtimeSource: () => jget('/realtime/source'),
   // 云端设备 <-> 仿真设备实例关联：仅关联后云端读数才同步到对应设备实例
-  linkMqttDevice: (cloudId, localId) => jput('/realtime/link', { cloud_id: cloudId, local_id: localId }),
+  boxLinks: () => jget('/realtime/link'),
+  linkMqttDevice: (cloudId, localId, factor = 1) => jput('/realtime/link', { cloud_id: cloudId, local_id: localId, factor }),
   unlinkMqttDevice: (cloudId) =>
     fetch(BASE + '/realtime/link/' + encodeURIComponent(cloudId), { method: 'DELETE' }).then(r => r.json()),
-  // 能碳一体机管理台（参照参考项目 yunduan1 console + dashboard 全部功能）
+  // 能碳一体机管理台（云端 K3s/KubeEdge 管理、设备 CRUD、盒子接入）
   boxOverview: () => jget('/box/overview'),
   boxDevices: () => jget('/box/devices'),
   boxCreateDevice: (payload) => jpost('/box/devices', payload),
-  boxDeleteDevice: (kind, name, namespace = 'default') =>
-    jpost('/box/devices/delete', { kind, name, namespace }),
+  boxUpdateModel: (payload) => jpost('/box/models', payload),
+  boxDeleteDevice: (kind, name, namespace = 'default', cloud = false, local = true) =>
+    jpost('/box/devices/delete', { kind, name, namespace, cloud, local }),
+  boxApplyDevices: (name = '', dryRun = false, modelName = '') =>
+    jpost('/box/devices/apply', { name, dry_run: dryRun, model_name: modelName }),
+  boxCloudConfig: () => jget('/box/cloud/config'),
+  boxCloudConfigSave: (payload) => jpost('/box/cloud/config', payload),
+  boxCloudAgentStatus: () => jget('/box/cloud/agent/status'),
+  boxCloudRestart: (payload) => jpost('/box/cloud/restart', payload),
+  boxCloudLogs: () => jget('/box/cloud/logs'),
   boxDevicesRealtime: () => jget('/box/devices/realtime'),
+  boxCloudCrd: (force = false) => jget('/box/devices/cloud' + (force ? '?force=true' : '')),
+  boxIngestDeviceValue: (device, namespace, property, value) =>
+    jpost('/box/devices/realtime/ingest', { device, namespace, property, value }),
   boxOnboard: (hostname, cloudIP, boxIP) =>
     jpost('/box/nodes/onboard', { hostname, cloudIP, boxIP }),
   boxStats: () => jget('/box/stats'),
   boxPublish: (topic, payload) => jpost('/box/publish', { topic, payload }),
+  // 盒子连接配置（IP/SSH 凭据）与云端应用部署
+  boxEdgeConfig: () => jget('/box/edge/config'),
+  boxEdgeConfigSave: (payload) => jpost('/box/edge/config', payload),
+  boxEdgeCheck: (host, port = 22) => jpost('/box/edge/check', { host, port }),
+  boxAppCmd: (payload) => jpost('/box/apps/cmd', payload),
+  boxApps: (box = 'nt001') => jget('/box/apps?box=' + encodeURIComponent(box)),
   // 云端 Broker 配置（前端配置化：能碳一体机管理 -> 总览 -> 云端数据链路「配置」，免手工编辑 mqtt.yaml）
   boxConfig: () => jget('/box/config'),
   boxConfigSave: (payload) => jpost('/box/config', payload),
+  // 云端实时推送 WebSocket（/api/ws/cloud）：云端 agent 经 MQTT cloud/# 推送的概览/CRD/日志，平台后端实时转发
+  openCloudFeed,
 }
 
 // WebSocket 遥测（url 省略则连接平台实时数据 /api/ws/feed，数据来自 MQTT 订阅）
@@ -107,6 +127,20 @@ export function openFeed(onMessage, onStatus, url) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
   const target = url || `${proto}://${location.host}/api/ws/feed`
   const ws = new WebSocket(target)
+  ws.onopen = () => onStatus && onStatus('open')
+  ws.onclose = () => onStatus && onStatus('closed')
+  ws.onerror = () => onStatus && onStatus('error')
+  ws.onmessage = (e) => {
+    try { onMessage(JSON.parse(e.data)) } catch (_) {}
+  }
+  return ws
+}
+
+// 云端实时推送 WebSocket（/api/ws/cloud）：云端 agent 经 MQTT cloud/# 推送的
+// 概览/CRD/日志，由平台后端实时转发。连接后先收 snapshot，之后收 state/crds/logs 增量。
+export function openCloudFeed(onMessage, onStatus) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+  const ws = new WebSocket(`${proto}://${location.host}/api/ws/cloud`)
   ws.onopen = () => onStatus && onStatus('open')
   ws.onclose = () => onStatus && onStatus('closed')
   ws.onerror = () => onStatus && onStatus('error')

@@ -6,23 +6,26 @@
 - CEA 分时  https://www.cneeex.com/zhhq/jsonData/kline.json?{ms_ts}
 - CCER      https://www.ccn.ac.cn/cets （HTML 解析，失败走官方行情列表）
 
-特性：
-- 60s TTL 缓存，避免频繁请求外部站点；
-- 外部拉取失败时降级为本地模拟行情（source=simulated），
-  保证数字孪生「碳市场」视图始终有实时变化的数值展示。
+架构说明：
+- 行情「数据获取」为策略模式（domain/market/sources.py）：
+  RemoteQuoteSource（远程官方源）失败时自动降级 SimulatedQuoteSource（本地模拟），
+  保证数字孪生「碳市场」视图始终有实时变化的数值展示；
+- 走势「预测算法」为策略模式（domain/market/forecast.py）：
+  linear / moving_average / exponential 可插拔，新增算法注册即可；
+- 60s TTL 缓存，避免频繁请求外部站点。
 """
 from __future__ import annotations
 
 import json
 import logging
 import math
-import random
 import re
 import time
 from datetime import date, timedelta
 from html import unescape
 from typing import Any
 
+from .domain.market import SimulatedQuoteSource, create_forecast_method, create_quote_source
 from .netutil import UA, TtlCache, fetch_json, fetch_text, now_iso
 
 logger = logging.getLogger(__name__)
@@ -404,81 +407,30 @@ def fetch_ccer_series() -> dict[str, Any]:
 # ── 降级模拟行情（外网不可用时保证界面实时变化） ────────────────
 
 
-def _sim_points(
-    *, base: float, instrument: str, n: int = 120, start: date | None = None
-) -> list[dict[str, Any]]:
-    """基于时间的确定性模拟序列：每分钟随机游走，保证轮询时数值有变化。"""
-    seed = int(time.time() // 60)
-    rng = random.Random(f"{instrument}-{seed}")
-    start = start or _today()
-    drift = rng.uniform(-0.015, 0.015)
-    out: list[dict[str, Any]] = []
-    price = base
-    for i in range(n):
-        d = date.fromordinal(start.toordinal() - (n - 1 - i))
-        o = price
-        c = price * (1 + rng.gauss(0, 0.006))
-        high = max(o, c) * (1 + abs(rng.gauss(0, 0.003)))
-        low = min(o, c) * (1 - abs(rng.gauss(0, 0.003)))
-        vol = int(rng.uniform(8000, 42000))
-        out.append(
-            {
-                "t": d.isoformat(),
-                "open": round(o, 2),
-                "close": round(c, 2),
-                "high": round(high, 2),
-                "low": round(low, 2),
-                "price": round(c, 2),
-                "volume": vol,
-                "source": "simulated",
-            }
-        )
-        price = c * (1 + drift * rng.random())
-    return out
-
-
-def _sim_quote(points: list[dict[str, Any]]) -> dict[str, Any]:
-    latest = points[-1]
-    prev = points[-2] if len(points) > 1 else latest
-    pct = (latest["close"] - prev["close"]) / prev["close"] * 100 if prev["close"] else 0
-    return {
-        **latest,
-        "t": _today().isoformat(),
-        "source": "simulated",
-        "change_pct": round(pct, 2),
-    }
-
-
 # ── 对外服务（TTL 缓存） ───────────────────────────────────────
 
 
 _cache = TtlCache(CACHE_TTL)
 
+# 模拟数据源单例（确定性模拟序列，供图表兜底使用）
+_sim_source = SimulatedQuoteSource()
+
 
 def fetch_quotes() -> dict[str, Any]:
-    """结构化报价：CEA + CCER 最新价、涨跌幅、月聚合、查询时间。"""
+    """结构化报价：CEA + CCER 最新价、涨跌幅、月聚合、查询时间。
+
+    数据获取委托给行情源策略（create_quote_source）：远程失败自动降级模拟。
+    """
 
     def _fetch() -> dict[str, Any]:
-        cea_pack = fetch_cea_series()
-        ccer = fetch_ccer_quote()
+        source = create_quote_source()
+        cea_pack = source.fetch_cea() or {}
+        ccer = source.fetch_ccer()
         sources_tried = list(cea_pack.get("sources_tried") or [])
         cea_latest = cea_pack.get("latest")
-        simulated = False
-
-        # CEA 失败 → 降级模拟
-        if not cea_latest:
-            points = _sim_points(base=93.5, instrument="cea")
-            cea_pack["points"] = points
-            cea_pack["monthly"] = aggregate_daily_to_monthly(points)
-            cea_pack["latest"] = _sim_quote(points)
-            cea_latest = cea_pack["latest"]
-            simulated = True
-
-        # CCER 失败 → 降级模拟
-        if not ccer:
-            points = _sim_points(base=61.2, instrument="ccer", n=60)
-            ccer = _sim_quote(points)
-            simulated = True
+        # CEA 模拟包补齐月度聚合（远程包在解析阶段已生成）
+        if cea_pack.get("points") and not cea_pack.get("monthly"):
+            cea_pack["monthly"] = aggregate_daily_to_monthly(cea_pack["points"])
 
         latest = cea_latest
         prev = cea_pack["points"][-2] if len(cea_pack["points"]) > 1 else latest
@@ -488,6 +440,10 @@ def fetch_quotes() -> dict[str, Any]:
             else 0
         )
         latest = {**latest, "change_pct": round(chg_pct, 2)}
+        simulated = (
+            getattr(source, "cea_source", source.name) == "simulated"
+            or getattr(source, "ccer_source", source.name) == "simulated"
+        )
         if simulated:
             latest["source"] = "simulated"
 
@@ -518,7 +474,7 @@ def fetch_chart(instrument: str = "cea", kind: str = "daily") -> dict[str, Any]:
             pack = fetch_cea_series()
             points = pack.get("points") or []
             if not points:
-                points = _sim_points(base=93.5, instrument="cea")
+                points = _sim_source.fetch_cea()["points"]
             return {
                 "ok": bool(points),
                 "instrument": "cea",
@@ -533,7 +489,7 @@ def fetch_chart(instrument: str = "cea", kind: str = "daily") -> dict[str, Any]:
         pack = fetch_ccer_series()
         points = pack.get("points") or []
         if not points:
-            points = _sim_points(base=61.2, instrument="ccer", n=60)
+            points = _sim_source.fetch_ccer()["points"]
         return {
             "ok": bool(points),
             "instrument": "ccer",
@@ -549,17 +505,7 @@ def fetch_chart(instrument: str = "cea", kind: str = "daily") -> dict[str, Any]:
     return _cache.get_or(f"chart:{instrument}:{kind}", _fetch)
 
 
-# ── 走势预测（最小二乘线性回归 + 残差置信带） ──────────────────
-
-
-def _ols(xs: list[float], ys: list[float]) -> tuple[float, float]:
-    """一元线性回归 y = a + b*x，返回 (a, b)。"""
-    n = len(xs)
-    mx, my = sum(xs) / n, sum(ys) / n
-    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
-    sxx = sum((x - mx) ** 2 for x in xs)
-    b = sxy / sxx if sxx else 0.0
-    return my - b * mx, b
+# ── 走势预测（策略模式：linear / moving_average / exponential） ──
 
 
 def _next_trade_date(day: date, step: int) -> date:
@@ -573,10 +519,16 @@ def _next_trade_date(day: date, step: int) -> date:
     return cur
 
 
-def forecast_series(instrument: str = "cea", days: int = 10) -> dict[str, Any]:
-    """基于历史收盘价做线性回归，外推未来 days 个交易日价格与置信区间。
+def forecast_series(instrument: str = "cea", days: int = 10,
+                    method: str = "linear") -> dict[str, Any]:
+    """基于历史收盘价外推未来 days 个交易日价格与置信区间。
 
-    - 取最近 90 个历史点拟合，残差标准差给出 ±1.65σ（约 90%）置信带；
+    预测方法 method：
+      - linear          线性回归（最小二乘） + 残差置信带（默认）
+      - moving_average  最近 N 日移动平均水平外推
+      - exponential     指数平滑 SES 水平外推（α=0.3）
+
+    - 取最近 90 个历史点拟合，标准差给出 ±1.65σ（约 90%）置信带；
     - 日期按历史平均间隔推进并跳过周末；
     - 复用 fetch_chart 的 60s TTL 缓存，不额外请求外部站点。
     """
@@ -584,6 +536,7 @@ def forecast_series(instrument: str = "cea", days: int = 10) -> dict[str, Any]:
     if instrument not in ("cea", "ccer"):
         instrument = "cea"
     days = max(3, min(int(days or 10), 30))
+    method = (method or "linear").strip().lower()
 
     chart = fetch_chart(instrument, "daily")
     points = chart.get("points") or []
@@ -605,10 +558,12 @@ def forecast_series(instrument: str = "cea", days: int = 10) -> dict[str, Any]:
 
     xs = [float(x) for x, _ in pairs]
     ys = [y for _, y in pairs]
-    a, b = _ols(xs, ys)
-    resid = [y - (a + b * x) for x, y in zip(xs, ys)]
-    s = math.sqrt(sum(r * r for r in resid) / max(1, len(resid) - 2))
     z = 1.65  # ~90% 置信区间
+    # 预测算法（策略模式）：linear / moving_average / exponential，可插拔注册
+    forecaster = create_forecast_method(method)
+    forecaster.fit(xs, ys)
+    s = forecaster.sigma(xs, ys)
+    method_label = forecaster.label
 
     # 历史点平均间隔（交易日天数），用于外推日期
     gaps = []
@@ -626,12 +581,11 @@ def forecast_series(instrument: str = "cea", days: int = 10) -> dict[str, Any]:
         cursor = date.fromisoformat(str(data[-1]["t"])[:10])
     except Exception:  # noqa: BLE001
         cursor = _today()
-    base = ys[-1]  # 从最后一个历史收盘价出发
 
     forecast: list[dict[str, Any]] = []
     for i in range(1, days + 1):
         cursor = _next_trade_date(cursor, step)
-        center = base + b * i
+        center = forecaster.predict(i)
         band = z * s * math.sqrt(1.0 + i / max(1, len(pairs)))
         forecast.append(
             {
@@ -648,11 +602,20 @@ def forecast_series(instrument: str = "cea", days: int = 10) -> dict[str, Any]:
         "ok": True,
         "instrument": instrument,
         "days": days,
-        "method": "线性回归（最小二乘） + 残差置信带",
+        "method": method_label,
         "confidence": "±1.65σ ≈ 90%",
-        "slope": round(b, 4),
+        "slope": round(forecaster.slope, 4),
         "base_date": data[-1]["t"] if data else None,
         "source_name": chart.get("source_name", ""),
         "history_tail": data[-5:],
         "forecast": forecast,
     }
+
+
+def market_forecast(instrument: str = "cea", days: int = 10,
+                    method: str = "linear") -> dict[str, Any]:
+    """行情预测别名：供报告生成等服务调用，透传预测方法。"""
+    return forecast_series(instrument=instrument, days=days, method=method)
+
+
+market_quotes = fetch_quotes  # 行情别名：供报告生成等服务调用

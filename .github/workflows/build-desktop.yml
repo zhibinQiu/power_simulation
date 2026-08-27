@@ -9,7 +9,7 @@
 #   或在仓库根目录执行：./push.sh "fix: xxx" --tag v1.0.0
 #
 # 说明：
-#   - 复用 platform/build_windows.bat（内含前端构建 + PyInstaller）。
+#   - 复用 platform/windows-platform-deploy/build_windows.bat（内含前端构建 + PyInstaller）。
 #   - 产物未签名：Windows 首次运行有 SmartScreen 提示。
 # ============================================================
 name: 桌面端自动打包
@@ -54,7 +54,7 @@ jobs:
 
       - name: 执行打包脚本 (Windows)
         shell: cmd
-        run: call platform\build_windows.bat
+        run: call platform\windows-platform-deploy\build_windows.bat
 
       # ---- 把 onedir 目录打成安装程序 exe（Inno Setup）----
       - name: 生成 Windows 安装程序 (Inno Setup)
@@ -65,7 +65,7 @@ jobs:
           choco install innosetup -y
           $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup*\ISCC.exe" | Select-Object -First 1
           if (-not $iscc) { throw "ISCC.exe 未找到，Inno Setup 安装失败" }
-          & $iscc.FullName /DAppVersion=$env:APP_VERSION platform\steelcarbon_twin.iss
+          & $iscc.FullName /DAppVersion=$env:APP_VERSION platform\windows-platform-deploy\steelcarbon_twin.iss
 
       # ---- 发布 GitHub Release，附件为纯 exe（免 zip 包裹）----
       - name: 发布 GitHub Release

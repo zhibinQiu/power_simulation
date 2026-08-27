@@ -1,5 +1,5 @@
 <template>
-  <canvas ref="cv" class="trend" :style="{ height: height + 'px' }"></canvas>
+  <canvas ref="cv" class="trend" :style="height > 0 ? { height: height + 'px' } : { height: '100%' }"></canvas>
 </template>
 
 <script setup>
@@ -8,9 +8,10 @@ import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 const props = defineProps({
   data: { type: Array, default: () => [] },   // [{t, v}]
   color: { type: String, default: '#0860A8' },
-  height: { type: Number, default: 120 },
+  height: { type: Number, default: 120 },     // 0 = 自适应父容器高度
   fill: { type: Boolean, default: true },
   grid: { type: Boolean, default: false },
+  axis: { type: Boolean, default: false },    // 绘制 y 轴刻度 + x 轴时间标签
   unit: { type: String, default: '' },
 })
 
@@ -22,7 +23,7 @@ function draw() {
   if (!el) return
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
   const w = el.clientWidth || 300
-  const h = props.height
+  const h = props.height > 0 ? props.height : (el.clientHeight || 200)
   el.width = w * dpr
   el.height = h * dpr
   const ctx = el.getContext('2d')
@@ -37,6 +38,14 @@ function draw() {
     return
   }
 
+  // 坐标轴留白（axis 模式为刻度标签留边）
+  const padL = props.axis ? 46 : 2
+  const padR = props.axis ? 10 : 2
+  const padT = props.axis ? 10 : 6
+  const padB = props.axis ? 20 : 6
+  const wInner = w - padL - padR
+  const hInner = h - padT - padB
+
   let min = Infinity, max = -Infinity
   for (const p of pts) { if (p.v < min) min = p.v; if (p.v > max) max = p.v }
   if (min === max) { min -= 1; max += 1 }
@@ -44,15 +53,25 @@ function draw() {
   min -= pad; max += pad
 
   const n = pts.length
-  const x = (i) => (n === 1 ? w - 2 : (i / (n - 1)) * (w - 4) + 2)
-  const y = (v) => h - 6 - ((v - min) / (max - min)) * (h - 14)
+  const x = (i) => (n === 1 ? w - 2 : padL + 2 + (i / (n - 1)) * (wInner - 4))
+  const y = (v) => padT + hInner - ((v - min) / (max - min)) * (hInner - 2)
 
-  if (props.grid) {
-    ctx.strokeStyle = 'rgba(90,100,115,.25)'
-    ctx.lineWidth = 1
-    for (let g = 0; g <= 3; g++) {
-      const gy = 6 + (g / 3) * (h - 14)
-      ctx.beginPath(); ctx.moveTo(2, gy); ctx.lineTo(w - 2, gy); ctx.stroke()
+  // 网格线 + y 轴刻度
+  ctx.strokeStyle = 'rgba(90,100,115,.25)'
+  ctx.lineWidth = 1
+  for (let g = 0; g <= 3; g++) {
+    const gv = min + (max - min) * (1 - g / 3)
+    const gy = y(gv)
+    ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(w - padR, gy); ctx.stroke()
+    if (props.axis) {
+      ctx.fillStyle = '#8A97A5'
+      ctx.font = '10px ui-monospace, monospace'
+      ctx.textAlign = 'right'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(axisFmt(gv), padL - 6, gy)
+      ctx.strokeStyle = 'rgba(90,100,115,.45)'
+      ctx.beginPath(); ctx.moveTo(padL - 3, gy); ctx.lineTo(padL, gy); ctx.stroke()
+      ctx.strokeStyle = 'rgba(90,100,115,.25)'
     }
   }
 
@@ -64,8 +83,8 @@ function draw() {
     ctx.beginPath()
     ctx.moveTo(x(0), y(pts[0].v))
     for (let i = 1; i < n; i++) ctx.lineTo(x(i), y(pts[i].v))
-    ctx.lineTo(x(n - 1), h - 6)
-    ctx.lineTo(x(0), h - 6)
+    ctx.lineTo(x(n - 1), h - padB)
+    ctx.lineTo(x(0), h - padB)
     ctx.closePath()
     ctx.fillStyle = grad
     ctx.fill()
@@ -85,6 +104,47 @@ function draw() {
   ctx.beginPath(); ctx.arc(lx, ly, 2.6, 0, Math.PI * 2)
   ctx.fillStyle = props.color; ctx.fill()
   ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.4; ctx.stroke()
+
+  // x 轴时间标签（首 / 中 / 尾，防溢出）
+  if (props.axis) {
+    const span = pts[n - 1].t - pts[0].t
+    const withSec = span < 3600   // 跨度不足 1 小时显示到秒
+    ctx.fillStyle = '#8A97A5'
+    ctx.font = '10px ui-monospace, monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'alphabetic'
+    const idxs = [...new Set([0, Math.floor((n - 1) / 2), n - 1])]
+    for (const i of idxs) {
+      const s = timeFmt(pts[i].t, withSec)
+      const tw = ctx.measureText(s).width
+      let tx = x(i) - tw / 2
+      if (tx < padL) tx = padL
+      if (tx + tw > w - padR) tx = w - padR - tw
+      ctx.fillText(s, tx, h - 5)
+    }
+    // 时间轴基线
+    ctx.strokeStyle = 'rgba(90,100,115,.25)'
+    ctx.beginPath(); ctx.moveTo(padL, h - padB); ctx.lineTo(w - padR, h - padB); ctx.stroke()
+  }
+}
+
+// y 轴刻度：按量级自适应小数位
+function axisFmt(v) {
+  const a = Math.abs(v)
+  if (a >= 1000) return v.toFixed(0)
+  if (a >= 100) return v.toFixed(0)
+  if (a >= 10) return v.toFixed(1)
+  return v.toFixed(2)
+}
+
+// x 轴时间标签：MM-DD HH:MM（跨度过小时补到秒）
+function timeFmt(t, withSec) {
+  const d = new Date(t * 1000)
+  const p = (n) => String(n).padStart(2, '0')
+  const hm = `${p(d.getHours())}:${p(d.getMinutes())}`
+  return withSec
+    ? `${p(d.getMonth() + 1)}-${p(d.getDate())} ${hm}:${p(d.getSeconds())}`
+    : `${p(d.getMonth() + 1)}-${p(d.getDate())} ${hm}`
 }
 
 function hexA(hex, a) {
@@ -103,4 +163,10 @@ onMounted(() => {
 onBeforeUnmount(() => { if (ro) ro.disconnect() })
 watch(() => props.data, () => nextTick(draw), { deep: true })
 watch(() => props.color, () => draw())
+watch(() => props.height, () => draw())
+watch(() => props.axis, () => draw())
 </script>
+
+<style scoped>
+.trend { display: block; width: 100%; }
+</style>

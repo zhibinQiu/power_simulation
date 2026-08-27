@@ -111,7 +111,7 @@
 .app.sim-dark .note-box { background: transparent; border: none; color: #8B99AC; }
 .app.sim-dark .mode-tag { background: var(--accent-l); border-color: var(--accent); color: var(--accent); }
 * { box-sizing: border-box; }
-html, body, #app { height: 100%; margin: 0; }
+html, body, #app { height: 100%; margin: 0; overflow: hidden; }
 body {
   font-family: var(--ui);
   font-size: 12px; color: var(--text);
@@ -130,8 +130,8 @@ button b, button strong,
    ========================================================= */
 .app {
   display: grid;
-  grid-template-columns: 48px var(--lw, 286px) 1fr var(--rw, 372px);
-  grid-template-rows: 34px 35px 1fr var(--cmd-h, 132px) 22px;
+  grid-template-columns: 48px var(--lw, 286px) minmax(0, 1fr) var(--rw, 372px);
+  grid-template-rows: 34px 35px minmax(0, 1fr) var(--cmd-h, 132px) 22px;
   /* 命令行窗口（cmd）与中间数字孪生（stage）同列同宽；工具栏宽度与数字孪生一致（仅占中间列），左右侧栏/活动栏顶到顶部（延伸至工具栏行），VSCode 面板式布局 */
   grid-template-areas:
     "topbar topbar topbar topbar"
@@ -147,8 +147,49 @@ button b, button strong,
 .app.bottom-collapsed { grid-template-rows: 34px 35px 1fr 0 22px; }
 .app.bottom-collapsed .cmdwin { display: none; }
 /* 非数字孪生独立视图（监测数据 / CEA 行情 / 碳排核算 / 能流分析 / 能碳一体机）沉浸模式：
-   隐藏左/右/下侧边栏与状态条，中间视图占满剩余空间 */
-.app.view-immersive { grid-template-rows: 34px 35px 1fr 0 0; }
+   默认隐藏左/右/下侧面板，中间视图占满剩余空间，底部状态栏保留；
+   用户通过顶栏按钮 / 左侧活动栏展开面板后，命令行行高由 --cmd-h 接管（状态条行常驻 22px） */
+.app.view-immersive { grid-template-rows: 34px 35px minmax(0, 1fr) var(--cmd-h, 132px) 22px; }
+
+/* ============ 视图名标识栏：占 ribbon 同行 grid-area（toolbar），与 RibbonToolbar 互斥显示
+   仅 boxManageOn 时渲染；高度与 ribbon 一致（35px），与 TopBar/Ribbon 风格统一 ============ */
+.view-banner {
+  grid-area: toolbar;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 35px; padding: 0 12px;
+  background: var(--panel); color: var(--text);
+  border-bottom: 1px solid var(--border);
+  border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+  font-family: var(--ui, -apple-system, "Segoe UI", "PingFang SC", sans-serif);
+  font-size: 12px; user-select: none;
+}
+.view-banner .vb-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.view-banner .vb-right { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 11px; }
+.view-banner .vb-logo {
+  font-size: 14px; line-height: 1; color: var(--accent);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.view-banner .vb-title { font-size: 12.5px; font-weight: 700; letter-spacing: .4px; white-space: nowrap; }
+.view-banner .vb-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px; border-radius: 10px; font-size: 10.5px; font-weight: 600;
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+}
+.view-banner .vb-chip.ok { color: var(--green); border-color: color-mix(in srgb, var(--green) 35%, var(--border)); }
+.view-banner .vb-chip.warn { color: var(--yellow); border-color: color-mix(in srgb, var(--yellow) 35%, var(--border)); }
+.view-banner .vb-chip.err { color: var(--red); border-color: color-mix(in srgb, var(--red) 35%, var(--border)); }
+.view-banner .vb-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--faint);
+}
+.view-banner .vb-dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.view-banner .vb-hint { color: var(--muted); }
+.view-banner .vb-close {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; font-size: 11px; cursor: pointer; border-radius: 5px;
+  border: 1px solid var(--border); background: var(--panel-2); color: var(--muted);
+  transition: background .12s, color .12s, border-color .12s;
+}
+.view-banner .vb-close:hover { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, var(--border)); }
 
 /* ============ 顶栏：VS Code 标题栏 + 菜单栏（浅色，扁平，无图标菜单） ============ */
 .topbar {
@@ -461,7 +502,7 @@ button b, button strong,
 .cmd-input { flex: 1; border: none; outline: none; background: transparent; font-family: var(--mono); font-size: 12px; color: var(--text); }
 
 /* ============ 底栏状态条（VS Code 式：主题蓝底、白字、hover 提亮） ============ */
-.statusbar { grid-area: status; display: flex; align-items: stretch; height: 22px;
+.statusbar { grid-area: status; display: flex; align-items: stretch; height: 22px; overflow: hidden;
   background: var(--accent); border-top: none; font-size: 10.5px; color: rgba(255,255,255,.85); font-family: var(--mono); letter-spacing: .1px; }
 .statusbar .st { display: flex; align-items: center; gap: 5px; padding: 0 10px; border-right: 1px solid rgba(255,255,255,.18); white-space: nowrap; cursor: default; }
 .statusbar .st:hover { background: rgba(255,255,255,.1); }

@@ -1,24 +1,91 @@
 {
   "models": [
     {
-      "name": "belt_scale-test-model",
+      "name": "weighing-indicator-model",
       "namespace": "default",
       "protocol": "modbus",
       "properties": [
         {
           "name": "weight",
-          "type": "float",
+          "type": "int",
           "accessMode": "r",
           "registerType": "holdingRegister",
           "register": 0,
-          "scale": 1,
-          "unit": "t",
-          "desc": "test"
+          "limit": 2,
+          "scale": 0.01,
+          "isRegisterSwap": true,
+          "unit": "kg",
+          "desc": "实时重量（32位有符号，低字在前）"
         }
       ],
-      "yaml": "apiVersion: devices.kubeedge.io/v1alpha2\nkind: DeviceModel\nmetadata:\n  name: belt_scale-test-model\n  namespace: default\nspec:\n  properties:\n        - name: weight\n          description: test\n          type: {\n            float: {}\n          }\n          accessMode: ReadOnly\n          protocolCommonConfig: {\n            collectCycle: 1000\n          }\n          registerType: holdingRegister\n          register: 0\n          limit: \n          scale: 1\n          isSwap: False\n          isRegisterSwap: False\n          unit: t\n",
-      "created_at": 1787506373
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: DeviceModel\nmetadata:\n  name: \"weighing-indicator-model\"\n  namespace: \"default\"\nspec:\n  properties:\n  - name: \"weight\"\n    description: \"实时重量（32位有符号，低字在前）\"\n    type: INT\n    accessMode: ReadOnly\n    unit: \"kg\"\n",
+      "created_at": 1787800615
     }
   ],
-  "devices": []
+  "devices": [
+    {
+      "name": "chengzhong",
+      "namespace": "default",
+      "model": "weighing-indicator-model",
+      "node": "nt001",
+      "protocol": "modbus",
+      "collectCycle": 1000,
+      "cloudDevice": "202603041423",
+      "comm": {
+        "commType": "serial",
+        "slaveID": 1,
+        "serialPort": "/dev/ttyUSB-weigh",
+        "baudRate": 9600,
+        "parity": "none",
+        "tcpIP": "192.168.1.10",
+        "tcpPort": 502
+      },
+      "opcua": {
+        "url": "opc.tcp://127.0.0.1:4840",
+        "userName": "",
+        "password": ""
+      },
+      "bluetooth": {
+        "macAddress": "AA:BB:CC:DD:EE:FF"
+      },
+      "lora": {
+        "broker": "127.0.0.1",
+        "port": 1883,
+        "applicationID": "1",
+        "devEUI": "",
+        "appKey": "",
+        "region": "CN470",
+        "dataRate": "SF7BW125"
+      },
+      "cellular": {
+        "serialPort": "/dev/ttyUSB2",
+        "baudRate": 115200,
+        "apn": "cmnet",
+        "iface": "wwan0"
+      },
+      "properties": [
+        {
+          "name": "weight",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "holdingRegister",
+          "register": 0,
+          "limit": 2,
+          "scale": 0.01,
+          "isRegisterSwap": true,
+          "unit": "kg",
+          "desc": "实时重量（32位有符号，低字在前）"
+        }
+      ],
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"chengzhong\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\nspec:\n  deviceModelRef:\n    name: \"weighing-indicator-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"weight\"\n    collectCycle: 1000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        com:\n          commType: serial\n          serialPort: \"/dev/ttyUSB-weigh\"\n          baudRate: 9600\n          dataBits: 8\n          parity: \"none\"\n          stopBits: 1\n        slaveID: 1\n        visitors:\n        - propertyName: \"weight\"\n          register: HoldingRegister\n          offset: 0\n          limit: 2\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: true\n",
+      "created_at": 1787800615,
+      "status": "reporting"
+    }
+  ],
+  "cloud": {
+    "host": "172.19.134.45",
+    "agent_port": 42083,
+    "agent_token": "3c55b2662ec1341b56456524a778acc4358cb36b75d377a6",
+    "namespace": "default"
+  }
 }

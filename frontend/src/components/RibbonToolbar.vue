@@ -83,92 +83,55 @@
         <!-- ============ 监测数据查看 ============ -->
         <template v-else-if="view === 'data'">
           <div class="rbtns">
-            <button class="rbtn primary" @click="actions.closeView()" title="关闭当前视图，返回数字孪生场景">
-              <Icon name="scene3d"/><span>返回数字孪生</span>
-            </button>
             <button class="rbtn" @click="actions.dataRefresh()" title="重新拉取监测数据">
               <Icon name="refresh"/><span>刷新数据</span>
             </button>
-            <button class="rbtn" :class="{ on: store.fullscreenOn }" @click="store.toggleFullscreen()" title="全屏显示">
-              <Icon name="fullscreen"/><span>{{ store.fullscreenOn ? '退出全屏' : '全屏' }}</span>
-            </button>
           </div>
-          <span class="rdiv"></span>
-          <span class="rbtn-label">监测数据查看</span>
         </template>
         <!-- ============ CEA & CCER 行情 ============ -->
         <template v-else-if="view === 'market'">
+          <!-- 页签切换已移到视图内部二级菜单，这里仅保留当前页签对应的功能 -->
           <div class="rbtns">
-            <button class="rbtn primary" @click="actions.closeView()" title="关闭当前视图，返回数字孪生场景">
-              <Icon name="scene3d"/><span>返回数字孪生</span>
-            </button>
-            <button class="rbtn" @click="actions.marketRefresh()" title="刷新行情数据">
-              <Icon name="refresh"/><span>刷新行情</span>
-            </button>
-            <button class="rbtn" :class="{ on: actions.marketInstrument() === 'cea' }" @click="actions.marketSwitch('cea')" title="切换为 CEA 日 K 行情">
-              <Icon name="compare"/><span>CEA 日K</span>
-            </button>
-            <button class="rbtn" :class="{ on: actions.marketInstrument() === 'ccer' }" @click="actions.marketSwitch('ccer')" title="切换为 CCER 均价行情">
-              <Icon name="compare"/><span>CCER 均价</span>
-            </button>
-            <button class="rbtn" :class="{ on: actions.marketForecastOn() }" @click="actions.marketForecast()" title="叠加未来走势预测曲线">
-              <Icon name="eye"/><span>预测叠加</span>
-            </button>
-            <button class="rbtn" :class="{ on: store.fullscreenOn }" @click="store.toggleFullscreen()" title="全屏显示">
-              <Icon name="fullscreen"/><span>{{ store.fullscreenOn ? '退出全屏' : '全屏' }}</span>
+            <!-- 行情页签功能 -->
+            <template v-if="actions.marketTabOn() === 'market'">
+              <button class="rbtn" @click="actions.marketRefresh()" title="刷新行情数据">
+                <Icon name="refresh"/><span>刷新行情</span>
+              </button>
+              <button class="rbtn" :class="{ on: actions.marketInstrument() === 'cea' }" @click="actions.marketSwitch('cea')" title="切换为 CEA 日 K 行情">
+                <Icon name="compare"/><span>CEA 日K</span>
+              </button>
+              <button class="rbtn" :class="{ on: actions.marketInstrument() === 'ccer' }" @click="actions.marketSwitch('ccer')" title="切换为 CCER 均价行情">
+                <Icon name="compare"/><span>CCER 均价</span>
+              </button>
+              <button class="rbtn" :class="{ on: actions.marketForecastOn() }" @click="actions.marketForecast()" title="叠加未来走势预测曲线">
+                <Icon name="eye"/><span>预测叠加</span>
+              </button>
+            </template>
+            <!-- 台账页签功能 -->
+            <template v-else>
+              <button class="rbtn" @click="actions.marketLedgerRefresh()" title="刷新企业台账与策略数据">
+                <Icon name="refresh"/><span>刷新台账</span>
+              </button>
+            </template>
+            <button class="rbtn" @click="actions.carbonReport()" title="生成碳资产分析报告（Markdown）">
+              <Icon name="report"/><span>生成碳资产报告</span>
             </button>
           </div>
-          <span class="rdiv"></span>
-          <span class="rbtn-label">CEA &amp; CCER 行情</span>
         </template>
         <!-- ============ 碳排核算 ============ -->
         <template v-else-if="view === 'calc'">
-          <div class="rbtns">
-            <button class="rbtn primary" @click="actions.closeView()" title="关闭当前视图，返回数字孪生场景">
-              <Icon name="scene3d"/><span>返回数字孪生</span>
-            </button>
-            <button class="rbtn" :class="{ on: store.fullscreenOn }" @click="store.toggleFullscreen()" title="全屏显示">
-              <Icon name="fullscreen"/><span>{{ store.fullscreenOn ? '退出全屏' : '全屏' }}</span>
-            </button>
-          </div>
-          <span class="rdiv"></span>
-          <span class="rbtn-label">碳排核算</span>
         </template>
         <!-- ============ 能流分析 ============ -->
         <template v-else-if="view === 'energy'">
-          <div class="rbtns">
-            <button class="rbtn primary" @click="actions.closeView()" title="关闭当前视图，返回数字孪生场景">
-              <Icon name="scene3d"/><span>返回数字孪生</span>
-            </button>
-            <button class="rbtn" :class="{ on: store.fullscreenOn }" @click="store.toggleFullscreen()" title="全屏显示">
-              <Icon name="fullscreen"/><span>{{ store.fullscreenOn ? '退出全屏' : '全屏' }}</span>
-            </button>
-          </div>
-          <span class="rdiv"></span>
-          <span class="rbtn-label">能流分析</span>
         </template>
-        <!-- ============ 能碳一体机管理 ============ -->
+        <!-- ============ 能碳一体机管理：工具栏已下沉到视图内部，顶部工具栏不再重复展示 ============ -->
         <template v-else-if="view === 'box'">
-          <div class="rbtns">
-            <button class="rbtn primary" @click="actions.closeView()" title="关闭当前视图，返回数字孪生场景">
-              <Icon name="scene3d"/><span>返回数字孪生</span>
-            </button>
-            <button class="rbtn" @click="actions.boxRefresh()" title="重新拉取能碳一体机数据">
-              <Icon name="refresh"/><span>刷新数据</span>
-            </button>
-            <button class="rbtn" :class="{ on: store.fullscreenOn }" @click="store.toggleFullscreen()" title="全屏显示">
-              <Icon name="fullscreen"/><span>{{ store.fullscreenOn ? '退出全屏' : '全屏' }}</span>
-            </button>
-          </div>
-          <span class="rdiv"></span>
-          <div class="rbtns">
-            <button v-for="t in boxTabs" :key="t.id" class="rbtn" :class="{ on: actions.boxTabOn() === t.id }"
-                    @click="actions.boxSwitchTab(t.id)">{{ t.label }}</button>
-          </div>
-          <span class="rdiv"></span>
-          <span class="rbtn-label">能碳一体机管理</span>
         </template>
       </div>
+      <!-- 关闭：非数字孪生/编排态显示在最右侧，点击关闭当前视图返回数字孪生 -->
+      <button v-if="view !== 'twin' && view !== 'edit'" class="rbtn close-btn" @click="actions.closeView()" title="关闭当前视图，返回数字孪生场景">
+        <Icon name="close"/><span>关闭</span>
+      </button>
       <!-- 亮度：点击按钮弹出滑条（仅数字孪生态显示） -->
       <div v-if="view === 'twin'" class="bright-wrap">
         <button class="rbtn" :class="{ on: showBrightness }" @click="showBrightness = !showBrightness" title="画面亮度（点击展开滑条）">
@@ -200,17 +163,7 @@ const props = defineProps({
 const store = useSimStore()
 const showBrightness = ref(false)
 
-// 能碳一体机管理页签（与 CarbonBoxView 内部保持一致）
-const boxTabs = [
-  { id: 'overview', label: '总览' },
-  { id: 'devices', label: '设备管理' },
-  { id: 'links', label: '设备关联' },
-  { id: 'onboard', label: '盒子接入' },
-  { id: 'realtime', label: '实时数据' },
-  { id: 'guide', label: '接入指引' },
-]
-
-// 当前工具栏所属视图：数字孪生 / 流程编排 / 监测数据 / CEA 行情 / 碳排核算 / 能流分析 / 能碳一体机
+// 当前工具栏所属视图：数字孪生 / 流程编排 / 监测数据 / 碳资产管理 / 碳排核算 / 能流分析 / 能碳一体机
 const view = computed(() => {
   if (store.editMode) return 'edit'
   if (store.dataViewOn) return 'data'
@@ -230,13 +183,10 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 </script>
 
 <style scoped>
-/* 视图名标签：数字孪生以外各视图工具栏右侧的当前视图名称 */
-.rbtn-label {
-  display: inline-flex; align-items: center;
-  height: 24px; padding: 0 10px; margin-left: 4px;
-  border-left: 1px solid var(--line);
-  font-size: 12px; letter-spacing: 1px;
-  color: var(--muted); user-select: none;
-  white-space: nowrap;
+/* 关闭按钮：非数字孪生/编排态视图工具栏最右侧，点击关闭当前视图返回数字孪生 */
+.close-btn {
+  flex: 0 0 auto; margin-left: auto; padding: 0 12px;
+  color: var(--muted); white-space: nowrap;
 }
+.close-btn:hover { color: #e05252; background: var(--panel-3); }
 </style>

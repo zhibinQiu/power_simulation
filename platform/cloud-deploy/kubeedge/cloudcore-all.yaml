@@ -1,0 +1,194 @@
+# ============================================================================
+# 能碳一体机 · 云端 KubeEdge cloudcore 部署 manifest（模板）
+#
+# 依据 kubeedge-console-ops.md 2.3 成功路径:
+#   Namespace kubeedge → SA cloudcore → ClusterRole(宽权限) → ClusterRoleBinding
+#   → ConfigMap cloudcore-config(内嵌 cloudcore.yaml) → Deployment(hostNetwork)
+#   → Service(ClusterIP)
+#
+# 使用前必须用 deploy_cloud.sh 渲染 {{CLOUD_IP}} 为云端对外 IP，例如:
+#   sed "s/{{CLOUD_IP}}/172.19.134.45/g" cloudcore-all.yaml | kubectl apply -f -
+#
+# 关键设计:
+#   - Deployment hostNetwork:true / dnsPolicy:ClusterFirstWithHostNet
+#     → cloudcore 直接监听宿主机 10001(quic)/10002(https)/10003(cloudStream)/10004(websocket)
+#   - hostPath 挂载宿主机 /etc/kubeedge（证书/CA 由 gen_certs.sh 预置，manifest 不生成）
+#   - 启动命令 cloudcore --config=/config/cloudcore.yaml（配置来自 ConfigMap）
+#   - securityContext.capabilities.add: ["NET_ADMIN"]
+#   - 不含 tokensecret：cloudcore 首次启动自动生成（ns kubeedge，key tokendata，默认 24h）
+# ============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubeedge
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cloudcore
+  namespace: kubeedge
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cloudcore
+rules:
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+  - nonResourceURLs: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cloudcore
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cloudcore
+subjects:
+  - kind: ServiceAccount
+    name: cloudcore
+    namespace: kubeedge
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudcore-config
+  namespace: kubeedge
+data:
+  cloudcore.yaml: |
+    apiVersion: cloudcore.config.kubeedge.io/v1alpha2
+    kind: CloudCore
+    modules:
+      cloudHub:
+        advertiseAddress:
+        - "{{CLOUD_IP}}"
+        dnsNames:
+        - cloudcore.kubeedge.svc
+        nodeLimit: 1000
+        quic:
+          enable: true
+          address: 0.0.0.0
+          port: 10001
+          maxIncomingStreams: 10000
+        tlsCAFile: /etc/kubeedge/ca/rootCA.crt
+        tlsCertFile: /etc/kubeedge/certs/server.crt
+        tlsPrivateKeyFile: /etc/kubeedge/certs/server.key
+        tokenRefreshDuration: 24h
+        websocket:
+          enable: true
+          address: 0.0.0.0
+          port: 10004
+          maxIncomingStreams: 10000
+        https:
+          enable: true
+          address: 0.0.0.0
+          port: 10002
+      edgeController:
+        enable: true
+        nodeUpdateFrequency: 10
+        buffer:
+          updatePodStatus: 1024
+          updateNodeStatus: 1024
+          queryConfigMap: 1024
+          querySecret: 1024
+          queryService: 1024
+          queryEndpoints: 1024
+          queryNode: 1024
+        load:
+          updatePodStatusWorkers: 1
+          updateNodeStatusWorkers: 1
+          queryConfigMapWorkers: 1
+          querySecretWorkers: 1
+          queryServiceWorkers: 1
+          queryEndpointsWorkers: 1
+          queryNodeWorkers: 1
+      deviceController:
+        enable: true
+      cloudStream:
+        enable: true
+        tunnelPort: 10003
+      router:
+        enable: false
+      dynamicController:
+        enable: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudcore
+  namespace: kubeedge
+  labels:
+    k8s-app: kubeedge
+    kubeedge: cloudcore
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: kubeedge
+      kubeedge: cloudcore
+  template:
+    metadata:
+      labels:
+        k8s-app: kubeedge
+        kubeedge: cloudcore
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: cloudcore
+          image: kubeedge/cloudcore:v1.20.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - cloudcore
+            - --config=/config/cloudcore.yaml
+          env:
+            - name: KUBECONFIG
+              value: /etc/kubeedge/kubeconfig
+          resources:
+            requests:
+              cpu: 100m
+              memory: 1536Mi
+            limits:
+              cpu: 1000m
+              memory: 1536Mi
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+          volumeMounts:
+            - name: certs
+              mountPath: /etc/kubeedge
+            - name: config
+              mountPath: /config
+            - name: kubeconfig
+              mountPath: /etc/kubeedge/kubeconfig
+      volumes:
+        - name: certs
+          hostPath:
+            path: /etc/kubeedge
+            type: DirectoryOrCreate
+        - name: config
+          configMap:
+            name: cloudcore-config
+        - name: kubeconfig
+          hostPath:
+            path: /etc/rancher/k3s/k3s.yaml
+            type: FileOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloudcore
+  namespace: kubeedge
+  labels:
+    k8s-app: kubeedge
+    kubeedge: cloudcore
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    k8s-app: kubeedge
+    kubeedge: cloudcore

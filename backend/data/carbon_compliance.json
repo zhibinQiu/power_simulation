@@ -1,0 +1,1013 @@
+{
+  "settings": {
+    "compliance": {
+      "ccer_max_ratio": 0.05,
+      "clearance_warn_days": [
+        90,
+        30,
+        15
+      ],
+      "price_low_percentile": 0.3,
+      "price_mid_percentile": 0.7,
+      "single_trade_cap_default": 0.0,
+      "annual_position_cap_default": 100.0,
+      "large_trade_split_threshold": 5.0,
+      "carry_forward_deadline_md": "06-10",
+      "carry_base_qty": 0.0,
+      "carry_net_sell_multiplier": 1.5
+    },
+    "strategy_profiles": {
+      "conservative": {
+        "allow_stockpile": false,
+        "allow_sell_surplus": false,
+        "allow_buy_external_ccer": false
+      },
+      "balanced": {
+        "allow_stockpile": false,
+        "allow_sell_surplus": true,
+        "allow_buy_external_ccer": true
+      },
+      "aggressive": {
+        "allow_stockpile": true,
+        "allow_sell_surplus": true,
+        "allow_buy_external_ccer": true
+      }
+    },
+    "channel": {
+      "prefer_offline": true,
+      "offline_discount_vs_listed": 0.03
+    },
+    "cost": {
+      "listing_fee_rate": 0.0,
+      "block_fee_rate": 0.0,
+      "trade_fee_rate": 0.0,
+      "tax_rate": 0.0,
+      "grid_emission_factor": 0.5703,
+      "overdue_penalty_per_t": 200.0,
+      "holding_cost_annual_rate": 0.04
+    },
+    "industry_params": {
+      "power": {
+        "quota_baseline": 0.0,
+        "capacity_factor": 1.0,
+        "free_quota_issue_month": 3,
+        "carry_years": 1,
+        "carry_cap_ratio": 1.0,
+        "clearance_deadline_md": "12-31",
+        "overdue_penalty_per_t": 200.0,
+        "grid_emission_factor": 0.5703
+      },
+      "steel": {
+        "quota_baseline": 0.0,
+        "capacity_factor": 1.0,
+        "free_quota_issue_month": 3,
+        "carry_years": 1,
+        "carry_cap_ratio": 1.0,
+        "clearance_deadline_md": "12-31",
+        "overdue_penalty_per_t": 200.0,
+        "grid_emission_factor": 0.5703
+      },
+      "cement": {
+        "quota_baseline": 0.0,
+        "capacity_factor": 1.0,
+        "free_quota_issue_month": 3,
+        "carry_years": 1,
+        "carry_cap_ratio": 1.0,
+        "clearance_deadline_md": "12-31",
+        "overdue_penalty_per_t": 200.0,
+        "grid_emission_factor": 0.5703
+      },
+      "aluminum": {
+        "quota_baseline": 0.0,
+        "capacity_factor": 1.0,
+        "free_quota_issue_month": 3,
+        "carry_years": 1,
+        "carry_cap_ratio": 1.0,
+        "clearance_deadline_md": "12-31",
+        "overdue_penalty_per_t": 200.0,
+        "grid_emission_factor": 0.5703
+      }
+    },
+    "integrations": {
+      "market_sync_period": "day",
+      "market_sync_enabled": true,
+      "erp_api_url": "",
+      "erp_api_key": "",
+      "excel_import_enabled": true
+    }
+  },
+  "enterprises": [
+    {
+      "id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+      "user_id": "default",
+      "name": "冀东钢铁集团有限公司",
+      "uscc": "91130207MA0G5KQ3Q9",
+      "industry": "steel",
+      "market_start_year": 2025,
+      "compliance_cycle": "annual",
+      "risk_profile": "balanced",
+      "annual_budget_cap": 100000000.0,
+      "single_trade_limit": 0.0,
+      "enterprise_attrs": {
+        "crude_steel_output": 1000.0,
+        "route": "长流程（高炉-转炉）",
+        "blast_furnace": "2×3200m³ 高炉",
+        "intensity_per_t_steel": 1.6,
+        "note": "年产粗钢约 1000 万吨，吨钢综合能耗约 550 kgce，外购电占比约 40%"
+      },
+      "created_at": "2026-08-24T13:48:37+08:00",
+      "updated_at": "2026-08-24T13:48:37+08:00",
+      "emissions": [
+        {
+          "id": "83ee8270-716f-4a30-b5d9-5497d510c013",
+          "year": 2025,
+          "verified_total": 1600.0,
+          "scope1_combustion": 1350,
+          "scope1_process": 250,
+          "scope2_power": 114
+        }
+      ],
+      "forecasts": [
+        {
+          "id": "fc-2026-001",
+          "year": 2026,
+          "forecast_total": 1580.0,
+          "capacity_plan": "粗钢产量 1000 万吨，维持现有产能",
+          "abatement_projects": [
+            "烧结烟气余热回收改造",
+            "高炉煤气发电提效",
+            "绿电年度交易 40 亿 kWh"
+          ],
+          "production_plan": "粗钢产量约 1010 万吨，吨钢碳排放强度降至 1.58"
+        }
+      ],
+      "cea_holdings": [
+        {
+          "id": "a963932d-33b0-436c-9b3d-ed5c3787fa09",
+          "vintage_year": 2025,
+          "free_quota": 1550.0,
+          "avg_cost": 0
+        }
+      ],
+      "cea_trades": [],
+      "ccer_holdings": [
+        {
+          "id": "a37abf51-4a7c-496f-be87-e4e3c67a6508",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "project_type": "forest",
+          "issue_year": 2025,
+          "expire_at": "2027-12-31",
+          "qty": 30.0,
+          "cost": 62.0,
+          "eligible_qty": 30.0,
+          "linked_green_cert": false
+        }
+      ],
+      "ccer_trades": [],
+      "green_power": [],
+      "green_certs": [],
+      "strategy_runs": [
+        {
+          "id": "run-2025-08-24-steel",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "year": 2025,
+          "compliance_cycle": "annual",
+          "created_at": "2026-08-24 14:08:33",
+          "status": "completed",
+          "accounting_snapshot": {
+            "scope1_total": 1600.0,
+            "scope2_from_power": 0.0,
+            "raw_total": 1600.0,
+            "reducible_power": 0.0,
+            "verified_emission": 1600.0,
+            "free_cea_quota": 1550.0,
+            "compliance_gap": 50.0,
+            "ccer_max_ratio": 0.05,
+            "ccer_cap": 80.0,
+            "own_ccer_eligible": 30.0,
+            "own_ccer_usable": 30.0,
+            "own_ccer_locked": 0.0,
+            "residual_gap_after_own_ccer": 20.0,
+            "allocated_free_cea": 1550.0,
+            "carry_forward_qty": 0.0,
+            "usable_cea_total": 1550.0,
+            "verified_emission_cap": 1600.0
+          },
+          "market_tags": {
+            "price_band": "high",
+            "time_window": "mid",
+            "action_tag": "hold",
+            "current_price": 97.8,
+            "cea_ccer_spread": 1.46,
+            "ccer_supply_tag": "unknown",
+            "rationale": "CEA 处年内高位逼近 100 元关口，缺口企业宜延后采购并优先消耗自有 CCER；规则预测年底约 101.1 元/吨，建议四季度回落窗口分批补足缺口",
+            "price_forecast": {
+              "as_of": "2026-08-24",
+              "year_end_expected": 101.1,
+              "range_low": 92.4,
+              "range_high": 106.3,
+              "direction": "up",
+              "note": "规则模型：趋势 0.20 元/日 + 履约季 5.6% 冲高 + 历史波动 3.1%；四季度或有 5~8 元/吨回落窗口"
+            },
+            "carry_forward": {
+              "deadline_md": "06-10",
+              "deadline": "2026-06-10",
+              "base_qty": 1550.0,
+              "net_sell": 0.0,
+              "net_sell_multiplier": 1.5,
+              "year_end_holding": 0.0,
+              "formula_cap": 1550.0,
+              "max_carry": 0.0,
+              "excess": 0.0,
+              "sell_to_expand_cap": 0.0
+            }
+          },
+          "plans": {
+            "min_cost": {
+              "id": "plan-min-cost",
+              "label": "成本最优",
+              "total_actions": 2,
+              "buy_cea": {
+                "qty": 20.0,
+                "unit_price": 94.9824,
+                "venue": "线下协议",
+                "cost": 18996480.0,
+                "split_suggested": true,
+                "note": "线下大宗 97.92 元/吨 × 0.97 ≈ 94.98 元/吨"
+              },
+              "use_ccer": {
+                "qty": 30.0,
+                "unit_price": 0.0,
+                "venue": "自有台账",
+                "cost": 0.0,
+                "note": "消耗自有 CCER 30 万吨（取得成本 62 元/吨）"
+              },
+              "total_cost": 18996480.0,
+              "net_saving": 587520.0,
+              "summary": "缺口 50 万吨：自有 CCER 抵扣 30 万吨 + 买入 CEA 20 万吨",
+              "risks": [
+                "年底履约冲刺期碳价或进一步冲高 5%～8%，采购成本存在上行风险",
+                "自有 CCER 仅 30 万吨，若减排量备案或审核存在不确定性，需提前预留资金采购 CEA",
+                "关注生态环境部钢铁行业 2025 年度配额分配方案正式文件，若配额收紧缺口可能扩大"
+              ]
+            },
+            "optimized": {
+              "id": "plan-optimized",
+              "label": "综合推荐",
+              "total_actions": 2,
+              "buy_cea": {
+                "qty": 20.0,
+                "unit_price": 94.9824,
+                "venue": "线下协议",
+                "cost": 18996480.0,
+                "split_suggested": true,
+                "note": "线下大宗 97.92 元/吨 × 0.97 ≈ 94.98 元/吨"
+              },
+              "use_ccer": {
+                "qty": 30.0,
+                "unit_price": 0.0,
+                "venue": "自有台账",
+                "cost": 0.0,
+                "note": "消耗自有 CCER 30 万吨（取得成本 62 元/吨）"
+              },
+              "total_cost": 18996480.0,
+              "net_saving": 587520.0,
+              "summary": "缺口 50 万吨：自有 CCER 抵扣 30 万吨 + 买入 CEA 20 万吨",
+              "risks": [
+                "年底履约冲刺期碳价或进一步冲高 5%～8%，采购成本存在上行风险",
+                "自有 CCER 仅 30 万吨，若减排量备案或审核存在不确定性，需提前预留资金采购 CEA",
+                "关注生态环境部钢铁行业 2025 年度配额分配方案正式文件，若配额收紧缺口可能扩大"
+              ]
+            },
+            "full_compliance": {
+              "id": "plan-full",
+              "label": "完全履约",
+              "total_actions": 2,
+              "buy_cea": {
+                "qty": 20.0,
+                "unit_price": 94.9824,
+                "venue": "线下协议",
+                "cost": 18996480.0,
+                "split_suggested": true,
+                "note": "线下大宗 97.92 元/吨 × 0.97 ≈ 94.98 元/吨"
+              },
+              "use_ccer": {
+                "qty": 30.0,
+                "unit_price": 0.0,
+                "venue": "自有台账",
+                "cost": 0.0,
+                "note": "消耗自有 CCER 30 万吨（取得成本 62 元/吨）"
+              },
+              "total_cost": 18996480.0,
+              "net_saving": 587520.0,
+              "summary": "缺口 50 万吨：自有 CCER 抵扣 30 万吨 + 买入 CEA 20 万吨",
+              "risks": [
+                "年底履约冲刺期碳价或进一步冲高 5%～8%，采购成本存在上行风险",
+                "自有 CCER 仅 30 万吨，若减排量备案或审核存在不确定性，需提前预留资金采购 CEA",
+                "关注生态环境部钢铁行业 2025 年度配额分配方案正式文件，若配额收紧缺口可能扩大"
+              ]
+            }
+          },
+          "selected_plan": "optimized",
+          "report_md": "# 冀东钢铁集团有限公司 2025 年碳履约策略推荐\n\n## 一、核算快照（2025 履约年）\n\n- 核查排放（范围一）：1600.00 万吨 CO₂e\n  - 燃料燃烧（烧结、炼铁、轧钢等）：1350.00 万吨\n  - 工业过程（石灰石/白云石分解等）：250.00 万吨\n- 外购电力（范围二，参考）：114.00 万吨 CO₂e\n- 免费配额：1550.00 万吨\n- 履约缺口：50.00 万吨\n- CCER 可抵扣上限（核查排放的 5%）：80.00 万吨\n- 台账可抵扣 CCER：30.00 万吨\n\n## 二、市场环境\n\n- CEA 现价：97.8 元/吨（年内高位）\n- 规则预测：年底约 101.1 元/吨（区间 92.4～106.3）\n- 综合判断：价格高位运行，缺口企业宜延后采购、优先消耗自有 CCER\n\n## 三、推荐方案（分层）\n\n| 方案 | 自有 CCER | 买入 CEA | 合计成本 |\n|------|-----------|----------|----------|\n| 成本最优 | 30 万吨 | 20 万吨 | 1899.6 万元 |\n| 综合推荐 | 30 万吨 | 20 万吨 | 1899.6 万元 |\n| 完全履约 | 30 万吨 | 20 万吨 | 1899.6 万元 |\n\n- 线下大宗成交价约 94.98 元/吨（较挂牌价 97.92 元/吨低 3%），按 20 万吨可节省约 58.8 万元。\n- 采购量 20 万吨超过 5 万吨大宗拆分阈值，建议拆分为 4×5 万吨分批执行。\n\n## 四、结转安排\n\n- 本履约年配额无盈余（缺口 50 万吨），无可结转数量。\n- 结转申请截止：2026-06-10。\n\n## 五、风险提示\n\n- 年底履约冲刺期碳价或进一步冲高，若未在四季度回落窗口采购，成本可能增加约 5%～8%。\n- 自有 CCER 仅 30 万吨，若减排量备案或审核存在不确定性，需提前预留资金采购 CEA。\n- 建议关注生态环境部关于钢铁行业 2025 年度配额分配方案的正式文件。\n"
+        },
+        {
+          "id": "44e55b83-768c-44f1-a0ff-966c0beb1f48",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "user_id": "default",
+          "compliance_year": 2026,
+          "accounting_snapshot": {
+            "scope1_total": 0.0,
+            "scope2_from_power": 0.0,
+            "raw_total": 0.0,
+            "reducible_power": 0.0,
+            "verified_emission": 1580.0,
+            "free_cea_quota": 1550.0,
+            "compliance_gap": 30.0,
+            "ccer_cap": 79.0,
+            "own_ccer_eligible": 30.0,
+            "own_ccer_usable": 30.0,
+            "residual_gap_after_own_ccer": 0.0,
+            "allocated_free_cea": 0.0,
+            "carry_forward_qty": 0.0,
+            "usable_cea_total": 1550.0
+          },
+          "market_tags": {
+            "price_band": "high",
+            "time_window": "mid",
+            "action_tag": "hold",
+            "current_price": 97.8,
+            "cea_ccer_spread": 1.4599999999999937,
+            "ccer_supply_tag": "unknown",
+            "rationale": "价格高位，缺口企业宜延后采购并优先消耗自有 CCER；日度预测年底约 101.3 元/吨（高于现价），宜评估提前分批采购",
+            "price_forecast": {
+              "as_of": "2026-08-24",
+              "end_date": "2026-12-31",
+              "last_close": 97.82,
+              "year_end_price": 101.35,
+              "year_end_low": 94.74,
+              "year_end_high": 107.97,
+              "peak_price": 102.16,
+              "peak_date": "2026-12-25",
+              "trough_price": 97.33,
+              "trough_date": "2026-09-25",
+              "trading_days": 93,
+              "method": "trend_seasonal_compliance",
+              "note": "算法=规则模型：衰减趋势(均线差日漂移)+去均值同周季节+履约季冲高回落（四季度相对上半年溢价定振幅；约12月初见顶、年底回吐）；波动带=近60日收益标准差×√天数。 CEA 公开侧无实时挂单，输入为历史日均/收盘；仅供履约择机参考，不构成投资建议。"
+            },
+            "carry_forward": {
+              "deadline_md": "06-10",
+              "deadline": "2027-06-10",
+              "base_qty": 1550.0,
+              "net_sell": 0.0,
+              "net_sell_multiplier": 1.5,
+              "year_end_holding": 0.0,
+              "formula_cap": 1550.0,
+              "max_carry": 0.0,
+              "excess": 0.0,
+              "sell_to_expand_cap": 0.0
+            }
+          },
+          "plans": [
+            {
+              "key": "min_cost",
+              "title": "最低成本履约方案",
+              "description": "仅 CEA+CCER 满足清缴刚需，优先线下撮合降本",
+              "actions": [
+                {
+                  "action": "use_ccer",
+                  "qty": 30.0,
+                  "unit_price": 0.0,
+                  "window": "mid",
+                  "note": "优先全额消耗自有存量 CCER（不涉及市场渠道）",
+                  "meta": {
+                    "fee_rate": 0.0,
+                    "fee_kind": "none"
+                  }
+                }
+              ],
+              "total_cost": 0.0,
+              "net_saving": 0.0,
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": []
+              },
+              "time_window": "mid",
+              "market_action_tag": "hold",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.03,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，并假定线下更优",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "optimized",
+              "title": "成本优化综合方案",
+              "description": "CEA+CCER + 择时窗口，线下优先、线上挂牌兜底",
+              "actions": [
+                {
+                  "action": "use_ccer",
+                  "qty": 30.0,
+                  "unit_price": 0.0,
+                  "window": "mid",
+                  "note": "优先全额消耗自有存量 CCER（不涉及市场渠道）",
+                  "meta": {
+                    "fee_rate": 0.0,
+                    "fee_kind": "none"
+                  }
+                }
+              ],
+              "total_cost": 0.0,
+              "net_saving": 0.0,
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": []
+              },
+              "time_window": "mid",
+              "market_action_tag": "hold",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.03,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，并假定线下更优",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "full_compliance",
+              "title": "稳健履约方案",
+              "description": "CEA+CCER 全覆盖，含囤存/出售等画像允许动作",
+              "actions": [
+                {
+                  "action": "use_ccer",
+                  "qty": 30.0,
+                  "unit_price": 0.0,
+                  "window": "mid",
+                  "note": "优先全额消耗自有存量 CCER（不涉及市场渠道）",
+                  "meta": {
+                    "fee_rate": 0.0,
+                    "fee_kind": "none"
+                  }
+                }
+              ],
+              "total_cost": 0.0,
+              "net_saving": 0.0,
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": []
+              },
+              "time_window": "mid",
+              "market_action_tag": "hold",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.03,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，并假定线下更优",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            }
+          ],
+          "status": "completed",
+          "report_md": "# 冀东钢铁集团有限公司 2026 年碳履约策略推荐\n\n## 核算快照\n\n- 最终核查排放：1580.00 万吨 CO₂e\n- 免费 CEA：1550.00 万吨\n- 履约缺口/富余：30.00 万吨\n- CCER 合规上限：79.00 万吨\n- 台账可抵扣 CCER：30.00 万吨\n- 本履约可动用 CCER：30.00 万吨\n\n## 市场周期\n\n- 价格带：高位\n- 时间窗口：年中窗口\n- 建议动作：观望持有\n- 说明：价格高位，缺口企业宜延后采购并优先消耗自有 CCER；日度预测年底约 101.3 元/吨（高于现价），宜评估提前分批采购\n\n## 分层推荐方案\n\n### 最低成本履约方案\n\n仅 CEA+CCER 满足清缴刚需，优先线下撮合降本\n\n- 总成本测算：0.00\n- 净节约：0.00\n- 操作窗口：年中窗口\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 30.00 | 0.00 | 年中窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n\n### 成本优化综合方案\n\nCEA+CCER + 择时窗口，线下优先、线上挂牌兜底\n\n- 总成本测算：0.00\n- 净节约：0.00\n- 操作窗口：年中窗口\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 30.00 | 0.00 | 年中窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n\n### 稳健履约方案\n\nCEA+CCER 全覆盖，含囤存/出售等画像允许动作\n\n- 总成本测算：0.00\n- 净节约：0.00\n- 操作窗口：年中窗口\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 30.00 | 0.00 | 年中窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n\n---\n\n本报告由确定性规则引擎生成，不构成投资或合规承诺，请结合最新政策复核。",
+          "created_at": "2026-08-24T15:27:32+08:00"
+        }
+      ],
+      "alerts": [
+        {
+          "id": "c12cd568-2ac1-45d0-90b9-125d5030f26e",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "user_id": "default",
+          "level": "warning",
+          "alert_type": "price_spike",
+          "message": "CEA 价格处于历史高位区间，关注采购成本与卖出窗口",
+          "due_at": null,
+          "acked": false,
+          "created_at": "2026-08-24T14:08:57+08:00"
+        },
+        {
+          "id": "963c9a4c-eb09-41f9-9dbb-a5e367337f5a",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "user_id": "default",
+          "level": "warning",
+          "alert_type": "price_spike",
+          "message": "CEA 价格处于历史高位区间，关注采购成本与卖出窗口",
+          "due_at": null,
+          "acked": false,
+          "created_at": "2026-08-24T15:27:32+08:00"
+        }
+      ]
+    }
+  ],
+  "market_cea": [
+    {
+      "id": "e4624cb4-0775-41ac-8727-9ea3d57463cf",
+      "year_month": "2021-07",
+      "avg_price": 53.8564,
+      "high": 61.07,
+      "low": 48.0,
+      "period_tag": "mid"
+    },
+    {
+      "id": "ecf88cda-6edd-4e45-9273-7d2aa1089cf2",
+      "year_month": "2021-08",
+      "avg_price": 51.4255,
+      "high": 59.0,
+      "low": 44.0,
+      "period_tag": "mid"
+    },
+    {
+      "id": "99d29640-41ca-4d40-bef9-01468d26c29c",
+      "year_month": "2021-09",
+      "avg_price": 43.8575,
+      "high": 50.18,
+      "low": 41.0,
+      "period_tag": "mid"
+    },
+    {
+      "id": "222d171b-dd4f-4c87-88e7-6111e616e797",
+      "year_month": "2021-10",
+      "avg_price": 43.5706,
+      "high": 48.49,
+      "low": 38.5,
+      "period_tag": "late"
+    },
+    {
+      "id": "fd98d520-5953-4bbd-8a77-db523fc5c653",
+      "year_month": "2021-11",
+      "avg_price": 42.8032,
+      "high": 46.0,
+      "low": 42.0,
+      "period_tag": "late"
+    },
+    {
+      "id": "6ae39031-271f-410f-b459-a97b4a4daccc",
+      "year_month": "2021-12",
+      "avg_price": 46.7013,
+      "high": 62.29,
+      "low": 40.0,
+      "period_tag": "late"
+    },
+    {
+      "id": "031925eb-8a0f-440c-be0a-aeddf5042e49",
+      "year_month": "2022-01",
+      "avg_price": 57.7784,
+      "high": 61.6,
+      "low": 51.71,
+      "period_tag": "early"
+    },
+    {
+      "id": "39fc561e-1176-43be-83c3-b7b8e4e10fa4",
+      "year_month": "2022-02",
+      "avg_price": 57.6594,
+      "high": 60.0,
+      "low": 50.54,
+      "period_tag": "early"
+    },
+    {
+      "id": "aab59d80-3bfb-42ce-bea3-ef5812e04497",
+      "year_month": "2022-03",
+      "avg_price": 57.8535,
+      "high": 59.0,
+      "low": 57.0,
+      "period_tag": "early"
+    },
+    {
+      "id": "d3fe81a6-691b-4a36-83f7-ccf16929453d",
+      "year_month": "2022-04",
+      "avg_price": 59.6995,
+      "high": 60.0,
+      "low": 58.0,
+      "period_tag": "early"
+    },
+    {
+      "id": "e49e9823-7f7d-4a85-ab7d-f1ec3c0c11ea",
+      "year_month": "2022-05",
+      "avg_price": 58.3763,
+      "high": 61.0,
+      "low": 58.0,
+      "period_tag": "mid"
+    },
+    {
+      "id": "0910196f-8cc5-4dfa-9568-73bfd04e49cc",
+      "year_month": "2022-06",
+      "avg_price": 59.1119,
+      "high": 60.0,
+      "low": 57.5,
+      "period_tag": "mid"
+    },
+    {
+      "id": "b4c3bd1c-59b6-4daa-bd64-4d3d279aa722",
+      "year_month": "2022-07",
+      "avg_price": 57.8338,
+      "high": 60.0,
+      "low": 55.0,
+      "period_tag": "mid"
+    },
+    {
+      "id": "d7309a7e-f2fd-4938-b14a-1971f37faaaa",
+      "year_month": "2022-08",
+      "avg_price": 58.1796,
+      "high": 59.5,
+      "low": 57.0,
+      "period_tag": "mid"
+    },
+    {
+      "id": "67c85f23-7ef6-44dd-9567-ad7c7ca8f904",
+      "year_month": "2022-09",
+      "avg_price": 58.0214,
+      "high": 59.0,
+      "low": 57.0,
+      "period_tag": "mid"
+    },
+    {
+      "id": "fcb64fc9-a961-4a90-a615-e569861fd5de",
+      "year_month": "2022-10",
+      "avg_price": 58.1131,
+      "high": 58.7,
+      "low": 57.5,
+      "period_tag": "late"
+    },
+    {
+      "id": "7b9fac5e-1763-4bef-b106-10fb2e246c20",
+      "year_month": "2022-11",
+      "avg_price": 57.8609,
+      "high": 58.2,
+      "low": 57.3,
+      "period_tag": "late"
+    },
+    {
+      "id": "b0ba43f3-9ee0-4150-91a1-9a3afcdf7cb3",
+      "year_month": "2022-12",
+      "avg_price": 56.4936,
+      "high": 58.0,
+      "low": 53.0,
+      "period_tag": "late"
+    },
+    {
+      "id": "91674e6e-ba4d-4603-a813-4bafffb45d1a",
+      "year_month": "2023-01",
+      "avg_price": 55.6994,
+      "high": 56.0,
+      "low": 55.0,
+      "period_tag": "early"
+    },
+    {
+      "id": "cde20c5c-35f7-4200-9753-33354b198ecc",
+      "year_month": "2023-02",
+      "avg_price": 56.092,
+      "high": 57.5,
+      "low": 55.0,
+      "period_tag": "early"
+    },
+    {
+      "id": "e0bc7f67-a584-4c09-982d-24f40bb094a7",
+      "year_month": "2023-03",
+      "avg_price": 56.0196,
+      "high": 57.5,
+      "low": 55.0,
+      "period_tag": "early"
+    },
+    {
+      "id": "c0cda249-9ea1-40a5-b36c-fd265b9995a3",
+      "year_month": "2023-04",
+      "avg_price": 54.9705,
+      "high": 56.0,
+      "low": 50.5,
+      "period_tag": "early"
+    },
+    {
+      "id": "ef63f9c6-5f38-424e-9318-a1384261684e",
+      "year_month": "2023-05",
+      "avg_price": 56.5695,
+      "high": 60.0,
+      "low": 55.5,
+      "period_tag": "mid"
+    },
+    {
+      "id": "628d8bb1-5e7c-4be0-96ee-be16555608d0",
+      "year_month": "2023-06",
+      "avg_price": 57.851,
+      "high": 60.0,
+      "low": 57.0,
+      "period_tag": "mid"
+    },
+    {
+      "id": "b2b3e228-9e65-4996-ac24-0a5d735f2ba7",
+      "year_month": "2023-07",
+      "avg_price": 61.0133,
+      "high": 65.0,
+      "low": 57.0,
+      "period_tag": "mid"
+    },
+    {
+      "id": "c2005abc-6214-4b67-9570-49af805b0828",
+      "year_month": "2023-08",
+      "avg_price": 69.2627,
+      "high": 75.0,
+      "low": 62.6,
+      "period_tag": "mid"
+    },
+    {
+      "id": "da646273-a822-4bdc-aeca-5f44776eba24",
+      "year_month": "2023-09",
+      "avg_price": 73.076,
+      "high": 77.0,
+      "low": 63.83,
+      "period_tag": "mid"
+    },
+    {
+      "id": "57502a40-2c77-462e-a3d9-eff7dcf45374",
+      "year_month": "2023-10",
+      "avg_price": 80.1876,
+      "high": 82.79,
+      "low": 75.29,
+      "period_tag": "late"
+    },
+    {
+      "id": "1bb6135e-7ab1-42cf-baaa-0fa9b4b437ab",
+      "year_month": "2023-11",
+      "avg_price": 72.9223,
+      "high": 79.47,
+      "low": 68.88,
+      "period_tag": "late"
+    },
+    {
+      "id": "718bccd3-6c7c-40f3-9212-42fe0fe69443",
+      "year_month": "2023-12",
+      "avg_price": 73.9319,
+      "high": 81.58,
+      "low": 65.58,
+      "period_tag": "late"
+    },
+    {
+      "id": "8e236834-55f1-4002-b671-fcedafcb35dd",
+      "year_month": "2024-01",
+      "avg_price": 72.5282,
+      "high": 76.81,
+      "low": 69.67,
+      "period_tag": "early"
+    },
+    {
+      "id": "8107c0f8-69d3-48be-866b-5a19d56dbc66",
+      "year_month": "2024-02",
+      "avg_price": 76.9353,
+      "high": 82.0,
+      "low": 71.67,
+      "period_tag": "early"
+    },
+    {
+      "id": "2c2ca0b6-e0a2-4ce4-a66d-a1e870863f40",
+      "year_month": "2024-03",
+      "avg_price": 83.8586,
+      "high": 90.67,
+      "low": 78.14,
+      "period_tag": "early"
+    },
+    {
+      "id": "f47cc5fb-7830-46e7-bc1a-7977ff9e3c95",
+      "year_month": "2024-04",
+      "avg_price": 93.7785,
+      "high": 104.0,
+      "low": 86.37,
+      "period_tag": "early"
+    },
+    {
+      "id": "fcaabe91-df7d-49a6-b20a-7d5ec08d4f9a",
+      "year_month": "2024-05",
+      "avg_price": 98.2495,
+      "high": 103.0,
+      "low": 93.23,
+      "period_tag": "mid"
+    },
+    {
+      "id": "bc410893-590b-4963-ab4c-80f6f16fc549",
+      "year_month": "2024-06",
+      "avg_price": 93.5753,
+      "high": 96.87,
+      "low": 88.67,
+      "period_tag": "mid"
+    },
+    {
+      "id": "7099d691-2c33-4770-b4e5-3504e3626296",
+      "year_month": "2024-07",
+      "avg_price": 89.8439,
+      "high": 92.33,
+      "low": 86.86,
+      "period_tag": "mid"
+    },
+    {
+      "id": "f026b485-62dc-4009-bd0b-1d90d3116b51",
+      "year_month": "2024-08",
+      "avg_price": 90.8377,
+      "high": 95.01,
+      "low": 88.0,
+      "period_tag": "mid"
+    },
+    {
+      "id": "3bc7878e-41d5-46ea-bf52-7dcebeb30956",
+      "year_month": "2024-09",
+      "avg_price": 94.2589,
+      "high": 100.79,
+      "low": 86.65,
+      "period_tag": "mid"
+    },
+    {
+      "id": "08b14118-b677-4efb-81b7-c7fbd5b743e1",
+      "year_month": "2024-10",
+      "avg_price": 103.1539,
+      "high": 104.6,
+      "low": 99.73,
+      "period_tag": "late"
+    },
+    {
+      "id": "84157cea-d42a-4740-bffe-596d80dd6269",
+      "year_month": "2024-11",
+      "avg_price": 104.4948,
+      "high": 106.02,
+      "low": 100.53,
+      "period_tag": "late"
+    },
+    {
+      "id": "81faf905-c60b-43ab-a531-9a1d13f4ddf2",
+      "year_month": "2024-12",
+      "avg_price": 99.325,
+      "high": 102.5,
+      "low": 97.01,
+      "period_tag": "late"
+    },
+    {
+      "id": "463525f0-eff7-4bc4-a8b2-1e909d69e552",
+      "year_month": "2025-01",
+      "avg_price": 94.7033,
+      "high": 97.01,
+      "low": 93.35,
+      "period_tag": "early"
+    },
+    {
+      "id": "d7bd82c2-daf5-4773-aa8b-54c1b1aaab5c",
+      "year_month": "2025-02",
+      "avg_price": 91.3644,
+      "high": 93.43,
+      "low": 89.37,
+      "period_tag": "early"
+    },
+    {
+      "id": "3cb8f292-e995-43c6-89fd-b762e8a24b2a",
+      "year_month": "2025-03",
+      "avg_price": 87.8976,
+      "high": 89.81,
+      "low": 85.58,
+      "period_tag": "early"
+    },
+    {
+      "id": "ee5d6b9e-55cd-4aaa-9f91-863e2ad200eb",
+      "year_month": "2025-04",
+      "avg_price": 80.8671,
+      "high": 86.25,
+      "low": 71.4,
+      "period_tag": "early"
+    },
+    {
+      "id": "62e8db31-e242-4409-bacc-5f5a4a2f83f7",
+      "year_month": "2025-05",
+      "avg_price": 69.8963,
+      "high": 71.5,
+      "low": 67.91,
+      "period_tag": "mid"
+    },
+    {
+      "id": "8bcc6113-7a46-45b6-920a-34a7c7b53049",
+      "year_month": "2025-06",
+      "avg_price": 71.512,
+      "high": 77.2,
+      "low": 67.05,
+      "period_tag": "mid"
+    },
+    {
+      "id": "6cfa77d2-ab07-43d6-989b-fa0a8565ac1d",
+      "year_month": "2025-07",
+      "avg_price": 73.5696,
+      "high": 74.78,
+      "low": 72.19,
+      "period_tag": "mid"
+    },
+    {
+      "id": "87c1664c-f60a-42ae-a817-8fba03f918f4",
+      "year_month": "2025-08",
+      "avg_price": 71.1219,
+      "high": 72.68,
+      "low": 69.23,
+      "period_tag": "mid"
+    },
+    {
+      "id": "939224f9-feb3-4ebd-930f-587f8be9a63f",
+      "year_month": "2025-09",
+      "avg_price": 62.5136,
+      "high": 69.49,
+      "low": 57.72,
+      "period_tag": "mid"
+    },
+    {
+      "id": "22e455f0-986f-4d19-849a-211b4ce707f4",
+      "year_month": "2025-10",
+      "avg_price": 53.9394,
+      "high": 59.3,
+      "low": 50.34,
+      "period_tag": "late"
+    },
+    {
+      "id": "9ce71cb3-6419-4539-8365-6baefc5a99e1",
+      "year_month": "2025-11",
+      "avg_price": 59.873,
+      "high": 70.14,
+      "low": 51.54,
+      "period_tag": "late"
+    },
+    {
+      "id": "14796aa3-88b8-4295-95a6-790b701db1d5",
+      "year_month": "2025-12",
+      "avg_price": 63.2735,
+      "high": 76.34,
+      "low": 56.32,
+      "period_tag": "late"
+    },
+    {
+      "id": "2d4a5d52-cc79-4f54-a90b-91f485db6596",
+      "year_month": "2026-01",
+      "avg_price": 77.7565,
+      "high": 83.4,
+      "low": 72.5,
+      "period_tag": "early"
+    },
+    {
+      "id": "1a0c3f3a-e69f-41a5-841a-20aa99a66e20",
+      "year_month": "2026-02",
+      "avg_price": 79.7343,
+      "high": 82.0,
+      "low": 74.0,
+      "period_tag": "early"
+    },
+    {
+      "id": "64ef0101-c397-4645-abbb-3a8c9821bca4",
+      "year_month": "2026-03",
+      "avg_price": 80.8659,
+      "high": 83.2,
+      "low": 79.0,
+      "period_tag": "early"
+    },
+    {
+      "id": "b6fe7f5c-3249-483b-9d92-b02aa579bb1f",
+      "year_month": "2026-04",
+      "avg_price": 78.7152,
+      "high": 80.0,
+      "low": 75.0,
+      "period_tag": "early"
+    },
+    {
+      "id": "0851ebae-3b95-4c29-9f8e-8a4f44ab748f",
+      "year_month": "2026-05",
+      "avg_price": 81.3828,
+      "high": 85.01,
+      "low": 73.89,
+      "period_tag": "mid"
+    },
+    {
+      "id": "e7e8f85f-2de9-402b-9808-01854d9de9ba",
+      "year_month": "2026-06",
+      "avg_price": 82.2405,
+      "high": 85.5,
+      "low": 80.5,
+      "period_tag": "mid"
+    },
+    {
+      "id": "2db55268-fc2f-41b3-9e10-ef63981ef8b7",
+      "year_month": "2026-07",
+      "avg_price": 90.1818,
+      "high": 99.5,
+      "low": 83.55,
+      "period_tag": "mid"
+    },
+    {
+      "id": "598b7ee1-3cb0-4674-bda4-be95b01ab428",
+      "year_month": "2026-08",
+      "avg_price": 97.8,
+      "high": 100.0,
+      "low": 96.5,
+      "period_tag": "mid"
+    }
+  ],
+  "market_ccer": [
+    {
+      "id": "44f22728-3528-45f2-9c19-a9f4b4e85c2e",
+      "year_month": "2026-08",
+      "project_type": "general",
+      "avg_price": 96.34
+    }
+  ],
+  "market_energy": []
+}

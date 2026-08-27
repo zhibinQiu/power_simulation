@@ -180,10 +180,11 @@ export const useSimStore = defineStore('sim', {
     newsTickerOn: (() => { try { return localStorage.getItem('sim.newsTickerOn') !== '0' } catch (e) { return true } })(),  // 底栏快讯是否显示（默认开，localStorage 持久化）
     fullscreenOn: false,      // 全屏模式：隐藏左/右/底栏，仅保留 3D 场景
     dataViewOn: false,        // 数据视图：中间 3D 场景替换为传感器历史数据表格（顶栏「视图 → 数据视图」切换）
-    carbonMarketOn: false,    // 碳市场视图：中间 3D 场景替换为碳市场实时行情（顶栏「视图 → 碳市场」切换）
+    carbonMarketOn: false,    // 碳资产管理视图：中间 3D 场景替换为碳资产行情与管理面板（顶栏「视图 → 碳资产管理」切换）
     carbonCalcOn: false,      // 碳排核算视图：中间 3D 场景替换为多标准碳核算结果对比（工具 → 低碳 → 全景碳核查切换）
     energyFlowOn: false,      // 能流分析视图：中间 3D 场景替换为能流桑基图（工具 → 能源 → 能流分析切换）
     boxManageOn: false,       // 能碳一体机管理视图：中间 3D 场景替换为云端设备识别 + 设备关联管理（视图 → 能碳一体机管理切换）
+    boxCloudSource: 'unknown',// 能碳一体机管理：云端连接状态（live / degraded / unknown），由 CarbonBoxView 轮询后写回，供 App.vue 顶部 view-banner 实时显示
     inspectorView: 'auto',    // 右侧检视器显式视图：'auto'（按选中推导）| 'park' 园区构成 | 'materials' 原料库 | 'strategy' 减排策略 | 'report' 报告面板         // 底栏（命令行窗口 + 状态条）是否展开
     reportPayload: null,      // 「导出报告」请求载荷（baseline/strategy/ops/...），供右侧报告面板消费
     selectedStrategyId: null, // 左侧策略库选中的策略
@@ -204,7 +205,7 @@ export const useSimStore = defineStore('sim', {
     processStrategyEnabled: {},  // { [processType]: boolean } — 在左侧工艺列表中勾选
     // 实时数据源配置（文件菜单「连接数据源」设置：平台 MQTT 实时数据 / 自定义 WebSocket / HTTP 轮询）
     dataSource: { type: 'sim', url: '', interval: 1000, name: 'Mqtt 实时数据' },
-    // MQTT 实时数据源状态（来自 /api/realtime/source，参照参考项目 yunduan1 数据链路）
+    // MQTT 实时数据源状态（来自 /api/realtime/source）
     mqttSource: null,
     // ---- 左侧活动栏（VS Code 式）与多数据源管理 ----
     activityView: 'explorer',   // 活动面板：'explorer' 资源 | 'search' 搜索 | 'scene' 场景 | 'connections' 连接
@@ -250,7 +251,7 @@ export const useSimStore = defineStore('sim', {
   }),
   getters: {
     // 视图模式：非数字孪生的独立视图（监测数据 / CEA 行情 / 碳排核算 / 能流分析 / 能碳一体机）激活时，
-    // 界面进入沉浸模式——隐藏左/右/下侧边栏，顶栏工具栏按当前视图渲染
+    // 界面进入沉浸模式——隐藏左/右/下侧面板（底部状态栏保留），顶栏工具栏按当前视图渲染
     viewModeOn: (s) => s.dataViewOn || s.carbonMarketOn || s.carbonCalcOn || s.energyFlowOn || s.boxManageOn,
     // 未读系统通知数（底栏铃铛徽标）
     unreadNotifs: (s) => s.notifications.filter((n) => !n.read).length,
@@ -963,6 +964,23 @@ export const useSimStore = defineStore('sim', {
     toggleLeft() { this.leftOpen = !this.leftOpen },
     toggleRight() { this.rightOpen = !this.rightOpen },
     toggleBottom() { this.bottomOpen = !this.bottomOpen },
+    // 进入非数字孪生视图：记录进入前布局状态并收起左/右/下侧边栏（沉浸模式）；
+    // 用户可随时通过顶栏按钮 / 左侧活动栏重新展开
+    _collapsePanels() {
+      if (!this._savedPanels) {
+        this._savedPanels = { leftOpen: this.leftOpen, rightOpen: this.rightOpen, bottomOpen: this.bottomOpen }
+      }
+      this.leftOpen = false; this.rightOpen = false; this.bottomOpen = false
+    },
+    // 退出非数字孪生视图：恢复进入前的布局状态（“只是隐藏”，不丢失面板展开情况）
+    _restorePanels() {
+      if (this._savedPanels) {
+        this.leftOpen = this._savedPanels.leftOpen
+        this.rightOpen = this._savedPanels.rightOpen
+        this.bottomOpen = this._savedPanels.bottomOpen
+        this._savedPanels = null
+      }
+    },
     // 底栏快讯显示开关（localStorage 持久化，刷新后保持）
     toggleNewsTicker() {
       this.newsTickerOn = !this.newsTickerOn
@@ -971,27 +989,32 @@ export const useSimStore = defineStore('sim', {
     // 数据视图：中间 3D 场景 ↔ 传感器历史数据表格（顶栏「视图 → 传感器数据」切换）
     toggleDataView() {
       this.dataViewOn = !this.dataViewOn
-      if (this.dataViewOn) { this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false }
+      if (this.dataViewOn) { this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false; this._collapsePanels() }
+      else { this._restorePanels() }
     },
-    // 碳市场视图：中间 3D 场景 ↔ 碳市场实时行情（顶栏「视图 → 碳市场」切换）
+    // 碳资产管理视图：中间 3D 场景 ↔ 碳资产管理面板（顶栏「视图 → 碳资产管理」切换）
     toggleCarbonMarket() {
       this.carbonMarketOn = !this.carbonMarketOn
-      if (this.carbonMarketOn) { this.dataViewOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false }
+      if (this.carbonMarketOn) { this.dataViewOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false; this._collapsePanels() }
+      else { this._restorePanels() }
     },
     // 碳排核算视图：中间 3D 场景 ↔ 多标准碳核算结果对比（工具 → 低碳 → 全景碳核查切换）
     toggleCarbonCalc() {
       this.carbonCalcOn = !this.carbonCalcOn
-      if (this.carbonCalcOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.energyFlowOn = false; this.boxManageOn = false }
+      if (this.carbonCalcOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.energyFlowOn = false; this.boxManageOn = false; this._collapsePanels() }
+      else { this._restorePanels() }
     },
     // 能流分析视图：中间 3D 场景 ↔ 能流桑基图（工具 → 能源 → 能流分析切换）
     toggleEnergyFlow() {
       this.energyFlowOn = !this.energyFlowOn
-      if (this.energyFlowOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.boxManageOn = false }
+      if (this.energyFlowOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.boxManageOn = false; this._collapsePanels() }
+      else { this._restorePanels() }
     },
     // 能碳一体机管理视图：中间 3D 场景 ↔ 云端设备识别 + 设备关联管理（视图 → 能碳一体机管理切换）
     toggleBoxManage() {
       this.boxManageOn = !this.boxManageOn
-      if (this.boxManageOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false }
+      if (this.boxManageOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this._collapsePanels() }
+      else { this._restorePanels() }
     },
     toggleFullscreen() {
       this.fullscreenOn = !this.fullscreenOn
@@ -2150,7 +2173,7 @@ export const useSimStore = defineStore('sim', {
 
     // ---- 实时数据源（平台 MQTT 实时 / 自定义 WebSocket / HTTP 轮询，支持多源并存）----
     _startFeed() { this._connectFeed() },
-    // MQTT 数据源状态轮询：连接状态 / 订阅主题 / 最近消息（参照参考项目 yunduan1 数据链路）
+    // MQTT 数据源状态轮询：连接状态 / 订阅主题 / 最近消息
     _startMqttPolling() {
       if (this._mqttTimer) return
       const poll = () => {

@@ -1,0 +1,16 @@
+{
+  "broker": {
+    "host": "172.19.134.45",
+    "port": 41883,
+    "username": "",
+    "password": "",
+    "client_id": "carbon-sim-collector",
+    "keepalive": 60,
+    "qos": 0
+  },
+  "topics": [
+    "#"
+  ],
+  "mapping": {},
+  "ignored_devices": []
+}

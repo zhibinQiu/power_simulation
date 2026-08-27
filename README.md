@@ -1,6 +1,6 @@
-# 行业能碳仿真平台
+# 工业能碳智控平台
 
-面向高炉炼铁的 **Web 版工业数字孪生仿真系统**：以 3D 孪生场景呈现全厂工艺，覆盖设备监测、碳素流仿真、碳排放核算、能耗计算与操作策略推荐四大能力，支持流程拖拽编排、自然语言策略生成、实时遥测与 AI 分析报告导出。
+面向流程工业的 **Web 版工业数字孪生与能碳智控系统**：以 3D 孪生场景呈现全厂工艺，覆盖设备监测、碳素流仿真、碳排放核算、能耗计算与操作策略推荐四大能力，支持流程拖拽编排、自然语言策略生成、实时遥测与 AI 分析报告导出；配套**软硬一体的能碳一体机**，依托自研**云边协同**系统，支持设备模型快速建立与下发、AI 模型远程部署与盒子傻瓜式接入。
 
 ## 功能特性
 
@@ -15,8 +15,8 @@
 - **数据视图**：全屏传感器历史数据表格（实时读数 / 均值 / 峰值 / 谷值 / 超限状态），替代 3D 场景快速核对全场数据；
 - **碳市场实时行情**：内置「碳市场」视图，实时展示 CEA（全国碳市场配额）日K线蜡烛图与 CCER（自愿减排量）成交均价折线图，叠加线性回归走势预测与置信带，15 秒自动刷新；
 - **市场快讯**：底部状态栏滚动播报中国煤炭交易网「市场快讯」（60 秒缓存，前端 5 分钟刷新），鼠标悬停暂停滚动以便细读；
-- **实时遥测**：WebSocket 推送设备读数（默认「Mqtt 实时」数据源：后端订阅云端 MQTT Broker 获取真实读数，参照参考项目 yunduan1 数据链路；亦支持自定义 WebSocket / HTTP 轮询），约 10 分钟环形缓冲 + 历史趋势；读数同步采用**关联制**：云端识别设备（能碳一体机盒子下）须在「视图 → 能碳一体机管理」中与仿真设备实例手动关联后才同步；
-- **能碳一体机管理**（视图 → 能碳一体机管理）：集成参考项目 yunduan1 全部能力，六页签——总览（云端 Broker $SYS 实时统计 + 边缘节点 + CloudCore/证书演示）、设备管理（KubeEdge DeviceModel/Device 三协议 CRUD + YAML 生成，`config/box_devices.json`）、设备关联（云端设备 ↔ 仿真设备实例，`config/links.json`）、盒子接入（edgecore.yaml 模板渲染 + token/caHash + 部署命令，`config/edgecore.template.yaml`）、实时数据（Device.twins 真实读数 + 趋势 + 消息流 + 发测试消息）、接入指引（eKuiper 转发规则 / 盒子采集 mapper / 部署包 / 诊断工具）；
+- **实时遥测**：WebSocket 推送设备读数（默认「Mqtt 实时」数据源：后端订阅云端 MQTT Broker 获取真实读数，不生成模拟数据；亦支持自定义 WebSocket / HTTP 轮询），约 10 分钟环形缓冲 + 历史趋势；读数同步采用**关联制**：云端识别设备（能碳一体机盒子下）须在「视图 → 能碳一体机管理」中与仿真设备实例手动关联后才同步；
+- **能碳一体机管理**（视图 → 能碳一体机管理）：集成参考项目 yunduan1 全部能力，六页签——总览（云端 Broker $SYS 实时统计 + 边缘节点 + CloudCore/证书演示）、设备管理（KubeEdge DeviceModel/Device 五协议 CRUD + YAML 生成，`config/box_devices.json`）、设备关联（云端设备 ↔ 仿真设备实例，`config/links.json`）、盒子接入（edgecore.yaml 模板渲染 + token/caHash + 部署命令，`config/edgecore.template.yaml`）、实时数据（Device.twins 真实读数 + 趋势 + 消息流 + 发测试消息）、接入指引（盒子采集 mapper / 部署包 / 诊断工具）；总体架构：云端（172.19.134.45）K3s 轻量 K8s + KubeEdge CloudCore 作为唯一控制平面；盒子边缘仅安装 EdgeCore（不部署 k3s-server，无本地控制平面），经 CloudHub 10002 端口长连接云端，边缘运行 Pod / mosquitto / box-mapper；
 - **命令行交互中枢**：聊天 / 代码 / 规划三模式 + 孪生控制命令（run / sim / stop / patrol / view / edit …）；
 - **AI 分析报告**：AI 生成或本地模板双引擎，报告标题、分析深度（精简/标准/深入）、附录表格可选，输出 Markdown + 分享页 HTML；
 - **工艺属性内化配置**：参数运行空间（min/max/step）、设备量程、设备规格档位均在编排模式节点属性面板中直接调整，随方案持久化（节点自定义范围 > 设备规格 ranges > 默认范围），无独立全局配置入口；
@@ -90,7 +90,11 @@ npx vite build         # 产物输出至 dist/，由后端 Catch-all 路由托�
 .
 ├── backend/
 │   ├── app/                    # FastAPI 应用
-│   │   ├── main.py             # 路由（REST + WebSocket + SPA 托管）
+│   │   ├── main.py             # 组合根（装配各业务域路由 + 核心仿真 REST + SPA 托管）
+│   │   ├── api/                # 业务域路由模块（按业务域独立，便于迁移）
+│   │   │   ├── box_router.py           # 能碳一体机管理（/api/box/*、/api/realtime/*）
+│   │   │   ├── carbon_assets_router.py # 碳资产管理（碳市场行情/报告任务/报告分享页）
+│   │   │   └── carbon_assistant.py     # 碳资产助手（报告生成 + 控排履约 + 碳合规）
 │   │   ├── carbon_engine.py    # 碳素流仿真引擎（RULES 注册表 + 缓存）
 │   │   ├── calculators.py      # 能耗折算与排放因子计算
 │   │   ├── factors.py          # 排放因子表

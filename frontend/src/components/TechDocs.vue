@@ -38,7 +38,7 @@ const sections = [
   {
     id: 'arch',
     title: '系统技术架构',
-    body: `# 行业能碳仿真平台 · 技术文档
+    body: `# 工业能碳智控平台 · 技术文档
 
 本平台是面向高炉炼铁的数字孪生仿真系统，覆盖设备监控、碳素流仿真、碳排放核算与操作策略推荐四大能力。
 
@@ -763,23 +763,163 @@ def _noise(v, pct=0.04):
 ## 五、数据源支持
 
 平台支持三种数据源（文件 → 连接数据源…）：
-1. **Mqtt 实时**：默认数据源，后端订阅云端 MQTT Broker（Broker 配置前端化：能碳一体机管理 → 总览 → 配置 Broker；参照参考项目 yunduan1 数据链路：边缘盒子（能碳一体机）eKuiper → Broker \`data/#\` 等主题）获取真实设备读数，不生成模拟数据；读数同步采用**关联制**（视图 → 能碳一体机管理）：自动识别云端设备并按盒子分组，须与仿真设备实例手动关联后（\`config/links.json\`）才同步到该设备实例；
+1. **Mqtt 实时**：默认数据源，后端订阅云端 MQTT Broker（Broker 配置前端化：能碳一体机管理界面 → 配置 Broker；链路：边缘盒子（能碳一体机）box-mapper 仪表采集 → 实时发布 Broker \`data/{box}/{device}/{instance}/{property}\` 主题）获取真实设备读数，不生成模拟数据；边缘 mapper 云边断连恢复后的补传历史（带真实采集时间戳）也经 \`data/#\` 回填平台折线图缺口；
 2. **自定义 WebSocket**：外部系统推送（接入真实工厂时使用）；
 3. **HTTP 轮询**：REST 拉取。
 
-### 能碳一体机管理台 API（参照参考项目 yunduan1 console + dashboard）
+### 能碳一体机管理台 API
 
 | 接口 | 返回要点 |
 | --- | --- |
-| GET /api/box/overview | 概览：\`{ broker:{connected,stats($SYS 真实统计)}, cloudcore(仿真演示), nodes(识别到的盒子), ports(CloudHub 10001-10004), certs, token }\` |
+| GET /api/box/overview | 概览：\`{ broker:{connected,stats($SYS 真实统计)}, cloudcore, nodes, ports, certs, token, cloud_source(live\|stale\|degraded\|unreachable), cloud_error }\`（cloudcore/节点/端口/证书/token 由云端 cloud-agent 本地采集并经 MQTT 长连接推送缓存，非 SSH；cloud_source 四态：live=推送实时且 CloudCore 运行、stale=推送中断展示过期缓存、degraded=推送实时但组件异常、unreachable=云端完全不可达；token 优先 CA 重签 1 年长期 token，失败回退 tokensecret；无节点返回空数组，不伪造数据） |
 | GET /api/box/devices | \`{ models[], devices[], cloud_devices }\`（DeviceModel/Device 列表 + 云端识别设备，本地持久化 \`config/box_devices.json\`） |
-| POST /api/box/devices | 创建设备/模型：\`mode=dryRun\` 返回三协议（Modbus/OPC-UA/Bluetooth）YAML 预览；\`mode=apply\` 保存到模拟集群；body 含 protocol/modelName/deviceName/nodeName/properties/comm/opcua/bluetooth |
+| POST /api/box/devices | 创建设备/模型：\`mode=dryRun\` 返回五协议（Modbus/OPC-UA/Bluetooth/LoRaWAN/Cellular）**v1beta1** YAML 预览（\`devices.kubeedge.io/v1beta1\`，协议映射在 \`spec.protocol.configData.visitors\`，见「能碳一体机接入运维」章节 §5.2）；\`mode=apply\` 保存到本地配置 \`box_devices.json\`（可一键下发云端 K3s）；body 含 protocol/modelName/deviceName/nodeName/properties/comm/opcua/bluetooth/lora/cellular |
 | POST /api/box/devices/delete | 删除：\`{kind: device\|model\|both, name, namespace}\` |
 | GET /api/box/devices/realtime | \`{ devices:[{name,state,lastOnlineTime,twins:[{propertyName,reported,observedDesired,timestamp,unit}],history}] }\`，reported 读数一律来自 MQTT 链路 |
-| POST /api/box/nodes/onboard | 盒子接入：\`{hostname,cloudIP,boxIP}\` → \`{edgecore, token, caHash, commands}\`（模板 \`config/edgecore.template.yaml\`，token/caHash 仿真演示） |
+| POST /api/box/nodes/onboard | 盒子接入：\`{hostname,cloudIP,boxIP}\` → \`{edgecore, token, token_source, token_expires, caHash, commands}\`（模板 \`config/edgecore.template.yaml\`；token 用云端 CA 私钥 HMAC-SHA256 重签 1 年长期 token（§5.4），失败回退 \`kubectl get secret tokensecret\`；caHash=rootCA.crt DER sha256；云端不可达时返回 ok=false 明确报错） |
 | GET /api/box/stats | \`{ stats, messages }\`：Broker $SYS 统计 + 最近 100 条实时消息流 |
 | POST /api/box/publish | 发测试消息：\`{topic, payload}\`，向云端 Broker 发布（实时仪表盘调试） |
   `,
+  },
+  {
+    id: 'kubeedge-ops',
+    title: '能碳一体机接入运维（KubeEdge）',
+    body: `## 能碳一体机接入运维（KubeEdge）
+
+本平台接入 KubeEdge 云端/边缘体系，完整运维知识见仓库根目录 \`kubeedge-console-ops.md\`，以下为要点速查。
+
+## 一、总体架构
+
+- 云端 \`172.19.134.45\` 运行 **K3s + KubeEdge CloudCore**，是**唯一控制平面**；
+- 盒子边缘设备只部署 **EdgeCore**（不部署 k3s-server，边缘不存在本地 K8s 控制平面），边缘通过 **CloudHub（10002 端口）** 长连接云端，运行 Pod（edged 拉起）、mosquitto（本地 MQTT）、box-mapper（仪表采集，DMI 上报 twins + MQTT 实时发布 data/#）；
+- 数据链路：边缘 box-mapper 仪表采集（Modbus/OPC-UA 等）→ ①DMI→edgecore→CloudHub→CloudCore→K3s Device.status.twins；②MQTT 实时发布→云端 MQTT Broker（TCP 41883）\`data/#\`；本平台订阅识别云端设备、与设备实例关联后同步读数。
+
+## 二、端口清单
+
+| 端口 | 用途 |
+| --- | --- |
+| 22 | 云端 SSH（root） |
+| 10000 | CloudCore 注册/join（keadm join --cloudcore-ipport） |
+| 10001 | CloudHub QUIC（通常禁用） |
+| 10002 | CloudHub HTTP/HTTPS（TLS，边缘长连接） |
+| 10003 | edgeStream（metrics/log/exec 数据面） |
+| 10004 | CloudHub WebSocket |
+| 41883 | 云端 MQTT Broker（边缘 box-mapper 实时数据 data/#） |
+
+## 三、设备 CRD 结构（v1beta1，DMI 时代）
+
+**注意：本环境已按 v1beta1 生成 YAML；旧 v1alpha2 结构（\`spec.propertyVisitors\`、\`spec.protocol.modbus.rtu\` 等）在 v1beta1 CRD 下会报 unknown field。**
+
+DeviceModel（属性为标量枚举 INT/FLOAT/DOUBLE/STRING/BOOLEAN/BYTES/STREAM）：
+
+\`\`\`yaml
+apiVersion: devices.kubeedge.io/v1beta1
+kind: DeviceModel
+metadata:
+  name: temperature-model
+  namespace: default
+spec:
+  properties:
+  - name: temperature
+    type: FLOAT
+    accessMode: ReadOnly
+    unit: "°C"
+\`\`\`
+
+Device（spec 顶层仅 deviceModelRef/methods/nodeName/properties/protocol 五字段；协议映射在 \`spec.protocol.configData\`，visitors 在 configData 内）：
+
+\`\`\`yaml
+apiVersion: devices.kubeedge.io/v1beta1
+kind: Device
+metadata:
+  name: temperature-device
+spec:
+  deviceModelRef:
+    name: temperature-model
+  nodeName: nt001
+  protocol:
+    protocolName: modbus
+    configData:
+      com:
+        commType: serial
+        serialPort: /dev/ttyS0
+        baudRate: 9600
+        dataBits: 8
+        parity: none
+        stopBits: 1
+      slaveID: 1
+      visitors:
+      - propertyName: temperature
+        register: HoldingRegister
+        offset: 1
+        limit: 0
+        scale: 0.1
+        isSwap: false
+        isRegisterSwap: false
+  properties:
+  - name: temperature
+    collectCycle: 1000
+\`\`\`
+
+协议 configData / visitor 要点：
+
+| 协议 | configData 关键字段 | visitor 字段 |
+| --- | --- | --- |
+| modbus | com.commType=serial/tcp、slaveID | register（HoldingRegister/InputRegister/CoilRegister/DiscreteInputRegister）、offset、limit、scale、isSwap、isRegisterSwap |
+| opcua | url、userName、password、securityMode、securityPolicy | opcua.nodeID |
+| bluetooth | macAddress（可选） | bluetooth.characteristicUUID |
+| lora | broker（盒子上 ChirpStack 上行推送目标，默认 127.0.0.1:1883）、applicationID、devEUI、appKey、region（CN470）、dataRate（SF7BW125） | lora.payloadKey（上行 JSON 键，支持 a.b.c 嵌套路径） |
+| cellular | serialPort（AT 口，默认 /dev/ttyUSB2）、baudRate、apn、iface（蜂窝网卡，默认 wwan0） | cellular.kind（signal/csq/rsrp/rsrq/sinr/iccid/imsi/imei/reg/rx_rate/tx_rate） |
+
+> LoRa：LoRa 传感器 → LoRaWAN 射频 → 盒子 LoRa 网关板（SX1302/SX1261）→ ChirpStack → 本地 mosquitto（\`application/{appID}/device/{devEUI}/event/up\`）→ mapper LoraReader 解析上行 JSON → DMI twins；
+> Cellular：5G/4G 模块自监控，mapper CellularReader 经 AT 口（AT+CSQ / AT+QENG="servingcell" / AT+ICCID / AT+CEREG?）采集信号/ICCID/注册态，\`/proc/net/dev\` 蜂窝网卡计数差分算上下行速率；\`iccid/imsi/imei\` 为字符串值走 twins 字符串上报。
+
+## 四、共享 Token 机制
+
+- KubeEdge token 为**四段式** \`caHash.header.payload.signature\`（HS256），caHash = 云端 \`rootCA.crt\` DER 的 SHA256；
+- cloudcore 每次重启会重签 **24 小时** token（k8s secret \`tokensecret\`）；管理台用云端 CA 私钥（\`/etc/kubeedge/ca/rootCA.key\` DER）**HMAC 重签 1 年长期 token**，保证不急着接盒子也随时能接；
+- 获取 token：\`kubectl -n kubeedge get secret tokensecret -o jsonpath='{.data.tokendata}' | base64 -d\`（注意：\`/etc/kubeedge/token\` 文件不存在，不要从该路径读取）。
+
+## 五、边缘接入流程
+
+1. 全新盒子先 \`keadm join\`（下载 edgecore 二进制、本地生成边缘证书 \`/etc/kubeedge/certs/server.{crt,key}\`、注册 systemd）：
+
+\`\`\`bash
+keadm join --cloudcore-ipport=172.19.134.45:10000 --token=<token> --kubeedge-version=v1.20.0 --with-edge-core
+\`\`\`
+
+2. 覆盖 \`/etc/kubeedge/config/edgecore.yaml\`（管理台模板替换 \`{{HOSTNAME}}/{{TOKEN}}/{{CLOUDIP}}\`，关键项：edgeHub.httpServer=10002、websocket=10004、deviceTwin.dmiSockPath=/etc/kubeedge/dmi.sock、edged 运行时 containerd、顶层 database 用 sqlite3）；
+3. \`systemctl daemon-reload && systemctl restart edgecore.service\`；
+4. 云端 \`kubectl get nodes\` 确认节点 Ready；
+5. 部署 box-deploy 采集包（mapper 仪表采集 + mosquitto + 云边协同断点续传）：
+   - 平台本机上传：\`scp -r platform/box-deploy root@<盒子IP>:/opt/weight-bridge/box-deploy\`
+   - 盒子一键部署（幂等）：\`ssh root@<盒子IP> "cd /opt/weight-bridge/box-deploy && ./deploy_box.sh"\`
+   - 按现场定制 \`/opt/weight-bridge/config.json\`（deviceName/property 与云端 Device 一致、serial.port 串口、modbus 寄存器、mqtt.boxId），改完 \`systemctl restart box-mapper\`
+   - 链路自检：\`./deploy_box.sh --check\`（只读验证 edgecore/dmi.sock/依赖/缓存目录）
+6. 云端创建 DeviceModel/Device（平台「能碳一体机管理」界面「新建设备」一键下发，或 kubectl apply \`backend/config/kubeedge/\` 下 YAML）；
+7. 云端触发路由并验证读数：\`kubectl annotate device <name> -n default sync=$(date +%s) --overwrite\` 后 \`kubectl get device <name> -o json | grep reported\`。
+
+注意：
+- 边缘证书由 keadm 在**盒子本地生成**（客户端身份），不要拷贝云端 cloudcore 的 server.{crt,key}；
+- 以上命令即「盒子接入」弹窗生成的部署命令，可在「能碳一体机管理」界面工具栏「盒子接入」一键复制。
+
+## 六、常见故障排查
+
+| 现象 | 排查方向 |
+| --- | --- |
+| 边缘节点 NotReady | NTP 时间不同步；edgehub 连不上 10002/10004（nc 测试）；证书过期（看概览「证书与 Token 有效期」） |
+| 应用设备报 unknown field | 用了旧 v1alpha2 字段，确认 protocolName + configData 结构 |
+| 云端识别设备为空 | \`box_config.json\` 的 ignored_devices 是否误过滤 + 云端 41883 是否可达（nc 172.19.134.45 41883） |
+| cloudcore 非 Running | kubectl get pod -n kubeedge 查看状态，关注概览页 CloudCore 卡片 |
+| 盒子到云端网络 | nc 依次测试 22 / 10002 / 10004 / 41883，定位防火墙或服务未监听 |
+
+## 七、证书与端口核查命令（云端）
+
+\`\`\`bash
+openssl x509 -enddate -noout -in /etc/kubeedge/ca/rootCA.crt
+openssl x509 -enddate -noout -in /etc/kubeedge/certs/server.crt
+ss -tlnp | grep -E ':(1000[0-4])[^0-9]'
+\`\`\``,
   },
   {
     id: 'contract',
@@ -905,9 +1045,17 @@ def _noise(v, pct=0.04):
 | POST | /api/chat | 命令行窗口自然语言对话（LLM，无 Key 兜底提示） |
 | GET | /api/carbon-market/quotes | 碳市场实时报价（CEA/CCER 最新价 + 涨跌幅 + 月聚合，60s 缓存） |
 | GET | /api/carbon-market/chart?instrument=cea\|ccer | 图表序列：CEA 日K线 / CCER 成交均价折线（60s 缓存） |
-| GET | /api/carbon-market/forecast?instrument=cea\|ccer&days=10 | 价格预测：线性回归外推 + ±1.65σ 置信带 |
+| GET | /api/carbon-market/forecast?instrument=cea\|ccer&days=10&method=linear\|moving_average\|exponential | 价格预测：线性回归 / 移动平均 / 指数平滑外推 + ±1.65σ 置信带 |
 | GET | /api/market-news | 市场快讯列表（中国煤炭交易网抓取 + 60s 缓存，失败返回 ok=false 与空列表） |
 | GET | /report/{rid} | 报告分享页（独立 HTML，新标签查看/打印） |
+| POST | /api/carbon-assistant/report | 碳资产报告任务（report_type：compliance_analysis\|market_brief\|policy_digest；forecast_method：linear\|moving_average\|exponential） |
+| GET | /api/carbon-assistant/reports?keyword=&report_type=&offset=&limit= | 碳资产报告列表（关键字/类型筛选 + 分页，返回 total） |
+| GET | /api/carbon-assistant/reports/{rid} | 碳资产报告详情（Markdown 原文 + report_type） |
+| GET | /api/carbon-assistant/reports/{rid}/view | 碳资产报告 HTML 阅读页（新窗口） |
+| GET | /api/carbon-assistant/reports/{rid}/download | 碳资产报告 Markdown 下载 |
+| DELETE | /api/carbon-assistant/reports/{rid} | 删除碳资产报告 |
+| GET | /api/carbon-assistant/tasks/{tid} | 碳资产报告任务状态（含 progress 0-100） |
+| POST | /api/carbon-assistant/tasks/{tid}/cancel | 取消碳资产报告任务 |
 
 ## 二、WebSocket 遥测
 
@@ -956,7 +1104,7 @@ def _noise(v, pct=0.04):
 
 ## 四、前端集成
 
-- \`CarbonMarketView.vue\`：行情卡片（CEA 最新价/涨跌幅/成交量/今开/最高/最低/昨收 + CCER 最新均价/成交量/基准参考）、CEA 蜡烛图（30 日 OHLCV）与 CCER 折线页签切换、预测叠加与置信带（±1.65σ）；15 秒轮询，断开自动停止；「实时数据 / 模拟行情」徽标来自 quotes.simulated；
+- \`CarbonAssistantView.vue\`：碳资产管理主入口，集成行情卡片（CEA 最新价/涨跌幅/成交量/今开/最高/最低/昨收 + CCER 最新均价/成交量/基准参考）、CEA 蜡烛图（30 日 OHLCV）与 CCER 折线页签切换、预测叠加与置信带（±1.65σ）；右上角与顶栏工具栏提供「生成碳资产报告」入口，侧边栏报告中心支持三种报告类型（履约综合分析 / 碳交易简报 / 政策摘要）与三种预测方法（线性回归 / 移动平均 / 指数平滑），后台任务含进度条与取消，历史报告支持搜索/筛选/分页、结论摘要卡片、HTML 阅读页、Markdown 下载与删除；15 秒轮询，断开自动停止；「实时数据 / 模拟行情」徽标来自 quotes.simulated；
 - \`StatusBar.vue\`：底部滚动播报快讯摘要（与「市场快讯服务」联动），鼠标悬停暂停滚动。`,
   },
   {
@@ -982,7 +1130,7 @@ def _noise(v, pct=0.04):
 
 - \`StatusBar.vue\`：左侧「市场快讯」滚动条持续轮播（每条约 18s 滚动周期，自适应条数），鼠标悬停暂停滚动；每 5 分钟自动刷新一次；
 - 快讯的显隐由系统设置「布局」页签「快讯滚动条」开关控制（\`newsTickerOn\`，存于 Pinia）；
-- 快讯与碳市场视图相互独立：快讯常驻状态栏，碳市场视图需「视图 → 碳市场」打开。`,
+- 快讯与碳资产管理视图相互独立：快讯常驻状态栏，碳资产管理视图需「视图 → 碳资产管理」打开。`,
   },
   {
     id: 'optimizer',
@@ -1110,7 +1258,7 @@ def _noise(v, pct=0.04):
 | SearchPanel | 全局搜索：按名称模糊匹配工序 / 物料 / 策略 / 设备，点击结果联动检视器、资源管理器与 3D 聚焦 |
 | ScenePanel | 场景控制：环境主题切换、显示图层开关（网格/轴向/标签/连线/热力图）、视角工具 |
 | ConnectionsPanel | 连接面板：三种数据源（模拟/WebSocket/HTTP）运行状态展示与在线启停，入口直达数据源配置 |
-| CarbonBoxView | 能碳一体机管理（视图 → 能碳一体机管理）：集成参考项目 yunduan1 全部能力，六页签——总览（Broker $SYS 统计 + 节点/CloudCore/证书，仿真演示）、设备管理（DeviceModel/Device 三协议 CRUD + YAML 生成，config/box_devices.json）、设备关联（云端设备 ↔ 仿真设备实例，config/links.json）、盒子接入（edgecore.yaml 模板渲染 + token/caHash + 部署命令）、实时数据（twins 真实读数 + 趋势 + 消息流 + 发测试消息）、接入指引（eKuiper 规则 / 盒子采集 / 部署包 / 诊断工具） |
+| CarbonBoxView | 能碳一体机管理（视图 → 能碳一体机管理）：原「数据概览」+「设备管理」合并为单界面——工具栏（盒子接入/新建设备/刷新）、云端数据链路（Broker $SYS 统计 + CloudCore 状态 + 证书与 Token，由云端 cloud-agent 经 MQTT 长连接推送，非 SSH；云端状态四态：云端实时/数据过期/部分异常/不可达）、实时消息流与发测试消息、设备管理（DeviceModel/Device 五协议 CRUD + v1beta1 YAML 生成，config/box_devices.json + 一键下发云端 K3s）、拓扑图 + 云端 CRD 生效态；盒子接入（edgecore.yaml 模板渲染 + 云端 CA 重签 1 年 token/caHash + 完整部署命令：① keadm join → ② 配置下发 → ③ 云建设备 → ④ box-deploy 采集包 → ⑤ 路由验证）；云端设备关联 / 边缘节点 / twins 实时值 / CloudHub 端口显示已移除；总体架构：云端 K3s + CloudCore 控制平面，盒子边缘仅装 EdgeCore（无本地控制平面，运行 Pod / mosquitto / mapper，DMI 采集 + 云边协同断点续传） |
 
 ## 八、数据源管理与系统设置
 

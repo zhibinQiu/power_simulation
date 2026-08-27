@@ -1,23 +1,25 @@
 #!/usr/bin/env bash
 # ============================================================
-#  行业能碳仿真平台 - macOS .app 一键打包脚本（统一位于 platform/）
+#  工业能碳智控平台 - macOS .app 一键打包脚本
+#  位置：platform/mac-platform-deploy/
 #  用法：
-#    ./platform/build_mac.sh             # 打包为 SteelCarbonTwin.app（原生客户端窗口）
-#    ./platform/build_mac.sh console     # 打包为终端运行的 onedir 版本（可见日志，Ctrl+C 退出）
-#    ./platform/build_mac.sh universal   # 额外构建 universal2（兼容 Intel + Apple Silicon）
+#    ./platform/mac-platform-deploy/build_mac.sh             # 打包为 SteelCarbonTwin.app（原生客户端窗口）
+#    ./platform/mac-platform-deploy/build_mac.sh console     # 打包为终端运行的 onedir 版本（可见日志，Ctrl+C 退出）
+#    ./platform/mac-platform-deploy/build_mac.sh universal   # 额外构建 universal2（兼容 Intel + Apple Silicon）
 #
 #  产物（位于项目根 dist/）：
 #    dist/SteelCarbonTwin.app        （app 模式）
 #    dist/SteelCarbonTwin/           （console / universal 模式）
 #
 #  说明：
+#    - 本目录为 macOS 打包资源（.sh / .icns / .spec / desktop_launcher.py / build_icons.py）；
 #    - 架构默认与本机一致；如需分发给 Intel Mac，用 universal 模式。
 #    - 分发到其他 Mac 时，首次打开若被 Gatekeeper 拦截：右键 → 打开。
 #      若需免提示分发，需 Apple Developer 账号签名 + 公证。
 # ============================================================
 set -euo pipefail
-# 定位到项目根目录（platform/ 的上级）
-cd "$(dirname "$0")/.."
+# 定位到项目根目录（platform/mac-platform-deploy/ 的上级两级）
+cd "$(dirname "$0")/../.."
 
 PY=python3
 if [ -x backend/.venv/bin/python ]; then PY="$(pwd)/backend/.venv/bin/python"; fi
@@ -33,7 +35,7 @@ echo "[1/4] 安装 Python 依赖 + PyInstaller + pywebview + Pillow..."
 "${RUNPY[@]}" -m pip install pyinstaller pywebview Pillow -q
 
 echo "[1.5/4] 生成 macOS 图标 (.icns)..."
-"${RUNPY[@]}" platform/build_icons.py --icns
+"${RUNPY[@]}" platform/mac-platform-deploy/build_icons.py
 
 echo "[2/4] 构建前端静态资源..."
 (cd frontend && npm install --silent && npm run build 2>&1 | tail -3)
@@ -60,13 +62,13 @@ esac
 
 "${RUNPY[@]}" -m PyInstaller --noconfirm --clean --onedir \
   --name SteelCarbonTwin \
-  --icon "$(pwd)/platform/icon.icns" \
+  --icon "$(pwd)/platform/mac-platform-deploy/icon.icns" \
   --collect-all uvicorn --collect-all websockets --collect-all webview \
   --add-data "$(pwd)/frontend/dist:frontend/dist" \
   --paths backend \
-  --specpath platform \
+  --specpath platform/mac-platform-deploy \
   "${EXTRA_ARGS[@]}" \
-  platform/desktop_launcher.py
+  platform/mac-platform-deploy/desktop_launcher.py
 
 echo "[4/4] 完成！"
 case "$MODE" in

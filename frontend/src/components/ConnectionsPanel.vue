@@ -11,7 +11,7 @@
       </button>
     </div>
 
-    <!-- MQTT 实时数据源状态（平台默认数据源：后端订阅云端 Broker 获取真实设备读数，参照参考项目 yunduan1 数据链路） -->
+    <!-- MQTT 实时数据源状态（平台默认数据源：后端订阅云端 Broker 获取真实设备读数） -->
     <div class="cn-mqtt" :class="{ on: mqttConnected }">
       <div class="cn-mqtt-head">
         <span class="cn-mqtt-title">Mqtt 实时数据源</span>

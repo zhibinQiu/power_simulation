@@ -29,7 +29,6 @@ const ceaPrev = computed(() => {
   const pts = quotes.value?.cea_monthly || []
   return pts.length ? pts[pts.length - 1] : null
 })
-const ceaDaily = computed(() => chart.value?.instrument === 'cea' ? (chart.value?.points || []) : [])
 
 // ── CCER 行情卡片 ──
 const ccer = computed(() => quotes.value?.ccer || {})
@@ -52,7 +51,7 @@ function dateLabel(t, prev) {
 // ── CEA 蜡烛图（SVG 手绘，历史 + 预测虚线蜡烛 + 置信带） ──
 const candleDims = { w: 1000, h: 440 }
 function buildCandles(points, fc, w, h) {
-  const hist = (points || []).slice(-80)
+  const hist = (points || [])
   const fcs = (fc && fc.ok ? (fc.forecast || []) : []).slice(0, 20)
   const all = [...hist, ...fcs]
   if (!all.length) return null
@@ -99,12 +98,12 @@ function buildCandles(points, fc, w, h) {
   return { bars, band, labels, yMax: max, yMin: min, gridLines: 5, fcCount: fcs.length }
 }
 
-const candle = computed(() => buildCandles(ceaDaily.value, forecastOn.value ? forecast.value : null, candleDims.w, candleDims.h))
+const candle = computed(() => buildCandles(visibleHist.value, forecastOn.value ? forecast.value : null, candleDims.w, candleDims.h))
 
 // ── CCER 折线图（SVG，历史实线 + 预测虚线 + 置信带） ──
 const lineDims = { w: 1000, h: 320 }
 function buildLine(points, fc, w, h) {
-  const hist = (points || []).slice(-70)
+  const hist = (points || [])
   const fcs = (fc && fc.ok ? (fc.forecast || []) : []).slice(0, 20)
   const all = [...hist, ...fcs]
   if (!hist.length) return null
@@ -160,8 +159,87 @@ function buildLine(points, fc, w, h) {
   return { linePts, dots, band, labels, lastPt, min, max, gridLines: 4 }
 }
 
-const ccerPoints = computed(() => chart.value?.instrument === 'ccer' ? (chart.value?.points || []) : [])
-const line = computed(() => buildLine(ccerPoints.value, forecastOn.value ? forecast.value : null, lineDims.w, lineDims.h))
+const line = computed(() => buildLine(visibleHist.value, forecastOn.value ? forecast.value : null, lineDims.w, lineDims.h))
+
+// ── 日期范围选择（双滑块拖动选择显示范围，历史按索引切片，预测段恒显示在末端） ──
+const range = ref({ s: 0, e: 0 })    // 可见历史索引区间 [s, e]
+const rangeActive = ref(false)       // 用户是否手动调整过
+const DEFAULT_SHOW = computed(() => (instrument.value === 'cea' ? 80 : 70))
+const allHist = computed(() =>
+  chart.value?.instrument === instrument.value ? (chart.value?.points || []) : []
+)
+let lastInst = ''
+watch(allHist, (pts) => {
+  if (!pts.length) return
+  const end = pts.length - 1
+  if (!rangeActive.value || lastInst !== instrument.value) {
+    // 首次加载或切换品种：默认显示最近一段（与原固定取最近 N 根一致）
+    lastInst = instrument.value
+    rangeActive.value = false
+    range.value = { s: Math.max(0, end - DEFAULT_SHOW.value + 1), e: end }
+  } else {
+    // 轮询刷新：保持用户窗口，仅收敛到新数据范围内
+    range.value = { s: Math.min(range.value.s, end), e: end }
+  }
+}, { immediate: true })
+
+const visibleHist = computed(() => {
+  const pts = allHist.value
+  if (!pts.length) return []
+  const n = pts.length
+  const s = Math.max(0, Math.min(range.value.s, n - 1))
+  const e = Math.min(n - 1, Math.max(range.value.e, s + 1))
+  return pts.slice(s, e + 1)
+})
+
+function setRangeStart(v) {
+  const n = allHist.value.length
+  if (n < 2) return
+  rangeActive.value = true
+  let s = Math.max(0, Math.min(+v, n - 1))
+  if (s >= range.value.e) { range.value.e = Math.min(s + 1, n - 1); s = range.value.e - 1 }
+  range.value.s = s
+}
+function setRangeEnd(v) {
+  const n = allHist.value.length
+  if (n < 2) return
+  rangeActive.value = true
+  let e = Math.min(n - 1, Math.max(+v, 0))
+  if (e <= range.value.s) { range.value.s = Math.max(0, e - 1); e = range.value.s + 1 }
+  range.value.e = e
+}
+function resetRange() {
+  rangeActive.value = false
+  const n = allHist.value.length
+  if (!n) return
+  const end = n - 1
+  range.value = { s: Math.max(0, end - DEFAULT_SHOW.value + 1), e: end }
+}
+
+const rangeLabel = computed(() => {
+  const pts = allHist.value
+  if (!pts.length) return '-- ~ --'
+  const f = (t) => String(t || '').slice(0, 10)
+  return `${f(pts[range.value.s]?.t)} ~ ${f(pts[range.value.e]?.t)}`
+})
+const rangeFillStyle = computed(() => {
+  const n = allHist.value.length
+  if (n < 2) return {}
+  return {
+    left: (range.value.s / (n - 1)) * 100 + '%',
+    right: ((n - 1 - range.value.e) / (n - 1)) * 100 + '%',
+  }
+})
+const rangeTicks = computed(() => {
+  const pts = allHist.value
+  if (!pts.length) return []
+  const n = pts.length
+  const out = []
+  for (let i = 0; i < n; i += Math.max(1, Math.floor(n / 8))) {
+    out.push({ i, label: String(pts[i].t || '').slice(0, 10).slice(5) })
+  }
+  return out
+})
 
 // ── 数据加载 ──
 async function loadAll() {
@@ -295,7 +373,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
         <svg v-if="instrument === 'cea' && candle" :viewBox="`0 0 ${candleDims.w} ${candleDims.h}`" class="cm-svg" preserveAspectRatio="none">
           <template v-for="i in candle.gridLines" :key="'g' + i">
             <line :x1="14" :x2="candleDims.w - 14" :y1="candleDims.h - 38 - i * (candleDims.h - 60) / candle.gridLines" :y2="candleDims.h - 38 - i * (candleDims.h - 60) / candle.gridLines" class="cm-grid" />
-            <text x="candleDims.w - 16" :y="candleDims.h - 40 - i * (candleDims.h - 60) / candle.gridLines" class="cm-axis">{{ fmt(candle.yMin + (candle.yMax - candle.yMin) * i / candle.gridLines) }}</text>
+            <text :x="candleDims.w - 16" :y="candleDims.h - 40 - i * (candleDims.h - 60) / candle.gridLines" class="cm-axis">{{ fmt(candle.yMin + (candle.yMax - candle.yMin) * i / candle.gridLines) }}</text>
           </template>
           <line :x1="14" :x2="candleDims.w - 14" :y1="candleDims.h - 38" :y2="candleDims.h - 38" class="cm-grid" />
           <!-- 预测置信带 -->
@@ -303,7 +381,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
           <polygon v-if="candle.band" :points="candle.band.lower" class="cm-band" />
           <path v-for="(b, i) in candle.bars" :key="'w' + i" :d="b.wick" :class="[b.up ? 'cm-up' : 'cm-down', { 'cm-fc': b.fc }]" stroke-width="1.2" />
           <path v-for="(b, i) in candle.bars" :key="'b' + i" :d="b.body" :class="[b.up ? 'cm-up' : 'cm-down', { 'cm-fc': b.fc }]" />
-          <text v-for="(l, i) in candle.labels" :key="'x' + i" :x="l.x" y="candleDims.h - 14" class="cm-axis cm-axis-x" text-anchor="middle">{{ l.text }}</text>
+          <text v-for="(l, i) in candle.labels" :key="'x' + i" :x="l.x" :y="candleDims.h - 14" class="cm-axis cm-axis-x" text-anchor="middle">{{ l.text }}</text>
         </svg>
         <div v-else-if="instrument === 'cea'" class="cm-empty">暂无 CEA 日K线数据</div>
 
@@ -311,7 +389,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
         <svg v-if="instrument === 'ccer' && line" :viewBox="`0 0 ${lineDims.w} ${lineDims.h}`" class="cm-svg" preserveAspectRatio="none">
           <template v-for="i in line.gridLines" :key="'g' + i">
             <line :x1="14" :x2="lineDims.w - 14" :y1="lineDims.h - 36 - i * (lineDims.h - 56) / line.gridLines" :y2="lineDims.h - 36 - i * (lineDims.h - 56) / line.gridLines" class="cm-grid" />
-            <text x="lineDims.w - 16" :y="lineDims.h - 38 - i * (lineDims.h - 56) / line.gridLines" class="cm-axis">{{ fmt(line.min + (line.max - line.min) * i / line.gridLines) }}</text>
+            <text :x="lineDims.w - 16" :y="lineDims.h - 38 - i * (lineDims.h - 56) / line.gridLines" class="cm-axis">{{ fmt(line.min + (line.max - line.min) * i / line.gridLines) }}</text>
           </template>
           <!-- 预测置信带 -->
           <polygon v-if="line.band" :points="line.band.upper" class="cm-band" />
@@ -321,9 +399,31 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
           <circle v-for="(d, i) in line.dots" :key="'d' + i" :cx="d.x" :cy="d.y" r="2.2" class="cm-dot">
             <title>{{ d.t }} · {{ fmt(d.v) }} 元/吨</title>
           </circle>
-          <text v-for="(l, i) in line.labels" :key="'x' + i" :x="l.x" y="lineDims.h - 12" class="cm-axis cm-axis-x" text-anchor="middle">{{ l.text }}</text>
+          <text v-for="(l, i) in line.labels" :key="'x' + i" :x="l.x" :y="lineDims.h - 12" class="cm-axis cm-axis-x" text-anchor="middle">{{ l.text }}</text>
         </svg>
         <div v-else-if="instrument === 'ccer'" class="cm-empty">暂无 CCER 均价数据</div>
+      </div>
+
+      <!-- 日期范围选择：拖动两端滑块选择显示范围（置于图表横坐标日期下方） -->
+      <div class="cm-range" v-if="allHist.length > 2">
+        <div class="cm-range-row">
+          <span class="cm-range-label">显示范围</span>
+          <span class="cm-range-text">{{ rangeLabel }}</span>
+          <button v-if="rangeActive" class="cm-range-reset" @click="resetRange">重置范围</button>
+        </div>
+        <div class="cm-range-sliders">
+          <div class="cm-range-track">
+            <div class="cm-range-fill" :style="rangeFillStyle" />
+            <input type="range" class="cm-slider cm-slider-start" :min="0" :max="Math.max(0, allHist.length - 1)"
+                   :value="range.s" @input="setRangeStart($event.target.value)" title="拖动选择开始日期" />
+            <input type="range" class="cm-slider cm-slider-end" :min="0" :max="Math.max(0, allHist.length - 1)"
+                   :value="range.e" @input="setRangeEnd($event.target.value)" title="拖动选择结束日期" />
+          </div>
+          <div class="cm-range-scale">
+            <span v-for="tk in rangeTicks" :key="tk.i" class="cm-range-tick"
+                  :style="{ left: (tk.i / Math.max(1, allHist.length - 1) * 100) + '%' }">{{ tk.label }}</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -354,13 +454,13 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
   padding: 12px 14px 14px;
   overflow: auto;
   color: var(--text);
-  background: var(--bg);
+  background: var(--panel-2);
   font-family: var(--ui);
 }
 
 /* 徽章：模式标签（与 .mode-tag 同体系） */
 .cm-badge {
-  font-size: 10px; padding: 1px 8px; border-radius: 3px;
+  font-size: 10px; padding: 1px 8px; border-radius: 999px;
   background: var(--accent-l); color: var(--accent-d);
   border: 1px solid var(--accent);
   white-space: nowrap;
@@ -371,7 +471,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
 }
 
 .cm-error {
-  padding: 6px 10px; border-radius: 4px; font-size: 12px; color: var(--red);
+  padding: 6px 10px; border-radius: 5px; font-size: 12px; color: var(--red);
   background: rgba(209, 75, 75, 0.08); border: 1px solid rgba(209, 75, 75, 0.3);
 }
 
@@ -379,7 +479,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
 .cm-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 10px; }
 .cm-card {
   position: relative;
-  border-radius: 4px; padding: 12px 14px;
+  border-radius: 8px; padding: 12px 14px;
   background: var(--panel);
   border: 1px solid var(--border);
 }
@@ -393,7 +493,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
 .cm-card-exch {
   font-size: 10px; color: var(--muted);
   background: var(--panel-2); border: 1px solid var(--border);
-  padding: 1px 8px; border-radius: 3px;
+  padding: 1px 8px; border-radius: 999px;
 }
 .cm-card-price { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
 .cm-price {
@@ -423,7 +523,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
 /* —— 走势图面板 —— */
 .cm-chart-box {
   flex: 1; min-height: 260px;
-  border-radius: 4px; padding: 10px 12px;
+  border-radius: 8px; padding: 10px 12px;
   background: var(--panel);
   border: 1px solid var(--border);
   display: flex; flex-direction: column; gap: 6px;
@@ -438,6 +538,73 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
 .cm-legend .lg { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 4px; border-radius: 2px; }
 .lg-hist { background: var(--accent); }
 .lg-fc { background: var(--yellow); height: 2px; }
+
+/* —— 日期范围选择器（双滑块）：贴合图表底部横坐标下方，左右与绘图区对齐（SVG pad=14） —— */
+.cm-range {
+  flex: none;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 6px 14px 0;
+  border-top: 1px solid var(--line);
+  user-select: none;
+}
+.cm-range-row { display: flex; align-items: center; gap: 10px; font-size: 11px; }
+.cm-range-label { color: var(--muted); flex: none; }
+.cm-range-text {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  color: var(--accent); font-size: 11px; letter-spacing: .2px;
+}
+.cm-range-reset {
+  margin-left: auto; flex: none;
+  font-size: 10px; color: var(--muted);
+  background: none; border: 1px solid var(--line);
+  border-radius: 4px; padding: 1px 8px; cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+.cm-range-reset:hover { color: var(--accent); border-color: var(--accent); }
+.cm-range-sliders { position: relative; padding-top: 2px; }
+.cm-range-track { position: relative; height: 22px; }
+.cm-range-track::before {
+  content: ''; position: absolute; top: 50%; left: 0; right: 0;
+  height: 4px; margin-top: -2px; border-radius: 2px;
+  background: var(--line);
+}
+.cm-range-fill {
+  position: absolute; top: 50%; height: 4px; margin-top: -2px;
+  border-radius: 2px; background: var(--accent); opacity: .4;
+  pointer-events: none;
+}
+.cm-slider {
+  position: absolute; top: 0; left: 0; width: 100%; height: 22px;
+  margin: 0; padding: 0; background: none;
+  -webkit-appearance: none; appearance: none;
+  pointer-events: none;
+}
+.cm-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--panel); border: 2px solid var(--accent);
+  cursor: ew-resize; pointer-events: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  transition: transform .1s;
+}
+.cm-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.cm-slider::-moz-range-thumb {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--panel); border: 2px solid var(--accent);
+  cursor: ew-resize; pointer-events: auto;
+}
+.cm-slider-start { z-index: 1; }
+.cm-slider-end { z-index: 2; }
+.cm-range-scale { position: relative; height: 15px; margin-top: 1px; }
+.cm-range-tick {
+  position: absolute; top: 0; transform: translateX(-50%);
+  font-size: 9px; color: var(--muted); white-space: nowrap;
+  font-family: var(--mono); letter-spacing: .2px;
+}
+.cm-range-tick::before {
+  content: ''; position: absolute; top: -7px; left: 50%;
+  width: 1px; height: 4px; background: var(--line);
+}
 
 /* SVG 图表：外层容器撑满剩余空间，SVG 绝对定位填满容器，保证底部坐标轴始终在可视区内 */
 .cm-chart-svg {
@@ -472,9 +639,9 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
 .cm-ticker {
   display: flex; align-items: center; gap: 8px;
   font-size: 11px; color: var(--muted);
-  padding: 6px 10px; border-radius: 4px;
+  padding: 6px 10px; border-radius: 6px;
   background: var(--panel-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   transition: background 0.4s;
 }
 .cm-ticker.flash { background: var(--accent-l); }

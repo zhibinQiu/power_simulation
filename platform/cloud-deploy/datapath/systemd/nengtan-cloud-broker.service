@@ -1,0 +1,13 @@
+[Unit]
+Description=NengTan Cloud MQTT Broker (amqtt, TCP 41883 / WS 41083)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=__VENV__/bin/python -u __DATA_DIR__/broker.py
+Restart=always
+RestartSec=5
+WorkingDirectory=__DATA_DIR__
+
+[Install]
+WantedBy=multi-user.target

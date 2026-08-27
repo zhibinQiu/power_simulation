@@ -1,0 +1,14 @@
+[Unit]
+Description=NengTan Cloud Data Dashboard (Flask, :41500)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=__VENV__/bin/python -u __DATA_DIR__/dashboard.py
+Restart=always
+RestartSec=5
+WorkingDirectory=__DATA_DIR__
+Environment=DASHBOARD_PORT=41500
+
+[Install]
+WantedBy=multi-user.target

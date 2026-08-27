@@ -9,7 +9,7 @@
       <div class="ds-body">
         <p class="ds-tip">
           平台支持多个实时数据源并存（可分别启用/停用）。「Mqtt 实时」为平台默认数据源：
-          后端订阅云端 MQTT Broker（参照参考项目 yunduan1 数据链路；Broker 配置在「能碳一体机管理」视图前端配置）获取真实设备读数。
+          后端订阅云端 MQTT Broker（Broker 配置在「能碳一体机管理」视图前端配置）获取真实设备读数。
           遥测数据形如 <code>{ devices: [{ id, reading }], units?: [...] }</code>；
           通过「字段对齐」可把外部遥测字段名映射为场景内传感器/设备 id，实现数值对齐。
         </p>

@@ -1,0 +1,8 @@
+# KubeEdge uses $hw/... topics; MQTT spec: '#' does NOT match '$'-prefixed topics,
+# so an explicit $hw/# rule is REQUIRED.
+user admin
+topic readwrite $hw/#
+topic readwrite #
+
+user user01
+topic readwrite #

@@ -43,8 +43,8 @@ logging.basicConfig(
 )
 log = logging.getLogger("launcher")
 
-# ---- 路径：本文件位于项目根/platform/，backend 包在项目根/backend/ ----
-_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+# ---- 路径：本文件位于项目根/platform/windows-platform-deploy/，backend 包在项目根/backend/ ----
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 _BACKEND = os.path.join(_ROOT, "backend")
 if _BACKEND not in sys.path:
     sys.path.insert(0, _BACKEND)
@@ -121,7 +121,7 @@ def main() -> None:
     label = "macOS" if system == "Darwin" else system
 
     print("=" * 56)
-    print(f"  行业能碳仿真平台 · {label} 桌面版")
+    print(f"  工业能碳智控平台 · {label} 桌面版")
     print(f"  本地服务: {url}")
     print("  正在打开客户端窗口，关闭窗口即退出应用")
     print("=" * 56)
@@ -143,7 +143,7 @@ def main() -> None:
 
     try:
         webview.create_window(
-            "行业能碳仿真平台",
+            "工业能碳智控平台",
             url,
             width=1440,
             height=900,

@@ -1,0 +1,30 @@
+# ============================================================================
+# NengTan 标准 DMI 多协议 Mapper 容器镜像 (arm64)
+# 支持 Modbus RTU / Modbus TCP / OPC-UA 并行采集（见 mapper/box_mapper.py）
+#
+# 构建 (本机, 需 docker buildx):
+#   docker buildx build --platform linux/arm64 \
+#     -t 220.154.128.231:5000/nengtan-multi-mapper:1.3.0 \
+#     -f Dockerfile.mapper . \
+#     --push
+#
+# 盒子一行启动 (无需装任何 Python 依赖):
+#   ctr -n k8s.io run --detach --net-host \
+#     --mount type=bind,src=/opt/weight-bridge/config.json,dst=/opt/nengtan/config.json \
+#     --mount type=bind,src=/etc/kubeedge/dmi.sock,dst=/etc/kubeedge/dmi.sock \
+#     --mount type=bind,src=/dev/ttyUSB4,dst=/dev/ttyUSB4 \
+#     --mount type=bind,src=/opt/box-apps,dst=/opt/box-apps \
+#     220.154.128.231:5000/nengtan-multi-mapper:1.3.0
+# ============================================================================
+FROM python:3.10-slim
+
+RUN pip install --no-cache-dir grpcio protobuf asyncua
+
+COPY mapper/box_mapper.py /opt/nengtan/
+COPY mapper/api_pb2.py    /opt/nengtan/
+COPY mapper/api_pb2_grpc.py /opt/nengtan/
+
+ENV CONFIG_PATH=/opt/nengtan/config.json \
+    PYTHONUNBUFFERED=1
+
+CMD ["python3", "-u", "/opt/nengtan/box_mapper.py"]

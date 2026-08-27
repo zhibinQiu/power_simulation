@@ -2,22 +2,19 @@
 
 设计说明：
 - 报告骨架与所有数值表格由本地代码生成（保证数字精确、可复现、无幻觉）；
-- 「执行摘要结论 / 基线数据洞察 / 策略效果评估 / 优化建议」等分析段落由大语言模型撰写，
-  大模型只负责基于给定数据的解读与建议，不参与数字计算；
-- 无 LLM Key / 超时 / 输出异常时自动回退到确定性文案，保证离线可用。
+- 「执行摘要结论 / 基线数据洞察 / 策略效果评估 / 优化建议」等分析段落由「报告分析引擎」生成；
+- 分析引擎为策略模式（domain/reporting/engines.py）：LLM 撰写优先，无 Key / 超时 / 异常
+  时自动回退到确定性模板文案，保证离线可用。新增引擎只需在工厂注册一行，本文件无需改动。
 """
 from __future__ import annotations
 
-import json
 import re
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
-from .llm_strategy import chat_completion
+from .domain.reporting import create_report_engine
+from .domain.reporting.engines import _fmt, _pct  # noqa: F401 —— 渲染与模板共用格式化工具
 from .models import SimResult
-
-_ENGINE_LLM = "llm"
-_ENGINE_TEMPLATE = "template"
 
 CO2_UNIT = "tCO₂/h"          # 排放量
 STEEL_UNIT = "t/h"           # 钢产量
@@ -27,28 +24,8 @@ ENERGY_INTENSITY_UNIT = "kgce/t"  # 单位产品综合能耗
 
 
 # ---------------------------------------------------------------------------
-# 数值工具
+# 数值工具（_fmt/_pct 定义于 domain/reporting/engines.py，模板与渲染共用）
 # ---------------------------------------------------------------------------
-
-def _fmt(v, digits=1) -> str:
-    """格式化数值：空值显示 '-', 否则保留 digits 位小数并加千分位。"""
-    if v is None:
-        return "-"
-    try:
-        return f"{float(v):,.{digits}f}"
-    except (TypeError, ValueError):
-        return "-"
-
-
-def _pct(part, whole) -> str:
-    """百分比字符串（分母为 0 或空返回 '-'）。"""
-    if not whole:
-        return "-"
-    try:
-        return f"{float(part) / float(whole) * 100:.1f}%"
-    except (TypeError, ValueError, ZeroDivisionError):
-        return "-"
-
 
 def _snap(v, digits=2) -> Optional[float]:
     """把数值保留 digits 位小数后返回（供 LLM 上下文与对比计算）。"""
@@ -227,11 +204,11 @@ def _render_markdown(ctx: Dict[str, Any], analysis: Dict[str, str],
     L: List[str] = []
 
     # 标题与元信息
-    L.append(f"# {title or '行业能碳仿真分析报告'}")
+    L.append(f"# {title or '工业能碳智控分析报告'}")
     meta = [f"**生成时间**：{datetime.now().strftime('%Y-%m-%d %H:%M')}"]
     if scenario:
         meta.append(f"**仿真情景**：{scenario}")
-    meta.append("**数据来源**：行业能碳仿真平台仿真引擎")
+    meta.append("**数据来源**：工业能碳智控平台仿真引擎")
     for m in meta:
         L.append(f"> {m}")
     L.append("")
@@ -527,159 +504,59 @@ def _ledger_md(ctx_units: Optional[Dict[str, Any]]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# LLM 分析段落
+# 报告正文后处理：剔除提示词/思考链泄漏，统一 Markdown 排版
 # ---------------------------------------------------------------------------
 
-_LLM_SYSTEM = (
-    "你是钢铁行业节能减碳领域的资深数据分析专家，负责为「行业能碳仿真平台」的仿真结果撰写分析报告。"
-    "你只根据给定的仿真数据撰写分析，绝不编造任何数字，也不要计算具体数值（数值全部由系统计算）。"
-    "所有单位按上下文说明理解（CO2 为 tCO2/h、强度为 kgCO2/t、能耗为 GJ/h、单位能耗为 kgce/t）。"
-    "输出简体中文，专业、精炼、结构清晰。"
+# 提示词/思考链泄漏特征：这些是仅供模型阅读的指令或草稿措辞，绝不应出现在交付报告正文中
+_LEAK_PATTERNS: tuple = (
+    r"我们需要回答", r"我们需要撰写", r"我们需要解读", r"我们需要输出",
+    r"我们需要思考", r"我们需要合理", r"我们需",
+    r"请撰写报告", r"撰写报告「", r"请输出完整\s*Markdown",
+    r"输出完整\s*Markdown报告", r"输出纯\s*Markdown",
+    r"用户要求", r"用户说", r"用户禁止", r"根据用户", r"用户提供的事实底稿",
+    r"系统提示", r"系统已计算",
+    r"硬约束",
+    r"事实底稿", r"底稿第",
+    r"只输出该段", r"不要输出标题", r"不要重复数据", r"可含短列表",
+    r"每段\s*\d+\s*[-~—]\s*\d+\s*字", r"字数要求",
+    r"请严格依据", r"请原样使用",
 )
 
 
-# 分析深度 → 每段字数要求与单次 LLM 输出上限
-_DEPTH_SPEC: Dict[str, Dict[str, Any]] = {
-    "brief":    {"chars": "每段 80~150 字", "max_tokens": 600},
-    "standard": {"chars": "每段 150~300 字", "max_tokens": 900},
-    "deep":     {"chars": "每段 300~500 字", "max_tokens": 1600},
-}
+def _is_leak_para(para: str) -> bool:
+    """判断一段是否为提示词/思考链泄漏（应剔除）。"""
+    p = para.strip()
+    if not p:
+        return False
+    if re.search("|".join(_LEAK_PATTERNS), p):
+        return True
+    # 思考链自指特征：第一人称任务语言 / 草稿标记 / 自我提问
+    if re.match(r"^(我们需要|我们需|可能内容|草稿[:：]|先起草|开始起草)", p):
+        return True
+    if p.count("？") + p.count("?") >= 2:
+        return True
+    return False
 
 
-def _llm_section(ctx: Dict[str, Any], key: str, title: str, instruction: str,
-                 spec: Dict[str, Any]) -> Optional[str]:
-    """单段独立调用大模型；成功返回正文文本，失败返回 None。"""
-    prompt = (
-        "以下是数字孪生平台的一次仿真结果（JSON）：\n"
-        f"```json\n{json.dumps(ctx, ensure_ascii=False, indent=1)}\n```\n\n"
-        f"请撰写报告「{title}」这一段（{spec['chars']}，简体中文，Markdown 正文，可含短列表）。\n"
-        f"{instruction}\n"
-        "只输出该段正文内容，不要输出标题、序号或 JSON，也不要重复数据表格。"
-    )
-    messages = [
-        {"role": "system", "content": _LLM_SYSTEM},
-        {"role": "user", "content": prompt},
-    ]
-    try:
-        raw = chat_completion(messages, timeout=90.0, max_tokens=spec["max_tokens"])
-    except Exception:
-        return None
-    if not raw:
-        return None
-    text = raw.strip()
-    # 去掉可能残留的 Markdown 围栏与标题行
-    text = re.sub(r"^```(?:markdown)?\s*", "", text, flags=re.M)
-    text = re.sub(r"\s*```\s*$", "", text).strip()
-    text = re.sub(r"^#+\s+.*\n", "", text).strip()
-    return text or None
-
-
-def _llm_analysis(ctx: Dict[str, Any], depth: str = "standard",
-                  progress_cb: Optional[Callable[[int, str], None]] = None) -> Optional[Dict[str, str]]:
-    """分段调用大模型生成 4 段分析文本，每完成一段回调进度。
-
-    单段失败时用确定性文案补充该段；全部失败返回 None（由调用方整体回退）。
-    """
-    spec = _DEPTH_SPEC.get(depth, _DEPTH_SPEC["standard"])
-    has_strategy = bool(ctx["strategy"])
-
-    def _p(pct: int, stage: str) -> None:
-        if progress_cb:
-            progress_cb(pct, stage)
-
-    strategy_inst = (
-        ("评估策略「%s」的实施效果：核心指标变化、主要节能与减排来源工序、"
-         "强度与能耗改善程度，并评估策略合理性。" % ctx["strategy_name"])
-        if has_strategy else
-        "本次未应用策略，请基于基线数据说明当前无策略对照、建议应用策略后对比，并简述可尝试的策略方向。"
-    )
-    sections = [
-        ("summary", "执行摘要",
-         "一句话概述整体能耗与排放水平与最关键发现，可给出综合能耗、总排放与强度水平结论。", 8, 25),
-        ("baseline_insight", "基线数据分析洞察",
-         "解读排放结构（直接/间接占比）、主要排放工序与贡献、能耗结构（外购电力与燃料占比）与主要能耗工序、"
-         "强度与能耗效率、能流与碳流向特征，指出主要节能与减排机会点。", 28, 45),
-        ("strategy_eval", "策略效果评估", strategy_inst, 48, 65),
-        ("suggestions", "结论与优化建议",
-         "给出 3~5 条具体、可落地的后续节能减碳建议（可结合工序类型、碳流向、能流与能耗结构等），"
-         "使用短列表，并说明预期关注点。", 68, 82),
-    ]
-    fallback = _fallback_analysis(ctx)
-    out: Dict[str, str] = {}
-    for key, title, instruction, p0, p1 in sections:
-        _p(p0, f"llm_{key}")
-        try:
-            text = _llm_section(ctx, key, title, instruction, spec)
-        except Exception:
-            text = None
-        out[key] = text or fallback.get(key, "")
-        _p(p1, f"llm_{key}")
-    if not any(v for v in out.values()):
-        return None
-    return out
-
-
-def _fallback_analysis(ctx: Dict[str, Any]) -> Dict[str, str]:
-    """确定性兜底文案：无 LLM Key / 调用失败时使用。"""
-    b_ctx = ctx["baseline"]
-    s_ctx = ctx["strategy"]
-    has_strategy = bool(s_ctx)
-    b = b_ctx["totals"] if b_ctx else {}
-    top = ""
-    if b_ctx:
-        rows = sorted(b_ctx["units"], key=lambda u: u["co2_total"] or 0, reverse=True)
-        if rows:
-            first = rows[0]
-            top = (f"排放最大的工序为 **{first['name']}**（{_fmt(first['co2_total'])} tCO₂/h，"
-                   f"占全厂 {_pct(first['co2_total'], b.get('co2_total'))}），是减排优先关注对象。")
-    summary = (
-        f"基线情景下全厂总排放为 **{_fmt(b.get('co2_total'))} tCO₂/h**，"
-        f"吨钢碳排放强度 **{_fmt(b.get('intensity'))} kgCO₂/t**。{top}"
-    )
-    energy_note = ""
-    if b_ctx:
-        t = b_ctx["totals"]
-        e_top = sorted(b_ctx["units"], key=lambda u: u["energy_total"] or 0, reverse=True)
-        if e_top and e_top[0].get("energy_total"):
-            energy_note = (
-                f"综合能耗为 **{_fmt(t.get('energy_total'))} GJ/h**，其中燃料能耗占 "
-                f"{_pct(t.get('fuel_energy'), t.get('energy_total'))}、外购电力折标占 "
-                f"{_pct((t.get('elec') or 0) * 3.6, t.get('energy_total'))}；"
-                f"能耗最大的工序为 **{e_top[0]['name']}**（{_fmt(e_top[0].get('energy_total'))} GJ/h）。"
-            )
-    baseline_insight = (
-        f"直接排放占全厂 {_pct(b.get('co2_direct'), b.get('co2_total'))}、间接排放占 "
-        f"{_pct(b.get('co2_indirect'), b.get('co2_total'))}；碳利用率 "
-        f"{b.get('carbon_utilization') * 100 if b.get('carbon_utilization') else 0:.2f}%。{energy_note}"
-        f"{top}建议后续围绕主要排放与能耗工序推进余热回收、燃料替代与能效优化。"
-    )
-    if has_strategy:
-        s = s_ctx["totals"]
-        red = (b.get("co2_total", 0) - s.get("co2_total", 0))
-        strategy_eval = (
-            f"策略「{ctx['strategy_name']}」应用后全厂减排 **{_fmt(red)} tCO₂/h**"
-            f"（减排率 {_pct(red, b.get('co2_total'))}），吨钢强度由 {_fmt(b.get('intensity'))} 降至 "
-            f"{_fmt(s.get('intensity'))} kgCO₂/t。整体效果显著，建议结合工序级贡献进一步微调参数。"
-        )
-    else:
-        strategy_eval = "本次未应用策略，暂无前后对照；建议输入策略文本并执行仿真后再导出对比报告。"
-    suggestions = (
-        "- 优先对排放占比最大的工序开展节能改造与工艺优化；\n"
-        "- 提高煤气/余热回收利用率，降低综合能耗与单位产品能耗；\n"
-        "- 结合碳捕集与利用技术提升碳利用率；\n"
-        "- 定期运行策略仿真，量化各类减排措施的边际效果后择优实施。"
-    )
-    return {
-        "summary": summary,
-        "baseline_insight": baseline_insight,
-        "strategy_eval": strategy_eval,
-        "suggestions": suggestions,
-    }
+def _polish_report_text(text: str) -> str:
+    """清洗提示词/思考链泄漏段落，并统一 Markdown 排版（分段、压缩空行、标题前空行、去行尾空格）。"""
+    paras = re.split(r"\n\s*\n", (text or ""))
+    kept = [p for p in paras if not _is_leak_para(p)]
+    body = "\n\n".join(kept).strip()
+    # 排版统一：压缩多余空行、去除行尾空格、标题前保证空行
+    body = re.sub(r"\n{3,}", "\n\n", body)
+    body = re.sub(r"[ \t]+\n", "\n", body)
+    body = re.sub(r"(?<!^)\n(#{1,4}\s)", r"\n\n\1", body)
+    return body
 
 
 # ---------------------------------------------------------------------------
 # 对外入口
 # ---------------------------------------------------------------------------
+
+# 说明：LLM 分析段落（_llm_section / _llm_analysis / _fallback_analysis）
+# 已迁移至 domain/reporting/engines.py 并以策略模式（LlmReportEngine /
+# TemplateReportEngine / AutoReportEngine）组织，见 generate_report 下方调用。
 
 def generate_report(baseline: SimResult, strategy: Optional[SimResult] = None,
                     strategy_name: str = "", strategy_text: str = "",
@@ -708,19 +585,20 @@ def generate_report(baseline: SimResult, strategy: Optional[SimResult] = None,
 
     _p(2, "ctx")
     ctx = _build_ctx(baseline, strategy, strategy_name, strategy_text, ops, understood, scenario)
-    engine_used = _ENGINE_LLM
-    if engine == _ENGINE_TEMPLATE:
+    # 报告分析引擎（策略模式）：'template' / 'llm' / 'auto'（LLM 优先、失败自动回退模板）
+    engine_obj = create_report_engine(engine)
+    _p(8, "analyze")
+    analysis = engine_obj.build_analysis(ctx, depth=depth, progress_cb=progress_cb)
+    if analysis is None:
+        # 'llm' 强制模式下 LLM 不可用时的最终兜底
+        engine_used = "template"
         _p(40, "template")
-        analysis = _fallback_analysis(ctx)
-        engine_used = _ENGINE_TEMPLATE
+        analysis = create_report_engine("template").build_analysis(ctx, depth=depth)
     else:
-        analysis = _llm_analysis(ctx, depth=depth, progress_cb=progress_cb)
-        if analysis is None:
-            engine_used = _ENGINE_TEMPLATE
-            _p(40, "template")
-            analysis = _fallback_analysis(ctx)
+        engine_used = getattr(engine_obj, "used_engine", engine_obj.name)
     _p(90, "render")
     md = _render_markdown(ctx, analysis, title=title, with_appendix=with_appendix)
+    md = _polish_report_text(md)
     return {
         "ok": True,
         "markdown": md,

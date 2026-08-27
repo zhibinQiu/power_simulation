@@ -33,10 +33,15 @@
         <span>均值 <b>{{ fmt(avg) }}</b></span>
         <span>峰值 <b>{{ fmt(max) }}</b></span>
         <span>谷值 <b>{{ fmt(min) }}</b></span>
+        <!-- 视图切换：列表 / 折线图 -->
+        <div class="dv-mode-switch">
+          <button class="dv-mode" :class="{ on: viewMode === 'list' }" @click="viewMode = 'list'">列表</button>
+          <button class="dv-mode" :class="{ on: viewMode === 'chart' }" @click="viewMode = 'chart'">折线图</button>
+        </div>
       </div>
 
-      <!-- 中间：历史数据表格 -->
-      <div class="dv-table-wrap">
+      <!-- 中间：历史数据（列表视图） -->
+      <div class="dv-table-wrap" v-if="viewMode === 'list'">
         <table class="dv-table">
           <thead>
             <tr>
@@ -61,6 +66,18 @@
           </tbody>
         </table>
       </div>
+
+      <!-- 中间：历史数据（折线图视图） -->
+      <div class="dv-chart-wrap" v-else>
+        <TrendChart v-if="chartRows.length"
+                    :data="chartRows" :color="curDev.color || '#0072BD'"
+                    :height="0" :grid="true" :axis="true" />
+        <div v-else class="dv-chart-empty">暂无历史数据</div>
+        <div class="dv-chart-foot" v-if="chartRows.length">
+          <span>区间 {{ fmtTime(chartRows[0].t) }} → {{ fmtTime(chartRows[chartRows.length - 1].t) }}</span>
+          <span>采样 {{ chartRows.length }} 点</span>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -69,9 +86,11 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
+import TrendChart from './TrendChart.vue'
 
 const store = useSimStore()
 const curId = ref(null)
+const viewMode = ref('list')   // 'list' 列表 / 'chart' 折线图
 
 // 关闭数据视图，返回数字孪生
 const close = () => store.toggleDataView()
@@ -108,6 +127,13 @@ const rows = computed(() => {
   if (!dev || !dev.id) return []
   const h = store.deviceHistory[dev.id] || []
   return [...h].reverse()
+})
+
+// 折线图序列（正序：时间从左到右）
+const chartRows = computed(() => {
+  const dev = curDev.value
+  if (!dev || !dev.id) return []
+  return [...(store.deviceHistory[dev.id] || [])]
 })
 
 const curLive = computed(() => (curDev.value.id != null ? store.deviceLiveOf(curDev.value.id) : null))
@@ -181,8 +207,19 @@ defineExpose({ close, refresh })
 .dv-range { color: var(--muted); font-size: 11px; padding: 2px 8px; background: var(--panel-3); border: 1px solid var(--border); border-radius: 10px; }
 .dv-live2 { display: flex; align-items: baseline; gap: 4px; margin-left: auto; }
 .dv-live-v { font-size: 16px; font-weight: 500; color: var(--accent); font-family: var(--mono); }
+/* ---- 列表 / 折线图切换 ---- */
+.dv-mode-switch { display: flex; flex: 0 0 auto; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; background: var(--panel); }
+.dv-mode { padding: 2px 10px; font-size: 11px; line-height: 16px; color: var(--muted); background: transparent; border: none; cursor: pointer; }
+.dv-mode + .dv-mode { border-left: 1px solid var(--border); }
+.dv-mode:hover { color: var(--text); }
+.dv-mode.on { background: var(--accent-l); color: var(--accent-d); font-weight: 500; }
 /* ---- 表格 ---- */
 .dv-table-wrap { flex: 1 1 auto; overflow: auto; background: var(--panel); }
+/* ---- 折线图 ---- */
+.dv-chart-wrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 12px 16px 6px; background: var(--panel); }
+.dv-chart-wrap :deep(.trend) { flex: 1 1 auto; min-height: 0; }
+.dv-chart-empty { flex: 1; display: grid; place-items: center; color: var(--faint); font-size: 12px; }
+.dv-chart-foot { display: flex; align-items: center; gap: 16px; padding: 6px 2px 0; color: var(--muted); font-size: 11px; font-family: var(--mono); }
 .dv-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .dv-table th, .dv-table td {
   padding: 5px 12px; border-bottom: 1px solid var(--line);

@@ -1,38 +1,50 @@
 # 能碳一体机（边缘盒子）edgecore.yaml 模板
-# 占位符: {{HOSTNAME}} 盒子主机名 / {{TOKEN}} 云端共享 token / {{CLOUDIP}} 云端 CloudCore IP
-# 本模板参照参考项目 yunduan1 console 的 edgecore.template.yaml 结构，按 KubeEdge 标准配置裁剪。
+# 占位符：{{HOSTNAME}} 盒子主机名 / {{TOKEN}} 云端共享 token / {{CLOUDIP}} 云端 CloudCore 地址
+# 结构按云端 KubeEdge v1.20 已验证字段配置（见 kubeedge-console-ops.md §3.4）：
+#   - 模块名 edgeHub（含 httpServer/websocket/quic/tlsCaFile），非旧版 cloudHub；
+#   - 运行时 containerd（CRI），非 docker/dockershim；
+#   - 顶层 database（driverName: sqlite3），非旧版 db 模块；
+#   - deviceTwin.dmiSockPath 为 v1beta1 twins 上报（DMI）所必需。
 apiVersion: edgecore.config.kubeedge.io/v1alpha2
 kind: EdgeCore
 modules:
-  cloudHub:
-    server: {{CLOUDIP}}:10002
-    token: {{TOKEN}}
+  edgeHub:
+    enable: true
+    httpServer: https://{{CLOUDIP}}:10002
+    websocket:
+      enable: true
+      server: {{CLOUDIP}}:10004
+    quic:
+      enable: false
+      server: {{CLOUDIP}}:10001
     tlsCaFile: /etc/kubeedge/ca/rootCA.crt
     tlsCertFile: /etc/kubeedge/certs/server.crt
     tlsPrivateKeyFile: /etc/kubeedge/certs/server.key
-    quic:
-      maxIncomingStreams: 10000
-    websocket:
-      enable: true
-  edgeHub:
-    heartbeat: 15
-    messageTimeout: 30
-    serviceBus:
-      enable: false
+    rotateCertificates: true
+    token: {{TOKEN}}
+  edgeStream:
+    enable: true
+    server: {{CLOUDIP}}:10003
+  deviceTwin:
+    enable: true
+    dmiSockPath: /etc/kubeedge/dmi.sock
   eventBus:
     enable: true
     mqttMode: 2
   edged:
-    registerNodeNamespace: default
+    enable: true
     hostnameOverride: {{HOSTNAME}}
-    clusterDNS: 10.96.0.10
+    podSandboxImage: kubeedge/pause:3.6
+    registerNodeNamespace: default
+    registerSchedulable: true
+    clusterDNS: 10.43.0.10
     clusterDomain: cluster.local
-    runtimeType: docker
-    remoteRuntimeEndpoint: unix:///var/run/dockershim.sock
-    nodeIP: ""
-  db:
-    driver: sqlite
-    dataSource: /etc/kubeedge/edgecore.db
-  metaManager:
-    metaServer:
-      enable: false
+    tailoredKubeletConfig:
+      containerRuntimeEndpoint: unix:///run/containerd/containerd.sock
+      imageServiceEndpoint: unix:///run/containerd/containerd.sock
+      cgroupDriver: systemd
+      failSwapOn: false
+      staticPodPath: /etc/kubeedge/manifests
+database:
+  dataSource: /var/lib/kubeedge/edgecore.db
+  driverName: sqlite3

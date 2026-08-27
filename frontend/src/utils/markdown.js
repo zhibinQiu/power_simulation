@@ -13,10 +13,12 @@ function inline(s) {
   return t
 }
 
-export function renderMarkdown(src) {
+export function renderMarkdown(src, opts = {}) {
+  const headingIds = !!(opts && opts.headingIds)
   const lines = String(src || '').split('\n')
   const out = []
   let i = 0
+  let hid = 0
   const isTableRow = (l) => /^\s*\|.*\|\s*$/.test(l)
   while (i < lines.length) {
     const line = lines[i]
@@ -52,7 +54,9 @@ export function renderMarkdown(src) {
 
     if (/^#{1,4}\s/.test(trimmed)) {
       const level = trimmed.match(/^#+/)[0].length
-      out.push('<h' + level + '>' + inline(trimmed.replace(/^#+\s*/, '')) + '</h' + level + '>')
+      hid += 1
+      const idAttr = headingIds ? ' id="md-h-' + hid + '"' : ''
+      out.push('<h' + level + idAttr + '>' + inline(trimmed.replace(/^#+\s*/, '')) + '</h' + level + '>')
       i++
       continue
     }
@@ -82,4 +86,17 @@ export function renderMarkdown(src) {
     i++
   }
   return out.join('\n')
+}
+
+// 解析 Markdown 标题生成目录（与 renderMarkdown 的 headingIds 锚点编号一致）
+export function parseToc(src) {
+  const toc = []
+  let hid = 0
+  for (const line of String(src || '').split('\n')) {
+    const m = line.trim().match(/^(#{1,4})\s+(.*)$/)
+    if (!m) continue
+    hid += 1
+    toc.push({ level: m[1].length, text: m[2].replace(/[*`]/g, '').trim(), id: 'md-h-' + hid })
+  }
+  return toc
 }

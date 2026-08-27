@@ -2,10 +2,10 @@
   <div class="ab-mask" @click.self="$emit('close')">
     <div class="ab-modal" role="dialog" aria-modal="true" aria-label="关于本平台">
       <div class="ab-logo">
-        <img src="/favicon.png" alt="行业能碳仿真平台" />
+        <img src="/favicon.png" alt="工业能碳智控平台" />
       </div>
 
-      <div class="ab-name">行业能碳仿真平台</div>
+      <div class="ab-name">工业能碳智控平台</div>
       <div class="ab-sub">Web 版工业数字孪生仿真系统</div>
       <div class="ab-sub">面向高炉炼铁的能碳仿真与优化平台</div>
       <div class="ab-ver">版本 v0.1.0</div>
