@@ -10,6 +10,12 @@ RestartSec=5
 WorkingDirectory=__DATA_DIR__
 Environment=BROKER_HOST=127.0.0.1
 Environment=BROKER_PORT=41883
+# 时序数据库 (TDengine) 写入：盒子 data/ 主题自动落库 nengtan.readings（TDengine 未部署时仅跳过写入, 不影响落盘）
+Environment=TSDB_ENABLED=1
+Environment=TSDB_URL=http://127.0.0.1:6041
+Environment=TSDB_USER=root
+Environment=TSDB_PASS=taosdata
+Environment=TSDB_DB=nengtan
 
 [Install]
 WantedBy=multi-user.target

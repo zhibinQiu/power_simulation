@@ -30,6 +30,11 @@ EDGE_PORT=22
 EDGE_USER="root"
 EDGE_PASS=""
 EDGE_KEY=""
+# 时序数据库 (TDengine)：/api/history 查询用（本机安装时可保持默认）
+TSDB_URL="http://127.0.0.1:6041"
+TSDB_USER="root"
+TSDB_PASS="taosdata"
+TSDB_DB="nengtan"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -44,6 +49,10 @@ while [[ $# -gt 0 ]]; do
     --edge-user) EDGE_USER="$2"; shift 2 ;;
     --edge-pass) EDGE_PASS="$2"; shift 2 ;;
     --edge-key) EDGE_KEY="$2"; shift 2 ;;
+    --tdengine-url) TSDB_URL="$2"; shift 2 ;;
+    --tdengine-user) TSDB_USER="$2"; shift 2 ;;
+    --tdengine-pass) TSDB_PASS="$2"; shift 2 ;;
+    --tdengine-db) TSDB_DB="$2"; shift 2 ;;
     *) echo "未知参数: $1"; exit 2 ;;
   esac
 done
@@ -69,6 +78,12 @@ cat > "$INSTALL_DIR/config.json" <<EOF
   "broker_username": "$BROKER_USER",
   "broker_password": "$BROKER_PASS",
   "intervals": {"state": 30, "crds": 5, "logs": 3},
+  "tdengine": {
+    "url": "$TSDB_URL",
+    "user": "$TSDB_USER",
+    "password": "$TSDB_PASS",
+    "db": "$TSDB_DB"
+  },
   "edge": {
     "host": "$EDGE_HOST",
     "port": $EDGE_PORT,

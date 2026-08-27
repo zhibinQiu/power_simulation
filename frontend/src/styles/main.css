@@ -517,7 +517,7 @@ button b, button strong,
   background: var(--accent); border-top: none; font-size: 10.5px; color: rgba(255,255,255,.85); font-family: var(--mono); letter-spacing: .1px; }
 .statusbar .st { display: flex; align-items: center; gap: 5px; padding: 0 10px; border-right: 1px solid rgba(255,255,255,.18); white-space: nowrap; cursor: default; }
 .statusbar .st:hover { background: rgba(255,255,255,.1); }
-.statusbar .st .v { color: #fff; font-weight: 600; }
+.statusbar .st .v { color: #fff; }
 .statusbar .st.spacer { flex: 1; border-right: none; }
 .statusbar .st.spacer:hover { background: none; }
 /* 市场快讯滚动条 */
@@ -530,7 +530,7 @@ button b, button strong,
 .statusbar .news-track:hover { animation-play-state: paused; }
 .statusbar .news-list { display: inline-flex; align-items: center; }
 .statusbar .news-item { padding-right: 22px; font-size: 11px; font-family: var(--ui); -webkit-font-smoothing: antialiased; }
-.statusbar .news-item .news-time { color: #fff; font-weight: 700; margin-right: 7px; font-family: var(--mono); }
+.statusbar .news-item .news-time { color: #fff; margin-right: 7px; font-family: var(--mono); }
 .statusbar .nt-empty { color: rgba(255,255,255,.6); padding-left: 4px; font-family: var(--ui); }
 @keyframes news-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 .statusbar .ok { color: #B7F7D0; } .statusbar .err { color: #FFC2B8; } .statusbar .warnc { color: #FFE0A3; }
@@ -544,7 +544,7 @@ button b, button strong,
 .statusbar .st-notif { position: relative; padding: 0 12px; border-right: none; cursor: pointer; }
 .statusbar .st-notif svg { width: 15px; height: 15px; fill: rgba(255,255,255,.92); display: block; }
 .statusbar .st-notif .ntf-badge { position: absolute; top: 2px; right: 4px; min-width: 14px; height: 14px; padding: 0 3px;
-  background: var(--red); color: #fff; border-radius: 8px; font-size: 9px; font-weight: 700; font-family: var(--ui);
+  background: var(--red); color: #fff; border-radius: 8px; font-size: 9px; font-family: var(--ui);
   display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1.5px var(--accent); }
 .statusbar .st-notif.open { background: rgba(255,255,255,.15); }
 /* ============ 系统通知中心（仿 VS Code 通知中心） ============ */

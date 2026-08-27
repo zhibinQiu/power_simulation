@@ -62,7 +62,7 @@ KUBECONFIG_PATH="${KUBECONFIG_PATH:-/etc/rancher/k3s/k3s.yaml}"
 
 # 时序数据库 (TDengine)
 TSDB_DIR="${TSDB_DIR:-/opt/tdengine}"
-TDENGINE_VER="${TDENGINE_VER:-3.3.5.0}"
+TDENGINE_VER="${TDENGINE_VER:-3.3.6.0}"
 TSDB_KEEP="${TSDB_KEEP:-30}"
 
 [ "$(id -u)" -ne 0 ] && { echo "[error] 请以 root 运行 (云端需操作 /etc/kubeedge 与 systemd)"; exit 1; }
@@ -266,10 +266,11 @@ deploy_tsdb() {
       TARBALL="$TDSB_TAR"
       log "离线安装包: $TDSB_TAR"
     else
-      local ARCH="$(uname -m)"; case "$ARCH" in x86_64) ARCH=x86_64 ;; aarch64|arm64) ARCH=aarch64 ;; *) err "暂不支持架构 $ARCH (仅 x86_64/aarch64)" ;; esac
-      local URL="https://github.com/taosdata/TDengine/releases/download/ver-$TDENGINE_VER/TDengine-server-$TDENGINE_VER-Linux-$ARCH.tar.gz"
-      log "在线下载 TDengine $TDENGINE_VER ($ARCH): $URL (约 30MB, 云端无外网时请预下载并用 TDSB_TAR 指定) ..."
-      curl -fsSL "$URL" -o /tmp/tdengine-server.tar.gz || {
+      local ARCH="$(uname -m)"; case "$ARCH" in x86_64|amd64) ARCH=x64 ;; aarch64|arm64) ARCH=aarch64 ;; *) err "暂不支持架构 $ARCH (仅 x86_64/aarch64)" ;; esac
+      # 官方下载: TDengine 3.x 资产名为 TDengine-server-<VER>-Linux-x64.tar.gz (GitHub release 已不放二进制)
+      local URL="https://www.taosdata.com/assets-download/3.0/TDengine-server-$TDENGINE_VER-Linux-$ARCH.tar.gz"
+      log "在线下载 TDengine $TDENGINE_VER ($ARCH): $URL (约 180MB, 云端无外网时请预下载并用 TDSB_TAR 指定) ..."
+      curl -fsSL -A "Mozilla/5.0" "$URL" -o /tmp/tdengine-server.tar.gz || {
         warn "在线下载失败 (无外网?), 可手动下载后: TDSB_TAR=/path/to/TDengine-server-$TDENGINE_VER-Linux-$ARCH.tar.gz $0 --tsdb-only"
         return 1
       }
@@ -280,7 +281,8 @@ deploy_tsdb() {
     # 官方包解压后目录内为 TDengine-server-<ver> 的 install.sh 或根 install.sh
     local INST="$(find "$TMP" -maxdepth 2 -name install.sh | head -1)"
     [ -n "$INST" ] || err "TDengine 安装包缺少 install.sh: $TARBALL"
-    (cd "$(dirname "$INST")" && ./install.sh) || err "TDengine install.sh 执行失败"
+    # -e no 非交互安装（跳过 FQDN 询问），装到 /usr/local/taos
+    (cd "$(dirname "$INST")" && ./install.sh -e no >/dev/null 2>&1) || err "TDengine install.sh 执行失败"
     rm -rf "$TMP" /tmp/tdengine-server.tar.gz
     systemctl daemon-reload
     systemctl enable taosd >/dev/null 2>&1 || true
