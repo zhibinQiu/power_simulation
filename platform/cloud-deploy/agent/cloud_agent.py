@@ -581,7 +581,7 @@ def _tsdb_history(box: str = "", device: str = "", instance: str = "", prop: str
     for name, val in (("device", device), ("instance", instance), ("property", prop)):
         if val:
             cond += f" AND {name}='{val.replace(chr(39), chr(39) * 2)}'"
-    sql = (f"SELECT _wstart AS t, AVG(value) AS v FROM {db}.readings "
+    sql = (f"SELECT _wstart AS t, AVG(val) AS v FROM {db}.readings "
            f"WHERE {cond} AND ts>={start_ms} AND ts<={end_ms} "
            f"INTERVAL({interval}) FILL(NULL) ORDER BY t ASC")
     auth = base64.b64encode(f"{user}:{password}".encode()).decode()

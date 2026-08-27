@@ -32,7 +32,7 @@ async def main() -> None:
 
     config = {
         "listeners": {
-            "tcp": {
+            "default": {
                 "type": "tcp",
                 "bind": BIND_TCP,
                 "max_connections": MAX_CONNS,
@@ -48,7 +48,6 @@ async def main() -> None:
         "auth": {"allow-anonymous": True},
         "plugins": [
             "amqtt.plugins.authentication.AnonymousAuthPlugin",
-            "amqtt.plugins.logging.PacketLogger",
         ],
     }
     broker = Broker(config)

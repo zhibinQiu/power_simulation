@@ -93,17 +93,29 @@ def _ts_record(topic: str, payload: bytes) -> None:
     parts = topic.split("/")
     if len(parts) != 5 or parts[0] != "data":
         return
+    raw = payload.decode("utf-8", errors="replace").strip()
+    value = None
     try:
-        value = float(payload.decode("utf-8", errors="replace").strip())
+        value = float(raw)
     except (ValueError, TypeError):
-        return
-    if value != value:  # NaN
+        # 兼容 JSON payload: {"weight":0.54} / {"value":1.2} / {"val":3}
+        try:
+            obj = json.loads(raw)
+            if isinstance(obj, dict):
+                for k in ("value", "val", "weight", "reading", "data"):
+                    if k in obj and obj[k] not in (None, ""):
+                        try:
+                            value = float(obj[k]); break
+                        except (ValueError, TypeError):
+                            continue
+        except Exception:
+            value = None
+    if value is None or value != value:  # NaN / 无法解析
         return
     ts_ms = int(time.time() * 1000)
     box, device, instance, prop = (_esc(parts[1]), _esc(parts[2]), _esc(parts[3]), _esc(parts[4]))
-    row = f"({ts_ms},{value!r},'{box}','{device}','{instance}','{prop}')"
     with _TS_LOCK:
-        _TS_BUF.append(row)
+        _TS_BUF.append((box, device, instance, prop, ts_ms, value))
 
 
 def _ts_flush() -> None:
@@ -115,12 +127,18 @@ def _ts_flush() -> None:
         _TS_BUF.clear()
     if not rows:
         return
-    for i in range(0, len(rows), _TS_MAX_BATCH):
-        batch = rows[i:i + _TS_MAX_BATCH]
-        sql = f"INSERT INTO {TSDB_STABLE} VALUES " + " ".join(batch)
+    groups = {}
+    for (box, device, instance, prop, ts_ms, value) in rows:
+        groups.setdefault((box, device, instance, prop), []).append(
+            f"({ts_ms},{value!r})")
+    for (box, device, instance, prop), vals in groups.items():
+        subtable = f"t_{box}_{device}_{instance}_{prop}".replace("-", "_")
+        sql = (f"INSERT INTO {subtable} USING {TSDB_STABLE} "
+               f"TAGS('{box}','{device}','{instance}','{prop}') VALUES "
+               + " ".join(vals))
         auth = base64.b64encode(f"{TSDB_USER}:{TSDB_PASS}".encode()).decode()
         req = urllib.request.Request(
-            f"{TSDB_URL}/rest/sql", data=sql.encode("utf-8"), method="POST",
+            f"{TSDB_URL}/rest/sql/{TSDB_DB}", data=sql.encode("utf-8"), method="POST",
             headers={"Authorization": f"Basic {auth}", "Content-Type": "text/plain"},
         )
         try:
@@ -128,6 +146,8 @@ def _ts_flush() -> None:
                 data = json.loads(resp.read().decode("utf-8", errors="replace"))
             if data.get("code", 0) != 0:
                 log.warning("TDengine 写入失败: %s (%s)", data.get("desc"), sql[:160])
+            else:
+                log.info("TDengine 已写入 %d 行", len(vals))
         except Exception as e:  # noqa: BLE001 TDengine 不可用不影响订阅主循环
             log.warning("TDengine 写入异常: %s", e)
             return
@@ -142,15 +162,16 @@ def _ts_flush_worker() -> None:
             pass
 
 
-def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None) -> None:
+def on_connect(client, userdata, flags, rc, properties=None, *args) -> None:
     if rc == 0:
-        log.info("已连接 %s:%s (MQTT5=%s), 订阅 %s", BROKER_HOST, BROKER_PORT, mqtt.MQTTv5, TOPICS)
+        log.info("已连接 %s:%s, 订阅 %s", BROKER_HOST, BROKER_PORT, TOPICS)
         client.subscribe(TOPICS, qos=0)
     else:
         log.warning("连接失败 rc=%s, 将重试", rc)
 
 
-def on_disconnect(client: mqtt.Client, userdata, rc, properties=None) -> None:
+def on_disconnect(client, userdata, *args) -> None:
+    rc = args[0] if args else 0
     if rc != 0:
         log.warning("意外断开 (rc=%s), 自动重连", rc)
 
@@ -167,8 +188,7 @@ def main() -> None:
     client = mqtt.Client(
         mqtt.CallbackAPIVersion.VERSION2,
         client_id=f"nengtan-cloud-collector-{os.getpid()}-{random.randint(1000, 9999)}",
-        protocol=mqtt.MQTTv5,
-        clean_session=True,
+        protocol=mqtt.MQTTv311,
     )
     client.on_connect = on_connect
     client.on_disconnect = on_disconnect
