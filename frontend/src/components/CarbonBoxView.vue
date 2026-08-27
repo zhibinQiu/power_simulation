@@ -116,7 +116,7 @@
                 <div :ref="setNodeRef('n_cloudcore')" class="cbx-topo-mod cloudcore" :class="{ down: overview.cloud_source !== 'live' || (overview.cloudcore && overview.cloudcore.phase !== 'Running') }">
                   <div class="cbx-topo-mod-head">
                     <span class="cbx-topo-mod-name">☁ CloudCore</span>
-                    <span class="cbx-topo-mod-badge" :class="{ ok: overview.cloudcore && overview.cloudcore.phase === 'Running' }">{{ overview.cloudcore ? overview.cloudcore.phase : '—' }}</span>
+                    <span class="cbx-topo-mod-badge" :class="{ ok: overview.cloudcore && overview.cloudcore.phase === 'Running' }">{{ overview.cloudcore ? phaseZh(overview.cloudcore.phase) : '—' }}</span>
                   </div>
                   <div class="cbx-topo-mod-sub">CloudHub :10002 · KubeEdge CRD<br/>{{ cloudCfg.host || '172.19.134.45' }}</div>
                   <div class="cbx-topo-mod-ops">
@@ -142,7 +142,7 @@
                     <span class="cbx-topo-mod-name">📦 {{ b.name }}</span>
                     <span class="cbx-topo-mod-badge" :class="{ ok: readyOk(b.ready), err: b.ready === false }">{{ readyZh(b.ready) }}</span>
                   </div>
-                  <div class="cbx-topo-mod-sub">EdgeCore<template v-if="b.version && b.version !== '—'"> · v{{ b.version }}</template><template v-if="b.roles && b.roles !== '—'"> · {{ b.roles }}</template><br/>edgecore MQTT :1883 · {{ b.source === 'mqtt' ? 'MQTT 识别' : 'K8s Agent' }} · {{ devCountOf(b.name) }} 台待下发</div>
+                  <div class="cbx-topo-mod-sub">EdgeCore<template v-if="b.version && b.version !== '—'"> · v{{ b.version }}</template><template v-if="b.roles && b.roles !== '—'"> · {{ roleZh(b.roles) }}</template><br/>edgecore MQTT :1883 · {{ b.source === 'mqtt' ? 'MQTT 识别' : 'K8s Agent' }} · {{ devCountOf(b.name) }} 台待下发</div>
                   <!-- 盒子当前运行的服务/模型（云端部署，盒子周期上报 state/{box}/services） -->
                   <div class="cbx-topo-svcs">
                     <template v-if="b.services && b.services.length">
@@ -588,7 +588,7 @@
           <div class="cbx-dialog cbx-dialog-xl">
             <div class="cbx-dialog-head">
               <b>实时数据：<code>{{ devRtName }}</code></b>
-              <span v-if="devRt" class="cbx-tag" :class="{ ok: devRt.state === 'reporting' }">{{ devRt.state }}</span>
+              <span v-if="devRt" class="cbx-tag" :class="{ ok: devRt.state === 'reporting' }">{{ devRt.state === 'reporting' ? '上报中' : '等待上报' }}</span>
               <span v-if="devRt" class="cbx-sec-hint">节点 {{ devRt.node }} · 模型 {{ devRt.model }} · 每 3s 自动刷新</span>
               <button class="cbx-op danger" @click="closeDevRealtime">✕</button>
             </div>
@@ -2065,6 +2065,22 @@ function protoOfDev(dev) {
   if (dev.protocol) return dev.protocol
   const local = (devices.value.devices || []).find((x) => x.name === dev.name || x.cloudDevice === dev.name)
   return (local && local.protocol) || ''
+}
+// CloudCore Pod 状态统一中文：kubectl 返回的 .status.phase / containerState 原值 → 中文
+const PHASE_ZH = {
+  Running: '运行中', Pending: '待启动', Succeeded: '已完成', Failed: '失败', Unknown: '未知',
+  ContainerCreating: '容器创建中', CrashLoopBackOff: '启动崩溃循环',
+  ImagePullBackOff: '镜像拉取失败', ErrImagePull: '镜像拉取错误', Terminating: '终止中',
+}
+function phaseZh(s) {
+  if (!s) return '未知'
+  return PHASE_ZH[s] || s
+}
+// K8s 节点角色统一中文：control-plane/edge/master → 中文
+const ROLE_ZH = { edge: '边端', 'control-plane': '控制面', master: '控制面', worker: '工作节点', '<none>': '普通节点' }
+function roleZh(r) {
+  if (!r || r === '—') return '—'
+  return ROLE_ZH[String(r).toLowerCase()] || r
 }
 // 状态统一中文：online→在线 / offline→离线 / 未知
 function stateZh(s) {

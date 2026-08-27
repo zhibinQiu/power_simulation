@@ -16,7 +16,7 @@ import asyncio
 import time
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
 from .. import box_console
@@ -414,14 +414,16 @@ def box_cloud_logs():
 
 @router.get("/box/cloud/tsdb/history")
 def box_cloud_tsdb_history(box: str = "", device: str = "", instance: str = "",
-                           prop: str = "", start: str = "", end: str = "", points: int = 500):
+                           prop: str = "", property_: str = Query("", alias="property"),
+                           start: str = "", end: str = "", points: int = 500):
     """云端时序库历史读数查询（TDengine，经 agent /api/history）。
 
-    参数：box/device/instance/prop 主题四元组（至少 box）；start/end 支持毫秒时间戳或
-    'YYYY-MM-DD HH:MM:SS'（缺省近 24h）；points 目标点数（默认 500，最大 2000）。
+    参数：box/device/instance/prop 主题四元组（至少 box），prop 与 property 互为别名；
+    start/end 支持毫秒时间戳或 'YYYY-MM-DD HH:MM:SS'（缺省近 24h）；
+    points 目标点数（默认 500，最大 2000）。
     返回降采样序列 [{t, v}]，用于前端历史曲线。
     """
-    return cloud_agent.history(box, device, instance, prop, start, end, points)
+    return cloud_agent.history(box, device, instance, prop or property_, start, end, points)
 
 
 @router.post("/box/devices/apply")

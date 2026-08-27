@@ -6,13 +6,9 @@
         <!-- ============ 数字孪生（默认）：运行仿真 + 流程编排 + 视角工具 ============ -->
         <template v-if="view === 'twin'">
           <div class="rbtns">
-            <button class="rbtn primary" :class="{ on: store.simMode }" @click="actions.onSimToggle()">
-              <Icon :name="store.simMode ? 'stop' : 'run'"/>
-              <span>{{ store.simMode ? '退出仿真' : '运行仿真' }}</span>
-            </button>
-            <button class="rbtn primary" @click="actions.onToggleEdit()">
-              <Icon name="pencil"/>
-              <span>流程编排</span>
+            <button class="rbtn sim-btn" :class="{ on: store.simMode }" @click="actions.onSimToggle()"
+                    :title="store.simMode ? '退出仿真' : '运行仿真：启动实时模拟'">
+              <Icon :name="store.simMode ? 'stop' : 'run'" size="14"/>
             </button>
           </div>
           <span class="rdiv"></span>
@@ -34,13 +30,9 @@
         <!-- ============ 流程编排态：编排工具 ============ -->
         <template v-else-if="view === 'edit'">
           <div class="rbtns">
-            <button class="rbtn primary" :class="{ on: store.simMode }" @click="actions.onSimToggle()">
-              <Icon :name="store.simMode ? 'stop' : 'run'"/>
-              <span>{{ store.simMode ? '退出仿真' : '运行仿真' }}</span>
-            </button>
-            <button class="rbtn primary" :class="{ on: store.editMode }" @click="actions.onToggleEdit()">
-              <Icon name="pencil"/>
-              <span>完成编排</span>
+            <button class="rbtn sim-btn" :class="{ on: store.simMode }" @click="actions.onSimToggle()"
+                    :title="store.simMode ? '退出仿真' : '运行仿真：启动实时模拟'">
+              <Icon :name="store.simMode ? 'stop' : 'run'" size="14"/>
             </button>
           </div>
           <span class="rdiv"></span>

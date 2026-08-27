@@ -6,9 +6,10 @@
       云端 TDengine（nengtan.readings 超表，见 deploy_cloud.sh --tsdb-only）；
       写失败不阻塞订阅主循环（原始数据仍有落盘兜底）
 实现与 backend/app/mqtt_source.py 同源（参照参考项目 deploy_pkg/collect_sensor_data.py）：
-    - paho-mqtt，默认 MQTT 5.0（amqtt 0.12 对 MQTT 3.1.1 跨客户端路由有缺陷）
+    - paho-mqtt，MQTT 3.1.1（amqtt 0.12 实测对 MQTT 5.0 连接返回 Unsupported protocol version，v3.1.1 才正常）
     - 默认订阅 '#'（amqtt 对 'data/#' 前缀通配符路由有缺陷），on_message 过滤 $SYS
     - 唯一 client_id（含 pid），断线自动重连（1s→30s 退避）
+    - on_connect/on_disconnect 用 paho 2.x 兼容签名（v3.1.1 下多出的形参用 *args 兜底）
 
 环境变量（TDengine 写入，均可选，默认本地 127.0.0.1:6041）：
     TSDB_ENABLED  默认 1；设 0 关闭时序写入（仅落盘）

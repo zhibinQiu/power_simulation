@@ -255,57 +255,46 @@ deploy_datapath() {
     || warn "41883 未监听, 排查: journalctl -u nengtan-cloud-broker -n 30"
 }
 
-# ----------------------------- 5b. 时序数据库 (TDengine) ------------------------------
+# ----------------------------- 5b. 时序数据库 (TDengine, Docker) ------------------------------
+# 说明: openEuler 24.03 等系统不受 TDengine 3.x 原生安装支持 (issue #23603),
+#       官方推荐 Docker 方式, 绕开平台检测。容器映射 6030(tcp/udp)+6041 到宿主机。
+TDENGINE_IMAGE="tdengine/tdengine:${TDENGINE_VER}"
+TDENGINE_CTN="nengtan-tdengine"
 deploy_tsdb() {
-  log "部署时序数据库 TDengine (库 nengtan, 超表 readings, 保留 ${TSDB_KEEP} 天) ..."
-  if systemctl is-active taosd >/dev/null 2>&1; then
-    log "taosd 已在运行, 复用现有 TDengine"
+  log "部署时序数据库 TDengine (Docker $TDENGINE_IMAGE, 库 nengtan, 超表 readings, 保留 ${TSDB_KEEP} 天) ..."
+  command -v docker >/dev/null 2>&1 || err "未安装 docker, 请先安装 docker (TDengine 走容器方式)"
+
+  # 幂等: 容器已在运行则直接复用
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$TDENGINE_CTN"; then
+    log "容器 $TDENGINE_CTN 已在运行, 复用现有 TDengine"
   else
-    local TARBALL=""
-    if [ -n "${TDSB_TAR:-}" ] && [ -f "$TDSB_TAR" ]; then
-      TARBALL="$TDSB_TAR"
-      log "离线安装包: $TDSB_TAR"
-    else
-      local ARCH="$(uname -m)"; case "$ARCH" in x86_64|amd64) ARCH=x64 ;; aarch64|arm64) ARCH=aarch64 ;; *) err "暂不支持架构 $ARCH (仅 x86_64/aarch64)" ;; esac
-      # 官方下载: TDengine 3.x 资产名为 TDengine-server-<VER>-Linux-x64.tar.gz (GitHub release 已不放二进制)
-      local URL="https://www.taosdata.com/assets-download/3.0/TDengine-server-$TDENGINE_VER-Linux-$ARCH.tar.gz"
-      log "在线下载 TDengine $TDENGINE_VER ($ARCH): $URL (约 180MB, 云端无外网时请预下载并用 TDSB_TAR 指定) ..."
-      curl -fsSL -A "Mozilla/5.0" "$URL" -o /tmp/tdengine-server.tar.gz || {
-        warn "在线下载失败 (无外网?), 可手动下载后: TDSB_TAR=/path/to/TDengine-server-$TDENGINE_VER-Linux-$ARCH.tar.gz $0 --tsdb-only"
-        return 1
-      }
-      TARBALL=/tmp/tdengine-server.tar.gz
-    fi
-    local TMP="$(mktemp -d)"
-    tar xzf "$TARBALL" -C "$TMP" || err "TDengine 安装包解压失败: $TARBALL"
-    # 官方包解压后目录内为 TDengine-server-<ver> 的 install.sh 或根 install.sh
-    local INST="$(find "$TMP" -maxdepth 2 -name install.sh | head -1)"
-    [ -n "$INST" ] || err "TDengine 安装包缺少 install.sh: $TARBALL"
-    # -e no 非交互安装（跳过 FQDN 询问），装到 /usr/local/taos
-    (cd "$(dirname "$INST")" && ./install.sh -e no >/dev/null 2>&1) || err "TDengine install.sh 执行失败"
-    rm -rf "$TMP" /tmp/tdengine-server.tar.gz
-    systemctl daemon-reload
-    systemctl enable taosd >/dev/null 2>&1 || true
-    systemctl restart taosd || err "taosd 启动失败: journalctl -u taosd -n 30"
-    # taosadapter (REST 6041) 由安装包注册, 一并启动
-    if systemctl list-unit-files taosadapter >/dev/null 2>&1; then
-      systemctl enable taosadapter >/dev/null 2>&1 || true
-      systemctl restart taosadapter 2>/dev/null || warn "taosadapter 启动失败 (可手动 systemctl start taosadapter)"
-    fi
+    docker rm -f "$TDENGINE_CTN" >/dev/null 2>&1 || true
+    log "拉取镜像 $TDENGINE_IMAGE (首次约 600MB, 云端无外网时请预 docker pull 并 docker save/load) ..."
+    docker pull "$TDENGINE_IMAGE" || err "镜像拉取失败: docker pull $TDENGINE_IMAGE"
+    mkdir -p "$TSDB_DIR/data" "$TSDB_DIR/log"
+    docker run -d --name "$TDENGINE_CTN" --restart=unless-stopped \
+      -p 6030:6030/tcp -p 6030:6030/udp -p 6041:6041 \
+      -v "$TSDB_DIR/data:/var/lib/taos" -v "$TSDB_DIR/log:/var/log/taos" \
+      "$TDENGINE_IMAGE" \
+      || err "TDengine 容器启动失败: docker logs $TDENGINE_CTN"
+    # 等待 taosd 就绪
+    for _ in $(seq 1 15); do
+      docker exec "$TDENGINE_CTN" taos -s "SELECT 1;" >/dev/null 2>&1 && break
+      sleep 1
+    done
   fi
 
-  # 初始化库与超表 (幂等)
-  command -v taos >/dev/null 2>&1 || err "未找到 taos CLI"
-  taos -s "CREATE DATABASE IF NOT EXISTS nengtan KEEP $TSDB_KEEP DURATION 1 BUFFER 256 PRECISION 'ms';" >/dev/null 2>&1 \
+  # 初始化库与超表 (幂等; 列名为 val, 与 collector/cloud-agent 一致)
+  docker exec "$TDENGINE_CTN" taos -s "CREATE DATABASE IF NOT EXISTS nengtan KEEP $TSDB_KEEP DURATION 24h BUFFER 256 PRECISION 'ms';" >/dev/null 2>&1 \
     || err "创建数据库失败"
-  taos -s "CREATE STABLE IF NOT EXISTS nengtan.readings (ts TIMESTAMP, value DOUBLE) TAGS (box NCHAR(64), device NCHAR(64), instance NCHAR(64), property NCHAR(64));" >/dev/null 2>&1 \
+  docker exec "$TDENGINE_CTN" taos -s "CREATE STABLE IF NOT EXISTS nengtan.readings (ts TIMESTAMP, val DOUBLE) TAGS (box BINARY(32), device BINARY(32), instance BINARY(32), property BINARY(32));" >/dev/null 2>&1 \
     || err "创建超表 readings 失败"
 
   sleep 1
   if ss -tln 2>/dev/null | grep -q ':6041'; then
-    log "TDengine 就绪 ✓ taosd(6030) + taosadapter REST(6041) 本地可用 (不对外放行)"
+    log "TDengine 就绪 ✓ Docker($TDENGINE_CTN) 6030 + REST 6041 本地可用 (不对外放行)"
   else
-    warn "6041 未监听 (taosadapter 未启动?), 历史查询将不可用; 排查: journalctl -u taosadapter -n 20"
+    warn "6041 未监听 (容器未就绪?), 历史查询将不可用; 排查: docker logs $TDENGINE_CTN"
   fi
 }
 
@@ -375,20 +364,18 @@ do_check() {
   echo "--- 6. 数据面最近落盘 ---"
   ls -t "$DATA_DIR"/collected/*.log 2>/dev/null | head -1 && tail -n 2 "$(ls -t "$DATA_DIR"/collected/*.log 2>/dev/null | head -1)" 2>/dev/null \
     || echo "  (无落盘数据)"
-  echo "--- 6b. 时序数据库 (TDengine) ---"
-  if systemctl is-active taosd >/dev/null 2>&1; then
-    echo "  taosd        : ACTIVE"
+  echo "--- 6b. 时序数据库 (TDengine, Docker) ---"
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "nengtan-tdengine"; then
+    echo "  容器 nengtan-tdengine : ACTIVE"
     if ss -tln 2>/dev/null | grep -q ':6041'; then
-      echo "  taosadapter  : 6041 OK (REST, 仅本地)"
-      if command -v taos >/dev/null 2>&1; then
-        N="$(taos -s "SELECT COUNT(*) FROM nengtan.readings;" 2>/dev/null | grep -Eo '^ *[0-9]+' | head -1 || true)"
-        echo "  readings 总点数: ${N:-?}"
-      fi
+      echo "  REST 6041    : OK (仅本地)"
+      N="$(docker exec nengtan-tdengine taos -s "SELECT COUNT(*) FROM nengtan.readings;" 2>/dev/null | grep -Eo '^ *[0-9]+' | head -1 || true)"
+      echo "  readings 总点数: ${N:-?}"
     else
-      echo "  taosadapter  : 6041 未监听 (历史查询不可用)"
+      echo "  REST 6041    : 未监听 (历史查询不可用, docker logs nengtan-tdengine)"
     fi
   else
-    echo "  taosd        : inactive (未部署时序库)"
+    echo "  容器 nengtan-tdengine : 未运行 (未部署时序库, docker run 见 deploy_tsdb)"
   fi
   echo "--- 7. 云端 agent ---"
   systemctl is-active cloud-agent >/dev/null 2>&1 \
