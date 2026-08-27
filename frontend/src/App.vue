@@ -184,21 +184,28 @@ function onExport() {
   pushCmd('已打开右侧报告面板：请配置标题、引擎与分析深度后点击「生成报告」。', 'guide')
 }
 // 打开独立文档网站（宣传手册 / 使用手册 / 技术文档已脱离平台，作为独立服务跳转）
+// 文档站固定部署在云端服务器（与平台同机），访问地址使用「云端服务 IP」而非浏览器当前 host。
 function openDocsSite(page = '') {
   const target = page ? '/#/' + page : '/#/'
-  const open = (base) => window.open(base + target, '_blank')
+  const open = (host) => {
+    const port = import.meta.env.DEV ? 5174 : 40183
+    window.open(`http://${host}:${port}${target}`, '_blank')
+  }
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 4000)
   fetch('/api/help/site', { signal: ctrl.signal })
     .then((r) => (r.ok ? r.json() : null))
     .then((data) => {
-      if (data && data.url) return open(data.url)
-      throw new Error('no url')
+      if (data && data.host) return open(data.host)
+      throw new Error('no host')
     })
     .catch(() => {
-      // 后端接口不可用时按部署形态推导文档站地址（dev 5174 / prod 40183）
-      const port = import.meta.env.DEV ? 5174 : 40183
-      open(`http://${location.hostname}:${port}`)
+      // 后端接口不可用时：优先用云端配置 IP（box_cloud_config），再回退默认云端 IP
+      const fallback = () => open('172.19.134.45')
+      api.boxCloudConfig().then((c) => {
+        if (c && c.host) open(c.host)
+        else fallback()
+      }).catch(fallback)
     })
     .finally(() => clearTimeout(timer))
 }
