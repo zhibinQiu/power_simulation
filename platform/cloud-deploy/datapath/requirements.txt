@@ -2,6 +2,6 @@
 # broker.py:   amqtt（hbmqtt 改名后的社区维护版）
 # collector.py: paho-mqtt
 # dashboard.py: flask
-amqtt==0.12.1
+amqtt==0.12.0
 paho-mqtt==2.1.0
 flask==3.0.3

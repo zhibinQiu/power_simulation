@@ -28,8 +28,9 @@
   --warn-b: rgba(255,180,0,.25);   /* 提醒提示条边框 */
   --purple: #7c5cff;        /* 紫色标识（AI 标记等非语义点缀） */
   --shadow: 0 1px 3px rgba(0,0,0,.14), 0 6px 18px rgba(0,0,0,.10);
-  /* VS Code 风格字体栈：UI 用系统无衬线；数值/命令用等宽（Cascadia Code / JetBrains Mono 优先） */
-  --mono: "Cascadia Code", "JetBrains Mono", Menlo, "SF Mono", Monaco, Consolas, "Courier New", monospace;
+  /* VS Code 风格字体栈：UI 用系统无衬线；数值/命令用系统等宽（与 VSCode 默认一致：SF Mono / Menlo / Consolas 优先，
+     Cascadia Code / JetBrains Mono 仅作最后兜底，避免安装了这两款开发字体时显示观感与 VSCode 差异过大） */
+  --mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, "Cascadia Code", "JetBrains Mono", "Courier New", monospace;
   --ui: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
 
   /* 右侧属性面板统一间距令牌：所有分区/卡片/行/提示共用，保证对齐 */

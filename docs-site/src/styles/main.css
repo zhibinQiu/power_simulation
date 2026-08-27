@@ -1,0 +1,502 @@
+:root {
+  --bg: #f4f6f9;
+  --panel: #ffffff;
+  --ink: #1f2937;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --accent: #2563eb;
+  --nav-bg: #0f172a;
+  --nav-ink: #e2e8f0;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+#app,
+.site {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- 顶部导航 ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 24px;
+  height: 56px;
+  background: var(--nav-bg);
+  color: var(--nav-ink);
+  flex: none;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.brand-badge {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #06b6d4, #3b82f6);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.nav {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.nav a {
+  color: #cbd5e1;
+  text-decoration: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav a:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.nav a.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-weight: 600;
+}
+
+.topbar .back-platform {
+  color: #94a3b8;
+  text-decoration: none;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  transition: all 0.15s;
+}
+
+.topbar .back-platform:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* ---------- 主区域 ---------- */
+.main {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+/* ---------- 首页 ---------- */
+.home {
+  min-height: 100%;
+  overflow: auto;
+  background:
+    radial-gradient(800px 400px at 20% 0%, rgba(59, 130, 246, 0.12), transparent 60%),
+    radial-gradient(700px 380px at 85% 10%, rgba(6, 182, 212, 0.1), transparent 60%),
+    var(--bg);
+}
+
+.hero {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 72px 24px 36px;
+  text-align: center;
+}
+
+.hero h1 {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  background: linear-gradient(120deg, #0f172a 20%, #3b82f6 60%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero p {
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.cards {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 24px 80px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  --accent: #2563eb;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px 22px;
+  cursor: pointer;
+  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 4px;
+  background: var(--accent);
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.1);
+  border-color: var(--accent);
+}
+
+.card-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 2px;
+}
+
+.card h2 {
+  margin-top: 10px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.card p {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 14px;
+  min-height: 44px;
+}
+
+.card-go {
+  display: inline-block;
+  margin-top: 14px;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ---------- 文档页 ---------- */
+.doc {
+  display: flex;
+  height: 100%;
+  --accent: #2563eb;
+}
+
+.toc {
+  width: 264px;
+  flex: none;
+  overflow-y: auto;
+  background: #fbfcfe;
+  border-right: 1px solid var(--line);
+  padding: 18px 12px 40px;
+}
+
+.toc-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--nav-bg);
+  padding: 4px 12px 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+
+.toc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toc-list a {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: #374151;
+  text-decoration: none;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.toc-list a:hover {
+  background: #eef2f7;
+}
+
+.toc-list a.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.toc-no {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.65;
+  min-width: 16px;
+}
+
+.doc-scroll {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+}
+
+.doc-body {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 44px 90px;
+}
+
+.doc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 26px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.doc-head h1 {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--nav-bg);
+}
+
+.back-link {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.back-link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.doc-section {
+  margin-bottom: 40px;
+  scroll-margin-top: 16px;
+}
+
+.sec-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 14px;
+  color: var(--nav-bg);
+}
+
+.sec-badge {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.doc-end {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 60px;
+  border-top: 1px dashed var(--line);
+  padding-top: 24px;
+}
+
+.to-top {
+  position: sticky;
+  left: 100%;
+  bottom: 24px;
+  margin-right: 24px;
+  background: var(--nav-bg);
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
+}
+
+.to-top:hover {
+  background: var(--accent);
+}
+
+/* ---------- Markdown 内容样式 ---------- */
+.doc-md h1,
+.doc-md h2,
+.doc-md h3,
+.doc-md h4 {
+  color: var(--nav-bg);
+  margin: 22px 0 10px;
+  line-height: 1.4;
+}
+
+.doc-md h1 { font-size: 24px; }
+.doc-md h2 { font-size: 20px; }
+.doc-md h3 { font-size: 17px; }
+.doc-md h4 { font-size: 15px; }
+
+.doc-md p {
+  margin: 10px 0;
+}
+
+.doc-md ul,
+.doc-md ol {
+  margin: 10px 0;
+  padding-left: 24px;
+}
+
+.doc-md li {
+  margin: 4px 0;
+}
+
+.doc-md strong {
+  color: var(--nav-bg);
+}
+
+.doc-md code {
+  background: #eef1f5;
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-family: 'SF Mono', Consolas, Menlo, monospace;
+  font-size: 13px;
+  color: #b45309;
+}
+
+.doc-md pre.rp-code {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px 18px;
+  overflow-x: auto;
+  margin: 14px 0;
+  line-height: 1.55;
+}
+
+.doc-md pre.rp-code code {
+  background: none;
+  color: inherit;
+  padding: 0;
+  font-size: 13px;
+}
+
+.doc-md blockquote {
+  border-left: 4px solid var(--accent);
+  background: #f8fafc;
+  padding: 10px 16px;
+  border-radius: 0 8px 8px 0;
+  margin: 14px 0;
+  color: #334155;
+}
+
+.doc-md table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 14px;
+}
+
+.doc-md th,
+.doc-md td {
+  border: 1px solid var(--line);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.doc-md th {
+  background: #f1f5f9;
+  font-weight: 700;
+  color: var(--nav-bg);
+}
+
+.doc-md tr:nth-child(even) td {
+  background: #fafbfc;
+}
+
+.doc-md hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 20px 0;
+}
+
+/* ---------- 页脚 ---------- */
+.foot {
+  flex: none;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 12px;
+  padding: 10px;
+  background: var(--nav-bg);
+}
+
+/* ---------- 404 ---------- */
+.notfound {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.notfound a {
+  color: var(--accent);
+}

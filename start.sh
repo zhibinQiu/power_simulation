@@ -3,10 +3,11 @@
 #  一键启动脚本：工业能碳智控平台
 #
 #  用法:
-#    ./start.sh               开发模式：后端(8010) + 前端 dev(5173)
-#    ./start.sh --prod        生产模式：构建前端产物 + 后端托管(8010)
+#    ./start.sh               开发模式：后端(8010) + 前端 dev(5173) + 文档站 dev(5174)
+#    ./start.sh --prod        生产模式：构建前端/文档站产物 + 后端托管(8010) + 文档站 preview(40183)
 #    ./start.sh --backend     仅启动后端
 #    ./start.sh --frontend    仅启动前端 dev
+#    ./start.sh --no-docs     不启动独立文档网站
 #    ./start.sh --help        查看帮助
 #
 #  说明:
@@ -23,14 +24,16 @@ mkdir -p "$LOG_DIR"
 MODE="dev"        # dev | prod
 RUN_BACKEND=1
 RUN_FRONTEND=1
+RUN_DOCS=1
 
 for arg in "$@"; do
   case "$arg" in
     --prod)     MODE="prod" ;;
     --backend)  RUN_FRONTEND=0 ;;
     --frontend) RUN_BACKEND=0 ;;
+    --no-docs)  RUN_DOCS=0 ;;
     -h|--help)
-      sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
@@ -40,19 +43,25 @@ for arg in "$@"; do
   esac
 done
 
-# ---- 生产模式：先构建前端产物，由后端 Catch-all 路由托管 ----
+# ---- 生产模式：先构建前端产物，由后端 Catch-all 路由托管；文档站构建后用 vite preview 托管 ----
 if [ "$MODE" = "prod" ]; then
   echo "==> [构建] 前端产物 (npx vite build)..."
   (cd "$ROOT/frontend" && npx vite build)
+  if [ "$RUN_DOCS" = "1" ]; then
+    echo "==> [构建] 文档网站产物 (docs-site: npx vite build)..."
+    (cd "$ROOT/docs-site" && npx vite build)
+  fi
   RUN_FRONTEND=0
 fi
 
 BACKEND_PID=""
 FRONTEND_PID=""
+DOCS_PID=""
 
 cleanup() {
   echo ""
   echo "==> 正在停止服务..."
+  [ -n "$DOCS_PID" ] && kill "$DOCS_PID" 2>/dev/null || true
   [ -n "$FRONTEND_PID" ] && kill "$FRONTEND_PID" 2>/dev/null || true
   [ -n "$BACKEND_PID" ] && kill "$BACKEND_PID" 2>/dev/null || true
   wait 2>/dev/null || true
@@ -97,15 +106,39 @@ if [ "$RUN_FRONTEND" = "1" ]; then
   wait_ready "http://127.0.0.1:5173" "前端" || true
 fi
 
+# ---- 启动独立文档网站（宣传手册/使用手册/技术文档） ----
+if [ "$RUN_DOCS" = "1" ]; then
+  if [ ! -d "$ROOT/docs-site/node_modules" ]; then
+    echo "   首次运行，安装文档站依赖 (npm install)..."
+    (cd "$ROOT/docs-site" && npm install)
+  fi
+  if [ "$MODE" = "prod" ]; then
+    echo "==> [文档站] 启动静态托管 (127.0.0.1:40183)..."
+    (cd "$ROOT/docs-site" && npx vite preview --port 40183 --host 127.0.0.1) > "$LOG_DIR/docs-site.log" 2>&1 &
+  else
+    echo "==> [文档站] 启动 Vite dev (127.0.0.1:5174)..."
+    (cd "$ROOT/docs-site" && npm run dev) > "$LOG_DIR/docs-site.log" 2>&1 &
+  fi
+  DOCS_PID=$!
+  echo "   PID: $DOCS_PID    日志: $LOG_DIR/docs-site.log"
+  if [ "$MODE" = "prod" ]; then
+    wait_ready "http://127.0.0.1:40183" "文档站" || true
+  else
+    wait_ready "http://127.0.0.1:5174" "文档站" || true
+  fi
+fi
+
 # ---- 输出访问地址 ----
 echo ""
 echo "=============================================="
 echo "  ✅ 服务已启动"
 if [ "$MODE" = "prod" ]; then
   echo "  访问: http://127.0.0.1:8010  (后端托管前端产物)"
+  [ "$RUN_DOCS" = "1" ] && echo "  文档站: http://127.0.0.1:40183  (宣传手册/使用手册/技术文档)"
 else
   echo "  前端: http://127.0.0.1:5173"
   echo "  后端: http://127.0.0.1:8010  (API / WebSocket)"
+  [ "$RUN_DOCS" = "1" ] && echo "  文档站: http://127.0.0.1:5174  (宣传手册/使用手册/技术文档)"
 fi
 echo "  按 Ctrl+C 停止全部服务"
 echo "=============================================="

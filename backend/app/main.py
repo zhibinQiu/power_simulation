@@ -30,6 +30,7 @@ from . import realtime
 from .api.box_router import router as box_router
 from .api.carbon_assets_router import router as carbon_assets_router
 from .api.carbon_assets_router import share_router as report_share_router
+from .api.help_router import router as help_router
 from .api.simulation_router import router as simulation_router
 
 app = FastAPI(title="工业能碳智控平台", version="0.1.0")
@@ -44,6 +45,7 @@ app.add_middleware(
 app.include_router(simulation_router)          # 核心仿真（预置/解析/仿真/策略/扫描/审计/聊天/AI 优化）
 app.include_router(box_router)                 # 能碳一体机管理
 app.include_router(carbon_assets_router)       # 碳资产管理（含 /api/carbon-assistant/*）
+app.include_router(help_router)                # 帮助中心（独立文档网站地址）
 app.include_router(report_share_router)        # 报告分享页 /report/{rid}
 
 

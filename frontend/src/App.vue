@@ -1,7 +1,7 @@
 <template>
   <div class="app" :class="{ 'left-collapsed': !store.leftOpen, 'right-collapsed': !store.rightOpen, 'bottom-collapsed': !store.bottomOpen, 'sim-dark': store.simMode, 'view-immersive': store.viewModeOn }"
        :style="{ '--cmd-h': store.bottomOpen ? cmdH + 'px' : '0px', '--lw': store.leftOpen ? lw + 'px' : '0px', '--rw': store.rightOpen ? rw + 'px' : '0px' }">
-    <TopBar :menus="menus" ref="topBarRef" @export="onExport" @help="openPromo" />
+    <TopBar :menus="menus" ref="topBarRef" @export="onExport" @help="openDocsSite('promo')" />
 
     <!-- 最左侧活动栏（VS Code 式）：资源管理器 / 搜索 / 场景 / 连接 -->
     <ActivityBar />
@@ -49,9 +49,6 @@
 
     <DataSourceDialog v-if="showDataSource" @close="showDataSource = false" />
     <SystemSettingsDialog v-if="showSettings" @close="showSettings = false" />
-    <TechDocs v-if="showTechDocs" @close="showTechDocs = false" />
-    <UserManual v-if="showManual" @close="showManual = false" />
-    <PromoManual v-if="showPromo" @close="showPromo = false" />
     <AboutDialog v-if="showAbout" @close="showAbout = false" />
     <TftAnalysisDialog v-if="showTftAnalysis" @close="showTftAnalysis = false" />
     <ContextMenu />
@@ -77,9 +74,6 @@ import { openAuditDialog } from './stores/scan'
 // 对话框类组件按需懒加载：首屏不加载其代码，打开时才请求，降低首包体积与内存占用
 const DataSourceDialog = defineAsyncComponent(() => import('./components/DataSourceDialog.vue'))
 const SystemSettingsDialog = defineAsyncComponent(() => import('./components/SystemSettingsDialog.vue'))
-const TechDocs = defineAsyncComponent(() => import('./components/TechDocs.vue'))
-const UserManual = defineAsyncComponent(() => import('./components/UserManual.vue'))
-const PromoManual = defineAsyncComponent(() => import('./components/PromoManual.vue'))
 const AboutDialog = defineAsyncComponent(() => import('./components/AboutDialog.vue'))
 const TftAnalysisDialog = defineAsyncComponent(() => import('./components/TftAnalysisDialog.vue'))
 const ContextMenu = defineAsyncComponent(() => import('./components/ContextMenu.vue'))
@@ -117,9 +111,6 @@ const boxViewRef = ref(null)
 
 const showDataSource = ref(false)
 const showSettings = ref(false)
-const showTechDocs = ref(false)
-const showManual = ref(false)
-const showPromo = ref(false)
 const showAbout = ref(false)
 const showTftAnalysis = ref(false)
 
@@ -192,7 +183,25 @@ function onExport() {
   })
   pushCmd('已打开右侧报告面板：请配置标题、引擎与分析深度后点击「生成报告」。', 'guide')
 }
-function openPromo() { showPromo.value = true }
+// 打开独立文档网站（宣传手册 / 使用手册 / 技术文档已脱离平台，作为独立服务跳转）
+function openDocsSite(page = '') {
+  const target = page ? '/#/' + page : '/#/'
+  const open = (base) => window.open(base + target, '_blank')
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 4000)
+  fetch('/api/help/site', { signal: ctrl.signal })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (data && data.url) return open(data.url)
+      throw new Error('no url')
+    })
+    .catch(() => {
+      // 后端接口不可用时按部署形态推导文档站地址（dev 5174 / prod 40183）
+      const port = import.meta.env.DEV ? 5174 : 40183
+      open(`http://${location.hostname}:${port}`)
+    })
+    .finally(() => clearTimeout(timer))
+}
 function onAbout() { showAbout.value = true }
 
 // 关闭当前视图，返回数字孪生场景（供各视图工具栏「返回数字孪生」按钮调用）
@@ -301,9 +310,9 @@ const menus = [
     ] },
   ] },
   { id: 'help', label: '帮助', items: [
-    { label: '宣传手册', accel: 'F1', act: () => { showPromo.value = true } },
-    { label: '使用手册', act: () => { showManual.value = true } },
-    { label: '技术文档', act: () => { showTechDocs.value = true } },
+    { label: '宣传手册', accel: 'F1', act: () => openDocsSite('promo') },
+    { label: '使用手册', act: () => openDocsSite('manual') },
+    { label: '技术文档', act: () => openDocsSite('tech') },
     { label: '快捷键', act: () => pushCmd('快捷键：Ctrl+Enter 运行 · Ctrl+Z 撤销 · Ctrl+Y 重做 · F 聚焦选中工序 · 右键节点/资源打开上下文菜单（选中/参数扫描/重命名/复制/删除）· 编排态 F2 重命名、Ctrl+D 复制节点、Del 删除。','out') },
     { sep: true },
     { label: '关于本平台', act: onAbout },

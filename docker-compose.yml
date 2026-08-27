@@ -2,11 +2,13 @@
 # 用法（在映射目录 /root/qzb/jianpai 下）：
 #   docker compose build
 #   docker compose up -d
-# 访问：http://<服务器IP>:40013
+# 访问：http://<服务器IP>:40014
+# 文档站（宣传手册/使用手册/技术文档）：http://<服务器IP>:40183
 #
 # 源码映射：整个项目挂到容器 /app，修改 backend/ 下任意 .py 文件，
 # 容器内的 uvicorn --reload 会自动重启生效。
-# 注意：前端改动需先在本机/映射目录执行 `npm run build`（frontend/dist 由后端静态托管）。
+# 注意：前端改动需先在本机/映射目录执行 `npm run build`（frontend/dist 由后端静态托管），
+#       文档站改动需先执行 `cd docs-site && npm run build`（docs-site/dist 由下方服务静态托管）。
 
 services:
   steel-twin:
@@ -25,4 +27,21 @@ services:
       - LLM_BASE_URL=https://api.deepseek.com/v1
       - LLM_API_KEY=sk-f431be74819a4b7f82fd04f06977a039
       - LLM_MODEL=deepseek-v4-pro
+    restart: unless-stopped
+
+  # 独立文档网站：宣传手册 / 使用手册 / 技术文档
+  # 平台帮助菜单（帮助 -> 宣传手册/使用手册/技术文档）点击跳转到本服务（端口 40183）。
+  docs-site:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nengtan-docs-site
+    working_dir: /app/docs-site
+    volumes:
+      - .:/app
+    command: ["python3", "-m", "http.server", "40183", "--bind", "0.0.0.0", "--directory", "/app/docs-site/dist"]
+    ports:
+      - "40183:40183"
+    depends_on:
+      - steel-twin
     restart: unless-stopped
