@@ -131,13 +131,19 @@ export const PROCESS_TEMPLATES = [
     // 由独立工辅(鼓风机/热风炉/喷吹系统)经物料连线供给的驱动量，连线存在时覆盖下方手动参数
     drivenBy: { blast_air: 'wind_rate', hot_blast: 'hot_blast_temp', pulverized_coal: 'coal_inj', draft: 'draft' },
     params: [{ key: 'hot_metal', label: '铁水产量', unit: 't/h', min: 200, max: 2000, step: 50, def: 1000 },
-            { key: 'coke_rate', label: '焦比', unit: 'kg/t', min: 250, max: 550, step: 5, def: 470 },
+            { key: 'coke_rate', label: '焦比', unit: 'kg/t', min: 300, max: 550, step: 5, def: 410 },
             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 5, max: 60, step: 5, def: 30 },
-            { key: 'coal_inj', label: '喷煤比', unit: 'kg/t', min: 0, max: 250, step: 5, def: 150 },
+            { key: 'coal_inj', label: '喷煤比', unit: 'kg/t', min: 0, max: 220, step: 5, def: 130 },
+            // 炉料结构（百分比配比 + 总入炉矿量）：矿源脉石(CaO/SiO₂/MgO/Al₂O₃)参与炉渣二元碱度计算，
+            // 成分取物料面板「详细化学成分」（烧结矿/球团/块矿=铁矿石）；各矿量 = 总矿量 × 配比/Σ配比
+            { key: 'burden_total', label: '总入炉矿量', unit: 'kg/t', min: 1000, max: 2200, step: 10, def: 1625 },
+            { key: 'sinter_pct', label: '烧结矿配比', unit: '%', min: 0, max: 100, step: 1, def: 62 },
+            { key: 'pellet_pct', label: '球团配比', unit: '%', min: 0, max: 100, step: 1, def: 31 },
+            { key: 'lump_pct', label: '块矿配比', unit: '%', min: 0, max: 100, step: 1, def: 7 },
             { key: 'slag_rate', label: '渣比', unit: 'kg/t', min: 200, max: 450, step: 5, def: 300 },
-            { key: 'flux', label: '熔剂比', unit: 'kg/t', min: 0, max: 150, step: 5, def: 120 },
-            { key: 'wind_rate', label: '风量', unit: 'Nm³/t', min: 500, max: 1500, step: 10, def: 900 },
-            { key: 'hot_blast_temp', label: '热风温度', unit: '℃', min: 950, max: 1300, step: 10, def: 1200 },
+            { key: 'flux', label: '熔剂比', unit: 'kg/t', min: 0, max: 150, step: 5, def: 10 },
+            { key: 'wind_rate', label: '风量', unit: 'kNm³/h', min: 100, max: 900, step: 10, def: 600 },
+            { key: 'hot_blast_temp', label: '热风温度', unit: '℃', min: 1100, max: 1250, step: 10, def: 1200 },
             { key: 'oxygen_enrich', label: '富氧率', unit: '%', min: 0, max: 14, step: 0.5, def: 0 },
             { key: 'draft', label: '炉顶抽力(相对)', unit: '×', min: 0.5, max: 1.5, step: 0.02, def: 1.0 },
             { key: 'blast_humidity', label: '鼓风湿度', unit: 'g/Nm³', min:2, max:30, step:1, def: 10.0}
@@ -446,7 +452,7 @@ export const DEVICE_TEMPLATES = [
   { type: 'pump', label: '泵', kind: 'adjustable', unit: 'm³/h', setpoint: { min: 10, max: 1000, def: 300, unit: 'm³/h' }, powerPerUnit: 0.002, effType: 'none', measures: '流量/扬程', response: { bias: 0.05, noise: 0.015 }, desc: '本工序的可调设备，控制流体输送流量/扬程，其设定值经碳引擎折算为泵组电耗与间接排放，是减排策略的作用对象。' },
   { type: 'valve', label: '调节阀', kind: 'adjustable', unit: '%', setpoint: { min: 0, max: 100, def: 50, unit: '%' }, powerPerUnit: 0, effType: 'none', measures: '开度', response: { bias: 0.05, noise: 0.02 }, desc: '本工序的可调设备，控制管路开度以调节介质流量，其设定值经碳引擎折算为调节能耗与间接排放，是减排策略的作用对象。' },
   { type: 'burner', label: '燃烧器', kind: 'adjustable', unit: 'ratio', setpoint: { min: 0.8, max: 1.3, def: 1.0, unit: '空燃比' }, powerPerUnit: 0, effType: 'burner', measures: '空燃比', response: { bias: 0.02, noise: 0.008 }, desc: '本工序的可调设备，其空燃比设定影响燃料完全燃烧程度，经碳引擎折算为燃料消耗与直接/间接排放，是减排策略的作用对象。' },
-  { type: 'injector', label: '喷吹系统', kind: 'adjustable', unit: 'kg/h', setpoint: { min: 0, max: 300, def: 120, unit: 'kg/h' }, powerPerUnit: 0.005, effType: 'feeder', measures: '喷吹速率', response: { bias: 0.03, noise: 0.01 }, desc: '本工序的可调设备，喷吹煤粉等以顶替焦炭，其喷吹速率设定经碳引擎折算为喷吹能耗与间接排放，是减排策略的作用对象。' },
+  { type: 'injector', label: '喷吹系统', kind: 'metering', unit: 'kg/h', setpoint: { min: 0, max: 300, def: 120, unit: 'kg/h' }, powerPerUnit: 0.005, effType: 'feeder', measures: '喷吹速率', response: { bias: 0.03, noise: 0.01 }, desc: '本工序的喷吹设备，喷吹煤粉以顶替焦炭。喷煤量已锁定不可调节（随工况设定固定，富氧率提升时自动联动增加）。' },
   { type: 'electrode_reg', label: '电极调节器', kind: 'adjustable', unit: 'MW', setpoint: { min: 20, max: 120, def: 70, unit: 'MW' }, powerPerUnit: 0.01, effType: 'none', measures: '电弧功率', response: { bias: 0.02, noise: 0.008 }, desc: '本工序的可调设备，控制电弧功率以调节熔化/加热强度，其设定值经碳引擎折算为电耗与间接排放，是减排策略的作用对象。' },
   { type: 'vfd', label: '变频器', kind: 'adjustable', unit: 'Hz', setpoint: { min: 0, max: 50, def: 40, unit: 'Hz' }, powerPerUnit: 0, effType: 'none', measures: '电机转速', response: { bias: 0.01, noise: 0.005 }, desc: '本工序的可调设备，通过改变电机频率调节转速，其设定值经碳引擎折算为节电效果与间接排放，是减排策略的作用对象。' },
   { type: 'oxygen_lance', label: '氧枪', kind: 'adjustable', unit: 'Nm³/h', setpoint: { min: 1000, max: 8000, def: 4000, unit: 'Nm³/h' }, powerPerUnit: 0.00002, effType: 'none', measures: '供氧强度', response: { bias: 0.02, noise: 0.008 }, desc: '本工序的可调设备，控制供氧强度以强化冶炼/富氧，其设定值经碳引擎折算为制氧能耗与间接排放，是减排策略的作用对象。' },
@@ -868,7 +874,7 @@ export const PROCESS_ADJUSTABLE = (() => {
   const m = {}
   for (const t of PROCESS_TEMPLATES) {
     const set = new Set(PROCESS_ADJUSTABLE_BASE[t.type] || [])
-    if (t.route === 'aux') set.add(t.type) // 工辅自身可调
+    if (t.route === 'aux' && t.type !== 'injector') set.add(t.type) // 工辅自身可调（喷吹系统除外：喷煤量已锁定不可调）
     m[t.type] = [...set]
   }
   return Object.freeze(m)

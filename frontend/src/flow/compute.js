@@ -4,6 +4,7 @@
 // 实时联动：此处接入「排放因子配置」(factors.fuels 的 NCV/CC) 与物料隐含碳因子
 // (materialOverrides 中的外购电/绿电/自发电)，使编辑态右栏碳排预估随因子改动即时变化。
 import { PROCESS_MAP, DEVICE_MAP, DEVICE_COUPLE_REGISTRY, deriveProcessOpParams } from '../data/flowLibrary'
+import { bfFuelRates } from '../utils/bfFuel'
 
 // 默认电力碳因子（无覆盖/无 factors 时的回退，与 MATERIAL_MAP 隐含因子一致）
 const DEF_GRID = 0.5703   // 外购电 tCO₂/MWh（2022 年全国电力平均 CO₂ 排放因子）
@@ -37,9 +38,42 @@ function outMassOf(node) {
   }
 }
 
+// 高炉焦比/煤比取值：操作参数(风量/风温/富氧/抽力)存在时按经验耦合式推算（与后端 calc_bf 一致），
+// 否则直接读面板参数。供燃料燃烧与国标式直接排放共用，保证两条链路取值一致。
+// 实现已提取至 utils/bfFuel.js（与 TFT 弹窗、后端 _bf_effective_fuel 三处共用同一真源）
+
+// 高炉国标式直接排放（tCO₂/h），与后端 calculators.calc_bf 的 gb 分支 1:1 对齐，
+// 对应 GB/T 32151.5 企业层级碳平衡核算：
+//   E = 焦炭入碳 + 煤粉入碳 − 铁水溶碳 − 渣带碳 + 熔剂分解
+//     入碳 = 消耗量 AD × 收到基低位发热量 NCV × 单位热值含碳量 CC × 44/12
+//     产品/副产品带出碳（铁水溶碳 4.5%、渣带碳 3%）从排放中扣减。
+// 替代模板静态 efDirect（1.60 经验值），随焦比/煤比/熔剂/渣比/因子配置实时联动。
+const BF_CO2_PER_C = 3.6667                                  // 44/12
+const BF_METAL_C = { hm: 0.045, slag: 0.030 }                // 铁水/渣含碳率（factors.METAL_C）
+const BF_DEF_FLUX_EF = 0.4395                                // 石灰石分解 tCO₂/t（无 carbonate 配置时兜底）
+const BF_DEF_COKE_EF = 28.435 * 0.0295 * BF_CO2_PER_C        // 兜底焦炭排放因子 tCO₂/t
+const BF_DEF_COAL_EF = 26.7 * 0.0262 * BF_CO2_PER_C          // 兜底煤粉排放因子 tCO₂/t
+function bfGbDirect(effNode, fuels, factorsCfg, overrides) {
+  const p = effNode.params || {}
+  const om = p.hot_metal || 0
+  const { coke, coal } = bfFuelRates(p, overrides)
+  const F = (k, d) => {
+    const f = fuels && fuels[k]
+    return f && f.ncv != null && f.cc != null ? f.ncv * f.cc * BF_CO2_PER_C : d
+  }
+  const fluxEf = (factorsCfg && factorsCfg.carbonate && factorsCfg.carbonate.limestone != null)
+    ? factorsCfg.carbonate.limestone : BF_DEF_FLUX_EF
+  const cokeCo2 = om * coke / 1000 * F('coke', BF_DEF_COKE_EF)      // 焦炭入碳 tCO₂/h
+  const coalCo2 = om * coal / 1000 * F('coal', BF_DEF_COAL_EF)      // 煤粉入碳 tCO₂/h
+  const hmC = om * BF_METAL_C.hm * BF_CO2_PER_C                     // 铁水溶碳扣减
+  const slagC = om * (p.slag_rate != null ? p.slag_rate : 300) / 1000 * BF_METAL_C.slag * BF_CO2_PER_C
+  const fluxCo2 = om * (p.flux != null ? p.flux : 120) / 1000 * fluxEf  // 熔剂分解加项
+  return cokeCo2 + coalCo2 - hmC - slagC + fluxCo2
+}
+
 // 燃料燃烧排放（tCO₂/h）：依据工艺参数估算燃料用量 × NCV × CC × 3.667。
 // fuels 来自 factors.fuels（含 ncv / cc / unit）。用于让 NCV/CC 改动实时影响估算。
-function fuelCombustion(node, fuels) {
+function fuelCombustion(node, fuels, overrides) {
   if (!fuels) return 0
   const p = node.params || {}
   const om = outMassOf(node)
@@ -51,21 +85,8 @@ function fuelCombustion(node, fuels) {
   let c = 0
   switch (node.type) {
     case 'blast_furnace': {
-      // 操作参数(风量/风温/富氧/抽力) → 焦比/煤比，与后端 calc_bf 一致；否则直接调参
-      let coke = p.coke_rate != null ? p.coke_rate : 470
-      let coal = p.coal_inj != null ? p.coal_inj : 150
-      const wind = p.wind_rate, tB = p.hot_blast_temp, o2 = p.oxygen_enrich, draft = p.draft
-      if (wind != null || tB != null || o2 != null || draft != null) {
-        const windF = wind != null ? wind : 1.0
-        const tempF = tB != null ? tB / 1250 : 1.0
-        const oxyF = o2 != null ? 1.0 + o2 / 21 : 1.0
-        const draftF = draft != null ? draft : 1.0
-        const dCoke = -150 * (windF - 1) - 250 * (tempF - 1) - 90 * (oxyF - 1) - 30 * (draftF - 1)
-        coke = Math.max(300, Math.min(560, coke + dCoke))
-        const total = (p.coke_rate != null ? p.coke_rate : 470) + (p.coal_inj != null ? p.coal_inj : 150)
-          - 20 * (windF - 1) - 15 * (tempF - 1) - 10 * (oxyF - 1) - 8 * (draftF - 1)
-        coal = Math.max(0, Math.min(260, total - coke))
-      }
+      // 焦比/煤比：操作参数存在时经经验耦合式推算（与后端 calc_bf 一致）；否则直接调参
+      const { coke, coal } = bfFuelRates(p, overrides)
       c += om * coke / 1000 * I('coke')
       c += om * coal / 1000 * I('coal')
       break
@@ -191,10 +212,17 @@ export function computeScheme(scheme, factors, factorsDefault, overrides) {
     let efDirect = t.efDirect
     if (deviceSavings[n.id]) efDirect *= (1 - deviceSavings[n.id])
 
-    // 直接排放 = 经验直接排放 + (编辑态燃料燃烧 − 默认燃料燃烧)，未编辑时偏移为 0
-    const editedC = fuelCombustion(effNode, liveFuels)
-    const defaultC = fuelCombustion(effNode, defFuels)
-    let direct = outMass * efDirect + (editedC - defaultC)
+    // 直接排放：高炉走国标式实时公式（替代静态 efDirect），其余工序 = 经验直接排放 + 燃料偏移
+    let direct
+    if (n.type === 'blast_furnace') {
+      // 国标式：E = Σ燃料(AD×NCV×CC×44/12) − 铁水溶碳 − 渣带碳 + 熔剂分解，
+      // 随焦比/煤比/熔剂/渣比与因子配置实时联动，与后端 simulate gb 口径一致
+      direct = bfGbDirect(effNode, liveFuels || defFuels, factors, overrides)
+    } else {
+      const editedC = fuelCombustion(effNode, liveFuels, overrides)
+      const defaultC = fuelCombustion(effNode, defFuels, overrides)
+      direct = outMass * efDirect + (editedC - defaultC)
+    }
     if (direct < 0) direct = 0
 
     // 间接（电）：该工序是否接入绿电决定采用绿电/外购电因子

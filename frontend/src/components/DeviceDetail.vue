@@ -217,8 +217,8 @@ const baseParams = computed(() => {
   const u = store.model.units.find((x) => x.id === info.value.unitId)
   return u ? (u.params || {}) : {}
 })
-// TFT 策略提示：仅高炉（blast_furnace）热制度相关可调设备展示（风量/湿度、风温、喷煤）
-const TFT_DEVICES = ['blower', 'hot_blast_stove', 'injector']
+// TFT 策略提示：仅高炉（blast_furnace）热制度相关可调设备展示（风量/湿度、风温；喷吹系统喷煤量已锁定，不在此列）
+const TFT_DEVICES = ['blower', 'hot_blast_stove']
 // TFT 实时参数：工序基础参数 + 当前工序全部热制度设备实际设定折算（拖动滑块实时联动 TFT 与建议）
 const tftParams = computed(() => {
   if (!info.value) return {}

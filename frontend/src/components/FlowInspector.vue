@@ -181,6 +181,53 @@
       </div>
       </CollapseSection>
 
+      <!-- ===== 炉渣二元碱度 R₂（仅高炉节点）：CaO/SiO₂ 全来源平衡 ===== -->
+      <CollapseSection v-if="node.type === 'blast_furnace' && slagInfo" title="炉渣碱度（CaO/SiO₂/MgO/Al₂O₃）" tone="green" :show-more="false">
+      <div class="card">
+      <div class="kv2 slag-r2-row">
+        <span>二元碱度 R₂（CaO/SiO₂）</span>
+        <b class="slag-r2-val">{{ slagInfo.r2.toFixed(2) }}
+          <span class="slag-tag" :class="slagInfo.level.cls">{{ slagInfo.level.txt }}</span>
+        </b>
+      </div>
+      <div class="kv2 slag-r2-row">
+        <span>四元碱度 R₄（(CaO+MgO)/(SiO₂+Al₂O₃)）</span>
+        <b class="slag-r2-val">{{ slagInfo.r4.toFixed(2) }}
+          <span class="slag-tag" :class="slagInfo.r4Level.cls">{{ slagInfo.r4Level.txt }}</span>
+        </b>
+      </div>
+      <div class="kv2"><span>适宜区间</span><b>R₂ 1.05–1.25 · R₄ 1.0–1.35（参考）</b></div>
+      <div class="kv2"><span>燃料量（有效）</span><b>焦 {{ slagInfo.coke.toFixed(0) }} + 煤 {{ slagInfo.coal.toFixed(0) }} <span class="u">kg/t（含富氧置换联动）</span></b></div>
+      <div class="slag-tbl-t">入渣氧化物平衡（kg/tFe）</div>
+      <div class="slag-tbl">
+        <div class="slag-tr slag-th"><span>来源</span><span>用量</span><span>CaO</span><span>SiO₂</span><span>MgO</span><span>Al₂O₃</span></div>
+        <div class="slag-tr" v-for="pt in slagInfo.parts" :key="pt.name">
+          <span>{{ pt.name }}</span><span>{{ pt.rate.toFixed(0) }}</span>
+          <span>{{ pt.cao.toFixed(1) }}</span><span>{{ pt.sio2.toFixed(1) }}</span>
+          <span>{{ pt.mgo.toFixed(1) }}</span><span>{{ pt.al2o3.toFixed(1) }}</span>
+        </div>
+        <div class="slag-tr slag-sum"><span>合计</span><span></span>
+          <span>{{ slagInfo.caoTotal.toFixed(1) }}</span><span>{{ slagInfo.sio2Gross.toFixed(1) }}</span>
+          <span>{{ slagInfo.mgoTotal.toFixed(1) }}</span><span>{{ slagInfo.al2o3Total.toFixed(1) }}</span>
+        </div>
+        <div class="slag-tr"><span>Si 还原入铁扣减（[Si] 0.5%）</span><span></span><span></span>
+          <span class="slag-neg">−{{ slagInfo.siDeduct.toFixed(1) }}</span><span></span><span></span>
+        </div>
+        <div class="slag-tr slag-sum"><span>入渣合计</span><span></span>
+          <span>{{ slagInfo.caoTotal.toFixed(1) }}</span><span>{{ slagInfo.sio2Total.toFixed(1) }}</span>
+          <span>{{ slagInfo.mgoTotal.toFixed(1) }}</span><span>{{ slagInfo.al2o3Total.toFixed(1) }}</span>
+        </div>
+      </div>
+      <div class="kv2"><span>炉渣四元成分（质量分数 %）</span><b>CaO {{ slagInfo.comp.cao.toFixed(1) }} · SiO₂ {{ slagInfo.comp.sio2.toFixed(1) }} · MgO {{ slagInfo.comp.mgo.toFixed(1) }} · Al₂O₃ {{ slagInfo.comp.al2o3.toFixed(1) }}</b></div>
+      <div class="kv2"><span>成分法渣量估算</span><b>{{ slagInfo.slagEst.toFixed(0) }} <span class="u">kg/t（节点设定渣比 {{ node.params.slag_rate ?? 300 }}，交叉校验用）</span></b></div>
+      <div class="pr-hint">
+        R₂ = ΣCaO / ΣSiO₂ = {{ slagInfo.caoTotal.toFixed(1) }} / {{ slagInfo.sio2Total.toFixed(1) }}；
+        R₄ = (CaO+MgO)/(SiO₂+Al₂O₃) = ({{ slagInfo.caoTotal.toFixed(1) }}+{{ slagInfo.mgoTotal.toFixed(1) }}) / ({{ slagInfo.sio2Total.toFixed(1) }}+{{ slagInfo.al2o3Total.toFixed(1) }})。
+        成分来源：烧结/球团/块矿脉石 + 焦炭/煤粉灰分（物料面板「详细化学成分 → 灰分组成」）+ 熔剂(石灰石)；MgO 主要来自熔剂与灰分、Al₂O₃ 主要来自矿脉石与煤灰。炉料成分与入炉比修改后实时联动。
+      </div>
+      </div>
+      </CollapseSection>
+
       <button class="del-node" @click="store.removeFlowNode(node.id)">删除该工序节点</button>
     </template>
 
@@ -249,6 +296,7 @@
         <div class="kv2"><span>隐含碳因子</span><b>{{ matCarbon }} <span class="u">tCO₂/单位</span></b></div>
       </div>
       <div class="pr-hint">该节点作为画布中的物料输入源，从输出端口连入工艺输入端口即可指定其作为输入。</div>
+      <button v-if="matCompEditable" class="comp-btn" @click="store.selectMaterial(node.type)">设置详细成分（TFe / CaO / 固定碳…）→</button>
       </CollapseSection>
     </template>
   </div>
@@ -260,6 +308,7 @@ import { useSimStore } from '../stores/sim'
 import { MATERIALS, MATERIAL_MAP, PROCESS_MAP, DEVICE_MAP } from '../data/flowLibrary'
 import { EDITABLE_PARAMS } from '../data/processMeta'
 import CollapseSection from './CollapseSection.vue'
+import { calcSlagBasicity } from '../utils/slagBasicity'
 
 const store = useSimStore()
 
@@ -384,6 +433,14 @@ function delNodePort(dir, i) {
 const matCat = computed(() => (MATERIAL_MAP[node.value.type] && MATERIAL_MAP[node.value.type].cat) || '—')
 const matUnit = computed(() => (MATERIAL_MAP[node.value.type] && MATERIAL_MAP[node.value.type].unit) || '—')
 const matCarbon = computed(() => (MATERIAL_MAP[node.value.type] && MATERIAL_MAP[node.value.type].carbon) ?? '—')
+// 支持详细化学成分设定的物料（烧结矿/球团/块矿/焦炭/煤/喷吹煤粉/石灰石），点击跳转物料属性面板
+const matCompEditable = computed(() => ['sinter', 'pellet', 'iron_ore', 'coke', 'coal', 'pulverized_coal', 'limestone'].includes(node.value.type))
+// 高炉炉渣二元碱度（CaO/SiO₂）：随节点参数（焦比/煤比/熔剂比/炉料入炉比/富氧率）与
+// 物料成分覆盖（灰分组成、矿石 CaO/SiO₂、石灰石成分）实时联动
+const slagInfo = computed(() => {
+  if (!node.value || node.value.type !== 'blast_furnace') return null
+  return calcSlagBasicity(node.value.params || {}, store.materialOverrides || {})
+})
 const devIcon = (type) => (DEVICE_MAP[type] && DEVICE_MAP[type].icon) || 'gauge'
 const devMeasures = computed(() => (DEVICE_MAP[node.value.type] && DEVICE_MAP[node.value.type].measures) || '—')
 // 设备设定值量程：节点自定义量程（range，随方案持久化）> 设备库默认设定范围
@@ -445,6 +502,23 @@ function bindToProcess(pid) {
 
 <style scoped>
 .flow-insp { display: flex; flex-direction: column; }
+/* 炉渣二元碱度区块 */
+.slag-r2-row b { font-size: 15px; }
+.slag-r2-val { display: inline-flex; align-items: center; gap: 6px; }
+.slag-tag { font-size: 10px; padding: 1px 8px; border-radius: 3px; font-weight: 400; }
+.slag-tag.ok { color: var(--green, #4f9d6b); border: 1px solid rgba(79,157,107,.4); background: rgba(79,157,107,.10); }
+.slag-tag.low { color: #b06a1a; border: 1px solid rgba(201,154,46,.5); background: rgba(201,154,46,.12); }
+.slag-tag.high { color: #b04a3a; border: 1px solid rgba(176,74,58,.4); background: rgba(176,74,58,.10); }
+.slag-tbl-t { font-size: 11px; font-weight: 500; color: var(--green, #4f9d6b); margin: 10px 0 4px; }
+.slag-tbl { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.slag-tr { display: grid; grid-template-columns: 1.6fr 0.7fr 0.75fr 0.75fr 0.75fr 0.75fr; font-size: 11px; padding: 3px 8px; }
+.slag-tr + .slag-tr { border-top: 1px solid var(--line); }
+.slag-th { color: var(--muted); font-size: 10.5px; background: rgba(0,0,0,.02); }
+.slag-sum { font-weight: 500; background: rgba(0,0,0,.02); }
+.slag-neg { color: #b04a3a; }
+.comp-btn { margin-top: 8px; width: 100%; font-size: 11px; padding: 5px 8px; border-radius: 5px;
+  color: var(--accent2); border: 1px solid rgba(95,130,148,.35); background: rgba(95,130,148,.08); cursor: pointer; }
+.comp-btn:hover { background: rgba(95,130,148,.16); }
 .spec-sel { width: 100%; }
 .recipe-row { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
 .recipe-row select, .bind-row select { flex: 1; }

@@ -127,6 +127,60 @@
       </CollapseSection>
 
       <CollapseSection
+        v-else-if="sid === 'slag' && slagInfo"
+        title="炉渣碱度（CaO/SiO₂/MgO/Al₂O₃）"
+        tone="green"
+        drag-id="slag"
+        v-model="layout.state.open[sid]"
+        @drop="layout.move($event.from, $event.to, $event.position)"
+      >
+        <p class="sec-desc">高炉炉渣二元碱度估算：R₂ = ΣCaO / ΣSiO₂（入渣氧化物，kg/tFe）。随炉料配比、燃料比（含富氧置换联动）与物料详细化学成分实时变化。</p>
+        <div class="card">
+          <div class="kv2 slag-r2-row">
+            <span>二元碱度 R₂（CaO/SiO₂）</span>
+            <b class="slag-r2-val">{{ slagInfo.r2.toFixed(2) }}
+              <span class="slag-tag" :class="slagInfo.level.cls">{{ slagInfo.level.txt }}</span>
+            </b>
+          </div>
+          <div class="kv2 slag-r2-row">
+            <span>四元碱度 R₄（(CaO+MgO)/(SiO₂+Al₂O₃)）</span>
+            <b class="slag-r2-val">{{ slagInfo.r4.toFixed(2) }}
+              <span class="slag-tag" :class="slagInfo.r4Level.cls">{{ slagInfo.r4Level.txt }}</span>
+            </b>
+          </div>
+          <div class="kv2"><span>适宜区间</span><b>R₂ 1.05–1.25 · R₄ 1.0–1.35（参考）</b></div>
+          <div class="kv2"><span>燃料量（有效）</span><b>焦 {{ slagInfo.coke.toFixed(0) }} + 煤 {{ slagInfo.coal.toFixed(0) }} <span class="u">kg/t（含富氧置换联动）</span></b></div>
+          <div class="slag-tbl-t">入渣氧化物平衡（kg/tFe）</div>
+          <div class="slag-tbl">
+            <div class="slag-tr slag-th"><span>来源</span><span>用量</span><span>CaO</span><span>SiO₂</span><span>MgO</span><span>Al₂O₃</span></div>
+            <div class="slag-tr" v-for="pt in slagInfo.parts" :key="pt.name">
+              <span>{{ pt.name }}</span><span>{{ pt.rate.toFixed(0) }}</span>
+              <span>{{ pt.cao.toFixed(1) }}</span><span>{{ pt.sio2.toFixed(1) }}</span>
+              <span>{{ pt.mgo.toFixed(1) }}</span><span>{{ pt.al2o3.toFixed(1) }}</span>
+            </div>
+            <div class="slag-tr slag-sum"><span>合计</span><span></span>
+              <span>{{ slagInfo.caoTotal.toFixed(1) }}</span><span>{{ slagInfo.sio2Gross.toFixed(1) }}</span>
+              <span>{{ slagInfo.mgoTotal.toFixed(1) }}</span><span>{{ slagInfo.al2o3Total.toFixed(1) }}</span>
+            </div>
+            <div class="slag-tr"><span>Si 还原入铁扣减（[Si] 0.5%）</span><span></span><span></span>
+              <span class="slag-neg">−{{ slagInfo.siDeduct.toFixed(1) }}</span><span></span><span></span>
+            </div>
+            <div class="slag-tr slag-sum"><span>入渣合计</span><span></span>
+              <span>{{ slagInfo.caoTotal.toFixed(1) }}</span><span>{{ slagInfo.sio2Total.toFixed(1) }}</span>
+              <span>{{ slagInfo.mgoTotal.toFixed(1) }}</span><span>{{ slagInfo.al2o3Total.toFixed(1) }}</span>
+            </div>
+          </div>
+          <div class="kv2"><span>炉渣四元成分（质量分数 %）</span><b>CaO {{ slagInfo.comp.cao.toFixed(1) }} · SiO₂ {{ slagInfo.comp.sio2.toFixed(1) }} · MgO {{ slagInfo.comp.mgo.toFixed(1) }} · Al₂O₃ {{ slagInfo.comp.al2o3.toFixed(1) }}</b></div>
+          <div class="kv2"><span>成分法渣量估算</span><b>{{ slagInfo.slagEst.toFixed(0) }} <span class="u">kg/t（工序设定渣比 {{ unit.params.slag_rate ?? 300 }}，交叉校验用）</span></b></div>
+          <div class="pr-hint">
+            R₂ = ΣCaO / ΣSiO₂ = {{ slagInfo.caoTotal.toFixed(1) }} / {{ slagInfo.sio2Total.toFixed(1) }}；
+            R₄ = (CaO+MgO)/(SiO₂+Al₂O₃) = ({{ slagInfo.caoTotal.toFixed(1) }}+{{ slagInfo.mgoTotal.toFixed(1) }}) / ({{ slagInfo.sio2Total.toFixed(1) }}+{{ slagInfo.al2o3Total.toFixed(1) }})。
+            成分来源：烧结/球团/块矿脉石 + 焦炭/煤粉灰分（物料「详细化学成分 → 灰分组成」）+ 熔剂(石灰石)；MgO 主要来自熔剂与灰分、Al₂O₃ 主要来自矿脉石与煤灰。
+          </div>
+        </div>
+      </CollapseSection>
+
+      <CollapseSection
         v-else-if="sid === 'io'"
         title="输入输出 · 编排设定"
         tone="green"
@@ -267,6 +321,9 @@ import { useSimStore, UNIT_TYPES } from '../stores/sim'
 import { DEVICE_MAP, PROCESS_ADJUSTABLE, MATERIAL_MAP } from '../data/flowLibrary'
 import CollapseSection from './CollapseSection.vue'
 import { buildRealtimeTftParams, collectTftContext, DEFAULT_TFT_CONFIG } from '../utils/tft'
+import { calcSlagBasicity } from '../utils/slagBasicity'
+// 混合煤单一数据源：把用户在物料界面编辑的配煤折算为 TFT 配置
+import { makeTftConfig } from '../utils/coalBlend'
 import { useDragLayout } from '../composables/useDragSort'
 // 高炉数值仿真分析弹窗：仅在点击入口时按需加载
 const TftAnalysisDialog = defineAsyncComponent(() => import('./TftAnalysisDialog.vue'))
@@ -274,13 +331,13 @@ const TftAnalysisDialog = defineAsyncComponent(() => import('./TftAnalysisDialog
 const store = useSimStore()
 
 /* 工序面板模块布局：按工序类型分别持久化（顺序 + 折叠状态，每次打开恢复上次布局）
- * 默认顺序：实时监测 → 能耗 → 碳排放 → 核算台账 → 碳平衡 → 输入输出 → 可调节 → 关联设备 → 减排策略
+ * 默认顺序：实时监测 → 能耗 → 碳排放 → 核算台账 → 碳平衡 → 炉渣碱度(二元碱度) → 输入输出 → 可调节 → 关联设备 → 减排策略
  * 默认可调节 / 关联设备 / 减排策略折叠，其余展开 */
-const unitLayoutKey = computed(() => 'insp-layout:unit:v5:' + (store.selectedUnit?.type || 'unit'))
+const unitLayoutKey = computed(() => 'insp-layout:unit:v6:' + (store.selectedUnit?.type || 'unit'))
 const layout = useDragLayout(
   unitLayoutKey,
-  ['live', 'energy', 'carbon', 'ledger', 'balance', 'io', 'devices', 'related', 'strategy'],
-  { live: true, energy: true, carbon: true, ledger: true, balance: true, io: true, devices: false, related: false, strategy: false },
+  ['live', 'energy', 'carbon', 'ledger', 'balance', 'slag', 'io', 'devices', 'related', 'strategy'],
+  { live: true, slag: true, energy: true, carbon: true, ledger: true, balance: true, io: true, devices: false, related: false, strategy: false },
 )
 // 选中工序实例：场景/列表/左侧工艺目录点击均直接选中具体实例，同一个实例只有一个面板
 const unit = computed(() => store.selectedUnit)
@@ -300,11 +357,12 @@ const liveData = computed(() => {
 })
 
 // TFT 实时参数：工序基础参数 + 当前工序热制度设备实际设定折算（拖动滑块实时联动）
+// 注：喷吹系统(喷煤量)已锁定不可调，不再参与设备设定折算
 const tftParams = computed(() => {
   const u = unit.value
   if (!u) return {}
   const sps = {}
-  for (const dt of ['hot_blast_stove', 'blower', 'injector']) {
+  for (const dt of ['hot_blast_stove', 'blower']) {
     const did = `${u.id}::${dt}`
     const sp = store.deviceSetpoints[did]
     const es = store.deviceExtraSetpoints[did]
@@ -316,7 +374,15 @@ const tftParams = computed(() => {
 // TFT 计算上下文（值 + 状态），用于与实时监测其它指标一致的卡片显示
 const tftCtx = computed(() => {
   if (!unit.value || unit.value.type !== 'blast_furnace') return null
-  try { return collectTftContext(tftParams.value || {}, DEFAULT_TFT_CONFIG) } catch (e) { return null }
+  try { return collectTftContext(tftParams.value || {}, makeTftConfig(store.materialOverrides || {})) } catch (e) { return null }
+})
+
+// 炉渣二元碱度 R₂（CaO/SiO₂）：高炉专属指标。
+// 参数取「基础参数 + 设备设定派生」的当前生效值（复用 TFT 同源折算：富氧率/风温等设备
+// 设定实时联动，与主流程排放链路口径一致）；物料成分覆盖读 materialOverrides。
+const slagInfo = computed(() => {
+  if (!unit.value || unit.value.type !== 'blast_furnace') return null
+  try { return calcSlagBasicity(tftParams.value || {}, store.materialOverrides || {}) } catch (e) { return null }
 })
 // 高炉数值仿真分析：仅仿真模式可用（与 Alt+T 快捷键同一入口逻辑）
 const showTft = ref(false)
@@ -505,4 +571,19 @@ function fmtNum(n) { return Number(n).toLocaleString('zh-CN', { maximumFractionD
 .delta-item { background: var(--panel-2); border: 1px solid var(--line); border-radius: 3px; padding: 5px; text-align: center; }
 .dl { font-size: 10px; color: var(--muted); display: block; }
 .dv { font-size: 11px; font-weight: 500; display: block; margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+/* 炉渣二元碱度 R₂（与流程编排属性面板同款样式） */
+.slag-r2-row b { font-size: 15px; }
+.slag-r2-val { display: inline-flex; align-items: center; gap: 6px; }
+.slag-tag { font-size: 10px; padding: 1px 8px; border-radius: 3px; font-weight: 400; }
+.slag-tag.ok { color: var(--green, #4f9d6b); border: 1px solid rgba(79,157,107,.4); background: rgba(79,157,107,.10); }
+.slag-tag.low { color: #b06a1a; border: 1px solid rgba(201,154,46,.5); background: rgba(201,154,46,.12); }
+.slag-tag.high { color: #b04a3a; border: 1px solid rgba(176,74,58,.4); background: rgba(176,74,58,.10); }
+.slag-tbl-t { font-size: 11px; font-weight: 500; color: var(--green, #4f9d6b); margin: 10px 0 4px; }
+.slag-tbl { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.slag-tr { display: grid; grid-template-columns: 1.6fr 0.7fr 0.75fr 0.75fr 0.75fr 0.75fr; font-size: 11px; padding: 3px 8px; }
+.slag-tr + .slag-tr { border-top: 1px solid var(--line); }
+.slag-th { color: var(--muted); font-size: 10.5px; background: rgba(0,0,0,.02); }
+.slag-sum { font-weight: 500; background: rgba(0,0,0,.02); }
+.slag-neg { color: #b04a3a; }
 </style>

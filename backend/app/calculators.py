@@ -17,7 +17,14 @@ from .factors import (
     _base,                # 单工序结果基底
     METAL_C,              # 铁水/钢水溶解碳系数
     _clamp,               # 取值钳制（鼓风炉有效燃料比等边界处理）
+    PULVERIZED_COAL_COMP, # 喷吹煤粉元素/工业分析（置换比公式输入）
+    BF_COAL_REF,          # 名义基准煤比 kg/tFe（喷煤置换零点）
+    BF_OXY_COAL_PER_PCT,  # 富氧派生煤比：每 1% 富氧允许多喷煤粉 kg/tFe
+    replacement_ratio,    # 喷煤置换比（Geerdes 公式）
 )
+
+# 喷煤置换比（与前端 bfFuel.js RR 一致，当前 ≈ 0.71）
+RR = replacement_ratio()
 
 
 def _fuel_formula(fuel: str, amount: float, co2: float, cfg: Dict) -> str:
@@ -137,17 +144,20 @@ def _flux_co2(flux_t: float, cfg: Dict, dolomite_ratio: float = 0.0) -> Dict:
 
 
 def _bf_effective_fuel(p):
-    """高炉「操作/设备参数 → 工艺状态(焦比/煤比)」的耦合推导。
+    """高炉「操作参数 + 富氧派生煤比 + 喷煤置换 → 工艺状态(焦比/煤比)」的耦合推导。
 
     返回 (coke_rate, coal_inj, op_mode, info)。
-    - op_mode=False：节点未带任何操作参数，直接用给定焦比/煤比（直接调参模式）。
-    - op_mode=True ：以节点当前焦比/煤比为基准，按操作参数相对「名义工况」
-      (风量 1.0 / 风温 1250℃ / 富氧 0%) 的偏离做扰动推算。这样无论基线焦比是
-      360 还是 470，进入操作模式都不会发生跳变；且操作参数最后被谁设置即谁生效。
-
-    机理（经验耦合，用于教学/演示，体现因果方向而非精确冶金模型）：
-      风量↑/风温↑/富氧↑ → 风口燃烧带更旺、允许更高喷煤并改善热效率 → 焦比↓、
-      总燃料比略降。喷煤(煤比)对焦炭的顶替是减碳的主要杠杆。
+    - 喷煤置换（无条件，节点定义了煤比即生效）：有效煤比偏离名义基准(175 kg/tFe)时，
+      焦比按 Δ焦比 = −RR × Δ煤比 反向联动（RR = 喷煤置换比，Geerdes 公式，
+      成分见 factors.PULVERIZED_COAL_COMP，当前 ≈ 0.71）。
+    - 富氧为「派生煤比」通道（不再直接节焦）：每 +1% 富氧允许多喷 15 kg/tFe 煤粉
+      （BF_OXY_COAL_PER_PCT，实测出处见 factors.py），有效煤比 = 设定煤比 + 15×富氧率，
+      再经喷煤置换联动降低焦比。
+    - op_mode=True：节点带操作参数(风量/风温/富氧/抽力)，按相对「名义工况」
+      (风温 1250℃ / 抽力 1.0) 的偏离叠加扰动推算（风温/抽力直接节焦）；否则只应用
+      喷煤置换项。
+    - 风量是产量通道：提高铁水产量但单位焦比不变，不参与焦比/煤比推算。
+    - 设定煤比原样读取（输入值即基准），不再做总燃料比守恒补偿。
     """
     ref_coke = p.get("coke_rate")
     ref_coal = p.get("coal_inj")
@@ -155,29 +165,40 @@ def _bf_effective_fuel(p):
     t_blast = p.get("hot_blast_temp")
     o2 = p.get("oxygen_enrich")
     draft = p.get("draft")
-    if wind is None and t_blast is None and o2 is None and draft is None:
-        return (ref_coke if ref_coke is not None else 470,
-                ref_coal if ref_coal is not None else 150,
-                False, {})
-    # 名义工况；风量 wind_rate 为绝对供风量 kNm³/h，基准 600 kNm³/h = 相对 1.0 倍
-    wind_f = wind / 600.0 if wind is not None else 1.0
-    temp_f = (t_blast / 1250.0) if t_blast is not None else 1.0
-    oxy_f = (1.0 + o2 / 21.0) if o2 is not None else 1.0
-    draft_f = draft if draft is not None else 1.0
+    has_op = any(v is not None for v in (wind, t_blast, o2, draft))
     base_coke = ref_coke if ref_coke is not None else 470
-    base_coal = ref_coal if ref_coal is not None else 150
-    # 操作改善 → 焦比下降（喷煤/富氧/抽力顶替焦炭），敏感性系数经验取值
-    d_coke = -150 * (wind_f - 1) - 250 * (temp_f - 1) - 90 * (oxy_f - 1) - 30 * (draft_f - 1)
+    # 富氧派生煤比：设定煤比为基准，富氧每 +1% 允许多喷 15 kg/tFe；无煤比参数时不派生
+    coal_base = _clamp(ref_coal, 0, 260) if ref_coal is not None else None
+    coal_oxy = (BF_OXY_COAL_PER_PCT * o2) if o2 is not None else 0.0
+    coal = _clamp(coal_base + coal_oxy, 0, 260) if coal_base is not None else 150
+    # 喷煤置换：Δ焦比 = −RR × (有效煤比 − 名义基准煤比 175)；无煤比参数时不耦合
+    d_coke = -RR * (coal - BF_COAL_REF) if coal_base is not None else 0.0
+    if has_op:
+        temp_f = (t_blast / 1250.0) if t_blast is not None else 1.0
+        draft_f = draft if draft is not None else 1.0
+        # 风温↑/抽力↑ → 焦比下降（敏感性系数经验取值，与前端 dCoke 完全一致）；
+        # 富氧不直接节焦，其作用经「派生煤比 → 喷煤置换 → 焦比联动」体现
+        d_coke += -250 * (temp_f - 1) - 30 * (draft_f - 1)
     coke = _clamp(base_coke + d_coke, 300, 560)
-    # 操作改善也提升热效率，总燃料比略降；煤比相应补偿（焦比降则煤比升）
-    total = (base_coke + base_coal) - 20 * (wind_f - 1) - 15 * (temp_f - 1) - 10 * (oxy_f - 1) - 8 * (draft_f - 1)
-    coal = _clamp(total - coke, 0, 260)
     info = {
         "wind_rate": wind, "hot_blast_temp": t_blast, "oxygen_enrich": o2, "draft": draft,
-        "coke_rate_base": round(base_coke, 1), "coal_inj_base": round(base_coal, 1),
-        "coke_rate_derived": round(coke, 1), "coal_inj_derived": round(coal, 1),
+        "coke_rate_base": round(base_coke, 1),
+        "coke_rate_derived": round(coke, 1),
+        "coal_inj_base": round(coal_base if coal_base is not None else 150, 1),
+        "coal_inj_derived": round(coal, 1),
+        "coal_oxy_inc": round(coal_oxy, 1),
+        "replacement_ratio": round(RR, 3),
     }
-    return coke, coal, True, info
+    return coke, coal, has_op, info
+
+
+# 高炉排放核算口径开关：
+#   "gb"      —— 国标企业核算式：入碳按 E = AD × NCV(收到基低位发热量) × CC × 44/12
+#                （AD 为燃料消耗量），排放 CO₂ = 入碳 − 产品带出碳（铁水溶碳 4.5%、
+#                渣带碳 3%，以未氧化形态随产品/副产品离开工序，予以扣除）；
+#   "balance" —— 碳平衡法演示口径：数学上与国标式一致，但保留完整碳素流字段
+#                （carbon_to_steel / carbon_to_slag / carbon_to_co2），用于碳流可视化。
+BF_EMISSION_METHOD = "gb"
 
 
 def calc_bf(p, cfg=DEFAULT_FACTORS):
@@ -190,37 +211,74 @@ def calc_bf(p, cfg=DEFAULT_FACTORS):
     c_coke = direct_coke / CO2_PER_C
     c_coal = direct_coal / CO2_PER_C
     c_in = c_coke + c_coal
-    c_steel = hm * METAL_C["hot_metal"]                    # 铁水溶解碳
+    c_steel = hm * METAL_C["hot_metal"]                    # 铁水溶解碳（碳平衡法扣减项）
     slag_rate = p.get("slag_rate", 300.0)                  # 渣比 kg/t 铁（默认 300）
     slag_t = hm * slag_rate / 1000.0                       # t/h 高炉渣
-    c_slag = slag_t * METAL_C["bf_slag"]                   # 炉渣带走碳（未排放）
+    c_slag = slag_t * METAL_C["bf_slag"]                   # 炉渣带走碳
     flux = _flux_co2(hm * p.get("flux", 0.0) / 1000.0, cfg)
     flux_co2 = flux["co2"]
-    c_to_co2 = (c_in - c_steel - c_slag) + flux_co2 / CO2_PER_C
-    direct = (c_in - c_steel - c_slag) * CO2_PER_C + flux_co2
     elec = p.get("electricity", hm * 0.03)
     indirect = elec * cfg["grid_ef"]
     r = _base()
-    r.update(co2_direct=direct, co2_indirect=indirect, carbon_in=c_in + flux_co2 / CO2_PER_C,
-             carbon_to_steel=c_steel, carbon_to_slag=c_slag, carbon_to_co2=c_to_co2,
-             steel_output=hm, carbon_by_fuel={"coke": c_coke, "coal": c_coal})
-    r["ledger"] = [
-        _led("焦炭", coke_t, "t/h", "NCV×CC×44/12", direct_coke, "direct",
-             formula=_fuel_formula("coke", coke_t, direct_coke, cfg)),
-        _led("喷吹煤粉", coal_t, "t/h", "NCV×CC×44/12", direct_coal, "direct",
-             formula=_fuel_formula("coal", coal_t, direct_coal, cfg)),
-        _led("熔剂(石灰石分解)", flux["limestone"], "t/h", f"分解因子 {cfg['carbonate']['limestone']} tCO₂/t", flux_co2, "direct",
-             formula=_carbonate_formula(flux["limestone"], flux_co2, cfg)),
-        _led("铁水溶解碳(未排放)", c_steel, "tC/h", f"铁水含碳 {METAL_C['hot_metal']*100:.1f}% 进入钢水", 0.0, "direct",
-             formula=f"{c_steel:.1f} tC 进入钢水（不排放）"),
-        _led("炉渣带走碳(未排放)", c_slag, "tC/h", f"渣比 {slag_rate:.0f} kg/t · 渣含碳 {METAL_C['bf_slag']*100:.1f}% 进入高炉渣", 0.0, "direct",
-             formula=f"{slag_t:.1f} t 渣 × {METAL_C['bf_slag']*100:.1f}% = {c_slag:.1f} tC 进入渣（不排放）"),
-        _led("外购电力", elec, "MWh/h", f"电网因子 {cfg['grid_ef']} tCO₂/MWh", indirect, "indirect",
-             formula=_elec_formula(elec, indirect, cfg)),
-    ]
-    notes = ["铁水约 4.5% 的碳以溶解碳进入钢水，不计入 CO₂ 排放",
-             "炉渣带走碳（渣含碳约 3%）随水淬渣排出，不计入 CO₂ 排放，物料平衡须单独扣减",
-             "高炉是长流程钢厂最大的直接碳排源"]
+
+    if BF_EMISSION_METHOD == "balance":
+        # —— 碳平衡法（原实现）——
+        c_to_co2 = (c_in - c_steel - c_slag) + flux_co2 / CO2_PER_C
+        direct = (c_in - c_steel - c_slag) * CO2_PER_C + flux_co2
+        r.update(co2_direct=direct, co2_indirect=indirect,
+                 carbon_in=c_in + flux_co2 / CO2_PER_C,
+                 carbon_to_steel=c_steel, carbon_to_slag=c_slag, carbon_to_co2=c_to_co2,
+                 steel_output=hm, carbon_by_fuel={"coke": c_coke, "coal": c_coal})
+        r["ledger"] = [
+            _led("焦炭", coke_t, "t/h", "NCV×CC×44/12", direct_coke, "direct",
+                 formula=_fuel_formula("coke", coke_t, direct_coke, cfg)),
+            _led("喷吹煤粉", coal_t, "t/h", "NCV×CC×44/12", direct_coal, "direct",
+                 formula=_fuel_formula("coal", coal_t, direct_coal, cfg)),
+            _led("熔剂(石灰石分解)", flux["limestone"], "t/h", f"分解因子 {cfg['carbonate']['limestone']} tCO₂/t", flux_co2, "direct",
+                 formula=_carbonate_formula(flux["limestone"], flux_co2, cfg)),
+            _led("铁水溶解碳(未排放)", c_steel, "tC/h", f"铁水含碳 {METAL_C['hot_metal']*100:.1f}% 进入钢水", 0.0, "direct",
+                 formula=f"{c_steel:.1f} tC 进入钢水（不排放）"),
+            _led("炉渣带走碳(未排放)", c_slag, "tC/h", f"渣比 {slag_rate:.0f} kg/t · 渣含碳 {METAL_C['bf_slag']*100:.1f}% 进入高炉渣", 0.0, "direct",
+                 formula=f"{slag_t:.1f} t 渣 × {METAL_C['bf_slag']*100:.1f}% = {c_slag:.1f} tC 进入渣（不排放）"),
+            _led("外购电力", elec, "MWh/h", f"电网因子 {cfg['grid_ef']} tCO₂/MWh", indirect, "indirect",
+                 formula=_elec_formula(elec, indirect, cfg)),
+        ]
+        notes = ["铁水约 4.5% 的碳以溶解碳进入钢水，不计入 CO₂ 排放",
+                 "炉渣带走碳（渣含碳约 3%）随水淬渣排出，不计入 CO₂ 排放，物料平衡须单独扣减",
+                 "高炉是长流程钢厂最大的直接碳排源"]
+    else:
+        # —— 国标企业核算式：燃料入碳 AD×NCV×CC×44/12，扣除产品带出碳 ——
+        deduct_steel = c_steel * CO2_PER_C
+        deduct_slag = c_slag * CO2_PER_C
+        direct = direct_coke + direct_coal + flux_co2 - deduct_steel - deduct_slag
+        c_to_co2 = (c_in - c_steel - c_slag) + flux_co2 / CO2_PER_C
+        r.update(co2_direct=direct, co2_indirect=indirect,
+                 carbon_in=c_in + flux_co2 / CO2_PER_C,
+                 carbon_to_steel=c_steel, carbon_to_slag=c_slag, carbon_to_co2=c_to_co2,
+                 steel_output=hm, carbon_by_fuel={"coke": c_coke, "coal": c_coal})
+        r["ledger"] = [
+            _led("焦炭(国标式入碳)", coke_t, "t/h", "AD×NCV×CC×44/12", direct_coke, "direct",
+                 formula=_fuel_formula("coke", coke_t, direct_coke, cfg)),
+            _led("喷吹煤粉(国标式入碳)", coal_t, "t/h", "AD×NCV×CC×44/12", direct_coal, "direct",
+                 formula=_fuel_formula("coal", coal_t, direct_coal, cfg)),
+            _led("熔剂(石灰石分解)", flux["limestone"], "t/h", f"分解因子 {cfg['carbonate']['limestone']} tCO₂/t", flux_co2, "direct",
+                 formula=_carbonate_formula(flux["limestone"], flux_co2, cfg)),
+            _led("产品带出碳扣减(铁水)", c_steel, "tC/h",
+                 f"铁水含碳 {METAL_C['hot_metal']*100:.1f}% 随产品带出（未氧化），按国标企业核算扣除",
+                 -deduct_steel, "direct",
+                 formula=f"-{c_steel:.1f} tC/h × 44/12 = -{deduct_steel:.1f} tCO₂/h"),
+            _led("副产品带出碳扣减(炉渣)", c_slag, "tC/h",
+                 f"渣比 {slag_rate:.0f} kg/t · 渣含碳 {METAL_C['bf_slag']*100:.1f}% 随渣带出（未氧化），予以扣除",
+                 -deduct_slag, "direct",
+                 formula=f"-{c_slag:.1f} tC/h × 44/12 = -{deduct_slag:.1f} tCO₂/h"),
+            _led("外购电力", elec, "MWh/h", f"电网因子 {cfg['grid_ef']} tCO₂/MWh", indirect, "indirect",
+                 formula=_elec_formula(elec, indirect, cfg)),
+        ]
+        notes = ["直接排放按国标企业核算式：入碳 = AD×NCV×CC×44/12（消耗量×收到基低位发热量×单位热值含碳量）",
+                 "扣除产品带出碳：铁水溶碳 "
+                 f"{METAL_C['hot_metal']*100:.1f}%（−{deduct_steel:.0f} tCO₂/h）与渣带碳 "
+                 f"{METAL_C['bf_slag']*100:.1f}%（−{deduct_slag:.0f} tCO₂/h），未氧化碳不计入排放",
+                 "高炉是长流程钢厂最大的直接碳排源"]
     if op_mode:
         parts = []
         if op_info.get("wind_rate") is not None:

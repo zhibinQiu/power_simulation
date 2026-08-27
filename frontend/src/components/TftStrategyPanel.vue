@@ -114,6 +114,9 @@ import {
   buildDeviceTftAdvices, buildSystemTftAdvices,
   previewDeviceChange, inferDeviceSetpoints, TFT_DEVICE_PROBES,
 } from '../utils/tft'
+// 混合煤单一数据源：未显式传入 config 时，用物料界面编辑的配煤折算 TFT 配置
+import { makeTftConfig } from '../utils/coalBlend'
+import { useSimStore } from '../stores/sim'
 
 const props = defineProps({
   // 当前工序参数（系统实时值，来自 store.model.units[u].params）
@@ -129,7 +132,7 @@ const props = defineProps({
   config: { type: Object, default: () => DEFAULT_TFT_CONFIG },
 })
 
-const cfg = computed(() => props.config || DEFAULT_TFT_CONFIG)
+const cfg = computed(() => props.config || makeTftConfig(useSimStore().materialOverrides || {}))
 const isSystem = computed(() => props.mode === 'system')
 
 const ctx = computed(() => {

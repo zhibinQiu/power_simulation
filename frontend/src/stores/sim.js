@@ -107,22 +107,10 @@ function linkedAuxTypesFor(scheme, unitId) {
 // 编辑态增删节点/连线会改变规模指纹自动失效；同一方案运行期内跨消息直接命中缓存。
 const _adjTypesCache = new WeakMap()
 function adjustableTypesFor(scheme, unitType, unitId) {
-  const base = PROCESS_ADJUSTABLE[unitType] || []
-  if (!scheme) return [...base]
-  const nodes = scheme.nodes || []
-  const conns = scheme.connections || []
-  const scale = (nodes.length << 16) ^ conns.length
-  let entry = _adjTypesCache.get(scheme)
-  if (!entry || entry.scale !== scale) {
-    entry = { scale, byUnit: new Map() }
-    _adjTypesCache.set(scheme, entry)
-  }
-  if (entry.byUnit.has(unitId)) return entry.byUnit.get(unitId)
-  const set = new Set(base)
-  for (const dt of linkedAuxTypesFor(scheme, unitId)) set.add(dt)
-  const arr = [...set]
-  entry.byUnit.set(unitId, arr)
-  return arr
+  const set = new Set(PROCESS_ADJUSTABLE[unitType] || [])
+  // 喷吹系统(喷煤量)已锁定：即使连线供给高炉也不作为可调设备合成（喷吹速率固定为工艺默认值）
+  for (const dt of linkedAuxTypesFor(scheme, unitId)) if (dt !== 'injector') set.add(dt)
+  return [...set]
 }
 
 // 撤销/重做：合并键 + 时间戳（模块级，避免进入响应式 state）
@@ -257,7 +245,7 @@ export const useSimStore = defineStore('sim', {
     selectedMaterialId: null,   // 选中的物料库 id
     // 左侧资源管理器：浏览态选中（只看属性，不改动产线）
     selectedAssetType: null,    // 选中的工艺类型（PROCESS_TEMPLATES.type）-> 仅用于左侧目录高亮；面板始终为实例面板
-    materialOverrides: {},      // 物料隐含碳因子覆盖：matId -> { carbon }（本会话内）
+    materialOverrides: {},      // 物料属性覆盖：matId -> { carbon, density, moisture, composition:{...}, blend:[{id,name,ratio,comp:{...}}] }（随方案持久化）
     // 撤销/重做栈（仅编辑态编排方案）
     historyPast: [],        // 历史快照（每次编辑前压入上一状态）
     historyFuture: [],      // 重做快照
@@ -490,11 +478,34 @@ export const useSimStore = defineStore('sim', {
           if (!this.scheme.groups) this.scheme.groups = []
           if (this.scheme.activeGroupId == null) this.scheme.activeGroupId = null
           migrateLegacyDevices(this.scheme)   // 存量方案：旧可调设备 -> 独立工辅节点 + 驱动连线
+          // 迁移：旧版炉料结构绝对值（烧结 1270/球团 195/块矿 160 kg/t）-> 百分比配比 + 总矿量
+          // 识别特征：高炉节点存在 sinter_ratio 且 >100（旧绝对值）；换算保留相对比例，一次性写回并重存
+          const bfNode = (this.scheme.nodes || []).find((n) => n && n.id === 'blast_furnace' && n.params)
+          if (bfNode && bfNode.params.sinter_pct == null && bfNode.params.sinter_ratio != null && Number(bfNode.params.sinter_ratio) > 100) {
+            const s = Number(bfNode.params.sinter_ratio) || 0
+            const pe = Number(bfNode.params.pellet_ratio) || 0
+            const lu = Number(bfNode.params.lump_ratio) || 0
+            const tot = s + pe + lu
+            if (tot > 0) {
+              bfNode.params.sinter_pct = Math.round((s / tot) * 1000) / 10
+              bfNode.params.pellet_pct = Math.round((pe / tot) * 1000) / 10
+              bfNode.params.lump_pct = Math.round((lu / tot) * 1000) / 10
+              bfNode.params.burden_total = Math.round(tot)
+              delete bfNode.params.sinter_ratio
+              delete bfNode.params.pellet_ratio
+              delete bfNode.params.lump_ratio
+              this._saveScheme()
+            }
+          }
           // 迁移：彻底移除历史方案中的旧 facility 节点（旧「工辅/设施」概念已删除，仅处理存量数据）
           const kept = new Set((this.scheme.nodes || []).filter((n) => n && n.kind !== 'facility').map((n) => n.id))
           this.scheme.nodes = this.scheme.nodes.filter((n) => n && n.kind !== 'facility')
           this.scheme.connections = (this.scheme.connections || []).filter((c) => kept.has(c.from) && kept.has(c.to))
           this.processRoute = saved.route || this.processRoute
+          // 同步恢复物料属性覆盖（隐含碳因子/密度/含水率/详细化学成分），旧方案无该字段时保持默认
+          if (saved.materialOverrides && typeof saved.materialOverrides === 'object') {
+            this.materialOverrides = saved.materialOverrides
+          }
           // 同步恢复设备设定值（视图态/编辑态统一存储，驱动实时读数与碳引擎折算）
           const sps = {}
           const esps = {}
@@ -876,13 +887,10 @@ export const useSimStore = defineStore('sim', {
         this._simLog('param', `${uname} · ${pLabel}`, `${fmtNum(prev)} → ${fmtNum(num)}${pUnit ? ' ' + pUnit : ''}`, `pu_${id}_${key}`)
       }
       const params = { ...u.params }
-      // 两模式互斥：操作/设备参数(wind_rate/hot_blast_temp/oxygen_enrich) 与
-      // 直接调参(coke_rate/coal_inj) 最后被谁设置，谁生效。
-      if (OP_PARAM_KEYS.has(key)) {
-        DIRECT_PARAM_KEYS.forEach((k) => delete params[k])
-      } else if (DIRECT_PARAM_KEYS.has(key)) {
-        OP_PARAM_KEYS.forEach((k) => delete params[k])
-      }
+      // 操作参数(风量/风温/富氧)与直接调参(焦比/煤比)共存：
+      // coke_rate/coal_inj 作为基准；风温/抽力叠加 dCoke 偏移，富氧派生煤比(+15/1%)
+      // 再经喷煤置换联动焦比（见 utils/bfFuel.bfFuelRates）。
+      // 不再互斥删除——两者是"基准+增量"的互补关系。
       params[key] = num
       u.params = params
       this.refresh(); this.autoLayout()
@@ -959,6 +967,56 @@ export const useSimStore = defineStore('sim', {
       }
       this.materialOverrides = { ...this.materialOverrides, [id]: { ...(this.materialOverrides[id] || {}), [key]: val } }
       if (this.simMode && key !== 'note') this.refresh()
+    },
+    // 配置物料详细化学成分（如烧结矿 TFe/FeO/CaO、焦炭固定碳/灰分等，质量分数 %），
+    // 覆盖值存于 materialOverrides[id].composition，随方案持久化；仅 sinter/pellet/coke 支持。
+    setMaterialComp(id, key, val) {
+      const v = Number(val)
+      if (isNaN(v) || v < 0) return
+      const cur = (this.materialOverrides[id] || {}).composition || {}
+      if (this.simMode) {
+        const ml = ((MATERIAL_MAP[id] || {}).name) || id
+        let prev = _simParamSnapshot && _simParamSnapshot.materialOverrides[id] && _simParamSnapshot.materialOverrides[id].composition
+        prev = prev && prev[key] != null ? prev[key] : (cur[key] != null ? cur[key] : '—')
+        this._simLog('factor', `${ml} · 成分 ${key}`, `${fmtNum(prev)} → ${fmtNum(v)} %`, `mc_${id}_${key}`)
+      }
+      this.materialOverrides = { ...this.materialOverrides, [id]: { ...(this.materialOverrides[id] || {}), composition: { ...cur, [key]: v } } }
+      if (this.simMode) this.refresh()
+    },
+    // 清除某物料的成分覆盖，恢复库默认成分
+    clearMaterialComp(id) {
+      const ov = this.materialOverrides[id]
+      if (!ov || !ov.composition) return
+      const { composition, ...rest } = ov
+      this.materialOverrides = { ...this.materialOverrides, [id]: rest }
+      if (this.simMode) this.refresh()
+    },
+    // 配置喷吹煤粉配煤混合（N 种煤）：blend = [{ id, name, ratio, comp:{...} }]。
+    // 覆盖值存于 materialOverrides[id].blend，随方案持久化；coalBlend.getCoalBlend 优先读它，
+    // 否则回退默认混合（无烟煤/烟煤各 50%）。TFT / 置换比 RR / CO₂ / 炉渣碱度均经此联动。
+    // 调用方（MaterialInspector）负责维护数组整体（增删/改项），此处按整体写入。
+    setCoalBlend(id, blend) {
+      if (!Array.isArray(blend)) return
+      const arr = blend.map((x) => ({
+        id: x.id,
+        name: x.name,
+        ratio: Number(x.ratio) || 0,
+        comp: { ...(x.comp || {}) },
+      }))
+      if (this.simMode) {
+        const ml = ((MATERIAL_MAP[id] || {}).name) || id
+        this._simLog('factor', `${ml} · 配煤混合`, `已更新（${arr.length} 种煤）`, `pcblend_${id}`)
+      }
+      this.materialOverrides = { ...this.materialOverrides, [id]: { ...(this.materialOverrides[id] || {}), blend: arr } }
+      if (this.simMode) this.refresh()
+    },
+    // 清除喷吹煤粉配煤覆盖，恢复默认混合（无烟煤/烟煤各 50%，加权 == 原固定值）
+    clearCoalBlend(id) {
+      const ov = this.materialOverrides[id]
+      if (!ov || !ov.blend) return
+      const { blend, ...rest } = ov
+      this.materialOverrides = { ...this.materialOverrides, [id]: rest }
+      if (this.simMode) this.refresh()
     },
     // 配置燃料的 NCV / CC（与顶栏「因子配置」同一数据源 factors.fuels），编辑后触发后端重算
     setFuelFactor(key, field, val) {
@@ -1514,6 +1572,7 @@ export const useSimStore = defineStore('sim', {
         localStorage.setItem('sim.scheme', JSON.stringify({
           route: this.processRoute,
           scheme: this.scheme,
+          materialOverrides: this.materialOverrides,
         }))
       } catch (e) { /* localStorage 不可用时静默忽略 */ }
     },

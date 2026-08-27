@@ -13,7 +13,7 @@
 //       温度的加权平均比热容（gas_mean_cp 多项式），迭代求解 TFT。
 // ============================================================================
 
-import { deriveProcessOpParams } from '../data/flowLibrary'
+import { deriveProcessOpParams } from '../data/flowLibrary.js'
 
 // ---- 1. 固定物理常数（文档 §9.3：热力学基准）----
 export const TFT_CONST = {
@@ -110,7 +110,7 @@ export const DEFAULT_TFT_CONFIG = {
     },
     pulverized_coal: {
       enabled: true, fuel_type: 'solid', name: '喷吹煤粉', rateKey: 'coal_inj',
-      FC: 0.72, Celem: 0.74, H: 0.04, decomp_heat: 0.35,
+      FC: 0.81, Celem: 0.83, H: 0.04, decomp_heat: 0.35, Ash:0.10, H2O: 0.05
     },
     heavy_oil: {
       enabled: false, fuel_type: 'liquid', name: '重油', rate: 20,
@@ -355,11 +355,11 @@ export function previewDeviceChange(unitType, deviceType, setpoint, extraSetpoin
 }
 
 // 高炉热制度相关可调设备：探测步长（用于生成操作建议）
+// 注：喷吹系统(喷煤量)已锁定不可调，不再列入探测
 export const TFT_DEVICE_PROBES = [
   { type: 'hot_blast_stove', label: '热风炉·风温', step: 30, unit: '℃' },
   { type: 'blower', label: '鼓风机·风量', step: 520, unit: 'm³/h' },
   { type: 'blower', label: '鼓风机·鼓风湿度', step: 1, unit: 'g/Nm³', extraKey: 'humidity', def: 10 },
-  { type: 'injector', label: '喷吹系统·喷煤量', step: 20, unit: 'kg/h' },
 ]
 
 // 从工序参数反推设备当前设定（设备设定缺失时兜底）；overrides 可用实际设定值覆盖（如当前选中的设备）

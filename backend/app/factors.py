@@ -38,6 +38,29 @@ METAL_C = {
     "steel_slag": 0.015,          # 转炉钢渣含碳率 ~1.5%（企业可配，渣中溶解碳）
 }
 
+# 喷吹煤粉元素/工业分析（喷煤置换比 Geerdes 公式输入；与前端 tft.js
+# DEFAULT_TFT_CONFIG.fuels.pulverized_coal 一致——前端改配置后需同步此处）
+PULVERIZED_COAL_COMP = {"Celem": 0.83, "H": 0.04, "H2O": 0.05, "Ash": 0.10}
+
+# 基准煤比 kg/tFe（喷煤置换的零点，「模板=基准」：= 前端 flowLibrary 高炉模板 coal_inj def。
+# 前端 bfFuel.js 已动态读取模板 def 自动跟随；后端为手动同步，改模板后需同步此处）
+BF_COAL_REF = 130
+
+# 富氧派生煤比系数：每 1% 富氧允许多喷煤粉 kg/tFe。
+# 富氧升温 → 燃烧带容纳更多煤粉 → 置换焦炭（富氧不再直接节焦，作用经喷煤通道体现）。
+# 实测数据出处：北大先锋·山西某钢厂 0→4% 富氧，煤比 120→170 kg/t（原 ≈12.5 kg/t per 1%）；
+# 当前配置按 15 kg/t per 1% 设定（用户调整）。
+BF_OXY_COAL_PER_PCT = 15
+
+
+def replacement_ratio(comp=None):
+    """喷煤置换比（Geerdes 公式，The Coal Handbook [17.11]）：
+    RR% = 2·C% + 2.5·H% − 2·H₂O% + 0.9·Ash% − 86，返回小数（当前配置 ≈ 0.89）。
+    C/H 取元素分析（Celem/H），H₂O/Ash 取收到基工业分析。"""
+    c = comp if comp is not None else PULVERIZED_COAL_COMP
+    rr = (2 * c["Celem"] + 2.5 * c["H"] - 2 * c["H2O"] + 0.9 * c["Ash"]) * 100 - 86
+    return rr / 100.0
+
 # 排放因子表（可配置项的默认值）。前端可在「因子配置」面板覆盖。
 # fuels[fuel] = {ncv, cc, unit, label, desc}
 #   ncv: 低位发热量 GJ/t(固体/液体) 或 GJ/1e4Nm³(气体)

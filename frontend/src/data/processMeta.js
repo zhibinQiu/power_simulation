@@ -7,9 +7,10 @@
 // =============================================================
 
 // ---------- 高炉参数键分级 ----------
-// 高炉：直接调参 vs 设备/操作驱动 两类参数键（互斥，最后触碰者生效）
-//  - OP_PARAM_KEYS    操作杠杆（风量/热风温度/富氧率），由"可调设备"驱动
-//  - DIRECT_PARAM_KEYS 直接工艺参数（焦比/喷煤比），由工艺面板直接输入
+// 高炉：直接调参与操作杠杆两类参数键（共存，基准+增量关系）
+//  - OP_PARAM_KEYS    操作杠杆（风量/热风温度/富氧率）：风温/抽力叠加 dCoke 偏移，
+//                     富氧派生煤比(+15 kg/t per 1%)再经喷煤置换联动焦比
+//  - DIRECT_PARAM_KEYS 直接工艺参数（焦比/喷煤比），作为推算基准
 export const OP_PARAM_KEYS = new Set(['wind_rate', 'hot_blast_temp', 'oxygen_enrich'])
 export const DIRECT_PARAM_KEYS = new Set(['coke_rate', 'coal_inj'])
 

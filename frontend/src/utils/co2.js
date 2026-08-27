@@ -1,30 +1,27 @@
 // ============================================================================
 // 高炉 CO2 排放计算模块 —— 前端移植版
-// 与后端 Python bf_tft_v20.py §10「碳平衡法」1:1 对齐。
+// 与后端 calculators.calc_bf 的「国标式」(BF_EMISSION_METHOD='gb') 口径 1:1 对齐，
+// 对应 GB/T 32151.5《钢铁行业碳排放核算》企业层级碳平衡核算：
 //
-// 口径（v20 定稿）：
-//   全炉碳收支: 入炉碳 C_in = 铁水溶碳 C_HM(唯一产品碳) + 排放碳 C_emit
-//   排放碳     C_emit = C_in - C_HM
-//   CO2 排放   = C_emit × (M_CO2 / M_C) = C_emit × 44.009/12.011  [kg CO2/tHM]
+//   入碳   C_in  = Σ 燃料消耗量 AD × 收到基低位发热量 NCV × 单位热值含碳量 CC
+//                  （折合等效碳含量：焦炭 28.435×0.0295 = 83.88%C、煤粉 26.7×0.0262 = 69.95%C）
+//   排放   E     = (C_in − 铁水溶碳 C_HM − 渣带碳 C_slag) × M_CO2/M_C + 熔剂分解 CO2
 //
 //   关键约定：
-//     - 炉尘碳 C_dust 不再作为产品碳扣减，全部计入排放碳
-//       （未燃煤粉 U 与焦粉随炉尘/煤气带出，最终仍氧化为 CO2）；
-//     - 即「输入碳 - 输出碳 = 排放碳」，其中输出碳只有铁水含碳；
-//     - 炉尘量/含碳参数仅作信息展示，不参与扣减；
-//     - 无论 CO 在炉内是否氧化完全，离炉后均按 CO2 计（Scope1 + CO 燃烧）；
-//     - 未计入石灰石熔剂分解 CO2 与焦炭/煤粉挥发分碳（仅计固定碳 FC）。
+//     - 入炉燃料碳按「AD×NCV×CC」全量计入，不按固定碳 FC 简化（与国标一致）；
+//     - 铁水溶碳(4.5%)与炉渣带碳(3%)以产品/副产品形态带出工序、未氧化，从排放中扣减；
+//     - 石灰石熔剂分解 CO2 为加项（因子 0.4395 tCO₂/t，可配置）；
+//     - 炉尘碳 C_dust 仅作信息展示：未燃煤粉/焦粉随炉尘煤气带出最终仍氧化为 CO2，不单独扣减；
+//     - 无论 CO 在炉内是否氧化完全，离炉后均按 CO2 计（Scope1 + CO 燃烧）。
 //
 // 与前端 TFT 模块的关系：
 //   - 燃料用量复用同一份工序参数（coke_rate / coal_inj）；
-//   - 入炉碳采用后端 v20 燃料成分（焦炭固定碳 85.82%、煤粉 67.57%），
-//     以保证与后端默认结果逐位一致（C_in=413.4 → CO2=1349.9 kg/tHM）；
-//     若要与前端 TFT 的燃料配置（FC 0.85 / 0.72）统一，覆盖
-//     co2Config.coke_carbon_pct / coal_carbon_pct 即可；
+//   - 熔剂比 flux_rate(默认 120 kg/tHM) / 渣比 slag_rate(默认 300 kg/tHM) 取流程模板默认值，
+//     与后端 calc_bf 的 p.get("flux") / p.get("slag_rate") 兜底一致；
 //   - 「风口/非风口路径细分」默认走后端 v20 氧驱动口径（splitFrom='backend'），
 //     细分结果与后端打印一致（默认工况 908.1 / 441.8 kg CO2/tHM）；
 //     需要与前端 TFT 自洽时设 splitFrom='tft' 取 calcTFT 的 C_burn。
-//   - CO2 总量仅取决于 C_in 与 C_HM，与 TFT 燃烧路径模型无关。
+//   - CO2 总量仅取决于 C_in、C_HM、C_slag 与熔剂量，与 TFT 燃烧路径模型无关。
 // ============================================================================
 
 import { collectTftContext, TFT_PARAM_DEFAULTS } from './tft.js'
@@ -39,13 +36,22 @@ export const CO2_CONST = {
   N2_AIR: 0.79,    // 空气中 N2 体积分数
 }
 
-// ---- 2. CO2 排放计算参数（与后端 v20 默认值一致）----
+// 碳→CO₂ 换算系数（国标 GB/T 32151.5 采用 44/12；CO2_CONST.M_CO2/M_C 为摩尔质量精确比，
+// 两者差约 0.07%。为与后端 calculators.CO2_PER_C 及编辑态 compute.js 逐位一致，统一用 44/12。）
+export const CO2_PER_C_GB = 44 / 12
+
+// ---- 2. CO2 排放计算参数（与后端 calculators.calc_bf 国标式默认值一致）----
 export const CO2_DEFAULTS = {
   hm_carbon_pct: 4.5,      // 铁水含碳 %（唯一产品碳，一般 4.0~4.8）
+  slag_carbon_pct: 3.0,    // 渣含碳 %（副产品带出碳，与后端 METAL_C['bf_slag'] 一致）
   dust_rate: 20.0,         // 炉尘量 kg/tHM（仅信息展示；炉尘碳计入排放，不再扣减）
   dust_carbon_pct: 30.0,   // 炉尘含碳 %（仅信息展示；炉尘碳计入排放，不再扣减）
-  coke_carbon_pct: 85.82,  // 焦炭固定碳 %（与后端 v20 燃料成分一致）
-  coal_carbon_pct: 67.57,  // 煤粉固定碳 %（与后端 v20 燃料成分一致）
+  // 国标式入碳：AD×NCV×CC 折合等效碳含量（NCV×CC），不再用固定碳 FC
+  coke_carbon_pct: 83.88,  // 焦炭等效碳 % = 28.435 GJ/t × 0.0295 tC/GJ
+  coal_carbon_pct: 69.95,  // 煤粉等效碳 % = 26.700 GJ/t × 0.0262 tC/GJ
+  flux_rate: 120.0,        // 熔剂比 kg/tHM（石灰石，模板默认值，与后端 calc_bf 兜底一致）
+  flux_ef: 0.4395,         // 石灰石分解因子 tCO₂/t（与后端 factors.carbonate.limestone 一致）
+  slag_rate: 300.0,        // 渣比 kg/tHM（模板默认值，与后端 calc_bf 兜底一致）
   splitFrom: 'backend',    // 路径细分口径: 'backend' = 后端 v20 氧驱动风口碳（默认, 与后端打印一致）
                            //              'tft'     = 前端 TFT 的 C_burn（与前端 TFT 自洽）
 }
@@ -86,35 +92,41 @@ export function calcBackendRacewayCarbon(params = {}, co2Cfg = {}) {
   }
 }
 
-// ---- 3. 核心：CO2 排放计算（碳平衡法）----
-// params  : 工序参数 { coke_rate, coal_inj, ... }（与 TFT 同源，走 TFT_PARAM_DEFAULTS 兜底）
+// ---- 3. 核心：CO2 排放计算（国标式碳平衡，与后端 calc_bf gb 分支一致）----
+// params  : 工序参数 { coke_rate, coal_inj, flux, slag_rate, ... }（与 TFT 同源，走 TFT_PARAM_DEFAULTS 兜底；
+//           flux/slag_rate 缺省取模板默认 120/300 kg/tHM，与后端 calc_bf 兜底一致）
 // tftRes  : calcTFT() 的返回值（当 co2Cfg.splitFrom='tft' 时提供 C_burn 作风口燃烧碳；
 //           否则不用，细分走后端氧驱动口径）
-// co2Cfg  : CO2 参数覆盖 { hm_carbon_pct, coke_carbon_pct, coal_carbon_pct,
-//           dust_rate, dust_carbon_pct, splitFrom }
+// co2Cfg  : CO2 参数覆盖 { hm_carbon_pct, slag_carbon_pct, coke_carbon_pct, coal_carbon_pct,
+//           flux_rate, flux_ef, slag_rate, dust_rate, dust_carbon_pct, splitFrom }
 export function calcCo2Emission(params = {}, tftRes = null, co2Cfg = {}) {
   const p = { ...TFT_PARAM_DEFAULTS, ...params }
   const c = { ...CO2_DEFAULTS, ...co2Cfg }
 
-  // ---- 碳收支（kg C/tHM）----
+  // ---- 碳收支（kg C/tHM；入碳按 AD×NCV×CC 国标式）----
   const cokeRate = num(p.coke_rate, TFT_PARAM_DEFAULTS.coke_rate)
   const coalRate = num(p.coal_inj, TFT_PARAM_DEFAULTS.coal_inj)
+  const hotMetal = num(p.hot_metal, 1000)                     // 铁水产量 t/h（缺省与后端一致 1000）
+  const fluxRate = num(p.flux, c.flux_rate)                   // 熔剂比 kg/tHM
+  const slagRate = num(p.slag_rate, c.slag_rate)              // 渣比 kg/tHM
 
-  const C_coke = cokeRate * c.coke_carbon_pct / 100          // 焦炭带入碳
-  const C_coal = coalRate * c.coal_carbon_pct / 100          // 煤粉带入碳
-  const C_in = C_coke + C_coal                               // 入炉碳（仅燃料固定碳 FC）
+  const C_coke = cokeRate * c.coke_carbon_pct / 100          // 焦炭带入碳（NCV×CC 等效）
+  const C_coal = coalRate * c.coal_carbon_pct / 100          // 煤粉带入碳（NCV×CC 等效）
+  const C_in = C_coke + C_coal                               // 入炉碳（国标式口径）
 
-  const C_HM = 1000 * c.hm_carbon_pct / 100                  // 铁水溶碳（唯一产品碳）
+  const C_HM = 1000 * c.hm_carbon_pct / 100                  // 铁水溶碳（产品带出碳，扣减）
+  const C_slag = slagRate * c.slag_carbon_pct / 100          // 渣带碳（副产品带出碳，扣减）
+  const CO2_flux = fluxRate * c.flux_ef                      // 熔剂分解 CO₂（加项，kg CO₂/tHM）
 
-  // ---- 排放碳 = 入炉碳 - 铁水溶碳（炉尘碳/未燃煤粉均含于其中, 计入排放）----
-  const C_emit = Math.max(C_in - C_HM, 0)                    // kg C/tHM ★
-  const CO2_emit = C_emit * CO2_CONST.M_CO2 / CO2_CONST.M_C  // kg CO2/tHM ★★
+  // ---- 排放碳 = 入炉碳 − 铁水溶碳 − 渣带碳（炉尘碳/未燃煤粉均含于其中, 计入排放）----
+  const C_emit = Math.max(C_in - C_HM - C_slag, 0)           // kg C/tHM ★
+  const CO2_emit = C_emit * CO2_PER_C_GB + CO2_flux  // kg CO2/tHM ★★
 
   // 炉尘碳（信息展示，计入排放不扣减）
   const C_dust = c.dust_rate * c.dust_carbon_pct / 100
 
   // ---- 路径细分（仅展示用，不改变总量）----
-  // 与后端一致：产品扣减(仅铁水溶碳)优先从非风口碳池 C_other 中扣
+  // 与后端一致：产品/副产品扣减(铁水溶碳+渣带碳)优先从非风口碳池 C_other 中扣
   //   （渗碳出自未在风口燃烧的燃料碳），不足部分再扣风口燃烧碳 m_C_R。
   // 默认走后端 v20 氧驱动口径（splitFrom='backend'），与后端打印一致；
   // 需要与前端 TFT 自洽时设 splitFrom='tft'，取 tftRes.C_burn。
@@ -123,19 +135,24 @@ export function calcCo2Emission(params = {}, tftRes = null, co2Cfg = {}) {
     : calcBackendRacewayCarbon(p, c)
   const m_C_R = rc.m_C_R                                    // 风口实际燃烧碳
   const C_other = Math.max(C_in - m_C_R, 0)                 // 非风口碳池
-  const C_other_to_gas = Math.max(C_other - C_HM, 0)        // 非风口路径排放碳
+  const C_other_to_gas = Math.max(C_other - C_HM - C_slag, 0) // 非风口路径排放碳
   const C_raceway_to_gas = Math.max(C_emit - C_other_to_gas, 0) // 风口路径排放碳
 
   return {
     // 碳收支
     C_coke, C_coal, C_in,
-    C_HM, C_dust, C_emit, CO2_emit,
+    C_HM, C_slag, CO2_flux, C_dust, C_emit, CO2_emit,
     CO2_t: CO2_emit / 1000,                                  // t CO2/tHM
+    // 排放速率（tCO₂/h）= 强度 × 铁水产量，与后端 simulate 台账同口径
+    hot_metal: hotMetal,                                     // t/h
+    CO2_rate: (CO2_emit / 1000) * hotMetal,                  // tCO₂/h ★ 展示主口径
     // 路径细分（风口路径 / 非风口碳池）
     m_C_R, C_other,
     C_other_to_gas, C_raceway_to_gas,
-    CO2_from_raceway: C_raceway_to_gas * CO2_CONST.M_CO2 / CO2_CONST.M_C,
-    CO2_from_other: C_other_to_gas * CO2_CONST.M_CO2 / CO2_CONST.M_C,
+    CO2_from_raceway: C_raceway_to_gas * CO2_PER_C_GB,
+    CO2_from_other: C_other_to_gas * CO2_PER_C_GB,
+    CO2_rate_raceway: (C_raceway_to_gas * CO2_PER_C_GB / 1000) * hotMetal,  // tCO₂/h
+    CO2_rate_other: (C_other_to_gas * CO2_PER_C_GB / 1000) * hotMetal,     // tCO₂/h
     // 风口氧驱动诊断（splitFrom='backend' 时有效）
     eta_coal: rc.eta_coal, O2_supply: rc.O2_supply,
     C_burnable: rc.C_burnable, m_C_R_O2: rc.m_C_R_O2,
@@ -143,7 +160,8 @@ export function calcCo2Emission(params = {}, tftRes = null, co2Cfg = {}) {
     split_from: c.splitFrom,
     // 参数快照
     coke_rate: cokeRate, coal_inj: coalRate,
-    hm_carbon_pct: c.hm_carbon_pct,
+    flux_rate: fluxRate, slag_rate: slagRate,
+    hm_carbon_pct: c.hm_carbon_pct, slag_carbon_pct: c.slag_carbon_pct,
     coke_carbon_pct: c.coke_carbon_pct, coal_carbon_pct: c.coal_carbon_pct,
   }
 }
