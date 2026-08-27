@@ -163,7 +163,16 @@ def _bf_effective_fuel(p):
     ref_coal = p.get("coal_inj")
     wind = p.get("wind_rate")
     t_blast = p.get("hot_blast_temp")
+    # 纯氧流量 o2_flow(Nm³/h) 优先：按物理混合反算富氧率%（与前端 tft.enrichFromFlow 口径一致）；
+    # 缺省时回退原 oxygen_enrich 参数（兼容存量工况）。
     o2 = p.get("oxygen_enrich")
+    o2_flow = p.get("o2_flow")
+    hm = p.get("hot_metal") or 0
+    if o2_flow is not None and wind and hm:
+        b_air = wind * 1000.0 / hm
+        b_o2 = o2_flow / hm if hm else 0.0  # o2_flow 单位 Nm³/h，已是绝对流量，无需 ×1000
+        o2_frac = (b_air * 0.21 + b_o2) / (b_air + b_o2) if (b_air + b_o2) else 0.21
+        o2 = max(0.0, (o2_frac - 0.21) * 100)
     draft = p.get("draft")
     has_op = any(v is not None for v in (wind, t_blast, o2, draft))
     base_coke = ref_coke if ref_coke is not None else 470

@@ -142,9 +142,9 @@ export const PROCESS_TEMPLATES = [
             { key: 'lump_pct', label: '块矿配比', unit: '%', min: 0, max: 100, step: 1, def: 7 },
             { key: 'slag_rate', label: '渣比', unit: 'kg/t', min: 200, max: 450, step: 5, def: 300 },
             { key: 'flux', label: '熔剂比', unit: 'kg/t', min: 0, max: 150, step: 5, def: 10 },
-            { key: 'wind_rate', label: '风量', unit: 'kNm³/h', min: 100, max: 900, step: 10, def: 600 },
-            { key: 'hot_blast_temp', label: '热风温度', unit: '℃', min: 1100, max: 1250, step: 10, def: 1200 },
-            { key: 'oxygen_enrich', label: '富氧率', unit: '%', min: 0, max: 14, step: 0.5, def: 0 },
+            { key: 'wind_rate', label: '风量', unit: 'kNm³/h', min: 50, max: 480, step: 10, def: 228 },
+            { key: 'hot_blast_temp', label: '热风温度', unit: '℃', min: 1100, max: 1250, step: 10, def: 1150 },
+            { key: 'o2_flow', label: '纯氧流量', unit: 'Nm³/h', min: 0, max: 60000, step: 500, def: 0 },
             { key: 'draft', label: '炉顶抽力(相对)', unit: '×', min: 0.5, max: 1.5, step: 0.02, def: 1.0 },
             { key: 'blast_humidity', label: '鼓风湿度', unit: 'g/Nm³', min:2, max:30, step:1, def: 10.0}
             ],
@@ -455,7 +455,7 @@ export const DEVICE_TEMPLATES = [
   { type: 'injector', label: '喷吹系统', kind: 'metering', unit: 'kg/h', setpoint: { min: 0, max: 300, def: 120, unit: 'kg/h' }, powerPerUnit: 0.005, effType: 'feeder', measures: '喷吹速率', response: { bias: 0.03, noise: 0.01 }, desc: '本工序的喷吹设备，喷吹煤粉以顶替焦炭。喷煤量已锁定不可调节（随工况设定固定，富氧率提升时自动联动增加）。' },
   { type: 'electrode_reg', label: '电极调节器', kind: 'adjustable', unit: 'MW', setpoint: { min: 20, max: 120, def: 70, unit: 'MW' }, powerPerUnit: 0.01, effType: 'none', measures: '电弧功率', response: { bias: 0.02, noise: 0.008 }, desc: '本工序的可调设备，控制电弧功率以调节熔化/加热强度，其设定值经碳引擎折算为电耗与间接排放，是减排策略的作用对象。' },
   { type: 'vfd', label: '变频器', kind: 'adjustable', unit: 'Hz', setpoint: { min: 0, max: 50, def: 40, unit: 'Hz' }, powerPerUnit: 0, effType: 'none', measures: '电机转速', response: { bias: 0.01, noise: 0.005 }, desc: '本工序的可调设备，通过改变电机频率调节转速，其设定值经碳引擎折算为节电效果与间接排放，是减排策略的作用对象。' },
-  { type: 'oxygen_lance', label: '氧枪', kind: 'adjustable', unit: 'Nm³/h', setpoint: { min: 1000, max: 8000, def: 4000, unit: 'Nm³/h' }, powerPerUnit: 0.00002, effType: 'none', measures: '供氧强度', response: { bias: 0.02, noise: 0.008 }, desc: '本工序的可调设备，控制供氧强度以强化冶炼/富氧，其设定值经碳引擎折算为制氧能耗与间接排放，是减排策略的作用对象。' },
+  { type: 'oxygen_lance', label: '氧枪', kind: 'adjustable', unit: 'Nm³/h', setpoint: { min: 0, max: 60000, def: 4000, unit: 'Nm³/h' }, powerPerUnit: 0.00002, effType: 'none', measures: '供氧强度', response: { bias: 0.02, noise: 0.008 }, desc: '本工序的可调设备，控制纯氧流量(Nm³/h)以强化冶炼/富氧——其设定值即注入主风管的纯氧流量，经物理混合折算为富氧率与制氧能耗/间接排放，是减排策略的作用对象。' },
   { type: 'cool_pump', label: '冷却水泵', kind: 'adjustable', unit: 'm³/h', setpoint: { min: 50, max: 800, def: 300, unit: 'm³/h' }, powerPerUnit: 0.002, effType: 'none', measures: '水量/温度', response: { bias: 0.04, noise: 0.012 }, desc: '本工序的可调设备，控制冷却水量维持设备热平衡，其设定值经碳引擎折算为泵组电耗与间接排放，是减排策略的作用对象。' },
   { type: 'dedust_fan', label: '除尘风机', kind: 'adjustable', unit: 'm³/h', setpoint: { min: 1000, max: 6000, def: 3000, unit: 'm³/h' }, powerPerUnit: 0.00005, effType: 'none', measures: '风量', response: { bias: 0.03, noise: 0.01 }, desc: '本工序的可调设备，控制除尘风量维持收尘效率，其设定值经碳引擎折算为运行电耗与间接排放，是减排策略的作用对象。' },
   { type: 'waste_heat_boiler', label: '余热锅炉', kind: 'adjustable', unit: 't/h', setpoint: { min: 10, max: 300, def: 120, unit: 't/h' }, powerPerUnit: 0, effType: 'none', measures: '蒸汽产量', response: { bias: 0.03, noise: 0.01 }, desc: '本工序的可调设备，控制余热回收蒸汽产量，其设定值经碳引擎折算为余热回收量（负向排放），是减排策略的作用对象。' },
@@ -504,10 +504,10 @@ export const DEVICE_COUPLE_REGISTRY = {
       },
     },
     oxygen_lance: {
-      target: 'oxygen_enrich', effect: 'reduce', source: 'mechanism',
-      basis: '供氧强度正比于氧枪流量；富氧↑→允许更高喷煤、降低焦比',
+      target: 'o2_flow', effect: 'reduce', source: 'mechanism',
+      basis: '氧枪供给纯氧流量(Nm³/h)注入主风管与空气真实混合；纯氧不含 N₂，富氧率由风量+纯氧流量派生——富氧↑→压缩 N₂ 稀释、供氧↑、允许更高喷煤、降低焦比',
       nominal: 4000, uncertainty: '±3%',
-      derive: (s) => ({ oxygen_enrich: Math.min(14, Math.max(0, 14 * (Number(s) / 4000))) }),
+      derive: (s) => ({ o2_flow: Math.max(0, Number(s)) }),   // 设备设定值即纯氧流量 Nm³/h（1:1）
     },
     hot_blast_stove: {
       target: 'hot_blast_temp', effect: 'reduce', source: 'mechanism',

@@ -65,6 +65,20 @@ export function calcBoshGasCp(gasVolumes, T) {
   return cp_kJ / 1000 // kJ→MJ
 }
 
+// 由「风量 / 铁水产量 / 纯氧流量」反推派生富氧率(%)（与 collectTftInputs 同一物理混合模型）
+// 供 bfFuel 煤比联动、TFT 弹窗氧轴预览等处由 o2_flow 反算 富氧率% 使用。
+export function enrichFromFlow(wind, hotMetal, o2flow, humidity = 0) {
+  const w = Number(wind) || 0, hm = Number(hotMetal) || 0, o2 = Number(o2flow) || 0
+  const H = Math.max(0, Math.min(30, Number(humidity) || 0))
+  if (!(hm > 0) || !(w > 0)) return 0
+  const B_air = (w * 1000) / hm
+  const h2oVolFrac = H * 1.244 / 1000
+  const dry_air = Math.max(0, B_air * (1 - h2oVolFrac)) // 与 collectTftInputs 一致：O₂ 占比按干空气基底（湿分不供 O₂/N₂）
+  const B_o2 = o2 / hm   // o2 单位 Nm³/h，已是绝对流量，无需 ×1000
+  const O2_frac = (dry_air * 0.21 + B_o2) / Math.max(1e-9, dry_air + B_o2)
+  return Math.max(0, (O2_frac - 0.21) * 100)
+}
+
 // 系统工序参数兜底默认值（从系统取不到该参数时使用；数值与系统模板 PROCESS_TEMPLATES 一致）
 export const TFT_PARAM_DEFAULTS = {
   hot_blast_temp: 1200,   // 热风温度 ℃
@@ -86,11 +100,10 @@ export const TFT_PARAM_DEFAULTS = {
 //  hCombRatio      ：缺氧不完全燃烧下氢的燃烧比例（其余氢以 H2 进入炉缸煤气）
 //  tftLow/tftHigh  ：TFT 合规判定区间 ℃，默认 2050~2250，可随炉役/冶炼品种配置
 //  useElementCarbon：false=常规模式(基于固定碳FC) / true=高精度模式(基于元素碳Celem)
-//  blastNominal    ：工况标定。与 metalNominal 之比 = 物理比风量基准 Nm³/tFe（默认 40000/40=1000，行业典型值）
-//  metalNominal    ：工况标定。与 blastNominal 之比给出物理比风量基准（40000/40=1000 Nm³/tFe）
-//  产量/鼓风量说明：铁水产量直接取系统实际值 hot_metal(t/h)；比风量 = 基准 × wind_rate/600
-//                   （wind_rate 为绝对供风量 kNm³/h，基准 600 kNm³/h = 相对 1.0 倍）；
-//                   鼓风量 = 产量 × 比风量（TFT 为温度指标，仅取决于比风量/富氧/风温/燃料，与产量绝对值无关）
+//  比风量口径（2026-08 变更）：比风量 B = 鼓风量(wind_rate, kNm³/h) ÷ 铁水产量(hot_metal, t/h)，换算为 Nm³/tFe（×1000）。
+//                   TFT 现随铁水产量变化：相同鼓风量下产量越低 → 比风量越大 → TFT 越高（反之亦然）。
+//  blastNominal / metalNominal：【已弃用】原用于推导物理比风量基准，现不再驱动 B，保留字段以兼容既有配置结构。
+//  鼓风量自洽：QB = 产量 × 比风量 = hot_metal × B = wind_rate（kNm³/h → Nm³/h），与输入鼓风量一致。
 //  fuels           ：各燃料基础参数（换煤种/油品/燃气组分时可微调）；enabled 控制是否参与计算；
 //                    rateKey 表示用量取自哪个系统工序参数；无对应参数时用 rate 注入
 export const DEFAULT_TFT_CONFIG = {
@@ -169,32 +182,52 @@ export function collectTftInputs(params = {}, config = DEFAULT_TFT_CONFIG) {
   const tg = num(p.hot_blast_temp, TFT_PARAM_DEFAULTS.hot_blast_temp)
   const wind = num(p.wind_rate, TFT_PARAM_DEFAULTS.wind_rate)
   const hotMetal = num(p.hot_metal, TFT_PARAM_DEFAULTS.hot_metal)
-  // 工况标定：物理比风量基准 = blastNominal / metalNominal（默认 1000 Nm³/tFe，行业典型值）
-  const specBlast = num(config.blastNominal, 40000) / num(config.metalNominal, 40) // Nm³/tFe
-  const B = specBlast * wind / 600                             // 比风量 Nm³/tFe（绝对 kNm³/h ÷600 → 相对倍率）
+  // 比风量 = 鼓风量 / 铁水产量（用户指定口径：以实际供风总量 ÷ 实际铁水产量得到每吨铁送风量）
+  //   wind_rate：鼓风量，绝对供风量 kNm³/h（鼓风机供给的空气）
+  //   hot_metal：铁水产量 t/h（系统实际值）
+  //   单位换算：B_air [Nm³/tFe] = wind_rate[kNm³/h] × 1000 ÷ hot_metal[t/h]
+  // 富氧以「纯氧流量」o2_flow[Nm³/h]（氧枪/空分供给）注入主风管，与空气真实混合：
+  //   纯氧不含 N₂，故 N₂ 体积只来自空气、恒为 B_air×0.79；O₂ 体积 = 空气O₂ + 纯O₂；
+  //   富氧率(派生%) = 混合鼓风含氧% − 21%，由风量+纯氧流量实时算出（o2_flow 缺省时由旧
+  //   oxygen_enrich 反算，兼容存量工况）。修正了旧模型「富氧时把 N₂ 体积按比例压低」的近似。
+  const B_air = (wind * 1000) / Math.max(1, hotMetal)         // 空气比风量 Nm³/tFe（鼓风机供给）
+  const B = B_air                                              // 兼容下游：B 现指空气比风量
   const PFe = hotMetal                                         // 铁水产量 t/h（系统实际值）
-  const QB = PFe * B                                           // 鼓风量 Nm³/h（系统实际值）
-  // 富氧率：系统为富氧增量(%)（相对空气 21% 的提升量，范围 0~14%），算法使用同一口径，与 Python wO 一致
-  const wO = Math.min(14, Math.max(0, num(p.oxygen_enrich, TFT_PARAM_DEFAULTS.oxygen_enrich)))
-  const O2_blow = 0.21 + 0.01 * wO // 鼓风绝对氧浓度 = 空气氧 21% + 富氧增量
-  const N2_blow = 1.0 - O2_blow
-  // 鼓风显热：使用温度相关空气平均比热容 gasMeanCp('air', tg)
-  //   H_air = B · cp_air(0→tg) · tg   [MJ/tFe]
-  //   cp_air 单位 kJ/(Nm³·℃) → 除以 1000 转 MJ/(Nm³·℃)
-  //   useTempDependentCp=false 时退回固定 cpAir
+
+  // 鼓风湿度（g/Nm³）：先算（供 O₂/N₂ 体积切分与显热），水分在风口分解吸热、消耗碳并增加煤气量
+  const H = Math.max(0, Math.min(30, num(p.blast_humidity, TFT_PARAM_DEFAULTS.blast_humidity)))
+  const h2oVolFrac = H * 1.244 / 1000       // 每 Nm³ 鼓风含水蒸气体积 Nm³（1 kg H2O ≈ 1.244 Nm³）
+  const dry_air = Math.max(0, B_air * (1 - h2oVolFrac)) // 干空气比风量 Nm³/tFe（湿分不供氧、不产热，仅携显热）
+  const m_h2o = B_air * H / 1000             // 鼓风水分 kg/tFe
+  const Q_h2o_decomp = m_h2o * 10.8          // 水分分解吸热 MJ/tFe（C+H₂O→CO+H₂ 约 10.8 MJ/kg H2O）
+
+  // 纯氧流量 → 纯氧比风量（与空气同样以每吨铁计）；缺省时由存量 oxygen_enrich(%) 反算
+  const o2raw = p.o2_flow != null ? Number(p.o2_flow) : null
+  let B_o2
+  if (o2raw != null && Number.isFinite(o2raw)) {
+    B_o2 = Math.max(0, o2raw) / Math.max(1, hotMetal)   // 纯氧比风量 Nm³/tFe（o2_flow 单位 Nm³/h，已是绝对流量，无需 ×1000）
+  } else {
+    const wO_legacy = Math.min(14, Math.max(0, num(p.oxygen_enrich, TFT_PARAM_DEFAULTS.oxygen_enrich)))
+    B_o2 = dry_air * (0.01 * wO_legacy) / Math.max(1e-6, 0.79 - 0.01 * wO_legacy)
+  }
+  // 供 calcTFT 使用：V_O2 = dry_air·O2_blow = dry_air·0.21 + B_o2；V_N2 = dry_air·N2_blow = dry_air·0.79
+  //   （N₂ 只来自空气，富氧时绝不减少——这是相对旧模型的关键修正）
+  const O2_blow = 0.21 + B_o2 / Math.max(1e-9, dry_air)
+  const N2_blow = 0.79
+  // 派生富氧率（%）：混合鼓风含氧% − 21%
+  const O2_frac = (dry_air * 0.21 + B_o2) / Math.max(1e-9, dry_air + B_o2)
+  const oxygen_enrich = Math.max(0, (O2_frac - 0.21) * 100)
+  const wO = oxygen_enrich
+  const QB = PFe * (B_air + B_o2)                            // 总鼓风量（空气+纯氧）Nm³/h
+
+  // 鼓风显热：空气与纯氧均被热风炉加热至风温 tg，统一计入（温度相关空气平均比热容）
   const useTD = config.useTempDependentCp !== false
   const cpAir = useTD
     ? gasMeanCp('air', tg) / 1000
     : num(config.cpAir, 0.0013)
-  const Q_sensible_air = B * cpAir * tg                        // MJ/tFe
-  // 鼓风湿度（g/Nm³）：水分在风口分解（C+H₂O→CO+H₂）吸热、消耗碳并增加煤气量
-  const H = Math.max(0, Math.min(30, num(p.blast_humidity, TFT_PARAM_DEFAULTS.blast_humidity)))
-  const h2oVolFrac = H * 1.244 / 1000       // 每 Nm³ 鼓风含水蒸气体积 Nm³（1 kg H2O ≈ 1.244 Nm³）
-  const dry_air = Math.max(0, B * (1 - h2oVolFrac)) // 干风量 Nm³/tFe（湿分不供氧、不产热，仅携显热）
-  const m_h2o = B * H / 1000                // 鼓风水分 kg/tFe
-  const Q_h2o_decomp = m_h2o * 10.8         // 水分分解吸热 MJ/tFe（C+H₂O→CO+H₂ 约 10.8 MJ/kg H2O）
+  const Q_sensible_air = (dry_air + B_o2) * cpAir * tg          // MJ/tFe（空气+纯氧 显热）
   const fuel_list = buildFuelList(p, config)
-  return { tg, wind, QB, PFe, hot_metal: hotMetal, B, wO, O2_blow, N2_blow, cpAir, Q_sensible_air, blast_humidity: H, dry_air, m_h2o, Q_h2o_decomp, fuel_list }
+  return { tg, wind, QB, PFe, hot_metal: hotMetal, B, wO, o2_flow: o2raw, oxygen_enrich, O2_blow, N2_blow, cpAir, Q_sensible_air, blast_humidity: H, dry_air, m_h2o, Q_h2o_decomp, fuel_list }
 }
 
 // ---- 3. 核心算法：与 Python calc_tft_enthalpy_full 完全对齐 ----

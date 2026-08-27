@@ -8,10 +8,11 @@
 
 // ---------- 高炉参数键分级 ----------
 // 高炉：直接调参与操作杠杆两类参数键（共存，基准+增量关系）
-//  - OP_PARAM_KEYS    操作杠杆（风量/热风温度/富氧率）：风温/抽力叠加 dCoke 偏移，
-//                     富氧派生煤比(+15 kg/t per 1%)再经喷煤置换联动焦比
+//  - OP_PARAM_KEYS    操作杠杆（风量/热风温度/纯氧流量 o2_flow）：风温/抽力叠加 dCoke 偏移，
+//                     富氧(纯氧流量)派生煤比(+15 kg/t per 1%富氧)再经喷煤置换联动焦比；
+//                     富氧率 oxygen_enrich 为派生只读量（由风量+纯氧流量算出），不在此列
 //  - DIRECT_PARAM_KEYS 直接工艺参数（焦比/喷煤比），作为推算基准
-export const OP_PARAM_KEYS = new Set(['wind_rate', 'hot_blast_temp', 'oxygen_enrich'])
+export const OP_PARAM_KEYS = new Set(['wind_rate', 'hot_blast_temp', 'o2_flow'])
 export const DIRECT_PARAM_KEYS = new Set(['coke_rate', 'coal_inj'])
 
 // ---------- 各工序可编辑参数（UI 元数据）：label / 单位 / 范围 / 展示模式 ----------
@@ -31,7 +32,8 @@ export const EDITABLE_PARAMS = {
     { key: 'flux', label: '熔剂比', unit: 'kg/t', min: 0, max: 250, step: 5, mode: 'direct' },
     { key: 'wind_rate', label: '风量', unit: 'kNm³/h', min: 100, max: 900, step: 10, mode: 'aux', auxType: 'blower', auxNote: '由分支辅助工艺·鼓风机供风量驱动，点击实例跳转配置' },
     { key: 'hot_blast_temp', label: '热风温度', unit: '℃', min: 950, max: 1300, step: 10, mode: 'aux', auxType: 'hot_blast_stove', auxNote: '由分支辅助工艺·热风炉送风温度驱动，点击实例跳转配置' },
-    { key: 'oxygen_enrich', label: '富氧率', unit: '%', min: 0, max: 14, step: 0.5, mode: 'derived', auxType: 'oxy_supply', auxNote: '由全厂供氧系统·供氧量自动算出（富氧增量，相对空气 21%），相关配置在供氧系统中' },
+    { key: 'o2_flow', label: '纯氧流量', unit: 'Nm³/h', min: 0, max: 60000, step: 500, mode: 'direct', auxType: 'oxygen_lance', auxNote: '氧枪注入主风管的纯氧流量，与鼓风真实混合；富氧率由风量+纯氧流量派生（只读）' },
+    { key: 'oxygen_enrich', label: '富氧率(派生)', unit: '%', min: 0, max: 14, step: 0.1, mode: 'derived', auxType: 'oxygen_lance', auxNote: '由纯氧流量与鼓风量/铁水产量物理混合算出（富氧增量，相对空气 21%），只读' },
     { key: 'blast_humidity', label: '鼓风湿度', unit: 'g/Nm³', min: 0, max: 30, step: 1, mode: 'derived', auxType: 'blower', auxNote: '由鼓风机·鼓风湿度设定驱动，水分在风口分解吸热，影响高炉热制度（TFT）' },
   ],
   hydrogen_bf: [

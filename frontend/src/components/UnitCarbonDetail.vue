@@ -143,12 +143,12 @@
             </b>
           </div>
           <div class="kv2 slag-r2-row">
-            <span>四元碱度 R₄（(CaO+MgO)/(SiO₂+Al₂O₃)）</span>
-            <b class="slag-r2-val">{{ slagInfo.r4.toFixed(2) }}
-              <span class="slag-tag" :class="slagInfo.r4Level.cls">{{ slagInfo.r4Level.txt }}</span>
+            <span>三元碱度 R₃（(CaO+MgO)/SiO₂）</span>
+            <b class="slag-r2-val">{{ slagInfo.r3.toFixed(2) }}
+              <span class="slag-tag" :class="slagInfo.r3Level.cls">{{ slagInfo.r3Level.txt }}</span>
             </b>
           </div>
-          <div class="kv2"><span>适宜区间</span><b>R₂ 1.05–1.25 · R₄ 1.0–1.35（参考）</b></div>
+          <div class="kv2"><span>适宜区间</span><b>R₂ 1.15–1.25 · R₃ 1.40–1.55（参考）</b></div>
           <div class="kv2"><span>燃料量（有效）</span><b>焦 {{ slagInfo.coke.toFixed(0) }} + 煤 {{ slagInfo.coal.toFixed(0) }} <span class="u">kg/t（含富氧置换联动）</span></b></div>
           <div class="slag-tbl-t">入渣氧化物平衡（kg/tFe）</div>
           <div class="slag-tbl">
@@ -170,11 +170,11 @@
               <span>{{ slagInfo.mgoTotal.toFixed(1) }}</span><span>{{ slagInfo.al2o3Total.toFixed(1) }}</span>
             </div>
           </div>
-          <div class="kv2"><span>炉渣四元成分（质量分数 %）</span><b>CaO {{ slagInfo.comp.cao.toFixed(1) }} · SiO₂ {{ slagInfo.comp.sio2.toFixed(1) }} · MgO {{ slagInfo.comp.mgo.toFixed(1) }} · Al₂O₃ {{ slagInfo.comp.al2o3.toFixed(1) }}</b></div>
+          <div class="kv2"><span>炉渣氧化物成分（质量分数 %）</span><b>CaO {{ slagInfo.comp.cao.toFixed(1) }} · SiO₂ {{ slagInfo.comp.sio2.toFixed(1) }} · MgO {{ slagInfo.comp.mgo.toFixed(1) }} · Al₂O₃ {{ slagInfo.comp.al2o3.toFixed(1) }}</b></div>
           <div class="kv2"><span>成分法渣量估算</span><b>{{ slagInfo.slagEst.toFixed(0) }} <span class="u">kg/t（工序设定渣比 {{ unit.params.slag_rate ?? 300 }}，交叉校验用）</span></b></div>
           <div class="pr-hint">
             R₂ = ΣCaO / ΣSiO₂ = {{ slagInfo.caoTotal.toFixed(1) }} / {{ slagInfo.sio2Total.toFixed(1) }}；
-            R₄ = (CaO+MgO)/(SiO₂+Al₂O₃) = ({{ slagInfo.caoTotal.toFixed(1) }}+{{ slagInfo.mgoTotal.toFixed(1) }}) / ({{ slagInfo.sio2Total.toFixed(1) }}+{{ slagInfo.al2o3Total.toFixed(1) }})。
+            R₃ = (CaO+MgO)/SiO₂ = ({{ slagInfo.caoTotal.toFixed(1) }}+{{ slagInfo.mgoTotal.toFixed(1) }}) / {{ slagInfo.sio2Total.toFixed(1) }}。
             成分来源：烧结/球团/块矿脉石 + 焦炭/煤粉灰分（物料「详细化学成分 → 灰分组成」）+ 熔剂(石灰石)；MgO 主要来自熔剂与灰分、Al₂O₃ 主要来自矿脉石与煤灰。
           </div>
         </div>

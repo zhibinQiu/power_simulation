@@ -24,7 +24,7 @@
 //   - CO2 总量仅取决于 C_in、C_HM、C_slag 与熔剂量，与 TFT 燃烧路径模型无关。
 // ============================================================================
 
-import { collectTftContext, TFT_PARAM_DEFAULTS } from './tft.js'
+import { collectTftContext, enrichFromFlow, TFT_PARAM_DEFAULTS } from './tft.js'
 
 // ---- 1. 固定物理常数（与后端 v20 全局常量一致）----
 export const CO2_CONST = {
@@ -70,7 +70,12 @@ function num(v, dft) {
 // params: 已合并默认值的工序参数 { blast_humidity, oxygen_enrich, V_B, ... }
 // co2Cfg: 已合并默认值的 CO2 参数（提供 coke_carbon_pct / coal_carbon_pct）
 export function calcBackendRacewayCarbon(params = {}, co2Cfg = {}) {
-  const p = { ...TFT_PARAM_DEFAULTS, ...params }
+  // 富氧率：优先由纯氧流量 o2_flow 按物理混合反算（与 TFT 模型同一口径）；
+  // 缺省时回退参数 oxygen_enrich（兼容存量工况/设备 drives 写入的值）。
+  const oxygen_enrich = params.o2_flow != null
+    ? enrichFromFlow(params.wind_rate, params.hot_metal, params.o2_flow, params.blast_humidity)
+    : (params.oxygen_enrich != null ? params.oxygen_enrich : TFT_PARAM_DEFAULTS.oxygen_enrich)
+  const p = { ...TFT_PARAM_DEFAULTS, ...params, oxygen_enrich }
   const c = { ...CO2_DEFAULTS, ...co2Cfg }
   const V_B = num(p.V_B, 1000)                       // 比风量 Nm³/tHM（后端 CLI 默认 1000）
   const phi = p.blast_humidity / 1000 * CO2_CONST.VM / CO2_CONST.M_H2O   // Nm³ H2O/Nm³ 湿空气

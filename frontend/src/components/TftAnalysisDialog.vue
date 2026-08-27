@@ -182,10 +182,10 @@
                 </span>
               </div>
               <div class="co2-main">
-                <span class="co2-k">四元碱度 R₄（(CaO+MgO)/(SiO₂+Al₂O₃)）</span>
-                <span class="slag-val mono">{{ slagInfo.r4.toFixed(2) }}</span>
+                <span class="co2-k">三元碱度 R₃（(CaO+MgO)/SiO₂）</span>
+                <span class="slag-val mono">{{ slagInfo.r3.toFixed(2) }}</span>
                 <span class="cond-st" :style="{ color: slagColor }">
-                  <i class="st-dot" :style="{ background: slagColor }"></i>{{ slagInfo.r4Level.txt }}
+                  <i class="st-dot" :style="{ background: slagColor }"></i>{{ slagInfo.r3Level.txt }}
                 </span>
               </div>
               <div class="slag-grid">
@@ -195,7 +195,7 @@
                 <div class="cg-item"><span class="cg-k">入渣 MgO</span><b class="mono">{{ slagInfo.mgoTotal.toFixed(1) }} kg/t</b></div>
                 <div class="cg-item"><span class="cg-k">入渣 Al₂O₃</span><b class="mono">{{ slagInfo.al2o3Total.toFixed(1) }} kg/t</b></div>
                 <div class="cg-item"><span class="cg-k">渣量估算</span><b class="mono">{{ slagInfo.slagEst.toFixed(0) }} kg/t</b></div>
-                <div class="cg-item cg-wide"><span class="cg-k">炉渣四元成分（%）</span><b class="mono">CaO {{ slagInfo.comp.cao.toFixed(1) }} · SiO₂ {{ slagInfo.comp.sio2.toFixed(1) }} · MgO {{ slagInfo.comp.mgo.toFixed(1) }} · Al₂O₃ {{ slagInfo.comp.al2o3.toFixed(1) }}</b></div>
+                <div class="cg-item cg-wide"><span class="cg-k">炉渣氧化物成分（%）</span><b class="mono">CaO {{ slagInfo.comp.cao.toFixed(1) }} · SiO₂ {{ slagInfo.comp.sio2.toFixed(1) }} · MgO {{ slagInfo.comp.mgo.toFixed(1) }} · Al₂O₃ {{ slagInfo.comp.al2o3.toFixed(1) }}</b></div>
               </div>
               <div class="slag-tbl">
                 <div class="slag-tr slag-th"><span>来源</span><span>用量</span><span>CaO</span><span>SiO₂</span><span>MgO</span><span>Al₂O₃</span></div>
@@ -208,7 +208,7 @@
                 <div class="slag-tr"><span>Si 还原入铁扣减（[Si] 0.5%）</span><span></span><span></span><span class="slag-neg">−{{ slagInfo.siDeduct.toFixed(1) }}</span><span></span><span></span></div>
                 <div class="slag-tr slag-sum"><span>入渣合计</span><span></span><span>{{ slagInfo.caoTotal.toFixed(1) }}</span><span>{{ slagInfo.sio2Total.toFixed(1) }}</span><span>{{ slagInfo.mgoTotal.toFixed(1) }}</span><span>{{ slagInfo.al2o3Total.toFixed(1) }}</span></div>
               </div>
-              <div class="co2-tip">R₂ = ΣCaO/ΣSiO₂ = {{ slagInfo.caoTotal.toFixed(1) }} / {{ slagInfo.sio2Total.toFixed(1) }}；R₄ = (CaO+MgO)/(SiO₂+Al₂O₃) = ({{ slagInfo.caoTotal.toFixed(1) }}+{{ slagInfo.mgoTotal.toFixed(1) }}) / ({{ slagInfo.sio2Total.toFixed(1) }}+{{ slagInfo.al2o3Total.toFixed(1) }})（kg/tFe）。来源：烧结/球团/块矿脉石 + 焦炭/煤粉灰分（物料「详细化学成分 → 灰分组成」）+ 熔剂(石灰石)；MgO 主要来自熔剂与灰分、Al₂O₃ 主要来自矿脉石与煤灰；随滑块与物料成分实时联动。</div>
+              <div class="co2-tip">R₂ = ΣCaO/ΣSiO₂ = {{ slagInfo.caoTotal.toFixed(1) }} / {{ slagInfo.sio2Total.toFixed(1) }}；R₃ = (CaO+MgO)/SiO₂ = ({{ slagInfo.caoTotal.toFixed(1) }}+{{ slagInfo.mgoTotal.toFixed(1) }}) / {{ slagInfo.sio2Total.toFixed(1) }}（kg/tFe）。来源：烧结/球团/块矿脉石 + 焦炭/煤粉灰分（物料「详细化学成分 → 灰分组成」）+ 熔剂(石灰石)；MgO 主要来自熔剂与灰分、Al₂O₃ 主要来自矿脉石与煤灰；随滑块与物料成分实时联动。</div>
             </div>
 
 
@@ -253,7 +253,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { PROCESS_MAP } from '../data/flowLibrary'
-import { collectTftContext, DEFAULT_TFT_CONFIG } from '../utils/tft'
+import { collectTftContext, DEFAULT_TFT_CONFIG, enrichFromFlow } from '../utils/tft'
 import { collectSimContext } from '../utils/co2'
 import { effFuelParams, calcReplacementRatio, BF_NOMINAL } from '../utils/bfFuel'
 // 混合煤单一数据源：把用户在物料界面编辑的配煤（比例/成分）折算为 TFT/CO₂ 配置，
@@ -269,13 +269,13 @@ const emit = defineEmits(['close'])
 const store = useSimStore()
 
 // ---- 可分析轴配置（key 对齐高炉模板参数，附加节能语义）----
-// 可操作自变量（操作员可直接设定的旋钮）：风温/富氧/风量/喷煤/焦比/鼓风湿度
-//  · 富氧率/喷煤为耦合杠杆：富氧↑ → 派生煤比↑ → 经置换比 RR 联动降焦（富氧↑煤比↑焦比↓）。
+// 可操作自变量（操作员可直接设定的旋钮）：风温/纯氧流量/风量/喷煤/焦比/鼓风湿度
+//  · 纯氧流量(富氧率派生)/喷煤为耦合杠杆：纯氧↑ → 派生煤比↑ → 经置换比 RR 联动降焦（富氧↑煤比↑焦比↓）。
 //  · 焦比亦可作为独立可调轴（轴键映射为 coke_rate_set）：直接设定焦比，煤比冻结不动、
 //    不反向推导煤比（满足「调焦比，其他项不动」的诉求）。煤-焦耦合真源仍是 bfFuelRates。
 const AXIS_META = {
   hot_blast_temp: { label: '热风温度', hint: '风温↑ → 鼓风显热免费顶替焦炭放热，联动降低焦比、创造减碳空间' },
-  oxygen_enrich: { label: '富氧率', hint: '富氧↑ → 压缩 N2 稀释、供氧↑，每 +1% 允许多喷 15 kg/t 煤粉（置换焦炭降碳），并腾出 TFT' },
+  o2_flow: { label: '纯氧流量', hint: '氧枪纯氧流量(Nm³/h)注入主风管与空气混合；富氧率由风量+纯氧流量派生——纯氧不含 N₂，富氧↑→压缩 N₂ 稀释、供氧↑，并腾出 TFT' },
   wind_rate: { label: '风量', hint: '供氧与 N2 同步变化近抵消，是产量通道，不减碳' },
   coal_inj: { label: '喷煤比', hint: '喷煤↑替代焦炭（焦比联动↓）减碳，但热解吸热 + 产 H2O 稀释使 TFT↓' },
   coke_rate: { label: '焦比', hint: '焦比↑ → 风口碳燃烧放热↑，TFT↑、CO₂排放同步↑；降焦是最直接的减碳路径。本轴为「独立设定」：仅焦比变动，煤比冻结不反推' },
@@ -416,8 +416,8 @@ function onRestore() {
 //     curX 每帧变化 → seriesMap 反复扫描 200+ 点 → 主线程卡死、滑块拖不动。
 // 该函数与 curTftOf / curEffCoalOf 共用同一规则，保证圆点始终落在对应曲线上。
 function baseFor(a) {
-  const usePreview = axKey.value === 'oxygen_enrich' && a.key === 'coal_inj' && Number.isFinite(Number(curX.value))
-  return usePreview ? { ...baseParams.value, oxygen_enrich: Number(curX.value) } : baseParams.value
+  const usePreview = axKey.value === 'o2_flow' && a.key === 'coal_inj' && Number.isFinite(Number(curX.value))
+  return usePreview ? { ...baseParams.value, oxygen_enrich: enrichFromFlow(baseParams.value.wind_rate, baseParams.value.hot_metal, curX.value, baseParams.value.blast_humidity) } : baseParams.value
 }
 
 // 扫描某轴全范围 → TFT / CO2 序列
@@ -449,13 +449,13 @@ function scanAxis(a) {
 const staticSeries = computed(() => {
   const m = {}
   for (const a of axes.value) {
-    if (a.key === 'coal_inj' && axKey.value === 'oxygen_enrich') continue
+    if (a.key === 'coal_inj' && axKey.value === 'o2_flow') continue
     m[a.key] = scanAxis(a).filter((p) => p.tft != null)
   }
   return m
 })
 const dynCoal = computed(() => {
-  if (axKey.value !== 'oxygen_enrich') return null
+  if (axKey.value !== 'o2_flow') return null
   const a = axes.value.find((x) => x.key === 'coal_inj')
   return a ? scanAxis(a).filter((p) => p.tft != null) : null
 })
@@ -527,7 +527,10 @@ const delta = computed(() => {
 // 喷煤比轴的有效值信息（设定煤比 + 富氧派生 15×富氧率）。
 // 富氧率为当前轴时用滑块预览值，使拖动富氧率时喷煤量图实时联动；否则用模型当前富氧率。
 function effCoalInfo() {
-  const oxy = axKey.value === 'oxygen_enrich' ? Number(curX.value) : Number(baseParams.value.oxygen_enrich)
+  const bp = baseParams.value
+  const oxy = axKey.value === 'o2_flow'
+    ? enrichFromFlow(bp.wind_rate, bp.hot_metal, curX.value, bp.blast_humidity)
+    : (bp.oxygen_enrich != null ? bp.oxygen_enrich : enrichFromFlow(bp.wind_rate, bp.hot_metal, bp.o2_flow, bp.blast_humidity))
   return effFuelParams(baseParams.value, { oxygen_enrich: Number.isFinite(oxy) ? oxy : 0 }, store.materialOverrides)
 }
 
@@ -680,8 +683,8 @@ const note = computed(() => {
     text = '曲线近水平：风量↑同时放大供氧与 N2 稀释，两通道抵消，TFT 对风量不敏感——风量用于调节产量，不宜作为温度/减碳调节手段。'
   } else if (a.key === 'hot_blast_temp') {
     text = `曲线${slope > 0 ? '线性上升' : '下降'}（每 +10℃ 约 TFT ${(slope * 10).toFixed(0)}℃）：热风温度直接注入鼓风显热（分子），是最便宜、零碳排放的升温手段，为联动降焦腾出减碳空间。`
-  } else if (a.key === 'oxygen_enrich') {
-    text = `曲线${slope > 0 ? '上升' : '下降'}（每 +1% 约 TFT ${(slope * 1).toFixed(0)}℃）：富氧压缩 N2 分母并提升供氧，同时每 +1% 允许多喷 15 kg/t 煤粉（富氧升温 → 燃烧带容纳更多煤粉），经置换联动降焦；煤粉热解吸热会抵消部分 TFT 增益，注意富氧耗电的间接排放。`
+  } else if (a.key === 'o2_flow') {
+    text = `曲线${slope > 0 ? '上升' : '下降'}（纯氧流量↑→富氧率派生↑）：纯氧不含 N2，注入主风管压缩 N2 分母并提升供氧，同时富氧每升高约 1% 允许多喷 15 kg/t 煤粉（富氧升温 → 燃烧带容纳更多煤粉），经置换联动降焦；煤粉热解吸热会抵消部分 TFT 增益，注意纯氧由空分供给、其电耗计入间接排放。`
   } else if (a.key === 'coke_rate') {
     text = `曲线${slope > 0 ? '线性上升' : '下降'}（每 +10 kg/tFe 约 TFT ${(slope * 10).toFixed(0)}℃）：焦比是风口碳的直接来源，焦比↑ → 燃烧放热↑ → TFT↑，CO₂排放同步线性↑。降焦是最直接的减碳路径，但需风温/富氧/喷煤补偿热量缺口——本轴为独立设定，仅焦比变动、煤比冻结不反推。`
   } else if (a.key === 'coal_inj') {
