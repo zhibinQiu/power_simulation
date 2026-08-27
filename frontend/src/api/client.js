@@ -101,12 +101,27 @@ export const api = {
   boxCloudAgentStatus: () => jget('/box/cloud/agent/status'),
   boxCloudRestart: (payload) => jpost('/box/cloud/restart', payload),
   boxCloudLogs: () => jget('/box/cloud/logs'),
+  cloudTsdbHistory: (params = {}) => {
+    const q = new URLSearchParams()
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== null && v !== '') q.set(k, v)
+    }
+    return jget('/box/cloud/tsdb/history?' + q.toString())
+  },
   boxDevicesRealtime: () => jget('/box/devices/realtime'),
   boxCloudCrd: (force = false) => jget('/box/devices/cloud' + (force ? '?force=true' : '')),
   boxIngestDeviceValue: (device, namespace, property, value) =>
     jpost('/box/devices/realtime/ingest', { device, namespace, property, value }),
   boxOnboard: (hostname, cloudIP, boxIP) =>
     jpost('/box/nodes/onboard', { hostname, cloudIP, boxIP }),
+  // 一键接入：下载自解压脚本（base64）/ 远程一键接入（云端 agent SSH 推送执行）
+  boxOnboardScript: () => jget('/box/nodes/onboard/script'),
+  boxOnboardRemote: (payload) => jpost('/box/nodes/onboard/remote', payload),
+  // GitHub 托管：盒子现场一条 curl 命令拉取接入资产（部署包/证书/token 均托管在用户仓库）
+  boxGithubConfig: () => jget('/box/onboard/github-config'),
+  boxGithubConfigSave: (payload) => jpost('/box/onboard/github-config', payload),
+  boxGithubPush: (cloudIP) => jpost('/box/onboard/github-push', { cloudIP }),
+  boxConfigExport: (cloudIP, hostname) => jget(`/box/nodes/onboard/config-export?cloudIP=${encodeURIComponent(cloudIP)}&hostname=${encodeURIComponent(hostname)}`),
   boxStats: () => jget('/box/stats'),
   boxPublish: (topic, payload) => jpost('/box/publish', { topic, payload }),
   // 盒子连接配置（IP/SSH 凭据）与云端应用部署

@@ -48,24 +48,24 @@ cloud-deploy/
 ## 2. 快速开始（全新云服务器）
 
 ```bash
-# 0) 前提：k3s v1.30.x 已装、kubectl 可用、云端 IP 已规划
-#    本机默认 IP 172.19.134.45，若不同请用环境变量覆盖
-export CLOUD_IP=172.19.134.45
-
-# 1) 完整部署（控制面 + 数据面 + agent）
-sudo ./deploy_cloud.sh
-
-# 2) 自检（不修改任何东西）
-sudo ./deploy_cloud.sh --check
+# ⭐ 一键部署（傻瓜式，推荐）：自动装 k3s → 控制面 → 数据面 → agent → 打印平台配置
+#    本机默认 IP 172.19.134.45，若不同请用 --ip 指定
+sudo bash deploy_cloud.sh --bootstrap --ip 172.19.134.45
 ```
 
-也可以分步：
+部署结束会打印一段 JSON（含 agent_token/broker 地址），把 JSON 复制到平台
+「云端 Broker 配置 → 一键导入」即可完成平台对接（无需再 SSH 到云端）。
+
+分步模式（前置：k3s 已装）：
 
 ```bash
-sudo ./deploy_cloud.sh --control-only      # 仅 KubeEdge 控制面（cloudcore/CRD/防火墙）
-sudo ./deploy_cloud.sh --datapath-only     # 仅数据面（broker/dashboard/collector + systemd）
-sudo ./deploy_cloud.sh --agent-only        # 仅云端 agent（需数据面 broker 41883 已就绪）
-sudo ./deploy_cloud.sh --check             # 链路自检
+export CLOUD_IP=172.19.134.45
+sudo ./deploy_cloud.sh                       # 控制面 + 数据面 + agent
+sudo ./deploy_cloud.sh --control-only        # 仅 KubeEdge 控制面（cloudcore/CRD/防火墙）
+sudo ./deploy_cloud.sh --datapath-only       # 仅数据面（broker/dashboard/collector + systemd）
+sudo ./deploy_cloud.sh --agent-only          # 仅云端 agent（需数据面 broker 41883 已就绪）
+sudo ./deploy_cloud.sh --auto-k3s            # k3s 缺失时自动离线/在线安装（与分步模式搭配）
+sudo ./deploy_cloud.sh --check               # 链路自检
 ```
 
 > **agent_token 说明**：完整/`--agent-only` 部署 agent 时，若 `/opt/cloud-agent/config.json`

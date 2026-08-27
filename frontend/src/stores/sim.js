@@ -101,11 +101,28 @@ function linkedAuxTypesFor(scheme, unitId) {
   return out
 }
 
-// 某工序实例的可调设备类型 = 基础清单(PROCESS_ADJUSTABLE) + 实际连线供给的工辅类型（含上游链路传递）
+// 某工序实例的可调设备类型 = 基础清单(PROCESS_ADJUSTABLE) + 实际连线供给的工辅类型（含上游链路传递）。
+// 该集合依赖连线图遍历（O(节点数+连线数)），而实时消息处理中每个工序实例每条消息都会调用，
+// 高频数据流下重复全图扫描开销可观。此处按「方案对象 + 节点/连线规模指纹」缓存：
+// 编辑态增删节点/连线会改变规模指纹自动失效；同一方案运行期内跨消息直接命中缓存。
+const _adjTypesCache = new WeakMap()
 function adjustableTypesFor(scheme, unitType, unitId) {
-  const set = new Set(PROCESS_ADJUSTABLE[unitType] || [])
+  const base = PROCESS_ADJUSTABLE[unitType] || []
+  if (!scheme) return [...base]
+  const nodes = scheme.nodes || []
+  const conns = scheme.connections || []
+  const scale = (nodes.length << 16) ^ conns.length
+  let entry = _adjTypesCache.get(scheme)
+  if (!entry || entry.scale !== scale) {
+    entry = { scale, byUnit: new Map() }
+    _adjTypesCache.set(scheme, entry)
+  }
+  if (entry.byUnit.has(unitId)) return entry.byUnit.get(unitId)
+  const set = new Set(base)
   for (const dt of linkedAuxTypesFor(scheme, unitId)) set.add(dt)
-  return [...set]
+  const arr = [...set]
+  entry.byUnit.set(unitId, arr)
+  return arr
 }
 
 // 撤销/重做：合并键 + 时间戳（模块级，避免进入响应式 state）
@@ -2248,16 +2265,19 @@ export const useSimStore = defineStore('sim', {
     // 遥测消息落地：应用该数据源的「字段对齐映射」把外部字段名翻译为场景内传感器/设备 id
     _onFeedMsg(ds, msg) {
       if (!msg) return
-      const src = msg.type === 'telemetry' ? msg : msg
+      const src = msg
       if (!src || !src.devices) return
       this.live = src
       const now = Date.now() / 1000
       const mapping = (ds && ds.mapping) || {}
-      // 记录该数据源最近一次收到的外部字段 id（供「连接」面板做字段对齐）
+      // 记录该数据源最近一次收到的外部字段 id（供「连接」面板做字段对齐）；字段集合未变化时跳过，避免无谓的响应式更新
       if (ds) {
         const sid = ds.id || 'sim'
-        const fields = src.devices.map((d) => d.id)
-        this.lastFields = { ...this.lastFields, [sid]: Array.from(new Set(fields)) }
+        const fields = Array.from(new Set(src.devices.map((d) => d.id)))
+        const prev = this.lastFields[sid]
+        if (!prev || prev.length !== fields.length || prev.some((f, i) => f !== fields[i])) {
+          this.lastFields = { ...this.lastFields, [sid]: fields }
+        }
       }
       for (const d of src.devices) {
         // 字段对齐：若 mapping 配置了「外部字段 -> 内部传感器 id」，读数落入内部传感器；
@@ -2266,7 +2286,8 @@ export const useSimStore = defineStore('sim', {
         this.deviceLive[internalId] = d.reading
         const buf = this.deviceHistory[internalId] || (this.deviceHistory[internalId] = [])
         buf.push({ t: now, v: d.reading })
-        if (buf.length > 600) buf.splice(0, buf.length - 600)
+        // 超限批量截断（保留 600 点 ≈ 10 分钟@1Hz），避免逐点 splice 的重复搬移开销
+        if (buf.length > 900) buf.splice(0, buf.length - 600)
       }
       // 可调设备由前端合成、后端不推送其读数：按当前设定值补采样（设定值即工况值，输入框数字即当前值）
       const baseUnits = (this.baseline && this.baseline.units) || []
@@ -2281,7 +2302,7 @@ export const useSimStore = defineStore('sim', {
           this.deviceLive[did] = sp
           const buf = this.deviceHistory[did] || (this.deviceHistory[did] = [])
           buf.push({ t: now, v: sp })
-          if (buf.length > 600) buf.splice(0, buf.length - 600)
+          if (buf.length > 900) buf.splice(0, buf.length - 600)
         }
       }
     },

@@ -2,10 +2,14 @@
 import { onMounted, onBeforeUnmount } from 'vue'
 import { closeScanDialog, scanState } from '../stores/scan'
 
-export function useGlobalShortcuts({ store, onRun, focusSel, onMenuEsc }) {
+export function useGlobalShortcuts({ store, onRun, focusSel, onMenuEsc, onTftAnalysis }) {
   function onKeyGlobal(e) {
     const mod = e.ctrlKey || e.metaKey
     if (mod && e.key.toLowerCase() === 'enter') { e.preventDefault(); onRun(); return }
+    // Alt+T：高炉数值仿真分析（仅仿真模式可用，逻辑在回调内判断）
+    if (e.altKey && !mod && e.key.toLowerCase() === 't') {
+      if (onTftAnalysis) { e.preventDefault(); onTftAnalysis(); return }
+    }
     // Esc：优先关闭已打开的模态/弹层（扫描对话框、菜单），与组件内 Esc 互不冲突
     if (e.key === 'Escape') {
       if (scanState.open) { closeScanDialog(); return }

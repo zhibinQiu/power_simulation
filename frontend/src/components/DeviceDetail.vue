@@ -70,6 +70,8 @@
       :setpoint="setpointVal"
       :extra-setpoints="extraSetpointsNow"
     />
+    <!-- 高炉数值仿真分析入口：全厂高炉 TFT 数值总览与调参推演（原仿真菜单入口迁移至此） -->
+    <button v-if="showTftPanel" class="tft-entry-btn" @click="openTftAnalysis">高炉数值仿真分析</button>
     </CollapseSection>
 
     <!-- ===== 4. 其他内容 ===== -->
@@ -124,6 +126,8 @@
       @close="showWizard = false"
       @applied="showWizard = false"
     />
+    <!-- 高炉数值仿真分析弹窗（随入口按钮按需打开，异步分包降低首屏体积） -->
+    <TftAnalysisDialog v-if="showTft" @close="showTft = false" />
   </div>
 </template>
 
@@ -136,6 +140,8 @@ import DeviceGlyph from './DeviceGlyph.vue'
 import TftStrategyPanel from './TftStrategyPanel.vue'
 // 校准向导较重且仅在「用本厂数据校准」时按需打开：异步分包，降低首屏体积
 const CalibrationWizard = defineAsyncComponent(() => import('./CalibrationWizard.vue'))
+// 高炉数值仿真分析弹窗：仅在点击入口时按需加载
+const TftAnalysisDialog = defineAsyncComponent(() => import('./TftAnalysisDialog.vue'))
 import { getCoupling, deriveProcessOpParams, paramLabel, PROCESS_MAP, DEVICE_MAP } from '../data/flowLibrary'
 import { buildRealtimeTftParams } from '../utils/tft'
 
@@ -227,6 +233,12 @@ const tftParams = computed(() => {
   return buildRealtimeTftParams('blast_furnace', baseParams.value, sps)
 })
 const showTftPanel = computed(() => !!info.value && info.value.unitType === 'blast_furnace' && dev.value && TFT_DEVICES.includes(dev.value.type))
+// 高炉数值仿真分析：仅仿真模式可用（与 Alt+T 快捷键同一入口逻辑）
+const showTft = ref(false)
+function openTftAnalysis() {
+  if (store.simMode) showTft.value = true
+  else store.toast = '高炉数值分析仅限仿真模式使用：请先开启仿真模式'
+}
 const extraSetpointsNow = computed(() => {
   const o = {}
   if (dev.value && extraSps.value) for (const es of extraSps.value) o[es.key] = extraVal(es.key)
@@ -327,4 +339,8 @@ function f(n) { return n == null ? '—' : Number(n).toLocaleString('zh-CN', { m
 .cb-note { font-size: 10px; line-height: 1.6; margin: 8px 0 0; }
 .cb-note.data { color: var(--accent2); background: rgba(95,130,148,.10); border: 1px solid rgba(95,130,148,.28);
   border-radius: 3px; padding: 5px 8px; }
+/* 高炉数值仿真分析入口按钮（随 TFT 策略面板展示） */
+.tft-entry-btn { display: block; width: 100%; margin-top: 8px; padding: 6px 8px; font-size: 11px; text-align: center;
+  border-radius: 3px; border: 1px solid var(--accent2); background: transparent; color: var(--accent2); cursor: pointer; }
+.tft-entry-btn:hover { background: var(--accent2); color: #fff; }
 </style>

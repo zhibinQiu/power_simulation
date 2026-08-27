@@ -64,17 +64,48 @@ box-deploy/
 - systemd → `box-mapper.service`
 - 云下发应用/模型 → `/opt/box-apps/`（含 `manifest.json` 运行清单、`logs/`，可 `apps.dir` 改路径）
 
-## 新盒子接入完整流程（与平台「盒子接入」弹窗联动）
+## 新盒子接入完整流程（与平台「盒子一键接入」弹窗联动）
 
-平台「能碳一体机管理 → 设备列表 → 盒子接入」生成的部署命令即此完整流程（五步），可直接复制执行：
+**方式 A（推荐，GitHub 托管，零搬运）**：平台「盒子接入 → GitHub 托管」把接入资产
+（轻量引导脚本 + box-deploy 包 + edgecore.yaml + rootCA + token）同步到你的 GitHub 仓库
+`onboard/` 目录（幂等覆盖），盒子现场**一条 curl 命令**完成全部接入（幂等，可重跑）：
 
-1. **① EdgeCore 基础接入**（全新盒子首次）：`keadm join --cloudcore-ipport=<云IP>:10000 --token=<token> --kubeedge-version=v1.20.0 --with-edge-core`
-2. **② 配置下发**：从云端拉 `rootCA.crt`，覆盖 `/etc/kubeedge/config/edgecore.yaml`（模板渲染），`systemctl restart edgecore.service`，`kubectl get nodes` 确认 Ready
-3. **③ 云端创建设备**：平台「设备管理」一键下发，或 `kubectl apply backend/config/kubeedge/` 下 YAML
-4. **④ 本部署包**（mapper + mosquitto + 云边协同断点续传）：
-   - 平台本机上传：`scp -r platform/box-deploy root@<盒子IP>:/opt/weight-bridge/box-deploy`
-   - 盒子执行 `./deploy_box.sh`（幂等）；按现场改 `/opt/weight-bridge/config.json` 后 `systemctl restart box-mapper`；`./deploy_box.sh --check` 自检
-5. **⑤ 触发路由 + 验证**：云端 `kubectl annotate device <name> -n default sync=$(date +%s) --overwrite`，`kubectl get device <name> -o json | grep reported` 看到读数即通
+```bash
+# 盒子 root 下执行（任意有外网的盒子；自动拉取部署包/证书/配置 + keadm join + 自检）
+curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/onboard/onboard_box.sh | bash
+```
+
+**现场只有一份配置文件（无平台、无源码）**：平台「盒子接入 → GitHub 托管 → ⬇ 导出
+box-config.json」，把导出的配置保存到盒子 `/opt/weight-bridge/box-config.json`，然后执行
+同一条命令即可 —— 引导脚本自动读取该配置（`boxId`/`cloudIP` 必填；`token` 留空时自动从
+仓库拉取；`repo`/`branch` 可覆盖为镜像仓库），全部参数不再依赖脚本内置值。
+
+> 详细接入流程、box-config.json 字段表、现场命令全集与注意事项，统一见平台内
+> **「帮助 → 技术文档 → 盒子一键接入（GitHub 托管 · 配置驱动）」** 章节。
+
+**方式 B（离线/内网，自解压脚本）**：平台「盒子接入」生成**自解压一键脚本 `onboard_box.sh`**
+（内嵌 box-deploy 部署包 tar.gz + edgecore.yaml + rootCA.crt + token，约 18 MB），
+下载后放到盒子，**一条命令**完成全部接入：
+
+```bash
+# 盒子 root 下执行（现场 U 盘/局域网传脚本，或平台「远程一键接入」推送到盒子）
+bash onboard_box.sh
+```
+
+脚本自动完成：
+1. **① EdgeCore 基础接入**：edgecore 未运行且有 keadm → `keadm join --cloudcore-ipport=<云IP>:10000 --token=<token> --kubeedge-version=v1.20.0 --with-edge-core`；已接入自动跳过
+2. **② 配置下发**：内嵌 rootCA 写 `/etc/kubeedge/ca/rootCA.crt`（云端 agent 拉取；不可达时降级 `scp` 兜底），覆盖 `/etc/kubeedge/config/edgecore.yaml`（模板渲染），`systemctl restart edgecore.service`
+3. **③ 部署包解包**：内嵌 base64 解出到 `/opt/weight-bridge/box-deploy/`（无需手工 scp 上传）
+4. **④ config.json 自动定制**：首次生成时自动设 `mqtt.boxId=<盒子主机名>`、`mqtt.broker.host=<云IP>:41883`（已有 config.json 保留不动）
+5. **⑤ 一键部署**：`./deploy_box.sh`（幂等：依赖离线安装 + mapper + mosquitto + systemd）
+6. **⑥ 链路自检**：`./deploy_box.sh --check`
+
+平台另提供**「🚀 远程一键接入」**：云端 agent 经 SSH 把脚本推送到盒子并执行（无需现场操作），
+前提是云端 agent `config.json` 已配置 edge（盒子可达地址）；盒子无直达 IP 时云端无法 SSH 直达，改用下载脚本现场执行。
+
+> 手工五步（备选）：
+> ① `keadm join` → ② 拉 rootCA + 覆盖 edgecore.yaml + restart → ③ 云端建 Device（平台「设备管理」一键下发）→
+> ④ `scp -r platform/box-deploy root@<盒子IP>:/opt/weight-bridge/box-deploy` + `./deploy_box.sh` + 定制 config.json → ⑤ 云端 `kubectl annotate device <name> sync=$(date +%s) --overwrite` 触发路由，`kubectl get device <name> -o json | grep reported` 看到读数即通。
 
 > 云边协同：mapper 上报失败时读数落本地 SQLite（`/opt/weight-bridge/twin_cache.db`，上限 20 万条），连接恢复后先按真实时间戳 MQTT 补传（`data/<box>/<device>/...`，平台回填折线图缺口）再 DMI 补最新值，成功才删缓存——断连数据不丢。
 
@@ -207,7 +238,7 @@ mapper 周期(30s) --publish state/{box}/services--> 平台（运行服务清单
 
 ## 接线后如何接一台新设备
 
-1. 云端 `kubectl apply -f` DeviceModel/Device YAML（平台「能碳一体机管理 → 创建设备」生成，协议选 Modbus TCP / OPC-UA；或本仓库 `backend/config/kubeedge/`）
+1. 云端 `kubectl apply -f` DeviceModel/Device YAML（平台「能碳一体机管理 → 创建设备」生成，协议选 Modbus TCP / OPC-UA；或参考本仓库 `platform/box-deploy/mapper/config.json` 模板）
 2. 盒子改 `/opt/weight-bridge/config.json` 的 `devices` 数组：
    - `name` 与云端 Device 一致，`points[].property` 与 DeviceModel 属性一致
    - Modbus：按 DCS 点表填 `registerAddr / registerCount / type / byteOrder / scale`，`slaveId` 与 DCS 从站一致

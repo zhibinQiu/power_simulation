@@ -434,8 +434,6 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
         实时行情每 {{ POLL_MS / 1000 }} 秒自动刷新 · 数据源：
         {{ sourceName || '全国碳市场' }}
         <template v-if="queriedAt"> · 更新于 {{ formatTime(queriedAt) }}</template>
-        <span v-if="quotes?.simulated" class="cm-badge cm-badge-sim">模拟行情</span>
-        <span v-else class="cm-badge">实时数据</span>
         <a v-if="chart?.source_page" :href="chart.source_page" target="_blank" rel="noopener">查看官方页面 ↗</a>
       </span>
     </div>
@@ -456,18 +454,6 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
   color: var(--text);
   background: var(--panel-2);
   font-family: var(--ui);
-}
-
-/* 徽章：模式标签（与 .mode-tag 同体系） */
-.cm-badge {
-  font-size: 10px; padding: 1px 8px; border-radius: 999px;
-  background: var(--accent-l); color: var(--accent-d);
-  border: 1px solid var(--accent);
-  white-space: nowrap;
-}
-.cm-badge-sim {
-  background: rgba(201, 154, 46, 0.12); color: var(--yellow);
-  border-color: rgba(201, 154, 46, 0.4);
 }
 
 .cm-error {

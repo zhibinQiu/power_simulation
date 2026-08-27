@@ -142,7 +142,8 @@ class TestPublishToBroker:
 
     def test_publish_no_paho_returns_friendly_error(self, monkeypatch):
         """paho 未安装时应返回友好错误而非抛异常。"""
-        monkeypatch.setattr(mqtt_source, "_PAHO_OK", False)
+        # 拆包后 publish 实现在 mqtt_source.publish 子模块，检查的是 _shared 的探测标志
+        monkeypatch.setattr(mqtt_source._shared, "_PAHO_OK", False)
         r = mqtt_source.publish("data/x", "y")
         assert r["ok"] is False
         assert "paho-mqtt" in r.get("error", "")

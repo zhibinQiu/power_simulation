@@ -28,23 +28,23 @@
                   <span class="cell-val mono">{{ fmt(a.curVal) }} {{ a.unit }}</span>
                 </div>
                 <svg :viewBox="viewBox" preserveAspectRatio="none" @mousemove="onMove($event, a)" @mouseleave="tip = null">
-                  <rect :x="pad.l" :y="y(cfg.tftHigh)" :width="W - pad.l - pad.r" :height="Math.max(0, y(cfg.tftLow) - y(cfg.tftHigh))" fill="#3fae6a" opacity="0.10" />
-                  <line :x1="pad.l" :x2="W - pad.r" :y1="y(cfg.tftLow)" :y2="y(cfg.tftLow)" stroke="#89d185" stroke-dasharray="4 3" opacity="0.5" />
-                  <line :x1="pad.l" :x2="W - pad.r" :y1="y(cfg.tftHigh)" :y2="y(cfg.tftHigh)" stroke="#89d185" stroke-dasharray="4 3" opacity="0.5" />
+                  <rect :x="pad.l" :y="y(cfg.tftHigh)" :width="W - pad.l - pad.r" :height="Math.max(0, y(cfg.tftLow) - y(cfg.tftHigh))" fill="var(--green)" opacity="0.10" />
+                  <line :x1="pad.l" :x2="W - pad.r" :y1="y(cfg.tftLow)" :y2="y(cfg.tftLow)" stroke="var(--green)" stroke-dasharray="4 3" opacity="0.5" />
+                  <line :x1="pad.l" :x2="W - pad.r" :y1="y(cfg.tftHigh)" :y2="y(cfg.tftHigh)" stroke="var(--green)" stroke-dasharray="4 3" opacity="0.5" />
                   <g v-for="gv in yTicks" :key="'y' + gv">
-                    <line :x1="pad.l" :x2="W - pad.r" :y1="y(gv)" :y2="y(gv)" stroke="#333" />
+                    <line :x1="pad.l" :x2="W - pad.r" :y1="y(gv)" :y2="y(gv)" stroke="var(--border)" />
                     <text :x="pad.l - 6" :y="y(gv) + 3" text-anchor="end">{{ gv }}</text>
                   </g>
                   <g v-for="gx in a.ticks" :key="'x' + gx">
-                    <line :x1="xOf(a, gx)" :x2="xOf(a, gx)" :y1="H - pad.b" :y2="H - pad.b + 4" stroke="#454545" />
+                    <line :x1="xOf(a, gx)" :x2="xOf(a, gx)" :y1="H - pad.b" :y2="H - pad.b + 4" stroke="var(--border)" />
                     <text :x="xOf(a, gx)" :y="H - pad.b + 14" text-anchor="middle">{{ fmt(gx) }}</text>
                   </g>
-                  <line :x1="pad.l" :x2="pad.l" :y1="pad.t" :y2="H - pad.b" stroke="#454545" stroke-width="1" />
-                  <line :x1="pad.l" :x2="W - pad.r" :y1="H - pad.b" :y2="H - pad.b" stroke="#454545" stroke-width="1" />
+                  <line :x1="pad.l" :x2="pad.l" :y1="pad.t" :y2="H - pad.b" stroke="var(--border)" stroke-width="1" />
+                  <line :x1="pad.l" :x2="W - pad.r" :y1="H - pad.b" :y2="H - pad.b" stroke="var(--border)" stroke-width="1" />
                   <polyline v-for="(seg, i) in a.segs" :key="i" :points="seg.pts" fill="none" :stroke="colorOf[seg.code]" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
                   <template v-if="a.curTft != null">
-                    <line :x1="xOf(a, a.curVal)" :x2="xOf(a, a.curVal)" :y1="pad.t" :y2="H - pad.b" stroke="#6a6a6a" stroke-dasharray="3 3" opacity="0.6" />
-                    <circle :cx="xOf(a, a.curVal)" :cy="y(a.curTft)" r="4.5" fill="#1e1e1e" :stroke="cur.status.color" stroke-width="2.4" />
+                    <line :x1="xOf(a, a.curVal)" :x2="xOf(a, a.curVal)" :y1="pad.t" :y2="H - pad.b" stroke="var(--muted)" stroke-dasharray="3 3" opacity="0.6" />
+                    <circle :cx="xOf(a, a.curVal)" :cy="y(a.curTft)" r="4.5" fill="var(--panel)" :stroke="cur.status.color" stroke-width="2.4" />
                   </template>
                 </svg>
                 <div v-if="tip && tip.key === a.key" class="tad-tip" :style="{ left: tip.px + 'px', top: tip.py + 'px' }">
@@ -187,7 +187,7 @@ const W = 290
 const H = 200
 const pad = { l: 38, r: 8, t: 16, b: 22 }
 const viewBox = `0 0 ${W} ${H}`
-const colorOf = { low: '#f48771', ok: '#89d185', high: '#e2c08d' }
+const colorOf = { low: 'var(--red)', ok: 'var(--green)', high: 'var(--yellow)' }
 const noteIcon = { ok: '✓', low: '▲', high: '▲', warn: '⚠' }
 const tip = ref(null)
 
@@ -315,7 +315,7 @@ const cur = computed(() => {
   try {
     return collectSimContext({ ...baseParams.value, [ax.value.key]: curX.value })
   } catch (e) {
-    return { tft: 0, status: { code: 'err', label: '异常', color: '#8a8a8a' }, co2: { CO2_emit: 0, CO2_t: 0, C_in: 0, C_HM: 0, C_emit: 0, CO2_from_raceway: 0, CO2_from_other: 0, level: { code: 'err', label: '—', color: '#8a8a8a' } } }
+    return { tft: 0, status: { code: 'err', label: '异常', color: 'var(--faint)' }, co2: { CO2_emit: 0, CO2_t: 0, C_in: 0, C_HM: 0, C_emit: 0, CO2_from_raceway: 0, CO2_from_other: 0, level: { code: 'err', label: '—', color: 'var(--faint)' } } }
   }
 })
 
@@ -556,64 +556,64 @@ function fmt(v) {
 </script>
 
 <style scoped>
-/* ============ MATLAB / VSCode 深色混合风格 ============
-   色板：主蓝 #007acc / 强调 #3794ff / 激活底 #094771
-        编辑区 #1e1e1e / 面板 #252526 / 控件底 #2d2d30 / 边框 #3c3c3c */
+/* ============ 平台主题风格（背板颜色跟随全局 CSS 变量，浅色/仿真深色自适应） ============
+   原 VSCode 深色色板改为平台变量：面板 var(--panel) / 次级面板 var(--panel-2)
+   边框 var(--border) / 文字 var(--text) / 强调 var(--accent) / 状态色 var(--green|--yellow|--red|--orange) */
 .tad-mask {
   position: fixed; inset: 0; z-index: 1200;
   background: rgba(0, 0, 0, 0.4);
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  font-family: var(--ui);
 }
 .tad-dialog {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   width: 1260px; max-width: calc(100vw - 60px); height: 800px; max-height: calc(100vh - 80px);
   display: flex; flex-direction: column; overflow: hidden;
-  background: #1e1e1e; border: 1px solid #454545; border-radius: 4px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
-  color: #d4d4d4;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 4px;
+  box-shadow: var(--shadow);
+  color: var(--text);
 }
 .tad-dialog.dragging {
-  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.7), 0 0 0 1px #007acc;
+  box-shadow: var(--shadow), 0 0 0 1px var(--accent);
   cursor: grabbing;
 }
 
 /* ---- 标题栏 ---- */
 .tad-titlebar {
   display: flex; align-items: center; gap: 9px; flex: none;
-  background: #252526; padding: 0 8px 0 13px; height: 34px;
-  border-bottom: 1px solid #3c3c3c;
+  background: var(--panel-2); padding: 0 8px 0 13px; height: 34px;
+  border-bottom: 1px solid var(--border);
   cursor: move; user-select: none;
 }
 .tad-titlebar:active { cursor: grabbing; }
-.tad-icon { color: #3794ff; font-size: 14px; }
-.tad-title { font-size: 12.5px; font-weight: 600; color: #e6e6e6; letter-spacing: 0.3px; }
+.tad-icon { color: var(--accent); font-size: 14px; }
+.tad-title { font-size: 12.5px; font-weight: 600; color: var(--text); letter-spacing: 0.3px; }
 .st-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
 .tad-spacer { flex: 1; }
 .tad-restore {
-  height: 26px; padding: 0 12px; border: 1px solid #3c3c3c; background: transparent;
-  color: #b0b0b0; border-radius: 3px; font-size: 11.5px; cursor: pointer;
+  height: 26px; padding: 0 12px; border: 1px solid var(--border); background: transparent;
+  color: var(--muted); border-radius: 3px; font-size: 11.5px; cursor: pointer;
   display: inline-flex; align-items: center; letter-spacing: 0.3px;
   transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
-.tad-restore:hover:not(:disabled) { color: #e6e6e6; border-color: #007acc; background: #094771; }
+.tad-restore:hover:not(:disabled) { color: var(--text); border-color: var(--accent); background: var(--accent-l); }
 .tad-restore:disabled { opacity: 0.4; cursor: default; }
 .tad-close {
-  width: 26px; height: 26px; border: none; background: transparent; color: #a0a0a0;
+  width: 26px; height: 26px; border: none; background: transparent; color: var(--muted);
   border-radius: 3px; cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
-.tad-close:hover { background: #c42b1c; color: #fff; }
+.tad-close:hover { background: var(--red); color: #fff; }
 
 /* ---- 主体：左图表区 + 右信息区 ---- */
 .tad-body { flex: 1; min-height: 0; display: flex; }
 .tad-left {
   flex: 1.6; min-width: 0; display: flex; flex-direction: column; gap: 9px;
-  padding: 10px 12px; overflow-y: auto; background: #1e1e1e;
-  border-right: 1px solid #333;
+  padding: 10px 12px; overflow-y: auto; background: var(--panel);
+  border-right: 1px solid var(--border);
 }
 .tad-right {
   flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 9px;
-  padding: 10px 12px; overflow-y: auto; background: #252526;
+  padding: 10px 12px; overflow-y: auto; background: var(--panel-2);
 }
 
 /* ---- 四轴曲线 2×2 网格 ---- */
@@ -623,71 +623,71 @@ function fmt(v) {
   gap: 8px;
 }
 .tad-cell {
-  position: relative; background: #1a1a1a; border: 1px solid #333; border-radius: 3px;
+  position: relative; background: var(--panel-2); border: 1px solid var(--border); border-radius: 3px;
   padding: 4px 4px 2px; cursor: pointer;
   transition: border-color 0.12s, box-shadow 0.12s;
 }
-.tad-cell:hover { border-color: #454545; }
-.tad-cell.on { border-color: #007acc; box-shadow: inset 0 0 0 1px #007acc; }
+.tad-cell:hover { border-color: var(--accent2); }
+.tad-cell.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .cell-head {
   display: flex; justify-content: space-between; align-items: baseline; gap: 6px;
   padding: 0 4px 3px; font-size: 11px;
 }
-.cell-name { color: #9d9d9d; font-weight: 600; white-space: nowrap; }
-.tad-cell.on .cell-name { color: #5aa9ff; }
-.cell-val { color: #c8c8c8; font-size: 11px; }
+.cell-name { color: var(--faint); font-weight: 600; white-space: nowrap; }
+.tad-cell.on .cell-name { color: var(--accent); }
+.cell-val { color: var(--muted); font-size: 11px; }
 .tad-cell svg { width: 100%; height: auto; aspect-ratio: 290 / 200; display: block; }
-.tad-cell svg text { font-size: 9px; fill: #9d9d9d; }
+.tad-cell svg text { font-size: 9px; fill: var(--faint); }
 
 .tad-tip {
   position: absolute; transform: translate(-50%, -100%); pointer-events: none;
-  background: #252526; color: #d4d4d4; padding: 5px 9px; border-radius: 3px;
-  border: 1px solid #454545; font-size: 11.5px; white-space: nowrap; z-index: 5;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  background: var(--panel-2); color: var(--text); padding: 5px 9px; border-radius: 3px;
+  border: 1px solid var(--border); font-size: 11.5px; white-space: nowrap; z-index: 5;
+  box-shadow: var(--shadow);
 }
-.tad-tip .t1 { color: #9d9d9d; }
+.tad-tip .t1 { color: var(--faint); }
 .tad-tip .t2 { margin-top: 2px; }
-.tad-tip b { color: #ffd97a; }
+.tad-tip b { color: var(--yellow); }
 
 /* ---- 参数设定滑块（自定义细轨道，无原生外圈） ---- */
 .tad-setter {
-  flex: none; background: #252526; border: 1px solid #3c3c3c; border-radius: 3px;
+  flex: none; background: var(--panel-2); border: 1px solid var(--border); border-radius: 3px;
   padding: 8px 11px 6px; display: flex; flex-direction: column; gap: 1px;
 }
 .ts-head { display: flex; align-items: center; gap: 9px; }
-.ts-lbl { font-size: 12px; font-weight: 600; color: #3794ff; }
-.ts-val { font-size: 13px; color: #d4d4d4; }
-.ts-val b { font-size: 15px; color: #e6e6e6; }
+.ts-lbl { font-size: 12px; font-weight: 600; color: var(--accent); }
+.ts-val { font-size: 13px; color: var(--text); }
+.ts-val b { font-size: 15px; color: var(--text); }
 .ts-badge {
   margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
   font-size: 10.5px; padding: 1px 9px; border-radius: 8px; font-weight: 600;
 }
 .ts-badge .bd-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
-.ts-badge.ok { background: #1f3a2a; color: #89d185; }
-.ts-badge.ok .bd-dot { background: #89d185; }
-.ts-badge.dirty { background: #3a3019; color: #e2c08d; }
-.ts-badge.dirty .bd-dot { background: #e2c08d; }
+.ts-badge.ok { background: rgba(46, 158, 99, .14); color: var(--green); }
+.ts-badge.ok .bd-dot { background: var(--green); }
+.ts-badge.dirty { background: rgba(201, 154, 46, .14); color: var(--yellow); }
+.ts-badge.dirty .bd-dot { background: var(--yellow); }
 
 /* 细轨道 + 圆点滑块（无外圈） */
 .ts-range {
   -webkit-appearance: none; appearance: none;
   width: 100%; height: 4px; margin: 7px 0 4px;
-  background: #3c3c3c; border: none; border-radius: 2px;
+  background: var(--border); border: none; border-radius: 2px;
   outline: none; cursor: pointer;
 }
 .ts-range::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
   width: 13px; height: 13px; border-radius: 50%;
-  background: #007acc; border: 2px solid #d4d4d4;
+  background: var(--accent); border: 2px solid var(--text);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
   cursor: grab; transition: background 0.12s;
 }
-.ts-range::-webkit-slider-thumb:hover { background: #3794ff; }
+.ts-range::-webkit-slider-thumb:hover { background: var(--accent-d); }
 .ts-range::-webkit-slider-thumb:active { cursor: grabbing; }
-.ts-range::-moz-range-track { height: 4px; background: #3c3c3c; border: none; border-radius: 2px; }
+.ts-range::-moz-range-track { height: 4px; background: var(--border); border: none; border-radius: 2px; }
 .ts-range::-moz-range-thumb {
   width: 11px; height: 11px; border-radius: 50%;
-  background: #007acc; border: 2px solid #d4d4d4;
+  background: var(--accent); border: 2px solid var(--text);
   cursor: grab;
 }
 .ts-range:disabled { opacity: 0.4; cursor: default; }
@@ -695,94 +695,94 @@ function fmt(v) {
 
 .ts-scale {
   display: flex; justify-content: space-between;
-  font-size: 10px; color: #7a7a7a; padding: 0 1px;
+  font-size: 10px; color: var(--faint); padding: 0 1px;
 }
 
-/* ---- 动态解读（MATLAB 状态条风格） ---- */
+/* ---- 动态解读（平台状态条风格） ---- */
 .tad-note {
   flex: none; display: flex; gap: 7px; align-items: flex-start;
   font-size: 11.5px; line-height: 1.5; padding: 7px 10px; border-radius: 3px;
-  border: 1px solid #3c3c3c;
+  border: 1px solid var(--border);
 }
 .tad-note .note-icon { font-size: 12px; font-weight: 700; line-height: 1.4; }
-.tad-note.ok { background: #12251a; border-color: #1f4d33; color: #9fdfb5; }
-.tad-note.ok .note-icon { color: #89d185; }
-.tad-note.low, .tad-note.high { background: #3a2417; border-color: #6a3d1a; color: #f0c89a; }
-.tad-note.low .note-icon, .tad-note.high .note-icon { color: #e2c08d; }
-.tad-note.warn { background: #3a2f12; border-color: #6a571a; color: #e6d29a; }
-.tad-note.warn .note-icon { color: #e2c08d; }
+.tad-note.ok { background: rgba(46, 158, 99, .12); border-color: var(--green); color: var(--green); }
+.tad-note.ok .note-icon { color: var(--green); }
+.tad-note.low, .tad-note.high { background: rgba(192, 115, 42, .12); border-color: var(--orange); color: var(--orange); }
+.tad-note.low .note-icon, .tad-note.high .note-icon { color: var(--yellow); }
+.tad-note.warn { background: rgba(201, 154, 46, .12); border-color: var(--yellow); color: var(--yellow); }
+.tad-note.warn .note-icon { color: var(--yellow); }
 
 /* ---- 当前工况卡 ---- */
 .tad-cond {
-  flex: none; background: #1e1e1e; border: 1px solid #3c3c3c; border-radius: 3px;
+  flex: none; background: var(--panel); border: 1px solid var(--border); border-radius: 3px;
   padding: 7px 10px; display: flex; flex-direction: column; gap: 6px;
 }
 .cond-main { display: flex; align-items: baseline; gap: 6px; }
-.cond-tft { font-size: 24px; font-weight: 700; color: #e6e6e6; line-height: 1; }
-.cond-unit { font-size: 12px; color: #8a8a8a; }
+.cond-tft { font-size: 24px; font-weight: 700; color: var(--text); line-height: 1; }
+.cond-unit { font-size: 12px; color: var(--faint); }
 .cond-st {
   margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
   font-size: 11.5px; font-weight: 600;
 }
 .cond-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px;
-  border-top: 1px solid #2e2e2e; padding-top: 6px;
+  border-top: 1px solid var(--border); padding-top: 6px;
 }
 .cg-item { display: flex; justify-content: space-between; gap: 6px; font-size: 11px; }
-.cg-k { color: #8a8a8a; white-space: nowrap; }
-.cg-item b { color: #c8c8c8; font-weight: 600; }
+.cg-k { color: var(--faint); white-space: nowrap; }
+.cg-item b { color: var(--text); font-weight: 600; }
 .cond-tip {
-  font-size: 10.5px; line-height: 1.5; color: #7a7a7a;
-  background: #252526; border: 1px solid #2e2e2e; border-radius: 2px; padding: 5px 7px;
+  font-size: 10.5px; line-height: 1.5; color: var(--faint);
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 2px; padding: 5px 7px;
 }
 
 /* ---- CO2 排放卡（随配料比联动） ---- */
 .cond-co2 {
-  border-top: 1px solid #2e2e2e; padding-top: 6px;
+  border-top: 1px solid var(--border); padding-top: 6px;
   display: flex; flex-direction: column; gap: 5px;
 }
 .co2-main { display: flex; align-items: baseline; gap: 6px; }
-.co2-k { font-size: 10.5px; color: #8a8a8a; font-weight: 600; letter-spacing: 0.4px; white-space: nowrap; }
-.co2-val { font-size: 20px; font-weight: 700; color: #e6e6e6; line-height: 1; }
-.co2-unit { font-size: 11px; color: #8a8a8a; white-space: nowrap; }
+.co2-k { font-size: 10.5px; color: var(--faint); font-weight: 600; letter-spacing: 0.4px; white-space: nowrap; }
+.co2-val { font-size: 20px; font-weight: 700; color: var(--text); line-height: 1; }
+.co2-unit { font-size: 11px; color: var(--faint); white-space: nowrap; }
 .co2-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px;
 }
 .co2-tip {
-  font-size: 10px; line-height: 1.45; color: #6f8f7a;
-  background: #14231a; border: 1px solid #1f4d33; border-radius: 2px; padding: 4px 7px;
+  font-size: 10px; line-height: 1.45; color: var(--green);
+  background: rgba(46, 158, 99, .08); border: 1px solid var(--green); border-radius: 2px; padding: 4px 7px;
 }
 
-/* ---- 右栏标题（MATLAB 工具条小标题风格） ---- */
+/* ---- 右栏标题（平台分区小标题风格） ---- */
 .tad-sec-title {
   flex: none; font-size: 10.5px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
-  color: #9d9d9d; padding-bottom: 5px; border-bottom: 1px solid #3c3c3c;
+  color: var(--faint); padding-bottom: 5px; border-bottom: 1px solid var(--border);
 }
 
 /* ---- 灵敏度表 ---- */
 .tad-table { width: 100%; border-collapse: collapse; flex: none; font-size: 11px; }
 .tad-table th {
-  text-align: left; padding: 4px 8px; color: #8a8a8a; font-weight: 600;
-  border-bottom: 1px solid #3c3c3c; white-space: nowrap;
+  text-align: left; padding: 4px 8px; color: var(--faint); font-weight: 600;
+  border-bottom: 1px solid var(--border); white-space: nowrap;
 }
-.tad-table td { padding: 5px 8px; border-bottom: 1px solid #2e2e2e; color: #c8c8c8; white-space: nowrap; }
+.tad-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); color: var(--text); white-space: nowrap; }
 .tad-table tbody tr { cursor: pointer; }
-.tad-table tbody tr:hover { background: #2a2d2e; }
-.tad-table tr.on td { background: #0f2c47; color: #fff; }
-.tad-table tr.on .c-name { color: #5aa9ff; }
-.tad-table .c-name { font-weight: 600; color: #3794ff; }
+.tad-table tbody tr:hover { background: var(--accent-l); }
+.tad-table tr.on td { background: var(--sel); color: var(--text); }
+.tad-table tr.on .c-name { color: var(--accent); }
+.tad-table .c-name { font-weight: 600; color: var(--accent); }
 .tad-table .trend { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; }
 .tad-table .td-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
-.tad-table .trend.up { color: #f48771; }
-.tad-table .trend.up .td-dot { background: #f48771; }
-.tad-table .trend.down { color: #4a90d9; }
-.tad-table .trend.down .td-dot { background: #4a90d9; }
-.tad-table .trend.flat { color: #8a8a8a; }
-.tad-table .trend.flat .td-dot { background: #8a8a8a; }
+.tad-table .trend.up { color: var(--red); }
+.tad-table .trend.up .td-dot { background: var(--red); }
+.tad-table .trend.down { color: var(--accent); }
+.tad-table .trend.down .td-dot { background: var(--accent); }
+.tad-table .trend.flat { color: var(--faint); }
+.tad-table .trend.flat .td-dot { background: var(--faint); }
 
 .tad-ax-desc {
-  flex: none; font-size: 11px; line-height: 1.5; color: #9d9d9d;
-  padding: 6px 9px; background: #1e1e1e; border: 1px solid #3c3c3c; border-radius: 3px;
+  flex: none; font-size: 11px; line-height: 1.5; color: var(--muted);
+  padding: 6px 9px; background: var(--panel); border: 1px solid var(--border); border-radius: 3px;
 }
 
 /* ---- 策略建议 ---- */
@@ -791,13 +791,13 @@ function fmt(v) {
 .tad-advice li {
   position: relative; display: flex; gap: 7px; align-items: flex-start;
   padding: 6px 9px; border-radius: 3px; font-size: 11px; line-height: 1.5;
-  border: 1px solid #3c3c3c;
+  border: 1px solid var(--border);
 }
 .tad-advice .ad-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex: none; }
-.tad-advice .lv-g { background: #12251a; border-color: #1f4d33; color: #9fdfb5; }
-.tad-advice .lv-g .ad-dot { background: #89d185; }
-.tad-advice .lv-w { background: #3a2417; border-color: #6a3d1a; color: #f0c89a; }
-.tad-advice .lv-w .ad-dot { background: #e2c08d; }
+.tad-advice .lv-g { background: rgba(46, 158, 99, .12); border-color: var(--green); color: var(--green); }
+.tad-advice .lv-g .ad-dot { background: var(--green); }
+.tad-advice .lv-w { background: rgba(192, 115, 42, .12); border-color: var(--orange); color: var(--orange); }
+.tad-advice .lv-w .ad-dot { background: var(--yellow); }
 
-.mono { font-family: Consolas, 'SF Mono', Menlo, 'Courier New', monospace; }
+.mono { font-family: var(--mono); }
 </style>

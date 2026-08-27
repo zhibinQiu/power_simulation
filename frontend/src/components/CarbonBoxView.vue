@@ -273,6 +273,7 @@
                   <span class="cbx-res-ops">
                     <button class="cbx-op cbx-tiny" @click.stop="openEditDev(d)" title="编辑该设备配置">✎ 配置</button>
                     <template v-if="d._cloud">
+                      <button class="cbx-op cbx-tiny" @click.stop="openCloudHistory(d)" title="云端时序库（TDengine）历史读数曲线">📈 历史</button>
                       <button class="cbx-op cbx-tiny" @click.stop="openIngest(d)" title="手动上报 twins（回写设备状态）">⬆ 上报</button>
                       <button class="cbx-op cbx-tiny danger" @click.stop="delCloud('device', d.name, d.namespace || 'default')" title="删除云端 Device CRD">🗑 删除</button>
                     </template>
@@ -660,33 +661,85 @@
           </div>
         </div>
 
-        <!-- 盒子接入弹窗（工具栏「盒子接入」入口） -->
+        <!-- 盒子一键接入弹窗（工具栏「盒子接入」入口） -->
         <div v-if="onboardOpen" class="cbx-mask" @click.self="onboardOpen = false">
           <div class="cbx-dialog cbx-dialog-xl">
             <div class="cbx-dialog-head">
-              <b>盒子接入（edgecore + box-deploy 采集包 + token/caHash + 部署命令）</b>
+              <b>盒子一键接入（自解压脚本：box-deploy 采集包 + edgecore.yaml + rootCA + token）</b>
               <button class="cbx-op danger" @click="onboardOpen = false">✕</button>
             </div>
             <div class="cbx-form">
               <div class="cbx-form-row">
                 <label>盒子主机名</label><input v-model="onboardForm.hostname" class="cbx-input" placeholder="edge-box"/>
                 <label>云端 CloudCore IP</label><input v-model="onboardForm.cloudIP" class="cbx-input" placeholder="172.19.134.45"/>
-                <label>盒子 IP</label><input v-model="onboardForm.boxIP" class="cbx-input" placeholder="192.168.1.20"/>
-                <button class="cbx-op primary" :disabled="!onboardForm.cloudIP" @click="doOnboard">生成接入配置</button>
+                <label>盒子 IP（可选，远程一键时作为直达地址）</label><input v-model="onboardForm.boxIP" class="cbx-input" placeholder="192.168.1.20"/>
+                <button class="cbx-op primary" :disabled="!onboardForm.cloudIP || onboardBusy" @click="doOnboard">{{ onboardBusy ? '生成中…' : '生成一键脚本' }}</button>
               </div>
-              <p class="cbx-note">完整接入流程：① keadm join（EdgeCore）→ ② edgecore.yaml 下发 → ③ 云端创建设备 → ④ box-deploy 采集包部署（mapper + 云边协同断点续传）→ ⑤ 触发路由验证。盒子 IP 用于 ④ 采集包上传，留空则命令中使用占位符。</p>
+              <p class="cbx-note">一键脚本内置 box-deploy 采集部署包（mapper + mosquitto + 云边协同断点续传，约 18 MB），盒子执行一条 <code>bash onboard_box.sh</code> 即完成：① EdgeCore 接入（keadm join）→ ② rootCA / edgecore.yaml 下发 → ③ 部署包解包 → ④ config.json 自动定制（boxId / broker）→ ⑤ 一键部署 → ⑥ 链路自检。幂等，可重复执行。</p>
             </div>
             <div v-if="onboardResult" class="cbx-onboard">
               <div class="cbx-kv">
-                <div><span>共享 Token（{{ onboardResult.token_source === 'mint' ? 'CA 重签·长期' : 'tokensecret' }}）</span><code class="wrap">{{ onboardResult.token }}</code></div>
+                <div><span>共享 Token</span><code class="wrap">{{ onboardResult.token }}</code></div>
                 <div><span>CA 指纹</span><code class="wrap">{{ onboardResult.caHash }}</code></div>
                 <div v-if="onboardResult.token_expires"><span>Token 有效期至</span><b>{{ onboardResult.token_expires }}</b></div>
+                <div><span>一键脚本</span><b>{{ onboardResult.script_name }} · {{ (onboardResult.script_size / 1024 / 1024).toFixed(1) }} MB</b><code class="wrap">sha256 {{ onboardResult.script_sha256 }}</code></div>
+                <div v-if="onboardResult.script_generated_at"><span>生成时间</span><b>{{ onboardResult.script_generated_at }}</b></div>
               </div>
-              <div class="cbx-preview-head"><b>edgecore.yaml</b><button class="cbx-op" @click="copyOnboard">复制</button></div>
-              <pre class="cbx-code">{{ onboardResult.edgecore }}</pre>
-              <div class="cbx-preview-head"><b>部署命令</b></div>
-              <pre class="cbx-code">{{ onboardResult.commands.join('\n') }}</pre>
-              <p class="cbx-note" v-if="onboardResult.demo_note">⚠ {{ onboardResult.demo_note }}</p>
+              <div class="cbx-onboard-actions">
+                <button class="cbx-op primary" @click="downloadOnboardScript">⬇ 下载 onboard_box.sh</button>
+                <button class="cbx-op" :disabled="remoteRunning" @click="doOnboardRemote">{{ remoteRunning ? '远程接入中…' : '🚀 远程一键接入（云端 agent 推送执行）' }}</button>
+              </div>
+              <p class="cbx-note" v-if="onboardResult.script_hint">💡 {{ onboardResult.script_hint }}</p>
+              <p class="cbx-note">远程一键接入前提：① 平台 ⇄ 云端 agent 已配置（总览 → 配置）；② 云端 agent config.json 已配置 edge（盒子可达地址）。盒子无直达 IP 时云端无法 SSH 直达，请下载脚本后到现场执行。</p>
+              <div v-if="remoteSteps.length" class="cbx-remote-steps">
+                <div v-for="(s, i) in remoteSteps" :key="i" class="cbx-remote-step">
+                  <b :class="s.ok ? 'ok' : 'fail'">{{ s.ok ? '✔' : '✘' }} {{ i + 1 }}. {{ s.name }}</b>
+                  <pre class="cbx-code" v-if="s.detail">{{ s.detail }}</pre>
+                </div>
+              </div>
+              <details class="cbx-details" :open="ghResult">
+                <summary>GitHub 托管（盒子现场一条 curl 命令接入，免传 18MB 脚本）</summary>
+                <div class="cbx-form">
+                  <div class="cbx-form-row">
+                    <label>GitHub owner</label><input v-model="ghForm.owner" class="cbx-input" placeholder="zhibinQiu"/>
+                    <label>repo</label><input v-model="ghForm.repo" class="cbx-input" placeholder="power_simulation"/>
+                    <label>分支</label><input v-model="ghForm.branch" class="cbx-input" placeholder="master"/>
+                    <button class="cbx-op" :disabled="ghBusy" @click="saveGithubConfig">{{ ghBusy ? '保存中…' : '保存配置' }}</button>
+                  </div>
+                  <div class="cbx-form-row">
+                    <label>GitHub PAT（公开仓库盒子现场拉取无需验证；仅「同步写入」需要，留空沿用已保存）</label>
+                    <input v-model="ghForm.token" type="password" class="cbx-input" placeholder="ghp_…"/>
+                    <button class="cbx-op primary" :disabled="ghBusy || !onboardForm.cloudIP" @click="syncGithub">{{ ghBusy ? '同步中（含 13MB 部署包，约 10~30s）…' : '🔄 同步到 GitHub' }}</button>
+                    <button class="cbx-op" :disabled="ghExportBusy || !onboardForm.cloudIP" @click="exportBoxConfig">{{ ghExportBusy ? '生成中…' : '⬇ 导出 box-config.json' }}</button>
+                  </div>
+                  <p class="cbx-note">「导出 box-config.json」：现场无平台、无源码时，只凭这份配置 + 仓库脚本即可接入（配置放盒子 <code>/opt/weight-bridge/box-config.json</code>，命令见下方）。</p>
+                </div>
+                <div v-if="ghResult && ghResult.ok" class="cbx-kv">
+                  <div><span>盒子现场命令（任意盒子 root 执行，自动拉部署包/证书/配置 + keadm join + 自检）</span><code class="wrap">{{ ghResult.command }}</code></div>
+                  <div v-if="ghResult.caHash"><span>CA 指纹</span><code class="wrap">{{ ghResult.caHash }}</code></div>
+                </div>
+                <div v-if="ghExport && ghExport.ok" class="cbx-kv">
+                  <div><span>现场用法（配置文件已放盒子 /opt/weight-bridge/box-config.json 时，一条命令完成接入）</span><code class="wrap">curl -fsSL {{ ghLauncherUrl }} | bash</code></div>
+                  <div><span>显式指定配置路径</span><code class="wrap">curl -fsSL {{ ghLauncherUrl }} | bash -s -- -c /path/box-config.json</code></div>
+                  <div><span>box-config.json 内容（保存到盒子 /opt/weight-bridge/box-config.json）</span><pre class="cbx-code">{{ ghExport.content }}</pre></div>
+                  <div v-if="!ghExport.token_set" class="cbx-note">⚠ token 留空：云端当前不可达或未取到共享 token。不影响部署 —— 脚本会自动从仓库 <code>onboard/token</code> 拉取；也可手工填入。</div>
+                </div>
+                <div v-if="ghResult && ghResult.files" class="cbx-remote-steps">
+                  <div v-for="(f, i) in ghResult.files" :key="i" class="cbx-remote-step">
+                    <b :class="f.ok ? 'ok' : 'fail'">{{ f.ok ? '✔' : '✘' }} {{ f.path }}（{{ (f.size / 1024 / 1024).toFixed(1) }} MB）</b>
+                  </div>
+                </div>
+                <p class="cbx-note">托管说明：平台把「引导脚本 + box-deploy 部署包 + edgecore.yaml + rootCA + token」同步到仓库 <code>onboard/</code> 目录（幂等覆盖）。edgecore.yaml 保留占位符、由盒子端按配置替换，云端重建 / token 重签后无需重推（token 走仓库或现场 box-config.json）；box-deploy 部署包升级时需重新同步。仓库公开则盒子现场 <code>curl</code> 拉取无需任何验证（内含共享 token 与 rootCA，是否公开请自行权衡）。盒子现场执行 <code>curl -fsSL {{ ghResult ? ghResult.launcher_url : '…' }} | bash</code> 即完成接入（脚本自动读取 /opt/weight-bridge/box-config.json）。</p>
+              </details>
+              <details class="cbx-details">
+                <summary>高级：edgecore.yaml</summary>
+                <div class="cbx-preview-head"><span></span><button class="cbx-op" @click="copyOnboard">复制</button></div>
+                <pre class="cbx-code">{{ onboardResult.edgecore }}</pre>
+              </details>
+              <details class="cbx-details">
+                <summary>高级：手工部署命令（备选）</summary>
+                <pre class="cbx-code">{{ onboardResult.commands.join('\n') }}</pre>
+              </details>
             </div>
           </div>
         </div>
@@ -1049,12 +1102,17 @@
       </div>
     </div>
   </div>
+
+  <!-- 云端时序历史查询（TDengine） -->
+  <CloudHistoryDialog v-if="cloudHistoryDev" :device="cloudHistoryDev" @close="cloudHistoryDev = null" />
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
+// 云端时序历史查询弹窗（TDengine）：异步分包，点开才加载
+const CloudHistoryDialog = defineAsyncComponent(() => import('./CloudHistoryDialog.vue'))
 
 const store = useSimStore()
 
@@ -1635,19 +1693,111 @@ async function delCloud(kind, name, namespace) {
 }
 async function copyPreview() { try { await navigator.clipboard.writeText(preview.value); store.toast = 'YAML 已复制' } catch (e) {} }
 
-// ---- Tab4 盒子接入（预填云端 K3s+CloudCore 真实 IP 172.19.134.45 与参考盒子 IP，可改）----
-const onboardForm = reactive({ hostname: 'edge-box', cloudIP: '172.19.134.45', boxIP: '192.168.1.20' })
+// ---- Tab4 盒子一键接入（自解压脚本：box-deploy 包 + edgecore.yaml + rootCA + token）----
+const onboardForm = reactive({ hostname: 'edge-box', cloudIP: '172.19.134.45', boxIP: '' })
 const onboardResult = ref(null)
 const onboardOpen = ref(false)
+const onboardBusy = ref(false)
+const remoteRunning = ref(false)
+const remoteSteps = ref([])
 function openOnboard() {
   onboardResult.value = null
+  remoteSteps.value = []
   if (cloudCfg.host) onboardForm.cloudIP = cloudCfg.host
   onboardOpen.value = true
+  loadGithubConfig()
+}
+
+// ---- GitHub 托管（盒子现场一条 curl 命令接入）----
+const ghForm = reactive({ owner: '', repo: '', branch: 'master', token: '' })
+const ghResult = ref(null)
+const ghBusy = ref(false)
+const ghExport = ref(null)
+const ghExportBusy = ref(false)
+const ghLauncherUrl = computed(() => {
+  if (ghResult.value && ghResult.value.launcher_url) return ghResult.value.launcher_url
+  if (ghForm.owner && ghForm.repo) return `https://raw.githubusercontent.com/${ghForm.owner}/${ghForm.repo}/${ghForm.branch || 'master'}/onboard/onboard_box.sh`
+  return 'https://raw.githubusercontent.com/…/onboard/onboard_box.sh'
+})
+async function loadGithubConfig() {
+  try {
+    const r = await api.boxGithubConfig()
+    if (r.ok) {
+      ghForm.owner = r.owner
+      ghForm.repo = r.repo
+      ghForm.branch = r.branch || 'master'
+    }
+  } catch (e) { /* 未配置时静默 */ }
+}
+async function saveGithubConfig() {
+  ghBusy.value = true
+  try {
+    const r = await api.boxGithubConfigSave({ owner: ghForm.owner, repo: ghForm.repo, branch: ghForm.branch, token: ghForm.token })
+    store.toast = r.ok ? 'GitHub 配置已保存' : (r.error || '保存失败')
+  } catch (e) { store.toast = '保存失败：' + (e.message || e) }
+  finally { ghBusy.value = false }
+}
+async function syncGithub() {
+  ghBusy.value = true
+  ghResult.value = null
+  try {
+    const r = await api.boxGithubPush(onboardForm.cloudIP)
+    ghResult.value = r
+    store.toast = r.ok ? '已同步到 GitHub：盒子现场可一条命令接入' : ('同步失败：' + (r.error || '见文件状态'))
+  } catch (e) { store.toast = '同步失败：' + (e.message || e) }
+  finally { ghBusy.value = false }
+}
+async function exportBoxConfig() {
+  ghExportBusy.value = true
+  ghExport.value = null
+  try {
+    const r = await api.boxConfigExport(onboardForm.cloudIP, onboardForm.hostname)
+    ghExport.value = r
+    store.toast = r.ok ? '已生成 box-config.json：复制内容保存到盒子 /opt/weight-bridge/box-config.json 即可' : (r.error || '导出失败')
+  } catch (e) { store.toast = '导出失败：' + (e.message || e) }
+  finally { ghExportBusy.value = false }
 }
 async function doOnboard() {
+  onboardBusy.value = true
   try {
-    onboardResult.value = await api.boxOnboard(onboardForm.hostname, onboardForm.cloudIP, onboardForm.boxIP)
+    const r = await api.boxOnboard(onboardForm.hostname, onboardForm.cloudIP, onboardForm.boxIP)
+    if (!r.ok) { store.toast = r.error || '生成失败'; return }
+    onboardResult.value = r
+    remoteSteps.value = []
   } catch (e) { store.toast = '生成失败：' + (e.message || e) }
+  finally { onboardBusy.value = false }
+}
+async function downloadOnboardScript() {
+  try {
+    const r = await api.boxOnboardScript()
+    if (!r.ok) { store.toast = r.error || '脚本未生成'; return }
+    // base64 -> Blob 落盘（脚本约 18 MB，atob 一次性可接受）
+    const bin = atob(r.script_b64)
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    const blob = new Blob([bytes], { type: 'application/x-shellscript' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = r.script_name || 'onboard_box.sh'
+    document.body.appendChild(a); a.click(); a.remove()
+    URL.revokeObjectURL(url)
+    store.toast = `已下载 ${r.script_name}（${(r.script_size / 1024 / 1024).toFixed(1)} MB）`
+  } catch (e) { store.toast = '下载失败：' + (e.message || e) }
+}
+async function doOnboardRemote() {
+  remoteRunning.value = true
+  remoteSteps.value = []
+  try {
+    const r = await api.boxOnboardRemote({
+      hostname: onboardForm.hostname,
+      cloudIP: onboardForm.cloudIP,
+      boxIP: onboardForm.boxIP,
+    })
+    remoteSteps.value = r.steps || []
+    store.toast = r.ok ? '远程一键接入完成：盒子已接入云端' : ('远程一键接入失败：' + (r.error || '见步骤日志'))
+  } catch (e) { store.toast = '远程一键接入失败：' + (e.message || e) }
+  finally { remoteRunning.value = false }
 }
 async function copyOnboard() { try { await navigator.clipboard.writeText(onboardResult.value.edgecore); store.toast = 'edgecore.yaml 已复制' } catch (e) {} }
 
@@ -1809,6 +1959,9 @@ function onDevClick(d) {
   if (d._cloud) openDevRealtime(d)
   else openEditDev(d)
 }
+// 云端时序历史（TDengine）：打开历史查询弹窗（四元组从设备 node/name/twins 推导）
+const cloudHistoryDev = ref(null)
+function openCloudHistory(d) { cloudHistoryDev.value = d }
 
 // ---- 格式化 / 图表 ----
 // 仪表无效读数标志码（与后端 mqtt_source._INVALID_READING_VALUES 一致）
@@ -2045,23 +2198,55 @@ function saveTopoPos() {
 
 function restoreTopoPos() {
   try {
+    const canvas = topoCanvasRef.value
+    if (!canvas) return
     const saved = JSON.parse(localStorage.getItem(TOPO_POS_KEY) || '{}')
+    let dirty = false
     Object.keys(saved).forEach((k) => {
       const p = saved[k]
       if (typeof p.left !== 'number' || typeof p.top !== 'number') return
-      topoPos.value[k] = p
       const el = nodeRefs[k]
       if (!el) return
+      // 边界钳制：与拖拽约束一致，模块始终限制在通信拓扑图（canvas）范围内，
+      // 避免窗口缩放/更换屏幕后保存的旧位置把模块恢复到画布之外
+      const left = clampCoord(p.left, el.offsetWidth, canvas.clientWidth)
+      const top = clampCoord(p.top, el.offsetHeight, canvas.clientHeight)
+      if (left !== p.left || top !== p.top) dirty = true
+      topoPos.value[k] = { left, top }
       const ph = document.createElement('div')
       ph.className = 'cbx-topo-mod-ph'
       ph.style.width = el.offsetWidth + 'px'
       ph.style.height = el.offsetHeight + 'px'
       el.parentNode.insertBefore(ph, el)
       el.style.position = 'absolute'
-      el.style.left = p.left + 'px'
-      el.style.top = p.top + 'px'
+      el.style.left = left + 'px'
+      el.style.top = top + 'px'
     })
+    if (dirty) saveTopoPos()
   } catch (e) { /* ignore */ }
+}
+
+// 坐标钳制：保证模块不超出画布边界（同拖拽时的约束）
+function clampCoord(coord, modSize, canvasSize) {
+  return Math.min(Math.max(coord, 0), Math.max(canvasSize - modSize, 0))
+}
+
+// 窗口/画布尺寸变化后，对已恢复为 absolute 的模块重新钳制，防止越界到通信拓扑图之外
+function clampTopoPositions() {
+  const canvas = topoCanvasRef.value
+  if (!canvas) return
+  Object.keys(topoPos.value).forEach((k) => {
+    if (topoDrag && topoDrag.key === k) return   // 拖拽中已有实时约束，跳过
+    const el = nodeRefs[k]
+    if (!el || el.style.position !== 'absolute') return
+    const left = clampCoord(topoPos.value[k].left, el.offsetWidth, canvas.clientWidth)
+    const top = clampCoord(topoPos.value[k].top, el.offsetHeight, canvas.clientHeight)
+    if (left !== topoPos.value[k].left || top !== topoPos.value[k].top) {
+      topoPos.value[k] = { left, top }
+      el.style.left = left + 'px'
+      el.style.top = top + 'px'
+    }
+  })
 }
 
 function autoLayoutTopo() {
@@ -2084,6 +2269,7 @@ let topoRo2 = null
 function recalcLinks() {
   const canvas = topoCanvasRef.value
   if (!canvas) return
+  clampTopoPositions()   // 画布尺寸变化时纠正已恢复的模块位置，防止越界
   const cRect = canvas.getBoundingClientRect()
   const R = (el) => {
     if (!el) return null
@@ -2912,8 +3098,15 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
   color: #c8d6e5; font-size: 10px; line-height: 1.6; padding: 10px 12px;
   overflow: auto; max-height: 300px; white-space: pre;
 }
-/* ---- 盒子接入 ---- */
+/* ---- 盒子一键接入 ---- */
 .cbx-onboard { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.cbx-onboard-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.cbx-remote-steps { display: flex; flex-direction: column; gap: 6px; }
+.cbx-remote-step { border: 1px solid var(--border); border-radius: 4px; background: var(--panel-2); padding: 6px 10px; }
+.cbx-remote-step b.ok { color: #34c759; }
+.cbx-remote-step b.fail { color: #ff453a; }
+.cbx-details { border: 1px solid var(--border); border-radius: 4px; background: var(--panel-2); padding: 6px 10px; }
+.cbx-details summary { cursor: pointer; color: var(--muted); font-size: 11px; user-select: none; }
 /* ---- 实时数据 ---- */
 .cbx-twin-card {
   border: 1px solid var(--border); border-radius: 4px; background: var(--panel-2);

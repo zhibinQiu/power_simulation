@@ -22,6 +22,11 @@
   --orange: #C0732A;        /* 赭橙（范围一/未连接） */
   --rail: #243240;          /* 深色面（toast/3D 降级），中性深石板色，非蓝品牌 */
   --gas: #2F9BB0;           /* 气体/能源管道（与固体物料区分，沉静青） */
+  --ok: #30a46c;            /* 通用「正常/通过」状态色（设备健康、校验通过） */
+  --warn: #9a6b08;          /* 通用「提醒/提示」文字色 */
+  --warn-l: rgba(255,180,0,.08);   /* 提醒提示条背景 */
+  --warn-b: rgba(255,180,0,.25);   /* 提醒提示条边框 */
+  --purple: #7c5cff;        /* 紫色标识（AI 标记等非语义点缀） */
   --shadow: 0 1px 3px rgba(0,0,0,.14), 0 6px 18px rgba(0,0,0,.10);
   /* VS Code 风格字体栈：UI 用系统无衬线；数值/命令用等宽（Cascadia Code / JetBrains Mono 优先） */
   --mono: "Cascadia Code", "JetBrains Mono", Menlo, "SF Mono", Monaco, Consolas, "Courier New", monospace;
@@ -58,6 +63,11 @@
   --orange: #E08A45;
   --rail: #1A212B;
   --gas: #38B8D0;
+  --ok: #34d399;
+  --warn: #E0B64B;
+  --warn-l: rgba(224,182,75,.10);
+  --warn-b: rgba(224,182,75,.28);
+  --purple: #a78bfa;
 
   /* 属性面板风格（Blender 深色玻璃） */
   --input: #0B111A;        /* 输入框底色（比面板更深） */

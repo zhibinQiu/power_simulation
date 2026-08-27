@@ -46,6 +46,8 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
+import urllib.request
 from collections import deque
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -61,6 +63,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "broker_password": "",
     "intervals": {"state": 30, "crds": 5, "logs": 3},
     "edge": {"host": "", "port": 22, "user": "root", "password": "", "key": ""},
+    "tdengine": {"url": "http://127.0.0.1:6041", "user": "root", "password": "taosdata", "db": "nengtan"},
 }
 
 # systemctl 重启白名单（云端 systemd 服务）
@@ -85,7 +88,7 @@ def load_config() -> Dict[str, Any]:
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             data = json.load(f) or {}
         for k in ("http_port", "token", "broker_host", "broker_port",
-                  "broker_username", "broker_password", "intervals", "edge"):
+                  "broker_username", "broker_password", "intervals", "edge", "tdengine"):
             if k in data:
                 cfg[k] = data[k]
     except Exception as e:  # noqa: BLE001
@@ -110,6 +113,22 @@ def _run(cmd: str, stdin_data: Optional[str] = None, timeout: int = 90) -> "tupl
     if proc.returncode != 0:
         return False, proc.stdout, (proc.stderr or "").strip() or f"rc={proc.returncode}"
     return True, proc.stdout, ""
+
+
+def _run_bin(cmd: str, stdin_bytes: bytes, timeout: int = 180) -> "tuple[bool, str, str]":
+    """二进制 stdin 执行一条 shell 命令（用于 SSH 上传文件等），返回 (ok, stdout, stderr)。"""
+    try:
+        proc = subprocess.run(
+            ["bash", "-c", cmd], input=stdin_bytes,
+            capture_output=True, timeout=timeout,
+        )
+        out = proc.stdout.decode("utf-8", "replace")
+        err = proc.stderr.decode("utf-8", "replace")
+    except Exception as e:  # noqa: BLE001
+        return False, "", f"命令执行失败：{e}"
+    if proc.returncode != 0:
+        return False, out, err.strip() or f"rc={proc.returncode}"
+    return True, out, ""
 
 
 def _split_sections(stdout: str) -> Dict[str, str]:
@@ -422,10 +441,10 @@ class _Handler(BaseHTTPRequestHandler):
     def _denied(self) -> None:
         self._json(401, {"ok": False, "error": "unauthorized"})
 
-    def _read_body(self) -> Dict[str, Any]:
+    def _read_body(self, max_size: int = 4 * 1024 * 1024) -> Dict[str, Any]:
         try:
             n = int(self.headers.get("Content-Length") or 0)
-            if n > 4 * 1024 * 1024:  # 4MB 上限（YAML 下发达不到）
+            if n <= 0 or n > max_size:
                 return {}
             return json.loads(self.rfile.read(n).decode("utf-8", "replace") or "{}")
         except Exception:  # noqa: BLE001
@@ -437,7 +456,7 @@ class _Handler(BaseHTTPRequestHandler):
             return self._denied()
         path = self.path.split("?")[0]
         if path == "/api/health":
-            return self._json(200, {"ok": True, "ts": time.time(), "version": "1.0"})
+            return self._json(200, {"ok": True, "ts": time.time(), "version": "1.1"})
         if path == "/api/state":
             data = collect_state(); data["ts"] = time.time()
             return self._json(200, data)
@@ -448,14 +467,27 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json(200, collect_logs())
         if path == "/api/edge/config":
             return self._json(200, {"ok": True, "edge": dict(_CFG.get("edge") or {})})
+        if path == "/api/rootca":
+            return self._json(200, _rootca())
+        if path == "/api/history":
+            q = urllib.parse.parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")
+            g = lambda k, d="": (q.get(k) or [d])[0]  # noqa: E731
+            try:
+                pts = int(g("points", "500"))
+            except (TypeError, ValueError):
+                pts = 500
+            return self._json(200, _tsdb_history(
+                box=g("box"), device=g("device"), instance=g("instance"), prop=g("property"),
+                start=g("start"), end=g("end"), points=pts))
         self._json(404, {"ok": False, "error": "not found"})
 
-    # ---- 写（kubectl apply / delete / ingest） ----
+    # ---- 写（kubectl apply / delete / ingest / 盒子远程一键） ----
     def do_POST(self):  # noqa: N802
         if not self._auth_ok():
             return self._denied()
         path = self.path.split("?")[0]
-        body = self._read_body()
+        # /api/edge/upload 会携带整包 onboard 脚本（base64 可达数十 MB），放宽 body 上限
+        body = self._read_body(max_size=256 * 1024 * 1024 if path == "/api/edge/upload" else 4 * 1024 * 1024)
         if path == "/api/apply":
             yaml_text = str(body.get("yaml") or "")
             if not yaml_text:
@@ -492,7 +524,82 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json(200, _update_edge_config(body))
         if path == "/api/edge/check":
             return self._json(200, _edge_check(body))
+        if path == "/api/edge/run":
+            return self._json(200, _edge_run(body))
+        if path == "/api/edge/upload":
+            return self._json(200, _edge_upload(body))
         self._json(404, {"ok": False, "error": "not found"})
+
+
+def _parse_ms(s: str) -> int:
+    """时间串 → 毫秒时间戳。支持毫秒整数 / '2026-08-27 10:00:00' / ISO T 分隔。"""
+    s = str(s).strip()
+    if not s:
+        return 0
+    if s.isdigit():
+        return int(s)
+    try:
+        t = s.replace("T", " ")[:19]
+        return int(datetime.strptime(t, "%Y-%m-%d %H:%M:%S").timestamp() * 1000)
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def _tsdb_history(box: str = "", device: str = "", instance: str = "", prop: str = "",
+                  start: str = "", end: str = "", points: int = 500) -> Dict[str, Any]:
+    """查询云端 TDengine 设备历史读数（GET /api/history）。
+
+    data/{box}/{device}/{instance}/{property} 主题写入 nengtan.readings 超表
+    （deploy_cloud.sh --tsdb-only 部署）。按时间范围做 INTERVAL 降采样，
+    返回 [{t: 毫秒窗口起点, v: 均值}]，目标点数由 points 控制（默认 500）。
+    """
+    td = dict(_CFG.get("tdengine") or {})
+    url = str(td.get("url") or "http://127.0.0.1:6041").rstrip("/")
+    user = str(td.get("user") or "root")
+    password = str(td.get("password") or "taosdata")
+    db = str(td.get("db") or "nengtan")
+    if not box:
+        return {"ok": False, "error": "box 必填"}
+    try:
+        points = max(1, min(int(points), 2000))
+    except (TypeError, ValueError):
+        points = 500
+    now_ms = int(time.time() * 1000)
+    start_ms = _parse_ms(start) or (now_ms - 24 * 3600 * 1000)
+    end_ms = _parse_ms(end) or now_ms
+    if end_ms <= start_ms:
+        end_ms = start_ms + 1000
+    interval_s = max(1, int((end_ms - start_ms) / 1000 / points))
+    if interval_s < 60:
+        interval = f"{interval_s}s"
+    elif interval_s < 3600:
+        interval = f"{interval_s // 60}m"
+    else:
+        interval = f"{interval_s // 3600}h"
+
+    cond = f"box='{box.replace(chr(39), chr(39) * 2)}'"
+    for name, val in (("device", device), ("instance", instance), ("property", prop)):
+        if val:
+            cond += f" AND {name}='{val.replace(chr(39), chr(39) * 2)}'"
+    sql = (f"SELECT _wstart AS t, AVG(value) AS v FROM {db}.readings "
+           f"WHERE {cond} AND ts>={start_ms} AND ts<={end_ms} "
+           f"INTERVAL({interval}) FILL(NULL) ORDER BY t ASC")
+    auth = base64.b64encode(f"{user}:{password}".encode()).decode()
+    req = urllib.request.Request(f"{url}/rest/sql", data=sql.encode("utf-8"), method="POST",
+                                 headers={"Authorization": f"Basic {auth}",
+                                          "Content-Type": "text/plain"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8", "replace"))
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": f"TDengine 查询失败：{e}（云端需先部署时序库：deploy_cloud.sh --tsdb-only）"}
+    if not isinstance(data, dict) or data.get("code", 0) != 0:
+        desc = data.get("desc") if isinstance(data, dict) else "未知错误"
+        return {"ok": False, "error": f"TDengine 查询错误：{desc}"}
+    series = [{"t": row[0], "v": row[1]} for row in (data.get("data") or []) if row and row[1] is not None]
+    return {"ok": True, "box": box, "device": device, "instance": instance, "property": prop,
+            "start": start_ms, "end": end_ms, "interval": interval, "count": len(series),
+            "series": series}
 
 
 def _ingest(body: Dict[str, Any]) -> Dict[str, Any]:
@@ -605,12 +712,14 @@ def _edge_check(body: Dict[str, Any]) -> Dict[str, Any]:
                 "error": f"SSH({host}:{port}) 不可达：{e}"}
 
 
-def _ssh_run(remote_cmd: str, timeout: int = 60,
-             edge_override: "Optional[Dict[str, Any]]" = None) -> "tuple[bool, str, str]":
-    """SSH 到边缘盒子执行一条命令（重启 box-mapper 等），凭据来自 config.json 的 edge 字段。
+def _ssh_exec(remote_cmd: str, stdin_data: "Optional[str]" = None,
+              stdin_bytes: "Optional[bytes]" = None, timeout: int = 120,
+              edge_override: "Optional[Dict[str, Any]]" = None) -> "tuple[bool, str, str]":
+    """SSH 到边缘盒子执行一条任意命令，凭据来自 config.json 的 edge 字段。
 
     支持密码（需系统安装 sshpass）或密钥两种认证方式；均未配置时返回友好错误。
     edge_override 可由调用方（平台）传入本次请求的 edge 配置，覆盖 config.json（未传则用配置值）。
+    stdin_bytes 提供时按二进制通过 SSH stdin 传给远端（用于上传文件）。
     """
     edge = dict(_CFG.get("edge") or {})
     if edge_override:
@@ -635,9 +744,20 @@ def _ssh_run(remote_cmd: str, timeout: int = 60,
                           capture_output=True).returncode != 0:
             return False, "", "需要 sshpass 命令（密码认证）：yum install -y sshpass 后重试，或改用 edge.key 密钥认证"
         prefix = f"sshpass -p '{password}' ssh {common} {user}@{host}"
-    ok, stdout, stderr = _run(f"{prefix} 'systemctl restart {remote_cmd} && systemctl is-active {remote_cmd}'",
-                              timeout=timeout)
+    # 统一走 `ssh host bash -s` + stdin 传命令，避免远端命令引号/转义问题
+    cmd = f"{prefix} 'bash -s'"
+    if stdin_bytes is not None:
+        ok, stdout, stderr = _run_bin(cmd, stdin_bytes, timeout=timeout)
+    else:
+        ok, stdout, stderr = _run(cmd, stdin_data=remote_cmd, timeout=timeout)
     return ok, stdout, stderr
+
+
+def _ssh_run(remote_cmd: str, timeout: int = 60,
+             edge_override: "Optional[Dict[str, Any]]" = None) -> "tuple[bool, str, str]":
+    """SSH 到边缘盒子 systemctl 重启一条服务（重启 box-mapper 等），凭据来自 config.json 的 edge 字段。"""
+    return _ssh_exec(f"systemctl restart {remote_cmd} && systemctl is-active {remote_cmd}",
+                     timeout=timeout, edge_override=edge_override)
 
 
 def _restart(body: Dict[str, Any]) -> Dict[str, Any]:
@@ -697,6 +817,65 @@ def _restart(body: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": ok, "rc": 0 if ok else 1, "stdout": stdout.strip(), "stderr": stderr.strip(),
                 "kind": kind, "name": name, "namespace": ""}
     return {"ok": False, "error": f"kind 不合法：{kind}（仅支持 deployment / pod / systemd / edge）"}
+
+
+# ------------------------- 盒子一键接入通道（平台远程操作盒子） -------------------------
+
+def _rootca() -> Dict[str, Any]:
+    """返回云端 rootCA.crt（base64），供平台内嵌到盒子一键接入脚本，免除现场 scp。"""
+    for cand in ("/etc/kubeedge/ca/rootCA.crt", "/etc/kubeedge/ca/ca.crt"):
+        if os.path.isfile(cand):
+            try:
+                b64 = base64.b64encode(open(cand, "rb").read()).decode("ascii")
+                return {"ok": True, "path": cand, "data": b64, "size": len(b64)}
+            except Exception as e:  # noqa: BLE001
+                return {"ok": False, "error": f"读取 {cand} 失败：{e}"}
+    return {"ok": False, "error": "云端 rootCA.crt 不存在（请先部署 KubeEdge 控制面 gen_certs）"}
+
+
+def _edge_run(body: Dict[str, Any]) -> Dict[str, Any]:
+    """SSH 到边缘盒子执行一条任意命令（HTTP POST /api/edge/run）。
+
+    body: {cmd, timeout?, edge?}。cmd 为空拒绝；timeout 上限 900s（一键接入脚本可跑较久）。
+    该接口仅供平台经 Bearer token 调用，用途：盒子一键接入 / 现场远程运维。
+    """
+    cmd = str(body.get("cmd") or "").strip()
+    if not cmd:
+        return {"ok": False, "rc": 1, "stdout": "", "stderr": "cmd 不能为空"}
+    if "rm -rf /" in cmd.replace(" ", "").replace("\t", ""):
+        return {"ok": False, "rc": 1, "stdout": "", "stderr": "危险命令被拒绝"}
+    timeout = min(max(int(body.get("timeout") or 300), 10), 900)
+    edge_ovr = body.get("edge") if isinstance(body.get("edge"), dict) else None
+    ok, stdout, stderr = _ssh_exec(cmd, timeout=timeout, edge_override=edge_ovr)
+    return {"ok": ok, "rc": 0 if ok else 1, "stdout": stdout.strip(), "stderr": stderr.strip()}
+
+
+def _edge_upload(body: Dict[str, Any]) -> Dict[str, Any]:
+    """上传文件到边缘盒子（HTTP POST /api/edge/upload，base64 传输，可承载数十 MB）。
+
+    body: {path, data(base64), mode?, edge?}。path 必须是绝对路径；数据经 SSH stdin 写入，无命令行长度限制。
+    """
+    path = str(body.get("path") or "").strip()
+    data_b64 = str(body.get("data") or "")
+    mode = str(body.get("mode") or "0644").strip()
+    if not path:
+        return {"ok": False, "rc": 1, "stdout": "", "stderr": "path 不能为空"}
+    if not path.startswith("/"):
+        return {"ok": False, "rc": 1, "stdout": "", "stderr": f"path 必须是绝对路径：{path}"}
+    if not data_b64:
+        return {"ok": False, "rc": 1, "stdout": "", "stderr": "data(base64) 不能为空"}
+    if not re.fullmatch(r"[0-7]{3,4}", mode):
+        return {"ok": False, "rc": 1, "stdout": "", "stderr": f"mode 不合法：{mode}"}
+    try:
+        raw = base64.b64decode(data_b64)
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "rc": 1, "stdout": "", "stderr": f"data 不是合法 base64：{e}"}
+    d = path.rsplit("/", 1)[0] or "/"
+    edge_ovr = body.get("edge") if isinstance(body.get("edge"), dict) else None
+    cmd = f"mkdir -p '{d}' && cat > '{path}' && chmod {mode} '{path}' && echo OK"
+    ok, stdout, stderr = _ssh_exec(cmd, stdin_bytes=raw, timeout=300, edge_override=edge_ovr)
+    return {"ok": ok, "rc": 0 if ok else 1, "bytes": len(raw), "path": path,
+            "stdout": stdout.strip(), "stderr": stderr.strip()}
 
 
 def main() -> None:

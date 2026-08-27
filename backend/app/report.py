@@ -12,8 +12,7 @@ import re
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
-from .domain.reporting import create_report_engine
-from .domain.reporting.engines import _fmt, _pct  # noqa: F401 —— 渲染与模板共用格式化工具
+from .domain.reporting import _fmt, _pct, create_report_engine
 from .models import SimResult
 
 CO2_UNIT = "tCO₂/h"          # 排放量

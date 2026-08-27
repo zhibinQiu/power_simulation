@@ -11,6 +11,7 @@
             <template v-if="!(it.hide && it.hide())">
             <div v-if="it.sep" class="sep"></div>
             <div v-else-if="it.sub" class="mi mi-sub" @mouseenter="openSub = i" @mouseleave="openSub = null">
+              <span class="tick"></span>
               <span class="tx">{{ it.label }}</span>
               <span class="arrow">›</span>
               <div v-if="openSub === i" class="menu-drop sub">
@@ -18,6 +19,7 @@
                   <template v-if="!(c.hide && c.hide())">
                   <div v-if="c.sep" class="sep"></div>
                   <div v-else-if="c.sub" class="mi mi-sub" @mouseenter="openSub2 = ci" @mouseleave="openSub2 = null">
+                    <span class="tick"></span>
                     <span class="tx">{{ c.label }}</span>
                     <span class="arrow">›</span>
                     <div v-if="openSub2 === ci" class="menu-drop sub">

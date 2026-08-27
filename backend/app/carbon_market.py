@@ -8,8 +8,9 @@
 
 架构说明：
 - 行情「数据获取」为策略模式（domain/market/sources.py）：
-  RemoteQuoteSource（远程官方源）失败时自动降级 SimulatedQuoteSource（本地模拟），
-  保证数字孪生「碳市场」视图始终有实时变化的数值展示；
+  强制使用 RemoteQuoteSource（远程官方源），远程失败时不降级模拟，
+  而是回退显示「最近一次成功拉取」的历史数据（_last_good 缓存），
+  避免把模拟数据误当真实行情；
 - 走势「预测算法」为策略模式（domain/market/forecast.py）：
   linear / moving_average / exponential 可插拔，新增算法注册即可；
 - 60s TTL 缓存，避免频繁请求外部站点。
@@ -20,20 +21,21 @@ import json
 import logging
 import math
 import re
+import threading
 import time
 from datetime import date, timedelta
 from html import unescape
+from pathlib import Path
 from typing import Any
 
-from .domain.market import SimulatedQuoteSource, create_forecast_method, create_quote_source
-from .netutil import UA, TtlCache, fetch_json, fetch_text, now_iso
+from .domain.market import create_forecast_method, create_quote_source
+from .netutil import TtlCache, fetch_json, fetch_text, now_iso
 
 logger = logging.getLogger(__name__)
 
+# UA/Accept/Sec-Fetch 等由 netutil 自动生成（UA 池随机轮换），这里只保留必要的站点级头
 _HEADERS = {
-    "User-Agent": UA,
     "Referer": "https://www.cneeex.com/",
-    "Accept": "application/json,text/plain,*/*",
 }
 
 CNEEEX_DAILY_URL = "https://www.cneeex.com/zhhq/jsonData/hiskline.json"
@@ -46,7 +48,8 @@ CCER_WP_HISTORY_URL = (
 )
 PRIMARY_MARKET_URL = "https://www.ccn.ac.cn/cets"
 
-CACHE_TTL = 60.0  # 秒
+CACHE_TTL = 60.0  # 秒（CEA 分时行情）
+CACHE_TTL_CCER = 600.0  # 秒（CCER 为日频数据，10 分钟拉一次即可，降低反爬压力）
 
 
 # ── 数值/日期工具 ──────────────────────────────────────────────
@@ -297,70 +300,56 @@ def fetch_ccer_quote() -> dict[str, Any] | None:
 
 
 def fetch_ccer_series() -> dict[str, Any]:
-    """拉取 CCER 官方日行情列表；失败回退碳中和网历史表。"""
+    """拉取 CCER 官方日行情列表；失败回退碳中和网历史表。
+
+    全部走 netutil 增强请求层（UA 池 / 完整浏览器头 / cookie 会话 / 退避重试），
+    降低被反爬的概率；先访问首页让会话拿到 cookie，再请求数据接口。
+    """
     sources_tried: list[str] = [CCER_HOME_URL, CCER_DAILY_LIST_URL]
     quotes: list[dict[str, Any]] = []
     try:
-        import httpx
-
-        with httpx.Client(
-            timeout=httpx.Timeout(20.0, connect=6.0),
-            verify=False,
-            follow_redirects=True,
-            headers={"User-Agent": UA, "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"},
-        ) as client:
-            client.get(CCER_HOME_URL)
-            resp = client.get(
-                CCER_DAILY_LIST_URL,
-                headers={
-                    "Accept": "application/json,text/javascript,*/*;q=0.01",
-                    "Referer": CCER_SOURCE_PAGE,
-                    "X-Requested-With": "XMLHttpRequest",
-                },
-            )
-            resp.raise_for_status()
-            payload = resp.json()
+        fetch_text(CCER_HOME_URL, timeout=12.0)  # 预热会话 cookie
+        payload = fetch_json(
+            CCER_DAILY_LIST_URL,
+            timeout=20.0,
+            extra_headers={
+                "Referer": CCER_SOURCE_PAGE,
+                "X-Requested-With": "XMLHttpRequest",
+            },
+        )
     except Exception as exc:  # noqa: BLE001
         logger.warning("ccer official daily fetch failed: %s", exc)
         payload = {}
 
     rows = payload.get("rows") if isinstance(payload, dict) else None
     if isinstance(rows, list):
-        import asyncio
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        async def _gather() -> list[dict[str, Any]]:
-            sem = asyncio.Semaphore(8)
-
-            async def _one(row: dict[str, Any]) -> dict[str, Any] | None:
-                rel = str(row.get("url") or "").lstrip("/")
-                if not rel:
-                    return None
-                m = re.search(r"(\d{4})年(\d{1,2})月(\d{1,2})日", str(row.get("title") or ""))
-                td = _parse_cn_date(m.group(1), m.group(2), m.group(3)) if m else None
-                detail_url = CCER_SOURCE_PAGE.rsplit("/index.html", 1)[0] + "/" + rel
-                async with sem:
-                    try:
-                        import httpx
-
-                        async with httpx.AsyncClient(
-                            timeout=httpx.Timeout(12.0, connect=5.0),
-                            verify=False,
-                            follow_redirects=True,
-                            headers={"User-Agent": UA, "Referer": CCER_SOURCE_PAGE},
-                        ) as c:
-                            r = await c.get(detail_url)
-                            r.raise_for_status()
-                            return parse_ccer_daily_article(
-                                r.text, trade_date=td, source=detail_url
-                            )
-                    except Exception:  # noqa: BLE001
-                        return None
-
-            results = await asyncio.gather(*[_one(r) for r in rows[:20]])
-            return [q for q in results if q is not None]
+        def _one(row: dict[str, Any]) -> dict[str, Any] | None:
+            rel = str(row.get("url") or "").lstrip("/")
+            if not rel:
+                return None
+            m = re.search(r"(\d{4})年(\d{1,2})月(\d{1,2})日", str(row.get("title") or ""))
+            td = _parse_cn_date(m.group(1), m.group(2), m.group(3)) if m else None
+            detail_url = CCER_SOURCE_PAGE.rsplit("/index.html", 1)[0] + "/" + rel
+            try:
+                html = fetch_text(
+                    detail_url,
+                    timeout=12.0,
+                    extra_headers={"Referer": CCER_SOURCE_PAGE},
+                )
+                return (
+                    parse_ccer_daily_article(html, trade_date=td, source=detail_url)
+                    if html
+                    else None
+                )
+            except Exception:  # noqa: BLE001
+                return None
 
         try:
-            quotes = asyncio.run(_gather())
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                futures = [pool.submit(_one, r) for r in rows[:20]]
+                quotes = [f.result() for f in as_completed(futures) if f.result()]
         except Exception as exc:  # noqa: BLE001
             logger.warning("ccer gather failed: %s", exc)
             quotes = []
@@ -404,56 +393,109 @@ def fetch_ccer_series() -> dict[str, Any]:
     }
 
 
-# ── 降级模拟行情（外网不可用时保证界面实时变化） ────────────────
+# ── 最后成功数据缓存（远程失败时回退显示历史数据，不做模拟兜底） ──
+# 同时持久化到磁盘快照：进程重启后仍能回退到最近一次真实行情。
+
+
+_last_good_lock = threading.Lock()
+_last_good: dict[str, Any] = {}
+_SNAPSHOT_PATH = Path(__file__).resolve().parent.parent / "data" / "market_snapshot.json"
+_SNAPSHOT_KEYS = ("cea", "ccer", "chart:cea", "chart:ccer")
+
+
+def _load_snapshot() -> None:
+    """进程启动时从磁盘加载最近一次成功的行情快照，作为回退初始值。"""
+    try:
+        if not _SNAPSHOT_PATH.exists():
+            return
+        data = json.loads(_SNAPSHOT_PATH.read_text(encoding="utf-8"))
+        with _last_good_lock:
+            for key in _SNAPSHOT_KEYS:
+                if data.get(key):
+                    _last_good[key] = data[key]
+        logger.info("loaded market snapshot from %s", _SNAPSHOT_PATH)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("market snapshot load failed: %s", exc)
+
+
+def _save_snapshot() -> None:
+    """把最近一次成功的行情数据原子落盘（tmp + rename），供重启后回退。"""
+    try:
+        with _last_good_lock:
+            payload = {
+                "saved_at": now_iso(),
+                **{key: _last_good.get(key) for key in _SNAPSHOT_KEYS},
+            }
+        _SNAPSHOT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _SNAPSHOT_PATH.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(_SNAPSHOT_PATH)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("market snapshot save failed: %s", exc)
+
+
+_load_snapshot()
 
 
 # ── 对外服务（TTL 缓存） ───────────────────────────────────────
 
 
 _cache = TtlCache(CACHE_TTL)
-
-# 模拟数据源单例（确定性模拟序列，供图表兜底使用）
-_sim_source = SimulatedQuoteSource()
+_cache_ccer = TtlCache(CACHE_TTL_CCER)  # CCER 日频数据独立长 TTL
 
 
 def fetch_quotes() -> dict[str, Any]:
     """结构化报价：CEA + CCER 最新价、涨跌幅、月聚合、查询时间。
 
-    数据获取委托给行情源策略（create_quote_source）：远程失败自动降级模拟。
+    数据获取强制使用远程官方源（不做模拟兜底）；远程失败时回退显示
+    「最近一次成功拉取」的历史数据，无历史则该品种返回空对象。
     """
 
     def _fetch() -> dict[str, Any]:
-        source = create_quote_source()
+        source = create_quote_source("remote")
         cea_pack = source.fetch_cea() or {}
-        ccer = source.fetch_ccer()
+        ccer = source.fetch_ccer() or {}
         sources_tried = list(cea_pack.get("sources_tried") or [])
-        cea_latest = cea_pack.get("latest")
-        # CEA 模拟包补齐月度聚合（远程包在解析阶段已生成）
+        sources_tried += list(ccer.get("sources_tried") or [])
+
+        # 按品种判定：远程成功则更新「最后成功」缓存；失败则回退历史数据
+        had_new = False
+        with _last_good_lock:
+            if cea_pack.get("points"):
+                _last_good["cea"] = cea_pack
+                had_new = True
+            elif _last_good.get("cea"):
+                cea_pack = _last_good["cea"]
+
+            if ccer.get("points") or ccer.get("price"):
+                _last_good["ccer"] = ccer
+                had_new = True
+            elif _last_good.get("ccer"):
+                ccer = _last_good["ccer"]
+        if had_new:
+            _save_snapshot()
+
+        # CEA 补齐月度聚合（历史包未聚合时按日序列现算）
         if cea_pack.get("points") and not cea_pack.get("monthly"):
             cea_pack["monthly"] = aggregate_daily_to_monthly(cea_pack["points"])
 
-        latest = cea_latest
-        prev = cea_pack["points"][-2] if len(cea_pack["points"]) > 1 else latest
-        chg_pct = (
-            (latest["close"] - prev["close"]) / prev["close"] * 100
-            if prev.get("close")
-            else 0
-        )
-        latest = {**latest, "change_pct": round(chg_pct, 2)}
-        simulated = (
-            getattr(source, "cea_source", source.name) == "simulated"
-            or getattr(source, "ccer_source", source.name) == "simulated"
-        )
-        if simulated:
-            latest["source"] = "simulated"
+        latest = cea_pack.get("latest")
+        if latest:
+            prev = cea_pack["points"][-2] if len(cea_pack["points"]) > 1 else latest
+            chg_pct = (
+                (latest["close"] - prev["close"]) / prev["close"] * 100
+                if prev.get("close")
+                else 0
+            )
+            latest = {**latest, "change_pct": round(chg_pct, 2)}
 
         return {
-            "ok": True,
-            "simulated": simulated,
+            "ok": bool(latest) or bool(ccer.get("price") or ccer.get("latest")),
+            "simulated": False,
             "queried_at": now_iso(),
             "sources_tried": sources_tried,
-            "cea": latest,
-            "ccer": ccer,
+            "cea": latest or {},
+            "ccer": ccer.get("latest") or ccer,
             "cea_monthly": cea_pack.get("monthly") or [],
             "daily_count": len(cea_pack.get("points") or []),
             "intraday": cea_pack.get("intraday"),
@@ -463,7 +505,10 @@ def fetch_quotes() -> dict[str, Any]:
 
 
 def fetch_chart(instrument: str = "cea", kind: str = "daily") -> dict[str, Any]:
-    """供前端图表的序列数据：cea → 日K线，ccer → 成交均价折线。"""
+    """供前端图表的序列数据：cea → 日K线，ccer → 成交均价折线。
+
+    远程失败时回退显示「最近一次成功拉取」的历史序列，无历史则 ok=False。
+    """
     instrument = (instrument or "cea").strip().lower()
     kind = (kind or "daily").strip().lower()
     if instrument not in ("cea", "ccer"):
@@ -471,10 +516,19 @@ def fetch_chart(instrument: str = "cea", kind: str = "daily") -> dict[str, Any]:
 
     def _fetch() -> dict[str, Any]:
         if instrument == "cea":
-            pack = fetch_cea_series()
+            try:
+                pack = fetch_cea_series()
+            except Exception:  # noqa: BLE001
+                logger.warning("cea series fetch failed, fallback to history", exc_info=True)
+                pack = {}
+            if not pack.get("points"):
+                with _last_good_lock:
+                    pack = _last_good.get("chart:cea", pack)
+            else:
+                with _last_good_lock:
+                    _last_good["chart:cea"] = pack
+                _save_snapshot()
             points = pack.get("points") or []
-            if not points:
-                points = _sim_source.fetch_cea()["points"]
             return {
                 "ok": bool(points),
                 "instrument": "cea",
@@ -486,10 +540,19 @@ def fetch_chart(instrument: str = "cea", kind: str = "daily") -> dict[str, Any]:
                 "queried_at": now_iso(),
                 "points": points,
             }
-        pack = fetch_ccer_series()
+        try:
+            pack = fetch_ccer_series()
+        except Exception:  # noqa: BLE001
+            logger.warning("ccer series fetch failed, fallback to history", exc_info=True)
+            pack = {}
+        if not pack.get("points"):
+            with _last_good_lock:
+                pack = _last_good.get("chart:ccer", pack)
+        else:
+            with _last_good_lock:
+                _last_good["chart:ccer"] = pack
+            _save_snapshot()
         points = pack.get("points") or []
-        if not points:
-            points = _sim_source.fetch_ccer()["points"]
         return {
             "ok": bool(points),
             "instrument": "ccer",
@@ -502,7 +565,8 @@ def fetch_chart(instrument: str = "cea", kind: str = "daily") -> dict[str, Any]:
             "points": points,
         }
 
-    return _cache.get_or(f"chart:{instrument}:{kind}", _fetch)
+    cache = _cache_ccer if instrument == "ccer" else _cache
+    return cache.get_or(f"chart:{instrument}:{kind}", _fetch)
 
 
 # ── 走势预测（策略模式：linear / moving_average / exponential） ──

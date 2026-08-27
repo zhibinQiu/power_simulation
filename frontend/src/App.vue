@@ -56,14 +56,11 @@
     <TftAnalysisDialog v-if="showTftAnalysis" @close="showTftAnalysis = false" />
     <ContextMenu />
     <SensitivityDialog />
-
-    <!-- 欢迎页：进入前覆盖主界面，选择项目后进入数字孪生 -->
-    <WelcomeScreen v-if="!store.entered" @open="onOpenProject" />
   </div>
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted, defineAsyncComponent } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { useSimStore } from './stores/sim'
 import TopBar from './components/TopBar.vue'
 import RibbonToolbar from './components/RibbonToolbar.vue'
@@ -73,13 +70,6 @@ import LeftSidebar from './components/LeftSidebar.vue'
 import ActivityBar from './components/ActivityBar.vue'
 import RightInspector from './components/RightInspector.vue'
 import SceneViewer from './components/SceneViewer.vue'
-import WelcomeScreen from './components/WelcomeScreen.vue'
-import DataView from './components/DataView.vue'
-import CarbonAssistantView from './views/CarbonAssistantView.vue'
-import CarbonCalcView from './components/CarbonCalcView.vue'
-import EnergyFlowView from './components/EnergyFlowView.vue'
-import CarbonBoxView from './components/CarbonBoxView.vue'
-import FlowEditor from './components/FlowEditor.vue'
 import { usePanelSizes } from './composables/usePanelSizes'
 import { useGlobalShortcuts } from './composables/useGlobalShortcuts'
 import { openAuditDialog } from './stores/scan'
@@ -94,6 +84,28 @@ const AboutDialog = defineAsyncComponent(() => import('./components/AboutDialog.
 const TftAnalysisDialog = defineAsyncComponent(() => import('./components/TftAnalysisDialog.vue'))
 const ContextMenu = defineAsyncComponent(() => import('./components/ContextMenu.vue'))
 const SensitivityDialog = defineAsyncComponent(() => import('./components/SensitivityDialog.vue'))
+
+// 视图类组件同样按需懒加载：CarbonBoxView（能碳一体机管理）等体量巨大（数千行），
+// 首屏同步打包会让 index 主包高达 600+KB；改为进入对应视图时才加载，首屏只保留
+// SceneViewer/LeftSidebar/RightInspector 等数字孪生核心组件，显著降低首屏加载与内存占用。
+const DataView = defineAsyncComponent(() => import('./components/DataView.vue'))
+const CarbonAssistantView = defineAsyncComponent(() => import('./views/CarbonAssistantView.vue'))
+const CarbonCalcView = defineAsyncComponent(() => import('./components/CarbonCalcView.vue'))
+const EnergyFlowView = defineAsyncComponent(() => import('./components/EnergyFlowView.vue'))
+const CarbonBoxView = defineAsyncComponent(() => import('./components/CarbonBoxView.vue'))
+const FlowEditor = defineAsyncComponent(() => import('./components/FlowEditor.vue'))
+
+// 等待视图组件挂载完成：懒加载组件首次打开需异步加载代码，ref 可能延迟可用
+function waitViewRef(r, timeout = 6000) {
+  if (r.value) return Promise.resolve(true)
+  return new Promise((resolve) => {
+    const t0 = Date.now()
+    const iv = setInterval(() => {
+      if (r.value) { clearInterval(iv); resolve(true) }
+      else if (Date.now() - t0 > timeout) { clearInterval(iv); resolve(false) }
+    }, 80)
+  })
+}
 
 const store = useSimStore()
 const topBarRef = ref(null)
@@ -193,23 +205,24 @@ function closeView() {
   pushCmd('已返回数字孪生场景。', 'out')
 }
 // 监测数据视图：重新拉取历史数据（DataView 暴露的 refresh）
-function dataRefresh() { if (dataViewRef.value && dataViewRef.value.refresh) dataViewRef.value.refresh() }
+async function dataRefresh() { await waitViewRef(dataViewRef); if (dataViewRef.value?.refresh) dataViewRef.value.refresh() }
 // 碳资产管理视图：刷新行情（CarbonAssistantView 暴露的 loadAll）
-function marketRefresh() { if (marketViewRef.value && marketViewRef.value.loadAll) marketViewRef.value.loadAll() }
+async function marketRefresh() { await waitViewRef(marketViewRef); if (marketViewRef.value?.loadAll) marketViewRef.value.loadAll() }
 // 碳资产管理视图：切换品种（CEA / CCER）与预测叠加开关（CarbonAssistantView 暴露）
-const marketSwitch = (v) => { if (marketViewRef.value) marketViewRef.value.switchInstrument(v) }
-const marketForecast = () => { if (marketViewRef.value) marketViewRef.value.toggleForecast() }
+const marketSwitch = async (v) => { await waitViewRef(marketViewRef); if (marketViewRef.value) marketViewRef.value.switchInstrument(v) }
+const marketForecast = async () => { await waitViewRef(marketViewRef); if (marketViewRef.value) marketViewRef.value.toggleForecast() }
 // 碳资产管理视图：打开报告生成侧边栏（CarbonAssistantView 暴露的 openReport）
-const carbonReport = () => { if (marketViewRef.value && marketViewRef.value.openReport) marketViewRef.value.openReport() }
+const carbonReport = async () => { await waitViewRef(marketViewRef); if (marketViewRef.value?.openReport) marketViewRef.value.openReport() }
 // 状态以函数形式传入工具栏，避免普通对象内的 computed 不自动解包；函数在工具栏渲染时求值并建立响应式依赖
 const marketInstrument = () => marketViewRef.value?.instrument || 'cea'
 const marketForecastOn = () => !!(marketViewRef.value?.forecastOn)
 // 碳资产管理视图：当前页签（market / ledger），供顶栏「视图」二级菜单勾选与工具栏区分行情/台账功能
 const marketTabOn = () => marketViewRef.value?.tab || 'market'
 // 顶栏「视图」二级菜单：打开碳资产管理并切换到指定页签（market 行情 / ledger 台账）
-const marketSubNav = (id) => {
+const marketSubNav = async (id) => {
   if (!store.carbonMarketOn) store.toggleCarbonMarket()
-  nextTick(() => marketViewRef.value && marketViewRef.value.switchTab(id))
+  await waitViewRef(marketViewRef)
+  if (marketViewRef.value) marketViewRef.value.switchTab(id)
   pushCmd(`视图 >> 碳资产管理 >> ${id === 'market' ? 'CEA / CCER 行情' : '企业台账与策略'}。`, 'cmd')
 }
 // 顶栏「视图」菜单：打开能碳一体机管理（原数据概览/设备管理两页签已合并为一界面）
@@ -218,7 +231,7 @@ const boxSubNav = () => {
   pushCmd('视图 >> 能碳一体机管理。', 'cmd')
 }
 // 碳资产管理视图：刷新企业台账（CarbonAssistantView 暴露的 refreshLedger，转发到台账面板 loadAll）
-const marketLedgerRefresh = () => { if (marketViewRef.value && marketViewRef.value.refreshLedger) marketViewRef.value.refreshLedger() }
+const marketLedgerRefresh = async () => { await waitViewRef(marketViewRef); if (marketViewRef.value?.refreshLedger) marketViewRef.value.refreshLedger() }
 
 // 供命令窗口调用的孪生控制动作
 const twinActions = { onSimToggle, onResetView, onOverview, togglePatrol, focusSel, onToggleEdit }
@@ -243,10 +256,6 @@ const menus = [
     { label: '重置仿真参数', act: onResetParams },
     { label: '应用当前情景', act: () => { store.refresh(); pushCmd('已应用当前仿真情景并重新计算。','cmd') } },
     { sep: true },
-    { label: '高炉数值分析', accel: 'Alt+T', act: () => {
-      if (store.simMode) showTftAnalysis.value = true
-      else store.toast = '高炉数值分析仅限仿真模式使用：请先开启仿真模式'
-    } },
     { label: '参数优化', act: () => pushCmd('参数优化：切换至「数据」工具条 → 策略生成，使用自然语言描述目标。','guide') },
     { label: '数据校准', act: () => pushCmd('数据校准：在右侧检视器选中设备查看实时/历史读数。','guide') },
   ] },
@@ -254,7 +263,6 @@ const menus = [
     { sub: true, label: '数字孪生', items: () => [
       { sub: true, label: '环境', items: () => store.envModes.map(e => ({ id: e.id, label: e.label, checked: e.id === store.envMode, run: () => onEnvChange({ target: { value: e.id } }) })) },
     ] },
-    { sep: true },
     { sub: true, label: '碳资产管理', items: () => [
       { label: 'CEA / CCER 行情', checked: store.carbonMarketOn && marketTabOn() === 'market', run: () => marketSubNav('market') },
       { label: '企业台账与策略', checked: store.carbonMarketOn && marketTabOn() === 'ledger', run: () => marketSubNav('ledger') },
@@ -305,17 +313,30 @@ const menus = [
 useGlobalShortcuts({
   store, onRun, focusSel,
   onMenuEsc: () => topBarRef.value && topBarRef.value.closeMenus(),
+  onTftAnalysis: () => {
+    if (store.simMode) showTftAnalysis.value = true
+    else store.toast = '高炉数值分析仅限仿真模式使用：请先开启仿真模式'
+  },
 })
 
-onMounted(() => {
+onMounted(async () => {
   store.init()
   store.pushCmd('工业能碳智控平台已就绪。输入 help 查看命令，或直接点击顶栏与工具条操作。', 'guide')
   store.pushCmd('提示：左侧资产树选工序，中间 3D 点击聚焦，右栏检视器看属性。', 'guide')
-})
-
-// 欢迎页选择项目后进入：等待初始化完成，再按所选流程路线打开项目
-async function onOpenProject(route) {
+  // 无宣传页：初始化完成后直接进入主界面（保留已保存方案，不重建覆盖）
   await store.waitReady()
-  store.openProject(route)
-}
+  if (!store.entered) {
+    store.entered = true
+    store.refresh()
+    store.sceneRev++
+  }
+  // 首屏渲染完成且浏览器空闲后，预取常用视图 chunk：兼顾首屏轻量与后续视图切换的响应速度
+  // （defineAsyncComponent 的 loader 拉取模块后即被缓存，再次打开无需重新请求）
+  const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 4000))
+  idle(() => {
+    import('./components/CarbonBoxView.vue')
+    import('./views/CarbonAssistantView.vue')
+    import('./components/DataView.vue')
+  }, { timeout: 8000 })
+})
 </script>

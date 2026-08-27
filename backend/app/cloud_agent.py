@@ -19,6 +19,7 @@ import json
 import os
 import threading
 import time
+import urllib.parse
 import urllib.request
 from collections import deque
 from typing import Any, Dict, Optional, Set
@@ -233,6 +234,26 @@ def crds(force: bool = False) -> Dict[str, Any]:
     return {"ok": False, "error": err, "models": [], "devices": []}
 
 
+def history(box: str = "", device: str = "", instance: str = "", prop: str = "",
+            start: str = "", end: str = "", points: int = 500) -> Dict[str, Any]:
+    """查询云端 TDengine 设备历史读数（GET /api/history，经 agent 通道）。
+
+    需云端已部署时序库（deploy_cloud.sh --tsdb-only）且 collector 持续把
+    data/{box}/{device}/{instance}/{property} 写入 nengtan.readings。
+    返回 agent 按时间窗口降采样后的序列 [{t: 毫秒窗口起点, v: 均值}]。
+    """
+    if not box:
+        return {"ok": False, "error": "box 必填"}
+    q = urllib.parse.urlencode({"box": box, "device": device, "instance": instance,
+                                "property": prop, "start": start, "end": end, "points": points})
+    ok, data, err = _http(f"/api/history?{q}", timeout=15)
+    if not ok:
+        return {"ok": False, "error": err}
+    if not isinstance(data, dict):
+        return {"ok": False, "error": "agent 返回格式异常"}
+    return data
+
+
 def logs() -> Dict[str, Any]:
     """云端 CloudCore 实时日志（MQTT cloud/logs 增量推送累积的环形缓冲）。"""
     with _LOCK:
@@ -337,6 +358,38 @@ def check_edge(host: str = "", port: int = 22) -> Dict[str, Any]:
     if ok and data:
         return data
     return {"ok": False, "reachable": False, "error": err}
+
+
+def rootca() -> Dict[str, Any]:
+    """拉取云端 rootCA.crt（base64），供盒子一键接入脚本内嵌，免除现场 scp。"""
+    ok, data, err = _http("/api/rootca", "GET", timeout=15)
+    if ok and data:
+        return data
+    return {"ok": False, "error": err}
+
+
+def edge_run(cmd: str, timeout: int = 300,
+             edge: "Optional[Dict[str, Any]]" = None) -> Dict[str, Any]:
+    """远程在边缘盒子执行一条命令（POST /api/edge/run，一键接入脚本执行用）。"""
+    body: Dict[str, Any] = {"cmd": cmd, "timeout": timeout}
+    if edge:
+        body["edge"] = edge
+    ok, data, err = _http("/api/edge/run", "POST", body, timeout=min(timeout + 30, 950))
+    if ok and data:
+        return data
+    return {"ok": False, "rc": 1, "stdout": "", "stderr": err}
+
+
+def edge_upload(path: str, data_b64: str, mode: str = "0644",
+                edge: "Optional[Dict[str, Any]]" = None) -> Dict[str, Any]:
+    """上传文件到边缘盒子（POST /api/edge/upload，base64 传输，用于推送一键接入脚本）。"""
+    body: Dict[str, Any] = {"path": path, "data": data_b64, "mode": mode}
+    if edge:
+        body["edge"] = edge
+    ok, data, err = _http("/api/edge/upload", "POST", body, timeout=600)
+    if ok and data:
+        return data
+    return {"ok": False, "rc": 1, "bytes": 0, "path": path, "stdout": "", "stderr": err}
 
 
 # ------------------------- WebSocket 广播（/api/ws/cloud） -------------------------

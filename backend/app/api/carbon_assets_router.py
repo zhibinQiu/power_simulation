@@ -38,7 +38,7 @@ share_router = APIRouter(tags=["report-share"])
 @router.get("/carbon-market/quotes")
 def carbon_market_quotes():
     """实时碳市场报价：CEA（上海环交所）+ CCER 最新成交、涨跌幅、月均价聚合。
-    数据由 carbon_market 模块拉取并做 60s TTL 缓存；外网不可用时降级为模拟行情。"""
+    数据由 carbon_market 模块拉取并做 60s TTL 缓存；远程失败时回退显示最近一次成功拉取的历史数据。"""
     return fetch_quotes()
 
 

@@ -786,7 +786,7 @@ def _noise(v, pct=0.04):
     title: '能碳一体机接入运维（KubeEdge）',
     body: `## 能碳一体机接入运维（KubeEdge）
 
-本平台接入 KubeEdge 云端/边缘体系，完整运维知识见仓库根目录 \`kubeedge-console-ops.md\`，以下为要点速查。
+本平台接入 KubeEdge 云端/边缘体系。盒子傻瓜式接入（GitHub 托管 · 配置文件驱动）见本章节后「盒子一键接入（GitHub 托管 · 配置驱动）」；以下为云端/边缘体系要点速查。
 
 ## 一、总体架构
 
@@ -896,7 +896,7 @@ keadm join --cloudcore-ipport=172.19.134.45:10000 --token=<token> --kubeedge-ver
    - 盒子一键部署（幂等）：\`ssh root@<盒子IP> "cd /opt/weight-bridge/box-deploy && ./deploy_box.sh"\`
    - 按现场定制 \`/opt/weight-bridge/config.json\`（deviceName/property 与云端 Device 一致、serial.port 串口、modbus 寄存器、mqtt.boxId），改完 \`systemctl restart box-mapper\`
    - 链路自检：\`./deploy_box.sh --check\`（只读验证 edgecore/dmi.sock/依赖/缓存目录）
-6. 云端创建 DeviceModel/Device（平台「能碳一体机管理」界面「新建设备」一键下发，或 kubectl apply \`backend/config/kubeedge/\` 下 YAML）；
+6. 云端创建 DeviceModel/Device（平台「能碳一体机管理」界面「新建设备」一键下发，或参考 \`platform/box-deploy/mapper/config.json\` 模板）；
 7. 云端触发路由并验证读数：\`kubectl annotate device <name> -n default sync=$(date +%s) --overwrite\` 后 \`kubectl get device <name> -o json | grep reported\`。
 
 注意：
@@ -920,6 +920,144 @@ openssl x509 -enddate -noout -in /etc/kubeedge/ca/rootCA.crt
 openssl x509 -enddate -noout -in /etc/kubeedge/certs/server.crt
 ss -tlnp | grep -E ':(1000[0-4])[^0-9]'
 \`\`\``,
+  },
+  {
+    id: 'box-onboard',
+    title: '盒子一键接入（GitHub 托管 · 配置驱动）',
+    body: `## 盒子一键接入（GitHub 托管 · 配置文件驱动）
+
+「能碳一体机管理 → 盒子接入」提供三种接入方式，其中 **GitHub 托管**为推荐方式：现场无需平台、无需源码，只凭一份 **box-config.json** + 仓库引导脚本，一条命令完成接入（EdgeCore join + box-deploy 采集部署 + 链路自检，幂等可重跑）。
+
+## 一、三种接入方式对比
+
+| 方式 | 适用场景 | 现场动作 |
+| --- | --- | --- |
+| ① GitHub 托管（推荐） | 盒子有外网，可访问 GitHub | 配置放盒子 /opt/weight-bridge/ + 一条 curl 命令 |
+| ② 自解压脚本 onboard_box.sh | 离线 / 内网，无法访问 GitHub | U 盘 / 局域网传 18MB 脚本，bash 执行 |
+| ③ 云端 agent 远程一键接入 | 盒子可达（现场部署 / 手机热点） | 平台点「远程一键接入」推送执行 |
+
+## 二、GitHub 托管接入（平台侧）
+
+平台操作路径：「能碳一体机管理 → 盒子接入 → GitHub 托管」：
+
+1. 填写 owner / repo / 分支（默认 master）/ GitHub PAT（仅「同步写入」需要，contents 写权限；公开仓库盒子现场拉取无需验证，留空沿用已保存），保存配置；
+2. 「🔄 同步到 GitHub」：平台把五类资产幂等推送到仓库 \`onboard/\` 目录：
+   - \`onboard_box.sh\`：轻量引导脚本（约 4KB，配置文件驱动）；
+   - \`box-deploy.tar.gz\`：采集部署包（约 13MB）；
+   - \`edgecore.yaml\`：保留 \`{{HOSTNAME}}\` / \`{{TOKEN}}\` / \`{{CLOUDIP}}\` 占位符，由盒子端按配置统一替换 —— 云端重建 / token 重签**无需重新同步**；
+   - \`rootCA.crt\` / \`token\`：共享接入凭据；
+3. 「⬇ 导出 box-config.json」：生成现场配置文件（现场无平台、无源码时使用）。
+
+## 三、box-config.json 字段
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| boxId | 是 | 盒子主机名（与云端 K8s 节点名一致，如 my-box-01） |
+| cloudIP | 是 | 云端 CloudCore / MQTT Broker 地址（如 172.19.134.45） |
+| token | 否 | 共享接入 token；留空时脚本自动从仓库 \`onboard/token\` 拉取 |
+| repo | 否 | 镜像仓库 owner/repo（如改用 gitee 镜像时填写，覆盖脚本内置仓库地址） |
+| branch | 否 | 镜像仓库分支（默认 master） |
+
+其余未知字段（如平台导出的 \`_说明\`）脚本一律忽略，导出内容可直接使用。
+
+## 四、现场一条命令（盒子 root）
+
+\`\`\`bash
+# 方式 A（推荐）：配置放到 /opt/weight-bridge/box-config.json 后，脚本自动识别
+curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/onboard/onboard_box.sh | bash
+
+# 方式 B：显式指定配置路径（配置不在默认位置时）
+curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/onboard/onboard_box.sh | bash -s -- -c /path/box-config.json
+
+# 方式 C：无配置文件，命令行直接给参数
+curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/onboard/onboard_box.sh | bash -s -- -i 172.19.134.45 -n my-box-01
+
+# 方式 D：仅指定主机名（其余用脚本内置默认 + 仓库 token）
+curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/onboard/onboard_box.sh | bash -s my-box-01
+\`\`\`
+
+引导脚本自动完成：
+
+1. **参数解析与配置读取**：\`-c\` / \`-i\` / \`-n\` 命令行 > box-config.json（默认路径 \`/opt/weight-bridge/box-config.json\` 或 \`-c\` 指定）> 脚本内置默认值；
+2. **① EdgeCore 接入**：edgecore 未运行且有 keadm → \`keadm join\`（已接入自动跳过）；
+3. **② 配置下发**：rootCA + edgecore.yaml 从仓库拉取，python3 一次替换 \`{{HOSTNAME}}\` / \`{{TOKEN}}\` / \`{{CLOUDIP}}\`，重启 edgecore；
+4. **③ 部署包解包**：box-deploy.tar.gz 解压到 \`/opt/weight-bridge/box-deploy/\`；
+5. **④ config.json 定制**：首次生成时自动设 \`mqtt.boxId\` / \`mqtt.broker.host\`；
+6. **⑤ 一键部署 + 链路自检**：\`./deploy_box.sh\` + \`./deploy_box.sh --check\`。
+
+## 五、注意事项
+
+- **仓库公开则盒子现场拉取无需任何验证**（推荐公开，盒子一条 \`curl\` 即可拉全资产；内含共享 token 与 rootCA，是否公开请自行权衡）。token 重签后需平台重新「同步到 GitHub」，或现场 box-config.json 填入新 token（edgecore.yaml 无需重推）；
+- **box-deploy 部署包升级**后需平台重新「同步到 GitHub」一次；
+- 盒子主机名 = 云端 K8s 节点名（拼写不一致会导致断链，如 chengzhong1 与 chengzhong 不匹配）；
+- keadm join 与 edgecore.yaml 的 token 均按「配置文件 > 仓库拉取 > 报错提示」取值；
+- 离线 / 内网环境请使用「方式 ② 自解压脚本」或「方式 ③ 云端 agent 远程接入」。
+
+## 六、GitHub 源码一键部署（全新服务器 + 全新盒子）
+
+仓库公开后，除「GitHub 托管（平台预同步资产）」外，还支持**直接从源码仓库一键部署**，适合**全新服务器 + 全新盒子**场景，全程无需平台先同步资产：
+
+### 全新服务器 · 一键部署平台
+
+\`\`\`bash
+# 服务器 root（Ubuntu / Debian / CentOS），自动：拉源码 → 装依赖 → 构建前端 → systemd 启动
+curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/server.sh | bash
+# 自定义仓库 / 分支 / 目录 / 端口（默认 40013，遵循 40000+ 端口规范）：
+curl -fsSL <同上> | bash -s -- -r gitee.com/user/mirror -b main -d /opt/carbon-platform -p 40013
+\`\`\`
+
+平台监听 40013（可用 \`-p\` 修改），前端由后端托管、单端口对外；如需云端能力（K3s + CloudCore + cloud-agent），另用 \`platform/cloud-deploy/deploy_cloud.sh\` 部署。
+
+### 全新盒子 · 一键接入（免平台预同步）
+
+\`\`\`bash
+# 盒子 root；先放好 /opt/weight-bridge/box-config.json（boxId/cloudIP/token 必填）
+curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/box.sh | bash
+# 或命令行直接给参数（无配置文件）：
+curl -fsSL <同上> | bash -s -- -i 172.19.134.45 -n my-box-01 -t <token>
+\`\`\`
+
+与 \`onboard_box.sh\` 的区别：\`deploy/box.sh\` 直接拉**公开源码仓库** tarball（内含 box-deploy 部署包与 edgecore 模板），**无需平台「同步到 GitHub」**；唯一仍需现场提供的是**共享 token**（公开仓库不存放动态凭证，平台「导出 box-config.json」可自动填入）。box-config.json 额外支持 \`rootCA\`（base64，可选；keadm join 会自动从云端拉取）。
+
+| 脚本 | 前置条件 | 适用场景 |
+| --- | --- | --- |
+| \`onboard_box.sh\`（仓库 \`onboard/\` 目录） | 平台已「同步到 GitHub」 | 有平台、现场只有一份配置文件 |
+| \`deploy/box.sh\`（源码仓库） | 公开仓库 + token | 全新盒子 / 无平台预同步 |
+
+### 更新（服务器 · 数据安全优先）
+
+\`\`\`bash
+# 已部署实例升级，先备份现场数据 → 更新 → 恢复 → 重建前端 → 重启
+curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/update.sh | bash -s -- -d /opt/carbon-platform
+\`\`\`
+
+- 必须用 \`update.sh\` 而不是重跑 \`server.sh\`：源码仓库**跟踪**了 \`backend/config/\` 下的 \`box_config.json\` / \`box_devices.json\`（设备 CRD）/ \`links.json\`（设备关联）/ \`mqtt.yaml\`（云端 MQTT）与 \`backend/data/\`（碳合规、历史报告），直接 \`git reset --hard\` 会把这些**现场数据覆盖丢失**；update.sh 更新前自动备份到 \`<安装目录>/.update-backup-<时间戳>\`、更新后自动恢复，全程不丢数据。
+- \`platform_config.json\` / \`strategies.json\` / \`.env\` / \`github_config.json\` 已被 gitignore，常规更新不受影响（备份逻辑同样覆盖，双保险）。
+- \`server.sh\` 检测到已部署实例时会导向 \`update.sh\`，不会自行覆盖。
+- 盒子侧更新：重新执行 \`deploy/box.sh\` 即可（幂等——edgecore 运行中跳过 join、\`/opt/weight-bridge/config.json\` 现场配置保留，仅更新 box-deploy 程序）。
+
+### 云端时序数据库（TDengine · 设备历史落时序库）
+
+盒子实时读数（\`data/{box}/{device}/{instance}/{property}\`）默认只在平台内存保留最近约 10 分钟；若需**云端持久化历史**并支持跨天查询曲线，可在云端部署 TDengine 时序库：
+
+\`\`\`bash
+# 云端：完整部署会一并装时序库；也可只装时序库
+./deploy_cloud.sh --tsdb-only          # 仅部署 TDengine（已装自动跳过）
+./deploy_cloud.sh --bootstrap --ip <IP> # 完整一键（含时序库）
+# 云端无外网：先手动下载 TDengine-server-<ver>-Linux-<arch>.tar.gz
+# TDSB_TAR=/path/tdengine.tar.gz ./deploy_cloud.sh --tsdb-only
+\`\`\`
+
+- 部署内容：TDengine（taosd 6030 / taosadapter REST 6041，**仅本地监听不对外放行**），初始化库 \`nengtan\`（保留 \`TSDB_KEEP\` 天，默认 30）与超表 \`readings(ts, value) TAGS(box, device, instance, property)\`。
+- 数据写入：云端 \`collector\`（nengtan-collector.service）订阅 \`data/#\`，数值读数**每秒批量**写入时序库（REST，失败不阻塞订阅，原始数据仍全量落盘 collected/ 日志兜底）。
+- 查询链路：平台「数据视图 → 云端时序」或「盒子接入 → 设备列表 → 📈 历史」→ 后端 → cloud-agent \`/api/history\`（Bearer 认证）→ 云端本地查 TDengine → 按时间窗口降采样返回曲线。支持时间范围（近 1 小时 / 6 小时 / 24 小时 / 7 天），四元组自动从设备 node/name/twins 推导（property 可切换）。「数据视图」默认展示本地模拟历史，切到「云端时序」后设备列表来自 /box/devices/realtime（云端 CRD 设备），历史数据即从 TDengine 拉取，与盒子上报数据同源。
+- 自检：\`./deploy_cloud.sh --check\` 会显示 taosd 状态、6041 监听与 \`readings\` 总点数。
+- 数据量说明：单盒子单属性 1Hz ≈ 8.6 万点/天；TDengine 超表按 tag 自动建子表、压缩率高，几十个盒子完全无压力。
+
+## 七、关联章节
+
+- 云端体系 / 设备 CRD / 常见故障排查见「能碳一体机接入运维（KubeEdge）」；
+- 采集 mapper / 部署包 / 诊断工具说明见「能碳一体机管理」界面「接入指引」页签。`,
   },
   {
     id: 'contract',
@@ -1084,15 +1222,15 @@ ss -tlnp | grep -E ':(1000[0-4])[^0-9]'
 
 - **CEA**：从上海环境能源交易所公开行情页解析（日 K 序列 + 最新价 + 月聚合）；
 - **CCER**：优先从全国温室气体自愿减排交易系统（北京绿色交易所）日行情列表拉取，失败回退碳中和网整理的历史表 + 最新报价解析；
-- 任一环节失败（网络不可用 / 超时 / 解析失败）时，自动回退到**内置模拟行情**（按分钟确定性随机游走生成，保证轮询时数值持续变化），并在响应中标注来源 \`simulated\`，前端据此显示「模拟」徽标；
+- 任一环节失败（网络不可用 / 超时 / 解析失败）时，**不做模拟兜底**，回退显示最近一次成功拉取的**历史数据**（进程内缓存）；无历史数据时对应品种返回空对象，前端显示 \`--\`；
 - 全接口采用 **60 秒 TTL 缓存**（\`_TtlCache\` + 线程锁）：首次请求后缓存 60 秒，期间请求直接命中缓存，避免高频打外网。
 
 ## 二、API 契约
 
 | 接口 | 返回要点 |
 | --- | --- |
-| GET /api/carbon-market/quotes | \`{ ok, simulated, queried_at, cea, ccer, cea_monthly[], daily_count, intraday }\`；cea/ccer 含 \`t\`/价格/\`change_pct\`（涨跌幅）/来源；\`simulated\` 标识是否模拟数据 |
-| GET /api/carbon-market/chart?instrument=cea\|ccer&kind=daily | \`{ ok, instrument, kind, title, unit, source_name, source_page, queried_at, points[] }\`；CEA 返回日K线（t/开/高/低/收/量），CCER 返回成交均价折线；无外网时生成模拟序列兜底 |
+| GET /api/carbon-market/quotes | \`{ ok, simulated, queried_at, cea, ccer, cea_monthly[], daily_count, intraday }\`；cea/ccer 含 \`t\`/价格/\`change_pct\`（涨跌幅）/来源；\`simulated\` 恒为 false（无模拟数据，远程失败回退历史缓存） |
+| GET /api/carbon-market/chart?instrument=cea\|ccer&kind=daily | \`{ ok, instrument, kind, title, unit, source_name, source_page, queried_at, points[] }\`；CEA 返回日K线（t/开/高/低/收/量），CCER 返回成交均价折线；远程失败回退最近一次成功的历史序列 |
 | GET /api/carbon-market/forecast?instrument=cea\|ccer&days=10 | \`{ ok, instrument, days, method, confidence, slope, base_date, source_name, history_tail[], forecast[] }\`；forecast 中每点带 \`t/price/high/low\`（high/low 为 ±1.65σ 置信带），days 默认 10，上限 30 |
 
 ## 三、预测算法（forecast_series）
@@ -1104,7 +1242,7 @@ ss -tlnp | grep -E ':(1000[0-4])[^0-9]'
 
 ## 四、前端集成
 
-- \`CarbonAssistantView.vue\`：碳资产管理主入口，集成行情卡片（CEA 最新价/涨跌幅/成交量/今开/最高/最低/昨收 + CCER 最新均价/成交量/基准参考）、CEA 蜡烛图（30 日 OHLCV）与 CCER 折线页签切换、预测叠加与置信带（±1.65σ）；右上角与顶栏工具栏提供「生成碳资产报告」入口，侧边栏报告中心支持三种报告类型（履约综合分析 / 碳交易简报 / 政策摘要）与三种预测方法（线性回归 / 移动平均 / 指数平滑），后台任务含进度条与取消，历史报告支持搜索/筛选/分页、结论摘要卡片、HTML 阅读页、Markdown 下载与删除；15 秒轮询，断开自动停止；「实时数据 / 模拟行情」徽标来自 quotes.simulated；
+- \`CarbonAssistantView.vue\`：碳资产管理主入口，集成行情卡片（CEA 最新价/涨跌幅/成交量/今开/最高/最低/昨收 + CCER 最新均价/成交量/基准参考）、CEA 蜡烛图（30 日 OHLCV）与 CCER 折线页签切换、预测叠加与置信带（±1.65σ）；右上角与顶栏工具栏提供「生成碳资产报告」入口，侧边栏报告中心支持三种报告类型（履约综合分析 / 碳交易简报 / 政策摘要）与三种预测方法（线性回归 / 移动平均 / 指数平滑），后台任务含进度条与取消，历史报告支持搜索/筛选/分页、结论摘要卡片、HTML 阅读页、Markdown 下载与删除；15 秒轮询，断开自动停止；
 - \`StatusBar.vue\`：底部滚动播报快讯摘要（与「市场快讯服务」联动），鼠标悬停暂停滚动。`,
   },
   {
@@ -1252,7 +1390,7 @@ ss -tlnp | grep -E ':(1000[0-4])[^0-9]'
 
 | 组件 | 职责 |
 | --- | --- |
-| WelcomeScreen | 启动欢迎页：展示平台功能特性与能力链路，选择项目模板（钢铁长流程 / 短流程）进入系统 |
+| — | 无宣传页：打开网址直接进入系统主界面，按已保存方案/默认长流程展示数字孪生 |
 | ActivityBar | 类 VS Code 活动栏：资源管理器 / 搜索 / 场景 / 连接 四个入口，切换左侧面板 |
 | StatusBar | 底部状态栏：实时链路状态、工序/物流计数、监测点位、市场快讯滚动（点击弹详情）、策略情景、时钟与通知 |
 | SearchPanel | 全局搜索：按名称模糊匹配工序 / 物料 / 策略 / 设备，点击结果联动检视器、资源管理器与 3D 聚焦 |

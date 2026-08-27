@@ -1,21 +1,35 @@
-"""能碳一体机 · 云端传感器数据落盘接收器 (nengtan-collector)。
+"""能碳一体机 · 云端传感器数据接收器 (nengtan-collector)。
 
-订阅云端 MQTT Broker(41883) 的 '#'，把收到的 payload 按日写入 collected/ 目录。
+订阅云端 MQTT Broker(41883) 的 '#'，双通道处理：
+    - 落盘：全部主题 payload 按日写入 collected/ 目录（JSON lines，原始数据全量保留）
+    - 时序库：解析 data/{box}/{device}/{instance}/{property} 设备读数，批量写入
+      云端 TDengine（nengtan.readings 超表，见 deploy_cloud.sh --tsdb-only）；
+      写失败不阻塞订阅主循环（原始数据仍有落盘兜底）
 实现与 backend/app/mqtt_source.py 同源（参照参考项目 deploy_pkg/collect_sensor_data.py）：
     - paho-mqtt，默认 MQTT 5.0（amqtt 0.12 对 MQTT 3.1.1 跨客户端路由有缺陷）
     - 默认订阅 '#'（amqtt 对 'data/#' 前缀通配符路由有缺陷），on_message 过滤 $SYS
     - 唯一 client_id（含 pid），断线自动重连（1s→30s 退避）
 
+环境变量（TDengine 写入，均可选，默认本地 127.0.0.1:6041）：
+    TSDB_ENABLED  默认 1；设 0 关闭时序写入（仅落盘）
+    TSDB_URL      taosadapter REST 地址，默认 http://127.0.0.1:6041
+    TSDB_USER     默认 root；TSDB_PASS 默认 taosdata
+    TSDB_DB       默认 nengtan
+
 systemd: nengtan-collector.service
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
 import random
 import sys
+import threading
 import time
+import urllib.request
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 
@@ -27,6 +41,18 @@ BROKER_USER = os.getenv("BROKER_USER", "")
 BROKER_PASS = os.getenv("BROKER_PASS", "")
 TOPICS = os.getenv("MQTT_TOPICS", "#")
 OUT_DIR = Path(os.getenv("OUT_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "collected")))
+
+# ------------------------- TDengine 时序写入 -------------------------
+TSDB_ENABLED = os.getenv("TSDB_ENABLED", "1") == "1"
+TSDB_URL = os.getenv("TSDB_URL", "http://127.0.0.1:6041").rstrip("/")
+TSDB_USER = os.getenv("TSDB_USER", "root")
+TSDB_PASS = os.getenv("TSDB_PASS", "taosdata")
+TSDB_DB = os.getenv("TSDB_DB", "nengtan")
+TSDB_STABLE = f"{TSDB_DB}.readings"
+_TS_BUF: "deque[str]" = deque(maxlen=4096)  # 待写入的行 (ts,value,'box',...) 转义后片段
+_TS_LOCK = threading.Lock()
+_TS_FLUSH_SEC = 1.0  # 批量冲刷间隔
+_TS_MAX_BATCH = 512  # 单次批量最大行数
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -52,6 +78,70 @@ def _record(topic: str, payload: bytes) -> None:
         log.warning("写盘失败: %s", e)
 
 
+# ------------------------- TDengine 时序写入 -------------------------
+
+def _esc(s: str) -> str:
+    """NCHAR 字符串单引号转义（' → ''），防 SQL 注入。"""
+    return str(s).replace("'", "''")
+
+
+def _ts_record(topic: str, payload: bytes) -> None:
+    """解析 data/{box}/{device}/{instance}/{property} 读数并入时序缓冲。
+
+    非 data/ 主题、非数值 payload 一律跳过（原始数据仍由落盘保留）。
+    """
+    parts = topic.split("/")
+    if len(parts) != 5 or parts[0] != "data":
+        return
+    try:
+        value = float(payload.decode("utf-8", errors="replace").strip())
+    except (ValueError, TypeError):
+        return
+    if value != value:  # NaN
+        return
+    ts_ms = int(time.time() * 1000)
+    box, device, instance, prop = (_esc(parts[1]), _esc(parts[2]), _esc(parts[3]), _esc(parts[4]))
+    row = f"({ts_ms},{value!r},'{box}','{device}','{instance}','{prop}')"
+    with _TS_LOCK:
+        _TS_BUF.append(row)
+
+
+def _ts_flush() -> None:
+    """把缓冲批量写入 TDengine（REST /rest/sql）。失败仅告警，原始数据有落盘兜底。"""
+    if not TSDB_ENABLED:
+        return
+    with _TS_LOCK:
+        rows = list(_TS_BUF)
+        _TS_BUF.clear()
+    if not rows:
+        return
+    for i in range(0, len(rows), _TS_MAX_BATCH):
+        batch = rows[i:i + _TS_MAX_BATCH]
+        sql = f"INSERT INTO {TSDB_STABLE} VALUES " + " ".join(batch)
+        auth = base64.b64encode(f"{TSDB_USER}:{TSDB_PASS}".encode()).decode()
+        req = urllib.request.Request(
+            f"{TSDB_URL}/rest/sql", data=sql.encode("utf-8"), method="POST",
+            headers={"Authorization": f"Basic {auth}", "Content-Type": "text/plain"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode("utf-8", errors="replace"))
+            if data.get("code", 0) != 0:
+                log.warning("TDengine 写入失败: %s (%s)", data.get("desc"), sql[:160])
+        except Exception as e:  # noqa: BLE001 TDengine 不可用不影响订阅主循环
+            log.warning("TDengine 写入异常: %s", e)
+            return
+
+
+def _ts_flush_worker() -> None:
+    while True:
+        time.sleep(_TS_FLUSH_SEC)
+        try:
+            _ts_flush()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None) -> None:
     if rc == 0:
         log.info("已连接 %s:%s (MQTT5=%s), 订阅 %s", BROKER_HOST, BROKER_PORT, mqtt.MQTTv5, TOPICS)
@@ -69,6 +159,7 @@ def on_message(client: mqtt.Client, userdata, msg) -> None:
     if msg.topic.startswith("$SYS"):  # 过滤系统主题
         return
     _record(msg.topic, msg.payload)
+    _ts_record(msg.topic, msg.payload)
     log.debug("[%s] %s %s", msg.topic, len(msg.payload), msg.payload[:120])
 
 
@@ -87,6 +178,9 @@ def main() -> None:
     client.reconnect_delay_set(min_delay=1, max_delay=30)  # 1s→30s 退避
 
     log.info("启动 collector: %s:%s topics=%s out=%s", BROKER_HOST, BROKER_PORT, TOPICS, OUT_DIR)
+    if TSDB_ENABLED:
+        threading.Thread(target=_ts_flush_worker, daemon=True).start()
+        log.info("TDengine 时序写入已开启: %s stable=%s", TSDB_URL, TSDB_STABLE)
     while True:
         try:
             client.connect(BROKER_HOST, BROKER_PORT, keepalive=60)

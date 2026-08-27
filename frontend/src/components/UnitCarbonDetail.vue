@@ -122,6 +122,8 @@
           </div>
           <div class="chip2"><span>实时排放</span><b>{{ f(liveData != null ? liveData : res.co2_total) }}</b><i>tCO₂/h</i></div>
         </div>
+        <!-- 高炉数值仿真分析入口：全厂高炉 TFT 数值总览与调参推演（原仿真菜单入口迁移至此） -->
+        <button v-if="unit.type === 'blast_furnace'" class="tft-entry-btn" @click="openTftAnalysis">高炉数值仿真分析</button>
       </CollapseSection>
 
       <CollapseSection
@@ -254,16 +256,20 @@
     <p>当前产线未部署该工艺，暂无核算数据。</p>
     <p class="sub">进入「编排」后，可将左侧条目拖入编排画布并仿真测试。</p>
   </div>
+  <!-- 高炉数值仿真分析弹窗（随入口按钮按需打开，异步分包降低首屏体积） -->
+  <TftAnalysisDialog v-if="showTft" @close="showTft = false" />
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import { energyOf } from '../utils/energy'
 import { useSimStore, UNIT_TYPES } from '../stores/sim'
 import { DEVICE_MAP, PROCESS_ADJUSTABLE, MATERIAL_MAP } from '../data/flowLibrary'
 import CollapseSection from './CollapseSection.vue'
 import { buildRealtimeTftParams, collectTftContext, DEFAULT_TFT_CONFIG } from '../utils/tft'
 import { useDragLayout } from '../composables/useDragSort'
+// 高炉数值仿真分析弹窗：仅在点击入口时按需加载
+const TftAnalysisDialog = defineAsyncComponent(() => import('./TftAnalysisDialog.vue'))
 
 const store = useSimStore()
 
@@ -312,6 +318,12 @@ const tftCtx = computed(() => {
   if (!unit.value || unit.value.type !== 'blast_furnace') return null
   try { return collectTftContext(tftParams.value || {}, DEFAULT_TFT_CONFIG) } catch (e) { return null }
 })
+// 高炉数值仿真分析：仅仿真模式可用（与 Alt+T 快捷键同一入口逻辑）
+const showTft = ref(false)
+function openTftAnalysis() {
+  if (store.simMode) showTft.value = true
+  else store.toast = '高炉数值分析仅限仿真模式使用：请先开启仿真模式'
+}
 
 // 编排模式设定的输入输出与配比（只读展示）：实例 id 与编排节点 id 一致，直接查找
 const ioNode = computed(() => {
@@ -424,6 +436,10 @@ function fmtNum(n) { return Number(n).toLocaleString('zh-CN', { maximumFractionD
 /* .chips 已统一定义于全局 main.css */
 /* TFT 卡片：与实时监测其它指标同一 chip2 形式，右侧附加状态徽章 */
 .chip2.tft em { font-style: normal; font-size: 9px; line-height: 15px; color: #fff; border-radius: 8px; padding: 0 6px; margin-left: auto; flex: 0 0 auto; }
+/* 高炉数值仿真分析入口按钮（随「实时监测」TFT 卡片展示） */
+.tft-entry-btn { display: block; width: 100%; margin-top: 8px; padding: 6px 8px; font-size: 11px; text-align: center;
+  border-radius: 3px; border: 1px solid var(--accent2); background: transparent; color: var(--accent2); cursor: pointer; }
+.tft-entry-btn:hover { background: var(--accent2); color: #fff; }
 /* 输入输出（编排设定）只读展示 */
 .io-card { display: flex; gap: 14px; }
 .io-col { flex: 1; min-width: 0; }

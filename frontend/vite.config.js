@@ -22,6 +22,8 @@ export default defineConfig({
     proxy: {
       // 开发期把 API/WS 代理到后端，避免跨域
       '/api': { target: 'http://127.0.0.1:8010', changeOrigin: true, ws: true },
+      // 盒子/云端设备相关接口（/box/*）同样代理到后端，避免前端 SPA fallback 返回 index.html
+      '/box': { target: 'http://127.0.0.1:8010', changeOrigin: true },
       // 报告新页面（/report/<id>）也由后端渲染，开发期代理到后端
       '/report': { target: 'http://127.0.0.1:8010', changeOrigin: true },
     },

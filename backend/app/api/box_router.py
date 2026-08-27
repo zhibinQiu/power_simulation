@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from .. import box_console
 from .. import cloud_agent
+from .. import github_deploy
 from .. import mqtt_source
 
 router = APIRouter(prefix="/api", tags=["box-console"])
@@ -115,6 +116,34 @@ class BoxOnboardRequest(BaseModel):
     hostname: str = "edge-box"
     cloudIP: str = ""
     boxIP: str = ""
+
+
+class BoxOnboardRemoteRequest(BaseModel):
+    """盒子远程一键接入（云端 agent SSH 推送并执行 onboard_box.sh）。
+
+    boxIP/port/user/password/key 可选：覆盖云端 agent 默认 edge 连接（config.json edge 字段）。
+    盒子无直达 IP 时云端无法 SSH 直达，请改用「下载脚本 → 现场执行」。"""
+    hostname: str = "edge-box"
+    cloudIP: str = ""
+    boxIP: str = ""
+    port: int = 22
+    user: str = ""
+    password: str = ""
+    key: str = ""
+
+
+class GitHubConfigRequest(BaseModel):
+    """GitHub 托管配置（盒子一键接入资产同步到用户 GitHub 仓库）。
+
+    token 为 GitHub 个人访问令牌（PAT，contents 写权限）；留空表示沿用已保存值。"""
+    owner: str = ""
+    repo: str = ""
+    branch: str = "master"
+    token: str = ""
+
+
+class GitHubPushRequest(BaseModel):
+    cloudIP: str = ""
 
 
 class BoxPublishRequest(BaseModel):
@@ -258,6 +287,9 @@ class BoxCloudRestartRequest(BaseModel):
     - kind=edge：SSH 到边缘盒子 systemctl restart 边缘服务（name ∈ box-mapper / edgecore
       / box-collector，namespace 忽略）
     """
+    kind: str = "deployment"      # deployment | pod | systemd | edge
+    name: str = ""                # 工作负载 / 云端服务 / 边缘服务名
+    namespace: str = "default"    # kind=deployment/pod 时的命名空间
 
 
 @router.get("/box/cloud/config")
@@ -380,6 +412,18 @@ def box_cloud_logs():
     return box_console.cloud_logs()
 
 
+@router.get("/box/cloud/tsdb/history")
+def box_cloud_tsdb_history(box: str = "", device: str = "", instance: str = "",
+                           prop: str = "", start: str = "", end: str = "", points: int = 500):
+    """云端时序库历史读数查询（TDengine，经 agent /api/history）。
+
+    参数：box/device/instance/prop 主题四元组（至少 box）；start/end 支持毫秒时间戳或
+    'YYYY-MM-DD HH:MM:SS'（缺省近 24h）；points 目标点数（默认 500，最大 2000）。
+    返回降采样序列 [{t, v}]，用于前端历史曲线。
+    """
+    return cloud_agent.history(box, device, instance, prop, start, end, points)
+
+
 @router.post("/box/devices/apply")
 def box_devices_apply(req: BoxApplyRequest):
     """一键下发：调云端 agent 本地 kubectl apply（DeviceModel+Device，HTTP POST /api/apply）。
@@ -407,8 +451,53 @@ def box_ingest(req: BoxIngestRequest):
 
 @router.post("/box/nodes/onboard")
 def box_onboard(req: BoxOnboardRequest):
-    """盒子接入：edgecore.yaml 模板渲染 + 共享 token + caHash + 部署命令。"""
+    """盒子接入：生成自解压一键脚本（内嵌 box-deploy 包 + rootCA + edgecore.yaml + token），
+    返回脚本元信息（下载走 GET /box/nodes/onboard/script，远程一键走 POST /box/nodes/onboard/remote）。"""
     return box_console.onboard_node(req.model_dump())
+
+
+@router.get("/box/nodes/onboard/script")
+def box_onboard_script():
+    """下载已生成的一键接入脚本（onboard_box.sh，base64），浏览器/前端可落盘为可执行文件。"""
+    return box_console.onboard_script_download()
+
+
+@router.post("/box/nodes/onboard/remote")
+def box_onboard_remote(req: BoxOnboardRemoteRequest):
+    """盒子远程一键接入：云端 agent 把 onboard_box.sh 推送到盒子并执行（bash /opt/onboard_box.sh）。
+
+    前提：云端 agent config.json 已配置 edge（盒子可达地址）；或本请求带 boxIP/凭据覆盖。
+    盒子无直达 IP 时返回友好错误，指引改用「下载脚本 → 现场执行」。"""
+    return box_console.box_onboard_remote(req.model_dump())
+
+
+@router.get("/box/onboard/github-config")
+def box_github_config():
+    """GitHub 托管配置（owner/repo/branch/token 是否已设置）。"""
+    return github_deploy.get_config()
+
+
+@router.post("/box/onboard/github-config")
+def box_github_config_save(req: GitHubConfigRequest):
+    """保存 GitHub 托管配置（token 留空表示沿用已保存值，存在本地文件 chmod 600）。"""
+    return github_deploy.save_config(req.model_dump())
+
+
+@router.post("/box/onboard/github-push")
+def box_github_push(req: GitHubPushRequest):
+    """把盒子一键接入资产（引导脚本 + box-deploy 包 + edgecore.yaml + rootCA + token）
+    同步到 GitHub 仓库 onboard/ 目录（幂等覆盖）。返回盒子现场命令。"""
+    return github_deploy.push_to_github(str(req.cloudIP or "").strip())
+
+
+@router.get("/box/nodes/onboard/config-export")
+def box_onboard_config_export(hostname: str = "", cloudIP: str = ""):
+    """导出盒子现场接入配置文件 box-config.json（配合仓库 onboard_box.sh 使用）。
+
+    场景：现场无平台、无源码，手头只有这份配置文件 ——
+      放到盒子 /opt/weight-bridge/box-config.json 后一条命令 curl … | bash 即完成接入。
+    """
+    return github_deploy.export_box_config(hostname, cloudIP)
 
 
 @router.get("/box/stats")
