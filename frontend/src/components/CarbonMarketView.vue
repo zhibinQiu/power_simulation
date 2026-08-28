@@ -479,7 +479,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
 .cm-card-exch {
   font-size: 10px; color: var(--muted);
   background: var(--panel-2); border: 1px solid var(--border);
-  padding: 1px 8px; border-radius: 999px;
+  padding: 1px 8px; border-radius: 2px;
 }
 .cm-card-price { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
 .cm-price {
@@ -634,13 +634,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
 .cm-ticker a { color: var(--accent); text-decoration: none; }
 .cm-ticker a:hover { text-decoration: underline; }
 .cm-ticker-dot {
-  width: 7px; height: 7px; border-radius: 50%; flex: none;
-  background: var(--green); box-shadow: 0 0 0 0 rgba(46, 158, 99, 0.6);
-  animation: cmPulse 2s infinite;
-}
-@keyframes cmPulse {
-  0% { box-shadow: 0 0 0 0 rgba(46, 158, 99, 0.5); }
-  70% { box-shadow: 0 0 0 8px rgba(46, 158, 99, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(46, 158, 99, 0); }
+  width: 6px; height: 6px; border-radius: 2px; flex: none;
+  background: var(--green);
 }
 </style>

@@ -1,5 +1,6 @@
 <template>
-  <div class="scn-wrap">
+  <div class="scn-wrap" :class="{ 'drop-back': dropBackOver }"
+       @dragover="onBackOver" @dragleave="onBackLeave" @drop="onDropBack">
     <!-- 场景概要（标题由侧边栏头部统一显示，这里只保留统计） -->
     <div class="scn-head">
       <div class="scn-stats">
@@ -32,12 +33,16 @@
         <div class="tchildren" v-show="open[u.id] !== false">
           <div v-if="!devsOf(u.id).length" class="empty-hint sm">该工序暂无设备</div>
           <div v-for="d in devsOf(u.id)" :key="d.id" class="tchild leaf dev-leaf click"
-               :class="{ active: store.deviceDetailId === d.id }"
-               :title="d.measures ? d.label + '（' + d.measures + '）' : d.label"
-               @click="store.openDeviceDetail(d.id)">
+               :class="{ active: store.deviceDetailId === d.id, 'drag-src': dragId === d.id }"
+               :draggable="!store.editMode"
+               :title="(d.measures ? d.label + '（' + d.measures + '）' : d.label) + ' · 拖拽至「数据分析与策略」作为数据源'"
+               @click="store.openDeviceDetail(d.id)"
+               @dragstart="onDevDrag($event, d)"
+               @dragend="onDevDragEnd">
             <span class="tc-tt">{{ d.label }}</span>
             <span v-if="d.adjustable" class="adj-badge" title="可调设备：设定值可调节">可调</span>
             <span class="dev-live">{{ fmt(d.live) }}<span v-if="d.unit" class="dev-unit">{{ d.unit }}</span></span>
+            <span v-if="!store.editMode" class="drag-hint" title="拖拽到「数据分析与策略」作为数据源">↕</span>
           </div>
         </div>
       </div>
@@ -91,10 +96,49 @@ function onScroll() {
   clearTimeout(scrollTimer)
   scrollTimer = setTimeout(() => { scrolling.value = false }, 2000)
 }
+
+// ==================== 设备拖拽 → 「工况数据分析」数据源 ====================
+const dragId = ref(null)
+function onDevDrag(e, d) {
+  if (store.editMode) { e.preventDefault(); return }
+  dragId.value = d.id
+  e.dataTransfer.effectAllowed = 'copy'
+  e.dataTransfer.setData('application/x-dv-device', JSON.stringify({
+    id: d.id, label: d.label, unit: d.unit,
+    unitId: d.unitId, unitName: d.unitName, unitType: d.unitType,
+    color: d.color, reading: d.reading, adjustable: d.adjustable, range: d.range,
+  }))
+}
+function onDevDragEnd() { dragId.value = null }
+
+// ==================== 接收「拖回场景」：从工况数据分析把数据源拖回此处即移除 ====================
+const dropBackOver = ref(false)
+function onBackOver(e) {
+  // 仅响应从数据源列表拖回的拖拽（带 application/x-dv-remove 标记），避免与拖出设备混淆
+  if (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('application/x-dv-remove')) {
+    e.preventDefault()
+    dropBackOver.value = true
+  }
+}
+function onBackLeave() { dropBackOver.value = false }
+function onDropBack(e) {
+  e.preventDefault()
+  dropBackOver.value = false
+  try {
+    const raw = e.dataTransfer.getData('application/x-dv-device')
+    if (!raw) return
+    const src = JSON.parse(raw)
+    if (src && src._back && src.id) {
+      store.removeDvSource(src.id)
+      store.toast = `已把「${src.label || src.id}」移出工况数据源，如需重新添加请再次拖入`
+    }
+  } catch (err) {}
+}
 </script>
 
 <style scoped>
 .scn-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.scn-wrap.drop-back { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-l); }
 .scn-head { flex: 0 0 auto; padding: 8px 10px 6px; border-bottom: 1px solid var(--border); }
 .scn-badge { font-size: 10px; color: var(--accent); background: var(--accent-l); border-radius: 8px; padding: 1px 7px; }
 .scn-stats { display: flex; gap: 12px; align-items: center; font-size: 10.5px; color: var(--muted); }
@@ -107,4 +151,17 @@ function onScroll() {
 .adj-badge { flex: 0 0 auto; font-size: 9px; line-height: 1.7; color: var(--accent); background: var(--accent-l); border-radius: 5px; padding: 0 5px; }
 .dev-live { margin-left: auto; font-size: 10.5px; color: var(--accent2); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
 .dev-unit { margin-left: 2px; color: var(--faint); font-size: 10px; }
+.dev-leaf {
+  cursor: grab;
+  user-select: none; -webkit-user-select: none; -webkit-user-drag: element;
+}
+.dev-leaf:active { cursor: grabbing; }
+.dev-leaf.drag-src { opacity: .45; }
+.drag-hint {
+  flex: 0 0 auto; margin-left: 4px;
+  font-size: 10px; color: var(--faint);
+  border: 1px dashed var(--line); border-radius: 3px;
+  padding: 0 4px; line-height: 15px;
+}
+.dev-leaf:hover .drag-hint { color: var(--accent); border-color: var(--accent); }
 </style>

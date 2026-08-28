@@ -56,6 +56,10 @@ function draw() {
   const x = (i) => (n === 1 ? w - 2 : padL + 2 + (i / (n - 1)) * (wInner - 4))
   const y = (v) => padT + hInner - ((v - min) / (max - min)) * (hInner - 2)
 
+  // 预测段起点：数据点带 forecast:true 时，其后为外推预测（画虚线）
+  let histLen = n
+  for (let i = 0; i < n; i++) { if (pts[i].forecast) { histLen = i; break } }
+
   // 网格线 + y 轴刻度
   ctx.strokeStyle = 'rgba(90,100,115,.25)'
   ctx.lineWidth = 1
@@ -75,35 +79,56 @@ function draw() {
     }
   }
 
-  // 面积填充
-  if (props.fill) {
+  // 面积填充（仅填充历史段）
+  if (props.fill && histLen > 0) {
     const grad = ctx.createLinearGradient(0, 0, 0, h)
     grad.addColorStop(0, hexA(props.color, 0.32))
     grad.addColorStop(1, hexA(props.color, 0.02))
     ctx.beginPath()
     ctx.moveTo(x(0), y(pts[0].v))
-    for (let i = 1; i < n; i++) ctx.lineTo(x(i), y(pts[i].v))
-    ctx.lineTo(x(n - 1), h - padB)
+    for (let i = 1; i < histLen; i++) ctx.lineTo(x(i), y(pts[i].v))
+    ctx.lineTo(x(histLen - 1), h - padB)
     ctx.lineTo(x(0), h - padB)
     ctx.closePath()
     ctx.fillStyle = grad
     ctx.fill()
   }
 
-  // 折线
-  ctx.beginPath()
-  ctx.moveTo(x(0), y(pts[0].v))
-  for (let i = 1; i < n; i++) ctx.lineTo(x(i), y(pts[i].v))
-  ctx.strokeStyle = props.color
-  ctx.lineWidth = 1.6
-  ctx.lineJoin = 'round'
-  ctx.stroke()
+  // 历史段折线（实线）
+  if (histLen > 0) {
+    ctx.beginPath()
+    ctx.moveTo(x(0), y(pts[0].v))
+    for (let i = 1; i < histLen; i++) ctx.lineTo(x(i), y(pts[i].v))
+    ctx.strokeStyle = props.color
+    ctx.lineWidth = 1.6
+    ctx.lineJoin = 'round'
+    ctx.stroke()
+  }
 
-  // 末端点
+  // 预测段折线（虚线，带轻微透明）
+  if (histLen < n) {
+    ctx.beginPath()
+    ctx.moveTo(x(histLen - 1), y(pts[histLen - 1].v))
+    for (let i = histLen; i < n; i++) ctx.lineTo(x(i), y(pts[i].v))
+    ctx.setLineDash([4, 3])
+    ctx.strokeStyle = hexA(props.color, 0.75)
+    ctx.lineWidth = 1.5
+    ctx.lineJoin = 'round'
+    ctx.stroke()
+    ctx.setLineDash([])
+  }
+
+  // 末端点（预测末端用空心圆）
   const lx = x(n - 1), ly = y(pts[n - 1].v)
-  ctx.beginPath(); ctx.arc(lx, ly, 2.6, 0, Math.PI * 2)
-  ctx.fillStyle = props.color; ctx.fill()
-  ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.4; ctx.stroke()
+  if (pts[n - 1].forecast) {
+    ctx.beginPath(); ctx.arc(lx, ly, 2.6, 0, Math.PI * 2)
+    ctx.fillStyle = 'transparent'; ctx.fill()
+    ctx.strokeStyle = props.color; ctx.lineWidth = 1.4; ctx.stroke()
+  } else {
+    ctx.beginPath(); ctx.arc(lx, ly, 2.6, 0, Math.PI * 2)
+    ctx.fillStyle = props.color; ctx.fill()
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.4; ctx.stroke()
+  }
 
   // x 轴时间标签（首 / 中 / 尾，防溢出）
   if (props.axis) {

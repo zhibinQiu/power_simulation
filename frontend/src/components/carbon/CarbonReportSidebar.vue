@@ -571,7 +571,7 @@ onBeforeUnmount(clearPoll)
 .tag {
   padding: 4px 10px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 2px;
   background: var(--panel-2);
   color: var(--muted);
   font-size: 12px;
@@ -639,7 +639,7 @@ onBeforeUnmount(clearPoll)
 .task-state {
   font-size: 11px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 2px;
   background: var(--panel-3);
   color: var(--muted);
   flex-shrink: 0;

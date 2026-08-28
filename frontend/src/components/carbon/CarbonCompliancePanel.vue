@@ -704,7 +704,7 @@ tbody tr:hover td { background: var(--panel-2); }
 .hint { font-size: 11px; color: var(--muted); margin-left: 8px; }
 .run-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .chip {
-  padding: 2px 10px; border-radius: 999px; background: var(--panel-2);
+  padding: 2px 10px; border-radius: 2px; background: var(--panel-2);
   border: 1px solid var(--border); font-size: 10px; color: var(--muted);
 }
 .chip.pos { color: var(--red); border-color: rgba(209, 75, 75, 0.4); }

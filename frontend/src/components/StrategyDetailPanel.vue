@@ -15,32 +15,56 @@
         </CollapseSection>
       </template>
 
-      <!-- AI 优化模型（强化学习/遗传算法/粒子群）：随实时传感器数据采集，后台定时训练、模型逐渐变优 -->
+      <!-- AI 优化模型列表（按类别）：时序预测 / 参数优化 / 聚类分析，点击进入对应模型训练面板 -->
+      <template v-else-if="strategy.source === 'ai-list'">
+        <CollapseSection title="模型列表" tone="blue" :show-more="false">
+          <div class="card">
+            <div class="kv2"><span>分类</span><b>{{ aiGroups.length }} 类 · {{ AI_MODELS.length }} 个模型</b></div>
+          </div>
+          <div class="note-box">按类别浏览系统内置 AI 优化模型，点击模型卡片进入对应训练属性面板。</div>
+        </CollapseSection>
+        <CollapseSection v-for="g in aiGroups" :key="g.category" :title="g.name" tone="teal" :show-more="false">
+          <div v-for="m in g.models" :key="m.id" class="ai-card" :class="{ active: store.selectedStrategyId === m.id }"
+               :title="'进入「' + m.name + '」训练面板'" @click="enterAi(m)">
+            <div class="ai-card-head">
+              <b>{{ m.name }}</b>
+              <span class="tag">{{ m.tag }}</span>
+            </div>
+            <div class="ai-desc muted">{{ m.desc }}</div>
+          </div>
+        </CollapseSection>
+      </template>
+
+      <!-- AI 优化模型（序列预测 / 强化学习 / 遗传算法 / 粒子群 / 聚类工况识别）：随实时传感器数据采集，后台定时训练、模型逐渐变优 -->
       <template v-else-if="strategy.source === 'ai'">
         <CollapseSection title="模型名称" tone="blue" :show-more="false">
           <div class="card">
             <div class="kv2"><span>名称</span><b>{{ strategy.name }} <span class="tag">{{ modelTag }}</span></b></div>
             <div class="kv2"><span>状态</span><b><span class="badge" :class="badgeCls">{{ badgeTxt }}</span></b></div>
           </div>
+          <!-- 参数优化集中面板：GA / PSO / RL 三种算法在同一属性面板内切换 -->
+          <div v-if="optAlgoOn" class="opt-tabs">
+            <button v-for="a in optAlgos" :key="a.id" class="opt-tab" :class="{ on: strategy.id === a.id }" @click="enterOpt(a.id)">{{ a.label }}</button>
+          </div>
           <div class="note-box" v-if="strategy.description">{{ strategy.description }}</div>
-          <div class="note" v-if="st.ready && !st.iteration">模型已就绪：可「开始自动训练」或「训练一轮」启动迭代优化。</div>
+          <div class="note" v-if="st.ready && !st.iteration">{{ isClu ? '模型已就绪：可「开始自动训练」或「训练一轮」启动工况聚类识别。' : '模型已就绪：可「开始自动训练」或「训练一轮」启动迭代优化。' }}</div>
         </CollapseSection>
 
         <CollapseSection title="训练概览" tone="green" :show-more="false">
           <div v-if="st.ready" class="stat-row">
             <div class="stat"><b>{{ st.iteration || 0 }}</b><span>迭代轮数</span></div>
             <div class="stat"><b>{{ fmtSamples }}</b><span>传感器样本</span></div>
-            <div class="stat"><b>{{ bestTxt }}</b><span>最优强度 kgCO₂/t</span></div>
-            <div class="stat"><b :class="impCls">{{ impTxt }}</b><span>较初始提升</span></div>
+            <div class="stat"><b>{{ bestTxt }}</b><span v-if="!isClu">最优强度 {{ objUnit }}</span><span v-else>工况簇数</span></div>
+            <div class="stat"><b :class="impCls">{{ impTxt }}</b><span v-if="!isClu">较初始提升</span><span v-else>类内紧凑度</span></div>
           </div>
           <div v-else class="note">{{ notReadyTip }}</div>
           <div v-if="st.ready" class="actions">
-            <button class="x" :disabled="store.busy" @click="toggleTrain">{{ st.running ? '暂停训练' : '开始自动训练' }}</button>
-            <button class="x" :disabled="store.busy || st.running" @click="trainOnce">训练一轮</button>
+            <button class="x" :disabled="store.busy || llmBlocked" @click="toggleTrain">{{ st.running ? '暂停训练' : '开始自动训练' }}</button>
+            <button class="x" :disabled="store.busy || st.running || llmBlocked" @click="trainOnce">训练一轮</button>
           </div>
           <div v-if="st.ready" class="actions">
             <button class="x" :disabled="store.busy" @click="resetModel">重置</button>
-            <button class="x main" :disabled="store.busy || !st.iteration" @click="applyModel">应用最优参数</button>
+            <button class="x main" :disabled="store.busy || !st.iteration || isClu" @click="applyModel">{{ isClu ? '工况识别（不下发参数）' : '应用最优参数' }}</button>
           </div>
           <div v-if="st.ready" class="tip-row">
             <span class="dot" :class="{ on: st.running }"></span>
@@ -48,9 +72,9 @@
           </div>
         </CollapseSection>
 
-        <!-- 手动模式调优提醒：系统提醒引导手动应用优化参数 -->
-        <div v-if="st.ready && !st.auto_control && st.reminder" class="reminder">
-          <div class="rem-txt">训练取得新进展：最优强度降至 <b>{{ st.reminder.best_fitness != null ? st.reminder.best_fitness.toFixed(1) : '—' }}</b> kgCO₂/t（较上版提升 {{ st.reminder.improvement_pct != null ? st.reminder.improvement_pct.toFixed(1) : '0' }}%）。建议手动应用优化参数调优可调设备。</div>
+        <!-- 手动模式调优提醒：系统提醒引导手动应用优化参数（聚类为工况识别，无参数下发提醒） -->
+        <div v-if="st.ready && !st.auto_control && st.reminder && !isClu" class="reminder">
+          <div class="rem-txt">训练取得新进展：最优强度降至 <b>{{ st.reminder.best_fitness != null ? fmtFitness(st.reminder.best_fitness).toFixed(1) : '—' }}</b> {{ objUnit }}（较上版提升 {{ st.reminder.improvement_pct != null ? st.reminder.improvement_pct.toFixed(1) : '0' }}%）。建议手动应用优化参数调优可调设备。</div>
           <div class="rem-actions">
             <button class="x main" :disabled="store.busy" @click="applyModel">应用最优参数</button>
             <button class="x" :disabled="store.busy" @click="ackReminder">知道了</button>
@@ -93,7 +117,25 @@
           </div>
         </CollapseSection>
 
-        <CollapseSection title="适应度曲线" tone="amber" :show-more="false">
+        <!-- 聚类工况识别：工况簇分布（替代适应度曲线） -->
+        <CollapseSection v-if="isClu" title="工况簇分布" tone="amber" :show-more="false">
+          <div v-if="clusters.length" class="clu-list">
+            <div v-for="c in clusters" :key="c.id" class="clu-row">
+              <div class="clu-head">
+                <b>{{ c.name }}</b>
+                <span class="muted">{{ c.size }} 个快照 · 代表负荷 {{ c.load != null ? c.load.toFixed(2) : '—' }}</span>
+                <b>{{ c.pct }}%</b>
+              </div>
+              <div class="clu-bar"><div class="clu-fill" :style="{ width: c.pct + '%' }"></div></div>
+            </div>
+          </div>
+          <div v-else class="note">尚无工况聚类结果：开启自动训练或「训练一轮」后，基于实时传感器数据识别典型工况。</div>
+          <div v-if="clusters.length" class="tip-row">
+            <span class="muted">类内紧凑度 {{ compactTxt }}（越小代表工况分界越清晰）· 随实时数据滚动更新</span>
+          </div>
+        </CollapseSection>
+
+        <CollapseSection v-else title="适应度曲线" tone="amber" :show-more="false">
           <div v-if="curve.length > 1" class="chart">
             <svg :viewBox="`0 0 ${CW} ${CH}`" preserveAspectRatio="none" class="chart-svg">
               <line v-for="g in gridY" :key="'g' + g" :x1="0" :x2="CW" :y1="g" :y2="g" class="grid" />
@@ -103,14 +145,133 @@
             <div class="legend">
               <span class="lg best">最优</span>
               <span class="lg avg">平均</span>
-              <span class="lg muted">当前最优 {{ bestTxt }} kgCO₂/t</span>
+              <span class="lg muted">当前最优 {{ bestTxt }} {{ objUnit }}</span>
             </div>
           </div>
           <div v-else class="note">尚无训练轨迹：开启自动训练或「训练一轮」后生成（最优强度随迭代递减）。</div>
         </CollapseSection>
 
+        <!-- 决策变量：策略模型（强化学习 / 遗传算法 / 粒子群）——参与寻优的工艺参数 -->
+        <CollapseSection title="决策变量" v-if="strategy.id !== 'ai::seq' && !isClu" tone="teal" :show-more="false">
+          <div class="note">参与寻优的工艺参数（默认中间视图勾选设备对应的工艺参数，可手动增删；未选择的参数保持当前设定值，不参与寻优）。</div>
+          <div v-if="decisionList.length" class="dv-list">
+            <div v-for="row in decisionList" :key="row.dkey" class="dv-tag">
+              <span class="dv-main">
+                <b>{{ row.label }}</b>
+                <span class="muted">{{ row.unit_name }} · 当前 {{ row.value }}{{ row.unit }}</span>
+              </span>
+              <button class="dv-del" :disabled="store.busy" title="移除此参数（不参与寻优）" @click="removeDecision(row.dkey)">×</button>
+            </div>
+          </div>
+          <div v-else class="note">{{ decisionRows.length ? '未选择任何参数参与优化（全部参数保持当前设定值）' : '当前流程暂无可优化参数（kind=optim）：请先在「流程编排」中为工序添加可调参数。' }}</div>
+          <div v-if="decisionAddOptions.length" class="dv-add">
+            <select class="inp sel" value="" @change="onDecisionAdd($event.target.value)" :disabled="store.busy">
+              <option value="" disabled>手动添加参数…</option>
+              <option v-for="c in decisionAddOptions" :key="c.dkey" :value="c.dkey">{{ c.label }}（{{ c.unit_name }}）</option>
+            </select>
+          </div>
+        </CollapseSection>
+
+        <!-- 优化目标：策略模型——选择优化的最小化指标 -->
+        <CollapseSection title="优化目标" v-if="strategy.id !== 'ai::seq' && !isClu" tone="green" :show-more="false">
+          <div class="set-block">
+            <div class="set-row">
+              <span class="set-label">目标方向</span>
+              <label class="chk" title="勾选后表示所选目标指标越低越好（算法朝最小化方向寻优）；取消勾选则视为越高越好（对目标取负参与寻优）">
+                <input type="checkbox" :checked="objNeg" :disabled="store.busy" @change="onObjNeg" />
+                <span>取负值（该指标越低越好）</span>
+              </label>
+            </div>
+            <div class="set-row">
+              <span class="set-label">目标指标</span>
+              <select class="inp sel" :value="objKey" @change="onObjectiveChange" :disabled="store.busy">
+                <optgroup v-for="g in objGroups" :key="g.label" :label="g.label">
+                  <option v-for="o in g.items" :key="o.key" :value="o.key">{{ o.label }}（{{ o.unit }}）</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="note">优化算法将朝着所选指标的方向搜索最优参数组合：勾选「取负值」= 该指标越低越好；取消 = 该指标越高越好（如产量、设备利用率）。</div>
+          </div>
+        </CollapseSection>
+
+        <!-- 聚类工况识别：聚类算法选择 -->
+        <CollapseSection title="聚类算法" v-if="isClu" tone="teal" :show-more="false">
+          <div class="set-block">
+            <div class="set-row">
+              <span class="set-label">聚类方法</span>
+              <select class="inp sel" :value="cluModel" @change="onCluMethod" :disabled="store.busy">
+                <option v-for="m in cluModels" :key="m.id" :value="m.id">{{ m.label }}</option>
+              </select>
+            </div>
+            <div class="set-row">
+              <span class="set-label">分组簇数</span>
+              <select class="inp sel" :value="cluK" @change="onCluK" :disabled="store.busy">
+                <option :value="0">自动</option>
+                <option v-for="k in 5" :key="k" :value="k">{{ k }}</option>
+              </select>
+            </div>
+            <div class="note">聚类工况识别将按所选算法对最近 10 分钟工况快照自动划分典型运行工况（低/中/高负荷），只输出工况识别结果，不直接下发参数。</div>
+            <div class="note">「分组簇数」用于工况数据分析视图的多设备聚类分组（0=自动选择最佳分组数），修改后数据视图自动重新分析。</div>
+          </div>
+        </CollapseSection>
+
+        <CollapseSection title="预测模型" v-if="strategy.id === 'ai::seq'" tone="teal" :show-more="false">
+          <div class="set-block">
+            <div class="set-row">
+              <span class="set-label">时间序列模型</span>
+              <select class="inp sel" :value="seqModel" @change="onSeqModel" :disabled="store.busy">
+                <option v-for="m in seqModels" :key="m.id" :value="m.id">{{ m.label }}</option>
+              </select>
+            </div>
+            <div class="note" v-if="seqModel === 'llm'">时间序列大模型暂不实现：请选择 LSTM / LightGBM / XGBoost 后训练。</div>
+            <div class="note" v-else>序列预测算法将基于所选模型外推未来工况，并据此设定最佳策略 / 调节变量进行仿真分析。</div>
+          </div>
+        </CollapseSection>
+
+        <!-- 预测目标 / 影响变量：序列预测算法 -->
+        <CollapseSection title="预测目标" v-if="strategy.id === 'ai::seq'" tone="teal" :show-more="false">
+          <div class="set-block">
+            <div class="set-row">
+              <span class="set-label">预测对象</span>
+              <select class="inp sel" :value="ftKey" @change="onForecastTarget" :disabled="store.busy">
+                <option v-for="t in ftOptions" :key="t.id" :value="t.id">{{ t.label }}<template v-if="t.unit">（{{ t.unit }}）</template></option>
+              </select>
+            </div>
+            <div class="note">预测对象只能选择一个：从当前流程设备中选取（默认中间视图第一个勾选设备），且不能与「影响变量」重复。</div>
+          </div>
+        </CollapseSection>
+
+        <CollapseSection title="影响变量" v-if="strategy.id === 'ai::seq'" tone="teal" :show-more="false">
+          <div class="note">选择参与预测的监测设备指标（默认中间视图勾选设备，可手动增删；不勾选任意项 = 全部设备参与预测；已选为预测对象的设备自动剔除）。</div>
+          <div v-if="impactRows.length" class="dv-list">
+            <label v-for="row in impactRows" :key="row.id" class="dv-row chk">
+              <input type="checkbox" :checked="impactSet[row.id]" :disabled="store.busy" @change="onImpactToggle(row.id, $event.target.checked)" />
+              <span class="dv-main">
+                <b>{{ row.label }}</b>
+                <span class="muted">{{ row.unit_name }} · {{ row.unit || '—' }}</span>
+              </span>
+            </label>
+          </div>
+          <div v-else class="note">暂无实时设备数据（MQTT 未上报）：序列预测将回退为全厂工况负荷。</div>
+        </CollapseSection>
+
+        <!-- 聚类工况识别：聚类特征变量 -->
+        <CollapseSection title="聚类特征" v-if="isClu" tone="teal" :show-more="false">
+          <div class="note">选择参与工况聚类的监测设备指标（默认中间视图勾选设备，可手动增删；不勾选任意项 = 全部设备参与聚类）。</div>
+          <div v-if="featureRows.length" class="dv-list">
+            <label v-for="row in featureRows" :key="row.id" class="dv-row chk">
+              <input type="checkbox" :checked="featureSet[row.id]" :disabled="store.busy" @change="onFeatureToggle(row.id, $event.target.checked)" />
+              <span class="dv-main">
+                <b>{{ row.label }}</b>
+                <span class="muted">{{ row.unit_name }} · {{ row.unit || '—' }}</span>
+              </span>
+            </label>
+          </div>
+          <div v-else class="note">暂无实时设备数据（MQTT 未上报）：聚类将回退为基于全部可用指标。</div>
+        </CollapseSection>
+
         <CollapseSection title="算法超参数" tone="teal" :show-more="false">
-          <div v-for="(hp, key) in st.hyper_schema || {}" :key="key" class="hp-row">
+          <div v-for="(hp, key) in hpSchema" :key="key" class="hp-row">
             <span class="hp-label">{{ hp.label }}</span>
             <input class="hp-slider" type="range" :min="hp.min" :max="hp.max" :step="hp.step" v-model.number="hpDraft[key]" />
             <span class="hp-val">{{ fmtHp(hpDraft[key]) }}</span>
@@ -118,8 +279,8 @@
           <div class="actions"><button class="x" :disabled="store.busy || !st.ready" @click="saveHyper">保存超参数</button></div>
         </CollapseSection>
 
-        <CollapseSection title="最优参数建议" tone="blue" :show-more="false">
-          <div class="note" v-if="recommended">以下参数来自当前生效版本 <b>{{ recommended.version_id }}</b>（迭代 {{ recommended.iteration }} 轮 · 最优 {{ recommended.best_fitness }} kgCO₂/t）。</div>
+        <CollapseSection title="最优参数建议" v-if="!isClu" tone="blue" :show-more="false">
+          <div class="note" v-if="recommended">以下参数来自当前生效版本 <b>{{ recommended.version_id }}</b>（迭代 {{ recommended.iteration }} 轮 · 最优 {{ recommended.best_fitness }} {{ objUnit }}）。</div>
           <div v-if="bestParams.length" class="bp-list">
             <div v-for="bp in bestParams" :key="bp.unit_id + ':' + bp.key" class="bp-row">
               <div class="bp-left">
@@ -134,10 +295,10 @@
             </div>
           </div>
           <div v-else class="note">暂无最优参数建议：训练迭代后生成。</div>
-          <div class="note" v-if="st.archived && st.archived.best_fitness != null">上一轮模型：迭代 {{ st.archived.iteration }} 轮 · 最优 {{ st.archived.best_fitness }} kgCO₂/t</div>
+          <div class="note" v-if="st.archived && st.archived.best_fitness != null">上一轮模型：迭代 {{ st.archived.iteration }} 轮 · 最优 {{ fmtFitness(st.archived.best_fitness) }} {{ objUnit }}</div>
         </CollapseSection>
 
-        <CollapseSection title="模型版本" tone="green" :show-more="false">
+        <CollapseSection title="模型版本" v-if="!isClu" tone="green" :show-more="false">
           <div class="note">仅当新模型的评估指标（吨钢碳强度）优于当前版本时才自动替换为新版本；历史版本全部保留，可随时切换。</div>
           <div v-if="versions.length" class="ver-list">
             <div v-for="v in versions" :key="v.id" class="ver-row" :class="{ active: v.active }">
@@ -148,7 +309,7 @@
               </div>
               <div class="ver-meta muted">迭代 {{ v.iteration }} 轮 · {{ v.samples != null ? v.samples + ' 样本' : '' }} · {{ fmtTime(v.created_at) }}</div>
               <div class="ver-meta">
-                <span class="muted">最优强度</span> <b>{{ v.best_fitness != null ? v.best_fitness.toFixed(1) : '—' }}</b> kgCO₂/t
+                <span class="muted">最优强度</span> <b>{{ v.best_fitness != null ? fmtFitness(v.best_fitness).toFixed(1) : '—' }}</b> {{ objUnit }}
                 <span class="imp" :class="v.improvement_pct > 0.01 ? 'good' : 'bad'">{{ v.improvement_pct != null ? (v.improvement_pct >= 0 ? '↓' : '↑') + ' ' + Math.abs(v.improvement_pct).toFixed(1) + '%' : '' }}</span>
               </div>
               <div class="actions">
@@ -170,10 +331,135 @@
         </CollapseSection>
 
         <CollapseSection title="工作机制" tone="gray" :show-more="false">
-          <div class="note">
+          <div class="note" v-if="isClu">
+            实时传感器数据持续采集 → 构造最近 10 分钟「工况快照」（特征设备归一化读数 + 全厂负荷因子）→
+            按所选聚类算法（K-Means / DBSCAN / 层次聚类）自动划分典型运行工况簇 → 输出各工况占比与代表负荷。
+            聚类结果随数据滚动更新，用于辅助制定分工况调节策略，不直接下发参数。
+          </div>
+          <div class="note" v-else>
             实时传感器数据持续采集 → 后台按自训练频率定时训练（每轮迭代）→ 模型参数逐步收敛。
             只有新模型的评估指标（吨钢碳强度）优于当前版本时才替换为新版本，历史版本均保留可切换。
             开启「自动化控制」时，模型变优后自动把参数下发到可调设备；未开启时通过系统提醒手动调优。
+          </div>
+        </CollapseSection>
+      </template>
+
+      <!-- 数据拟合（多项式 / 指数 / 对数 / 幂函数）：对历史工况序列做曲线拟合建模，输出方程与 R²，不下发参数 -->
+      <template v-else-if="strategy.source === 'ai-fit'">
+        <CollapseSection title="模型名称" tone="blue" :show-more="false">
+          <div class="card">
+            <div class="kv2"><span>名称</span><b>{{ strategy.name }} <span class="tag">{{ modelTag }}</span></b></div>
+            <div class="kv2"><span>状态</span><b><span class="badge" :class="badgeCls">{{ badgeTxt }}</span></b></div>
+          </div>
+          <div class="note-box" v-if="strategy.description">{{ strategy.description }}</div>
+          <div class="note" v-if="st.ready && !st.iteration">模型已就绪：可「开始自动训练」或「训练一轮」启动曲线拟合。</div>
+        </CollapseSection>
+
+        <CollapseSection title="训练概览" tone="green" :show-more="false">
+          <div v-if="st.ready" class="stat-row">
+            <div class="stat"><b>{{ st.iteration || 0 }}</b><span>迭代轮数</span></div>
+            <div class="stat"><b>{{ fmtSamples }}</b><span>传感器样本</span></div>
+            <div class="stat"><b>{{ fitR2Txt }}</b><span>拟合优度 R²</span></div>
+            <div class="stat"><b class="fit-stat">{{ fitMethodLabel }}</b><span>拟合方法</span></div>
+          </div>
+          <div v-else class="note">{{ notReadyTip }}</div>
+          <div v-if="st.ready" class="actions">
+            <button class="x" :disabled="store.busy || llmBlocked" @click="toggleTrain">{{ st.running ? '暂停训练' : '开始自动训练' }}</button>
+            <button class="x" :disabled="store.busy || st.running || llmBlocked" @click="trainOnce">训练一轮</button>
+          </div>
+          <div v-if="st.ready" class="actions">
+            <button class="x" :disabled="store.busy" @click="resetModel">重置</button>
+            <button class="x" :disabled="store.busy || !st.iteration" @click="refreshFit">刷新拟合</button>
+          </div>
+          <div v-if="st.ready" class="tip-row">
+            <span class="dot" :class="{ on: st.running }"></span>
+            <span class="muted">{{ st.running ? '后台定时拟合进行中：随实时传感器数据每轮迭代' : '已暂停：点击「开始自动训练」恢复后台定时迭代' }}</span>
+          </div>
+        </CollapseSection>
+
+        <!-- 拟合设置：拟合对象 / 拟合方法（拟合对象与拟合变量互斥） -->
+        <CollapseSection title="拟合设置" tone="teal" :show-more="false">
+          <div class="set-block">
+            <div class="set-row">
+              <span class="set-label">拟合对象</span>
+              <select class="inp sel" :value="fitTarget" @change="onFitTarget" :disabled="store.busy">
+                <option v-for="t in fitTargets" :key="t.id" :value="t.id">{{ t.label }}<template v-if="t.unit">（{{ t.unit }}）</template></option>
+              </select>
+            </div>
+            <div class="set-row">
+              <span class="set-label">拟合方法</span>
+              <select class="inp sel" :value="fitMethod" @change="onFitMethod" :disabled="store.busy">
+                <option v-for="m in fitMethods" :key="m.id" :value="m.id">{{ m.label }}</option>
+              </select>
+            </div>
+            <div class="note" v-if="fitMethodInfo">{{ fitMethodInfo }}</div>
+          </div>
+          <div class="note">拟合对象只能选择一个：从当前流程设备中选取（默认中间视图第一个勾选设备），且不能与「拟合变量」重复。</div>
+        </CollapseSection>
+
+        <!-- 拟合变量：参与拟合的设备序列（默认中间视图勾选，可手动增删；空 = 全部设备） -->
+        <CollapseSection title="拟合变量" tone="teal" :show-more="false">
+          <div class="note">参与拟合的监测设备序列（默认中间视图勾选设备，可手动增删；未指定任意项 = 全部设备参与拟合；已选为拟合对象的设备自动剔除）。</div>
+          <div v-if="fitVarList.length" class="dv-list">
+            <div v-for="row in fitVarList" :key="row.id" class="dv-tag">
+              <span class="dv-main">
+                <b>{{ row.label }}</b>
+                <span class="muted">{{ row.unit_name }} · {{ row.unit || '—' }}</span>
+              </span>
+              <button class="dv-del" :disabled="store.busy" title="移除此变量（不参与拟合）" @click="removeFitVar(row.id)">×</button>
+            </div>
+          </div>
+          <div v-else class="note">未指定任何设备：全部设备参与拟合。</div>
+          <div v-if="fitVarAddOptions.length" class="dv-add">
+            <select class="inp sel" value="" @change="onFitVarAdd($event.target.value)" :disabled="store.busy">
+              <option value="" disabled>手动添加设备…</option>
+              <option v-for="c in fitVarAddOptions" :key="c.id" :value="c.id">{{ c.label }}<template v-if="c.unit">（{{ c.unit }}）</template></option>
+            </select>
+          </div>
+        </CollapseSection>
+
+        <!-- 拟合结果：方程 + R² + 拟合曲线（实际值散点 + 拟合线，含外推） -->
+        <CollapseSection title="拟合结果" tone="blue" :show-more="false">
+          <div v-if="fitResult && fitResult.equation" class="fit-eq">
+            <div class="fit-eq-main">{{ fitResult.equation }}</div>
+            <div class="muted">拟合方法 {{ fitResult.method_label || '—' }} · 样本 {{ fitResult.n || 0 }} 个 · R² = {{ fitResult.r2 != null ? fitResult.r2.toFixed(4) : '—' }}</div>
+          </div>
+          <div v-else class="note">尚无拟合结果：开启自动训练或「训练一轮」后，基于最近样本窗口的实时数据拟合曲线。</div>
+          <div v-if="fitCurve.length > 1" class="chart">
+            <svg :viewBox="`0 0 ${CW} ${CH}`" preserveAspectRatio="none" class="chart-svg">
+              <line v-for="g in gridY" :key="'fg' + g" :x1="0" :x2="CW" :y1="g" :y2="g" class="grid" />
+              <polyline :points="fitLinePts" class="line-best" />
+              <circle v-for="(c, i) in fitDots" :key="'fd' + i" :cx="c.x" :cy="c.y" r="2.2" class="fit-dot" />
+            </svg>
+            <div class="legend">
+              <span class="lg dot-blue">实际值</span>
+              <span class="lg best">拟合曲线</span>
+              <span class="lg muted">R² = {{ fitR2Txt }} · 曲线右端为外推</span>
+            </div>
+          </div>
+        </CollapseSection>
+
+        <CollapseSection title="算法超参数" tone="teal" :show-more="false">
+          <div v-for="(hp, key) in hpSchema" :key="key" class="hp-row">
+            <span class="hp-label">{{ hp.label }}</span>
+            <input class="hp-slider" type="range" :min="hp.min" :max="hp.max" :step="hp.step" v-model.number="hpDraft[key]" />
+            <span class="hp-val">{{ fmtHp(hpDraft[key]) }}</span>
+          </div>
+          <div class="actions"><button class="x" :disabled="store.busy || !st.ready" @click="saveHyper">保存超参数</button></div>
+        </CollapseSection>
+
+        <CollapseSection title="训练日志" tone="purple" :show-more="false">
+          <div v-if="st.logs && st.logs.length" class="logs">
+            <div v-for="(lg, i) in st.logs" :key="i" class="lg-line">{{ lg }}</div>
+          </div>
+          <div v-else class="note">暂无日志。</div>
+        </CollapseSection>
+
+        <CollapseSection title="工作机制" tone="gray" :show-more="false">
+          <div class="note">
+            实时传感器数据持续采集 → 取最近样本窗口的目标序列（全厂工况负荷或指定设备指标）→
+            按所选方法（多项式 / 指数 / 对数 / 幂函数）做最小二乘曲线拟合 → 输出拟合方程与 R² 拟合优度，
+            并绘制「实际值 + 拟合曲线（含外推）」对比图。拟合仅用于建模分析，不直接下发参数。
           </div>
         </CollapseSection>
       </template>
@@ -255,7 +541,7 @@
 
 <script setup>
 import { computed, ref, watch, onMounted } from 'vue'
-import { useSimStore, EDITABLE_PARAMS, AI_MODEL_MAP } from '../stores/sim'
+import { useSimStore, EDITABLE_PARAMS, AI_MODELS, AI_MODEL_MAP } from '../stores/sim'
 import CollapseSection from './CollapseSection.vue'
 
 const store = useSimStore()
@@ -286,17 +572,404 @@ const modelTag = computed(() => (AI_MODEL_MAP[strategy.value.id] || {}).tag || '
 const badgeCls = computed(() => (st.value.running ? 'run' : st.value.iteration > 0 ? 'pause' : 'idle'))
 const badgeTxt = computed(() => (st.value.running ? '训练中' : st.value.iteration > 0 ? '已暂停' : '待训练'))
 const notReadyTip = computed(() => '训练上下文未同步：进入面板后将随流程模型自动初始化')
+// 序列预测算法：可选的时序模型（后端 state.models 下发，缺省用内置默认）
+const seqModels = computed(() => {
+  const ms = st.value.models
+  return Array.isArray(ms) && ms.length
+    ? ms
+    : [
+        { id: 'lstm', label: 'LSTM 长短期记忆网络' },
+        { id: 'lightgbm', label: 'LightGBM 梯度提升' },
+        { id: 'xgboost', label: 'XGBoost 梯度提升' },
+        { id: 'llm', label: '时间序列大模型（暂不实现）' },
+      ]
+})
+const seqModel = computed(() => st.value.model || 'lstm')
+const llmBlocked = computed(() => seqModel.value === 'llm')
+function onSeqModel(e) {
+  store.setOptimizerSettings(strategy.value.id, { model: e.target.value })
+}
+
+// 聚类工况识别：当前模型是否为聚类分析（CLU）
+const isClu = computed(() => strategy.value.id === 'ai::clu')
+// 聚类算法可选（后端 state.methods 下发，缺省用内置默认）
+const cluModels = computed(() => {
+  const ms = st.value.methods
+  return Array.isArray(ms) && ms.length
+    ? ms
+    : [
+        { id: 'kmeans', label: 'K-Means 均值聚类' },
+        { id: 'dbscan', label: 'DBSCAN 密度聚类' },
+        { id: 'hierarchical', label: '层次聚类' },
+      ]
+})
+const cluModel = computed(() => st.value.method || 'kmeans')
+function onCluMethod(e) {
+  store.setOptimizerSettings(strategy.value.id, { method: e.target.value })
+}
+// 工况数据分析视图的多设备分组簇数（0=自动），由右侧属性面板统一配置
+const cluK = computed(() => store.cluK || 0)
+function onCluK(e) {
+  store.cluK = Number(e.target.value)
+}
+
+// ---- 参数优化集中面板：GA / PSO / RL 三种算法在同一属性面板内切换（工具栏「参数优化」入口） ----
+const optAlgos = [
+  { id: 'ai::ga', label: '遗传算法' },
+  { id: 'ai::pso', label: '粒子群' },
+  { id: 'ai::rl', label: '强化学习' },
+]
+const optAlgoOn = computed(() => optAlgos.some((a) => a.id === strategy.value.id))
+function enterOpt(id) {
+  if (store.busy || id === strategy.value.id) return
+  store.selectStrategy(id)
+  store.toast = `已切换到参数优化算法：${optAlgos.find((a) => a.id === id).label}`
+}
+
+// ---- 数据拟合（FIT）：拟合对象 / 方法 / 结果 / 曲线 ----
+const fitMethods = computed(() => {
+  const ms = st.value.methods
+  return Array.isArray(ms) && ms.length ? ms : []
+})
+const fitMethod = computed(() => st.value.method || 'poly')
+const fitTargets = computed(() => {
+  const back = st.value.targets || [{ id: 'load', label: '全厂工况负荷', unit: '负荷系数' }]
+  return mergeCandidates(back, flowDevices.value)
+})
+const fitTarget = computed(() => st.value.target || 'load')
+const fitTargetTouched = ref(false)  // 用户手动调整过拟合对象后不再跟随中间视图
+// 拟合变量候选：流程设备 + 后端候选，剔除拟合对象（与拟合对象互斥）
+const fitVarRows = computed(() => {
+  const back = st.value.fit_var_candidates || st.value.targets || []
+  return mergeCandidates(back, flowDevices.value).filter(c => c.id !== fitTarget.value)
+})
+// 已选拟合变量列表（空 = 全部设备参与拟合）
+const fitVarList = computed(() => {
+  const fv = st.value.fit_vars
+  if (!Array.isArray(fv) || !fv.length) return []
+  const set = new Set(fv)
+  return fitVarRows.value.filter(r => set.has(r.id))
+})
+// 可手动添加的拟合变量候选（未选中的设备）
+const fitVarAddOptions = computed(() => fitVarRows.value.filter(r => !fitVarList.value.some(x => x.id === r.id)))
+const fitVarTouched = ref(false)  // 用户手动调整过拟合变量后不再跟随中间视图
+function removeFitVar(id) {
+  fitVarTouched.value = true
+  const list = (Array.isArray(st.value.fit_vars) ? st.value.fit_vars : []).filter(x => x !== id)
+  store.setOptimizerSettings(strategy.value.id, { fit_vars: list })
+}
+function addFitVar(id) {
+  fitVarTouched.value = true
+  const cur = Array.isArray(st.value.fit_vars) ? [...st.value.fit_vars] : []
+  if (!cur.includes(id)) cur.push(id)
+  store.setOptimizerSettings(strategy.value.id, { fit_vars: cur })
+}
+function onFitVarAdd(v) {
+  if (v) addFitVar(v)
+}
+// 拟合对象默认 = 中间视图第一个勾选设备；拟合变量默认 = 中间视图勾选设备（排除拟合对象，二者互斥）
+watch(() => [flowSelIds.value, strategy.value.id, st.value.ready], ([ids]) => {
+  if (strategy.value.id !== 'ai::fit' || !st.value.ready || !ids.length) return
+  const patch = {}
+  let fk = fitTarget.value
+  if (!fitTargetTouched.value) {
+    const first = ids[0]
+    if (first && fitTargets.value.some(t => t.id === first) && (st.value.target || 'load') !== first) {
+      patch.target = first
+      fk = first
+    }
+  }
+  if (!fitVarTouched.value) {
+    const list = ids.filter(x => x !== fk)
+    if (list.length) patch.fit_vars = list
+  }
+  if (Object.keys(patch).length) store.setOptimizerSettings('ai::fit', patch)
+}, { immediate: true })
+const fitResult = computed(() => st.value.fit || null)
+const fitCurve = computed(() => st.value.curve || [])
+const fitR2Txt = computed(() => (st.value.best_r2 != null ? Number(st.value.best_r2).toFixed(3) : '—'))
+const fitMethodLabel = computed(() => {
+  const m = fitMethods.value.find((x) => x.id === fitMethod.value)
+  return m ? m.label : '—'
+})
+const fitMethodInfo = computed(() => {
+  const m = fitMethods.value.find((x) => x.id === fitMethod.value)
+  return m ? m.desc : ''
+})
+function onFitMethod(e) {
+  if (store.busy) return
+  store.setOptimizerSettings(strategy.value.id, { method: e.target.value })
+}
+function onFitTarget(e) {
+  if (store.busy) return
+  fitTargetTouched.value = true
+  const t = e.target.value
+  const patch = { target: t }
+  // 互斥：拟合对象不能同时作为拟合变量，从拟合变量中移除
+  const fv = st.value.fit_vars
+  if (Array.isArray(fv) && fv.includes(t)) patch.fit_vars = fv.filter(x => x !== t)
+  store.setOptimizerSettings(strategy.value.id, patch)
+}
+function refreshFit() {
+  store.refreshOptimizers()
+  store.toast = '已刷新拟合结果'
+}
+// 拟合曲线 SVG：散点 = 实际值，折线 = 拟合值（含外推）
+const fitDots = computed(() => {
+  const cs = fitCurve.value
+  if (cs.length < 2) return []
+  const ys = cs.filter((c) => c.y != null).map((c) => c.y)
+  if (ys.length < 2) return []
+  const min = Math.min(...ys)
+  const max = Math.max(...ys)
+  const span = max - min || 1
+  const pad = 8
+  const lastX = cs[cs.length - 1].x || 1
+  return cs.filter((c) => c.y != null).map((c) => {
+    const x = (c.x / lastX) * CW
+    const y = CH - pad - ((c.y - min) / span) * (CH - 2 * pad)
+    return { x: x.toFixed(1), y: y.toFixed(1) }
+  })
+})
+const fitLinePts = computed(() => {
+  const cs = fitCurve.value
+  if (cs.length < 2) return ''
+  const ys = cs.map((c) => (c.y != null ? c.y : c.yfit))
+  const min = Math.min(...ys)
+  const max = Math.max(...ys)
+  const span = max - min || 1
+  const pad = 8
+  const lastX = cs[cs.length - 1].x || 1
+  return cs
+    .map((c) => {
+      const v = c.y != null ? c.y : c.yfit
+      const x = (c.x / lastX) * CW
+      const y = CH - pad - ((v - min) / span) * (CH - 2 * pad)
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
+})
+
+// ---- AI 优化模型列表（按类别：时序预测 / 参数优化） ----
+const aiGroups = computed(() => {
+  const groups = []
+  for (const m of AI_MODELS) {
+    let g = groups.find(x => x.category === m.category)
+    if (!g) {
+      g = { category: m.category, name: m.categoryName || m.category, models: [] }
+      groups.push(g)
+    }
+    g.models.push(m)
+  }
+  return groups
+})
+function enterAi(m) {
+  if (store.busy) return
+  store.selectStrategy(m.id)
+  store.toast = `已打开 AI 优化模型「${m.name}」训练面板`
+}
+
+// ============ 中间视图联动：当前流程设备 ============
+// 工况数据分析中间视图拖入的数据源 = 当前流程设备列表（各算法手动添加时的候选来源）
+const flowDevices = computed(() => {
+  const srcs = store.dvSources || []
+  return srcs.map(s => ({
+    id: s.id,
+    label: s.label || s.id,
+    unit: s.unit || '',
+    unit_name: s.unitName || s.unit || '',
+    unit_type: s.unitType || '',
+  }))
+})
+// 中间视图当前勾选的设备 id（各算法输入的默认值来源）
+const flowSelIds = computed(() => (Array.isArray(store.dvSelIds) ? store.dvSelIds : []))
+// 合并候选：流程设备在前（带当前流程信息），后端 DEVICE_META 补全，按 id 去重
+function mergeCandidates(back, flows) {
+  const seen = {}
+  const out = []
+  for (const c of [...flows, ...back]) {
+    if (!c || !c.id || seen[c.id]) continue
+    seen[c.id] = 1
+    out.push(c)
+  }
+  return out
+}
+
+// ---- 决策变量（策略模型：RL / GA / PSO） ----
+const decisionRows = computed(() => st.value.space || [])
+// 已选参与优化的参数列表（active=true）
+const decisionList = computed(() => decisionRows.value.filter(r => !!r.active))
+// 可手动添加的候选（当前未参与优化的参数）
+const decisionAddOptions = computed(() => decisionRows.value.filter(r => !r.active))
+const decisionTouched = ref(false)  // 用户手动调整过决策变量后不再跟随中间视图
+// 决策变量默认 = 中间视图勾选设备对应的工艺参数（按设备所属工序 unitId/unitName 匹配）
+const optDefaultUnits = computed(() => {
+  const ids = flowSelIds.value
+  const srcs = store.dvSources || []
+  const set = new Set()
+  for (const s of srcs) {
+    if (ids.includes(s.id)) {
+      if (s.unitId) set.add(String(s.unitId))
+      else if (s.unitName) set.add(String(s.unitName))
+    }
+  }
+  return set
+})
+watch(() => [optDefaultUnits.value.size, strategy.value.id, st.value.ready], () => {
+  if (decisionTouched.value) return
+  if (!['ai::ga', 'ai::pso', 'ai::rl'].includes(strategy.value.id) || !st.value.ready) return
+  const rows = st.value.space || []
+  const list = rows
+    .filter(r => optDefaultUnits.value.has(String(r.unit_id)) || optDefaultUnits.value.has(String(r.unit_name)))
+    .map(r => r.dkey)
+  if (list.length) store.setOptimizerSettings(strategy.value.id, { decisions: list })
+}, { immediate: true })
+function removeDecision(dkey) {
+  decisionTouched.value = true
+  const list = decisionRows.value.filter(r => r.dkey !== dkey && r.active).map(r => r.dkey)
+  store.setOptimizerSettings(strategy.value.id, { decisions: list })
+}
+function addDecision(dkey) {
+  decisionTouched.value = true
+  const list = decisionRows.value.filter(r => r.dkey === dkey || r.active).map(r => r.dkey)
+  store.setOptimizerSettings(strategy.value.id, { decisions: list })
+}
+function onDecisionAdd(v) {
+  if (v) addDecision(v)
+}
+
+// ---- 优化目标（策略模型：RL / GA / PSO） ----
+const objOptions = computed(() => st.value.objectives || [{ key: 'intensity', label: '吨钢碳强度', unit: 'kgCO₂/t' }])
+// 按 group 分组（全流程指标 / 工艺实时指标），每项为 { label, items: [...] }
+const objGroups = computed(() => {
+  const groups = []
+  const map = {}
+  for (const o of objOptions.value) {
+    const g = o.group || '优化目标'
+    if (!map[g]) { map[g] = []; groups.push({ label: g, items: map[g] }) }
+    map[g].push(o)
+  }
+  return groups
+})
+const objKey = computed(() => st.value.objective || 'intensity')
+const objUnit = computed(() => st.value.objective_unit || 'kgCO₂/t')
+// 目标方向：勾选「取负值」= 该指标越低越好（算法朝最小化寻优）；取消 = 该指标越高越好
+const objNeg = computed(() => st.value.objective_neg !== false)
+function onObjectiveChange(e) {
+  store.setOptimizerSettings(strategy.value.id, { objective: e.target.value })
+}
+function onObjNeg(e) {
+  store.setOptimizerSettings(strategy.value.id, { objective_neg: e.target.checked })
+}
+
+// ---- 预测目标 / 影响变量（序列预测算法） ----
+// 预测对象候选：当前流程设备优先，合并后端 forecast_targets（全厂负荷 + 全部监测设备）
+const ftOptions = computed(() => {
+  const back = st.value.forecast_targets ||
+    [{ id: 'load', label: '全厂工况负荷', unit: '负荷系数', unit_name: '', unit_type: '' }]
+  return mergeCandidates(back, flowDevices.value)
+})
+const ftKey = computed(() => st.value.forecast_target || 'load')
+const ftTouched = ref(false)   // 用户手动调整过预测对象后不再跟随中间视图
+function onForecastTarget(e) {
+  ftTouched.value = true
+  store.setOptimizerSettings(strategy.value.id, { forecast_target: e.target.value })
+}
+// 影响变量候选：流程设备 + 后端候选，剔除预测对象（二者互斥）
+const impactRows = computed(() => {
+  const back = st.value.impact_candidates || []
+  const fk = ftKey.value
+  return mergeCandidates(back, flowDevices.value).filter(c => c.id !== fk)
+})
+// 已选影响变量列表（空 = 全部设备参与预测）
+const impactList = computed(() => {
+  const iv = st.value.impact_vars
+  if (!Array.isArray(iv) || !iv.length) return []
+  const set = new Set(iv)
+  return impactRows.value.filter(r => set.has(r.id))
+})
+// 可手动添加的影响变量候选（未选中的设备）
+const impactAddOptions = computed(() => impactRows.value.filter(r => !impactList.value.some(x => x.id === r.id)))
+const impactTouched = ref(false)  // 用户手动调整过影响变量后不再跟随中间视图
+function removeImpact(id) {
+  impactTouched.value = true
+  const list = (Array.isArray(st.value.impact_vars) ? st.value.impact_vars : []).filter(x => x !== id)
+  store.setOptimizerSettings(strategy.value.id, { impact_vars: list })
+}
+function addImpact(id) {
+  impactTouched.value = true
+  const cur = Array.isArray(st.value.impact_vars) ? [...st.value.impact_vars] : []
+  if (!cur.includes(id)) cur.push(id)
+  store.setOptimizerSettings(strategy.value.id, { impact_vars: cur })
+}
+function onImpactAdd(v) {
+  if (v) addImpact(v)
+}
+// 默认输入：预测对象 = 中间视图第一个勾选设备；影响变量 = 中间视图勾选设备（排除预测对象）
+watch(() => [flowSelIds.value, strategy.value.id, st.value.ready], ([ids]) => {
+  if (strategy.value.id !== 'ai::seq' || !st.value.ready || !ids.length) return
+  if (!ftTouched.value) {
+    const first = ids[0]
+    if (first && ftOptions.value.some(t => t.id === first) && (st.value.forecast_target || 'load') !== first) {
+      store.setOptimizerSettings('ai::seq', { forecast_target: first })
+    }
+  }
+  if (!impactTouched.value) {
+    const fk = ftKey.value
+    const list = ids.filter(x => x !== fk)
+    if (list.length) store.setOptimizerSettings('ai::seq', { impact_vars: list })
+  }
+}, { immediate: true })
+
+// ---- 聚类特征变量（聚类工况识别） ----
+const featureRows = computed(() => mergeCandidates(st.value.feature_candidates || [], flowDevices.value))
+const featureSet = computed(() => {
+  const m = {}
+  const fv = st.value.feature_vars
+  const all = !Array.isArray(fv) || !fv.length
+  for (const r of featureRows.value) m[r.id] = all || fv.includes(r.id)
+  return m
+})
+const featureTouched = ref(false)  // 用户手动调整过聚类特征后不再跟随中间视图
+function onFeatureToggle(id, checked) {
+  featureTouched.value = true
+  const list = featureRows.value.map(r => r.id).filter(rid => (rid !== id ? featureSet.value[rid] : checked))
+  const payload = list.length === featureRows.value.length ? [] : list
+  store.setOptimizerSettings(strategy.value.id, { feature_vars: payload })
+}
+// 聚类特征默认 = 中间视图勾选设备
+watch(() => [flowSelIds.value, strategy.value.id, st.value.ready], ([ids]) => {
+  if (strategy.value.id !== 'ai::clu' || !st.value.ready || featureTouched.value || !ids.length) return
+  store.setOptimizerSettings('ai::clu', { feature_vars: ids })
+}, { immediate: true })
+
+// ---- 工况簇分布（聚类工况识别） ----
+const clusters = computed(() => st.value.clusters || [])
+const compactTxt = computed(() => (st.value.compactness != null ? Number(st.value.compactness).toFixed(3) : '—'))
+
 const fmtSamples = computed(() => {
   const s = st.value.samples || 0
   return s >= 10000 ? (s / 10000).toFixed(1) + ' 万' : String(s)
 })
-const bestTxt = computed(() => (st.value.best_fitness != null ? st.value.best_fitness.toFixed(1) : '—'))
+// fitness（越小越好，方向已编码在符号中）→ 用户可读的目标值：取负方向时取反还原真实值
+function fmtFitness(x) {
+  if (x == null) return null
+  const neg = st.value.objective_neg !== false
+  return (neg ? x : -x)
+}
+const bestTxt = computed(() => {
+  if (isClu.value) return clusters.value.length ? String(clusters.value.length) : '—'
+  const f = fmtFitness(st.value.best_fitness)
+  return f != null ? f.toFixed(1) : '—'
+})
 const impTxt = computed(() => {
+  if (isClu.value) return compactTxt.value
   const p = st.value.improvement_pct
   if (p == null) return '—'
   return p >= 0 ? '↓ ' + Math.abs(p).toFixed(1) + '%' : '↑ ' + Math.abs(p).toFixed(1) + '%'
 })
 const impCls = computed(() => {
+  if (isClu.value) return ''
   const p = st.value.improvement_pct
   if (p == null) return ''
   return p > 0.01 ? 'good' : p < -0.01 ? 'bad' : ''
@@ -338,6 +1011,19 @@ function pts(key) {
     .join(' ')
 }
 
+// 算法超参数显示（聚类按算法过滤不适用的超参：DBSCAN 无 K，K-Means/层次聚类无 ε/最小样本数）
+const hpSchema = computed(() => {
+  const schema = st.value.hyper_schema || {}
+  if (!isClu.value) return schema
+  const out = {}
+  const dbscan = cluModel.value === 'dbscan'
+  for (const [key, hp] of Object.entries(schema)) {
+    if (dbscan && key === 'k') continue
+    if (!dbscan && (key === 'eps' || key === 'min_pts')) continue
+    out[key] = hp
+  }
+  return out
+})
 // 算法超参数草稿（轮询刷新时不覆盖用户编辑：仅在首次/切换条目时初始化）
 const hpDraft = ref({})
 // 控制与训练设置草稿：同样仅在首次/切换条目时从后端状态初始化
@@ -483,9 +1169,8 @@ textarea.inp { resize: vertical; font-family: inherit; line-height: 1.5; }
 .stat b.bad { color: #f87171; }
 .stat span { font-size: 10px; color: var(--muted); }
 .tip-row { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: 0 0 auto; }
-.dot.on { background: #34d399; box-shadow: 0 0 6px #34d399; animation: optpulse 1.6s infinite; }
-@keyframes optpulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+.dot { width: 6px; height: 6px; border-radius: 2px; background: var(--muted); flex: 0 0 auto; }
+.dot.on { background: var(--green); }
 .chart { width: 100%; }
 .chart-svg { width: 100%; height: 96px; display: block; }
 .chart-svg .grid { stroke: var(--line); stroke-width: 1; opacity: .5; }
@@ -497,6 +1182,18 @@ textarea.inp { resize: vertical; font-family: inherit; line-height: 1.5; }
 .legend .lg.best::before { background: #34d399; }
 .legend .lg.avg::before { background: #fbbf24; opacity: .7; }
 .legend .lg.muted::before { display: none; }
+.legend .lg.dot-blue::before { background: var(--accent2); width: 8px; height: 8px; border-radius: 50%; }
+/* 参数优化集中面板：GA / PSO / RL 算法切换 tabs */
+.opt-tabs { display: flex; gap: 6px; margin: 8px 0 2px; }
+.opt-tab { flex: 1; padding: 6px 4px; font-size: 11.5px; border: 1px solid var(--line); border-radius: 4px;
+  background: var(--panel-2); color: var(--muted); cursor: pointer; transition: all .12s; }
+.opt-tab.on { border-color: var(--accent); color: var(--accent); background: var(--accent-l); font-weight: 600; }
+.opt-tab:hover:not(.on) { border-color: var(--accent); color: var(--text); }
+/* 数据拟合：方程展示与曲线散点 */
+.fit-eq { padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; margin-bottom: 6px; }
+.fit-eq-main { font-family: var(--mono, Consolas, Menlo, monospace); font-size: 13px; color: var(--accent2); margin-bottom: 4px; word-break: break-all; }
+.fit-dot { fill: var(--accent2); opacity: .85; }
+.fit-stat { font-size: 11px; }
 .hp-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
 .hp-label { flex: 0 0 92px; font-size: 11px; color: var(--muted); }
 .hp-slider { flex: 1; accent-color: var(--accent2); min-width: 0; }
@@ -532,6 +1229,36 @@ textarea.inp { resize: vertical; font-family: inherit; line-height: 1.5; }
 .inp.time { width: auto; min-width: 86px; flex: 0 0 auto; padding: 3px 6px; font-size: 11px; }
 .chk { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); cursor: pointer; }
 .chk input { accent-color: var(--accent2); width: 15px; height: 15px; cursor: pointer; }
+/* ---- 聚类工况识别（CLU）：工况簇分布 ---- */
+.clu-list { display: flex; flex-direction: column; gap: 9px; padding: 2px 0 4px; }
+.clu-row { display: flex; flex-direction: column; gap: 4px; }
+.clu-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; }
+.clu-head b { font-size: 12px; color: var(--text); }
+.clu-head .muted { font-size: 10px; }
+.clu-head > b:last-child { font-size: 12px; color: var(--accent2); font-variant-numeric: tabular-nums; }
+.clu-bar { height: 6px; border-radius: 3px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
+.clu-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent2), var(--accent)); transition: width .4s ease; }
+/* ---- AI 模型列表（按类别） ---- */
+.ai-card { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; cursor: pointer; background: var(--panel-2); transition: border-color .15s, background .15s; }
+.ai-card:hover { border-color: var(--accent); }
+.ai-card.active { border-color: var(--accent); background: rgba(34, 211, 238, .08); }
+.ai-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+.ai-card-head b { font-size: 13px; }
+.ai-card .tag { font-size: 10px; padding: 1px 6px; border-radius: 3px; background: rgba(34, 211, 238, .15); color: var(--accent); border: 1px solid rgba(34, 211, 238, .35); }
+.ai-desc { font-size: 12px; line-height: 1.65; }
+/* ---- 决策变量 / 影响变量 / 拟合变量（已选列表 + 删除 + 手动添加） ---- */
+.dv-list { display: flex; flex-direction: column; gap: 6px; padding: 2px 0 4px; }
+.dv-row { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); transition: border-color .15s; }
+.dv-row:hover { border-color: var(--accent); }
+.dv-row input { margin-top: 3px; }
+.dv-tag { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); }
+.dv-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.dv-main .muted { font-size: 12px; }
+.dv-del { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 14px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .12s; }
+.dv-del:hover:not(:disabled) { color: #f87171; border-color: #f87171; }
+.dv-del:disabled { opacity: .5; cursor: not-allowed; }
+.dv-add { margin-top: 8px; }
+.dv-add .inp.sel { width: 100%; }
 .time-row { justify-content: flex-end; gap: 6px; }
 /* ---- 模型版本 ---- */
 .ver-list { display: flex; flex-direction: column; gap: 8px; }

@@ -145,6 +145,13 @@
               <span class="tch-count">{{ AI_MODELS.length }}</span>
             </div>
             <div class="tchildren" v-show="expanded.g_strat_ai">
+              <div class="tchild leaf flat click"
+                   :class="{ active: store.selectedStrategyId === 'ai::overview' }"
+                   title="按类别浏览全部 AI 优化模型，点击进入对应训练面板"
+                   @click="onAiOverviewClick">
+                <span class="tc-tt">模型列表（按类别）</span>
+                <span class="tc-tag ai">AI</span>
+              </div>
               <div v-for="m in AI_MODELS" :key="m.id" class="tchild leaf flat click"
                    :class="{ active: store.selectedStrategyId === m.id }"
                    :title="'点击查看 AI 优化模型「' + m.name + '」训练面板'"
@@ -199,7 +206,6 @@ import { useSimStore, AI_MODELS } from '../stores/sim'
 import { MATERIALS, PRODUCTS, ROUTE_GROUPS, PROCESS_TEMPLATES, PROCESS_ADJUSTABLE, DEVICE_MAP, PROCESS_MAP } from '../data/flowLibrary'
 import Icon from './Icon.vue'
 import { openContextMenu } from '../composables/contextMenu'
-import { openScanDialog } from '../stores/scan'
 import SearchPanel from './SearchPanel.vue'
 import ScenePanel from './ScenePanel.vue'
 import ConnectionsPanel from './ConnectionsPanel.vue'
@@ -394,13 +400,19 @@ function toggle(key) { expanded[key] = !expanded[key] }
 function onPresetClick(s) {
   if (store.busy) return
   store.selectStrategy(s.id)
-  store.toast = `已打开内置策略「${s.name || '未命名'}」属性：点击底部「策略仿真」进入仿真模式解析测试`
+  store.toast = `已打开内置策略「${s.name || '未命名'}」：点击底部「策略仿真」解析应用`
 }
 // 点击 AI 优化模型：打开右侧「策略属性」训练面板（随实时数据后台定时训练、模型逐渐变优）
 function onAiClick(m) {
   if (store.busy) return
   store.selectStrategy(m.id)
   store.toast = `已打开 AI 优化模型「${m.name}」训练面板：可开始自动训练/训练一轮/应用最优参数`
+}
+// 点击「模型列表（按类别）」：打开右侧 AI 优化模型列表（时序预测 / 参数优化 / 聚类分析多类别，点击进入对应模型）
+function onAiOverviewClick() {
+  if (store.busy) return
+  store.selectStrategy('ai::overview')
+  store.toast = '已打开 AI 优化模型列表：按类别浏览，点击模型卡片进入对应训练面板'
 }
 // 点击工艺策略（某工艺对应的绿色策略）：打开右侧「策略属性」面板（只读 + 启用/停用开关 + 查看工艺）
 function onGreenClick(g, gs) {
@@ -438,12 +450,11 @@ function onDrag(e, kind, type) {
   e.dataTransfer.setData('text/plain', type)
   e.dataTransfer.effectAllowed = 'copy'
 }
-// 资源叶子右键上下文菜单：查看属性 / 参数扫描（工艺）/ 删除（自定义策略）
+// 资源叶子右键上下文菜单：查看属性（工艺 / 原料）
 function onLeafContext(e, p) {
   const items = []
   if (p.kind === 'process') {
     items.push({ label: '查看属性', icon: 'process', action: () => onProcessClickFromType(p.type) })
-    items.push({ label: '参数敏感性扫描', icon: 'search', action: () => openScanDialog(p.type) })
   } else if (p.kind === 'material') {
     items.push({ label: '查看属性', icon: 'material', action: () => store.selectMaterial(p.id) })
   }

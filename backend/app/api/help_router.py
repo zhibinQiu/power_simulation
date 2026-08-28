@@ -4,10 +4,10 @@
 项目承载（构建产物 dist 经静态服务托管，端口见环境变量 DOCS_SITE_PORT，
 默认 40183，遵循项目 40000+ 端口规范）。平台帮助菜单通过本接口获取跳转地址。
 
-文档站与平台同部署在云端服务器，访问地址固定使用【云端服务 IP】（即云端
-Broker/Agent 的 host，配置于 box_devices.json 顶层 cloud.host，回退 broker host），
-而非浏览器当前访问的 host（前端可能经本机域名/内网 IP 访问，文档站实际只监听
-云端对外 IP）。前端兜底推导地址同理应使用该云端 IP。
+文档站经云端 frp 隧道暴露到公网（remotePort 40183），对外访问地址固定使用
+【公网地址】（环境变量 DOCS_PUBLIC_HOST 可覆盖，默认 36.151.146.71），
+而非浏览器当前访问的 host / 云端内网 IP——公网用户经 36.151.146.71:40183
+访问，内网用户同样可达。前端兜底推导地址同理应使用该公网地址。
 """
 from __future__ import annotations
 
@@ -22,13 +22,20 @@ _CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..
 _DEVICES_PATH = os.path.join(_CONFIG_DIR, "box_devices.json")
 _BROKER_CFG_PATH = os.path.join(_CONFIG_DIR, "box_config.json")
 _DEFAULT_CLOUD_HOST = "172.19.134.45"
+# 文档站经 frp 隧道暴露的公网入口（45 服务器 → 36.151.146.71:40183），
+# 可经环境变量 DOCS_PUBLIC_HOST 覆盖（如切换公网 frps 地址时）。
+_DEFAULT_PUBLIC_HOST = os.getenv("DOCS_PUBLIC_HOST", "").strip() or "36.151.146.71"
 
 
 def cloud_host() -> str:
-    """返回云端服务 IP（文档站实际监听的对外地址）。
+    """返回文档站对外访问地址。
 
-    优先 box_devices.json 顶层 cloud.host，回退 broker 配置 host，最后默认云端 IP。
+    文档站经 frp 隧道暴露公网，跳转链接固定使用公网地址（DOCS_PUBLIC_HOST
+    优先，默认 36.151.146.71），不再使用云端内网 IP。
     """
+    public = os.getenv("DOCS_PUBLIC_HOST", "").strip() or _DEFAULT_PUBLIC_HOST
+    if public:
+        return public
     for path, keys in (
         (_DEVICES_PATH, ("cloud", "host")),
         (_BROKER_CFG_PATH, ("broker", "host")),

@@ -247,7 +247,7 @@ function resetDefaults() {
 .ss-sw:disabled { opacity: .4; cursor: not-allowed; }
 /* 分段选择 */
 .ss-segs { display: flex; gap: 4px; flex-wrap: wrap; max-width: 320px; justify-content: flex-end; }
-.ss-seg { padding: 4px 10px; border: 1px solid var(--border); border-radius: 12px; font-size: 10px; color: var(--muted); background: var(--panel); cursor: pointer; }
+.ss-seg { padding: 4px 10px; border: 1px solid var(--border); border-radius: 2px; font-size: 10px; color: var(--muted); background: var(--panel); cursor: pointer; }
 .ss-seg:hover { border-color: var(--accent); }
 .ss-seg.on { background: var(--accent-l); border-color: var(--accent); color: var(--accent-d); font-weight: 600; }
 /* 数据源状态 */

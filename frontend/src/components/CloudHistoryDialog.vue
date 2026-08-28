@@ -2,7 +2,7 @@
   <div class="chd-mask" @click.self="close">
     <div class="chd-panel">
       <div class="chd-head">
-        <span class="chd-title">☁ 云端时序历史（TDengine）</span>
+        <span class="chd-title">云端时序历史（TDengine）</span>
         <button class="chd-x" @click="close" title="关闭">✕</button>
       </div>
       <div class="chd-sub">

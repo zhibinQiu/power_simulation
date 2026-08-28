@@ -139,7 +139,7 @@
 
     <div v-if="!visibleNodes.length" class="flow-empty">
       <template v-if="store.scheme.activeGroupId">该小组内暂无设备。从左侧拖入设备卡片归入本组，或双击小组卡片从外部画布把设备拖进来。</template>
-      <template v-else>画布为空。从左侧「主工艺线 / 设备 / 原料」拖入节点，或点击顶部工具条「编排 → 长流程示例 / 短流程示例」一键载入。</template>
+      <template v-else>画布为空。从左侧「主工艺线 / 设备 / 原料」拖入节点，或点击顶部工具条「编排 → 长流程模板 / 短流程模板」一键载入。</template>
     </div>
   </div>
 </template>
@@ -150,7 +150,6 @@ import { useSimStore } from '../stores/sim'
 import { MATERIALS, MATERIAL_MAP, PROCESS_MAP, DEVICE_MAP, materialFamily } from '../data/flowLibrary'
 import DeviceGlyph from './DeviceGlyph.vue'
 import { openContextMenu } from '../composables/contextMenu'
-import { openScanDialog } from '../stores/scan'
 
 const store = useSimStore()
 const canvasEl = ref(null)
@@ -649,9 +648,6 @@ function onNodeContext(e, n) {
   const items = [
     { label: '选中 / 聚焦节点', icon: 'target', action: () => store.selectFlow(n.id) },
   ]
-  if (n.kind === 'process' && n.type) {
-    items.push({ label: '参数敏感性扫描', icon: 'search', action: () => openScanDialog(n.type) })
-  }
   items.push({ sep: true })
   items.push({ label: '重命名', icon: 'pencil', accel: 'F2', action: () => startRename(n) })
   items.push({ label: '复制节点', icon: 'copy', accel: 'Ctrl+D', action: () => duplicateNode(n) })
@@ -703,7 +699,7 @@ onBeforeUnmount(() => {
   pointer-events: none; user-select: none; }
 .edge-label-gas { fill: var(--gas); }
 /* 工艺设备小组卡片：与普通工艺节点一致的卡片样式（成员折叠为一张卡片，标注台数），双击进入子编排 */
-.fgroup { position: absolute; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+.fgroup { position: absolute; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px;
   box-shadow: var(--shadow); z-index: 1; cursor: grab; user-select: none; overflow: hidden; }
 .fgroup:active { cursor: grabbing; }
 .fgroup:hover { border-color: var(--yellow); }
@@ -720,7 +716,7 @@ onBeforeUnmount(() => {
 .group-crumb .crumb-back { font-size: 12px; padding: 3px 9px; }
 .group-crumb .crumb-name { font-size: 12px; font-weight: 600; color: var(--accent2); }
 .group-crumb .crumb-hint { font-size: 10px; color: var(--muted); }
-.fnode { position: absolute; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+.fnode { position: absolute; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px;
   box-shadow: var(--shadow); user-select: none; }
 .fnode.sel { border-color: var(--accent2); box-shadow: 0 0 0 1px rgba(26,127,212,.5); }
 .fnode.device { border-style: dashed; }

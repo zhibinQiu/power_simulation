@@ -31,6 +31,7 @@ from .api.box_router import router as box_router
 from .api.carbon_assets_router import router as carbon_assets_router
 from .api.carbon_assets_router import share_router as report_share_router
 from .api.help_router import router as help_router
+from .api.license_router import router as license_router
 from .api.simulation_router import router as simulation_router
 
 app = FastAPI(title="工业能碳智控平台", version="0.1.0")
@@ -46,6 +47,7 @@ app.include_router(simulation_router)          # 核心仿真（预置/解析/�
 app.include_router(box_router)                 # 能碳一体机管理
 app.include_router(carbon_assets_router)       # 碳资产管理（含 /api/carbon-assistant/*）
 app.include_router(help_router)                # 帮助中心（独立文档网站地址）
+app.include_router(license_router)             # 平台激活（激活码校验 / 激活状态）
 app.include_router(report_share_router)        # 报告分享页 /report/{rid}
 
 

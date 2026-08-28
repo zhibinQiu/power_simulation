@@ -286,7 +286,7 @@ onBeforeUnmount(() => {
 .scene-host { position: relative; flex: 1 1 0; min-height: 0; }
 
 /* 3D 小组子场景 · 左上角返回顶层浮层（工具栏在场景外部独立成行，不再遮挡，恢复默认左上角位置） */
-.group-scene-bar { position: absolute; top: 12px; left: 12px; z-index: 6; display: flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.72); border: 1px solid rgba(0, 114, 189, 0.2); border-radius: 10px; padding: 6px 10px; backdrop-filter: blur(6px); }
+.group-scene-bar { position: absolute; top: 12px; left: 12px; z-index: 6; display: flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.72); border: 1px solid rgba(0, 114, 189, 0.2); border-radius: 4px; padding: 6px 10px; backdrop-filter: blur(6px); }
 .gs-back {
   display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px;
   background: transparent; border: 1px solid var(--border); border-radius: 4px;
@@ -308,7 +308,7 @@ onBeforeUnmount(() => {
   -webkit-backdrop-filter: blur(10px) saturate(1.3);
   backdrop-filter: blur(10px) saturate(1.3);
   border: 1px solid rgba(15, 23, 42, 0.10);
-  border-radius: 10px;
+  border-radius: 4px;
   box-shadow: 0 6px 24px rgba(15, 23, 42, 0.14);
   padding: 10px 12px;
   color: #1c1c1c;

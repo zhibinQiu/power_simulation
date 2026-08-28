@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from ..application.optimizer_service import optimizer_service
 from ..application.simulation_service import simulation_service
 from ..application.strategy_service import strategy_service
+from ..cluster import cluster_devices
 from ..models import (ParseRequest, ParseResult, ParsedOp, ProcessModel,
                       SimulateRequest, SimulateResponse, Strategy)
 
@@ -147,33 +148,48 @@ def apply_strategy(sid: str, model: ProcessModel = Body(...),
     return result
 
 
-# ------------------------- 求解 / 分析能力（参数扫描 + 守恒审计） -------------------------
-
-class ScanRequest(BaseModel):
-    """参数扫描（一维敏感性分析）：固定其余参数，扫描单工序某一参数，返回全厂指标随参数变化的曲线。"""
-    model: ProcessModel
-    unit_id: str
-    param: str
-    low: float
-    high: float
-    steps: int = 11
-    factors: Optional[Dict[str, Any]] = None
-
-
-@router.post("/api/scan")
-def do_scan(req: ScanRequest):
-    """单工序参数扫描：返回 { unit_name, param, points:[{value, co2_total, intensity, ...}] }。"""
-    try:
-        return simulation_service.scan(req.model, req.factors, req.unit_id,
-                                       req.param, req.low, req.high, req.steps)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
+# ------------------------- 求解 / 分析能力（守恒审计） -------------------------
 
 @router.post("/api/audit")
 def do_audit(model: ProcessModel = Body(...)):
     """碳元素守恒审计：逐工序核对碳输入与各去向（排CO₂/固钢/入渣/捕集/产品携出），返回闭合余量。"""
     return simulation_service.audit(model)
+
+
+# ------------------------- 工况数据分析（聚类） -------------------------
+
+class ClusterSeriesPoint(BaseModel):
+    t: float
+    v: float
+
+
+class ClusterDevice(BaseModel):
+    id: str
+    label: Optional[str] = None
+    unit: Optional[str] = None
+    series: List[ClusterSeriesPoint] = Field(default_factory=list)
+
+
+class ClusterRequest(BaseModel):
+    """聚类分析请求：多台设备在所选时间段内的 {t, v} 序列（前端按时间窗过滤后上传）。"""
+    devices: List[ClusterDevice] = Field(..., min_length=1)
+    k: Optional[int] = Field(None, ge=2, le=10, description="簇数，缺省自动选择")
+
+
+@router.post("/api/cluster")
+def do_cluster(req: ClusterRequest):
+    """多设备时间序列聚类分析（工况数据分析 → 聚类分析）。
+
+    输入：{devices: [{id, label?, unit?, series:[{t,v}]}], k?}
+    输出：{n, k, method, silhouette, features, clusters:[{cluster, size, devices, centroid, summary}]}
+    """
+    try:
+        return cluster_devices(
+            [d.model_dump() for d in req.devices],
+            k=req.k,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ------------------------- 命令行窗口：自然语言聊天 -------------------------

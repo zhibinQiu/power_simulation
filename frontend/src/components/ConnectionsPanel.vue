@@ -34,7 +34,7 @@
         <code class="cn-mqtt-topic">{{ mqttRecentMsg.topic }}</code>
         <div class="cn-mqtt-payload">{{ mqttRecentMsg.payload }}</div>
       </div>
-      <div class="cn-mqtt-note">设备读数由后端订阅 MQTT 获取（Broker 配置在「能碳一体机管理」视图前端配置），不再生成模拟数据。</div>
+      <div class="cn-mqtt-note">设备读数经 MQTT 实时采集（Broker 在「能碳一体机管理」中配置）。</div>
     </div>
 
     <!-- 新建 / 编辑表单 -->

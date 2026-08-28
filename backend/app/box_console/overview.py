@@ -146,11 +146,9 @@ def box_overview() -> Dict[str, Any]:
         "cloud_source": cloud_source,
         "cloud_error": cloud_error,
         "demo_note": "" if cloud_source == "live" else (
-            f"云端推送中断（数据 {cloud.get('_cache_age', 0)}s 前更新）：云端 MQTT Broker / cloud-agent 可能离线。"
-            f"以下 CloudCore/端口/证书/token 为过期缓存（不伪造数据）。"
+            f"云端推送中断（数据 {cloud.get('_cache_age', 0)}s 前更新）：云端 MQTT Broker / cloud-agent 可能离线，以下为缓存快照。"
             if cloud_source == "stale" else
             f"云端数据通道不可达：{cloud.get('error', '')}。"
-            f"以上 CloudCore/端口/证书/token 为空或不完整（不伪造数据），"
             f"请检查云端 MQTT Broker / cloud-agent 服务后重试。"
             if cloud_source == "unreachable" else
             f"云端 agent 实时可达，但 CloudCore 未运行或未解析到 Pod（{cloud_error}）。请检查云端 cloudcore 状态。"

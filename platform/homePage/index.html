@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工业能碳智控平台 | 能碳一体化数字孪生平台</title>
+<link rel="icon" href="assets/网页角标.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;800&family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --yellow:#ffb71b;
+  --yellow-hover:#f4a700;
+  --on-yellow:#151617;
+  --black:#000;
+  --header:#171917;
+  --ink:#151617;
+  --body:#4a4a4a;
+  --line:#e0e0e0;
+  --card:#f5f5f5;
+  --tab-gray:#d9d9d9;
+  --link:#0069c0;
+  --f-head:'Montserrat','PingFang SC','Microsoft YaHei',sans-serif;
+  --f-body:'Source Sans Pro','PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--f-body);color:var(--ink);background:#fff;line-height:1.7;-webkit-font-smoothing:antialiased}
+a{text-decoration:none;color:inherit}
+img{max-width:100%;display:block}
+ul{list-style:none}
+.wrap{max-width:1100px;margin:0 auto;padding:0 32px}
+#ov-products .wrap{max-width:1100px}  /* 产品区更宽，匹配参考站卡片宽度 */
+h1,h2,h3,h4,h5{font-family:var(--f-head);color:var(--ink)}
+.sec{padding:80px 0}
+.h2{font-size:34px;font-weight:700;line-height:1.25;letter-spacing:-.02em}
+
+/* 按钮（矩形黄钮） */
+.btn{display:inline-flex;align-items:center;gap:10px;padding:15px 36px;font-family:var(--f-head);font-size:15px;font-weight:600;background:var(--yellow);color:var(--on-yellow);border:none;cursor:pointer;transition:background .2s}
+.btn:hover{background:var(--yellow-hover)}
+.btn .arr{font-size:12px}
+.btn-outline{display:inline-flex;align-items:center;gap:10px;padding:13px 30px;font-family:var(--f-head);font-size:15px;font-weight:600;color:var(--yellow);border:2px solid var(--yellow);background:transparent;cursor:pointer;transition:.2s}
+.btn-outline:hover{background:var(--yellow);color:var(--on-yellow)}
+/* 文本链接（蓝） */
+.tlink{font-family:var(--f-head);font-size:14.5px;font-weight:600;color:var(--link)}
+.tlink:hover{text-decoration:underline}
+.tlink .arr{font-size:11px}
+
+/* ============ 页眉（固定顶部，下滑压缩至半高；占位随页眉同步动画，下沿始终与内容相连） ============ */
+body{padding-top:100px;transition:padding-top .3s ease}
+body.compact{padding-top:50px}
+header.site{background:var(--header);height:100px;display:flex;align-items:center;position:fixed;top:0;left:0;right:0;z-index:100;transition:height .3s ease}
+body.compact header.site{height:50px}
+.brand img{width:44px;height:44px;border-radius:10px;transition:.3s}
+body.compact .brand img{width:28px;height:28px;border-radius:6px}
+.brand .wm{transition:font-size .3s}
+.btn-pill{transition:padding .3s ease,background .2s}
+body.compact .btn-pill{padding-top:8px;padding-bottom:8px}
+header.site .wrap{max-width:1240px;width:100%;padding:0 16px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:14px}
+.brand .wm{color:#fff;font-family:var(--f-head);font-weight:700;font-size:20px;line-height:1.2}
+.brand .wm small{display:block;font-weight:400;font-size:10.5px;color:#9aa0a6;letter-spacing:.18em}
+.burger{width:44px;height:44px;background:none;border:none;cursor:pointer;display:none;place-items:center}
+.burger span{display:block;width:26px;height:2px;background:#fff;position:relative}
+.burger span::before,.burger span::after{content:"";position:absolute;left:0;width:26px;height:2px;background:#fff}
+.burger span::before{top:-8px}
+.burger span::after{top:8px}
+
+/* 主导航（参照模板菜单栏） */
+nav.main{display:flex;align-items:center;gap:6px;margin-left:48px}
+.nav-item{position:relative}
+.nav-item > a{display:inline-flex;align-items:center;gap:7px;padding:10px 16px;color:#fff;font-family:var(--f-body);font-size:18px;font-weight:600;border:1.5px solid transparent;border-radius:999px;transition:.2s}
+body.compact .nav-item > a{padding:6px 14px;font-size:16px}
+.nav-item > a .caret{font-size:11px;color:#fff;transition:transform .2s}
+.nav-item:hover > a{background:#2a2d2a}
+.nav-item:hover > a .caret{transform:rotate(180deg)}
+.nav-drop{position:absolute;top:calc(100% + 14px);left:0;min-width:250px;background:#fff;border-radius:6px;box-shadow:0 18px 46px rgba(0,0,0,.3);padding:12px;opacity:0;visibility:hidden;transform:translateY(-6px);transition:.22s;z-index:80}
+.nav-item:hover .nav-drop{opacity:1;visibility:visible;transform:none}
+.nav-drop::before{content:"";position:absolute;top:-14px;left:0;right:0;height:14px}
+.nav-drop a{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;font-size:16px;font-family:var(--f-body);font-weight:400;color:var(--ink);border-radius:4px;transition:.15s}
+.nav-drop a small{font-family:var(--f-body);font-weight:400;font-size:12px;color:#8a8a8a}
+.nav-drop a:hover{background:var(--card);padding-left:20px}
+/* 页眉右侧 */
+.header-right{display:flex;align-items:center;gap:8px;margin-left:auto}
+.h-icon{width:42px;height:42px;border-radius:50%;background:none;border:none;display:grid;place-items:center;color:#fff;cursor:pointer;transition:.2s}
+.h-icon:hover{background:#2a2d2a}
+.btn-pill{display:inline-flex;align-items:center;gap:10px;margin-left:10px;padding:12px 26px;border-radius:999px;background:var(--yellow);color:var(--on-yellow);font-family:var(--f-body);font-size:14px;font-weight:600;border:none;cursor:pointer}
+.btn-pill:hover{background:var(--yellow-hover)}
+.btn-pill .arr{font-size:13px}
+/* 搜索展开框 */
+.search-pop{position:absolute;top:100%;right:16px;margin-top:6px;background:#fff;border-radius:6px;box-shadow:0 18px 46px rgba(0,0,0,.3);padding:14px;display:none;z-index:90;width:360px;flex-direction:column;align-items:stretch}
+.search-pop.open{display:flex;gap:10px}
+.search-row{display:flex;gap:10px}
+.search-pop input{flex:1;padding:11px 16px;border:1.5px solid var(--line);border-radius:4px;font-size:14.5px;font-family:var(--f-body);outline:none}
+.search-pop input:focus{border-color:var(--yellow)}
+.search-pop .search-row button{padding:0 20px;border:none;background:var(--yellow);color:var(--on-yellow);font-family:var(--f-head);font-weight:600;font-size:14px;border-radius:4px;cursor:pointer}
+.search-pop .search-row button:hover{background:var(--yellow-hover)}
+.search-results{margin-top:10px;max-height:340px;overflow:auto;display:none}
+.search-results.show{display:block}
+.search-result{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:6px;cursor:pointer}
+.search-result:hover{background:#f5f5f5}
+.search-result .sr-type{flex:none;font-size:11px;color:#8a8a8a;padding-top: 3px;white-space:nowrap}
+.search-result .sr-title{flex:1;font-size:14px;color:var(--ink)}
+.search-empty{padding:12px;text-align:center;color:#8a8a8a;font-size:14px}
+.sr-hl{outline:3px solid var(--yellow);outline-offset:3px}
+
+/* 全屏菜单 */
+.menu-overlay{position:fixed;inset:0;background:#0a0a0a;z-index:200;display:flex;align-items:center;opacity:0;pointer-events:none;transition:opacity .3s}
+.menu-overlay.open{opacity:1;pointer-events:auto}
+.menu-overlay .wrap{width:100%}
+.menu-close{position:absolute;top:28px;right:40px;background:none;border:none;color:#fff;font-size:34px;cursor:pointer;line-height:1}
+.menu-links li{border-bottom:1px solid #2a2c2a}
+.menu-links a{display:flex;justify-content:space-between;align-items:center;padding:18px 4px;color:#fff;font-family:var(--f-head);font-weight:600;font-size:28px;transition:.2s}
+.menu-links a small{font-family:var(--f-body);font-size:13px;font-weight:400;color:#8a8f8a;letter-spacing:.1em}
+.menu-links a:hover{color:var(--yellow);padding-left:12px}
+.menu-foot{margin-top:34px;display:flex;gap:16px}
+
+/* ============ Hero ============ */
+.hero{position:relative;background:#000;color:#fff;min-height:calc(100vh - 100px);display:flex;flex-direction:column;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.82) 0%,rgba(0,0,0,.45) 45%,rgba(0,0,0,0) 72%);z-index:1}
+/* 右侧图标 + 同色系光晕拓展（参照 JetBrains 风格） */
+.hero-visual{position:absolute;top:0;right:0;bottom:0;width:56%;pointer-events:none}
+.hero-visual .glow{position:absolute;border-radius:50%}
+.hg1{width:720px;height:720px;right:-6%;top:-10%;background:radial-gradient(circle at 45% 45%,rgba(47,92,255,.5),rgba(47,92,255,0) 66%);filter:blur(50px)}
+.hg2{width:640px;height:640px;right:2%;top:26%;background:radial-gradient(circle at 55% 50%,rgba(63,178,110,.55),rgba(63,178,110,0) 62%);filter:blur(52px)}
+.hg3{width:820px;height:820px;right:-14%;bottom:-22%;background:radial-gradient(circle at 50% 50%,rgba(18,62,128,.55),rgba(18,62,128,0) 68%);filter:blur(46px)}
+.hg4{width:380px;height:380px;right:26%;top:6%;background:radial-gradient(circle at 50% 50%,rgba(87,120,220,.34),rgba(87,120,220,0) 66%);filter:blur(60px)}
+.hero-visual img{position:absolute;right:17%;top:50%;transform:translateY(-50%);width:268px;border-radius:62px;box-shadow:0 34px 90px rgba(0,0,0,.65),0 0 60px rgba(47,92,255,.22)}
+.hero > .wrap{max-width:1240px;width:100%;position:relative;z-index:2;flex:1;display:flex;flex-direction:column;justify-content:center;padding-top:56px;padding-bottom:64px}
+.hero h1{color:#fff;font-size:44px;font-weight:300;letter-spacing:-.01em;margin-bottom:20px}
+.hero h2{color:#fff;font-size:28px;font-weight:700;line-height:1.35;max-width:600px;margin-bottom:20px}
+.hero p{font-size:16px;color:#d5d5d5;max-width:520px}
+.hero-cta{margin-top:32px;display:flex;gap:16px}
+/* 选项卡（文档流内 sticky 吸顶；到达菜单栏下沿时自然粘住，半高压缩）
+   负边距由脚本按选项卡真实高度注入，使 Hero 黑色背景精确覆盖到按钮下沿、与之齐平 */
+.hero-tabs{position:sticky;top:50px;z-index:90;background:transparent;margin-top:-56px}
+.hero-tabs .wrap{max-width:1240px;display:flex;gap:6px}
+.hero-tabs button{width:190px;padding:19px 0;font-family:var(--f-head);font-size:15px;font-weight:600;color:var(--ink);background:var(--tab-gray);border:none;cursor:pointer;transition:background .2s,padding .3s ease}
+.hero-tabs button:hover{background:#e6e6e6}
+.hero-tabs button.active{background:#fff}
+.hero-tabs.stuck{background:transparent}
+.hero-tabs.stuck button{padding:8px 0;box-shadow:0 0 14px rgba(0,0,0,.2)}
+
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ============ WATCH VIDEO ============ */
+.watch-video{display:flex;align-items:center;justify-content:center;gap:18px;padding:44px 0 8px;cursor:pointer}
+.watch-video span{font-family:var(--f-head);font-size:14px;font-weight:600;letter-spacing:.14em}
+.watch-video .ycirc{width:74px;height:74px;border-radius:50%;background:var(--yellow);display:grid;place-items:center;transition:.25s}
+.watch-video:hover .ycirc{background:var(--yellow-hover);transform:scale(1.06)}
+.watch-video .ycirc svg{margin-left:4px}
+
+/* ============ 简介（图左文右） ============ */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
+.intro-copy .h2{font-size:38px;margin-bottom:22px}
+.intro-copy p{font-size:16px;color:var(--body)}
+.intro-copy p+p{margin-top:14px}
+.check-grid{margin-top:30px;display:grid;grid-template-columns:1fr 1fr;gap:20px 28px}
+.check-grid li{display:flex;gap:14px;align-items:flex-start;font-size:15.5px;font-family:var(--f-head);font-weight:600;line-height:1.5}
+.check-grid li img{flex:none;width:26px;height:26px;margin-top:1px}
+
+/* ============ 产品灰卡 ============ */
+.prod-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:40px}
+.prod-card{background:var(--card);padding:30px 28px 34px;display:flex;flex-direction:column}
+.prod-card .pimg{height:170px;display:grid;place-items:center;margin-bottom:22px;overflow:hidden}
+.prod-card .pimg img{max-height:170px;object-fit:cover}
+.prod-card h3{font-size:19px;font-weight:600;margin-bottom:6px}
+.prod-card .cat{font-size:13px;color:#8a8a8a;font-family:var(--f-head);margin-bottom:16px}
+.prod-card .picon{margin-bottom:16px}
+.prod-card p{font-size:14.5px;color:var(--body)}
+.prod-card ul{margin-top:16px;font-size:14px;color:var(--ink)}
+.prod-card ul li{padding-left:18px;position:relative;margin-bottom:7px}
+.prod-card ul li::before{content:"•";position:absolute;left:2px;font-weight:700}
+
+/* 查看更多（两侧横线） */
+.more-wrap{display:flex;align-items:center;gap:28px;margin-top:44px}
+.more-wrap::before,.more-wrap::after{content:"";flex:1;height:1px;background:var(--line)}
+.btn-more{display:inline-flex;align-items:center;gap:8px;padding:13px 34px;font-family:var(--f-head);font-size:14.5px;font-weight:600;color:var(--ink);background:#fff;border:1.5px solid var(--line);cursor:pointer;transition:.2s}
+.btn-more:hover{border-color:var(--ink)}
+
+/* ============ 视频区（文左图右） ============ */
+.video-box{position:relative;background:#000;cursor:pointer;overflow:hidden}
+.video-box img{width:100%;opacity:.92;transition:.3s}
+.video-box:hover img{opacity:1}
+.play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:72px;height:72px;border-radius:50%;background:var(--yellow);display:grid;place-items:center;transition:.25s}
+.video-box:hover .play{background:var(--yellow-hover);transform:translate(-50%,-50%) scale(1.06)}
+.play svg{margin-left:4px}
+.video-cap{position:absolute;left:0;bottom:0;right:0;padding:14px 20px;font-size:13px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.75))}
+
+/* ============ 手风琴（主要特征） ============ */
+.features{background:var(--card)}
+.feat-layout{display:grid;grid-template-columns:340px 1fr;gap:72px;align-items:start}
+.feat-side{position:sticky;top:40px}
+.feat-side .h2{font-size:30px;margin-bottom:16px}
+.feat-side p{font-size:15.5px;color:var(--body)}
+.acc-item{background:#fff;border:1px solid var(--line);border-top:none}
+.acc-item:first-child{border-top:1px solid var(--line)}
+.acc-head{width:100%;display:flex;align-items:center;gap:26px;padding:16px 26px;background:none;border:none;cursor:pointer;text-align:left;font-family:var(--f-head)}
+.acc-head .thumb{flex:none;width:128px;height:86px;object-fit:cover;background:#eee}
+.acc-head .name{flex:1;font-size:16.5px;font-weight:600;color:var(--ink)}
+.acc-head .pm{flex:none;width:40px;height:40px;border-radius:50%;border:2px solid var(--ink);background:transparent;display:grid;place-items:center;transition:.25s;position:relative}
+.acc-head .pm::before,.acc-head .pm::after{content:"";position:absolute;background:var(--ink);transition:.25s}
+.acc-head .pm::before{width:15px;height:2.2px}
+.acc-head .pm::after{width:2.2px;height:15px}
+.acc-item.open .acc-head .pm{background:var(--yellow);border-color:var(--yellow)}
+.acc-item.open .acc-head .pm::after{transform:rotate(90deg);opacity:0}
+.acc-body{max-height:0;overflow:hidden;transition:max-height .35s ease}
+.acc-body .inner{padding:4px 26px 28px 36px;font-size:15px;color:var(--body);display:grid;grid-template-columns:1fr 1.15fr;gap:40px;align-items:center}
+.acc-body .inner img.shot{width:100%;max-width:100%;border:1px solid var(--line);cursor:zoom-in;transition:filter .2s}
+.acc-body .inner img.shot:hover{filter:brightness(1.04)}
+/* 图片放大预览（lightbox） */
+.lightbox{position:fixed;inset:0;background:rgba(10,11,13,.92);display:none;align-items:center;justify-content:center;z-index:200;padding:40px;cursor:zoom-out}
+.lightbox.open{display:flex}
+.lightbox img{max-width:92vw;max-height:88vh;border-radius:10px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.lightbox .lb-close{position:absolute;top:22px;right: 26px;width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:26px;border:none;cursor:pointer;display:grid;place-items:center}
+.lightbox .lb-close:hover{background:rgba(255,255,255,.26)}
+.acc-body p+p{margin-top:10px}
+
+/* ============ FAQ（双列） ============ */
+.faq-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 56px;margin-top:36px}
+.faq-item{border-top:1px solid var(--line)}
+.faq-q{width:100%;display:flex;justify-content:space-between;align-items:center;gap:20px;padding:22px 4px;background:none;border:none;cursor:pointer;text-align:left;font-family:var(--f-head);font-size:15.5px;font-weight:600;color:var(--ink)}
+.faq-q .pm{flex:none;width:36px;height:36px;border-radius:50%;border:2px solid var(--ink);position:relative;transition:.25s}
+.faq-q .pm::before,.faq-q .pm::after{content:"";position:absolute;top:50%;left:50%;background:var(--ink);transition:.25s}
+.faq-q .pm::before{width:14px;height:2px;transform:translate(-50%,-50%)}
+.faq-q .pm::after{width:2px;height:14px;transform:translate(-50%,-50%)}
+.faq-item.open .faq-q .pm{background:var(--yellow);border-color:var(--yellow)}
+.faq-item.open .faq-q .pm::after{opacity:0}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .3s ease}
+.faq-a p{padding:0 4px 24px;font-size:14.5px;color:var(--body)}
+
+/* ============ 资源横卡（2列灰卡） ============ */
+.res-sec{margin-top:64px}
+.res-sec:first-of-type{margin-top:0}
+.res-sec .h2{font-size:30px;margin-bottom:32px}
+.res-cards{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.res-card{background:var(--card);display:flex;gap:0;transition:.25s}
+.res-card:hover{box-shadow:0 12px 30px rgba(0,0,0,.1)}
+.res-thumb{flex:none;width:128px;position:relative;overflow:hidden;display:grid;place-items:center;color:#fff}
+.res-thumb svg{width:44px;height:44px}
+.res-thumb img.cover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.res-thumb img.contain{width:72%;height:72%;object-fit:contain;position:relative;z-index:1}
+.res-thumb .vplay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:var(--yellow);display:grid;place-items:center;z-index:2}
+.res-body{padding:24px 26px}
+.res-body .cat{font-size:13px;color:#8a8a8a;font-family:var(--f-head);margin-bottom:4px}
+.res-body h4{font-size:16.5px;line-height:1.45;margin-bottom:10px}
+.res-body p{font-size:14px;color:var(--body);margin-bottom:16px}
+
+/* ============ CTA（深灰底三栏，参照 NVIDIA 布局） ============ */
+.cta{background:#1a1a1a}
+.cta-grid{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:64px;align-items:start}
+.cta-left h2{color:#fff;font-size:30px;font-weight:700;margin-bottom:18px}
+.cta-left p{font-size:15px;color:#b3b3b3;max-width:400px;margin-bottom:28px}
+.cta-steps{grid-column:span 2;position:relative;display:grid;grid-template-columns:1fr 1fr;gap:64px;padding-top:40px}
+.cta-steps-label{position:absolute;top:0;left:50%;transform:translateX(-50%);font-family:var(--f-head);font-size:14px;font-weight:600;color:#9a9a9a}
+.cta-step h4{color:#fff;font-size:17px;font-weight:600;margin-bottom:12px}
+.cta-step p{font-size:13.5px;color:#9a9a9a;margin-bottom:18px}
+.cta-step .step-link{font-family:var(--f-head);font-size:14px;font-weight:600;color:var(--yellow)}
+.cta-step .step-link:hover{text-decoration:underline}
+.cta-step .step-link .arr{font-size:11px}
+
+/* CTA 与页脚使用更窄的内容列（参照模板留白） */
+.cta .wrap, footer .wrap{max-width:1180px;padding:0 6.5%}
+
+/* ============ 页脚 ============ */
+footer{background:var(--black);color:#9a9a9a;padding:56px 0 0}
+.foot-grid{display:flex;gap:72px;align-items:flex-start}
+.foot-cols{display:contents}
+.foot-cols > div{min-width:110px}
+footer h5{color:#fff;font-size:14px;font-weight:700;margin-bottom:14px}
+footer ul{display:grid;gap:8px;font-size:13px}
+footer ul a:hover{color:#fff}
+.foot-cta{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:20px}
+.foot-cta .btn-outline{font-size:13.5px;padding:11px 22px}
+.foot-social{display:flex;gap:16px}
+.soc{color:#fff;font-size:13.5px;font-family:var(--f-head);cursor:pointer;transition:.2s}
+.soc:hover{color:var(--yellow)}
+.foot-bottom{margin-top:44px;border-top:1px solid #232323;padding:16px 0 20px;display:flex;justify-content:space-between;align-items:center;font-size:12px;flex-wrap:wrap;gap:12px}
+.foot-bottom .legal{display:flex;gap:24px;flex-wrap:wrap}
+.foot-bottom a:hover{color:#fff}
+
+@media(max-width:1080px){
+  .split,.feat-layout,.faq-grid,.res-cards,.prod-cards{grid-template-columns:1fr}
+  .foot-grid{flex-direction:column;gap:40px}
+  .foot-cta{margin-left:0;align-items:flex-start}
+  .cta-grid,.cta-steps{grid-template-columns:1fr}
+  .cta-steps{grid-column:auto;gap:32px}
+  .cta-steps-label{left:0;transform:none}
+  .hero-tabs button{width:auto;flex:1;padding:16px 0;font-size:14px}
+  .acc-body .inner{padding-left:26px;grid-template-columns:1fr;align-items:center}
+  .acc-body .inner img.shot{width:100%;max-width:100%}
+  .acc-head .thumb{display:none}
+  .res-thumb{width:96px}
+  nav.main,.header-right{display:none}
+  .hero-visual{display:none}
+  .burger{display:grid}
+  .search-pop{right:16px;left:16px}
+  .search-pop input{flex:1;width:auto}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= 页眉 ================= -->
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <img src="assets/工业能碳智控平台应用图标.svg" alt="工业能碳智控平台">
+      <span class="wm">工业能碳智控平台<small>HAIYI INTELLIGENCE</small></span>
+    </a>
+    <nav class="main">
+      <div class="nav-item">
+        <a href="#ov-intro" data-tab="0">产品与服务 <span class="caret">▾</span></a>
+        <div class="nav-drop">
+          <a href="#ov-intro" data-tab="0">产品概览 <small>OVERVIEW</small></a>
+          <a href="#ov-products" data-tab="0">产品模块 <small>PRODUCTS</small></a>
+          <a href="#cap-features" data-tab="1">八大能力 <small>CAPABILITIES</small></a>
+          <a href="#cta" data-tab="0">预约演示 <small>TRIAL</small></a>
+        </div>
+      </div>
+      <div class="nav-item">
+        <a href="#res-root" data-tab="2">学习 <span class="caret">▾</span></a>
+        <div class="nav-drop">
+          <a href="#res-root" data-tab="2">网络研讨会 <small>WEBINARS</small></a>
+          <a href="#res-root" data-tab="2">培训课程 <small>TRAINING</small></a>
+          <a href="#res-root" data-tab="2">视频中心 <small>VIDEOS</small></a>
+          <a href="#res-root" data-tab="2">精选文章 <small>ARTICLES</small></a>
+        </div>
+      </div>
+      <div class="nav-item">
+        <a href="#cta" data-tab="0">关于我们 <span class="caret">▾</span></a>
+        <div class="nav-drop">
+          <a href="#cta" data-tab="0">联系我们 <small>CONTACT</small></a>
+          <a href="#cta" data-tab="0">加入我们 <small>CAREERS</small></a>
+          <a href="#cta" data-tab="0">新闻中心 <small>NEWS</small></a>
+          <a href="#ov-faq" data-tab="0">常见问题 <small>FAQ</small></a>
+        </div>
+      </div>
+    </nav>
+    <div class="header-right">
+      <button class="h-icon" id="searchBtn" aria-label="搜索">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      </button>
+      <a class="btn-pill" href="#cta" data-tab="0">预约演示 <span class="arr">→</span></a>
+    </div>
+    <button class="burger" id="menuBtn" aria-label="菜单"><span></span></button>
+    <div class="search-pop" id="searchPop">
+      <div class="search-row">
+        <input type="text" placeholder="搜索产品、能力与资源…">
+        <button type="button">搜索</button>
+      </div>
+      <div class="search-results" id="searchResults"></div>
+    </div>
+  </div>
+</header>
+
+<!-- 全屏菜单 -->
+<div class="menu-overlay" id="menuOverlay">
+  <button class="menu-close" id="menuClose" aria-label="关闭">×</button>
+  <div class="wrap">
+    <ul class="menu-links">
+      <li><a href="#ov-intro" data-tab="0">产品概览 <small>OVERVIEW</small></a></li>
+      <li><a href="#cap-features" data-tab="1">八大能力 <small>CAPABILITIES</small></a></li>
+      <li><a href="#ov-products" data-tab="0">产品模块 <small>PRODUCTS</small></a></li>
+      <li><a href="#ov-faq" data-tab="0">常见问题 <small>FAQ</small></a></li>
+      <li><a href="#res-root" data-tab="2">资源与活动 <small>RESOURCES</small></a></li>
+      <li><a href="#cta" data-tab="0">联系我们 <small>CONTACT</small></a></li>
+    </ul>
+    <div class="menu-foot">
+      <a class="btn" href="#cta" data-tab="0">免费试用 <span class="arr">▸</span></a>
+      <a class="btn-outline" href="#cta" data-tab="0">联系我们 <span class="arr">▸</span></a>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Hero ================= -->
+<section class="hero" id="top">
+  <div class="wrap">
+    <h1>工业能碳智控平台</h1>
+    <h2>一位懂能、懂碳、懂市场的「数字专家」</h2>
+    <p>从数据采集、三维孪生到仿真寻优与自动控制，轻松管理您的整个「数字工厂」。</p>
+    <div class="hero-cta">
+      <a class="btn" href="http://36.151.146.71:40005/" target="_blank" rel="noopener">网页版 <span class="arr">▸</span></a>
+      <a class="btn-outline" href="https://github.com/zhibinQiu/power_simulation/releases/download/v1.0.1/SteelCarbonTwin-windows-x64-setup.exe" download>应用下载 <span class="arr">▸</span></a>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <div class="glow hg1"></div>
+    <div class="glow hg2"></div>
+    <div class="glow hg3"></div>
+    <div class="glow hg4"></div>
+    <img src="assets/工业能碳智控平台应用图标.svg" alt="工业能碳智控平台应用图标">
+  </div>
+</section>
+<div class="hero-tabs">
+  <div class="wrap">
+    <button class="active" data-tab="0">概览</button>
+    <button data-tab="1">能力</button>
+    <button data-tab="2">资源与活动</button>
+  </div>
+</div>
+
+<!-- ================= Tab 1：概览 ================= -->
+<div class="tab-panel active" id="panel-0">
+
+  <!-- 简介：图左文右 -->
+  <section class="sec" id="ov-intro" style="padding-top:40px">
+    <div class="wrap split">
+      <div>
+        <img src="assets/工业能碳智控平台-电脑框截图.svg" alt="平台工艺编排界面">
+      </div>
+      <div class="intro-copy">
+        <h2 class="h2">工业能碳智控平台：<br>让更优决策在此诞生</h2>
+        <p>要验证您的调度想法，往往需要提供真实工况的测试。工业能碳智控平台让您跨工序集成数据，更高效地创建更精准的能碳模型。</p>
+        <p>平台通过将所有能碳数据汇聚于一处，让更明智的经营决策变得更加容易。</p>
+        <ul class="check-grid">
+          <li><img src="assets/check-icon.svg" alt="">轻松管理全厂能源、碳排与成本数据</li>
+          <li><img src="assets/check-icon.svg" alt="">在单一界面中集成多工序分析</li>
+          <li><img src="assets/check-icon.svg" alt="">自动化数据传递，节省核算时间</li>
+          <li><img src="assets/check-icon.svg" alt="">创建更高保真度的能碳模型</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 产品 -->
+  <section class="sec" id="ov-products" style="padding-top:0">
+    <div class="wrap">
+      <h2 class="h2">产品</h2>
+      <p style="margin-top:16px;font-size:16px;color:var(--body);max-width:640px">工业能碳智控平台以「云边协同」架构交付，软硬件模块自动连接，数据实现无缝通信。</p>
+      <div class="prod-cards">
+        <div class="prod-card">
+          <div class="pimg"><img src="assets/工业能碳智控平台-电脑框-工艺流程3D.svg" alt="数字孪生引擎界面"></div>
+          <h3>数字孪生引擎</h3>
+          <div class="cat">平台模块</div>
+          <div class="picon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#151617" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l5 3V8l5 3V8l6 4v9H4z"/><path d="M8 17h2M13 17h2"/></svg></div>
+          <p>通过一套三维数字孪生解决方案，提供全厂 20 多种工序设备的真实比例呈现，满足全厂虚拟巡视需求。</p>
+          <ul>
+            <li>物料流与能流颜色可视</li>
+            <li>拖拽式工艺流程自搭</li>
+            <li>设备信息量身定制</li>
+          </ul>
+        </div>
+        <div class="prod-card">
+          <div class="pimg"><img src="assets/工业能碳智控平台-电脑框-高炉仿真分析.svg" alt=""></div>
+          <h3>能碳仿真寻优</h3>
+          <div class="cat">平台模块</div>
+          <div class="picon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#151617" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg></div>
+          <p>使用零风险仿真沙盒与一工序一 AI 模型，大量策略模板和知识库使复杂寻优具有极大的可扩展性。</p>
+          <ul>
+            <li>改前改后效益对比</li>
+            <li>自然语言下达指令</li>
+            <li>三账合一自动核算</li>
+          </ul>
+        </div>
+        <div class="prod-card">
+          <div class="pimg"><img src="assets/能碳一体机.svg" alt=""></div>
+          <h3>能碳一体机</h3>
+          <div class="cat">边缘硬件</div>
+          <div class="picon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#151617" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></div>
+          <p>部署在工厂现场的智能感知设备，以「不打扰、不改造」的接入能力著称，是连接真实工厂与数字工厂的桥梁。</p>
+          <ul>
+            <li>旁路接入现有系统</li>
+            <li>直连现场计量设备</li>
+            <li>断网续传不丢数据</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 常见问题（双列） -->
+  <section class="sec" id="ov-faq" style="padding-top:0">
+    <div class="wrap">
+      <h2 class="h2">常见问题</h2>
+      <div class="faq-grid">
+        <div class="faq-item">
+          <button class="faq-q">什么是工业能碳智控平台？<span class="pm"></span></button>
+          <div class="faq-a"><p>工业能碳智控平台是连接「真实工厂」与「数字工厂」的能碳一体化管理平台。平台将工厂全要素数字化后，AI 智能体便拥有可持续感知与行动的「身体」：三维孪生看清全厂能流与碳流，仿真沙盒支持零风险试错，优化策略可在三级安全防护下自动下发执行。</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">平台如何接入我厂现有的数据系统？<span class="pm"></span></button>
+          <div class="faq-a"><p>通过自主研发的能碳一体机，提供两大接入方式：一是「不打扰、不改造」的旁路接入，对接企业已有的计量系统与数据中心；二是直接连接电表、气表、流量计、传感器等现场设备。两种方式均支持断网续传，确保数据连续、及时、可信。</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">仿真调整会影响真实生产吗？<span class="pm"></span></button>
+          <div class="faq-a"><p>不会。平台提供零风险仿真沙盒：仿真模式下随意调整、反复试算，改坏了也不影响真实数据。每一项工艺调整都会先展示「改之前 vs 改之后」的能耗、碳排与成本对比，确认有效后再决定是否下发执行。</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">自动下发安全吗？决策权在谁手里？<span class="pm"></span></button>
+          <div class="faq-a"><p>平台设有三级安全防护墙：参数边界防护、耦合一致性防护、执行确认防护。同时提供「自动/建议」双模协作机制——机器给建议、人做决定，安全边界与最终决策权始终掌握在工程师手中。</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">平台支持哪些行业？<span class="pm"></span></button>
+          <div class="faq-a"><p>平台覆盖全国碳市场四大重点控制行业：钢铁行业已全面上线（烧结、焦化、高炉、转炉、连铸、轧钢等 20 多种工序设备建模就绪），水泥、化工、有色行业同步就绪，实现「一套平台、四大行业」。</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">云边协同是如何分工的？<span class="pm"></span></button>
+          <div class="faq-a"><p>边（能碳一体机）就近感知：部署在工厂现场，就近收集能源、生产、计量等各类数据，随采随算；云（平台系统）云端思考：汇聚全厂数据，负责深度的核算、推演、学习与思考，智慧随时下发。现场的事就近办，深度的事云端想。</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ================= Tab 2：能力 ================= -->
+<div class="tab-panel" id="panel-1">
+
+  <!-- 视频区 -->
+  <section class="sec" id="cap-video">
+    <div class="wrap split">
+      <div>
+        <h2 class="h2">观看不同工艺环节的相互通信</h2>
+        <p style="margin-top:18px;font-size:16px;color:var(--body)">需要了解烧结与高炉如何相互影响？或者燃料配比如何影响全厂碳强度？工业能碳智控平台可让您同时观察不同的工序与物理量，在仿真之间来回传递数据。如果在一处调整中出现了某些变化，您可以在所有关联环节中看到它。</p>
+      </div>
+      <div class="video-box">
+        <img src="assets/工业能碳智控平台-电脑框截图.svg" alt="平台三维数字孪生界面">
+        <div class="play"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="#151617"/></svg></div>
+        <div class="video-cap">全厂虚拟巡视 · 三维数字孪生实时联动</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 主要特征 -->
+  <section class="sec features" id="cap-features">
+    <div class="wrap feat-layout">
+      <div class="feat-side">
+        <h2 class="h2">主要特征</h2>
+        <p>八大能力，驱动能碳管理全面升级——让能源消耗看得见、碳排放算得清、优化决策想得出、执行落地动得了。</p>
+      </div>
+      <div id="featAcc">
+        <div class="acc-item">
+          <button class="acc-head"><span class="name">看得见 · 3D 数字孪生与全厂虚拟巡视</span><span class="pm"></span></button>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>烧结、焦化、高炉、转炉、连铸、轧钢……20 多种工序设备按真实比例呈现在三维场景中，整条产线尽收眼底。想看哪道工序点哪里，物料怎么流动、能耗高低分布，用颜色就能看得清清楚楚。</p><p>无需亲临现场，即可完成一次「全厂虚拟巡视」，让巡检变得轻松高效。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-工艺流程3D.svg" alt=""></div></div>
+        </div>
+        <div class="acc-item">
+          <button class="acc-head"><span class="name">建得真 · 拖拽式工艺流程自搭与设备定制</span><span class="pm"></span></button>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>工艺流程自己搭：像搭积木一样，拖一拖、连一连，就能搭出企业真实的工艺流程——从原料、炼铁、炼钢到轧钢，流程怎么走，企业说了算。</p><p>设备信息自己配：每台设备的量程、运行范围、规模大小都可以按企业实际「量身定制」，改完马上生效，三维场景和仿真结果随即更新。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-工艺编排.svg" alt=""></div></div>
+        </div>
+        <div class="acc-item">
+          <button class="acc-head"><span class="name">算得清 · 三账合一与全流程可追溯</span><span class="pm"></span></button>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>能源账：从原料到成品，每道工序的电、气、煤、焦消耗自动汇总，全厂能耗、吨钢能耗一目了然。碳账：每道工序的碳排放自动核算，全厂碳排总量、吨钢碳强度一键可得。成本账：每次调整都同步估算成本变化。</p><p>账目可追溯：每一笔能源、每一笔碳从哪来、到哪去，清清楚楚，经得起核查。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-碳素流守恒审计.svg" alt=""></div></div>
+        </div>
+        <div class="acc-item">
+          <button class="acc-head"><span class="name">推演得准 · 零风险仿真沙盒</span><span class="pm"></span></button>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>一键仿真：输入工艺参数，平台立即算出对应的能耗、碳排与成本。零风险试错：在仿真模式下随意调整、反复试算，改坏了也不影响真实数据，退出即还原。</p><p>效果对比：执行某项减排策略前，平台自动展示「改之前 vs 改之后」——能耗降多少、减排多少吨、降本多少元，一目了然。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-高炉仿真分析.svg" alt=""></div></div>
+        </div>
+        <div class="acc-item">
+          <button class="acc-head"><span class="name">想得出 · 自然语言交互与一工序一 AI 模型</span><span class="pm"></span></button>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>用大白话下指令：像和人说话一样，输入「焦比降低 5%」「提高喷煤量 10%」，AI 自动理解并转化为可执行的调整方案。</p></div><img class="shot" src="assets/framed/f5.svg" alt=""></div></div>
+        </div>
+        <div class="acc-item">
+          <button class="acc-head"><span class="name">动得了 · 「感知—寻优—执行」自动闭环</span><span class="pm"></span></button>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>智能自动控制：优化模型找到更优参数后，在三级防护校验范围内自动下发到可调设备，形成「感知—寻优—执行」的智能闭环。</p><p>一句话指挥仿真：输入简单指令即可运行、停止仿真、切换视角，操控整个「数字工厂」。AI 不只给建议，还能动手干。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-数据源管理.svg" alt=""></div></div>
+        </div>
+        <div class="acc-item">
+          <button class="acc-head"><span class="name">守得住 · 三级安全防护墙</span><span class="pm"></span></button>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>第一级·参数边界防护：每一项可调参数都设有安全运行区间，AI 操作一旦触碰边界立刻被拦截。第二级·耦合一致性防护：自动识别自相矛盾的操作组合，在源头上拦截不合理策略。第三级·执行确认防护：关键操作必须经工程师确认后方可执行，全程留痕、可查可溯。</p><p>「自动/建议」双模协作：机器给建议、人做决定——安全边界与最终决策权，始终牢牢掌握在工程师手中。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-碳素流守恒审计.svg" alt=""></div></div>
+        </div>
+        <div class="acc-item">
+          <button class="acc-head"><span class="name">会汇报 · 行情感知与智能报告</span><span class="pm"></span></button>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>每日自动获取碳市场数据：碳配额价格、自愿减排量价格自动更新，走势图直观呈现，未来价格趋势智能预测。每日自动获取原料与能源市场资讯：煤炭、焦炭等原料价格与市场快讯自动抓取。</p><p>智能报告：能耗盘点、碳排盘点、减排效果、优化建议，自动生成条理清晰的分析报告，支持 PDF、Word、Excel、PPT 一键导出与分享。</p></div><img class="shot" src="assets/framed/f8.svg" alt=""></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ================= Tab 3：资源与活动 ================= -->
+<div class="tab-panel" id="panel-2">
+  <section class="sec" id="res-root">
+    <div class="wrap">
+
+      <div class="res-sec">
+        <h2 class="h2">网络研讨会</h2>
+        <div class="res-cards">
+          <div class="res-card">
+            <div class="res-thumb" style="background:#6b5b95"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
+            <div class="res-body">
+              <div class="cat">网络研讨会</div>
+              <h4>15 分钟看懂：钢铁长流程能碳仿真如何落地</h4>
+              <p>从烧结到轧钢，演示全流程数字孪生搭建与三账合一核算的完整路径。</p>
+              <a class="tlink" href="#res-root">查看网络研讨会 <span class="arr">▸</span></a>
+            </div>
+          </div>
+          <div class="res-card">
+            <div class="res-thumb" style="background:#6b5b95"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
+            <div class="res-body">
+              <div class="cat">网络研讨会</div>
+              <h4>「感知—寻优—执行」：能碳闭环的实战拆解</h4>
+              <p>深度讲解三级安全防护墙与自动/建议双模协作机制的设计逻辑。</p>
+              <a class="tlink" href="#res-root">查看网络研讨会 <span class="arr">▸</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="res-sec">
+        <h2 class="h2">培训</h2>
+        <div class="res-cards">
+          <div class="res-card">
+            <div class="res-thumb" style="background:#2a9d8f"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg></div>
+            <div class="res-body">
+              <div class="cat">培训</div>
+              <h4>工业能碳智控平台入门（自定进度）</h4>
+              <p>平台框架与操作界面介绍，从零完成第一个数字工厂项目的搭建。</p>
+              <a class="tlink" href="#res-root">查看培训课程 <span class="arr">▸</span></a>
+            </div>
+          </div>
+          <div class="res-card">
+            <div class="res-thumb" style="background:#2a9d8f"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+            <div class="res-body">
+              <div class="cat">培训</div>
+              <h4>工艺流程自搭与设备定制实训营</h4>
+              <p>像搭积木一样搭建企业真实产线，掌握设备信息「量身定制」的全部技巧。</p>
+              <a class="tlink" href="#res-root">查看培训课程 <span class="arr">▸</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="res-sec">
+        <h2 class="h2">视频</h2>
+        <div class="res-cards">
+          <div class="res-card">
+            <div class="res-thumb" style="background:#171917"><svg viewBox="0 0 24 24" fill="#ffb71b"><path d="M8 5v14l11-7z"/></svg></div>
+            <div class="res-body">
+              <div class="cat">视频</div>
+              <h4>全厂虚拟巡视实录：三维孪生实时联动</h4>
+              <p>跟随镜头完成一次「全厂虚拟巡视」，看物料流与能流如何在三维场景中联动。</p>
+              <a class="tlink" href="#res-root">观看视频 <span class="arr">▸</span></a>
+            </div>
+          </div>
+          <div class="res-card">
+            <div class="res-thumb" style="background:#171917"><svg viewBox="0 0 24 24" fill="#ffb71b"><path d="M8 5v14l11-7z"/></svg></div>
+            <div class="res-body">
+              <div class="cat">视频</div>
+              <h4>一句话指挥仿真：「焦比降低 5%」会发生什么</h4>
+              <p>AI 自动完成「解析 → 确认 → 应用 → 对比」全流程，让「您说，它调，您验」成为现实。</p>
+              <a class="tlink" href="#res-root">观看视频 <span class="arr">▸</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="res-sec">
+        <h2 class="h2">文章</h2>
+        <div class="res-cards">
+          <div class="res-card">
+            <div class="res-thumb" style="background:#8a8f8a"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/></svg></div>
+            <div class="res-body">
+              <div class="cat">文章</div>
+              <h4>节能减排与降本增效，从来不是二选一</h4>
+              <p>同样可观的节能减碳空间，往往藏在日常运行的「细枝末节」里——靠聪明的算法调度，把能耗和碳排放「挤」出来。</p>
+              <a class="tlink" href="#res-root">阅读文章 <span class="arr">▸</span></a>
+            </div>
+          </div>
+          <div class="res-card">
+            <div class="res-thumb" style="background:#8a8f8a"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/></svg></div>
+            <div class="res-body">
+              <div class="cat">文章</div>
+              <h4>从钢铁走向更多行业：一套平台的复用之道</h4>
+              <p>平台覆盖全国碳市场四大重点控制行业，每个行业、每个工序都有专门建模的专属算法。</p>
+              <a class="tlink" href="#res-root">阅读文章 <span class="arr">▸</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</div>
+
+<!-- ================= CTA ================= -->
+<section class="sec cta" id="cta">
+  <div class="wrap">
+    <div class="cta-grid">
+      <div class="cta-left">
+        <h2>准备好开始了吗？</h2>
+        <p>如果您面临节能降碳方面的挑战，我们的团队将随时为您提供帮助，让我们携手把工程挑战转化为价值增长的机遇。</p>
+        <a class="btn" href="#cta" style="font-size:14px;padding:13px 30px">联系我们 <span class="arr">▸</span></a>
+      </div>
+      <div class="cta-steps">
+        <div class="cta-step">
+          <h4>预约产品演示</h4>
+          <p>与我们的能碳专家交流，探讨如何将工业能碳智控平台投入到您的实际生产中。</p>
+          <a class="step-link" href="#cta">开始咨询 <span class="arr">▸</span></a>
+        </div>
+        <div class="cta-step">
+          <h4>随时了解最新动态</h4>
+          <p>获取有关平台功能更新、行业洞察与节能降碳实践等信息最新新闻。</p>
+          <a class="step-link" href="#cta">订阅 <span class="arr">▸</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 页脚 ================= -->
+<footer id="site-footer">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-cols">
+        <div>
+          <h5>产品</h5>
+          <ul>
+            <li><a href="#ov-products" data-tab="0">产品模块</a></li>
+            <li><a href="#cap-features" data-tab="1">八大能力</a></li>
+            <li><a href="#cta" data-tab="0">免费试用</a></li>
+          </ul>
+        </div>
+        <div>
+          <h5>支持</h5>
+          <ul>
+            <li><a href="#ov-faq" data-tab="0">常见问题</a></li>
+            <li><a href="#cta" data-tab="0">客户中心</a></li>
+            <li><a href="#cta" data-tab="0">平台支持</a></li>
+          </ul>
+        </div>
+        <div>
+          <h5>学习</h5>
+          <ul>
+            <li><a href="#res-root" data-tab="2">网络研讨会</a></li>
+            <li><a href="#res-root" data-tab="2">培训课程</a></li>
+            <li><a href="#res-root" data-tab="2">视频中心</a></li>
+            <li><a href="#res-root" data-tab="2">精选文章</a></li>
+          </ul>
+        </div>
+        <div>
+          <h5>关于</h5>
+          <ul>
+            <li><a href="#cta" data-tab="0">联系我们</a></li>
+            <li><a href="#cta" data-tab="0">加入我们</a></li>
+            <li><a href="#cta" data-tab="0">新闻中心</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="foot-cta">
+        <a class="btn-outline" href="#cta" data-tab="0">了解更多关于我们的产品？ <span class="arr">▸</span></a>
+        <div class="foot-social">
+          <span class="soc" title="微博">微博</span>
+          <span class="soc" title="知乎">知乎</span>
+          <span class="soc" title="哔哩哔哩">Bilibili</span>
+          <span class="soc" title="微信">微信</span>
+          <span class="soc" title="X">视频号</span>
+        </div>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>Copyright © 2026 工业能碳智控平台 · 海颐智能</span>
+      <div class="legal">
+        <a href="#site-footer">法律声明</a>
+        <a href="#site-footer">隐私声明</a>
+        <a href="#site-footer">Cookie 政策</a>
+        <a href="#site-footer">出口合规性</a>
+        <a href="#site-footer">条款和条件</a>
+        <a href="#site-footer">站点地图</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* Hero 选项卡切换 */
+var tabBtns = document.querySelectorAll('.hero-tabs button');
+var panels = document.querySelectorAll('.tab-panel');
+function switchTab(i){
+  tabBtns.forEach(function(b,j){ b.classList.toggle('active', i===j); });
+  panels.forEach(function(p,j){ p.classList.toggle('active', i===j); });
+  openDefault(panels[i]);
+}
+tabBtns.forEach(function(b){
+  b.addEventListener('click', function(){ switchTab(+b.dataset.tab); });
+});
+
+/* 手风琴：同组仅一个展开 */
+document.querySelectorAll('.acc-head').forEach(function(head){
+  head.addEventListener('click', function(){
+    var item = head.parentElement;
+    var body = item.querySelector('.acc-body');
+    var isOpen = item.classList.contains('open');
+    item.parentElement.querySelectorAll('.acc-item.open').forEach(function(o){
+      o.classList.remove('open');
+      o.querySelector('.acc-body').style.maxHeight = null;
+    });
+    if(!isOpen){
+      item.classList.add('open');
+      body.style.maxHeight = body.scrollHeight + 'px';
+    }
+  });
+});
+/* FAQ 手风琴：每项独立 */
+document.querySelectorAll('.faq-q').forEach(function(q){
+  q.addEventListener('click', function(){
+    var item = q.parentElement;
+    var a = item.querySelector('.faq-a');
+    var isOpen = item.classList.contains('open');
+    item.classList.toggle('open', !isOpen);
+    a.style.maxHeight = !isOpen ? a.scrollHeight + 'px' : null;
+  });
+});
+function openDefault(scope){
+  scope.querySelectorAll('.acc-item.open .acc-body, .faq-item.open .faq-a').forEach(function(b){
+    b.style.maxHeight = b.scrollHeight + 'px';
+  });
+}
+openDefault(document.getElementById('panel-0'));
+
+/* 全屏菜单 */
+var overlay = document.getElementById('menuOverlay');
+document.getElementById('menuBtn').addEventListener('click', function(){ overlay.classList.add('open'); });
+document.getElementById('menuClose').addEventListener('click', function(){ overlay.classList.remove('open'); });
+
+/* 搜索展开框 */
+var searchPop = document.getElementById('searchPop');
+document.getElementById('searchBtn').addEventListener('click', function(e){
+  e.stopPropagation();
+  searchPop.classList.toggle('open');
+  if(searchPop.classList.contains('open')) searchPop.querySelector('input').focus();
+});
+document.addEventListener('click', function(e){
+  if(!searchPop.contains(e.target)) searchPop.classList.remove('open');
+});
+
+/* 站内搜索：检索卡片与问答，命中后切换标签并定位 */
+(function(){
+  var input = searchPop.querySelector('input');
+  var btn = searchPop.querySelector('.search-row button');
+  var box = document.getElementById('searchResults');
+  var index = [];
+  function collect(sel, type){
+    document.querySelectorAll(sel).forEach(function(card){
+      var panel = card.closest('.tab-panel');
+      if(!panel) return;
+      var pi = Array.prototype.indexOf.call(panels, panel);
+      var tEl = card.querySelector('h3, h4, .name, .cat, .faq-q');
+      var title = tEl ? tEl.textContent.trim() : '';
+      index.push({el:card, pi:pi, title:title, text:card.textContent.replace(/\s+/g,' ').trim(), type:type});
+    });
+  }
+  collect('.prod-card','产品模块');
+  collect('.acc-item','八大能力');
+  collect('.res-card','资源');
+  collect('.faq-item','常见问题');
+
+  function highlight(el){
+    document.querySelectorAll('.sr-hl').forEach(function(x){ x.classList.remove('sr-hl'); });
+    el.classList.add('sr-hl');
+    setTimeout(function(){ el.classList.remove('sr-hl'); }, 2200);
+  }
+  function run(q){
+    q = (q||'').trim();
+    box.innerHTML = '';
+    box.classList.remove('show');
+    if(!q){ return; }
+    var ql = q.toLowerCase();
+    var hits = index.filter(function(it){ return it.text.toLowerCase().indexOf(ql) >= 0; });
+    if(!hits.length){
+      box.innerHTML = '<div class="search-empty">未找到相关内容</div>';
+      box.classList.add('show');
+      return;
+    }
+    hits.slice(0,15).forEach(function(it){
+      var r = document.createElement('div');
+      r.className = 'search-result';
+      r.innerHTML = '<span class="sr-type">'+it.type+'</span><span class="sr-title">'+it.title+'</span>';
+      r.addEventListener('click', function(){
+        searchPop.classList.remove('open');
+        switchTab(it.pi);
+        setTimeout(function(){
+          var el = it.el;
+          if(el.classList.contains('acc-item')){ el.classList.add('open'); var b=el.querySelector('.acc-body'); if(b) b.style.maxHeight=b.scrollHeight+'px'; }
+          if(el.classList.contains('faq-item')){ el.classList.add('open'); var a=el.querySelector('.faq-a'); if(a) a.style.maxHeight=a.scrollHeight+'px'; }
+          var y = el.getBoundingClientRect().top + window.scrollY - 90;
+          window.scrollTo({top:y, behavior:'smooth'});
+          highlight(el);
+        }, 80);
+      });
+      box.appendChild(r);
+    });
+    box.classList.add('show');
+  }
+  input.addEventListener('input', function(){ run(this.value); });
+  btn.addEventListener('click', function(){ run(input.value); });
+  input.addEventListener('keydown', function(e){ if(e.key==='Enter') run(this.value); });
+})();
+
+/* 下滑压缩页眉；选项卡 sticky 吸顶（文档流内自然粘住），触顶后压缩为半高 */
+var heroTabsEl = document.querySelector('.hero-tabs');
+var heroEl = document.querySelector('.hero');
+/* 把选项卡负边距精确设为自身高度，使 Hero 黑色背景覆盖到按钮下沿、与之齐平；
+   仅在高度变化时写入，避免每帧重排以及吸顶临界点的来回抖动 */
+var _lastTabH = 0;
+function syncTabMargin(){
+  var h = heroTabsEl.offsetHeight;
+  if(h !== _lastTabH){ heroTabsEl.style.marginTop = (-h) + 'px'; _lastTabH = h; }
+}
+function heroBottom(){ return heroEl.offsetTop + heroEl.offsetHeight; }
+syncTabMargin();
+window.addEventListener('resize', syncTabMargin);
+window.addEventListener('scroll', function(){
+  document.body.classList.toggle('compact', window.scrollY > 80);
+  /* 吸顶阈值基于 Hero 底边计算，不随选项卡高度/状态漂移，避免临界点反复抖动 */
+  heroTabsEl.classList.toggle('stuck', (window.scrollY + 50) >= heroBottom());
+}, {passive:true});
+
+/* 带 data-tab 的链接：先切 Tab 再锚定 */
+document.querySelectorAll('a[data-tab]').forEach(function(a){
+  a.addEventListener('click', function(e){
+    e.preventDefault();
+    overlay.classList.remove('open');
+    switchTab(+a.dataset.tab);
+    var target = document.querySelector(a.getAttribute('href'));
+    if(target){
+      setTimeout(function(){
+        window.scrollTo({top: target.getBoundingClientRect().top + window.scrollY - 20, behavior:'smooth'});
+      }, 30);
+    }
+  });
+});
+</script>
+<div class="lightbox" id="lightbox">
+  <button class="lb-close" aria-label="关闭">×</button>
+  <img id="lbImg" src="" alt="">
+</div>
+<script>
+(function(){
+  var lb = document.getElementById('lightbox');
+  var lbImg = document.getElementById('lbImg');
+  var imgs = document.querySelectorAll('.acc-body img.shot');
+  imgs.forEach(function(img){
+    img.addEventListener('click', function(e){
+      e.stopPropagation();
+      lbImg.src = img.getAttribute('src');
+      lb.classList.add('open');
+    });
+  });
+  function closeLb(){ lb.classList.remove('open'); lbImg.src=''; }
+  lb.addEventListener('click', function(e){
+    if(e.target === lb || e.target.classList.contains('lb-close')) closeLb();
+  });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeLb(); });
+})();
+</script>
+</body>
+</html>

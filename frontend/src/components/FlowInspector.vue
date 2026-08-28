@@ -82,7 +82,7 @@
         </div>
         <span class="l-trail" v-if="estOf(n.id) && n.kind === 'process'">{{ fmt(estOf(n.id).co2) }} <span class="u">tCO₂/h</span></span>
       </div>
-      <div v-if="!store.scheme.nodes.length" class="empty">画布为空，请从左侧拖入节点或载入示例。</div>
+      <div v-if="!store.scheme.nodes.length" class="empty">画布为空，请从左侧拖入节点或载入模板。</div>
       </CollapseSection>
     </template>
 

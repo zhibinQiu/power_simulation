@@ -170,7 +170,7 @@ def _mint_long_token(ca_hash: str, key_der_b64: str, days: int = 365) -> "Option
 # ------------------------- 采集：概览（cloudcore / 节点 / 端口 / 证书 / token） -------------------------
 
 _STATE_QUERY = (
-    "echo '==POD=='; kubectl get pod -n kubeedge --no-headers -o custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[0].ready,PHASE:.status.phase,RESTARTS:.status.containerStatuses[0].restartCount,AGE:.metadata.creationTimestamp,PODIP:.status.podIP,NODE:.spec.nodeName 2>/dev/null | grep -i cloudcore || echo NO_POD;"
+    "echo '==POD=='; kubectl get pod -n kubeedge -l app=cloudcore --no-headers -o custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[0].ready,PHASE:.status.phase,RESTARTS:.status.containerStatuses[0].restartCount,AGE:.metadata.creationTimestamp,PODIP:.status.podIP,NODE:.spec.nodeName 2>/dev/null | grep -i cloudcore || echo NO_POD;"
     "echo '==NODES=='; kubectl get nodes -o wide 2>/dev/null || echo NO_NODES;"
     "echo '==PORTS=='; ss -tlnup 2>/dev/null | grep -E ':(1000[0-4])[^0-9]' | head -20;"
     "echo '==CERTS=='; for f in /etc/kubeedge/ca/*.crt /etc/kubeedge/certs/*.crt; do"
@@ -193,15 +193,24 @@ def collect_state() -> Dict[str, Any]:
         return out
     sections = _split_sections(stdout)
 
+    # 优先取 Running 的 cloudcore pod（避免遗留 Pending/孤儿 pod 被误判为云端异常）；
+    # 全部非 Running 时退而取第一个，保留可见性。
+    first_cc = None
     for line in sections.get("POD", "").splitlines():
         p = line.split()
         if len(p) >= 7 and p[0] != "NAME":
-            out["cloudcore"] = {
+            item = {
                 "name": p[0], "ready": "1/1" if p[1].lower() == "true" else "0/1",
                 "phase": p[2], "restarts": p[3], "age": p[4], "podIP": p[5], "node": p[6],
                 "available": p[2] == "Running",
             }
-            break
+            if first_cc is None:
+                first_cc = item
+            if p[2] == "Running":
+                out["cloudcore"] = item
+                break
+    if out.get("cloudcore") is None:
+        out["cloudcore"] = first_cc
 
     for line in sections.get("NODES", "").splitlines():
         p = line.split()
@@ -357,14 +366,22 @@ def collect_logs() -> Dict[str, Any]:
         out["error"] = stderr or stdout or "采集失败"
         return out
     sections = _split_sections(stdout)
+    # 优先取 Running 的 cloudcore pod（日志面板状态与概览一致，避免孤儿 Pending pod 干扰）
+    first_cc = None
     for line in sections.get("POD", "").splitlines():
         p = line.split()
         if len(p) >= 4:
-            out["cloudcore"] = {
+            item = {
                 "name": p[0], "ready": p[1].lower() == "true",
                 "phase": p[2], "restarts": p[3],
             }
-            break
+            if first_cc is None:
+                first_cc = item
+            if p[2] == "Running":
+                out["cloudcore"] = item
+                break
+    if out.get("cloudcore") is None:
+        out["cloudcore"] = first_cc
     fresh: List[str] = []
     for line in sections.get("LOG", "").splitlines():
         line = line.strip()
@@ -545,6 +562,32 @@ def _parse_ms(s: str) -> int:
         return 0
 
 
+def _td_ts_ms(v: Any) -> int:
+    """TDengine REST 结果行的时间戳列 → 毫秒整数。
+
+    TDengine 配置 timezone 后 REST /rest/sql 返回的时间戳列可能为
+    'YYYY-MM-DD HH:MM:SS[.fff]' / RFC3339 字符串，直接透传给前端会使
+    Number()=NaN → 归 0 → 页面时间全显示 1970-01-01。这里统一规范化：
+    纯数字（13 位=毫秒、10 位=秒）、数字字符串、时间字符串三种格式均可。
+    """
+    if v is None or isinstance(v, bool):
+        return 0
+    if isinstance(v, (int, float)):
+        n = int(v)
+        return n if n >= 10 ** 12 else (n * 1000 if n >= 10 ** 9 else n)
+    s = str(v).strip()
+    if not s:
+        return 0
+    if s.replace(".", "", 1).isdigit():
+        n = int(float(s))
+        return n if n >= 10 ** 12 else (n * 1000 if n >= 10 ** 9 else n)
+    try:
+        t = s.replace("T", " ")[:19]
+        return int(datetime.strptime(t, "%Y-%m-%d %H:%M:%S").timestamp() * 1000)
+    except Exception:  # noqa: BLE001
+        return 0
+
+
 def _tsdb_history(box: str = "", device: str = "", instance: str = "", prop: str = "",
                   start: str = "", end: str = "", points: int = 500) -> Dict[str, Any]:
     """查询云端 TDengine 设备历史读数（GET /api/history）。
@@ -596,7 +639,7 @@ def _tsdb_history(box: str = "", device: str = "", instance: str = "", prop: str
     if not isinstance(data, dict) or data.get("code", 0) != 0:
         desc = data.get("desc") if isinstance(data, dict) else "未知错误"
         return {"ok": False, "error": f"TDengine 查询错误：{desc}"}
-    series = [{"t": row[0], "v": row[1]} for row in (data.get("data") or []) if row and row[1] is not None]
+    series = [{"t": _td_ts_ms(row[0]), "v": row[1]} for row in (data.get("data") or []) if row and row[1] is not None]
     return {"ok": True, "box": box, "device": device, "instance": instance, "property": prop,
             "start": start_ms, "end": end_ms, "interval": interval, "count": len(series),
             "series": series}

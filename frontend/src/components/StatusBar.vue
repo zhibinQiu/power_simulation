@@ -1,6 +1,10 @@
 <template>
   <!-- ============ 底栏状态条 ============ -->
   <footer class="statusbar">
+    <span v-if="!store.license.activated" class="st lic-warn" @click="store.openAbout()"
+          title="产品未激活，点击在「关于本平台」中激活">
+      <span class="lic-tri">⚠</span> 产品未激活
+    </span>
     <span class="st"><span class="feed-dot" :class="'feed-' + store.feedStatus"></span> 实时链路 <span class="v">{{ feedText }}</span></span>
     <span class="st">{{ store.editMode ? '编排方案' : '流程模型' }} · <span class="v">{{ store.editMode ? store.scheme.nodes.length + ' 节点' : store.model.units.length + ' 工序' }}</span> / <span class="v">{{ store.editMode ? store.scheme.connections.length + ' 连线' : store.model.flows.length + ' 物流' }}</span></span>
     <span class="st">监测点位 <span class="v">{{ deviceCount }}</span></span>

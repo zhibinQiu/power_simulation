@@ -16,9 +16,8 @@
 所有排放因子集中在 factors.DEFAULT_FACTORS（含单位与说明），可通过 simulate(factors=...)
 运行时覆盖，便于按企业实测数据替换——这就是"可配置项"，前端提供编辑入口。
 
-说明：本引擎在公式形式上对齐国家标准，默认参数为典型参考值，用于教学与
-平台演示、体现碳素流向与策略对比的相对关系；绝对值非企业精确台账，不可直接
-作为合规报送依据。
+说明：本引擎排放计算式对齐国家标准，默认参数为行业典型参考值（可按企业实测数据覆盖），
+用于碳素流向分析与策略对比；计算结果请以企业实测台账为准。
 """
 from __future__ import annotations
 
@@ -661,64 +660,9 @@ def build_energy_sankey(raw, cfg: Dict, flows=None) -> Dict[str, object]:
     return {"nodes": [n.model_dump() for n in nodes], "links": [l.model_dump() for l in links]}
 
 
-# ============================ 求解 / 分析能力（对标 Aspen 参数扫描） ============================
-# 说明：现有 simulate 是「松耦合代数求和」，缺少联立求解与敏感性分析。以下两个函数
-# 在不改动 simulate 既有行为的前提下，补上「参数扫描（敏感性分析）」与「守恒审计」，
-# 直接把平台从「一次性算出一个数」提升到「能看趋势、能量闭合度」的分析工具。
-
-def parameter_scan(model: ProcessModel, factors: Dict, unit_id: str, param: str,
-                  low: float, high: float, steps: int = 11) -> Dict:
-    """单工序参数扫描（一维敏感性分析）。
-
-    固定其余参数，将目标工序的 `param` 从 low 线性扫到 high（共 steps 点），
-    逐点 simulate 并采集全厂总量，返回随参数变化的曲线。用于回答：
-    「焦比从 360 扫到 480，吨钢碳强度怎么变？」这类工程问题。
-
-    返回：{ unit_id, unit_name, unit_type, param, low, high, steps, points:[{value, co2_total, ...}] }
-    """
-    if low >= high:
-        raise ValueError("扫描区间下界必须小于上界（low < high）")
-    steps = max(2, int(steps))
-    # 克隆模型，避免污染入参
-    m2 = ProcessModel(**model.model_dump())
-    target = next((u for u in m2.units if u.id == unit_id), None)
-    if target is None:
-        raise ValueError(f"未找到工序 id={unit_id}（请检查流程模型）")
-    if param not in (target.params or {}):
-        # 允许覆盖引擎默认值：若参数未显式设置，仍以默认值起扫
-        base = (DEFAULT_PARAMS.get(target.type, {}) or {}).get(param)
-        if base is None:
-            raise ValueError(f"工序 {target.name}（{target.type}）不存在参数 {param}（请核对参数名）")
-    is_int = isinstance((target.params or {}).get(param, (DEFAULT_PARAMS.get(target.type, {}) or {}).get(param)), int)
-
-    points = []
-    for i in range(steps):
-        frac = i / (steps - 1)
-        val = low + (high - low) * frac
-        if is_int:
-            val = int(round(val))
-        target.params[param] = val
-        r = simulate(m2, factors)            # 调用内核，复用全部既有算法
-        t = r.totals
-        points.append({
-            "value": round(val, 3),
-            "co2_total": t.co2_total,
-            "co2_direct": t.co2_direct,
-            "co2_indirect": t.co2_indirect,
-            "intensity": t.intensity,
-            "steel_output": t.steel_output,
-            "energy_total": t.energy_total,
-            "energy_intensity": t.energy_intensity,
-        })
-    return {
-        "unit_id": unit_id,
-        "unit_name": target.name,
-        "unit_type": target.type,
-        "param": param,
-        "low": low, "high": high, "steps": steps,
-        "points": points,
-    }
-
+# ============================ 求解 / 分析能力（守恒审计） ============================
+# 说明：现有 simulate 是「松耦合代数求和」，下面补上「守恒审计」，在不改动 simulate
+# 既有行为的前提下，逐工序核对碳输入与各去向，提供全厂碳闭合度分析。
 
 def conservation_audit(model: ProcessModel, factors: Dict = None) -> Dict:
     """碳元素守恒审计（工程严谨性自检）。

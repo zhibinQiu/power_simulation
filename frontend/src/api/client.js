@@ -49,9 +49,6 @@ export const api = {
     if (patch && Array.isArray(patch.ops)) qs.set('ops', JSON.stringify(patch.ops))
     return fetch(BASE + '/strategies/' + sid + (qs.toString() ? '?' + qs.toString() : ''), { method: 'PUT' }).then(r => r.json())
   },
-  // 参数扫描（一维敏感性分析）：固定其余参数，扫描单工序某参数，返回随参数变化的全厂指标曲线
-  scan: (model, unitId, param, low, high, steps = 11, factors = null) =>
-    jpost('/scan', { model, unit_id: unitId, param, low, high, steps, factors }),
   // 碳素流守恒审计：逐工序核对碳输入与各去向，返回闭合余量
   audit: (model) => jpost('/audit', model),
   generateReport: (payload) => jpost('/report', payload),
@@ -82,6 +79,12 @@ export const api = {
   marketNews: (page = 1) => jget('/market-news?page=' + page),
   // 实时数据源状态（MQTT 连接状态 / 订阅主题 / 最近消息）
   realtimeSource: () => jget('/realtime/source'),
+  // 平台激活：查询激活状态 / 提交激活码激活
+  licenseStatus: () => jget('/license/status'),
+  licenseActivate: (code) => jpost('/license/activate', { code }),
+  // 工况数据分析：多设备时间序列聚类（devices: [{id, label?, unit?, series:[{t,v}]}], k?）
+  clusterDevices: (devices, k = null) =>
+    jpost('/cluster', k ? { devices, k } : { devices }),
   // 云端设备 <-> 仿真设备实例关联：仅关联后云端读数才同步到对应设备实例
   boxLinks: () => jget('/realtime/link'),
   linkMqttDevice: (cloudId, localId, factor = 1) => jput('/realtime/link', { cloud_id: cloudId, local_id: localId, factor }),

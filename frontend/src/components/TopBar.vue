@@ -104,3 +104,6 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
 defineExpose({ closeMenus })
 </script>
+
+<style scoped>
+</style>

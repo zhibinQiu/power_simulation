@@ -10,7 +10,7 @@
           <b :style="{ color: status.color }">{{ fmt(ctx.tft) }}</b>
           <i>℃</i>
         </div>
-        <span class="tft-badge" :style="{ background: status.color }">{{ status.label }}</span>
+        <span class="tft-badge" :style="{ color: status.color, borderColor: status.color }">{{ status.label }}</span>
       </div>
       <div class="tft-range">目标区间 {{ cfg.tftLow }} – {{ cfg.tftHigh }} ℃</div>
 
@@ -208,12 +208,12 @@ function deltaLabel(d) { return `TFT ${d >= 0 ? '↑' : '↓'} ${Math.abs(d).toF
 <style scoped>
 .tft-panel { margin-top: 2px; }
 .tft-head-row { display: flex; align-items: center; justify-content: space-between; }
-.tft-src { font-size: 10px; color: var(--accent2); background: rgba(95,130,148,.10); border: 1px solid rgba(95,130,148,.28); border-radius: 10px; padding: 1px 8px; }
+.tft-src { font-size: 10px; color: var(--accent2); background: rgba(95,130,148,.10); border: 1px solid rgba(95,130,148,.28); border-radius: 2px; padding: 1px 8px; }
 .tft-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-top: 6px; }
 .tft-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .tft-val b { font-size: 28px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1; }
 .tft-val i { font-size: 12px; color: var(--muted); font-style: normal; margin-left: 3px; }
-.tft-badge { font-size: 11px; padding: 3px 10px; border-radius: 12px; color: #fff; letter-spacing: .3px; white-space: nowrap; }
+.tft-badge { font-size: 11px; padding: 2px 8px; border-radius: 2px; border: 1px solid; letter-spacing: .3px; white-space: nowrap; }
 .tft-range { font-size: 11px; color: var(--muted); margin-top: 4px; }
 .tft-bar { position: relative; height: 8px; background: var(--bg); border-radius: 4px; margin: 10px 0 4px; border: 1px solid var(--line); }
 .tft-bar-ok { position: absolute; top: 0; bottom: 0; background: rgba(63,174,106,.18); }

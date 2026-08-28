@@ -83,7 +83,7 @@
       <template v-else-if="report && phase === 'done'">
         <div class="rp-toolbar">
           <span class="rp-badge" :class="report.engine">
-            {{ report.engine === 'llm' ? 'AI 生成' : '本地模板' }}
+            {{ report.engine === 'llm' ? 'AI 生成' : '标准模板' }}
           </span>
           <a class="rp-link" :href="report.url" target="_blank" rel="noopener">
             新页面查看 ↗
@@ -148,7 +148,7 @@ const cfg = ref({ title: '', engine: 'auto', depth: 'standard', withAppendix: tr
 const engineOpts = [
   { id: 'auto', label: '自动', desc: '有 AI 则 AI，否则模板' },
   { id: 'llm', label: 'AI 生成', desc: '强制大语言模型撰写' },
-  { id: 'template', label: '本地模板', desc: '确定性文案，生成最快' },
+  { id: 'template', label: '标准模板', desc: '确定性文案，生成最快' },
 ]
 
 const STAGE_TEXT = {

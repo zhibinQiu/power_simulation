@@ -1,6 +1,6 @@
 // 全局快捷键与文档级点击处理
 import { onMounted, onBeforeUnmount } from 'vue'
-import { closeScanDialog, scanState } from '../stores/scan'
+import { closeAuditDialog, auditState } from '../stores/audit'
 
 export function useGlobalShortcuts({ store, onRun, focusSel, onMenuEsc, onTftAnalysis }) {
   function onKeyGlobal(e) {
@@ -10,9 +10,9 @@ export function useGlobalShortcuts({ store, onRun, focusSel, onMenuEsc, onTftAna
     if (e.altKey && !mod && e.key.toLowerCase() === 't') {
       if (onTftAnalysis) { e.preventDefault(); onTftAnalysis(); return }
     }
-    // Esc：优先关闭已打开的模态/弹层（扫描对话框、菜单），与组件内 Esc 互不冲突
+    // Esc：优先关闭已打开的模态/弹层（审计对话框、菜单），与组件内 Esc 互不冲突
     if (e.key === 'Escape') {
-      if (scanState.open) { closeScanDialog(); return }
+      if (auditState.open) { closeAuditDialog(); return }
       if (onMenuEsc) onMenuEsc()
       return
     }

@@ -27,7 +27,7 @@
                 上传 CSV
                 <input type="file" accept=".csv,.txt" @change="onFile" hidden />
               </label>
-              <button class="cw-btn ghost" @click="loadSample">载入示例</button>
+              <button class="cw-btn ghost" @click="loadSample">载入样例</button>
               <span class="cw-cnt" v-if="rows.length">已解析 {{ rows.length }} 组</span>
             </div>
           </div>
@@ -230,7 +230,7 @@ function pct(v, base) {
 .cw-mask { position: fixed; inset: 0; background: rgba(8,20,35,.55); z-index: 50;
   display: flex; align-items: center; justify-content: center; padding: 20px; }
 .cw-card { width: 560px; max-width: 96vw; max-height: 92vh; overflow: auto; background: #fff;
-  border-radius: 12px; box-shadow: 0 18px 50px rgba(0,0,0,.28); border: 1px solid #d8dee6; }
+  border-radius: 4px; box-shadow: 0 18px 50px rgba(0,0,0,.28); border: 1px solid #d8dee6; }
 .cw-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 16px 18px;
   border-bottom: 1px solid #eef1f5; }
 .cw-title { font-size: 14px; font-weight: 700; }

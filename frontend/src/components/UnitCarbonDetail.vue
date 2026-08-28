@@ -549,7 +549,7 @@ function fmtNum(n) { return Number(n).toLocaleString('zh-CN', { maximumFractionD
 .list-card { padding: 2px 8px; }
 /* 厂内实例切换条 */
 .inst-switch { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
-.inst-chip { font-size: 10.5px; padding: 3px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); cursor: pointer; }
+.inst-chip { font-size: 10.5px; padding: 3px 10px; border-radius: 2px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); cursor: pointer; }
 .inst-chip:hover { border-color: var(--accent2); }
 .inst-chip.on { background: var(--accent2); border-color: var(--accent2); color: #04121d; }
 

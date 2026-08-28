@@ -1,13 +1,13 @@
 <template>
   <!-- 工具条（独立行：位于顶部菜单条下方、3D 视图/编排画布上方，横贯全宽，普通/编排态浅色、仿真态深色）
-       按当前激活视图渲染各自工具栏：数字孪生 / 流程编排 / 监测数据 / CEA 行情 / 碳排核算 / 能流分析 / 能碳一体机 -->
+       按当前激活视图渲染各自工具栏：数字孪生 / 流程编排 / 工况数据分析 / CEA 行情 / 碳排核算 / 能流分析 / 能碳一体机 -->
   <div class="ribbon">
       <div class="ribbon-body">
         <!-- ============ 数字孪生（默认）：运行仿真 + 流程编排 + 视角工具 ============ -->
         <template v-if="view === 'twin'">
           <div class="rbtns">
             <button class="rbtn sim-btn" :class="{ on: store.simMode }" @click="actions.onSimToggle()"
-                    :title="store.simMode ? '退出仿真' : '运行仿真：启动实时模拟'">
+                    :title="store.simMode ? '退出仿真' : '运行仿真'">
               <Icon :name="store.simMode ? 'stop' : 'run'" size="14"/>
             </button>
           </div>
@@ -31,7 +31,7 @@
         <template v-else-if="view === 'edit'">
           <div class="rbtns">
             <button class="rbtn sim-btn" :class="{ on: store.simMode }" @click="actions.onSimToggle()"
-                    :title="store.simMode ? '退出仿真' : '运行仿真：启动实时模拟'">
+                    :title="store.simMode ? '退出仿真' : '运行仿真'">
               <Icon :name="store.simMode ? 'stop' : 'run'" size="14"/>
             </button>
           </div>
@@ -61,24 +61,27 @@
           </div>
           <span class="rdiv"></span>
           <div class="rbtns">
-            <button class="rbtn" @click="actions.loadExample('long')" title="载入长流程炼钢示例">
-              <Icon name="flow"/><span>长流程示例</span>
+            <button class="rbtn" @click="actions.loadExample('long')" title="载入长流程炼钢模板">
+              <Icon name="flow"/><span>长流程模板</span>
             </button>
-            <button class="rbtn" @click="actions.loadExample('short')" title="载入短流程炼钢示例">
-              <Icon name="process"/><span>短流程示例</span>
+            <button class="rbtn" @click="actions.loadExample('short')" title="载入短流程炼钢模板">
+              <Icon name="process"/><span>短流程模板</span>
             </button>
             <button class="rbtn" @click="actions.clearScheme()" title="清空编排画布">
               <Icon name="trash"/><span>清空画布</span>
             </button>
           </div>
         </template>
-        <!-- ============ 监测数据查看 ============ -->
+        <!-- ============ 工况数据分析 ============ -->
         <template v-else-if="view === 'data'">
+          <span class="ribbon-title">数据分析与策略</span>
+          <span class="rdiv"></span>
           <div class="rbtns">
-            <button class="rbtn" @click="actions.dataRefresh()" title="重新拉取监测数据">
+            <button class="rbtn" @click="actions.dataRefresh()" title="重新拉取工况数据">
               <Icon name="refresh"/><span>刷新数据</span>
             </button>
           </div>
+          <!-- AI 分析入口已下沉到 DataView 内部视图 tab，顶部工具栏不再重复展示 -->
         </template>
         <!-- ============ CEA & CCER 行情 ============ -->
         <template v-else-if="view === 'market'">
@@ -155,7 +158,7 @@ const props = defineProps({
 const store = useSimStore()
 const showBrightness = ref(false)
 
-// 当前工具栏所属视图：数字孪生 / 流程编排 / 监测数据 / 碳资产管理 / 碳排核算 / 能流分析 / 能碳一体机
+// 当前工具栏所属视图：数字孪生 / 流程编排 / 工况数据分析 / 碳资产管理 / 碳排核算 / 能流分析 / 能碳一体机
 const view = computed(() => {
   if (store.editMode) return 'edit'
   if (store.dataViewOn) return 'data'
@@ -176,6 +179,14 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
 <style scoped>
 /* 关闭按钮：非数字孪生/编排态视图工具栏最右侧，点击关闭当前视图返回数字孪生 */
+.ribbon-title {
+  flex: 0 0 auto;
+  padding: 0 4px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
 .close-btn {
   flex: 0 0 auto; margin-left: auto; padding: 0 12px;
   color: var(--muted); white-space: nowrap;

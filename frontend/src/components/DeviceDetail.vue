@@ -116,7 +116,7 @@
 
     <CollapseSection title="活动数据 → 碳引擎" tone="teal" :show-more="false">
     <div class="feeds">{{ feedsText }}</div>
-    <div class="note">碳排放为因变量，由本设备采集的活动数据乘排放因子得出。当前为<span class="hl">模拟读数</span>，接入真实工厂后将显示 SCADA（数据采集与监视控制系统）/ EMS（能源管理系统）实测值。</div>
+    <div class="note">碳排放 = 活动数据 × 排放因子；接入 SCADA / EMS 后显示实测值。</div>
     </CollapseSection>
 
     <CalibrationWizard
@@ -301,8 +301,7 @@ function f(n) { return n == null ? '—' : Number(n).toLocaleString('zh-CN', { m
 .insp-head { margin-bottom: 4px; }
 .trend-head { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
 .trend-head .sp { flex: 1; }
-.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.2s infinite; }
-@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+.live-dot { width: 6px; height: 6px; border-radius: 2px; background: var(--accent); }
 .trend-foot { display: flex; gap: 14px; flex-wrap: wrap; font-size: 10px; color: var(--muted); margin-top: 6px; }
 .trend-foot b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 400; }
 .feeds { margin-top: 6px; font-size: 11px; line-height: 1.5; color: var(--accent2); background: rgba(95,130,148,.10);

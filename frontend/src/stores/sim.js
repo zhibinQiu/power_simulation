@@ -9,13 +9,17 @@ import { PARK } from '../data/park'
 import { OP_PARAM_KEYS, DIRECT_PARAM_KEYS, EDITABLE_PARAMS, UNIT_TYPES, CATEGORY_ORDER, TECHS } from '../data/processMeta'
 export { OP_PARAM_KEYS, DIRECT_PARAM_KEYS, EDITABLE_PARAMS, UNIT_TYPES, CATEGORY_ORDER, TECHS }
 
-// AI 优化模型：左侧「策略 → AI优化模型」目录（强化学习 / 遗传算法 / 粒子群）。
+// AI 优化模型：左侧「策略 → AI优化模型」目录（序列预测 / 强化学习 / 遗传算法 / 粒子群）。
 // 随实时传感器数据持续采集，后端调度线程定时训练，模型迭代次数与最优强度逐步提升
 // （属性面板轮询后端状态实时展示「逐渐变优」过程，训练结果可一键应用到流程）。
+// 类别：seq = 时序预测（预测未来工况）；opt = 参数优化（决策变量 + 优化目标设定）；cluster = 聚类分析（工况识别）
 export const AI_MODELS = [
-  { id: 'ai::rl', name: '强化学习优化', tag: 'RL', desc: '在线策略梯度：随实时传感器数据持续更新参数策略，先探索后利用，越训越优。' },
-  { id: 'ai::ga', name: '遗传算法优化', tag: 'GA', desc: '种群进化寻优：对喷煤比、焦比、废钢比等关键工艺参数组合做选择/交叉/变异，全局搜索最低碳排配置。' },
-  { id: 'ai::pso', name: '粒子群优化', tag: 'PSO', desc: '群体智能寻优：粒子在参数空间协同飞行，快速逼近最优运行点，适合实时在线寻优。' },
+  { id: 'ai::seq', category: 'seq', categoryName: '时序预测', name: '序列预测算法', tag: 'SEQ', desc: '适用于预测未来工况：内置 LSTM、LightGBM、XGBoost 与时间序列大模型（暂不实现），可设定预测目标 / 影响变量，设定最佳策略或调节变量进行仿真分析。' },
+  { id: 'ai::rl', category: 'opt', categoryName: '参数优化', name: '强化学习优化策略', tag: 'RL', desc: '在线策略梯度：随实时传感器数据持续更新参数策略，先探索后利用，越训越优。' },
+  { id: 'ai::ga', category: 'opt', categoryName: '参数优化', name: '遗传算法优化策略', tag: 'GA', desc: '适用于设备启停与连续参数复合的混合场景：对设备启停开关与喷煤比、焦比等连续参数组合做选择/交叉/变异，全局搜索最低碳排配置。' },
+  { id: 'ai::pso', category: 'opt', categoryName: '参数优化', name: '粒子群优化策略', tag: 'PSO', desc: '适用于连续参数空间下最优解的探索：粒子在连续参数空间协同飞行，快速逼近最优运行点，适合实时在线寻优。' },
+  { id: 'ai::clu', category: 'cluster', categoryName: '聚类分析', name: '聚类工况识别', tag: 'CLU', desc: '适用于历史工况的自动聚类与模式划分：内置 K-Means、DBSCAN 与层次聚类，自动识别典型运行工况（低/中/高负荷）及其占比，辅助制定分工况调节策略。' },
+  { id: 'ai::fit', category: 'fit', categoryName: '数据拟合', name: '数据拟合分析', tag: 'FIT', desc: '对历史工况数据做曲线拟合建模：内置多项式 / 指数 / 对数 / 幂函数拟合，输出拟合方程与 R² 拟合优度，辅助洞察负荷趋势与关联规律。' },
 ]
 export const AI_MODEL_MAP = Object.fromEntries(AI_MODELS.map((m) => [m.id, m]))
 
@@ -148,6 +152,9 @@ export const useSimStore = defineStore('sim', {
     entered: false,      // 欢迎页是否已进入（打开项目后置 true，进入主界面）
     busy: false,
     feedStatus: 'init',
+    // 平台激活状态（后端 /api/license/*）：未激活时状态栏提示「产品未激活」
+    license: { activated: false, machineId: '', boundMachine: '', activatedAt: '', checked: false },
+    aboutDialog: false,   // 关于本平台弹窗开关（内嵌平台激活；StatusBar / 帮助菜单 / App 共用）
     toast: '',
     scenario: 'steel',           // 当前仿真场景（四大控排）：steel 钢铁(默认) / cement 水泥 / chemical 化工 / nonferrous 有色
     processRoute: 'short',       // 当前流程：short 短流程(默认) / long 长流程；数字孪生默认展示短流程
@@ -198,6 +205,9 @@ export const useSimStore = defineStore('sim', {
     deviceSetpoints: {},      // 可调设备设定值覆盖：devId -> number（视图态/编辑态统一存储，驱动实时读数与碳引擎折算）
     deviceExtraSetpoints: {}, // 可调设备附加可调项（如鼓风机鼓风湿度）：devId -> { key: number }
     deviceMeta: {},           // 设备元数据（后端 /api/devices/history 的 meta）
+    dvSources: [],            // 工况数据分析数据源：从左侧「场景」资源树拖入的设备（对象数组，跨视图保留；拖回场景即移除）
+    dvSelIds: [],             // 工况数据分析中间视图当前勾选的设备 id（右侧属性面板各算法的默认输入来源）
+    cluK: 0,                  // 工况数据分析「聚类分析」分组簇数（0=自动），由右侧属性面板 ai::clu 统一配置
     // AI 优化模型（GA/PSO/RL 在线训练）：后端状态缓存 id -> state，轮询刷新展示「逐渐变优」
     optimizers: {},
     optimizerPolling: false,  // 是否已在轮询（模块级 timer 防重）
@@ -255,7 +265,7 @@ export const useSimStore = defineStore('sim', {
     notifications: [],
   }),
   getters: {
-    // 视图模式：非数字孪生的独立视图（监测数据 / CEA 行情 / 碳排核算 / 能流分析 / 能碳一体机）激活时，
+    // 视图模式：非数字孪生的独立视图（工况数据分析 / CEA 行情 / 碳排核算 / 能流分析 / 能碳一体机）激活时，
     // 界面进入沉浸模式——隐藏左/右/下侧面板（底部状态栏保留），顶栏工具栏按当前视图渲染
     viewModeOn: (s) => s.dataViewOn || s.carbonMarketOn || s.carbonCalcOn || s.energyFlowOn || s.boxManageOn,
     // 未读系统通知数（底栏铃铛徽标）
@@ -269,7 +279,7 @@ export const useSimStore = defineStore('sim', {
     linkedAuxOfUnit: (s) => (unitId) => linkedAuxTypesFor(s.scheme, unitId),
     resultForView: (s) => s.strategy || s.baseline,
     liveUnit: (s) => (id) => (s.live && s.live.units ? s.live.units.find((u) => u.id === id) : null),
-    // 某工序的内置监测设备（含模拟读数），来自 baseline 仿真结果附带
+    // 某工序的内置监测设备（含实时读数），来自 baseline 仿真结果附带
     devicesForUnit: (s) => (id) => {
       if (!s.baseline || !s.baseline.units) return []
       const u = s.baseline.units.find((x) => x.id === id)
@@ -387,9 +397,16 @@ export const useSimStore = defineStore('sim', {
         const p = s.presets[i]
         if (p) return { id: s.selectedStrategyId, name: p.name || '未命名策略', description: p.text || '', raw_text: p.text || '', ops: [], applied: !!p.applied, source: 'preset' }
       }
+      if (s.selectedStrategyId === 'ai::overview') {
+        return { id: 'ai::overview', name: 'AI优化模型', description: '按类别浏览系统内置 AI 优化模型（时序预测 / 参数优化 / 聚类分析），点击进入对应模型的训练属性面板。', source: 'ai-list' }
+      }
       if (typeof s.selectedStrategyId === 'string' && s.selectedStrategyId.startsWith('ai::')) {
         const m = AI_MODEL_MAP[s.selectedStrategyId]
-        if (m) return { id: s.selectedStrategyId, name: m.name, description: m.desc, source: 'ai' }
+        if (m) {
+          // 数据拟合面板结构独立（非参数下发型模型），使用独立来源渲染
+          const src = s.selectedStrategyId === 'ai::fit' ? 'ai-fit' : 'ai'
+          return { id: s.selectedStrategyId, name: m.name, description: m.desc, source: src }
+        }
       }
       return null
     },
@@ -464,6 +481,7 @@ export const useSimStore = defineStore('sim', {
         loadCalibrations()   // 启动即恢复本厂标定耦合（localStorage），否则用默认机理/经验系数
         this._loadDataSource() // 恢复上次设置的实时数据源（平台 MQTT 实时 / 自定义 WS / HTTP）
         this._startMqttPolling() // 定时拉取 MQTT 数据源状态（连接状态/订阅主题/最近消息）
+        this.fetchLicense() // 查询平台激活状态（后台加载，不阻塞主流程）
         const [m, presets, factors, schema, devs, hist] = await Promise.all([
           api.presetModel(), api.presetStrategies(), api.getFactors(), api.getParamSchema(),
           api.getDevices(), api.getDeviceHistory(),
@@ -543,6 +561,23 @@ export const useSimStore = defineStore('sim', {
         this.notify('error', '初始化失败', e.message)
       }
     },
+    // ---------- 平台激活 ----------
+    async fetchLicense() {
+      try {
+        const st = await api.licenseStatus()
+        this.license = { ...st, checked: true }
+      } catch (e) {
+        this.license = { activated: false, machineId: '', boundMachine: '', activatedAt: '', checked: true }
+      }
+    },
+    // 提交激活码；返回 { ok, activated, message }，失败时 message 可直接展示
+    async activatePlatform(code) {
+      const r = await api.licenseActivate(code)
+      if (r && r.ok && r.status) this.license = { ...r.status, activated: true, checked: true }
+      return r
+    },
+    openAbout() { this.aboutDialog = true },
+    closeAbout() { this.aboutDialog = false },
     // 把"合成可调设备"的设定值按 DEVICE_COUPLE_REGISTRY 推导为各工序参数，
     // 注入模型副本（不污染源 model）。设备设定值优先（实际装备工况即运行点）。
     _applyDeviceOpParams(model) {
@@ -1056,16 +1091,35 @@ export const useSimStore = defineStore('sim', {
         this._savedPanels = null
       }
     },
+    // 工况数据分析：数据源增删（从左侧「场景」资源树拖入添加；拖回场景即移除）
+    addDvSource(src) {
+      if (!src || !src.id) return
+      if (!this.dvSources.some((s) => s.id === src.id)) this.dvSources.push(src)
+    },
+    removeDvSource(id) {
+      this.dvSources = this.dvSources.filter((s) => s.id !== id)
+    },
+    clearDvSources() { this.dvSources = [] },
     // 底栏快讯显示开关（localStorage 持久化，刷新后保持）
     toggleNewsTicker() {
       this.newsTickerOn = !this.newsTickerOn
       try { localStorage.setItem('sim.newsTickerOn', this.newsTickerOn ? '1' : '0') } catch (e) {}
     },
-    // 数据视图：中间 3D 场景 ↔ 传感器历史数据表格（顶栏「视图 → 传感器数据」切换）
+    // 数据视图：中间 3D 场景 ↔ 工况数据分析面板（顶栏「数据 → 工况数据分析」切换）
     toggleDataView() {
       this.dataViewOn = !this.dataViewOn
-      if (this.dataViewOn) { this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false; this._collapsePanels() }
-      else { this._restorePanels() }
+      if (this.dataViewOn) {
+        this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false
+        // 记录进入前布局状态（退出时恢复）
+        if (!this._savedPanels) this._savedPanels = { leftOpen: this.leftOpen, rightOpen: this.rightOpen, bottomOpen: this.bottomOpen }
+        // 工况数据分析的数据源需从左侧「场景」资源树拖入 → 打开时自动展开左侧并定位到场景面板
+        this.leftOpen = true
+        this.rightOpen = false
+        this.bottomOpen = false
+        this.activityView = 'scene'
+      } else {
+        this._restorePanels()
+      }
     },
     // 碳资产管理视图：中间 3D 场景 ↔ 碳资产管理面板（顶栏「视图 → 碳资产管理」切换）
     toggleCarbonMarket() {
@@ -1133,7 +1187,15 @@ export const useSimStore = defineStore('sim', {
       this.inspectorView = 'auto'
       this.rightOpen = true
     },
-    closeInspector() { this._clearBrowse(); this.deviceDetailId = null; this.selectedUnitId = null; this.selectedMaterialId = null; this.selectedStrategyId = null; this.selectedGroupId = null; this.selectedFlowId = null; this.inspectorView = 'auto' },
+    closeInspector() {
+      // 关闭 AI 模型训练面板时退回「模型列表（按类别）」面板，而不是直接关闭检视器
+      const sid = this.selectedStrategyId
+      if (typeof sid === 'string' && sid.startsWith('ai::') && sid !== 'ai::overview') {
+        this.selectStrategy('ai::overview')
+        return
+      }
+      this._clearBrowse(); this.deviceDetailId = null; this.selectedUnitId = null; this.selectedMaterialId = null; this.selectedStrategyId = null; this.selectedGroupId = null; this.selectedFlowId = null; this.inspectorView = 'auto'
+    },
     // 切换某个工艺的某项节能减碳策略启用状态
     toggleGreenStrategy(processType, strategyId) {
       if (!this.activeGreenStrategies[processType]) {
@@ -1269,7 +1331,7 @@ export const useSimStore = defineStore('sim', {
           await this.parse(this.strategyInput)
           if (this.parsed && this.parsed.ops.length) {
             await this.runExperiment()
-            this.toast = `已对内置策略「${st.name}」完成仿真测试，可在右上角对比仿真结果`
+            this.toast = `已对内置策略「${st.name}」完成仿真，可在右上角对比结果`
           } else {
             this.toast = '该内置策略解析结果为空'
           }
@@ -1293,11 +1355,11 @@ export const useSimStore = defineStore('sim', {
     },
     // 顶栏「重置视图」按钮 -> SceneViewer watch 该计数 -> scene.resetView()
     resetView() { this.viewResetNonce++ },
-    // 切换仿真场景（四大控排）；非钢铁场景当前仅占位（模型建设中）
+    // 切换仿真场景（四大控排）；非钢铁场景当前不支持切换
     setScenario(id) {
       if (id === this.scenario) return
       this.scenario = id
-      if (id !== 'steel') this.toast = '该控排场景模型建设中，当前仅「钢铁」可用'
+      if (id !== 'steel') this.toast = '当前仅支持「钢铁」控排场景'
     },
     // 切换核心孪生外围环绕环境（森林/城市/沙漠/海岸），触发中间 3D 场景重建
     setEnvMode(id) {
@@ -1562,7 +1624,7 @@ export const useSimStore = defineStore('sim', {
       this._saveScheme()   // 持久化当前模板方案，刷新后保持
       // 编排模式下载入模板后自动适配视图：新方案分行排布，让画布尽量占满屏幕
       if (this.editMode) this.flowZoomFit()
-      this.toast = route === 'short' ? '已载入短流程炼钢示例' : '已载入长流程炼钢示例'
+      this.toast = route === 'short' ? '已载入短流程炼钢模板' : '已载入长流程炼钢模板'
     },
     // 持久化当前编排方案：完成编排（exitEdit）、载入模板、清空画布、调节设备设定值时写入，
     // 使刷新后保持最后一次编排结果，而不是回退到默认流程。
@@ -2380,7 +2442,7 @@ export const useSimStore = defineStore('sim', {
           clearTimeout(this._feedNotifTimer)
           this._feedNotifTimer = setTimeout(() => {
             if (this.feedStatus !== next) return
-            if (next === 'open') this.notify('success', '实时链路已恢复', '实时数据链路已重新连接，监测数据持续更新。')
+            if (next === 'open') this.notify('success', '实时链路已恢复', '实时数据链路已重新连接，工况数据持续更新。')
             else if (next === 'error') this.notify('error', '实时链路异常', '实时数据链路异常，请检查数据源配置。')
             else if (next === 'closed') this.notify('warn', '实时链路已断开', '实时数据链路已断开，仿真将基于最近一次数据继续运行。')
           }, 1500)

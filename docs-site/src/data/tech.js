@@ -23,7 +23,7 @@ export const sections = [
 frontend/src/
   ├─ App.vue              # 主界面：顶栏菜单 / 活动栏 / 状态栏 / 3D 场景 / 检视器
   ├─ stores/sim.js        # Pinia 全局状态（流程、仿真、实验、撤销重做、活动栏/数据源/视图开关）
-  ├─ stores/scan.js       # 参数扫描与守恒审计状态
+  ├─ stores/audit.js      # 碳素流守恒审计对话框状态
   ├─ utils/               # tft.js TFT算法 / energy.js 能耗 / markdown.js 渲染
   ├─ data/flowLibrary.js  # 设备耦合推导 deriveProcessOpParams
   ├─ three/scene.js       # TwinScene 3D 场景（环境/巡检/热力图/物流动画）
@@ -1080,13 +1080,12 @@ curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/upda
 }
 \`\`\`
 
-## 六、扫描 / 审计 / 优化器请求
+## 六、审计 / 优化器请求
 
 以下端点使用 \`dict\` 请求体（不经 Pydantic），由后端按需读取：
 
 | 端点 | 请求体字段 |
 | --- | --- |
-| POST /api/scan | param / mode(center\|range\|sweep) / range / density / keep_ratio / exclude_self |
 | POST /api/audit | model（流程）+ 可选 ops |
 | POST /api/optimizers/context | model + factors（训练上下文） |
 | PUT /api/optimizers/{oid}/settings | auto_control / schedule{enabled,interval_h,start,end} / samples |
@@ -1125,7 +1124,6 @@ curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/upda
 | POST | /api/simulate | 仿真（baseline + 可选策略对比 delta） |
 | POST | /api/apply | 直接对流程应用一组操作 |
 | POST | /api/strategies | 创建策略；GET/PUT/DELETE /api/strategies/{id}；POST /api/strategies/{id}/apply 应用策略 |
-| POST | /api/scan | 单工序参数敏感性扫描（扫参区间 / 密度 / 保留比例） |
 | POST | /api/audit | 全流程碳素流守恒审计（碳输入 = 排 CO₂ + 固钢 + 入渣 + 捕集 + 产品携出） |
 | POST | /api/optimizers/context | 同步 AI 优化训练上下文（当前流程 + 因子，供优化器建模） |
 | GET | /api/optimizers | 优化模型列表与训练状态（迭代/曲线/最优参数摘要） |
@@ -1240,16 +1238,21 @@ curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/upda
     title: 'AI 优化模型引擎',
     body: `## AI 优化模型引擎
 
-后端 \`optimizers.py\` 提供三套在线自学习优化模型（**遗传算法 GA / 粒子群 PSO / 强化学习 RL**），随流程运行与实时传感器数据后台持续训练，输出碳强度最优的设备参数建议，并支持版本管理与自动化控制。
+后端 \`optimizers.py\` 提供五套在线自学习优化模型（**序列预测算法 SEQ / 强化学习优化策略 RL / 遗传算法优化策略 GA / 粒子群优化策略 PSO / 聚类工况识别 CLU**），随流程运行与实时传感器数据后台持续训练，输出碳强度最优的设备参数建议或典型工况分布，并支持版本管理与自动化控制。
 
 ## 一、模型架构
 
 | 组件 | 职责 |
 | --- | --- |
 | OptimizerBase | 优化器基类：归一化状态、适应度求值、训练循环、版本/提醒管理 |
-| GeneticOptimizer | 遗传算法（GA）：选择 / 交叉 / 变异算子 |
-| ParticleSwarmOptimizer | 粒子群（PSO）：惯性权重 + 个体/全局最优引导 |
-| RLQOptimizer | 强化学习（Q-Learning 表）：以离散动作 Q 表驱动寻优 |
+| SequencePredictOptimizer | 序列预测算法（SEQ）：指数平滑时序外推预测未来工况，支持预测目标 / 影响变量设定，在预测工况下采样调节变量做仿真评估 |
+| 决策变量 decisions | 策略模型（RL / GA / PSO / SEQ）属性面板勾选参与优化的工艺参数，未启用的维度在训练中冻结为当前设定值 |
+| 优化目标 objective | 策略模型可切换优化目标（吨钢碳强度 / 吨钢综合能耗 / 全厂 CO₂ 排放总量），适应度评估与日志单位随目标动态调整 |
+| GeneticOptimizer | 遗传算法优化策略（GA）：选择 / 交叉 / 变异算子，适用于设备启停与连续参数复合的混合场景 |
+| ParticleSwarmOptimizer | 粒子群优化策略（PSO）：惯性权重 + 个体/全局最优引导，适用于连续参数空间最优解探索 |
+| ReinforcementOptimizer | 强化学习优化策略（RL）：在线策略梯度 REINFORCE，随实时数据先探索后利用 |
+| ClusteringOptimizer | 聚类工况识别（CLU）：基于最近传感器读数构造工况快照（特征设备归一化读数 + 负荷因子），内置 K-Means / DBSCAN / 层次聚类，输出典型工况簇占比与代表负荷（不寻优、不产生版本） |
+| 聚类特征 feature_vars | 聚类模型设定参与工况聚类的监测设备（空 = 全部设备），支持 \`method\`（算法）与 \`feature_vars\`（特征）下发 |
 | TrainingScheduler | 后台调度线程：按配置频率定时迭代全部活跃优化器 |
 
 ## 二、优化空间与上下文
@@ -1340,7 +1343,6 @@ curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/upda
 
 | 面板 | 入口 | 说明 |
 | --- | --- | --- |
-| 参数敏感性扫描（SensitivityDialog） | 画布节点 / 左侧策略库工序右键 → 参数敏感性扫描 | 对单工序指定参数扫参，生成敏感性曲线与建议调节方向（POST /api/scan） |
 | 碳素流守恒审计 | 工具菜单 → 碳素流守恒审计 | 逐工序核算碳输入/输出五项平衡，输出偏差与守恒率（POST /api/audit） |
 | 高炉数值分析（TftAnalysisDialog） | 仿真菜单 → 高炉数值分析（Alt+T） | 全厂高炉 TFT 数值总览、鼓风/喷煤调参推演，复用 utils/tft.js 焓平衡 |
 | 参数范围/设备量程内化 | 编排模式工序/设备节点属性面板 | 节点属性面板直接编辑参数运行空间（min/max/step）与设备量程，随方案持久化，无需全局配置（优先级：节点自定义 > 设备规格 ranges > 默认） |

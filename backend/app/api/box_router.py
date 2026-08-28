@@ -34,8 +34,8 @@ def realtime_source_status():
     """实时数据源状态：MQTT 连接状态 / 订阅主题 / 最近消息 / 字段映射
     + 云端识别设备列表（cloud_devices）与设备关联表（links）。
 
-    数据链路：边缘盒子 box-mapper（Modbus/OPC-UA 等仪表采集）实时发布 data/# → 云端 MQTT Broker（Broker 配置在
-    「能碳一体机管理」视图前端配置，免手工编辑配置文件）→ 本平台订阅获取真实设备读数（不生成模拟数据）。
+    数据链路：边缘盒子 box-mapper 实时发布 data/# → 云端 MQTT Broker（Broker 在「能碳一体机管理」中配置）→
+    平台订阅获取实时设备读数。
 
     关联制：云端设备必须与仿真系统中的设备实例手动关联（见 /api/realtime/link），
     未关联的设备读数不会同步到仿真系统。"""
@@ -236,7 +236,7 @@ def box_devices():
 
 @router.post("/box/devices")
 def box_create_device(req: BoxDeviceRequest):
-    """创建设备：mode=dryRun 返回三协议 YAML 预览；mode=apply 保存到模拟集群。
+    """创建设备：mode=dryRun 返回三协议 YAML 预览；mode=apply 保存到云端集群。
     模型点位变更会同步重刷所有引用该模型的设备（对同一模型的所有设备同时生效）。"""
     p = req.model_dump()
     try:

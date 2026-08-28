@@ -20,19 +20,13 @@
       <FlowEditor v-if="store.editMode" />
     </main>
 
-    <!-- 视图名标识栏：仅在能碳一体机管理视图下显示，承载标题与实时云端状态徽章
-         （与 TopBar / Ribbon 风格统一，位于中间舞台之上） -->
+    <!-- 视图名标识栏：仅在能碳一体机管理视图下显示，承载标题（与 TopBar / Ribbon 风格统一，位于中间舞台之上） -->
     <div v-if="store.boxManageOn" class="view-banner">
       <div class="vb-left">
         <span class="vb-logo">◈</span>
         <b class="vb-title">能碳一体机管理</b>
-        <span class="vb-chip" :class="store.boxCloudSource === 'live' ? 'ok' : (store.boxCloudSource === 'degraded' ? 'warn' : 'err')">
-          <span class="vb-dot" :class="{ on: store.boxCloudSource === 'live' }"></span>
-          {{ store.boxCloudSource === 'live' ? '云端在线' : (store.boxCloudSource === 'stale' ? '云端数据过期' : (store.boxCloudSource === 'degraded' ? '云端部分异常' : '云端不可达')) }}
-        </span>
       </div>
       <div class="vb-right">
-        <span class="vb-hint">云端 {{ store.boxCloudSource === 'live' ? '在线' : (store.boxCloudSource === 'stale' ? '推送中断·旧缓存' : (store.boxCloudSource === 'degraded' ? '部分异常' : '不可达')) }} · 3s 刷新</span>
         <button class="vb-close" @click="closeView" title="关闭能碳一体机管理，返回数字孪生场景">✕ 关闭</button>
       </div>
     </div>
@@ -49,10 +43,10 @@
 
     <DataSourceDialog v-if="showDataSource" @close="showDataSource = false" />
     <SystemSettingsDialog v-if="showSettings" @close="showSettings = false" />
-    <AboutDialog v-if="showAbout" @close="showAbout = false" />
+    <AboutDialog v-if="store.aboutDialog" />
     <TftAnalysisDialog v-if="showTftAnalysis" @close="showTftAnalysis = false" />
     <ContextMenu />
-    <SensitivityDialog />
+    <ConservationAuditDialog />
   </div>
 </template>
 
@@ -69,7 +63,7 @@ import RightInspector from './components/RightInspector.vue'
 import SceneViewer from './components/SceneViewer.vue'
 import { usePanelSizes } from './composables/usePanelSizes'
 import { useGlobalShortcuts } from './composables/useGlobalShortcuts'
-import { openAuditDialog } from './stores/scan'
+import { openAuditDialog } from './stores/audit'
 
 // 对话框类组件按需懒加载：首屏不加载其代码，打开时才请求，降低首包体积与内存占用
 const DataSourceDialog = defineAsyncComponent(() => import('./components/DataSourceDialog.vue'))
@@ -77,7 +71,7 @@ const SystemSettingsDialog = defineAsyncComponent(() => import('./components/Sys
 const AboutDialog = defineAsyncComponent(() => import('./components/AboutDialog.vue'))
 const TftAnalysisDialog = defineAsyncComponent(() => import('./components/TftAnalysisDialog.vue'))
 const ContextMenu = defineAsyncComponent(() => import('./components/ContextMenu.vue'))
-const SensitivityDialog = defineAsyncComponent(() => import('./components/SensitivityDialog.vue'))
+const ConservationAuditDialog = defineAsyncComponent(() => import('./components/ConservationAuditDialog.vue'))
 
 // 视图类组件同样按需懒加载：CarbonBoxView（能碳一体机管理）等体量巨大（数千行），
 // 首屏同步打包会让 index 主包高达 600+KB；改为进入对应视图时才加载，首屏只保留
@@ -111,7 +105,6 @@ const boxViewRef = ref(null)
 
 const showDataSource = ref(false)
 const showSettings = ref(false)
-const showAbout = ref(false)
 const showTftAnalysis = ref(false)
 
 const { lw, rw, cmdH, resizing, startLeftResize, startRightResize, startResize } = usePanelSizes()
@@ -130,7 +123,7 @@ function onSimToggle() {
     pushCmd('已退出仿真模式，数字孪生环境已切换为工业。', 'tip')
   } else {
     store.enterSim()
-    pushCmd('已进入仿真模式：所有修改仅预览，退出后自动恢复。仿真模式下可直接输入自然语言指令（如“降低焦比 10%”），由智能体解析并应用（规划中）。', 'guide')
+    pushCmd('已进入仿真模式：修改即时预览，可直接输入自然语言指令（如“降低焦比 10%”），由智能体解析并应用。', 'guide')
     consoleRef.value && consoleRef.value.focusInput()
   }
 }
@@ -160,9 +153,9 @@ function onAutoLayout() {
 }
 function onToggleEdit() { if (store.editMode) store.exitEdit(); else store.enterEdit(); pushCmd(store.editMode ? '已退出流程编排。' : '进入流程编排：可从左侧「资源管理器」拖拽条目到画布，节点参数在右侧编排属性中调整。', store.editMode ? 'out' : 'guide') }
 function ensureEdit() { if (!store.editMode) store.enterEdit() }
-function loadExample(route) { ensureEdit(); store.loadTemplate(route); pushCmd(route === 'short' ? '已载入短流程炼钢示例。' : '已载入长流程炼钢示例。', 'out') }
+function loadExample(route) { ensureEdit(); store.loadTemplate(route); pushCmd(route === 'short' ? '已载入短流程炼钢模板。' : '已载入长流程炼钢模板。', 'out') }
 function clearScheme() { ensureEdit(); store.clearScheme(); pushCmd('已清空编排画布。', 'out') }
-function autoLayoutScheme() { ensureEdit(); store.autoLayoutScheme(); pushCmd('已自动布局编排节点：主工艺横向排列（一行 3-4 个），工辅排在各自主工艺下方，互不重叠。', 'out') }
+function autoLayoutScheme() { ensureEdit(); store.autoLayoutScheme(); pushCmd('已自动布局：主工艺横向排列，工辅位于其下方。', 'out') }
 function addGroupBtn() { ensureEdit(); const id = store.addFlowGroup(); pushCmd(id ? '已新建小组，可将设备拖入其中。' : '新建小组失败。', 'out') }
 function duplicateGroupBtn() { ensureEdit(); const id = store.duplicateFlowGroup(store.selectedGroupId); if (id) pushCmd('已复制小组。', 'out') }
 function flowZoomBtn(f) { store.flowZoom(f) }
@@ -170,7 +163,7 @@ function flowFit() { store.flowZoomFit() }
 function onEnvChange(e) { store.setEnvMode(e.target.value); pushCmd(`外围景观 → ${store.envModes.find((m) => m.id === store.envMode)?.label || store.envMode}。`, 'cmd') }
 // 导出 AI 分析报告：基线数据分析 + 使用的策略 + 策略前后对比，由后端大模型生成 Markdown
 function onExport() {
-  if (!store.baseline) { pushCmd('暂无仿真数据：请先运行仿真或应用情景后再导出报告。', 'tip'); store.toast = '请先运行仿真再导出报告'; return }
+  if (!store.baseline) { pushCmd('暂无可导出数据：请先运行仿真或应用情景。', 'tip'); store.toast = '请先运行仿真再导出报告'; return }
   const sel = store.selectedStrategy
   store.openReportPanel({
     baseline: store.baseline,
@@ -184,7 +177,7 @@ function onExport() {
   pushCmd('已打开右侧报告面板：请配置标题、引擎与分析深度后点击「生成报告」。', 'guide')
 }
 // 打开独立文档网站（宣传手册 / 使用手册 / 技术文档已脱离平台，作为独立服务跳转）
-// 文档站固定部署在云端服务器（与平台同机），访问地址使用「云端服务 IP」而非浏览器当前 host。
+// 文档站经云端 frp 隧道暴露公网（36.151.146.71:40183），跳转链接固定使用公网地址。
 function openDocsSite(page = '') {
   const target = page ? '/#/' + page : '/#/'
   const open = (host) => {
@@ -200,16 +193,12 @@ function openDocsSite(page = '') {
       throw new Error('no host')
     })
     .catch(() => {
-      // 后端接口不可用时：优先用云端配置 IP（box_cloud_config），再回退默认云端 IP
-      const fallback = () => open('172.19.134.45')
-      api.boxCloudConfig().then((c) => {
-        if (c && c.host) open(c.host)
-        else fallback()
-      }).catch(fallback)
+      // 后端接口不可用时：直接回退公网文档站入口（frp 隧道）
+      open('36.151.146.71')
     })
     .finally(() => clearTimeout(timer))
 }
-function onAbout() { showAbout.value = true }
+function onAbout() { store.openAbout() }
 
 // 关闭当前视图，返回数字孪生场景（供各视图工具栏「返回数字孪生」按钮调用）
 function closeView() {
@@ -220,8 +209,24 @@ function closeView() {
   else if (store.boxManageOn) store.toggleBoxManage()
   pushCmd('已返回数字孪生场景。', 'out')
 }
-// 监测数据视图：重新拉取历史数据（DataView 暴露的 refresh）
+// 工况数据分析视图：重新拉取历史数据（DataView 暴露的 refresh）
 async function dataRefresh() { await waitViewRef(dataViewRef); if (dataViewRef.value?.refresh) dataViewRef.value.refresh() }
+// 工况数据分析视图：AI 分析按钮 —— 打开右侧对应属性面板（时序预测 / 参数优化 / 聚类分析 / 数据拟合）。
+// 与左侧资源树点击 AI 模型行为一致（selectStrategy → 右侧 strategyDetail）；参数优化为集中面板（GA/PSO/RL 面板内切换）。
+function openAiModel(id) {
+  if (id === 'ai::opt') {
+    // 参数优化集中面板：已打开某个参数优化算法时保持不跳变，否则默认遗传算法（面板顶部可切换 遗传算法 / 粒子群 / 强化学习）
+    const cur = store.selectedStrategyId
+    const curOpt = /^ai::(ga|pso|rl)$/.test(String(cur || ''))
+    store.selectStrategy(curOpt ? cur : 'ai::ga')
+    store.toast = '已打开参数优化属性面板：可在面板顶部切换 遗传算法 / 粒子群 / 强化学习'
+    return
+  }
+  const cur = store.selectedStrategyId
+  store.selectStrategy(cur === id ? cur : id)
+  const m = id === 'ai::seq' ? '时序预测' : id === 'ai::clu' ? '聚类分析' : id === 'ai::fit' ? '数据拟合' : 'AI 模型'
+  store.toast = `已打开「${m}」属性面板`
+}
 // 碳资产管理视图：刷新行情（CarbonAssistantView 暴露的 loadAll）
 async function marketRefresh() { await waitViewRef(marketViewRef); if (marketViewRef.value?.loadAll) marketViewRef.value.loadAll() }
 // 碳资产管理视图：切换品种（CEA / CCER）与预测叠加开关（CarbonAssistantView 暴露）
@@ -252,15 +257,15 @@ const marketLedgerRefresh = async () => { await waitViewRef(marketViewRef); if (
 // 供命令窗口调用的孪生控制动作
 const twinActions = { onSimToggle, onResetView, onOverview, togglePatrol, focusSel, onToggleEdit }
 // 供工具条调用的动作
-const ribbonActions = { onSimToggle, onToggleEdit, toggleAuto, togglePatrol, onResetView, autoLayoutScheme, flowZoomBtn, flowFit, loadExample, clearScheme, closeView, dataRefresh, marketRefresh, marketSwitch, marketForecast, marketLedgerRefresh, carbonReport, marketInstrument, marketForecastOn, marketTabOn }
+const ribbonActions = { onSimToggle, onToggleEdit, toggleAuto, togglePatrol, onResetView, autoLayoutScheme, flowZoomBtn, flowFit, loadExample, clearScheme, closeView, dataRefresh, openAiModel, marketRefresh, marketSwitch, marketForecast, marketLedgerRefresh, carbonReport, marketInstrument, marketForecastOn, marketTabOn }
 
 /* ---------------- 经典菜单条（文件 / 仿真 / 视图 / 编辑 / 工具 / 帮助） ---------------- */
 const menus = [
   { id: 'file', label: '文件', items: [
-    { label: '新建方案', act: () => pushCmd('新建方案：已清空当前编排（原型占位）。','out') },
-    { label: '打开方案…', act: () => pushCmd('打开方案：请在左侧「策略」中载入已存方案（原型占位）。','guide') },
+    { label: '新建方案', act: () => pushCmd('新建方案：已清空当前编排。','out') },
+    { label: '打开方案…', act: () => pushCmd('打开方案：请在左侧「策略」中载入已存方案。','guide') },
     { sep: true },
-    { label: '保存方案', accel: 'Ctrl+S', act: () => pushCmd('方案已保存至本地工作区。','out') },
+    { label: '保存方案', accel: 'Ctrl+S', act: () => pushCmd('方案已保存。','out') },
     { label: '连接数据源…', act: () => { showDataSource.value = true } },
     { label: '导出分析报告', act: onExport },
     { sep: true },
@@ -283,10 +288,8 @@ const menus = [
       { label: 'CEA / CCER 行情', checked: store.carbonMarketOn && marketTabOn() === 'market', run: () => marketSubNav('market') },
       { label: '企业台账与策略', checked: store.carbonMarketOn && marketTabOn() === 'ledger', run: () => marketSubNav('ledger') },
     ] },
+    { label: '数据分析与策略', toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
     { label: '能碳一体机管理', toggle: () => store.boxManageOn, act: () => boxSubNav() },
-  ] },
-  { id: 'data', label: '数据', items: [
-    { label: '监测数据查看', toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
   ] },
   { id: 'edit', label: '编辑', items: [
     { label: store.editMode ? '完成编排' : '进入流程编排', act: onToggleEdit },
@@ -303,8 +306,8 @@ const menus = [
     { label: '复制小组', hide: () => !store.editMode, disabled: () => !store.selectedGroupId, act: () => duplicateGroupBtn() },
     { label: '删除小组', hide: () => !store.editMode, disabled: () => !store.selectedGroupId, act: () => store.removeFlowGroup(store.selectedGroupId) },
     { sep: true, hide: () => !store.editMode },
-    { label: '长流程示例', hide: () => !store.editMode, act: () => loadExample('long') },
-    { label: '短流程示例', hide: () => !store.editMode, act: () => loadExample('short') },
+    { label: '长流程模板', hide: () => !store.editMode, act: () => loadExample('long') },
+    { label: '短流程模板', hide: () => !store.editMode, act: () => loadExample('short') },
     { label: '清空画布', hide: () => !store.editMode, act: () => clearScheme() },
   ] },
   { id: 'tools', label: '工具', items: [
@@ -320,7 +323,7 @@ const menus = [
     { label: '宣传手册', accel: 'F1', act: () => openDocsSite('promo') },
     { label: '使用手册', act: () => openDocsSite('manual') },
     { label: '技术文档', act: () => openDocsSite('tech') },
-    { label: '快捷键', act: () => pushCmd('快捷键：Ctrl+Enter 运行 · Ctrl+Z 撤销 · Ctrl+Y 重做 · F 聚焦选中工序 · 右键节点/资源打开上下文菜单（选中/参数扫描/重命名/复制/删除）· 编排态 F2 重命名、Ctrl+D 复制节点、Del 删除。','out') },
+    { label: '快捷键', act: () => pushCmd('快捷键：Ctrl+Enter 运行 · Ctrl+Z 撤销 · Ctrl+Y 重做 · F 聚焦工序 · 编排态 F2 重命名、Ctrl+D 复制、Del 删除 · 右键节点打开菜单。','out') },
     { sep: true },
     { label: '关于本平台', act: onAbout },
   ] },

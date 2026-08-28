@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from ..carbon_engine import cached_simulate, conservation_audit, parameter_scan, sim_cache_stats
+from ..carbon_engine import cached_simulate, conservation_audit, sim_cache_stats
 from ..devices import library_payload
 from ..factors import default_factors
 from ..llm_strategy import chat_completion, llm_parse
@@ -95,11 +95,6 @@ class SimulationService:
         return {"model": applied, "sim": cached_simulate(applied, factors)}
 
     # ------------------------- 求解 / 分析 -------------------------
-
-    def scan(self, model: ProcessModel, factors: Optional[Dict[str, Any]],
-             unit_id: str, param: str, low: float, high: float, steps: int = 11) -> Dict[str, Any]:
-        """单工序参数扫描（一维敏感性分析）。"""
-        return parameter_scan(model, factors, unit_id, param, low, high, steps)
 
     def audit(self, model: ProcessModel) -> Dict[str, Any]:
         """碳元素守恒审计：逐工序核对碳输入与各去向闭合余量。"""

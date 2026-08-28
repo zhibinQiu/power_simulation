@@ -17,7 +17,7 @@
     <div class="cmd-input-row">
       <span class="pmt">&gt;&gt;</span>
       <input ref="cmdInput" v-model="cmdText" class="cmd-input" spellcheck="false" autocomplete="off"
-             :placeholder="store.simMode ? '仿真模式：可输入自然语言指令（如“焦比降低10%”），由智能体解析并应用（规划中），或 /help 查看命令' : '直接聊天，或 /code /plan 切换模式（/help 查看）'" @keydown.enter="runCmd" @keydown.up="histUp" @keydown.down="histDown" />
+             :placeholder="store.simMode ? '仿真模式：可输入自然语言指令（如“焦比降低10%”），由智能体解析并应用，或 /help 查看命令' : '直接聊天，或 /code /plan 切换模式（/help 查看）'" @keydown.enter="runCmd" @keydown.up="histUp" @keydown.down="histDown" />
     </div>
   </section>
 </template>
@@ -73,7 +73,7 @@ watch(() => [...store.cmdLog], () => scrollLog())
 function helpText() {
   return '孪生命令：help · run/sim 运行 · stop 停止 · /sim 进入仿真模式 · reset 重置视角 · overview 全景 · patrol 虚拟巡视 · view top|front|side|focus · edit 进入编排 · done 完成 · clear 清屏\n' +
          '聊天模式（默认）：直接输入自然语言即可对话。切换：/code 代码 · /plan 规划。退出当前模式：/quit（回到聊天）；/back 直接回聊天。\n' +
-         '仿真模式：点击「运行」或输入 /sim 进入，退出后所有修改自动恢复；仿真模式下可直接输入自然语言指令（如“焦比降低10%”），由智能体解析、经您确认后自动应用于仿真并实时对比（规划中）。'
+         '仿真模式：点击「运行」或输入 /sim 进入，退出后修改自动恢复；可直接输入自然语言指令（如“焦比降低10%”），由智能体解析、经您确认后自动应用并实时对比。'
 }
 /* 命令行窗口：模式 + 自然语言聊天（默认即聊天，/code /plan 切模式，/quit 退出） */
 const cmdMode = ref('chat')
@@ -111,8 +111,8 @@ async function runCmd() {
   if (raw.startsWith('/')) { handleSlash(raw); return }
   const first = raw.split(/\s+/)[0].toLowerCase()
   if (KNOWN_CMDS.has(first)) { runTwinCommand(first, raw); return }
-  if (store.simMode && cmdMode.value === 'chat') {   // 仿真模式：自然语言 → 智能体解析（规划中）
-    pushCmd(`[智能体解析 · 规划中] 收到指令：「${raw}」。未来将由智能体解析为可执行操作，经您确认后自动应用于仿真并实时对比。当前可在仿真模式中手动调整参数，或点击左侧「策略」中的内置/自定义策略应用。`, 'warn')
+  if (store.simMode && cmdMode.value === 'chat') {   // 仿真模式：自然语言 → 智能体解析
+    pushCmd(`收到指令：「${raw}」。可直接在仿真模式中手动调整参数，或点击左侧「策略」应用内置/自定义策略。`, 'warn')
     return
   }
   chatWithModel(raw)                         // 其余自然语言 → 直接对话
