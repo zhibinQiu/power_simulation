@@ -82,10 +82,23 @@ Environment=PYTHONUNBUFFERED=1
 WantedBy=multi-user.target
 EOF
 
-    # ---------- ③ 启用并启动 ----------
+    # ---------- ③ 防火墙放行（firewalld 未放行则自动放行，避免端口被拦） ----------
+    log "③ 检查防火墙放行 ${PORT}/tcp"
+    "${SSH[@]}" "if systemctl is-active --quiet firewalld; then
+        if ! firewall-cmd --list-ports 2>/dev/null | grep -qw '$PORT/tcp'; then
+          firewall-cmd --permanent --add-port=$PORT/tcp && firewall-cmd --reload
+          echo '[portal] 已放行 '$PORT'/tcp'
+        else
+          echo '[portal] '$PORT'/tcp 已放行'
+        fi
+      else
+        echo '[portal] firewalld 未运行，跳过'
+      fi"
+
+    # ---------- ④ 启用并启动 ----------
     "${SSH[@]}" "systemctl daemon-reload && systemctl enable --now $SERVICE"
 
-    # ---------- ④ 自检 ----------
+    # ---------- ⑤ 自检 ----------
     sleep 2
     if "${SSH[@]}" "systemctl is-active --quiet $SERVICE"; then
       IP=$("${SSH[@]}" "hostname -I 2>/dev/null | awk '{print \$1}'")
