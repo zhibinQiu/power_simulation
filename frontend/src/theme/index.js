@@ -12,8 +12,8 @@ export const ACCENTS = [
 const KEY = 'carbon-sim.accent'
 const saved = localStorage.getItem(KEY)
 
-/** 当前主题色 id（响应式，绑定到 App 根节点的 data-accent） */
-export const accent = ref(ACCENTS.some((a) => a.id === saved) ? saved : 'amber')
+/** 当前主题色 id（响应式，绑定到 App 根节点的 data-accent），默认科技蓝 */
+export const accent = ref(ACCENTS.some((a) => a.id === saved) ? saved : 'blue')
 
 export function setAccent(id) {
   if (!ACCENTS.some((a) => a.id === id)) return
