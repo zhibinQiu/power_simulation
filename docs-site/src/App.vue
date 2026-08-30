@@ -39,6 +39,6 @@ const backHref = computed(() => routeQuery.value.from || '')
       </div>
     </main>
 
-    <footer class="foot">能碳一体机 · 文档中心</footer>
+    <footer class="foot">能碳一体机 · 文档中心 · v2.0.0</footer>
   </div>
 </template>

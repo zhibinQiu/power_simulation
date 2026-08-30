@@ -2,7 +2,8 @@
   <aside class="inspector">
     <!-- 宽度拖拽手柄（左侧边缘） -->
     <div class="inspector-rsz" :class="{ dragging: rszDragging }" @mousedown.prevent="onRszStart" :title="t('拖拽调整宽度')"></div>
-    <div class="sidebar-head">
+    <!-- 本析智擎模式：按需隐藏顶部标题栏与关闭按钮（窗口内自含工具条） -->
+    <div v-if="mode !== 'agent'" class="sidebar-head">
       <span class="ttl">{{ headTitle }}</span>
       <span class="spacer"></span>
       <button v-if="mode !== 'overview' || store.selectedGroupId || store.selectedFlowId" class="x-btn" :title="t('返回总览')" @click="store.closeInspector()">✕</button>

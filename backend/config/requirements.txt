@@ -7,3 +7,9 @@ python-multipart>=0.0.9
 # 实时数据获取：MQTT 订阅（参照参考项目 yunduan1 数据链路）
 paho-mqtt>=2.0
 pyyaml>=6.0
+# 知识库（LLM-WIKI）：文档解析
+pypdf>=4.0
+python-docx>=1.1
+# 多智能体架构（本析智擎）与 MCP 协议（Skills 双向接入）
+langgraph>=1.0
+mcp>=2.0

@@ -191,8 +191,8 @@ export const useSimStore = defineStore('sim', {
     viewId: null,
     // 三栏布局 & 检视器状态
     leftOpen: true,           // 左侧栏是否展开
-    rightOpen: true,          // 右侧栏（检视器）是否展开
-    bottomOpen: true,
+    rightOpen: false,         // 右侧栏（检视器）是否展开（默认隐藏，点选资产/设备时自动展开）
+    bottomOpen: false,        // 底栏（命令行）是否展开（默认隐藏，可由状态栏/命令入口展开）
     newsTickerOn: (() => { try { return localStorage.getItem('sim.newsTickerOn') !== '0' } catch (e) { return true } })(),  // 底栏快讯是否显示（默认开，localStorage 持久化）
     fullscreenOn: false,      // 全屏模式：隐藏左/右/底栏，仅保留 3D 场景
     dataViewOn: false,        // 数据视图：中间 3D 场景替换为传感器历史数据表格（顶栏「视图 → 数据视图」切换）
@@ -608,9 +608,33 @@ export const useSimStore = defineStore('sim', {
     // 注入模型副本（不污染源 model）。设备设定值优先（实际装备工况即运行点）。
     _applyDeviceOpParams(model) {
       if (!model || !model.units) return model
-      const units = model.units.map((u) => {
+      // 统一浅拷贝一层 params，避免后续传导/桥接污染源 model
+      const units = model.units.map((u) => ({ ...u, params: { ...(u.params || {}) } }))
+      // 1) 驱动连线传导：工辅（热风炉/鼓风机/引风机/喷吹…）自身运行参数经物料连线
+      //    写入被服务工艺的目标参数（与 compileSchemeToModel 的驱动折算段一致，见 flows 段）。
+      //    此前 refresh 路径缺失此步——用户在仿真中调热风炉「送风温度」等工辅参数后，
+      //    不会传导到高炉 hot_blast_temp，后端读到旧风温，碳排/能耗对比自然无变化。
+      const nodeById = Object.fromEntries((this.scheme.nodes || []).map((n) => [n.id, n]))
+      const unitById = Object.fromEntries(units.map((u) => [u.id, u]))
+      for (const c of (this.scheme.connections || [])) {
+        const f = nodeById[c.from], t = nodeById[c.to]
+        const ft = f && PROCESS_MAP[f.type]
+        if (!ft || !ft.drives) continue
+        const drive = ft.drives[c.material]
+        if (!drive) continue
+        const srcUnit = unitById[f.id], dstUnit = unitById[t.id]
+        if (!srcUnit || !dstUnit) continue
+        const srcVal = (srcUnit.params && srcUnit.params[drive.src] != null) ? Number(srcUnit.params[drive.src]) : null
+        if (srcVal != null) {
+          // 驱动连线：工辅供给绝对量直接写入同量纲目标参数（如 热风温度℃ → 高炉热风温度℃）
+          dstUnit.params = { ...(dstUnit.params || {}), [drive.dst]: srcVal }
+        }
+      }
+      // 2) 设备设定值桥接（DEVICE_COUPLE_REGISTRY）：设备设定优先（实际装备工况即运行点）
+      for (let i = 0; i < units.length; i++) {
+        const u = units[i]
         const reg = DEVICE_COUPLE_REGISTRY[u.type]
-        if (!reg) return u
+        if (!reg) continue
         // 工辅类设备须由编排连线绑定才桥接其设定值（未连线即未绑定、不生效）；
         // 非工辅可调设备（变频/除尘风机等）照常桥接。
         const linkedAux = new Set(linkedAuxTypesFor(this.scheme, u.id))
@@ -629,9 +653,10 @@ export const useSimStore = defineStore('sim', {
           })
           .filter(Boolean)
         const overrides = deriveProcessOpParams(u.type, devs, u.params || {})
-        if (!Object.keys(overrides).length) return u
-        return { ...u, params: { ...(u.params || {}), ...overrides } }
-      })
+        if (Object.keys(overrides).length) {
+          units[i] = { ...u, params: { ...(u.params || {}), ...overrides } }
+        }
+      }
       return { ...model, units }
     },
     // 刷新防抖：滑块/设备设定拖动会高频触发，合并为「停顿后一次」后端重算（约 280ms），
@@ -1208,8 +1233,8 @@ export const useSimStore = defineStore('sim', {
         this.bottomOpen = false
       } else {
         this.leftOpen = true
-        this.rightOpen = true
-        this.bottomOpen = true
+        this.rightOpen = false
+        this.bottomOpen = false
       }
     },
     // 右侧检视器显式视图（左侧资产树/工具栏触发）：park 园区构成 / materials 原料库 / strategy 减排策略

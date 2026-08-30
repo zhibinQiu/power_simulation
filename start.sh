@@ -9,12 +9,14 @@
 #    ./start.sh --frontend    仅启动前端 dev
 #    ./start.sh --no-docs     不启动独立文档网站
 #    ./start.sh --no-portal   不启动门户网站
+#    ./start.sh --no-portal-sync  不自动同步门户到线上官网 (https://www.nengyousuan.com)
 #    ./start.sh --help        查看帮助
 #
 #  说明:
 #    - 后端首次运行自动创建 .venv 并安装依赖
 #    - 前端首次运行自动 npm install
 #    - 日志写入 .logs/ 目录，Ctrl+C 停止全部服务
+#    - 默认启动门户时会把 platform/homePage/ 同步到线上官网 43.161.194.75（免密 SSH），失败不阻断本地服务
 # ============================================================
 set -euo pipefail
 
@@ -27,6 +29,11 @@ RUN_BACKEND=1
 RUN_FRONTEND=1
 RUN_DOCS=1
 RUN_PORTAL=1
+PORTAL_SYNC=1     # 启动门户时同步 platform/homePage 到线上官网 43.161.194.75
+
+# 线上官网（https://www.nengyousuan.com）部署目标
+PORTAL_SERVER="root@43.161.194.75"
+PORTAL_REMOTE_DIR="/var/www/nengyousuan"
 
 for arg in "$@"; do
   case "$arg" in
@@ -35,8 +42,9 @@ for arg in "$@"; do
     --frontend) RUN_BACKEND=0 ;;
     --no-docs)  RUN_DOCS=0 ;;
     --no-portal) RUN_PORTAL=0 ;;
+    --no-portal-sync) PORTAL_SYNC=0 ;;
     -h|--help)
-      sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
@@ -45,6 +53,32 @@ for arg in "$@"; do
       ;;
   esac
 done
+
+# ---- 停止上次残留的本项目服务（避免端口被旧进程占用导致新服务起不来/页面卡住）----
+stop_old_services() {
+  echo "==> [清理] 停止上次残留的本项目服务..."
+  local stopped=0
+  # 旧后端：uvicorn（--reload 的 reloader+worker 一并终止）与 run.sh 启动器
+  pkill -f "uvicorn app\.main:app" 2>/dev/null && { echo "   - 已停止旧后端 (uvicorn)"; stopped=1; } || true
+  pkill -f "config/run\.sh" 2>/dev/null && { echo "   - 已停止旧后端启动器 (run.sh)"; stopped=1; } || true
+  # 旧前端 / 文档站 dev 服务器（vite dev 与 preview 共用 .bin/vite 入口）
+  pkill -f "frontend/node_modules/\.bin/vite" 2>/dev/null && { echo "   - 已停止旧前端 dev (vite)"; stopped=1; } || true
+  pkill -f "docs-site/node_modules/\.bin/vite" 2>/dev/null && { echo "   - 已停止旧文档站 dev (vite)"; stopped=1; } || true
+  # 旧门户静态服务器
+  pkill -f "http\.server 40200" 2>/dev/null && { echo "   - 已停止旧门户 (http.server)"; stopped=1; } || true
+  # 旧的一键启动脚本（排除当前进程，避免自杀）
+  for opid in $(pgrep -f "start\.sh" 2>/dev/null || true); do
+    if [ "$opid" != "$$" ]; then
+      kill "$opid" 2>/dev/null && { echo "   - 已停止旧启动脚本 (PID $opid)"; stopped=1; } || true
+    fi
+  done
+  # 给被杀的进程留出退出时间，避免刚清理完又端口冲突
+  if [ "$stopped" = "1" ]; then
+    sleep 1
+  fi
+  return 0
+}
+stop_old_services
 
 # ---- 生产模式：先构建前端产物，由后端 Catch-all 路由托管；文档站构建后用 vite preview 托管 ----
 if [ "$MODE" = "prod" ]; then
@@ -140,6 +174,20 @@ if [ "$RUN_PORTAL" = "1" ]; then
   PORTAL_PID=$!
   echo "   PID: $PORTAL_PID    日志: $LOG_DIR/portal.log"
   wait_ready "http://127.0.0.1:40200" "门户" || true
+fi
+
+# ---- 同步门户到线上官网（https://www.nengyousuan.com，43.161.194.75 + Nginx）----
+# 每次启动都把最新 platform/homePage/ 推上线，失败仅警告、不阻断本地服务
+if [ "$PORTAL_SYNC" = "1" ]; then
+  echo "==> [门户] 同步 platform/homePage/ → 线上官网 $PORTAL_SERVER:$PORTAL_REMOTE_DIR ..."
+  if rsync -az --delete \
+      -e "ssh -i $HOME/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o BatchMode=yes" \
+      --exclude='.DS_Store' --exclude='.serve.pid' --exclude='.serve.log' --exclude='*.log' \
+      "$ROOT/platform/homePage/" "$PORTAL_SERVER:$PORTAL_REMOTE_DIR/"; then
+    echo "   ✔ 线上官网已更新: https://www.nengyousuan.com"
+  else
+    echo "   ⚠ 官网同步失败（不影响本地服务，请检查网络与免密 SSH 配置）" >&2
+  fi
 fi
 
 # ---- 输出访问地址 ----

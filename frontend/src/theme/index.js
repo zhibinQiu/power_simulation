@@ -1,4 +1,4 @@
-// 系统主题色：预设主题色列表 + 响应式状态 + localStorage 持久化。
+// 系统主题：主题色（accent）+ 界面模式（themeMode：白天/夜间）。
 // 实际颜色通过 App 根节点 data-accent 属性 + main.css 中的变量覆盖规则生效。
 import { ref } from 'vue'
 
@@ -22,3 +22,17 @@ export function setAccent(id) {
 }
 
 export function getAccent() { return accent.value }
+
+const MODE_KEY = 'carbon-sim.theme-mode'
+const savedMode = localStorage.getItem(MODE_KEY)
+
+/** 界面主题模式：'light'（白天，顶栏/底栏亮色）| 'dark'（夜间，深色界面） */
+export const themeMode = ref(savedMode === 'dark' ? 'dark' : 'light')
+
+export function setThemeMode(mode) {
+  if (mode !== 'light' && mode !== 'dark') return
+  themeMode.value = mode
+  localStorage.setItem(MODE_KEY, mode)
+}
+
+export function getThemeMode() { return themeMode.value }

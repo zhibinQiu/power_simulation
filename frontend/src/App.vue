@@ -1,5 +1,5 @@
 <template>
-  <div class="app" :class="{ 'left-collapsed': !store.leftOpen, 'right-collapsed': !store.rightOpen, 'bottom-collapsed': !store.bottomOpen, 'sim-dark': store.simMode, 'view-immersive': store.viewModeOn, 'fullscreen-on': store.fullscreenOn }"
+  <div class="app" :class="{ 'left-collapsed': !store.leftOpen, 'right-collapsed': !store.rightOpen, 'bottom-collapsed': !store.bottomOpen, 'sim-dark': store.simMode || themeMode === 'dark', 'view-immersive': store.viewModeOn, 'fullscreen-on': store.fullscreenOn }"
        :data-accent="accent"
        :style="{ '--cmd-h': store.bottomOpen ? cmdH + 'px' : '0px', '--lw': store.leftOpen ? lw + 'px' : '0px', '--rw': store.rightOpen ? rw + 'px' : '0px' }">
     <TopBar :menus="menus" ref="topBarRef" @export="onExport" @help="openDocsSite('promo')" @toggle-agent="toggleAgent" />
@@ -48,6 +48,11 @@
     <SystemSettingsDialog v-if="showSettings" @close="showSettings = false" />
     <AboutDialog v-if="store.aboutDialog" />
     <TftAnalysisDialog v-if="showTftAnalysis" @close="showTftAnalysis = false" />
+    <!-- AI 管理对话框：知识库 / 智能体 / 技能 / 本体（语义层） -->
+    <KnowledgeManageDialog v-if="showKnowledgeManage" @close="showKnowledgeManage = false" />
+    <AgentManageDialog v-if="showAgentManage" @close="showAgentManage = false" />
+    <SkillManageDialog v-if="showSkillManage" @close="showSkillManage = false" />
+    <OntologyManageDialog v-if="showOntologyManage" @close="showOntologyManage = false" />
     <ContextMenu />
     <ConservationAuditDialog />
     <!-- 全局即时反馈层：类型化 Toast（视觉+听觉）与任务进度条（进度可视化） -->
@@ -62,7 +67,7 @@
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { useSimStore } from './stores/sim'
 import { t } from './i18n'
-import { accent } from './theme'
+import { accent, themeMode } from './theme'
 import { lazyDialog } from './utils/asyncComp'
 import ToastLayer from './components/ToastLayer.vue'
 import TaskProgress from './components/TaskProgress.vue'
@@ -82,6 +87,10 @@ import { openAuditDialog } from './stores/audit'
 const DataSourceDialog = defineAsyncComponent(() => import('./components/DataSourceDialog.vue'))
 const SystemSettingsDialog = defineAsyncComponent(() => import('./components/SystemSettingsDialog.vue'))
 const AboutDialog = defineAsyncComponent(() => import('./components/AboutDialog.vue'))
+const KnowledgeManageDialog = defineAsyncComponent(() => import('./components/KnowledgeBaseDialog.vue'))
+const AgentManageDialog = defineAsyncComponent(() => import('./components/AgentManageDialog.vue'))
+const SkillManageDialog = defineAsyncComponent(() => import('./components/SkillManageDialog.vue'))
+const OntologyManageDialog = defineAsyncComponent(() => import('./components/OntologyManageDialog.vue'))
 // 高炉数值仿真弹窗：lazyDialog 提供加载占位/失败重试/错误提示，避免偶发加载失败时打不开
 const TftAnalysisDialog = lazyDialog(() => import('./components/TftAnalysisDialog.vue'))
 const ContextMenu = defineAsyncComponent(() => import('./components/ContextMenu.vue'))
@@ -127,6 +136,10 @@ const boxViewRef = ref(null)
 const showDataSource = ref(false)
 const showSettings = ref(false)
 const showTftAnalysis = ref(false)
+const showKnowledgeManage = ref(false)
+const showAgentManage = ref(false)
+const showSkillManage = ref(false)
+const showOntologyManage = ref(false)
 
 const { lw, rw, cmdH, resizing, startLeftResize, startRightResize, startResize } = usePanelSizes()
 
@@ -325,7 +338,6 @@ const menus = computed(() => [
       { label: t('CEA / CCER 行情'), checked: store.carbonMarketOn && marketTabOn() === 'market', run: () => marketSubNav('market') },
       { label: t('企业台账与策略'), checked: store.carbonMarketOn && marketTabOn() === 'ledger', run: () => marketSubNav('ledger') },
     ] },
-    { label: t('数据分析与策略'), toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
     { label: t('能碳一体机管理'), toggle: () => store.boxManageOn, act: () => boxSubNav() },
   ] },
   { id: 'edit', label: t('编辑'), items: [
@@ -358,6 +370,15 @@ const menus = computed(() => [
     { sub: true, label: t('能源'), items: () => [
       { label: t('能流分析'), run: () => store.toggleEnergyFlow() },
     ] },
+  ] },
+  { id: 'ai', label: t('AI'), items: [
+    { label: t('数据分析与策略'), toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
+    { sep: true },
+    { label: t('知识库管理'), act: () => { showKnowledgeManage.value = true } },
+    { sep: true },
+    { label: t('智能体管理'), act: () => { showAgentManage.value = true } },
+    { label: t('技能管理'), act: () => { showSkillManage.value = true } },
+    { label: t('本体管理'), act: () => { showOntologyManage.value = true } },
   ] },
   { id: 'help', label: t('帮助'), items: [
     { label: t('宣传手册'), accel: 'F1', act: () => openDocsSite('promo') },

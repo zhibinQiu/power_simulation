@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import urllib.error
 import urllib.request
@@ -21,6 +22,8 @@ from typing import List, Optional
 
 from .models import ParseResult, ParsedOp
 from .param_schema import PARAM_SCHEMA, TECHS_INFO, UNIT_TYPES_INFO
+
+logger = logging.getLogger(__name__)
 
 def _load_dotenv():
     """本地直接运行（run.sh / uvicorn）时，docker-compose 注入的 LLM_* 不会进入进程环境；
@@ -51,11 +54,16 @@ _load_dotenv()
 
 
 def _llm_cfg():
-    """惰性读取 LLM 配置（支持进程环境变量与 .env 兜底）。"""
+    """惰性读取 LLM 配置（设置弹窗保存的动态配置 > 进程环境变量 / .env > 默认值）。
+
+    动态配置由 backend/app/llm_settings.py 管理：保存后立即生效、无需重启。
+    """
+    from .llm_settings import get_llm_cfg
+    cfg = get_llm_cfg()
     return (
-        os.getenv("LLM_BASE_URL", "https://api.deepseek.com/v1").rstrip("/"),
-        os.getenv("LLM_API_KEY", ""),
-        os.getenv("LLM_MODEL", "deepseek-chat"),
+        cfg["base_url"].rstrip("/"),
+        cfg["api_key"],
+        cfg["model"],
     )
 
 _VALID_ACTIONS = {"replace_type", "add_unit", "remove_unit", "apply_tech", "set_param"}
@@ -172,6 +180,54 @@ def chat_completion(messages: List[dict], timeout: float = 30.0,
                     max_tokens: int = 1500) -> Optional[str]:
     """通用聊天补全（OpenAI 兼容接口）。无 key / 网络异常返回 None，由调用方兜底。"""
     return _call_llm(messages, timeout=timeout, response_format=None, max_tokens=max_tokens)
+
+
+def chat_completion_tools(messages: List[dict], tools: List[dict],
+                          timeout: float = 60.0, max_tokens: int = 2048) -> Optional[dict]:
+    """通用聊天补全，支持函数调用（OpenAI 兼容 tool calling）。
+
+    返回结构：
+      {"content": str | None, "tool_calls": [{"id","name","arguments"(str)}] | []}
+    未配置 key / 网络异常 / 解析失败返回 None，由调用方兜底。
+    """
+    base_url, api_key, model = _llm_cfg()
+    if not api_key:
+        return None
+    url = f"{base_url}/chat/completions"
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.4,
+        "max_tokens": max_tokens,
+        "tools": tools,
+        "tool_choice": "auto",
+    }
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=body, method="POST", headers={
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    })
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        with opener.open(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        msg = data["choices"][0]["message"]
+        calls = []
+        for c in (msg.get("tool_calls") or []):
+            fn = c.get("function") or {}
+            calls.append({
+                "id": c.get("id") or "",
+                "name": fn.get("name") or "",
+                "arguments": fn.get("arguments") or "{}",
+            })
+        return {"content": msg.get("content") or "", "tool_calls": calls}
+    except (urllib.error.URLError, urllib.error.HTTPError, KeyError, IndexError,
+            ValueError, TimeoutError, OSError) as exc:
+        logger.warning("chat_completion_tools failed: %s %s", type(exc).__name__, exc)
+        if isinstance(exc, urllib.error.HTTPError):
+            logger.warning("  http body: %s",
+                           exc.read().decode("utf-8", "ignore")[:400])
+        return None
 
 
 def chat_completion_stream(messages: List[dict], timeout: float = 300.0,

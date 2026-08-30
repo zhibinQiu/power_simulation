@@ -28,13 +28,24 @@ from . import mqtt_source
 from . import presets
 from . import realtime
 from .api.box_router import router as box_router
-from .api.carbon_assets_router import router as carbon_assets_router
-from .api.carbon_assets_router import share_router as report_share_router
+from .api.carbon_assets_router import (router as carbon_assets_router,
+                                       share_router as report_share_router)
+from .api.ai_admin_router import router as ai_admin_router
+from .api.chat_session_router import router as chat_session_router
 from .api.help_router import router as help_router
+from .api.knowledge_router import router as knowledge_router
 from .api.license_router import router as license_router
 from .api.simulation_router import router as simulation_router
+from .api.settings_router import router as settings_router
 
-app = FastAPI(title="工业能碳智控平台", version="0.1.0")
+
+async def _lifespan(app):
+    """应用生命周期：启动时后台初始化 Skills（内置 + 连接第三方 MCP server）。"""
+    from .skills.registry import init_registry
+    init_registry(connect_mcp=True)
+    yield
+
+app = FastAPI(title="工业能碳智控平台", version="2.0.0", lifespan=_lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,10 +55,14 @@ app.add_middleware(
 
 # 业务域路由（保持原有 /api 路径兼容）
 app.include_router(simulation_router)          # 核心仿真（预置/解析/仿真/策略/扫描/审计/聊天/AI 优化）
+app.include_router(ai_admin_router)            # AI 管理（智能体/技能/本体）
+app.include_router(chat_session_router)        # 聊天会话（历史对话/继续对话）
 app.include_router(box_router)                 # 能碳一体机管理
 app.include_router(carbon_assets_router)       # 碳资产管理（含 /api/carbon-assistant/*）
 app.include_router(help_router)                # 帮助中心（独立文档网站地址）
+app.include_router(knowledge_router)           # 知识库（LLM-WIKI 式多级文件夹 + 文档解析，无需权限）
 app.include_router(license_router)             # 平台激活（激活码校验 / 激活状态）
+app.include_router(settings_router)            # 系统设置（LLM 配置等）
 app.include_router(report_share_router)        # 报告分享页 /report/{rid}
 
 
@@ -69,9 +84,12 @@ realtime.register_realtime(app)
 
 
 # ------------------------- 静态托管前端 -------------------------
-if os.path.isdir(FRONTEND_DIST):
-    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")
+# assets 子目录可能未构建（如仅 index.html 存在），逐个按存在性挂载，避免后端启动崩溃
+_assets_dir = os.path.join(FRONTEND_DIST, "assets")
+if os.path.isdir(_assets_dir):
+    app.mount("/assets", StaticFiles(directory=_assets_dir), name="assets")
 
+if os.path.isdir(FRONTEND_DIST):
     @app.get("/{full_path:path}")
     async def spa(full_path: str):
         # 若存在真实静态文件（模型/解码器等），直接返回，避免全部回退 index.html

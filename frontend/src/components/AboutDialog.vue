@@ -13,7 +13,7 @@
       <div class="ab-name">{{ t('工业能碳智控平台') }}</div>
       <div class="ab-sub">{{ t('Web 版工业数字孪生仿真系统') }}</div>
       <div class="ab-sub">{{ t('面向高炉炼铁的能碳仿真与优化平台') }}</div>
-      <div class="ab-ver">{{ t('版本') }} v0.1.0</div>
+      <div class="ab-ver">{{ t('版本') }} v2.0.0</div>
 
       <div class="ab-divider"></div>
 

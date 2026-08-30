@@ -13,6 +13,10 @@ SERVER_DIR="/root/qzb/jianpai"
 GIT_REMOTE="github"
 GIT_BRANCH="master"
 
+# 线上官网（https://www.nengyousuan.com，43.161.194.75 + Nginx 静态托管）
+PORTAL_SERVER="root@43.161.194.75"
+PORTAL_REMOTE_DIR="/var/www/nengyousuan"
+
 if ! git remote | grep -qx "$GIT_REMOTE"; then
   echo "❌ 未找到名为 '$GIT_REMOTE' 的远端，请先添加 GitHub 仓库："
   echo "   git remote add github https://github.com/zhibinQiu/power_simulation.git"
@@ -54,7 +58,7 @@ if [ -z "$MSG" ]; then
   MSG="sync: 更新代码"
 fi
 
-echo "==> [1/3] rsync 源码 + 构建产物到服务器 $SERVER:$SERVER_DIR"
+echo "==> [1/4] rsync 源码 + 构建产物到服务器 $SERVER:$SERVER_DIR"
 rsync -az \
   -e "ssh -p 22 -o StrictHostKeyChecking=no -o BatchMode=yes" \
   --exclude='.DS_Store' --exclude='node_modules' --exclude='.playwright-cli' \
@@ -64,7 +68,14 @@ rsync -az \
   ./ "$SERVER:$SERVER_DIR/"
 echo "    rsync 完成"
 
-echo "==> [2/3] git 提交本地改动（源码进 GitHub，构建产物 dist 已被 .gitignore 忽略）"
+echo "==> [2/4] 同步门户官网 platform/homePage/ → 线上官网 $PORTAL_SERVER:$PORTAL_REMOTE_DIR"
+rsync -az --delete \
+  -e "ssh -p 22 -o StrictHostKeyChecking=no -o BatchMode=yes -i $HOME/.ssh/id_ed25519" \
+  --exclude='.DS_Store' --exclude='.serve.pid' --exclude='.serve.log' --exclude='*.log' \
+  ./platform/homePage/ "$PORTAL_SERVER:$PORTAL_REMOTE_DIR/"
+echo "    官网同步完成: https://www.nengyousuan.com"
+
+echo "==> [3/4] git 提交本地改动（源码进 GitHub，构建产物 dist 已被 .gitignore 忽略）"
 git add .
 if git diff --cached --quiet; then
   echo "    无本地改动，跳过提交"
@@ -73,7 +84,7 @@ else
   echo "    已提交: $MSG"
 fi
 
-echo "==> [3/3] 推送到 GitHub 云端仓库"
+echo "==> [4/4] 推送到 GitHub 云端仓库"
 git pull --rebase "$GIT_REMOTE" "$GIT_BRANCH" 2>/dev/null || true
 git push "$GIT_REMOTE" "$GIT_BRANCH"
 echo "    推送完成"

@@ -30,6 +30,26 @@
   --red: #BC3B30;           /* 报警/危险（ISA-101 红=报警） */
   --orange: #A85E2A;        /* 赭橙（范围一/未连接） */
   --rail: #171917;          /* 深色面（门户 header 黑：toast/3D 降级/状态栏/顶栏） */
+  /* 顶栏 / 底栏：白天模式亮色（可由用户切换夜间模式，.app.sim-dark 覆盖为深色） */
+  --topbar-bg: #EFEEE9;             /* 菜单条底（比工具条深一档，亮色分层） */
+  --topbar-fg: #23231F;             /* 顶栏主文字 */
+  --topbar-fg-mute: #4A4942;        /* 顶栏次级文字（菜单项/快捷按钮） */
+  --topbar-hover-bg: rgba(0,0,0,.08);
+  --topbar-hover-fg: #171917;
+  --topbar-line: rgba(0,0,0,.12);   /* 顶栏底边线 */
+  --topbar-sep: rgba(0,0,0,.18);    /* 顶栏内分隔竖线 */
+  --sb-bg: #EFEEE9;                 /* 底栏背景（与顶栏同色系） */
+  --sb-fg: #4A4942;                 /* 底栏主文字 */
+  --sb-fg-strong: #23231F;
+  --sb-fg-faint: #98978E;
+  --sb-hover-bg: rgba(0,0,0,.06);
+  --sb-open-bg: rgba(0,0,0,.10);
+  --sb-line: rgba(0,0,0,.12);       /* 底栏分隔线/顶边线 */
+  --sb-icon: #3A3A34;               /* 底栏图标 */
+  --sb-ok: #1E7B4F;                 /* 底栏语义色（亮底可读的深色版本） */
+  --sb-err: #B3372B;
+  --sb-warn: #8F6509;
+  --feed-init: #B9B8B0;             /* 底栏数据源「连接中」圆点 */
   --gas: #35808F;           /* 气体/能源管道（沉静青） */
   --ok: #2E8B57;            /* 通用「正常/通过」状态色 */
   --warn: #8F6509;          /* 通用「提醒/提示」文字色 */
@@ -77,6 +97,26 @@
   --red: #E86666;
   --orange: #DE8A4A;
   --rail: #111311;          /* 深色面（比背景更深一档） */
+  /* 顶栏 / 底栏：夜间模式深色（覆盖白天亮色变量） */
+  --topbar-bg: #171917;
+  --topbar-fg: rgba(255,255,255,.92);
+  --topbar-fg-mute: rgba(255,255,255,.88);
+  --topbar-hover-bg: rgba(255,255,255,.14);
+  --topbar-hover-fg: #fff;
+  --topbar-line: rgba(255,255,255,.08);
+  --topbar-sep: rgba(255,255,255,.18);
+  --sb-bg: var(--rail);
+  --sb-fg: rgba(255,255,255,.82);
+  --sb-fg-strong: rgba(255,255,255,.95);
+  --sb-fg-faint: rgba(255,255,255,.55);
+  --sb-hover-bg: rgba(255,255,255,.08);
+  --sb-open-bg: rgba(255,255,255,.15);
+  --sb-line: rgba(255,255,255,.14);
+  --sb-icon: rgba(255,255,255,.92);
+  --sb-ok: #9EE6C0;
+  --sb-err: #FFB3A8;
+  --sb-warn: #F5D48A;
+  --feed-init: rgba(255,255,255,.42);
   --gas: #3FC0D4;
   --ok: #3EDC9B;
   --warn: #C9A02C;
@@ -93,8 +133,6 @@
   --shadow: 0 1px 2px rgba(0,0,0,.45), 0 6px 18px rgba(0,0,0,.40);
 }
 /* 仿真模式：对少数硬编码浅色的兜底修补（门户暖炭黑 / 主黄） */
-.app.sim-dark .topbar { background: #171917; }
-.app.sim-dark .mbar-item:hover, .app.sim-dark .mbar-item.open { background: rgba(255,255,255,.14); }
 .app.sim-dark .menu-drop { background: #1E211E; border-color: #383D37; box-shadow: var(--shadow); }
 .app.sim-dark .menu-drop .mi:hover { background: var(--accent-l); }
 .app.sim-dark .ribbon { background: #1E211E; }
@@ -245,20 +283,20 @@ body.panel-dragging .app { transition: none; }
 }
 .view-banner .vb-close:hover { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, var(--border)); }
 
-/* ============ 顶栏：VS Code 标题栏 + 菜单栏（浅色，扁平，无图标菜单） ============ */
+/* ============ 顶栏：VS Code 标题栏 + 菜单栏（白天亮色 / 夜间深色，扁平，无图标菜单） ============ */
 .topbar {
   grid-area: topbar; display: flex; align-items: stretch; height: 34px;
-  background: var(--rail); color: rgba(255,255,255,.92); position: relative; z-index: 60;
-  border-bottom: 1px solid rgba(255,255,255,.08);
+  background: var(--topbar-bg); color: var(--topbar-fg); position: relative; z-index: 60;
+  border-bottom: 1px solid var(--topbar-line);
   font-family: var(--ui);
 }
-/* 菜单条（门户风格：深黑顶栏白字菜单，hover 半透明白高亮） */
+/* 菜单条（门户风格：白天亮色底深字 / 夜间深黑底白字，hover 高亮） */
 .menubar { display: flex; align-items: center; gap: 2px; height: 100%; padding: 0 6px; }
-.mbar-item { position: relative; display: flex; align-items: center; padding: 0 12px; height: 26px; font-size: 13px; color: rgba(255,255,255,.88);
+.mbar-item { position: relative; display: flex; align-items: center; padding: 0 12px; height: 26px; font-size: 13px; color: var(--topbar-fg-mute);
   cursor: pointer; font-family: var(--ui); background: transparent; user-select: none; border-radius: var(--radius);
   transition: background .1s; }
-.mbar-item:hover { background: rgba(255,255,255,.12); color: #fff; }
-.mbar-item.open { background: rgba(255,255,255,.16); color: #fff; }
+.mbar-item:hover { background: var(--topbar-hover-bg); color: var(--topbar-hover-fg); }
+.mbar-item.open { background: var(--topbar-hover-bg); color: var(--topbar-hover-fg); }
 /* 菜单下拉（ISA-101：几何直角、单层弱阴影，浅色浮层保持可读） */
 .menu-drop { position: absolute; top: calc(100% + 4px); left: 0; min-width: 220px; background: var(--panel); color: var(--text);
   border: 1px solid var(--border); box-shadow: var(--shadow); padding: 4px; z-index: 80; border-radius: var(--radius); }
@@ -283,7 +321,7 @@ body.panel-dragging .app { transition: none; }
   min-width: 180px; box-shadow: var(--shadow); z-index: 60; }
 .topbar .spacer { flex: 1; }
 .top-actions { display: flex; align-items: center; gap: 3px; padding: 0 10px; height: 100%; }
-.tdiv { width: 1px; height: 15px; background: rgba(255,255,255,.18); margin: 0 3px; }
+.tdiv { width: 1px; height: 15px; background: var(--topbar-sep); margin: 0 3px; }
 .tbtn { display: flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; font-size: 12px;
   background: transparent; border: 1px solid transparent; color: var(--text); border-radius: var(--radius);
   cursor: pointer; white-space: nowrap; font-family: var(--ui);
@@ -291,11 +329,11 @@ body.panel-dragging .app { transition: none; }
 .tbtn:hover { background: var(--panel-3); color: var(--text); }
 .tbtn:active { background: var(--sel); transform: translateY(1px); }
 .tbtn.on { color: var(--accent-d); background: var(--accent-l); }
-/* 顶栏右侧快捷按钮（门户深黑顶栏上的白色图标按钮） */
-.topbar .tbtn { color: rgba(255,255,255,.88); }
-.topbar .tbtn:hover { background: rgba(255,255,255,.12); color: #fff; }
-.topbar .tbtn:active { background: rgba(255,255,255,.2); transform: translateY(1px); }
-.topbar .tbtn.on { color: var(--accent-d); background: rgba(240,165,0,.18); }
+/* 顶栏右侧快捷按钮（白天亮色 / 夜间深色顶栏上的图标按钮） */
+.topbar .tbtn { color: var(--topbar-fg-mute); }
+.topbar .tbtn:hover { background: var(--topbar-hover-bg); color: var(--topbar-hover-fg); }
+.topbar .tbtn:active { background: var(--topbar-hover-bg); transform: translateY(1px); }
+.topbar .tbtn.on { color: var(--accent-d); background: var(--accent-l); }
 .tbtn:disabled, .tbtn.disabled { color: var(--faint); cursor: default; opacity: .55; }
 .tbtn:disabled:hover, .tbtn.disabled:hover { background: transparent; color: var(--faint); }
 .tbtn .ui-icon { width: 15px; height: 15px; }
@@ -413,8 +451,9 @@ body.panel-dragging .app { transition: none; }
 /* 左侧栏宽度拖拽手柄（右侧边缘细条，鼠标移入显示抓取提示） */
 .sidebar-rsz { position: absolute; top: 0; right: 0; width: 6px; height: 100%; cursor: ew-resize; z-index: 6; }
 .sidebar-rsz:hover, .sidebar-rsz.dragging { background: rgba(20, 110, 180, .25); }
-/* 右侧栏宽度拖拽手柄（左侧边缘细条，与左侧栏对称） */
-.inspector-rsz { position: absolute; top: 0; left: 0; width: 6px; height: 100%; cursor: ew-resize; z-index: 6; }
+/* 右侧栏宽度拖拽手柄（左侧边缘细条，与左侧栏对称）；
+   固定模式的本析智擎（agent-view z-index:8）铺满面板，手柄需置于其上保持可拖拽 */
+.inspector-rsz { position: absolute; top: 0; left: 0; width: 6px; height: 100%; cursor: ew-resize; z-index: 60; }
 .inspector-rsz:hover, .inspector-rsz.dragging { background: rgba(20, 110, 180, .25); }
 .sidebar-head, .inspector-head {
   display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--border);
@@ -598,12 +637,12 @@ body.panel-dragging .app { transition: none; }
 .app.sim-dark .cmd-log .sim-cmp-delta.good { color: #43c07a; background: rgba(67, 192, 122, .12); }
 .app.sim-dark .cmd-log .sim-cmp-delta.bad { color: #e06b62; background: rgba(224, 107, 98, .12); }
 
-/* ============ 底栏状态条（ISA-101 高绩效 HMI：沉稳深石板蓝灰底、浅色文字，不喧宾夺主） ============ */
+/* ============ 底栏状态条（ISA-101 高绩效 HMI：白天亮色 / 夜间深色，不喧宾夺主） ============ */
 .statusbar { grid-area: status; display: flex; align-items: stretch; height: 22px; overflow: hidden;
-  background: var(--rail); border-top: 1px solid rgba(0,0,0,.12); font-size: 10.5px; color: rgba(255,255,255,.82); font-family: var(--mono); letter-spacing: .1px; }
-.statusbar .st { display: flex; align-items: center; gap: 5px; padding: 0 10px; border-right: 1px solid rgba(255,255,255,.14); white-space: nowrap; cursor: default; }
-.statusbar .st:hover { background: rgba(255,255,255,.08); }
-.statusbar .st .v { color: rgba(255,255,255,.95); }
+  background: var(--sb-bg); border-top: 1px solid var(--sb-line); font-size: 10.5px; color: var(--sb-fg); font-family: var(--mono); letter-spacing: .1px; }
+.statusbar .st { display: flex; align-items: center; gap: 5px; padding: 0 10px; border-right: 1px solid var(--sb-line); white-space: nowrap; cursor: default; }
+.statusbar .st:hover { background: var(--sb-hover-bg); }
+.statusbar .st .v { color: var(--sb-fg-strong); }
 .statusbar .st.spacer { flex: 1; border-right: none; }
 .statusbar .st.spacer:hover { background: none; }
 /* 市场快讯滚动条 */
@@ -616,27 +655,25 @@ body.panel-dragging .app { transition: none; }
 .statusbar .news-track:hover { animation-play-state: paused; }
 .statusbar .news-list { display: inline-flex; align-items: center; }
 .statusbar .news-item { padding-right: 22px; font-size: 11px; font-family: var(--ui); -webkit-font-smoothing: antialiased; }
-.statusbar .news-item .news-time { color: rgba(255,255,255,.92); margin-right: 7px; font-family: var(--mono); }
-.statusbar .nt-empty { color: rgba(255,255,255,.55); padding-left: 4px; font-family: var(--ui); }
+.statusbar .news-item .news-time { color: var(--sb-fg-strong); margin-right: 7px; font-family: var(--mono); }
+.statusbar .nt-empty { color: var(--sb-fg-faint); padding-left: 4px; font-family: var(--ui); }
 @keyframes news-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-/* 语义状态色（ISA-101：在深底上使用柔和高亮，避免高饱和闪烁） */
-.statusbar .ok { color: #9EE6C0; } .statusbar .err { color: #FFB3A8; } .statusbar .warnc { color: #F5D48A; }
+/* 语义状态色（ISA-101：白天用深色可读版，夜间用柔和高亮，避免高饱和闪烁） */
+.statusbar .ok { color: var(--sb-ok); } .statusbar .err { color: var(--sb-err); } .statusbar .warnc { color: var(--sb-warn); }
 /* 平台激活状态提示：未激活时显示在实时链路左侧，黄色警示、可点击进入激活弹窗 */
-.statusbar .lic-warn { color: #F5D48A; cursor: pointer; }
+.statusbar .lic-warn { color: var(--sb-warn); cursor: pointer; }
 .statusbar .lic-warn .lic-tri { font-size: 10px; line-height: 1; }
 .statusbar .mono { font-family: var(--mono); }
 .feed-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; }
-.feed-open { background: #4FC98A; } .feed-closed { background: #F08A78; } .feed-init { background: rgba(255,255,255,.42); }
-/* 深色仿真模式：状态栏与 rail 同族，保持沉稳 */
-.app.sim-dark .statusbar { background: var(--rail); border-top-color: rgba(255,255,255,.06); }
+.feed-open { background: #4FC98A; } .feed-closed { background: #F08A78; } .feed-init { background: var(--feed-init); }
 
 /* ============ 底栏通知按钮（仿 VS Code 铃铛） ============ */
 .statusbar .st-notif { position: relative; padding: 0 12px; border-right: none; cursor: pointer; }
-.statusbar .st-notif svg { width: 15px; height: 15px; fill: rgba(255,255,255,.92); display: block; }
+.statusbar .st-notif svg { width: 15px; height: 15px; fill: var(--sb-icon); display: block; }
 .statusbar .st-notif .ntf-badge { position: absolute; top: 2px; right: 4px; min-width: 14px; height: 14px; padding: 0 3px;
   background: var(--red); color: #fff; border-radius: 7px; font-size: 9px; font-family: var(--ui);
   display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1.5px var(--accent); }
-.statusbar .st-notif.open { background: rgba(255,255,255,.15); }
+.statusbar .st-notif.open { background: var(--sb-open-bg); }
 /* ============ 系统通知中心（仿 VS Code 通知中心） ============ */
 .notif-center { position: fixed; right: 8px; bottom: 30px; width: 372px; max-width: calc(100vw - 16px);
   background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius);

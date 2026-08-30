@@ -1,0 +1,17 @@
+{
+  "docs": {
+    "96e57442b41e": {
+      "id": "96e57442b41e",
+      "title": "说明",
+      "folder": "测试目录",
+      "ext": ".txt",
+      "size": 3710,
+      "chars": 3242,
+      "original": "说明.txt",
+      "parse": true,
+      "raw": "raw/96e57442b41e.txt",
+      "created_at": "2026-08-30T12:01:36",
+      "updated_at": "2026-08-30T12:01:36"
+    }
+  }
+}

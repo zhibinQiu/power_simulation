@@ -1,0 +1,1101 @@
+{
+  "concepts": [
+    {
+      "id": "con_a3b01805",
+      "name": "烧结",
+      "description": "铁矿石粉造块工序，将矿粉烧结成烧结矿供高炉使用",
+      "category": "工序",
+      "aliases": [
+        "烧结工序"
+      ],
+      "keywords": [
+        "烧结"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639094,
+      "updated_at": 1788058631.639094
+    },
+    {
+      "id": "con_ef719f5a",
+      "name": "炼焦",
+      "description": "煤在隔绝空气下干馏成焦炭的工序，产出焦炭与焦炉煤气",
+      "category": "工序",
+      "aliases": [
+        "焦化工序"
+      ],
+      "keywords": [
+        "炼焦",
+        "焦化"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.6391098,
+      "updated_at": 1788058631.6391098
+    },
+    {
+      "id": "con_577bc628",
+      "name": "高炉炼铁",
+      "description": "用焦炭还原铁矿石冶炼生铁的工序，是高炉-转炉长流程核心工序",
+      "category": "工序",
+      "aliases": [
+        "炼铁工序",
+        "高炉工序"
+      ],
+      "keywords": [
+        "炼铁",
+        "高炉"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639123,
+      "updated_at": 1788058631.639123
+    },
+    {
+      "id": "con_dcdb813a",
+      "name": "转炉炼钢",
+      "description": "以铁水为原料，通过顶吹/底吹氧气去除杂质冶炼粗钢的工序",
+      "category": "工序",
+      "aliases": [
+        "炼钢工序",
+        "转炉工序"
+      ],
+      "keywords": [
+        "炼钢",
+        "转炉"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639133,
+      "updated_at": 1788058631.639133
+    },
+    {
+      "id": "con_7bfb10a8",
+      "name": "连铸",
+      "description": "将钢水连续浇铸成钢坯的工序",
+      "category": "工序",
+      "aliases": [
+        "连铸工序"
+      ],
+      "keywords": [
+        "连铸"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639144,
+      "updated_at": 1788058631.639144
+    },
+    {
+      "id": "con_82c33b69",
+      "name": "热轧",
+      "description": "钢坯加热后轧制成板材/带材/型材的工序",
+      "category": "工序",
+      "aliases": [
+        "热轧工序"
+      ],
+      "keywords": [
+        "热轧"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639153,
+      "updated_at": 1788058631.639153
+    },
+    {
+      "id": "con_1d8d9416",
+      "name": "冷轧",
+      "description": "热轧卷在常温下进一步轧薄、改善表面与性能的工序",
+      "category": "工序",
+      "aliases": [
+        "冷轧工序"
+      ],
+      "keywords": [
+        "冷轧"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639164,
+      "updated_at": 1788058631.639164
+    },
+    {
+      "id": "con_88d11625",
+      "name": "电炉炼钢",
+      "description": "以废钢为原料、电弧加热冶炼的短流程炼钢工序",
+      "category": "工序",
+      "aliases": [
+        "电弧炉工序",
+        "短流程"
+      ],
+      "keywords": [
+        "电炉",
+        "电弧炉"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639174,
+      "updated_at": 1788058631.639174
+    },
+    {
+      "id": "con_1b66561b",
+      "name": "高炉本体",
+      "description": "冶炼生铁的核心竖炉设备，炉容决定产能",
+      "category": "设备",
+      "aliases": [
+        "高炉"
+      ],
+      "keywords": [
+        "高炉本体"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639185,
+      "updated_at": 1788058631.639185
+    },
+    {
+      "id": "con_b76cb6c6",
+      "name": "热风炉",
+      "description": "为高炉鼓入高温热风的蓄热式换热设备",
+      "category": "设备",
+      "aliases": [],
+      "keywords": [
+        "热风炉"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639194,
+      "updated_at": 1788058631.639194
+    },
+    {
+      "id": "con_71e7c260",
+      "name": "喷煤系统",
+      "description": "向高炉喷吹煤粉以部分替代焦炭的节能设备",
+      "category": "设备",
+      "aliases": [
+        "煤粉喷吹"
+      ],
+      "keywords": [
+        "喷煤"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639204,
+      "updated_at": 1788058631.639204
+    },
+    {
+      "id": "con_a84ad5f2",
+      "name": "转炉",
+      "description": "顶吹/底吹氧气炼钢的容器设备",
+      "category": "设备",
+      "aliases": [
+        "氧气顶吹转炉"
+      ],
+      "keywords": [
+        "转炉设备"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639214,
+      "updated_at": 1788058631.639214
+    },
+    {
+      "id": "con_555eee5f",
+      "name": "连铸机",
+      "description": "钢水连铸成坯的核心设备",
+      "category": "设备",
+      "aliases": [],
+      "keywords": [
+        "连铸机"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639223,
+      "updated_at": 1788058631.639223
+    },
+    {
+      "id": "con_4edd9edb",
+      "name": "加热炉",
+      "description": "热轧前将钢坯加热至轧制温度的炉子，消耗煤气/电力",
+      "category": "设备",
+      "aliases": [
+        "轧钢加热炉"
+      ],
+      "keywords": [
+        "加热炉"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639232,
+      "updated_at": 1788058631.639232
+    },
+    {
+      "id": "con_44ab06ab",
+      "name": "轧机",
+      "description": "将钢坯/带钢轧制成形的核心设备",
+      "category": "设备",
+      "aliases": [],
+      "keywords": [
+        "轧机"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639241,
+      "updated_at": 1788058631.639241
+    },
+    {
+      "id": "con_b8823b11",
+      "name": "焦炭",
+      "description": "高炉主要还原剂与热源，由炼焦工序产出",
+      "category": "物料",
+      "aliases": [
+        "冶金焦"
+      ],
+      "keywords": [
+        "焦炭"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.6392498,
+      "updated_at": 1788058631.6392498
+    },
+    {
+      "id": "con_55063e53",
+      "name": "铁矿石",
+      "description": "高炉炼铁的主要原料（含烧结矿/球团矿）",
+      "category": "物料",
+      "aliases": [
+        "矿粉",
+        "烧结矿",
+        "球团"
+      ],
+      "keywords": [
+        "铁矿石",
+        "矿石"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.6392589,
+      "updated_at": 1788058631.6392589
+    },
+    {
+      "id": "con_a43f3ead",
+      "name": "喷吹煤",
+      "description": "经喷煤系统喷入高炉的煤粉，部分替代焦炭",
+      "category": "物料",
+      "aliases": [
+        "煤粉"
+      ],
+      "keywords": [
+        "喷吹煤"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639269,
+      "updated_at": 1788058631.639269
+    },
+    {
+      "id": "con_75c5b4b2",
+      "name": "废钢",
+      "description": "电炉/转炉炼钢的补充原料",
+      "category": "物料",
+      "aliases": [],
+      "keywords": [
+        "废钢"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.6392782,
+      "updated_at": 1788058631.6392782
+    },
+    {
+      "id": "con_c778015a",
+      "name": "生铁",
+      "description": "高炉冶炼产物，转炉炼钢主要原料",
+      "category": "物料",
+      "aliases": [
+        "铁水"
+      ],
+      "keywords": [
+        "生铁",
+        "铁水"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639287,
+      "updated_at": 1788058631.639287
+    },
+    {
+      "id": "con_d12feb76",
+      "name": "粗钢",
+      "description": "转炉/电炉冶炼出的钢水浇铸产物，钢材生产的中间产品",
+      "category": "物料",
+      "aliases": [
+        "钢水"
+      ],
+      "keywords": [
+        "粗钢",
+        "钢水"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639297,
+      "updated_at": 1788058631.639297
+    },
+    {
+      "id": "con_5fbf5e6a",
+      "name": "焦比",
+      "description": "冶炼单位铁水消耗的焦炭量，焦比=焦炭消耗量/铁水产量，单位 kg/t",
+      "category": "指标",
+      "aliases": [
+        "焦炭比"
+      ],
+      "keywords": [
+        "焦比"
+      ],
+      "properties": {
+        "unit": "kg/t",
+        "formula": "焦炭消耗量 / 铁水产量"
+      },
+      "builtin": true,
+      "created_at": 1788058631.6393092,
+      "updated_at": 1788058631.6393092
+    },
+    {
+      "id": "con_536e3704",
+      "name": "燃料比",
+      "description": "冶炼单位铁水消耗的焦炭与喷吹煤折合总量，单位 kg/t",
+      "category": "指标",
+      "aliases": [],
+      "keywords": [
+        "燃料比"
+      ],
+      "properties": {
+        "unit": "kg/t",
+        "formula": "(焦炭消耗量 + 喷吹煤消耗量) / 铁水产量"
+      },
+      "builtin": true,
+      "created_at": 1788058631.6393201,
+      "updated_at": 1788058631.6393201
+    },
+    {
+      "id": "con_de21e066",
+      "name": "综合能耗",
+      "description": "吨钢（或全厂）综合能源消耗，折标准煤，单位 kgce/t",
+      "category": "指标",
+      "aliases": [
+        "吨钢综合能耗"
+      ],
+      "keywords": [
+        "综合能耗",
+        "能耗"
+      ],
+      "properties": {
+        "unit": "kgce/t"
+      },
+      "builtin": true,
+      "created_at": 1788058631.639329,
+      "updated_at": 1788058631.639329
+    },
+    {
+      "id": "con_ca3c9c0d",
+      "name": "工序能耗",
+      "description": "某工序单位产品的能源消耗，如高炉工序能耗",
+      "category": "指标",
+      "aliases": [],
+      "keywords": [
+        "工序能耗"
+      ],
+      "properties": {
+        "unit": "kgce/t"
+      },
+      "builtin": true,
+      "created_at": 1788058631.639339,
+      "updated_at": 1788058631.639339
+    },
+    {
+      "id": "con_e9467d95",
+      "name": "碳排放强度",
+      "description": "单位粗钢产品的 CO2 排放量，强度=总碳排放/粗钢产量，单位 tCO2/t",
+      "category": "指标",
+      "aliases": [
+        "碳强度",
+        "吨钢碳排放"
+      ],
+      "keywords": [
+        "碳排放强度",
+        "碳强度"
+      ],
+      "properties": {
+        "unit": "tCO2/t",
+        "formula": "总碳排放 / 粗钢产量"
+      },
+      "builtin": true,
+      "created_at": 1788058631.639348,
+      "updated_at": 1788058631.639348
+    },
+    {
+      "id": "con_41de8543",
+      "name": "碳排放总量",
+      "description": "一定时期内全厂（或某工序）CO2 排放总量，单位 tCO2",
+      "category": "指标",
+      "aliases": [
+        "总排放"
+      ],
+      "keywords": [
+        "碳排放总量",
+        "总排放"
+      ],
+      "properties": {
+        "unit": "tCO2"
+      },
+      "builtin": true,
+      "created_at": 1788058631.639358,
+      "updated_at": 1788058631.639358
+    },
+    {
+      "id": "con_611213af",
+      "name": "电耗",
+      "description": "单位产品电力消耗，如电炉工序电耗，单位 kWh/t",
+      "category": "指标",
+      "aliases": [],
+      "keywords": [
+        "电耗"
+      ],
+      "properties": {
+        "unit": "kWh/t"
+      },
+      "builtin": true,
+      "created_at": 1788058631.6393669,
+      "updated_at": 1788058631.6393669
+    },
+    {
+      "id": "con_9a3d9b97",
+      "name": "电力",
+      "description": "外购电力，间接碳排放的主要来源",
+      "category": "能源",
+      "aliases": [
+        "外购电",
+        "电"
+      ],
+      "keywords": [
+        "电力",
+        "外购电"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639376,
+      "updated_at": 1788058631.639376
+    },
+    {
+      "id": "con_a09246ad",
+      "name": "高炉煤气",
+      "description": "高炉副产煤气，热值较低，可回收利用",
+      "category": "能源",
+      "aliases": [
+        "BFG"
+      ],
+      "keywords": [
+        "高炉煤气"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639385,
+      "updated_at": 1788058631.639385
+    },
+    {
+      "id": "con_cf2529b5",
+      "name": "转炉煤气",
+      "description": "转炉副产煤气，热值高，可回收利用",
+      "category": "能源",
+      "aliases": [
+        "LDG"
+      ],
+      "keywords": [
+        "转炉煤气"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639394,
+      "updated_at": 1788058631.639394
+    },
+    {
+      "id": "con_03f69409",
+      "name": "焦炉煤气",
+      "description": "炼焦副产煤气，热值高，广泛用于加热炉",
+      "category": "能源",
+      "aliases": [
+        "COG"
+      ],
+      "keywords": [
+        "焦炉煤气"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639403,
+      "updated_at": 1788058631.639403
+    },
+    {
+      "id": "con_7b8d2248",
+      "name": "CO2",
+      "description": "二氧化碳，钢铁行业最主要的温室气体排放物",
+      "category": "排放",
+      "aliases": [
+        "二氧化碳",
+        "碳排放"
+      ],
+      "keywords": [
+        "co2",
+        "二氧化碳"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639461,
+      "updated_at": 1788058631.639461
+    },
+    {
+      "id": "con_2ff422b0",
+      "name": "SO2",
+      "description": "二氧化硫，烧结/焦化工序主要大气污染物",
+      "category": "排放",
+      "aliases": [],
+      "keywords": [
+        "so2",
+        "二氧化硫"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639471,
+      "updated_at": 1788058631.639471
+    },
+    {
+      "id": "con_69a7fefe",
+      "name": "NOx",
+      "description": "氮氧化物，燃烧过程产生的污染物",
+      "category": "排放",
+      "aliases": [],
+      "keywords": [
+        "nox",
+        "氮氧化物"
+      ],
+      "properties": {},
+      "builtin": true,
+      "created_at": 1788058631.639476,
+      "updated_at": 1788058631.639476
+    }
+  ],
+  "relations": [
+    {
+      "id": "rel_75fcb529",
+      "source": "con_1b66561b",
+      "target": "con_577bc628",
+      "type": "属于",
+      "description": "高炉本体是高炉炼铁工序的核心设备",
+      "builtin": true,
+      "created_at": 1788058631.639484,
+      "updated_at": 1788058631.639484
+    },
+    {
+      "id": "rel_b8913b95",
+      "source": "con_b76cb6c6",
+      "target": "con_577bc628",
+      "type": "属于",
+      "description": "热风炉是高炉炼铁工序的配套设备",
+      "builtin": true,
+      "created_at": 1788058631.6394901,
+      "updated_at": 1788058631.6394901
+    },
+    {
+      "id": "rel_1b1d9f33",
+      "source": "con_71e7c260",
+      "target": "con_577bc628",
+      "type": "属于",
+      "description": "喷煤系统属于高炉炼铁工序",
+      "builtin": true,
+      "created_at": 1788058631.639494,
+      "updated_at": 1788058631.639494
+    },
+    {
+      "id": "rel_9d7098f8",
+      "source": "con_a84ad5f2",
+      "target": "con_dcdb813a",
+      "type": "属于",
+      "description": "转炉是转炉炼钢工序的核心设备",
+      "builtin": true,
+      "created_at": 1788058631.639497,
+      "updated_at": 1788058631.639497
+    },
+    {
+      "id": "rel_41e2e322",
+      "source": "con_555eee5f",
+      "target": "con_7bfb10a8",
+      "type": "属于",
+      "description": "连铸机是连铸工序的核心设备",
+      "builtin": true,
+      "created_at": 1788058631.639501,
+      "updated_at": 1788058631.639501
+    },
+    {
+      "id": "rel_cc9b329f",
+      "source": "con_4edd9edb",
+      "target": "con_82c33b69",
+      "type": "属于",
+      "description": "加热炉属于热轧工序",
+      "builtin": true,
+      "created_at": 1788058631.639505,
+      "updated_at": 1788058631.639505
+    },
+    {
+      "id": "rel_4de23011",
+      "source": "con_44ab06ab",
+      "target": "con_82c33b69",
+      "type": "属于",
+      "description": "轧机属于热轧工序",
+      "builtin": true,
+      "created_at": 1788058631.639509,
+      "updated_at": 1788058631.639509
+    },
+    {
+      "id": "rel_a4a5b745",
+      "source": "con_577bc628",
+      "target": "con_5fbf5e6a",
+      "type": "包含",
+      "description": "高炉炼铁工序的关键指标包括焦比",
+      "builtin": true,
+      "created_at": 1788058631.639512,
+      "updated_at": 1788058631.639512
+    },
+    {
+      "id": "rel_9e78eefa",
+      "source": "con_577bc628",
+      "target": "con_536e3704",
+      "type": "包含",
+      "description": "高炉炼铁工序的关键指标包括燃料比",
+      "builtin": true,
+      "created_at": 1788058631.6395159,
+      "updated_at": 1788058631.6395159
+    },
+    {
+      "id": "rel_cf4ad2dc",
+      "source": "con_dcdb813a",
+      "target": "con_611213af",
+      "type": "包含",
+      "description": "转炉炼钢涉及电耗指标",
+      "builtin": true,
+      "created_at": 1788058631.639519,
+      "updated_at": 1788058631.639519
+    },
+    {
+      "id": "rel_1b0576f7",
+      "source": "con_88d11625",
+      "target": "con_611213af",
+      "type": "包含",
+      "description": "电炉炼钢的关键指标是电耗",
+      "builtin": true,
+      "created_at": 1788058631.639523,
+      "updated_at": 1788058631.639523
+    },
+    {
+      "id": "rel_e7a2fd99",
+      "source": "con_577bc628",
+      "target": "con_b8823b11",
+      "type": "消耗",
+      "description": "高炉炼铁消耗焦炭作为还原剂与热源",
+      "builtin": true,
+      "created_at": 1788058631.639526,
+      "updated_at": 1788058631.639526
+    },
+    {
+      "id": "rel_640db53f",
+      "source": "con_577bc628",
+      "target": "con_55063e53",
+      "type": "消耗",
+      "description": "高炉炼铁消耗铁矿石",
+      "builtin": true,
+      "created_at": 1788058631.63953,
+      "updated_at": 1788058631.63953
+    },
+    {
+      "id": "rel_776dde69",
+      "source": "con_577bc628",
+      "target": "con_a43f3ead",
+      "type": "消耗",
+      "description": "高炉炼铁喷吹煤粉以替代部分焦炭",
+      "builtin": true,
+      "created_at": 1788058631.639534,
+      "updated_at": 1788058631.639534
+    },
+    {
+      "id": "rel_353ac7b2",
+      "source": "con_577bc628",
+      "target": "con_9a3d9b97",
+      "type": "消耗",
+      "description": "高炉炼铁消耗电力（鼓风/上料等）",
+      "builtin": true,
+      "created_at": 1788058631.6395369,
+      "updated_at": 1788058631.6395369
+    },
+    {
+      "id": "rel_eeba84c7",
+      "source": "con_88d11625",
+      "target": "con_9a3d9b97",
+      "type": "消耗",
+      "description": "电炉炼钢主要消耗电力",
+      "builtin": true,
+      "created_at": 1788058631.63954,
+      "updated_at": 1788058631.63954
+    },
+    {
+      "id": "rel_27635235",
+      "source": "con_88d11625",
+      "target": "con_75c5b4b2",
+      "type": "消耗",
+      "description": "电炉炼钢以废钢为主要原料",
+      "builtin": true,
+      "created_at": 1788058631.639544,
+      "updated_at": 1788058631.639544
+    },
+    {
+      "id": "rel_151a3017",
+      "source": "con_82c33b69",
+      "target": "con_03f69409",
+      "type": "消耗",
+      "description": "热轧加热炉消耗焦炉煤气",
+      "builtin": true,
+      "created_at": 1788058631.6395478,
+      "updated_at": 1788058631.6395478
+    },
+    {
+      "id": "rel_ed15e1a6",
+      "source": "con_82c33b69",
+      "target": "con_9a3d9b97",
+      "type": "消耗",
+      "description": "热轧工序轧机消耗电力",
+      "builtin": true,
+      "created_at": 1788058631.639551,
+      "updated_at": 1788058631.639551
+    },
+    {
+      "id": "rel_30f94911",
+      "source": "con_577bc628",
+      "target": "con_c778015a",
+      "type": "产出",
+      "description": "高炉炼铁产出生铁（铁水）",
+      "builtin": true,
+      "created_at": 1788058631.639554,
+      "updated_at": 1788058631.639554
+    },
+    {
+      "id": "rel_c9e29b32",
+      "source": "con_dcdb813a",
+      "target": "con_d12feb76",
+      "type": "产出",
+      "description": "转炉炼钢产出粗钢",
+      "builtin": true,
+      "created_at": 1788058631.6395578,
+      "updated_at": 1788058631.6395578
+    },
+    {
+      "id": "rel_9a951f0d",
+      "source": "con_ef719f5a",
+      "target": "con_b8823b11",
+      "type": "产出",
+      "description": "炼焦工序产出焦炭",
+      "builtin": true,
+      "created_at": 1788058631.639561,
+      "updated_at": 1788058631.639561
+    },
+    {
+      "id": "rel_4ef9edd7",
+      "source": "con_ef719f5a",
+      "target": "con_03f69409",
+      "type": "产出",
+      "description": "炼焦工序副产焦炉煤气",
+      "builtin": true,
+      "created_at": 1788058631.6395662,
+      "updated_at": 1788058631.6395662
+    },
+    {
+      "id": "rel_55d36968",
+      "source": "con_577bc628",
+      "target": "con_a09246ad",
+      "type": "产出",
+      "description": "高炉副产高炉煤气",
+      "builtin": true,
+      "created_at": 1788058631.6395688,
+      "updated_at": 1788058631.6395688
+    },
+    {
+      "id": "rel_1d6da32d",
+      "source": "con_dcdb813a",
+      "target": "con_cf2529b5",
+      "type": "产出",
+      "description": "转炉副产转炉煤气",
+      "builtin": true,
+      "created_at": 1788058631.639573,
+      "updated_at": 1788058631.639573
+    },
+    {
+      "id": "rel_7c094c80",
+      "source": "con_577bc628",
+      "target": "con_7b8d2248",
+      "type": "排放",
+      "description": "高炉炼铁是钢铁厂最大 CO2 排放源",
+      "builtin": true,
+      "created_at": 1788058631.6395772,
+      "updated_at": 1788058631.6395772
+    },
+    {
+      "id": "rel_1861c64b",
+      "source": "con_a3b01805",
+      "target": "con_2ff422b0",
+      "type": "排放",
+      "description": "烧结工序排放 SO2",
+      "builtin": true,
+      "created_at": 1788058631.639581,
+      "updated_at": 1788058631.639581
+    },
+    {
+      "id": "rel_4a9acce9",
+      "source": "con_a3b01805",
+      "target": "con_7b8d2248",
+      "type": "排放",
+      "description": "烧结工序排放 CO2",
+      "builtin": true,
+      "created_at": 1788058631.639585,
+      "updated_at": 1788058631.639585
+    },
+    {
+      "id": "rel_d64c024b",
+      "source": "con_ef719f5a",
+      "target": "con_2ff422b0",
+      "type": "排放",
+      "description": "炼焦工序排放 SO2",
+      "builtin": true,
+      "created_at": 1788058631.639588,
+      "updated_at": 1788058631.639588
+    },
+    {
+      "id": "rel_d0faec9e",
+      "source": "con_dcdb813a",
+      "target": "con_7b8d2248",
+      "type": "排放",
+      "description": "转炉炼钢排放 CO2",
+      "builtin": true,
+      "created_at": 1788058631.639591,
+      "updated_at": 1788058631.639591
+    },
+    {
+      "id": "rel_db512f03",
+      "source": "con_82c33b69",
+      "target": "con_7b8d2248",
+      "type": "排放",
+      "description": "热轧加热炉燃烧煤气排放 CO2",
+      "builtin": true,
+      "created_at": 1788058631.639595,
+      "updated_at": 1788058631.639595
+    },
+    {
+      "id": "rel_933b448c",
+      "source": "con_5fbf5e6a",
+      "target": "con_e9467d95",
+      "type": "影响",
+      "description": "焦比越高，炼铁工序碳排放强度越高",
+      "builtin": true,
+      "created_at": 1788058631.6395981,
+      "updated_at": 1788058631.6395981
+    },
+    {
+      "id": "rel_efbfefae",
+      "source": "con_536e3704",
+      "target": "con_de21e066",
+      "type": "影响",
+      "description": "燃料比直接影响炼铁工序能耗",
+      "builtin": true,
+      "created_at": 1788058631.639602,
+      "updated_at": 1788058631.639602
+    },
+    {
+      "id": "rel_c4327403",
+      "source": "con_a43f3ead",
+      "target": "con_5fbf5e6a",
+      "type": "影响",
+      "description": "提高喷煤比可降低焦比",
+      "builtin": true,
+      "created_at": 1788058631.639605,
+      "updated_at": 1788058631.639605
+    },
+    {
+      "id": "rel_5b5f493f",
+      "source": "con_a09246ad",
+      "target": "con_de21e066",
+      "type": "影响",
+      "description": "副产煤气回收利用可降低全厂综合能耗",
+      "builtin": true,
+      "created_at": 1788058631.639609,
+      "updated_at": 1788058631.639609
+    }
+  ],
+  "rules": [
+    {
+      "id": "rule_ea6bca0e",
+      "name": "焦比定义与计算",
+      "description": "焦比是冶炼单位铁水消耗的焦炭量，计算公式：焦比 = 焦炭消耗量 / 铁水产量。焦比越低代表炼铁燃料效率越高。",
+      "keywords": [
+        "焦比",
+        "焦炭比",
+        "焦炭消耗",
+        "怎么算焦比",
+        "如何计算焦比"
+      ],
+      "if_question": "用户询问焦比的定义、计算方式或数值水平",
+      "conclusion": "焦比 = 焦炭消耗量 / 铁水产量（kg/t），是衡量炼铁燃料效率的核心指标。",
+      "answer_template": "焦比是炼铁工序的关键经济指标，表示冶炼 1 吨铁水消耗的焦炭量。\n计算公式：**焦比 = 焦炭消耗量 ÷ 铁水产量**，单位 kg/t。\n焦比越低，说明喷煤、精料等降焦措施效果越好，燃料成本与碳排放也越低。",
+      "can_answer": true,
+      "source": "seed",
+      "builtin": true,
+      "created_at": 1788058631.639616,
+      "updated_at": 1788058631.639616
+    },
+    {
+      "id": "rule_8674ad33",
+      "name": "碳排放强度定义",
+      "description": "碳排放强度 = 总碳排放 / 粗钢产量（tCO2/t），是衡量吨钢碳排放水平的核心指标，可直接用实时数据计算。",
+      "keywords": [
+        "碳排放强度",
+        "碳强度",
+        "吨钢碳排放",
+        "怎么算碳排放",
+        "如何计算碳强度"
+      ],
+      "if_question": "用户询问碳排放强度、吨钢碳排放的定义或计算",
+      "conclusion": "碳排放强度 = 总碳排放 / 粗钢产量（tCO2/t）。",
+      "answer_template": "碳排放强度表示每生产 1 吨粗钢产生的 CO2 排放量：\n**碳排放强度 = 总碳排放 ÷ 粗钢产量**，单位 tCO2/t。\n若要查看当前实时值，可调用实时设备/仿真技能获取最新数据后计算。",
+      "can_answer": true,
+      "source": "seed",
+      "builtin": true,
+      "created_at": 1788058631.639621,
+      "updated_at": 1788058631.639621
+    },
+    {
+      "id": "rule_59ad9610",
+      "name": "综合能耗与工序能耗",
+      "description": "综合能耗是全厂/吨钢总能源消耗（kgce/t）；工序能耗是某工序单位产品的能耗。高炉炼铁、烧结是能耗与碳排大户。",
+      "keywords": [
+        "综合能耗",
+        "工序能耗",
+        "能耗",
+        "吨钢能耗",
+        "能耗构成"
+      ],
+      "if_question": "用户询问综合能耗/工序能耗的定义或哪道工序能耗高",
+      "conclusion": "综合能耗为吨钢总能耗（kgce/t）；长流程中高炉炼铁与烧结工序能耗占比最高。",
+      "answer_template": "综合能耗指全厂吨钢能源消耗总量（kgce/t）；工序能耗指单个工序单位产品的能耗。\n在长流程（高炉-转炉）中，**高炉炼铁、烧结**的能耗与碳排放占比最高。\n可调用「仿真」或「实时设备」技能获取各工序能耗与排放数据。",
+      "can_answer": true,
+      "source": "seed",
+      "builtin": true,
+      "created_at": 1788058631.639625,
+      "updated_at": 1788058631.639625
+    },
+    {
+      "id": "rule_e7a55493",
+      "name": "降碳路径（喷煤替代焦炭）",
+      "description": "提高喷煤比以部分替代焦炭（焦炭碳排放系数高于煤粉），可降低焦比与碳排放强度。",
+      "keywords": [
+        "降碳",
+        "减排",
+        "降焦比",
+        "怎么降碳",
+        "如何减排",
+        "低碳"
+      ],
+      "if_question": "用户询问如何降低碳排放/焦比",
+      "conclusion": "提高喷煤比替代焦炭、提升副产煤气回收利用率是长流程主要降碳路径。",
+      "answer_template": "钢铁长流程主要降碳路径包括：\n1. **提高喷煤比**：用煤粉部分替代焦炭，降低焦比与燃料成本；\n2. **副产煤气回收利用**：高炉/转炉/焦炉煤气回用于加热炉，减少外购能源；\n3. **废钢短流程**：电炉炼钢（废钢+电）碳排放强度远低于长流程；\n4. **电气化与绿电**：提升电炉比例、采购绿电降低间接排放。",
+      "can_answer": true,
+      "source": "seed",
+      "builtin": true,
+      "created_at": 1788058631.6396291,
+      "updated_at": 1788058631.6396291
+    },
+    {
+      "id": "rule_443289fe",
+      "name": "设备能耗构成",
+      "description": "转炉炼钢与电炉炼钢的主要能耗均为电力；热轧主要消耗煤气（加热炉）与电力（轧机）。",
+      "keywords": [
+        "电耗",
+        "转炉能耗",
+        "电炉能耗",
+        "热轧能耗",
+        "哪个设备耗电"
+      ],
+      "if_question": "用户询问设备/工序的能耗（电耗）构成",
+      "conclusion": "电炉/转炉以电力为主，热轧为煤气+电力。",
+      "answer_template": "各工序主要能耗构成：\n- **电炉炼钢**：以电力为主（电弧加热），电耗指标高；\n- **转炉炼钢**：以电力+氧气为主，电耗指标相对低；\n- **热轧**：加热炉消耗煤气（焦炉/高炉/转炉煤气），轧机消耗电力。",
+      "can_answer": true,
+      "source": "seed",
+      "builtin": true,
+      "created_at": 1788058631.639633,
+      "updated_at": 1788058631.639633
+    },
+    {
+      "id": "rule_c2772d44",
+      "name": "副产煤气回收",
+      "description": "高炉煤气（BFG）、转炉煤气（LDG）、焦炉煤气（COG）为钢铁厂三大副产煤气，回收利用可显著降低能耗与外购能源。",
+      "keywords": [
+        "煤气",
+        "副产煤气",
+        "回收",
+        "bfg",
+        "ldg",
+        "cog"
+      ],
+      "if_question": "用户询问副产煤气种类或回收利用",
+      "conclusion": "三大副产煤气：BFG（高炉）、LDG（转炉）、COG（焦炉），回收利用是节能关键。",
+      "answer_template": "钢铁厂三大副产煤气：\n1. **高炉煤气（BFG）**：热值低、产量大，高炉工序副产；\n2. **转炉煤气（LDG）**：热值高，转炉工序副产；\n3. **焦炉煤气（COG）**：热值最高，炼焦工序副产。\n回收利用于加热炉等可替代外购燃料，显著降低全厂综合能耗与成本。",
+      "can_answer": true,
+      "source": "seed",
+      "builtin": true,
+      "created_at": 1788058631.639637,
+      "updated_at": 1788058631.639637
+    },
+    {
+      "id": "rule_f3d63a81",
+      "name": "长流程 vs 短流程",
+      "description": "长流程（高炉-转炉）以铁矿石为原料碳排放高；短流程（电炉-废钢）碳排放约为长流程的 1/3，是低碳转型方向。",
+      "keywords": [
+        "长流程",
+        "短流程",
+        "电炉",
+        "转炉",
+        "碳排放对比"
+      ],
+      "if_question": "用户询问长流程/短流程的碳排放对比",
+      "conclusion": "短流程（电炉+废钢）吨钢碳排放约为长流程（高炉+转炉）的 1/3。",
+      "answer_template": "钢铁两种主要工艺流程碳排放差异很大：\n1. **长流程（高炉-转炉）**：以铁矿石为原料，焦炭还原过程排放大量 CO2，吨钢碳排放高；\n2. **短流程（电炉-废钢）**：以废钢为原料、电弧加热，吨钢碳排放约为长流程的 1/3。\n提高电炉钢比例（废钢资源化）是钢铁行业碳达峰的关键路径。",
+      "can_answer": true,
+      "source": "seed",
+      "builtin": true,
+      "created_at": 1788058631.639641,
+      "updated_at": 1788058631.639641
+    },
+    {
+      "id": "rule_d608ad40",
+      "name": "工序排放源定位",
+      "description": "识别各工序主要排放源：高炉炼铁排放 CO2 最多；烧结排放 SO2 与 CO2；炼焦排放 SO2；转炉/热轧排放 CO2。",
+      "keywords": [
+        "排放源",
+        "哪个工序排放",
+        "co2 排放",
+        "污染来源"
+      ],
+      "if_question": "用户询问哪道工序/设备排放最多或排放源构成",
+      "conclusion": "高炉炼铁是全厂最大 CO2 排放源；烧结/焦化是 SO2 主要来源。",
+      "answer_template": "各工序主要排放源：\n- **CO2**：高炉炼铁（最大）、烧结、转炉炼钢、热轧（加热炉）；\n- **SO2**：烧结、炼焦；\n- **NOx**：各类燃烧过程（加热炉、烧结机头）。\n如需精确数值，可调用实时设备/仿真技能查看各工序当前排放。",
+      "can_answer": true,
+      "source": "seed",
+      "builtin": true,
+      "created_at": 1788058631.6396449,
+      "updated_at": 1788058631.6396449
+    }
+  ],
+  "updated_at": 1788058631.639703
+}

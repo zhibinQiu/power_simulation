@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>工业能碳智控平台 | 能碳一体化数字孪生平台</title>
+<title>工业能碳智控平台 v2.0.0 | 能碳一体化数字孪生平台</title>
 <link rel="icon" href="assets/网页角标.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;800&family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
@@ -133,6 +133,7 @@ body.compact .nav-item > a{padding:.38em .82em;font-size:1.6rem}
 .hero-visual img{position:absolute;right:17%;top:50%;transform:translateY(-50%);width:26.8rem;border-radius:23%;box-shadow:0 3.4rem 9rem rgba(0,0,0,.65),0 0 6rem rgba(47,92,255,.22)}
 .hero > .wrap{width:min(calc(100% - 6.4rem),var(--w-wide));position:relative;z-index:2;flex:1;display:flex;flex-direction:column;justify-content:center;padding-top:5.6rem;padding-bottom:6.4rem}
 .hero h1{color:#fff;font-size:4.6rem;font-weight:300;letter-spacing:-.01em;margin-bottom:2rem}
+.hero-ver{display:inline-block;vertical-align:middle;margin-left:1.4rem;font-size:1.9rem;font-weight:700;letter-spacing:.08em;color:var(--yellow);background:rgba(255,183,27,.1);border:1px solid rgba(255,183,27,.45);border-radius:9rem;padding:.35rem 1.2rem;transform:translateY(-.12em);white-space:nowrap}
 .hero h2{color:#fff;font-size:2.8rem;font-weight:700;line-height:1.35;max-width:60rem;margin-bottom:2rem}
 .hero p{font-size:1.6rem;color:#d5d5d5;max-width:52rem}
 .hero-cta{margin-top:3.2rem;display:flex;gap:1.6rem}
@@ -158,14 +159,6 @@ body.compact .nav-item > a{padding:.38em .82em;font-size:1.6rem}
 
 /* ============ 简介（图左文右） ============ */
 .split{display:grid;grid-template-columns:1fr 1fr;gap:6.4rem;align-items:center}
-#ov-intro .split > div > img{cursor:zoom-in;transition:filter .2s}
-#ov-intro .split > div > img:hover{filter:brightness(1.04)}
-.intro-copy .h2{font-size:3.8rem;margin-bottom:2.2rem}
-.intro-copy p{font-size:1.6rem;color:var(--body)}
-.intro-copy p+p{margin-top:1.4rem}
-.check-grid{margin-top:3rem;display:grid;grid-template-columns:1fr 1fr;gap:2rem 2.8rem}
-.check-grid li{display:flex;gap:1.4rem;align-items:flex-start;font-size:1.55rem;font-family:var(--f-head);font-weight:600;line-height:1.5}
-.check-grid li img{flex:none;width:2.6rem;height:2.6rem;margin-top:0.1rem}
 
 /* ============ 产品灰卡 ============ */
 .prod-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:2.6rem;margin-top:4rem}
@@ -175,7 +168,7 @@ body.compact .nav-item > a{padding:.38em .82em;font-size:1.6rem}
 .prod-card .pimg img:hover{filter:brightness(1.04)}
 .prod-card h3{font-size:1.9rem;font-weight:600;margin-bottom:0.6rem}
 .prod-card .cat{font-size:1.3rem;color:#8a8a8a;font-family:var(--f-head);margin-bottom:1.6rem}
-.prod-card .picon{margin-bottom:1.6rem}
+
 .prod-card p{font-size:1.45rem;color:var(--body)}
 .prod-card ul{margin-top:1.6rem;font-size:1.4rem;color:var(--ink)}
 .prod-card ul li{padding-left:1.8rem;position:relative;margin-bottom:0.7rem}
@@ -224,6 +217,25 @@ body.compact .nav-item > a{padding:.38em .82em;font-size:1.6rem}
 .lightbox .lb-close{position:absolute;top:2.2rem;right: 2.6rem;width:4.6rem;height:4.6rem;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:2.6rem;border:none;cursor:pointer;display:grid;place-items:center}
 .lightbox .lb-close:hover{background:rgba(255,255,255,.26)}
 .acc-body p+p{margin-top:1rem}
+
+/* ============ 平台愿景 ============ */
+.vision-head{text-align:center;margin-bottom:4rem}
+.vision-head .h2{margin-bottom:1.2rem}
+.vision-head p{font-family:var(--f-head);font-size:1.9rem;font-weight:600;color:var(--yellow)}
+.vision-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:2.6rem}
+.vision-card{background:var(--card);padding:3rem 2.8rem;border-top:0.5rem solid var(--yellow);box-shadow:0 0.6rem 2rem rgba(21,22,23,.06);transition:.25s}
+.vision-card:hover{box-shadow:0 1.4rem 3.4rem rgba(21,22,23,.12);transform:translateY(-0.4rem)}
+.vision-card h3{font-size:2.2rem;font-weight:700;margin-bottom:1.2rem}
+.vision-card p{font-size:1.5rem;line-height:1.9;color:var(--body)}
+@media(max-width:1080px){.vision-cards{grid-template-columns:1fr}}
+
+/* ============ 前沿技术 ============ */
+.tech-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2rem;margin-top:3.6rem}
+.tech-item{background:#fff;border:0.1rem solid var(--line);padding:2.4rem 2.2rem;transition:.25s}
+.tech-item:hover{border-color:var(--yellow);box-shadow:0 1rem 2.6rem rgba(21,22,23,.08);transform:translateY(-0.3rem)}
+.tech-item h3{font-size:1.65rem;font-weight:700;margin-bottom:1rem;padding-left:1.2rem;border-left:0.4rem solid var(--yellow)}
+.tech-item p{font-size:1.4rem;line-height:1.8;color:var(--body)}
+@media(max-width:1080px){.tech-grid{grid-template-columns:1fr 1fr}}
 
 /* ============ FAQ（双列） ============ */
 .faq-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 5.6rem;margin-top:3.6rem}
@@ -320,10 +332,11 @@ footer ul a:hover{color:#fff}
     </a>
     <nav class="main">
       <div class="nav-item">
-        <a href="#ov-intro" data-tab="0">产品与服务 <span class="caret">▾</span></a>
+        <a href="#ov-products" data-tab="0">产品与服务 <span class="caret">▾</span></a>
         <div class="nav-drop">
-          <a href="#ov-intro" data-tab="0">产品概览 <small>OVERVIEW</small></a>
+          <a href="#ov-vision" data-tab="0">平台愿景 <small>VISION</small></a>
           <a href="#ov-products" data-tab="0">产品模块 <small>PRODUCTS</small></a>
+          <a href="#ov-tech" data-tab="0">前沿技术 <small>TECH</small></a>
           <a href="#cap-features" data-tab="1">八大能力 <small>CAPABILITIES</small></a>
           <a href="#cta" data-tab="0">预约演示 <small>TRIAL</small></a>
         </div>
@@ -332,8 +345,6 @@ footer ul a:hover{color:#fff}
         <a href="#res-root" data-tab="2">学习 <span class="caret">▾</span></a>
         <div class="nav-drop">
           <a href="#res-root" data-tab="2">网络研讨会 <small>WEBINARS</small></a>
-          <a href="#res-root" data-tab="2">培训课程 <small>TRAINING</small></a>
-          <a href="#res-root" data-tab="2">视频中心 <small>VIDEOS</small></a>
           <a href="#res-root" data-tab="2">精选文章 <small>ARTICLES</small></a>
         </div>
       </div>
@@ -369,9 +380,10 @@ footer ul a:hover{color:#fff}
   <button class="menu-close" id="menuClose" aria-label="关闭">×</button>
   <div class="wrap">
     <ul class="menu-links">
-      <li><a href="#ov-intro" data-tab="0">产品概览 <small>OVERVIEW</small></a></li>
+      <li><a href="#ov-vision" data-tab="0">平台愿景 <small>VISION</small></a></li>
       <li><a href="#cap-features" data-tab="1">八大能力 <small>CAPABILITIES</small></a></li>
       <li><a href="#ov-products" data-tab="0">产品模块 <small>PRODUCTS</small></a></li>
+      <li><a href="#ov-tech" data-tab="0">前沿技术 <small>TECH</small></a></li>
       <li><a href="#ov-faq" data-tab="0">常见问题 <small>FAQ</small></a></li>
       <li><a href="#res-root" data-tab="2">资源与活动 <small>RESOURCES</small></a></li>
       <li><a href="#cta" data-tab="0">联系我们 <small>CONTACT</small></a></li>
@@ -386,7 +398,7 @@ footer ul a:hover{color:#fff}
 <!-- ================= Hero ================= -->
 <section class="hero" id="top">
   <div class="wrap">
-    <h1>工业能碳智控平台</h1>
+    <h1>工业能碳智控平台 <span class="hero-ver">v2.0.0</span></h1>
     <h2>一位懂能、懂碳、懂市场的「数字专家」</h2>
     <p>从数据采集、三维孪生到仿真寻优与自动控制，轻松管理您的整个「数字工厂」。</p>
     <div class="hero-cta">
@@ -397,8 +409,6 @@ footer ul a:hover{color:#fff}
   <div class="hero-visual">
     <div class="glow hg1"></div>
     <div class="glow hg2"></div>
-    <div class="glow hg3"></div>
-    <div class="glow hg4"></div>
     <img src="assets/工业能碳智控平台应用图标.svg" alt="工业能碳智控平台应用图标">
   </div>
 </section>
@@ -413,22 +423,22 @@ footer ul a:hover{color:#fff}
 <!-- ================= Tab 1：概览 ================= -->
 <div class="tab-panel active" id="panel-0">
 
-  <!-- 简介：图左文右 -->
-  <section class="sec" id="ov-intro" style="padding-top:4rem">
-    <div class="wrap split">
-      <div>
-        <img src="assets/工业能碳智控平台-电脑框截图.svg" alt="平台工艺编排界面">
-      </div>
-      <div class="intro-copy">
-        <h2 class="h2">工业能碳智控平台：<br>让更优决策在此诞生</h2>
-        <p>要验证您的调度想法，往往需要提供真实工况的测试。工业能碳智控平台让您跨工序集成数据，更高效地创建更精准的能碳模型。</p>
-        <p>平台通过将所有能碳数据汇聚于一处，让更明智的经营决策变得更加容易。</p>
-        <ul class="check-grid">
-          <li><img src="assets/check-icon.svg" alt="">轻松管理全厂能源、碳排与成本数据</li>
-          <li><img src="assets/check-icon.svg" alt="">在单一界面中集成多工序分析</li>
-          <li><img src="assets/check-icon.svg" alt="">自动化数据传递，节省核算时间</li>
-          <li><img src="assets/check-icon.svg" alt="">创建更高保真度的能碳模型</li>
-        </ul>
+  <!-- 平台愿景 -->
+  <section class="sec" id="ov-vision" style="padding-top:4rem">
+    <div class="wrap">
+      <div class="vision-cards">
+        <div class="vision-card">
+          <h3>低耗能</h3>
+          <p>用 AI 的「精打细算」代替设备的「大拆大换」，同样的产量，烧得更少、耗得更低。</p>
+        </div>
+        <div class="vision-card">
+          <h3>低碳</h3>
+          <p>每一次生产决策都算得清碳、降得下碳，能耗、碳排与成本同步优化。</p>
+        </div>
+        <div class="vision-card">
+          <h3>保护地球</h3>
+          <p>面向钢铁、水泥、化工、有色等控排行业及更多高耗能行业，让绿色转型触手可及。</p>
+        </div>
       </div>
     </div>
   </section>
@@ -437,43 +447,73 @@ footer ul a:hover{color:#fff}
   <section class="sec" id="ov-products" style="padding-top:0">
     <div class="wrap">
       <h2 class="h2">产品</h2>
-      <p style="margin-top:1.6rem;font-size:1.6rem;color:var(--body);max-width:64rem">工业能碳智控平台以「云边协同」架构交付，软硬件模块自动连接，数据实现无缝通信。</p>
+      <p style="margin-top:1.6rem;font-size:1.6rem;color:var(--body);max-width:64rem">「云边协同」架构交付，软硬件模块自动连接，数据无缝通信。</p>
       <div class="prod-cards">
         <div class="prod-card">
           <div class="pimg"><img src="assets/工业能碳智控平台-电脑框-工艺流程3D.svg" alt="数字孪生引擎界面"></div>
           <h3>数字孪生引擎</h3>
           <div class="cat">平台模块</div>
-          <div class="picon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#151617" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l5 3V8l5 3V8l6 4v9H4z"/><path d="M8 17h2M13 17h2"/></svg></div>
-          <p>通过一套三维数字孪生解决方案，提供全厂 20 多种工序设备的真实比例呈现，满足全厂工艺可视化需求。</p>
-          <ul>
-            <li>物料流与能流颜色可视</li>
-            <li>拖拽式工艺流程自搭</li>
-            <li>设备信息量身定制</li>
-          </ul>
+          <p>全厂 20+ 工序设备真实比例三维呈现，物料流与能流颜色可视，拖拽即可自搭工艺流程。</p>
         </div>
         <div class="prod-card">
           <div class="pimg"><img src="assets/工业能碳智控平台-电脑框-高炉仿真分析.svg" alt=""></div>
           <h3>能碳仿真寻优</h3>
           <div class="cat">平台模块</div>
-          <div class="picon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#151617" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg></div>
-          <p>使用零风险仿真沙盒与工序AI模型，大量策略模板和知识库使复杂寻优具有极大的可扩展性。</p>
-          <ul>
-            <li>改前改后效益对比</li>
-            <li>自然语言下达指令</li>
-            <li>三账合一自动核算</li>
-          </ul>
+          <p>零风险仿真沙盒 + 工序 AI 模型，策略调整即点即得，改前改后效益一目了然。</p>
+        </div>
+        <div class="prod-card">
+          <div class="pimg"><img src="assets/工业能碳智控平台-电脑框-策略分析.svg" alt=""></div>
+          <h3>本析智擎</h3>
+          <div class="cat">AI 智能助手</div>
+          <p>多智能体 AI 助手，自然语言直达设备数据、工艺仿真与碳市场行情，支持 MCP 双向接入。</p>
         </div>
         <div class="prod-card">
           <div class="pimg"><img src="assets/能碳一体机.svg" alt=""></div>
           <h3>能碳一体机</h3>
           <div class="cat">边缘硬件</div>
-          <div class="picon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#151617" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></div>
-          <p>部署在工厂现场的智能感知设备，以「不打扰、不改造」的接入能力著称，是连接真实工厂与数字工厂的桥梁。</p>
-          <ul>
-            <li>旁路接入现有系统</li>
-            <li>直连现场计量设备</li>
-            <li>断网续传不丢数据</li>
-          </ul>
+          <p>工厂现场智能感知设备，「不打扰、不改造」接入，断网续传不丢数据。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 前沿技术 -->
+  <section class="sec" id="ov-tech" style="padding-top:0">
+    <div class="wrap">
+      <h2 class="h2">前沿技术</h2>
+      <p style="margin-top:1.6rem;font-size:1.6rem;color:var(--body);max-width:64rem">以云边协同、AI 与实时数据技术为底座。</p>
+      <div class="tech-grid">
+        <div class="tech-item">
+          <h3>云边协同 · KubeEdge</h3>
+          <p>云端统一管理，边缘就近采集，AI 模型远程下发，断网不丢数据。</p>
+        </div>
+        <div class="tech-item">
+          <h3>3D 数字孪生</h3>
+          <p>全厂 20+ 工序设备真实比例建模，热力着色与物流粒子实时呈现。</p>
+        </div>
+        <div class="tech-item">
+          <h3>AI 优化模型引擎</h3>
+          <p>GA / PSO / RL / 时序预测 / 聚类五套在线模型自学习寻优。</p>
+        </div>
+        <div class="tech-item">
+          <h3>LLM 智能体</h3>
+          <p>自然语言策略解析、AI 分析报告与知识库，听得懂、说得出、做得到。</p>
+        </div>
+        <div class="tech-item">
+          <h3>碳市场行情感知</h3>
+          <p>CEA / CCER 实时行情自动获取，价格趋势智能预测。</p>
+        </div>
+        <div class="tech-item">
+          <h3>实时遥测</h3>
+          <p>MQTT + WebSocket 秒级推送，真实读数驱动数字工厂同步。</p>
+        </div>
+        <div class="tech-item">
+          <h3>时序数据库</h3>
+          <p>TDengine 云端落盘历史数据，支撑深度分析与趋势回放。</p>
+        </div>
+        <div class="tech-item">
+          <h3>三级安全防护</h3>
+          <p>参数边界 / 耦合一致性 / 执行确认，决策权始终在人。</p>
         </div>
       </div>
     </div>
@@ -486,27 +526,31 @@ footer ul a:hover{color:#fff}
       <div class="faq-grid">
         <div class="faq-item">
           <button class="faq-q">什么是工业能碳智控平台？<span class="pm"></span></button>
-          <div class="faq-a"><p>工业能碳智控平台是连接「真实工厂」与「数字工厂」的能碳一体化管理平台。平台将工厂全要素数字化后，AI 智能体便拥有可持续感知与行动的「身体」：三维孪生看清全厂能流与碳流，仿真沙盒支持零风险试错，优化策略可在三级安全防护下自动下发执行。</p></div>
+          <div class="faq-a"><p>连接「真实工厂」与「数字工厂」的能碳一体化管理平台：三维孪生看清全厂能流碳流，仿真沙盒零风险试错，优化策略在三级安全防护下执行。</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">「本析智擎」是什么？能做什么？<span class="pm"></span></button>
+          <div class="faq-a"><p>平台内置的多智能体 AI 助手，可调用设备数据、工艺仿真、碳市场行情与知识库，支持 MCP 双向接入。机器给建议，人做决定。</p></div>
         </div>
         <div class="faq-item">
           <button class="faq-q">平台如何接入我厂现有的数据系统？<span class="pm"></span></button>
-          <div class="faq-a"><p>通过自主研发的能碳一体机，提供两大接入方式：一是「不打扰、不改造」的旁路接入，对接企业已有的计量系统与数据中心；二是直接连接电表、气表、流量计、传感器等现场设备。两种方式均支持断网续传，确保数据连续、及时、可信。</p></div>
+          <div class="faq-a"><p>通过能碳一体机：旁路对接现有计量系统，或直连电表、气表、流量计等现场设备，均支持断网续传。</p></div>
         </div>
         <div class="faq-item">
           <button class="faq-q">仿真调整会影响真实生产吗？<span class="pm"></span></button>
-          <div class="faq-a"><p>不会。平台提供零风险仿真沙盒：仿真模式下随意调整、反复试算，改坏了也不影响真实数据。每一项工艺调整都会先展示「改之前 vs 改之后」的能耗、碳排与成本对比，确认有效后再决定是否下发执行。</p></div>
+          <div class="faq-a"><p>不会。仿真沙盒零风险试算，策略执行前自动展示「改前 vs 改后」的能耗、碳排与成本对比。</p></div>
         </div>
         <div class="faq-item">
           <button class="faq-q">自动下发安全吗？决策权在谁手里？<span class="pm"></span></button>
-          <div class="faq-a"><p>平台设有三级安全防护墙：参数边界防护、耦合一致性防护、执行确认防护。同时提供「自动/建议」双模协作机制——机器给建议、人做决定，安全边界与最终决策权始终掌握在工程师手中。</p></div>
+          <div class="faq-a"><p>三级防护（参数边界 / 耦合一致性 / 执行确认）+「自动/建议」双模协作，决策权始终在工程师手中。</p></div>
         </div>
         <div class="faq-item">
           <button class="faq-q">平台支持哪些行业？<span class="pm"></span></button>
-          <div class="faq-a"><p>平台覆盖全国碳市场四大重点控制行业：钢铁行业已全面上线（烧结、焦化、高炉、转炉、连铸、轧钢等 20 多种工序设备建模就绪），水泥、化工、有色行业同步就绪，实现「一套平台、四大行业」。</p></div>
+          <div class="faq-a"><p>面向钢铁、水泥、化工、有色四大控排行业及更多高耗能行业；钢铁率先落地，其余行业同步就绪、同构复用。</p></div>
         </div>
         <div class="faq-item">
           <button class="faq-q">云边协同是如何分工的？<span class="pm"></span></button>
-          <div class="faq-a"><p>边（能碳一体机）就近感知：部署在工厂现场，就近收集能源、生产、计量等各类数据，随采随算；云（平台系统）云端思考：汇聚全厂数据，负责深度的核算、推演、学习与思考，智慧随时下发。现场的事就近办，深度的事云端想。</p></div>
+          <div class="faq-a"><p>边缘就近采集感知，云端汇聚核算推演，模型与指令云端下发。现场的事就近办，深度的事云端想。</p></div>
         </div>
       </div>
     </div>
@@ -521,7 +565,7 @@ footer ul a:hover{color:#fff}
     <div class="wrap split">
       <div>
         <h2 class="h2">观看不同工艺环节的相互通信</h2>
-        <p style="margin-top:1.8rem;font-size:1.6rem;color:var(--body)">需要了解烧结与高炉如何相互影响？或者燃料配比如何影响全厂碳强度？工业能碳智控平台可让您同时观察不同的工序与物理量，在仿真之间来回传递数据。如果在一处调整中出现了某些变化，您可以在所有关联环节中看到它。</p>
+        <p style="margin-top:1.8rem;font-size:1.6rem;color:var(--body)">跨工序、跨行业观察参数联动——如钢铁烧结与高炉、水泥回转窑与熟料碳强度，一处调整，全链可见。</p>
       </div>
       <div class="video-box">
         <img src="assets/工业能碳智控平台-电脑框截图.svg" alt="平台三维数字孪生界面">
@@ -536,40 +580,40 @@ footer ul a:hover{color:#fff}
     <div class="wrap feat-layout">
       <div class="feat-side">
         <h2 class="h2">核心能力</h2>
-        <p>八大能力，驱动能碳管理全面升级——让能源消耗看得见、碳排放算得清、优化决策想得出、执行落地动得了。</p>
+        <p>八大能力覆盖感知、核算、寻优、执行全链路。</p>
       </div>
       <div id="featAcc">
         <div class="acc-item">
           <button class="acc-head"><span class="name">看得见 · 3D 数字孪生全厂工艺流程</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>烧结、焦化、高炉、转炉、连铸、轧钢……20 多种工序设备按真实比例呈现在三维场景中，整条产线尽收眼底。想看哪道工序点哪里，物料怎么流动、能耗高低分布，用颜色就能看得清清楚楚。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-工艺流程3D.svg" alt=""></div></div>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>钢铁、水泥、化工等全行业 20+ 工序设备真实比例三维呈现，物料流与能流颜色可视，想看哪道工序点哪里。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-工艺流程3D.svg" alt=""></div></div>
         </div>
         <div class="acc-item">
           <button class="acc-head"><span class="name">建得真 · 拖拽式工艺流程自搭与设备定制</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>工艺流程自己搭：像搭积木一样，拖一拖、连一连，就能搭出企业真实的工艺流程——从原料、炼铁、炼钢到轧钢，流程怎么走，企业说了算。</p><p>设备信息自己配：每台设备的量程、运行范围、规模大小都可以按企业实际「量身定制」，改完马上生效，三维场景和仿真结果随即更新。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-工艺编排.svg" alt=""></div></div>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>像搭积木一样拖拽自搭工艺流程（钢铁炼铁→轧钢、水泥生料→粉磨），设备量程与规模按企业实际量身定制。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-工艺编排.svg" alt=""></div></div>
         </div>
         <div class="acc-item">
           <button class="acc-head"><span class="name">算得清 · 三账合一与全流程可追溯</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>能源账：从原料到成品，每道工序的电、气、煤、焦消耗自动汇总，全厂能耗、吨钢能耗一目了然。碳账：每道工序的碳排放自动核算，全厂碳排总量、吨钢碳强度一键可得。成本账：每次调整都同步估算成本变化。</p><p>账目可追溯：每一笔能源、每一笔碳从哪来、到哪去，清清楚楚，经得起核查。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-碳素流守恒审计.svg" alt=""></div></div>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>能源、碳、成本三账合一自动核算，吨钢、吨熟料等单耗随手可查，每一笔从哪来到哪去都经得起核查。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-碳素流守恒审计.svg" alt=""></div></div>
         </div>
         <div class="acc-item">
           <button class="acc-head"><span class="name">推演得准 · 零风险仿真沙盒</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>一键仿真：输入工艺参数，平台立即算出对应的能耗、碳排与成本。零风险试错：在仿真模式下随意调整、反复试算，改坏了也不影响真实数据，退出即还原。</p><p>效果对比：执行某项减排策略前，平台自动展示「改之前 vs 改之后」——能耗降多少、减排多少吨、降本多少元，一目了然。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-高炉仿真分析.svg" alt=""></div></div>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>输入工艺参数立即算出能耗、碳排与成本；策略执行前自动展示「改前 vs 改后」效益对比，试错零风险。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-高炉仿真分析.svg" alt=""></div></div>
         </div>
         <div class="acc-item">
           <button class="acc-head"><span class="name">想得出 · 自然语言交互与工序AI 模型</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>用大白话下指令：像和人说话一样，输入「焦比降低 5%」「提高喷煤量 10%」，AI 自动理解并转化为可执行的调整方案。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-实时数据列表.svg" alt=""></div></div>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>大白话下指令，钢铁行业说「焦比降低 5%」、水泥行业说「吨熟料煤耗降 3%」，AI 自动解析为可执行方案。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-实时数据列表.svg" alt=""></div></div>
         </div>
         <div class="acc-item">
           <button class="acc-head"><span class="name">动得了 · 「感知—寻优—执行」自动闭环</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>智能自动控制：优化模型找到更优参数后，在三级防护校验范围内自动下发到可调设备，形成「感知—寻优—执行」的智能闭环。</p><p>一句话指挥仿真：输入简单指令即可运行、停止仿真、切换视角，操控整个「数字工厂」。AI 不只给建议，还能动手干。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-数据源管理.svg" alt=""></div></div>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>优化结果在三级防护校验范围内自动下发到可调设备，一句话即可指挥仿真运行与切换。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-数据源管理.svg" alt=""></div></div>
         </div>
         <div class="acc-item">
           <button class="acc-head"><span class="name">守得住 · 三级安全防护墙</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>第一级·参数边界防护：每一项可调参数都设有安全运行区间，AI 操作一旦触碰边界立刻被拦截。第二级·耦合一致性防护：自动识别自相矛盾的操作组合，在源头上拦截不合理策略。第三级·执行确认防护：关键操作必须经工程师确认后方可执行，全程留痕、可查可溯。</p><p>「自动/建议」双模协作：机器给建议、人做决定——安全边界与最终决策权，始终牢牢掌握在工程师手中。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-碳素流守恒审计.svg" alt=""></div></div>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>参数边界、耦合一致性、执行确认三级防护 +「自动/建议」双模协作——机器给建议、人做决定，决策权始终在工程师手中。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-碳素流守恒审计.svg" alt=""></div></div>
         </div>
         <div class="acc-item">
           <button class="acc-head"><span class="name">会汇报 · 行情感知与智能报告</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>每日自动获取碳市场数据：碳配额价格、自愿减排量价格自动更新，走势图直观呈现，未来价格趋势智能预测。每日自动获取原料与能源市场资讯：煤炭、焦炭等原料价格与市场快讯自动抓取。</p><p>智能报告：能耗盘点、碳排盘点、减排效果、优化建议，自动生成条理清晰的分析报告，支持 PDF、Word、Excel、PPT 一键导出与分享。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-碳核算报告.svg" alt=""></div></div>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>碳价与原料价格每日自动更新、趋势智能预测；能耗与碳排盘点报告自动生成，一键导出 PDF / Word / Excel / PPT。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-碳核算报告.svg" alt=""></div></div>
         </div>
       </div>
     </div>
@@ -585,69 +629,21 @@ footer ul a:hover{color:#fff}
         <h2 class="h2">网络研讨会</h2>
         <div class="res-cards">
           <div class="res-card">
-            <div class="res-thumb" style="background:#6b5b95"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
+            <div class="res-thumb" style="background:#2a302b"><svg viewBox="0 0 24 24" fill="none" stroke="#ffb71b" stroke-width="1.6" stroke-linecap="round"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
             <div class="res-body">
               <div class="cat">网络研讨会</div>
-              <h4>15 分钟看懂：钢铁长流程能碳仿真如何落地</h4>
-              <p>从烧结到轧钢，演示全流程数字孪生搭建与三账合一核算的完整路径。</p>
+              <h4>15 分钟看懂：能碳仿真如何落地（以钢铁长流程为例）</h4>
+              <p>全流程数字孪生搭建与三账合一核算的完整路径，同样的方法适用于水泥、化工、有色等行业。</p>
               <a class="tlink" href="#res-root">查看网络研讨会 <span class="arr">▸</span></a>
             </div>
           </div>
           <div class="res-card">
-            <div class="res-thumb" style="background:#6b5b95"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
+            <div class="res-thumb" style="background:#2a302b"><svg viewBox="0 0 24 24" fill="none" stroke="#ffb71b" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
             <div class="res-body">
               <div class="cat">网络研讨会</div>
               <h4>「感知—寻优—执行」：能碳闭环的实战拆解</h4>
-              <p>深度讲解三级安全防护墙与自动/建议双模协作机制的设计逻辑。</p>
+              <p>三级安全防护墙与自动/建议双模协作机制的设计逻辑。</p>
               <a class="tlink" href="#res-root">查看网络研讨会 <span class="arr">▸</span></a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="res-sec">
-        <h2 class="h2">培训</h2>
-        <div class="res-cards">
-          <div class="res-card">
-            <div class="res-thumb" style="background:#2a9d8f"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg></div>
-            <div class="res-body">
-              <div class="cat">培训</div>
-              <h4>工业能碳智控平台入门（自定进度）</h4>
-              <p>平台框架与操作界面介绍，从零完成第一个数字工厂项目的搭建。</p>
-              <a class="tlink" href="#res-root">查看培训课程 <span class="arr">▸</span></a>
-            </div>
-          </div>
-          <div class="res-card">
-            <div class="res-thumb" style="background:#2a9d8f"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
-            <div class="res-body">
-              <div class="cat">培训</div>
-              <h4>工艺流程自搭与设备定制实训营</h4>
-              <p>像搭积木一样搭建企业真实产线，掌握设备信息「量身定制」的全部技巧。</p>
-              <a class="tlink" href="#res-root">查看培训课程 <span class="arr">▸</span></a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="res-sec">
-        <h2 class="h2">视频</h2>
-        <div class="res-cards">
-          <div class="res-card">
-            <div class="res-thumb" style="background:#171917"><svg viewBox="0 0 24 24" fill="#ffb71b"><path d="M8 5v14l11-7z"/></svg></div>
-            <div class="res-body">
-              <div class="cat">视频</div>
-              <h4>全厂工艺三维孪生实录：实时联动</h4>
-              <p>跟随镜头看物料流与能流如何在三维场景中实时联动。</p>
-              <a class="tlink" href="#res-root">观看视频 <span class="arr">▸</span></a>
-            </div>
-          </div>
-          <div class="res-card">
-            <div class="res-thumb" style="background:#171917"><svg viewBox="0 0 24 24" fill="#ffb71b"><path d="M8 5v14l11-7z"/></svg></div>
-            <div class="res-body">
-              <div class="cat">视频</div>
-              <h4>一句话指挥仿真：「焦比降低 5%」会发生什么</h4>
-              <p>AI 自动完成「解析 → 确认 → 应用 → 对比」全流程，让「您说，它调，您验」成为现实。</p>
-              <a class="tlink" href="#res-root">观看视频 <span class="arr">▸</span></a>
             </div>
           </div>
         </div>
@@ -657,20 +653,20 @@ footer ul a:hover{color:#fff}
         <h2 class="h2">文章</h2>
         <div class="res-cards">
           <div class="res-card">
-            <div class="res-thumb" style="background:#8a8f8a"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/></svg></div>
+            <div class="res-thumb" style="background:#2a302b"><svg viewBox="0 0 24 24" fill="none" stroke="#ffb71b" stroke-width="1.6" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/></svg></div>
             <div class="res-body">
               <div class="cat">文章</div>
               <h4>节能减排与降本增效，从来不是二选一</h4>
-              <p>同样可观的节能减碳空间，往往藏在日常运行的「细枝末节」里——靠聪明的算法调度，把能耗和碳排放「挤」出来。</p>
+              <p>节能减碳空间藏在日常运行的「细枝末节」里——靠算法调度，把能耗和碳排「挤」出来。</p>
               <a class="tlink" href="#res-root">阅读文章 <span class="arr">▸</span></a>
             </div>
           </div>
           <div class="res-card">
-            <div class="res-thumb" style="background:#8a8f8a"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/></svg></div>
+            <div class="res-thumb" style="background:#2a302b"><svg viewBox="0 0 24 24" fill="none" stroke="#ffb71b" stroke-width="1.6" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/></svg></div>
             <div class="res-body">
               <div class="cat">文章</div>
-              <h4>从钢铁走向更多行业：一套平台的复用之道</h4>
-              <p>平台覆盖全国碳市场四大重点控制行业，每个行业、每个工序都有专门建模的专属算法。</p>
+              <h4>一套平台、服务全行业：从钢铁到水泥化工有色</h4>
+              <p>面向全国碳市场四大重点控排行业，每个行业、每个工序都有专属算法。</p>
               <a class="tlink" href="#res-root">阅读文章 <span class="arr">▸</span></a>
             </div>
           </div>
@@ -687,18 +683,18 @@ footer ul a:hover{color:#fff}
     <div class="cta-grid">
       <div class="cta-left">
         <h2>准备好开始了吗？</h2>
-        <p>如果您面临节能降碳方面的挑战，我们的团队将随时为您提供帮助，让我们携手把工程挑战转化为价值增长的机遇。</p>
+        <p>如果您面临节能降碳挑战，我们的团队随时为您提供帮助。</p>
         <a class="btn" href="#cta" style="font-size:1.4rem;padding:1.3rem 3rem">联系我们 <span class="arr">▸</span></a>
       </div>
       <div class="cta-steps">
         <div class="cta-step">
           <h4>预约产品演示</h4>
-          <p>与我们的能碳专家交流，探讨如何将工业能碳智控平台投入到您的实际生产中。</p>
+          <p>与能碳专家交流，探讨平台如何落地到您的实际生产。</p>
           <a class="step-link" href="#cta">开始咨询 <span class="arr">▸</span></a>
         </div>
         <div class="cta-step">
-          <h4>随时了解最新动态</h4>
-          <p>获取有关平台功能更新、行业洞察与节能降碳实践等信息最新新闻。</p>
+          <h4>订阅最新动态</h4>
+          <p>获取平台更新、行业洞察与降碳实践资讯。</p>
           <a class="step-link" href="#cta">订阅 <span class="arr">▸</span></a>
         </div>
       </div>
@@ -714,7 +710,9 @@ footer ul a:hover{color:#fff}
         <div>
           <h5>产品</h5>
           <ul>
+            <li><a href="#ov-vision" data-tab="0">平台愿景</a></li>
             <li><a href="#ov-products" data-tab="0">产品模块</a></li>
+            <li><a href="#ov-tech" data-tab="0">前沿技术</a></li>
             <li><a href="#cap-features" data-tab="1">八大能力</a></li>
             <li><a href="#cta" data-tab="0">免费试用</a></li>
           </ul>
@@ -731,8 +729,6 @@ footer ul a:hover{color:#fff}
           <h5>学习</h5>
           <ul>
             <li><a href="#res-root" data-tab="2">网络研讨会</a></li>
-            <li><a href="#res-root" data-tab="2">培训课程</a></li>
-            <li><a href="#res-root" data-tab="2">视频中心</a></li>
             <li><a href="#res-root" data-tab="2">精选文章</a></li>
           </ul>
         </div>
@@ -757,7 +753,7 @@ footer ul a:hover{color:#fff}
       </div>
     </div>
     <div class="foot-bottom">
-      <span>Copyright © 2026 工业能碳智控平台 · 海颐智能</span>
+      <span>Copyright © 2026 工业能碳智控平台 · 海颐智能 · v2.0.0</span>
       <div class="legal">
         <a href="#site-footer">法律声明</a>
         <a href="#site-footer">隐私声明</a>
@@ -849,6 +845,8 @@ document.addEventListener('click', function(e){
     });
   }
   collect('.prod-card','产品模块');
+  collect('.vision-card','平台愿景');
+  collect('.tech-item','前沿技术');
   collect('.acc-item','八大能力');
   collect('.res-card','资源');
   collect('.faq-item','常见问题');
@@ -940,7 +938,7 @@ document.querySelectorAll('a[data-tab]').forEach(function(a){
 (function(){
   var lb = document.getElementById('lightbox');
   var lbImg = document.getElementById('lbImg');
-  var imgs = document.querySelectorAll('.acc-body img.shot, .prod-card .pimg img, #ov-intro .split > div > img');
+  var imgs = document.querySelectorAll('.acc-body img.shot, .prod-card .pimg img');
   imgs.forEach(function(img){
     img.addEventListener('click', function(e){
       e.stopPropagation();

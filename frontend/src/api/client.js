@@ -138,6 +138,30 @@ export const api = {
   boxConfigSave: (payload) => jpost('/box/config', payload),
   // 云端实时推送 WebSocket（/api/ws/cloud）：云端 agent 经 MQTT cloud/# 推送的概览/CRD/日志，平台后端实时转发
   openCloudFeed,
+  // 知识库（LLM-WIKI 式：多级文件夹 + 文档上传解析，无需权限）
+  kbTree: () => jget('/knowledge/tree'),
+  kbCreateFolder: (name, parent = '') => jpost('/knowledge/folder', { name, parent }),
+  kbRenameFolder: (path, name) => jput('/knowledge/folder', { path, name }),
+  kbDeleteFolder: (path) =>
+    fetch(BASE + '/knowledge/folder?path=' + encodeURIComponent(path), { method: 'DELETE' }).then(r => r.json()),
+  kbUpload: (file, folder = '') => {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('folder', folder)
+    return fetch(BASE + '/knowledge/upload', { method: 'POST', body: fd }).then(r => r.json())
+  },
+  kbRenameDoc: (id, name) => jput('/knowledge/doc/' + id, { name }),
+  kbDeleteDoc: (id) => fetch(BASE + '/knowledge/doc/' + id, { method: 'DELETE' }).then(r => r.json()),
+  kbDocContent: (id) => jget('/knowledge/doc/' + id + '/content'),
+  kbRawUrl: (id) => BASE + '/knowledge/doc/' + id + '/raw',
+  kbSearch: (q) => jget('/knowledge/search?q=' + encodeURIComponent(q)),
+  // ---- 通用方法（管理界面用） ----
+  get: jget,
+  post: jpost,
+  put: jput,
+  del: (path) => fetch(BASE + path, { method: 'DELETE' }).then(r => r.json()),
+  upload: (path, formData) =>
+    fetch(BASE + path, { method: 'POST', body: formData }).then(r => r.json()),
 }
 
 // WebSocket 遥测（url 省略则连接平台实时数据 /api/ws/feed，数据来自 MQTT 订阅）

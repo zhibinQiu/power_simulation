@@ -197,21 +197,113 @@ def do_cluster(req: ClusterRequest):
 
 class ChatRequest(BaseModel):
     text: str
-    history: List = Field(default_factory=list)  # [[role, content], ...]
+    history: List = Field(default_factory=list)  # [[role, content], ...] 或 [{"role":..., "content":...}, ...]
     mode: str = "chat"          # chat | code | plan
+    agent: str = ""             # 智能体 id（空=传统聊天）；本析智擎多智能体模式
+    skills: List[str] = Field(default_factory=list)  # 本次对话选用的 skills
+
+
+@router.get("/api/mcp/servers")
+def mcp_servers():
+    """第三方 MCP Server 列表（含连接状态与暴露的 tools）。"""
+    from ..skills.registry import get_mcp_manager
+    return {"servers": get_mcp_manager().list_status()}
+
+
+class McpServerAddRequest(BaseModel):
+    name: str = Field(..., min_length=1, description="唯一名称（将作为 skills 前缀）")
+    transport: str = "stdio"     # stdio | http
+    command: str = ""            # stdio 启动命令
+    args: List[str] = Field(default_factory=list)
+    env: Dict[str, str] = Field(default_factory=dict)
+    cwd: str = ""
+    url: str = ""                # http 端点
+    headers: Dict[str, str] = Field(default_factory=dict)
+    enabled: bool = True
+
+
+@router.post("/api/mcp/servers")
+async def add_mcp_server(req: McpServerAddRequest):
+    """新增第三方 MCP Server 配置并立即连接，其 tools 注册为 skills。"""
+    from ..skills.mcp_client import McpServerConfig
+    from ..skills.registry import get_mcp_manager, get_registry
+
+    manager = get_mcp_manager()
+    servers = manager.load_config()
+    if any(s.name == req.name for s in servers):
+        raise HTTPException(status_code=400, detail=f"MCP server {req.name} 已存在")
+    cfg = McpServerConfig(
+        name=req.name, transport=req.transport, command=req.command, args=req.args,
+        env=req.env, cwd=req.cwd, url=req.url, headers=req.headers, enabled=req.enabled,
+    )
+    err = cfg.validate()
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    servers.append(cfg)
+    manager.save_config(servers)
+    if req.enabled:
+        try:
+            conn = await manager.connect(req.name, get_registry())
+            return {"ok": True, "server": conn.to_status()}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "server": cfg.to_status(), "error": str(e)}
+    return {"ok": True, "server": cfg.to_status()}
+
+
+@router.delete("/api/mcp/servers/{name}")
+async def delete_mcp_server(name: str):
+    """删除第三方 MCP Server 配置并断开连接。"""
+    from ..skills.registry import get_mcp_manager
+
+    manager = get_mcp_manager()
+    servers = manager.load_config()
+    rest = [s for s in servers if s.name != name]
+    if len(rest) == len(servers):
+        raise HTTPException(status_code=404, detail=f"MCP server {name} 不存在")
+    manager.save_config(rest)
+    await manager.disconnect(name)
+    return {"ok": True}
+
+
+@router.post("/api/mcp/servers/{name}/reload")
+async def reload_mcp_server(name: str):
+    """重连指定第三方 MCP Server，刷新其 tools 到 skills。"""
+    from ..skills.registry import get_mcp_manager, get_registry  # noqa: F401
+
+    manager = get_mcp_manager()
+    if name not in {s.name for s in manager.load_config()}:
+        raise HTTPException(status_code=404, detail=f"MCP server {name} 不存在")
+    try:
+        conn = await manager.reconnect(name, get_registry())
+        return {"ok": True, "server": conn.to_status()}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": str(e)}
 
 
 @router.post("/api/chat")
 def chat(req: ChatRequest):
-    """命令行窗口的自然语言对话端点。无 LLM key / 网络异常时返回 ok=False 与兜底提示。"""
-    return simulation_service.chat(req.text, req.history, req.mode)
+    """命令行窗口的自然语言对话端点。无 LLM key / 网络异常时返回 ok=False 与兜底提示。
+
+    agent 非空时走 LangGraph 多智能体（本析智擎），可调用选定 skills。
+    """
+    return simulation_service.chat(req.text, req.history, req.mode,
+                                   agent=req.agent, skills=req.skills)
 
 
 @router.post("/api/chat/stream")
 def chat_stream(req: ChatRequest):
-    """流式聊天端点（SSE）：逐段推送增量文本，前端逐字渲染；失败时流内产出兜底提示。"""
+    """流式聊天端点（SSE）：逐段推送事件，前端逐字渲染；失败时流内产出兜底提示。
+
+    agent 非空时走 LangGraph 多智能体（agent_chat_stream），事件含
+    {"type":"status"}（技能调用提示）与 {"type":"delta"}（回复增量）。
+    """
+    if req.agent:
+        gen = simulation_service.agent_chat_stream(
+            req.text, req.history, req.agent, req.skills)
+    else:
+        gen = simulation_service.chat_stream(req.text, req.history, req.mode)
     return StreamingResponse(
-        simulation_service.chat_stream(req.text, req.history, req.mode),
+        gen,
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

@@ -112,8 +112,66 @@ class SimulationService:
 
     # ------------------------- 聊天 -------------------------
 
-    def chat(self, text: str, history: List, mode: str) -> Dict[str, Any]:
-        """命令行窗口的自然语言对话（复用已配置的 LLM）。"""
+    def _history_messages(self, history: List) -> List[dict]:
+        """把前端历史（[["user", "..."], ...] 或 [{"role":..., "content":...}, ...]）
+        统一转为 OpenAI 消息列表。"""
+        out: List[dict] = []
+        for pair in (history or [])[-12:]:
+            if isinstance(pair, dict):
+                role = pair.get("role")
+                content = pair.get("content")
+                if role in ("user", "assistant") and content:
+                    out.append({"role": role, "content": str(content)})
+            elif isinstance(pair, (list, tuple)) and len(pair) == 2:
+                out.append({"role": pair[0], "content": str(pair[1])})
+        return out
+
+    def resolve_skills(self, agent_id: str, skills: List[str]) -> List[str]:
+        """按智能体白名单解析本次对话可用的 skill 列表。
+
+        - 用户显式选择的技能仅作「提示」：优先排在前面；
+        - 白名单（available_skills）内其余技能也全部纳入，由智能体根据问题
+          自主检索合适的技能；available_skills 为 None 时使用全部已注册技能。
+        """
+        from app.agents.registry import get_agent
+        from app.skills.registry import get_registry
+
+        agent = get_agent(agent_id)
+        registry = get_registry()
+        allow = agent.available_skills
+        # 用户提示技能也须在白名单内（available_skills=None 不限制），白名单外提示会被忽略
+        chosen = [s for s in (skills or [])
+                  if registry.get(s) is not None and (allow is None or s in allow)]
+        if allow is not None:
+            candidates = [n for n in allow if registry.get(n) is not None]
+        else:
+            candidates = list(registry.names(enabled_only=False))
+        result = list(chosen)  # 用户提示排前
+        for n in candidates:
+            if n not in result:
+                result.append(n)
+        return result
+
+    def chat(self, text: str, history: List, mode: str,
+             agent: str = "", skills: List[str] = None) -> Dict[str, Any]:
+        """命令行窗口的自然语言对话（复用已配置的 LLM）。
+
+        agent 非空时走 LangGraph 多智能体（可调用 skills）；否则保持传统单轮聊天。
+        """
+        if agent:
+            from app.agents.graph import agent_chat
+            from app.agents.registry import get_agent
+
+            a = get_agent(agent)
+            skill_names = self.resolve_skills(agent, skills or [])
+            history_msgs = self._history_messages(history)
+            try:
+                import asyncio
+                reply = asyncio.run(agent_chat(a, skill_names, text, history_msgs))
+                return {"ok": True, "mode": mode, "agent": agent,
+                        "skills": skill_names, "reply": reply}
+            except Exception:  # noqa: BLE001
+                return {"ok": False, "mode": mode, "agent": agent, "reply": None}
         sys_prompt = CHAT_MODE_PROMPTS.get(mode, CHAT_MODE_PROMPTS["chat"])
         messages = [{"role": "system", "content": sys_prompt}]
         for pair in (history or [])[-12:]:
@@ -126,10 +184,35 @@ class SimulationService:
                     "reply": "（模型未配置或未连通：请在后端设置 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL 后重启）"}
         return {"ok": True, "mode": mode, "reply": reply}
 
-    def chat_stream(self, text: str, history: List, mode: str):
-        """流式聊天：按 SSE（data: {"delta": "..."}）逐段产出增量回复文本，供前端逐字渲染。
+    def agent_chat_stream(self, text: str, history: List, agent: str,
+                          skills: List[str] = None):
+        """多智能体流式聊天：返回 async generator（SSE 事件序列）。
 
-        未连通 LLM 时产出兜底提示（同样以 SSE 格式，保证前端流式链路可解析）。
+        事件含 {"type":"status"}（技能调用提示）与 {"type":"delta"}（回复增量）。
+        注意：本方法为普通函数（非 generator function），返回 async generator 对象；
+        不能并入 chat_stream（其含同步 yield 是 generator function，return 会失效）。
+        """
+        from app.agents.graph import agent_chat_events
+        from app.agents.registry import get_agent
+
+        a = get_agent(agent)
+        skill_names = self.resolve_skills(agent, skills or [])
+        history_msgs = self._history_messages(history)
+
+        async def _agent_gen():
+            sent = False
+            async for ev in agent_chat_events(a, skill_names, text, history_msgs):
+                sent = True
+                yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+            if not sent:
+                yield (f"data: {json.dumps({'type': 'delta', 'delta': '（模型未配置或未连通：请在后端设置 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL 后重启）'}, ensure_ascii=False)}\n\n")
+
+        return _agent_gen()
+
+    def chat_stream(self, text: str, history: List, mode: str):
+        """流式聊天（传统单轮）：按 SSE（data: {"delta": "..."}）逐段产出增量回复文本。
+
+        多智能体（agent/skills）请走 agent_chat_stream。未连通 LLM 时产出兜底提示。
         """
         sys_prompt = CHAT_MODE_PROMPTS.get(mode, CHAT_MODE_PROMPTS["chat"])
         messages = [{"role": "system", "content": sys_prompt}]
