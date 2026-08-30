@@ -361,6 +361,13 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
             <template v-if="forecastOn && fcDays"> + 未来 {{ fcDays }} 日预测</template>
           </span>
         </div>
+        <div class="cm-chart-ops">
+          <span class="cm-seg">
+            <button :class="{ on: instrument === 'cea' }" @click="switchInstrument('cea')" title="切换 CEA 走势">CEA</button>
+            <button :class="{ on: instrument === 'ccer' }" @click="switchInstrument('ccer')" title="切换 CCER 走势">CCER</button>
+          </span>
+          <button class="cm-fc-btn" :class="{ on: forecastOn }" @click="toggleForecast" :title="forecastOn ? '关闭预测叠加' : '开启预测叠加'">预测叠加</button>
+        </div>
       </div>
 
       <div class="cm-legend">
@@ -518,6 +525,17 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
 .cm-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .cm-chart-meta { display: flex; align-items: center; gap: 10px; }
 .cm-chart-name { font-size: 11px; color: var(--muted); }
+.cm-chart-ops { display: flex; align-items: center; gap: 6px; }
+.cm-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+.cm-seg button, .cm-fc-btn {
+  padding: 3px 10px; font-size: 10.5px; cursor: pointer; border: none;
+  background: var(--panel-2); color: var(--muted);
+  transition: background .12s, color .12s;
+}
+.cm-seg button + button { border-left: 1px solid var(--border); }
+.cm-seg button:hover, .cm-fc-btn:hover { color: var(--accent); }
+.cm-seg button.on, .cm-fc-btn.on { background: color-mix(in srgb, var(--accent) 18%, var(--panel-2)); color: var(--accent); }
+.cm-fc-btn { border: 1px solid var(--border); border-radius: 5px; }
 
 /* 图例 */
 .cm-legend { display: flex; gap: 16px; font-size: 10px; color: var(--muted); align-items: center; }

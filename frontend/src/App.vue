@@ -23,18 +23,24 @@
       <FlowEditor v-if="store.editMode" />
     </main>
 
-    <!-- 视图名标识栏：仅在能碳一体机管理视图下显示，承载标题（与 TopBar / Ribbon 风格统一，位于中间舞台之上） -->
-    <div v-if="store.boxManageOn" class="view-banner">
+    <!-- 视图名标识栏：在能碳一体机管理 / 碳资产管理视图下显示，承载标题（与 TopBar / Ribbon 风格统一，位于中间舞台之上） -->
+    <div v-if="store.boxManageOn || store.carbonMarketOn" class="view-banner">
       <div class="vb-left">
-        <span class="vb-logo">◈</span>
-        <b class="vb-title">{{ t('能碳一体机管理') }}</b>
+        <b class="vb-title">{{ store.boxManageOn ? t('能碳一体机管理') : t('碳资产管理') }}</b>
       </div>
       <div class="vb-right">
-        <button class="vb-close" @click="closeView" :title="t('关闭能碳一体机管理，返回数字孪生场景')">✕ {{ t('关闭') }}</button>
+        <span v-if="store.carbonMarketOn" class="vb-market-tabs">
+          <button class="vb-tab" :class="{ on: marketTabOn() === 'market' }" @click="marketSubNav('market')">CEA / CCER 行情</button>
+          <button class="vb-tab" :class="{ on: marketTabOn() === 'ledger' }" @click="marketSubNav('ledger')">{{ t('企业台账与策略') }}</button>
+        </span>
+        <button v-if="store.carbonMarketOn && marketTabOn() === 'market'" class="vb-close" @click="marketRefresh">↻ {{ t('刷新行情') }}</button>
+        <button v-if="store.carbonMarketOn && marketTabOn() === 'ledger'" class="vb-close" @click="marketLedgerRefresh">↻ {{ t('刷新台账') }}</button>
+        <button v-if="store.carbonMarketOn" class="vb-close" @click="carbonReport">📄 {{ t('生成报告') }}</button>
+        <button class="vb-close" @click="closeView" :title="t('关闭当前视图，返回数字孪生场景')">✕ {{ t('关闭') }}</button>
       </div>
     </div>
 
-    <RibbonToolbar v-show="!store.boxManageOn" :actions="ribbonActions" />
+    <RibbonToolbar v-show="!store.boxManageOn && !store.carbonMarketOn" :actions="ribbonActions" />
 
     <!-- 右侧栏：上下文检视器；收起时由 .right-collapsed 置列宽 0 + 裁切，实现平滑滑出 -->
     <RightInspector @rsz="startRightResize" />

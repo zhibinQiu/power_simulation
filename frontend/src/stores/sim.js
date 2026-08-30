@@ -1184,7 +1184,7 @@ export const useSimStore = defineStore('sim', {
     toggleDataView() {
       this.dataViewOn = !this.dataViewOn
       if (this.dataViewOn) {
-        this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false
+        this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false; this.overviewOn = false
         // 记录进入前布局状态（退出时恢复）
         if (!this._savedPanels) this._savedPanels = { leftOpen: this.leftOpen, rightOpen: this.rightOpen, bottomOpen: this.bottomOpen }
         // 工况数据分析的数据源需从左侧「场景」资源树拖入 → 打开时自动展开左侧并定位到场景面板
@@ -1199,25 +1199,25 @@ export const useSimStore = defineStore('sim', {
     // 碳资产管理视图：中间 3D 场景 ↔ 碳资产管理面板（顶栏「视图 → 碳资产管理」切换）
     toggleCarbonMarket() {
       this.carbonMarketOn = !this.carbonMarketOn
-      if (this.carbonMarketOn) { this.dataViewOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false; this._collapsePanels() }
+      if (this.carbonMarketOn) { this.dataViewOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false; this.overviewOn = false; this._collapsePanels() }
       else { this._restorePanels() }
     },
     // 碳排核算视图：中间 3D 场景 ↔ 多标准碳核算结果对比（工具 → 低碳 → 全景碳核查切换）
     toggleCarbonCalc() {
       this.carbonCalcOn = !this.carbonCalcOn
-      if (this.carbonCalcOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.energyFlowOn = false; this.boxManageOn = false; this._collapsePanels() }
+      if (this.carbonCalcOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.energyFlowOn = false; this.boxManageOn = false; this.overviewOn = false; this._collapsePanels() }
       else { this._restorePanels() }
     },
     // 能流分析视图：中间 3D 场景 ↔ 能流桑基图（工具 → 能源 → 能流分析切换）
     toggleEnergyFlow() {
       this.energyFlowOn = !this.energyFlowOn
-      if (this.energyFlowOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.boxManageOn = false; this._collapsePanels() }
+      if (this.energyFlowOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.boxManageOn = false; this.overviewOn = false; this._collapsePanels() }
       else { this._restorePanels() }
     },
     // 能碳一体机管理视图：中间 3D 场景 ↔ 云端设备识别 + 设备关联管理（视图 → 能碳一体机管理切换）
     toggleBoxManage() {
       this.boxManageOn = !this.boxManageOn
-      if (this.boxManageOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this._collapsePanels() }
+      if (this.boxManageOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.overviewOn = false; this._collapsePanels() }
       else { this._restorePanels() }
     },
     // HMI人机交互屏：与 3D 场景互斥切换（开 HMI 关 3D，关 HMI 还原 3D）

@@ -1,5 +1,5 @@
 <template>
-  <div class="data-overview" :class="'ov-' + theme">
+  <div class="data-overview" :class="'ov-' + theme" v-fit>
     <!-- 顶部状态栏（各页面常驻） -->
     <header class="ov-head">
       <div class="ov-title">
@@ -37,7 +37,7 @@
           <button type="button" class="kpi" @click="goto('devices')">
             <div class="kpi-ring" :style="{ background: ringGradient }">
               <div class="kpi-ring-inner">
-                <b>{{ healthPct }}<em>%</em></b>
+                <b data-fit>{{ healthPct }}<em>%</em></b>
                 <i>{{ t('正常率') }}</i>
               </div>
             </div>
@@ -52,7 +52,7 @@
             <div class="kpi-ico carbon">CO₂</div>
             <div class="kpi-body">
               <span class="kpi-title">{{ t('年度碳排放') }}</span>
-              <span class="kpi-num">{{ fmtWan(carbon.yearly) }}<em> {{ t('万吨') }}</em></span>
+              <span class="kpi-num" data-fit>{{ fmtWan(carbon.yearly) }}<em> {{ t('万吨') }}</em></span>
               <span class="kpi-sub">{{ t('实时') }} {{ fmtNum(carbon.co2h) }} t/h</span>
             </div>
           </button>
@@ -61,7 +61,7 @@
             <div class="kpi-ico box"><i></i><i></i><i></i><i></i></div>
             <div class="kpi-body">
               <span class="kpi-title">{{ t('能碳一体机') }}</span>
-              <span class="kpi-num">{{ boxOnline }}<em> / {{ boxTotal }} {{ t('节点') }}</em></span>
+              <span class="kpi-num" data-fit>{{ boxOnline }}<em> / {{ boxTotal }} {{ t('节点') }}</em></span>
               <span class="kpi-sub"><i class="lg" :class="cloudAlarm ? 'ab' : 'ok'"></i>{{ t(cloudSource.label) }}</span>
             </div>
           </button>
@@ -70,7 +70,7 @@
             <div class="kpi-ico alarm">!</div>
             <div class="kpi-body">
               <span class="kpi-title">{{ t('报警中心') }}</span>
-              <span class="kpi-num" :class="{ warn: alarmHigh + alarmMid > 0 }">{{ alarmHigh + alarmMid }}<em> {{ t('条') }}</em></span>
+              <span class="kpi-num" data-fit :class="{ warn: alarmHigh + alarmMid > 0 }">{{ alarmHigh + alarmMid }}<em> {{ t('条') }}</em></span>
               <span class="kpi-sub"><i class="lg ab"></i>{{ alarmHigh }} {{ t('紧急') }}<i class="lg mid"></i>{{ alarmMid }} {{ t('一般') }}</span>
             </div>
           </button>
@@ -117,11 +117,11 @@
             </div>
             <div class="mod-grid">
               <div class="mg-item">
-                <b>{{ boxOnline }}<em> / {{ boxTotal }}</em></b>
+                <b data-fit>{{ boxOnline }}<em> / {{ boxTotal }}</em></b>
                 <i>{{ t('盒子节点就绪') }}</i>
               </div>
               <div class="mg-item">
-                <b>{{ boxDevOnline }}<em> / {{ boxDevices.length }}</em></b>
+                <b data-fit>{{ boxDevOnline }}<em> / {{ boxDevices.length }}</em></b>
                 <i>{{ t('传感器在线') }}</i>
               </div>
               <div class="mg-item">
@@ -173,7 +173,7 @@
                 <div v-for="d in g.devices" :key="d.id" class="dt-dev" :class="'st-' + d.state.key">
                   <i class="dd-dot"></i>
                   <span class="dd-name" :title="d.label">{{ d.label }}</span>
-                  <span class="dd-val" v-if="d.live != null">{{ fmtNum(d.live) }}<em> {{ d.unit }}</em></span>
+                  <span class="dd-val" data-fit v-if="d.live != null">{{ fmtNum(d.live) }}<em> {{ d.unit }}</em></span>
                   <span class="dd-val na" v-else>—</span>
                   <span class="dd-st" :style="{ color: d.state.color, borderColor: d.state.color }">{{ t(d.state.label) }}</span>
                   <span class="dd-why" v-if="d.state.reason">{{ t(d.state.reason, { dev: d.state.devPct }) }}</span>
@@ -189,26 +189,26 @@
         <template v-else-if="page === 'carbon'">
           <div class="dt-carbon-main">
             <span class="dcm-label">{{ t('年度总碳排放量') }}</span>
-            <span class="dcm-num">{{ fmtWan(carbon.yearly) }}<em> {{ t('万吨') }} CO₂</em></span>
+            <span class="dcm-num" data-fit>{{ fmtWan(carbon.yearly) }}<em> {{ t('万吨') }} CO₂</em></span>
             <span class="dcm-sub">{{ t('按 8000h/年折算 · 当前排放') }} {{ fmtNum(carbon.co2h) }} t/h</span>
           </div>
           <div class="dt-scopes">
             <div class="dts-row">
               <span class="dts-name">{{ t('直接排放 · Scope 1') }}</span>
-              <span class="dts-val">{{ fmtWan(carbon.directWan) }} {{ t('万吨') }}（{{ carbon.directPct.toFixed(1) }}%）</span>
+              <span class="dts-val" data-fit>{{ fmtWan(carbon.directWan) }} {{ t('万吨') }}（{{ carbon.directPct.toFixed(1) }}%）</span>
               <div class="dts-bar"><i class="direct" :style="{ width: carbon.directPct + '%' }"></i></div>
             </div>
             <div class="dts-row">
               <span class="dts-name">{{ t('间接排放 · Scope 2') }}</span>
-              <span class="dts-val">{{ fmtWan(carbon.indirectWan) }} {{ t('万吨') }}（{{ carbon.indirectPct.toFixed(1) }}%）</span>
+              <span class="dts-val" data-fit>{{ fmtWan(carbon.indirectWan) }} {{ t('万吨') }}（{{ carbon.indirectPct.toFixed(1) }}%）</span>
               <div class="dts-bar"><i class="indirect" :style="{ width: carbon.indirectPct + '%' }"></i></div>
             </div>
           </div>
           <div class="dt-metrics">
-            <div class="dmetric"><span class="dm-k">{{ t('吨钢排放强度') }}</span><b>{{ fmtNum(carbon.intensity) }}<em> kgCO₂/t</em></b></div>
-            <div class="dmetric"><span class="dm-k">{{ t('年产量') }}</span><b>{{ fmtWan(carbon.steelYear) }}<em> {{ t('万吨') }}</em></b></div>
-            <div class="dmetric"><span class="dm-k">{{ t('碳捕集速率') }}</span><b>{{ fmtNum(carbon.captured) }}<em> t/h</em></b></div>
-            <div class="dmetric"><span class="dm-k">{{ t('直接排放占比') }}</span><b>{{ carbon.directPct.toFixed(1) }}<em> %</em></b></div>
+            <div class="dmetric"><span class="dm-k">{{ t('吨钢排放强度') }}</span><b data-fit>{{ fmtNum(carbon.intensity) }}<em> kgCO₂/t</em></b></div>
+            <div class="dmetric"><span class="dm-k">{{ t('年产量') }}</span><b data-fit>{{ fmtWan(carbon.steelYear) }}<em> {{ t('万吨') }}</em></b></div>
+            <div class="dmetric"><span class="dm-k">{{ t('碳捕集速率') }}</span><b data-fit>{{ fmtNum(carbon.captured) }}<em> t/h</em></b></div>
+            <div class="dmetric"><span class="dm-k">{{ t('直接排放占比') }}</span><b data-fit>{{ carbon.directPct.toFixed(1) }}<em> %</em></b></div>
           </div>
         </template>
 
@@ -243,7 +243,7 @@
               <div v-for="d in boxDevices" :key="d.name" class="dt-sensor" :class="'st-' + devState(d).key">
                 <i class="nd-dot"></i>
                 <span class="nd-name" :title="d.name">{{ d.name }}</span>
-                <span class="nd-model">{{ d.model || '—' }}</span>
+                <span class="nd-model" data-fit>{{ d.model || '—' }}</span>
                 <span class="nd-st">{{ t(devState(d).label) }}</span>
                 <span class="nd-time" v-if="d.last_seen">{{ relTime(d.last_seen) }}{{ t('前') }}</span>
               </div>
@@ -255,10 +255,10 @@
         <!-- ── 报警中心 ── -->
         <template v-else-if="page === 'alarms'">
           <div class="ov-alarm-stats">
-            <div class="as-item high"><b>{{ alarmHigh }}</b><i>{{ t('紧急') }}</i></div>
-            <div class="as-item mid"><b>{{ alarmMid }}</b><i>{{ t('一般') }}</i></div>
-            <div class="as-item low"><b>{{ alarmLow }}</b><i>{{ t('提示') }}</i></div>
-            <div class="as-item total"><b>{{ alarms.length }}</b><i>{{ t('全部') }}</i></div>
+            <div class="as-item high"><b data-fit>{{ alarmHigh }}</b><i>{{ t('紧急') }}</i></div>
+            <div class="as-item mid"><b data-fit>{{ alarmMid }}</b><i>{{ t('一般') }}</i></div>
+            <div class="as-item low"><b data-fit>{{ alarmLow }}</b><i>{{ t('提示') }}</i></div>
+            <div class="as-item total"><b data-fit>{{ alarms.length }}</b><i>{{ t('全部') }}</i></div>
           </div>
           <div class="dt-alarms">
             <div v-for="(a, i) in alarms" :key="i" class="dt-alarm" :class="'lv-' + a.level">
@@ -539,6 +539,43 @@ onBeforeUnmount(() => {
   if (timer) clearInterval(timer)
   if (boxTimer) clearInterval(boxTimer)
 })
+
+// ---------- 数值自适应缩放（v-fit）：内容超出容器宽度时等比缩小字号，保证数字不溢出模块 ----------
+function fitRoot(root) {
+  let raf = null
+  const measure = () => {
+    raf = null
+    root.querySelectorAll('[data-fit]').forEach((el) => {
+      el.style.fontSize = ''
+      const base = parseFloat(getComputedStyle(el).fontSize) || 16
+      let size = base
+      let avail = el.clientWidth
+      if (avail < 1 && el.parentElement) avail = el.parentElement.clientWidth
+      let guard = 0
+      while (avail > 0 && el.scrollWidth > avail + 1 && size > 8 && guard++ < 12) {
+        size = Math.max(8, size * avail / Math.max(1, el.scrollWidth))
+        el.style.fontSize = size + 'px'
+      }
+    })
+  }
+  const schedule = () => { if (!raf) raf = requestAnimationFrame(measure) }
+  let ro = null
+  if (typeof ResizeObserver !== 'undefined') {
+    ro = new ResizeObserver(schedule)
+    ro.observe(root)
+  }
+  schedule()
+  return { schedule, cleanup: () => { if (raf) cancelAnimationFrame(raf); if (ro) ro.disconnect() } }
+}
+const vFit = {
+  mounted(el) {
+    const api = fitRoot(el)
+    el._fitSchedule = api.schedule
+    el._fitCleanup = api.cleanup
+  },
+  updated(el) { if (el._fitSchedule) el._fitSchedule() },
+  unmounted(el) { if (el._fitCleanup) el._fitCleanup() },
+}
 </script>
 
 <style scoped>
@@ -551,21 +588,21 @@ onBeforeUnmount(() => {
    - 直角硬边工业风（无圆角），正文 ≥ 12px、弱文本 ≥ 11px、触控目标 ≥ 40px
    ===================================================================== */
 .data-overview {
-  /* ----- 深色主题（默认，ISA-101 工控风：中性炭黑底 + 信息青蓝，去蓝底去品牌黄） ----- */
-  --ov-bg1: #121417;            /* 背景渐变起（中性深炭灰） */
-  --ov-bg2: #171A1D;            /* 背景渐变止 */
-  --ov-panel: #1B1E22;          /* 卡片/面板 */
-  --ov-panel-2: #22262B;        /* 次级卡片 */
-  --ov-panel-3: #2A2F35;        /* 三级底/输入 */
-  --ov-border: #3A4047;         /* 边框 */
-  --ov-border-ac: rgba(56, 189, 248, 0.30);  /* 强调边框（信息青） */
-  --ov-text: #E9ECF1;           /* 主文字（中性冷白） */
-  --ov-text-2: #A6ADB8;         /* 次要文字 */
-  --ov-text-3: #808A97;         /* 弱文字 */
-  --ov-faint: #68727E;          /* 更弱 */
-  --ov-accent: #38BDF8;         /* 强调/操作色（工控信息青蓝） */
-  --ov-accent-soft: rgba(56, 189, 248, 0.12);   /* 强调浅底 */
-  --ov-num: #5BC9F2;            /* 数字高亮（亮青） */
+  /* ----- 深色主题（默认）：冷蓝黑金属风，与平台深色主题（#0F172A 系 + 科技蓝）一致 ----- */
+  --ov-bg1: #0C1424;            /* 背景渐变起（冷蓝黑） */
+  --ov-bg2: #0A101E;            /* 背景渐变止（冷蓝黑） */
+  --ov-panel: #131C2E;          /* 卡片/面板（冷蓝黑） */
+  --ov-panel-2: #1A2438;        /* 次级卡片 */
+  --ov-panel-3: #233048;        /* 三级底/输入 */
+  --ov-border: #32435F;         /* 边框（冷蓝灰） */
+  --ov-border-ac: rgba(96, 165, 250, 0.38);  /* 强调边框（科技蓝） */
+  --ov-text: #EAF0FA;           /* 主文字（冷白） */
+  --ov-text-2: #A8B6CC;         /* 次要文字 */
+  --ov-text-3: #8291AC;         /* 弱文字 */
+  --ov-faint: #64738E;          /* 更弱 */
+  --ov-accent: #4DA3FF;         /* 强调/操作色（平台科技蓝 #2563EB 亮化） */
+  --ov-accent-soft: rgba(77, 163, 255, 0.12);   /* 强调浅底 */
+  --ov-num: #7EC8FF;            /* 数字高亮（亮科技蓝） */
   --ov-ok: #34D399;             /* 正常（工控绿） */
   --ov-ab: #F26D5E;             /* 异常（报警红） */
   --ov-mid: #F0912E;            /* 一般/警告（工控橙） */
@@ -578,15 +615,18 @@ onBeforeUnmount(() => {
   --ov-mid-bg: rgba(240, 145, 46, 0.12);
   --ov-warn-bg: rgba(90, 169, 230, 0.12);
   --ov-st-bg: rgba(110, 120, 131, 0.14);
-  --ov-ac-bg: rgba(56, 189, 248, 0.16);
+  --ov-ac-bg: rgba(77, 163, 255, 0.16);
   --ov-ab-soft: rgba(242, 109, 94, 0.08);   /* 报警脉冲弱 */
   --ov-ab-soft2: rgba(242, 109, 94, 0.18);  /* 报警脉冲强 */
+  /* 金属质感：面板顶部冷蓝高光线 + 微渐变 */
+  --ov-meta: linear-gradient(180deg, rgba(205, 228, 255, 0.06), rgba(205, 228, 255, 0) 48%);
 
   position: absolute; inset: 0;
   display: flex; flex-direction: column;
   padding: clamp(8px, 1.6vw, 16px) clamp(10px, 2vw, 20px) clamp(10px, 1.6vw, 16px);
   gap: clamp(8px, 1vw, 12px);
   background:
+    radial-gradient(120% 85% at 50% -12%, rgba(77, 163, 255, 0.13), transparent 55%),
     linear-gradient(180deg, var(--ov-bg1) 0%, var(--ov-bg2) 100%);
   color: var(--ov-text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -598,36 +638,37 @@ onBeforeUnmount(() => {
   -webkit-user-select: none; user-select: none;
 }
 
-/* ----- 浅色主题（中性浅灰白，信息青蓝强调，手动切换） ----- */
+/* ----- 浅色主题（冷白，科技蓝强调，与平台浅色主题一致，手动切换） ----- */
 .data-overview.ov-light {
-  --ov-bg1: #F0F1F3;
-  --ov-bg2: #F7F8FA;
+  --ov-bg1: #EEF1F6;
+  --ov-bg2: #F6F8FB;
   --ov-panel: #FFFFFF;
-  --ov-panel-2: #F1F3F6;
-  --ov-panel-3: #E6E9EE;
-  --ov-border: #C9CED6;
-  --ov-border-ac: rgba(14, 116, 144, 0.35);
-  --ov-text: #1F242B;
-  --ov-text-2: #434C57;
-  --ov-text-3: #636E7B;
-  --ov-faint: #8C95A0;
-  --ov-accent: #0E7490;
-  --ov-accent-soft: rgba(14, 116, 144, 0.10);
-  --ov-num: #0E7C9E;
+  --ov-panel-2: #F1F4F9;
+  --ov-panel-3: #E4E9F2;
+  --ov-border: #C7D0DE;
+  --ov-border-ac: rgba(37, 99, 235, 0.35);
+  --ov-text: #1C2433;
+  --ov-text-2: #3F4A5E;
+  --ov-text-3: #626F85;
+  --ov-faint: #8B96A8;
+  --ov-accent: #2563EB;
+  --ov-accent-soft: rgba(37, 99, 235, 0.10);
+  --ov-num: #1D6FD8;
   --ov-ok: #1E8E5A;
   --ov-ab: #C4402F;
   --ov-mid: #C05A12;
   --ov-warn: #2E6DA4;
   --ov-st: #79828D;
-  --ov-mask: rgba(31, 36, 43, 0.04);
+  --ov-mask: rgba(28, 36, 51, 0.04);
   --ov-ok-bg: rgba(30, 142, 90, 0.10);
   --ov-ab-bg: rgba(196, 64, 47, 0.10);
   --ov-mid-bg: rgba(192, 90, 18, 0.10);
   --ov-warn-bg: rgba(46, 109, 164, 0.10);
   --ov-st-bg: rgba(121, 130, 141, 0.12);
-  --ov-ac-bg: rgba(14, 116, 144, 0.12);
+  --ov-ac-bg: rgba(37, 99, 235, 0.12);
   --ov-ab-soft: rgba(196, 64, 47, 0.06);
   --ov-ab-soft2: rgba(196, 64, 47, 0.14);
+  --ov-meta: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0) 50%);
 }
 
 /* ================= 顶部状态栏 ================= */
@@ -840,7 +881,7 @@ onBeforeUnmount(() => {
 .dt-dev.st-abnormal .dd-dot { background: var(--ov-ab); animation: blink 1s ease-in-out infinite; }
 .dt-dev.st-stopped .dd-dot { background: var(--ov-st); }
 .dd-name { flex: 0 1 auto; font-size: 13px; color: var(--ov-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dd-val { flex: 0 0 auto; font-family: ui-monospace, monospace; font-size: 14px; font-weight: 700; color: var(--ov-num); }
+.dd-val { flex: 0 1 auto; font-family: ui-monospace, monospace; font-size: 14px; font-weight: 700; color: var(--ov-num); }
 .dd-val em { font-style: normal; font-size: 11px; color: var(--ov-text-3); font-weight: 500; }
 .dd-val.na { color: var(--ov-faint); }
 .dd-st { flex: 0 0 auto; font-size: 12px; font-weight: 700; padding: 1px 9px; border-radius: 0; border: 1px solid; background: var(--ov-mask); }
@@ -864,9 +905,9 @@ onBeforeUnmount(() => {
   background: var(--ov-panel);
   border: 1px solid var(--ov-border); border-radius: 0; padding: 15px 17px;
 }
-.dts-row { display: grid; grid-template-columns: minmax(120px, 1fr) auto; gap: 6px 12px; align-items: center; }
+.dts-row { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, auto); gap: 6px 12px; align-items: center; }
 .dts-name { font-size: 13px; color: var(--ov-text-2); }
-.dts-val { font-family: ui-monospace, monospace; font-size: 13px; color: var(--ov-text); }
+.dts-val { justify-self: end; font-family: ui-monospace, monospace; font-size: 13px; color: var(--ov-text); }
 .dts-bar { grid-column: 1 / -1; height: 9px; border-radius: 0; background: var(--ov-mask); overflow: hidden; }
 .dts-bar i { display: block; height: 100%; border-radius: 0; transition: width .6s ease; }
 .dts-bar i.direct { background: linear-gradient(90deg, var(--ov-warn), var(--ov-mid)); }
@@ -910,7 +951,7 @@ onBeforeUnmount(() => {
 .dt-node.st-abnormal .nd-dot, .dt-sensor.st-abnormal .nd-dot { background: var(--ov-ab); animation: blink 1s ease-in-out infinite; }
 .dt-node.st-stopped .nd-dot, .dt-sensor.st-stopped .nd-dot { background: var(--ov-st); }
 .nd-name { flex: 1 1 auto; min-width: 0; color: var(--ov-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nd-model { flex: 0 0 auto; font-size: 12px; color: var(--ov-text-3); }
+.nd-model { flex: 0 1 auto; font-size: 12px; color: var(--ov-text-3); }
 .nd-st { flex: 0 0 auto; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 9px; }
 .dt-node.st-run .nd-st, .dt-sensor.st-run .nd-st { color: var(--ov-ok); background: var(--ov-ok-bg); }
 .dt-node.st-abnormal .nd-st, .dt-sensor.st-abnormal .nd-st { color: var(--ov-ab); background: var(--ov-ab-bg); }
@@ -949,5 +990,76 @@ onBeforeUnmount(() => {
   .kpi { min-height: 80px; }
   .dt-devices { grid-template-columns: 1fr; }
   .mu-name { max-width: 80px; }
+}
+
+/* ================= 数值自适应缩放（data-fit 约束：单行、可收缩、溢出裁剪） ================= */
+[data-fit] { min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; }
+
+/* ================= 金属质感统一层（冷蓝高光渐变 + 顶部高光线，与平台冷色系一致） ================= */
+.data-overview .kpi,
+.data-overview .module,
+.data-overview .ov-ticker,
+.data-overview .dt-unit,
+.data-overview .dt-carbon-main,
+.data-overview .dt-scopes,
+.data-overview .dt-card,
+.data-overview .dt-alarm,
+.data-overview .mg-item,
+.data-overview .dmetric,
+.data-overview .dtc-item,
+.data-overview .dt-dev,
+.data-overview .dt-node,
+.data-overview .dt-sensor,
+.data-overview .as-item {
+  background-image: var(--ov-meta);
+  box-shadow: inset 0 1px 0 rgba(208, 230, 255, 0.07), 0 1px 3px rgba(0, 0, 0, 0.22);
+}
+.data-overview.ov-light .kpi,
+.data-overview.ov-light .module,
+.data-overview.ov-light .ov-ticker,
+.data-overview.ov-light .dt-unit,
+.data-overview.ov-light .dt-carbon-main,
+.data-overview.ov-light .dt-scopes,
+.data-overview.ov-light .dt-card,
+.data-overview.ov-light .dt-alarm,
+.data-overview.ov-light .mg-item,
+.data-overview.ov-light .dmetric,
+.data-overview.ov-light .dtc-item,
+.data-overview.ov-light .dt-dev,
+.data-overview.ov-light .dt-node,
+.data-overview.ov-light .dt-sensor,
+.data-overview.ov-light .as-item {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+/* 标题金属渐变文字（深色主题；浅色主题恢复普通文字色） */
+.data-overview .ov-title-text:not(.sub) {
+  background: linear-gradient(180deg, #F2F7FF 0%, #9FC0EE 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.data-overview.ov-light .ov-title-text:not(.sub) { background: none; color: var(--ov-text); }
+
+/* 数字金属高光（深色主题：上亮下影，增强屏幕可读性） */
+.data-overview .kpi-num,
+.data-overview .dcm-num,
+.data-overview .dmetric b,
+.data-overview .mg-item b,
+.data-overview .dd-val,
+.data-overview .dts-val,
+.data-overview .dtc-item b,
+.data-overview .as-item b,
+.data-overview .kpi-ring-inner b {
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+.data-overview.ov-light .kpi-num,
+.data-overview.ov-light .dcm-num,
+.data-overview.ov-light .dmetric b,
+.data-overview.ov-light .mg-item b,
+.data-overview.ov-light .dd-val,
+.data-overview.ov-light .dts-val,
+.data-overview.ov-light .dtc-item b,
+.data-overview.ov-light .as-item b,
+.data-overview.ov-light .kpi-ring-inner b {
+  text-shadow: none;
 }
 </style>

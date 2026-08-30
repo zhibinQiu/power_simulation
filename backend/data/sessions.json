@@ -1,6 +1,60 @@
 {
   "sessions": [
     {
+      "id": "8e21af47a27e",
+      "title": "碳市场最新行情如何？",
+      "agent": "general",
+      "skills": [],
+      "created_at": "2026-08-30 20:35:36",
+      "updated_at": "2026-08-30 20:35:37",
+      "messages": [
+        {
+          "role": "user",
+          "content": "碳市场最新行情如何？"
+        },
+        {
+          "role": "assistant",
+          "content": "（模型未配置或未连通：请在后端设置 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL 后重启）"
+        }
+      ]
+    },
+    {
+      "id": "0998107e1210",
+      "title": "分析最近一周的能耗趋势",
+      "agent": "general",
+      "skills": [],
+      "created_at": "2026-08-30 20:35:31",
+      "updated_at": "2026-08-30 20:35:31",
+      "messages": [
+        {
+          "role": "user",
+          "content": "分析最近一周的能耗趋势"
+        },
+        {
+          "role": "assistant",
+          "content": "综合能耗指全厂吨钢能源消耗总量（kgce/t）；工序能耗指单个工序单位产品的能耗。\n在长流程（高炉-转炉）中，**高炉炼铁、烧结**的能耗与碳排放占比最高。\n可调用「仿真」或「实时设备」技能获取各工序能耗与排放数据。"
+        }
+      ]
+    },
+    {
+      "id": "c3f6d40fe1e8",
+      "title": "帮我查询设备当前实时运行状态",
+      "agent": "general",
+      "skills": [],
+      "created_at": "2026-08-30 20:35:24",
+      "updated_at": "2026-08-30 20:35:24",
+      "messages": [
+        {
+          "role": "user",
+          "content": "帮我查询设备当前实时运行状态"
+        },
+        {
+          "role": "assistant",
+          "content": "（模型未配置或未连通：请在后端设置 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL 后重启）"
+        }
+      ]
+    },
+    {
       "id": "bd97881d6c02",
       "title": "帮我查询设备当前实时运行状态",
       "agent": "general",

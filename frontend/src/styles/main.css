@@ -150,6 +150,7 @@
   background: var(--input);
   border-color: #3A475C;
   color: var(--text);
+  color-scheme: dark;  /* 原生 number spinner 上下箭头 / 下拉控件按暗色渲染，避免黑色箭头在深色底上看不到 */
 }
 .app.sim-dark .num:focus, .app.sim-dark .num-input:focus {
   background: #0E1420;
@@ -282,6 +283,16 @@ body.panel-dragging .app { transition: none; }
   transition: background .12s, color .12s, border-color .12s;
 }
 .view-banner .vb-close:hover { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, var(--border)); }
+
+/* 碳资产管理标题栏：CEA/CCER 行情 与 企业台账与策略 页签切换（风格与 vb-close 一致） */
+.view-banner .vb-market-tabs { display: inline-flex; align-items: center; gap: 4px; }
+.view-banner .vb-tab {
+  padding: 3px 10px; font-size: 11px; cursor: pointer; border-radius: 5px;
+  border: 1px solid var(--border); background: var(--panel-2); color: var(--muted);
+  transition: background .12s, color .12s, border-color .12s;
+}
+.view-banner .vb-tab:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.view-banner .vb-tab.on { background: color-mix(in srgb, var(--accent) 18%, var(--panel-2)); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
 
 /* ============ 顶栏：VS Code 标题栏 + 菜单栏（白天亮色 / 夜间深色，扁平，无图标菜单） ============ */
 .topbar {

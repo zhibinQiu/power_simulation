@@ -7,7 +7,6 @@
     </span>
     <span class="st"><span class="feed-dot" :class="'feed-' + store.feedStatus"></span> {{ t('实时链路') }} <span class="v">{{ feedText }}</span></span>
     <span v-if="store.newsTickerOn" class="st spacer news-ticker" :title="t('市场快讯 · 中国煤炭交易网（ctctc.cn）')">
-      <span class="nt-label"><span class="feed-dot" :class="newsOn ? 'feed-open' : 'feed-init'"></span> {{ t('快讯') }}</span>
       <span class="news-scroll" v-if="newsItems.length">
         <span class="news-track" :style="{ '--news-dur': newsDur + 's' }">
           <span class="news-list">
@@ -20,7 +19,6 @@
       </span>
       <span v-else class="nt-empty">{{ newsError ? t('快讯暂不可用') : t('快讯加载中…') }}</span>
     </span>
-    <span class="st" :class="store.strategy ? 'ok' : 'warnc'">{{ store.strategy ? t('策略情景激活') : t('基线情景') }}</span>
     <span class="st mono"><span class="v">{{ clock }}</span></span>
     <span class="st st-notif" :class="{ open: notifOpen }" ref="notifBtn" @click="toggleNotif" :title="t('系统通知')">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2a.5.5 0 0 1 .5.5v.542a4 4 0 0 1 3.001 3.865v2.69l.852 1.421a.5.5 0 0 1-.435.744H4.082a.5.5 0 0 1-.435-.744l.852-1.42v-2.69A4 4 0 0 1 7.5 3.042V2.5A.5.5 0 0 1 8 2zm-1.16 10h2.32a2.003 2.003 0 0 1-3.868-.568l1.548.568zm3.66-.003l-.99-1.65h-3.02l-.99 1.65h4.01z"/></svg>
@@ -71,7 +69,6 @@ let timer = null
 
 // —— 市场快讯（中国煤炭交易网）——
 const newsItems = ref([])
-const newsOn = ref(false)
 const newsError = ref(false)
 const newsDur = computed(() => Math.max(60, newsItems.value.length * 18)) // 滚动周期随条数自适应（每条约 18s，慢速舒缓）
 let newsTimer = null
@@ -81,16 +78,13 @@ async function loadNews() {
     const r = await api.marketNews(1)
     if (r && r.ok && Array.isArray(r.items) && r.items.length) {
       newsItems.value = r.items
-      newsOn.value = true
       newsError.value = false
     } else {
       newsItems.value = []
-      newsOn.value = false
       newsError.value = true
     }
   } catch (_) {
     newsItems.value = []
-    newsOn.value = false
     newsError.value = true
   }
 }
