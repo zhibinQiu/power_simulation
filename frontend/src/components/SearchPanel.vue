@@ -6,12 +6,12 @@
         <svg class="search-ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
         </svg>
-        <input v-model="kw" type="text" class="sp-input" placeholder="搜索工艺、设备、物料、策略…" />
-        <button v-if="kw" class="sp-clear" title="清除搜索" @click="kw = ''">✕</button>
+        <input v-model="kw" type="text" class="sp-input" :placeholder="t('搜索工艺、设备、物料、策略…')" />
+        <button v-if="kw" class="x-btn sm" :title="t('清除搜索')" @click="kw = ''">✕</button>
       </div>
-      <label class="sp-scene" :class="{ on: onlyScene }" title="仅显示已部署到场景中的资源">
+      <label class="sp-scene" :class="{ on: onlyScene }" :title="t('仅显示已部署到场景中的资源')">
         <input type="checkbox" v-model="onlyScene" />
-        <span>仅场景</span>
+        <span>{{ t('仅场景') }}</span>
       </label>
     </div>
 
@@ -19,26 +19,26 @@
     <div class="sp-body" @scroll="onScroll" :class="{ scrolling }">
       <template v-if="!filtering">
         <div class="empty-hint">
-          输入关键词搜索工艺、设备、物料与策略；<br/>
-          勾选「仅场景」只显示当前已部署到场景中的资源。
+          {{ t('输入关键词搜索工艺、设备、物料与策略；') }}<br/>
+          {{ t('勾选「仅场景」只显示当前已部署到场景中的资源。') }}
         </div>
       </template>
       <template v-else>
-        <div v-if="!results.length" class="empty-hint">未找到匹配资源</div>
+        <div v-if="!results.length" class="empty-hint">{{ t('未找到匹配资源') }}</div>
         <div v-for="g in results" :key="g.key" class="sp-group">
           <div class="sp-group-title" @click="toggle(g.key)">
             <span class="twisty" :class="{ open: open[g.key] !== false }">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </span>
-            <span class="sp-group-name">{{ g.label }}</span>
+            <span class="sp-group-name">{{ t(g.label) }}</span>
             <span class="sp-count">{{ g.items.length }}</span>
           </div>
           <div v-show="open[g.key] !== false" class="sp-items">
             <div v-for="it in g.items" :key="it.id" class="sp-item" :class="{ active: it.active }"
-                 :title="it.title" @click="it.action && it.action()">
+                 :title="t(it.title)" @click="it.action && it.action()">
               <Icon :name="it.icon" :size="14" class="sp-item-ic" />
-              <span class="sp-item-name">{{ it.label }}</span>
-              <span v-if="it.sub" class="sp-item-sub">{{ it.sub }}</span>
+              <span class="sp-item-name">{{ t(it.label) }}</span>
+              <span v-if="it.sub" class="sp-item-sub">{{ t(it.sub) }}</span>
               <span v-if="it.live != null" class="sp-item-live">{{ fmt(it.live) }}</span>
             </div>
           </div>
@@ -53,6 +53,7 @@ import { reactive, ref, computed } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { MATERIALS, ROUTE_GROUPS, PROCESS_TEMPLATES, PROCESS_MAP } from '../data/flowLibrary'
 import Icon from './Icon.vue'
+import { t } from '../i18n'
 
 const store = useSimStore()
 const kw = ref('')
@@ -215,19 +216,14 @@ function materialInScene(matId) {
   background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
   padding: 0 7px; height: 24px; transition: border-color .15s, box-shadow .15s;
 }
-.sp-search-box.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-l); }
+.sp-search-box.active { border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent-l); }
 .search-ic { color: var(--faint); flex: 0 0 auto; }
 .sp-input {
   flex: 1; min-width: 0; border: none; outline: none; background: transparent;
   color: var(--text); font-size: 12px; padding: 0; height: 100%;
 }
 .sp-input::placeholder { color: var(--faint); }
-.sp-clear {
-  flex: 0 0 auto; width: 15px; height: 15px; display: grid; place-items: center;
-  border: none; border-radius: 50%; background: transparent; color: var(--faint);
-  font-size: 10px; cursor: pointer; padding: 0; line-height: 1;
-}
-.sp-clear:hover { color: var(--text); background: var(--border); }
+.sp-search-box .x-btn { flex: 0 0 auto; }
 .sp-scene {
   flex: 0 0 auto; display: flex; align-items: center; gap: 4px;
   font-size: 10.5px; color: var(--muted); cursor: pointer; user-select: none;
@@ -236,7 +232,7 @@ function materialInScene(matId) {
 }
 .sp-scene input { display: none; }
 .sp-scene:hover { color: var(--text); }
-.sp-scene.on { color: var(--accent); border-color: var(--accent-l); background: var(--accent-l); }
+.sp-scene.on { color: var(--accent-d); border-color: var(--accent-l); background: var(--accent-l); }
 .sp-body { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 6px 12px; }
 .sp-group { margin-top: 2px; }
 .sp-group-title {
@@ -254,7 +250,7 @@ function materialInScene(matId) {
   user-select: none; min-width: 0;
 }
 .sp-item:hover { background: var(--panel-2); }
-.sp-item.active { background: var(--accent-l); color: var(--accent); }
+.sp-item.active { background: var(--accent-l); color: var(--accent-d); }
 .sp-item-ic { flex: 0 0 auto; color: var(--accent2); opacity: .85; }
 .sp-item-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sp-item-sub { flex: 0 1 auto; font-size: 10.5px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

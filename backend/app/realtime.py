@@ -19,7 +19,7 @@ import asyncio
 import json
 import time
 from collections import defaultdict
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -32,6 +32,11 @@ from .presets import default_model
 class FeedManager:
     def __init__(self):
         self.active: List[WebSocket] = []
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+    def bind_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        """绑定主事件循环（uvicorn 启动时调用），供后台线程安全推送事件。"""
+        self._loop = loop
 
     async def connect(self, ws: WebSocket):
         await ws.accept()
@@ -40,6 +45,40 @@ class FeedManager:
     def disconnect(self, ws: WebSocket):
         if ws in self.active:
             self.active.remove(ws)
+
+    async def broadcast(self, payload: Dict[str, Any]) -> None:
+        """向所有活跃连接推送一条 JSON 消息（跳过已断开连接）。"""
+        dead: List[WebSocket] = []
+        for ws in self.active:
+            try:
+                await ws.send_json(payload)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self.disconnect(ws)
+
+    def notify(self, level: str, title: str, body: str, detail: str = "") -> None:
+        """线程安全地向前端推送一条事件通知（toast 弹窗 + 通知中心）。
+
+        供后台线程（mqtt_source 等非 async 上下文）调用：经主事件循环
+        广播 {type:'event'} 帧，前端收到后弹窗展示。无活跃连接时静默丢弃。
+        level 取值：success / info / warn / error。
+        """
+        loop = self._loop
+        if loop is None or loop.is_closed() or not self.active:
+            return
+        payload = {
+            "type": "event",
+            "level": level,
+            "title": title,
+            "body": body,
+            "detail": detail,
+            "ts": round(time.time(), 3),
+        }
+        try:
+            asyncio.run_coroutine_threadsafe(self.broadcast(payload), loop)
+        except Exception:  # pragma: no cover
+            pass
 
 
 manager = FeedManager()
@@ -158,8 +197,14 @@ def _safe_json(raw: str) -> Dict[str, Any]:
 
 def register_realtime(app) -> None:
     """把实时遥测相关路由挂载到 FastAPI 应用（在 main.py 中调用一次）。"""
+    @app.on_event("startup")
+    async def _bind_loop() -> None:
+        # 绑定主事件循环：mqtt_source 等后台线程经 manager.notify 推送事件到前端弹窗
+        manager.bind_loop(asyncio.get_running_loop())
+
     @app.websocket("/api/ws/feed")
     async def _ws_feed(ws: WebSocket):
+        manager.bind_loop(asyncio.get_running_loop())   # 兜底：连接建立时确保 loop 已绑定
         await ws_feed(ws)
 
     @app.get("/api/devices/history")

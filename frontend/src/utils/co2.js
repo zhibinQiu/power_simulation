@@ -175,14 +175,14 @@ export function calcCo2Emission(params = {}, tftRes = null, co2Cfg = {}) {
 // 参考: 典型高炉工序直接排放 ~1.5-2.0 t CO2/tHM（后端 v20 打印口径）
 export function evalCo2Level(co2t) {
   if (co2t < 1.2) {
-    return { code: 'low', label: '低碳排', color: '#3fae6a',
+    return { code: 'low', label: '低碳排', color: 'var(--green)',
       desc: '排放强度低于典型水平，燃料结构/利用效率较优' }
   }
   if (co2t > 1.8) {
-    return { code: 'high', label: '高碳排', color: '#e06c5a',
+    return { code: 'high', label: '高碳排', color: 'var(--red)',
       desc: '排放强度高于典型水平，建议核查焦比/煤比与直接还原度' }
   }
-  return { code: 'ok', label: '排放正常', color: '#e8a23d',
+  return { code: 'ok', label: '排放正常', color: 'var(--yellow)',
     desc: '排放强度处于典型高炉区间（约 1.5~2.0 t CO2/tHM）' }
 }
 

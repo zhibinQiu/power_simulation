@@ -15,27 +15,30 @@
         draggable="true"
         @dragstart.stop="onGripStart"
         @dragend.stop="onGripEnd"
-        title="拖动调整模块顺序"
+        :title="t('拖动调整模块顺序')"
       >⠿</span>
       <span v-if="$slots.actions" class="chead-actions" @click.stop>
         <slot name="actions" />
       </span>
-      <span v-else-if="showMore && !dragId" class="chead-more" :class="{ shown: hover }" @click.stop title="更多">⋯</span>
     </button>
-    <div v-show="isOpen" class="cbody">
-      <slot />
+    <!-- 包豪斯化：grid 轨道 0fr→1fr 平滑展开/折叠（替代 v-show 硬切换），丝滑不跳动 -->
+    <div class="cbody" :class="{ on: isOpen }">
+      <div class="cbody-in">
+        <slot />
+      </div>
     </div>
   </section>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { t } from '../i18n'
 import { useDragState } from '../composables/useDragSort'
 
 const props = defineProps({
   title: { type: String, required: true },
-  defaultOpen: { type: Boolean, default: true },
-  showMore: { type: Boolean, default: true },
+  /** 默认折叠（ISA-101 少即是多），点击标题展开 */
+  defaultOpen: { type: Boolean, default: false },
   /** 提供后该模块可上下拖拽重排；同时作为持久化的模块唯一 id */
   dragId: { type: String, default: '' },
   /** 受控展开状态（供父面板持久化） */
@@ -56,8 +59,6 @@ function toggle() {
 watch(() => props.modelValue, (v) => {
   if (v !== undefined) internal.value = v
 })
-
-const hover = ref(false)
 
 /* —— 拖拽 —— */
 const { draggedId, beginDrag, clearDrag, isDragging } = useDragState()
@@ -172,35 +173,23 @@ function onDrop(e) {
 .chead:hover .drag-grip { opacity: .7; }
 .drag-grip:hover { opacity: 1; background: var(--accent-l); color: var(--accent-d); }
 .drag-grip:active { cursor: grabbing; }
-.chead-more {
-  flex: 0 0 auto;
-  width: 18px;
-  height: 16px;
-  display: grid;
-  place-items: center;
-  font-size: 14px;
-  line-height: 1;
-  color: var(--muted);
-  border-radius: 3px;
-  opacity: .65;
-  transition: opacity .12s, background .12s, color .12s;
-  letter-spacing: 1px;
-}
-.chead:hover .chead-more, .chead-more.shown { opacity: 1; }
-.chead-more:hover { background: var(--accent-l); color: var(--accent-d); opacity: 1; }
 .chead-actions { display: inline-flex; align-items: center; gap: 4px; }
-.cbody { padding: 4px 6px 6px; }
+/* 包豪斯化：内容区用 grid 行轨道 0fr→1fr 实现平滑展开/折叠动画 */
+.cbody { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .24s cubic-bezier(.4, 0, .2, 1); }
+.cbody.on { grid-template-rows: 1fr; }
+.cbody-in { overflow: hidden; min-height: 0; padding: 4px 6px 6px; transition: padding .18s ease, opacity .18s ease; opacity: 1; }
+.csec:not(.open) .cbody-in { padding: 0 6px; opacity: 0; }
+/* 折叠时整体不可交互，避免键盘/点击落到隐藏内容 */
+.csec:not(.open) .cbody { pointer-events: none; }
 
 /* 暗黑仿真模式：扁平分组（保持与浅色一致的 VS Code 风格） */
 .app.sim-dark .csec { background: transparent; border-color: transparent; }
 .app.sim-dark .csec.open { background: transparent; }
 .app.sim-dark .csec:not(.open) .chead { background: transparent; }
-.app.sim-dark .chead:hover { background: #262D38; }
-.app.sim-dark .ctitle { color: #DDD; }
-.app.sim-dark .chev { color: #888; }
-.app.sim-dark .chead-more { color: #888; }
-.app.sim-dark .chead-more:hover { background: rgba(0, 114, 189, .25); color: #6AB0F2; }
-.app.sim-dark .drag-grip { color: #888; }
-.app.sim-dark .drag-grip:hover { background: rgba(61, 165, 255, .18); color: #6AB0F2; }
+.app.sim-dark .chead:hover { background: #2A2E2A; }
+.app.sim-dark .ctitle { color: #E2E0DA; }
+.app.sim-dark .chev { color: #8E8C84; }
+.app.sim-dark .drag-grip { color: #8E8C84; }
+.app.sim-dark .drag-grip:hover { background: rgba(245, 169, 10, .18); color: #FFC42E; }
 .app.sim-dark .csec.drop-before, .app.sim-dark .csec.drop-after { box-shadow: 0 -2px 0 0 var(--accent); }
 </style>

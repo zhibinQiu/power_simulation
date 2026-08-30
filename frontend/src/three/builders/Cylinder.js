@@ -9,7 +9,7 @@ import { PAL, mat, boxMesh, steelTex, tankShellTex } from './utils.js'
 export default function _buildCylinder(bodyMat) {
     const g = new THREE.Group()
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x00ccff
+    const neonColor = 0x2c6e9e
 
 
     // === 1. 钢包（ladle — 耐火材料内衬） ===
@@ -32,9 +32,9 @@ export default function _buildCylinder(bodyMat) {
     // === 2. 内部钢水熔池 ===
     const melt = new THREE.Mesh(
         new THREE.CylinderGeometry(2.8, 3.0, 3.0, 24),
-        mat(0xff8822, {
-            roughness: 0.05, metalness: 0.05, emissive: 0xcc3300, emissiveIntensity: 0.9,
-            transparent: true, opacity: 0.7, depthWrite: false
+        mat(0xbf6a30, {
+            roughness: 0.15, metalness: 0.05, emissive: 0x8a4018, emissiveIntensity: 0.5,
+            transparent: true, opacity: 0.75, depthWrite: false
         }))
     melt.position.y = 3.0; g.add(melt)
     melt.name = 'melt'
@@ -137,11 +137,11 @@ export default function _buildCylinder(bodyMat) {
 
     // === 7. 霓虹 ===
     const lfRing1 = new THREE.Mesh(new THREE.TorusGeometry(3.7, 0.12, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.5, roughness: 0.2 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     lfRing1.rotation.x = Math.PI / 2; lfRing1.position.set(0, 4.0, 0); g.add(lfRing1)
 
     const lfRing2 = new THREE.Mesh(new THREE.TorusGeometry(3.7, 0.12, 8, 24),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.4, roughness: 0.2 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     lfRing2.rotation.x = Math.PI / 2; lfRing2.position.set(0, 6.8, 0); g.add(lfRing2)
 
     // === 8. 动画钩子 ===
@@ -152,7 +152,7 @@ export default function _buildCylinder(bodyMat) {
     g.userData._arBubbles = arBubbles
 
     // === 物料转变动画：钢水(橙)→电弧加热合金→精炼钢水(亮橙) ===
-    // 颜色与连线载运体一致：crude_steel(0xff8822)→refined_steel(0xffaa44)
+    // 颜色与连线载运体一致：crude_steel(0xbf6a30)→refined_steel(0xc67a3c)
     const lfFlow = []
     for (let i = 0; i < 5; i++) {
         const glow = new THREE.Mesh(new THREE.SphereGeometry(0.25 + Math.random() * 0.12, 6, 4),
@@ -163,7 +163,7 @@ export default function _buildCylinder(bodyMat) {
             obj: glow, phase: i * 0.2, period: 4.5,
             srcPos: new THREE.Vector3((Math.random() - 0.5) * 3, 5.0, (Math.random() - 0.5) * 3),
             dstPos: new THREE.Vector3((Math.random() - 0.5) * 2, 2.5, (Math.random() - 0.5) * 2),
-            srcColor: 0xff8822, dstColor: 0xffaa44, scalePulse: 0.12,
+            srcColor: 0xbf6a30, dstColor: 0xc67a3c, scalePulse: 0.12,
         })
     }
 

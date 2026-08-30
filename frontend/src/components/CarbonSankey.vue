@@ -103,7 +103,7 @@ const drawnNodes = computed(() => {
     const isProcess = n.kind === 'process'
     const res = store.resultForView && store.resultForView.units && store.resultForView.units.find((u) => 'u:' + u.id === n.id)
     const color = n.kind === 'sink'
-      ? (n.id === 'co2' ? '#D14B4B' : n.id === 'steel' ? '#2E9E63' : n.id === 'slag' ? '#7B5FA6' : '#0072BD')
+      ? (n.id === 'co2' ? '#BC3B30' : n.id === 'steel' ? '#2E8B57' : n.id === 'slag' ? '#7B5FA6' : '#005E94')
       : isProcess ? hcolor(res ? res.heat : 0.3)
         : n.kind === 'mid' ? '#2CA6A4' : '#ED7D31'
     const anchor = n.col === lastCol ? 'end' : 'start'
@@ -127,7 +127,7 @@ const paths = computed(() => {
     const x0 = s.x + NODE_W, x1 = t.x
     const mx = (x0 + x1) / 2
     const color = t.kind === 'sink'
-      ? (t.id === 'co2' ? '#D14B4B' : t.id === 'steel' ? '#2E9E63' : t.id === 'slag' ? '#7B5FA6' : '#0072BD')
+      ? (t.id === 'co2' ? '#BC3B30' : t.id === 'steel' ? '#2E8B57' : t.id === 'slag' ? '#7B5FA6' : '#005E94')
       : (s.kind === 'fuel' ? '#ED7D31' : (s.kind === 'mid' || t.kind === 'mid') ? '#2CA6A4' : '#8b95a1')
     // 工艺与中间产品同列：改为向右的小弧线，避免水平反向弯曲重叠
     const d = Math.abs(x0 - x1) <= NODE_W + 1

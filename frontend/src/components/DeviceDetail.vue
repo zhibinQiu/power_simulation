@@ -7,22 +7,22 @@
         </span>
         <div>
           <div class="insp-title">{{ dev.label }}</div>
-          <div class="insp-sub">{{ metaLabel }} · {{ dev.adjustable ? '可调设备（策略作用对象）' : '计量设备（只读监测）' }}</div>
+          <div class="insp-sub">{{ metaLabel }} · {{ dev.adjustable ? t('可调设备（策略作用对象）') : t('计量设备（只读监测）') }}</div>
         </div>
       </div>
     </div>
     <!-- ===== 1. 实测值 / 设定值 ===== -->
-    <CollapseSection title="实测值 / 设定值" tone="blue" :show-more="false">
+    <CollapseSection :title="t('实测值 / 设定值')" tone="blue" :show-more="false">
     <p class="sec-desc" v-if="metaDesc !== '—'">{{ metaDesc }}</p>
-    <div class="kv2"><span>所属工序</span><b>{{ info.unitName }}（{{ unitTypeLabel }}）</b></div>
+    <div class="kv2"><span>{{ t('所属工序') }}</span><b>{{ info.unitName }}（{{ unitTypeLabel }}）</b></div>
     <!-- 计量项：仅计量设备展示 -->
-    <div class="kv2" v-if="!dev.adjustable && dev.measured"><span>计量项</span><b>{{ dev.measured }}</b></div>
+    <div class="kv2" v-if="!dev.adjustable && dev.measured"><span>{{ t('计量项') }}</span><b>{{ dev.measured }}</b></div>
 
     <!-- 计量设备：当前读数 / 计量精度 / 量程 -->
     <div class="chips" v-if="!dev.adjustable">
-      <div class="chip2"><span>当前读数</span><b>{{ f(live != null ? live : dev.reading) }}</b><i>{{ dev.unit }}</i></div>
-      <div class="chip2"><span>计量精度</span><b>{{ dev.accuracy || '—' }}</b></div>
-      <div class="chip2"><span>量程</span><b>{{ dev.range || '—' }}</b></div>
+      <div class="chip2"><span>{{ t('当前读数') }}</span><b>{{ f(live != null ? live : dev.reading) }}</b><i>{{ dev.unit }}</i></div>
+      <div class="chip2"><span>{{ t('计量精度') }}</span><b>{{ dev.accuracy || '—' }}</b></div>
+      <div class="chip2"><span>{{ t('量程') }}</span><b>{{ dev.range || '—' }}</b></div>
     </div>
 
     <!-- 可调设备：设定调节（输入框数值即当前设定值/工况值） -->
@@ -31,34 +31,34 @@
         <div class="pr-top"><span>{{ spLabel }}</span><b>{{ f(setpointVal) }} <span class="u">{{ sp.unit || '' }}</span></b></div>
         <input type="number" :min="sp.min" :max="sp.max" :step="sp.step || 1"
                :value="setpointVal" @input="onSetpoint" class="num"
-               :title="`当前 ${f(setpointVal)} ${sp.unit || ''}`" />
-        <div class="pr-hint">参考范围 {{ f(sp.min) }} – {{ f(sp.max) }} {{ sp.unit || '' }}</div>
+               :title="t('当前 {val} {unit}', { val: f(setpointVal), unit: sp.unit || '' })" />
+        <div class="pr-hint">{{ t('参考范围') }} {{ f(sp.min) }} – {{ f(sp.max) }} {{ sp.unit || '' }}</div>
       </div>
       <!-- 附加可调项（如鼓风机鼓风湿度） -->
       <div v-for="es in extraSps" :key="es.key" class="param-row extra-row">
         <div class="pr-top"><span>{{ es.label }}</span><b>{{ f(extraVal(es.key)) }} <span class="u">{{ es.unit }}</span></b></div>
         <input type="number" :min="es.min" :max="es.max" :step="es.step || 1"
                :value="extraVal(es.key)" @input="onExtraSetpoint(es.key, $event.target.value)"
-               class="num" :title="`当前 ${f(extraVal(es.key))} ${es.unit}`" />
-        <div class="pr-hint">参考范围 {{ f(es.min) }} – {{ f(es.max) }} {{ es.unit }}</div>
+               class="num" :title="t('当前 {val} {unit}', { val: f(extraVal(es.key)), unit: es.unit })" />
+        <div class="pr-hint">{{ t('参考范围') }} {{ f(es.min) }} – {{ f(es.max) }} {{ es.unit }}</div>
       </div>
-      <div class="note">输入框中的数值即为当前设定值（工况值），仿真计算以此为准；调节后经碳引擎折算为运行电耗 / 间接排放，估算随之更新。</div>
+      <div class="note">{{ t('输入框中的数值即为当前设定值（工况值），仿真计算以此为准；调节后经碳引擎折算为运行电耗 / 间接排放，估算随之更新。') }}</div>
     </div>
     </CollapseSection>
 
     <!-- ===== 3. 实时监控 ===== -->
-    <CollapseSection title="实时监控" tone="teal" :show-more="false">
+    <CollapseSection :title="t('实时监控')" tone="teal" :show-more="false">
     <div class="trend-head">
-      <span class="live-dot"></span> {{ dev.adjustable ? '设定值轨迹 · 1 Hz' : '实时采样 · 1 Hz' }}
+      <span class="live-dot"></span> {{ dev.adjustable ? t('设定值轨迹 · 1 Hz') : t('实时采样 · 1 Hz') }}
       <span class="sp"></span>
-      <span class="mono">{{ history.length }} 点</span>
+      <span class="mono">{{ history.length }} {{ t('点') }}</span>
     </div>
     <TrendChart :data="history" :color="dev.color" :height="150" :grid="true" :unit="dev.unit" />
     <div class="trend-foot">
       <!-- 可调设备不显示「最新」：输入框中的数字即当前设定值，避免与面板重复 -->
-      <span v-if="!dev.adjustable">最新 <b :style="{color:dev.color}">{{ f(latest) }} {{ dev.unit }}</b></span>
-      <span>均值 <b>{{ f(avg) }} {{ dev.unit }}</b></span>
-      <span>峰值 <b>{{ f(peak) }} {{ dev.unit }}</b></span>
+      <span v-if="!dev.adjustable">{{ t('最新') }} <b :style="{color:dev.color}">{{ f(latest) }} {{ dev.unit }}</b></span>
+      <span>{{ t('均值') }} <b>{{ f(avg) }} {{ dev.unit }}</b></span>
+      <span>{{ t('峰值') }} <b>{{ f(peak) }} {{ dev.unit }}</b></span>
     </div>
 
     <!-- 高炉风口热制度 · TFT 策略提示：实时热状态判定与操作建议（焓平衡真值），随实时监控展示 -->
@@ -71,22 +71,22 @@
       :extra-setpoints="extraSetpointsNow"
     />
     <!-- 高炉数值仿真分析入口：全厂高炉 TFT 数值总览与调参推演（原仿真菜单入口迁移至此） -->
-    <button v-if="showTftPanel && store.simMode" class="tft-entry-btn" @click="openTftAnalysis">高炉数值仿真分析</button>
+    <button v-if="showTftPanel && store.simMode" class="tft-entry-btn" @click="openTftAnalysis">{{ t('高炉数值仿真分析') }}</button>
     </CollapseSection>
 
     <!-- ===== 4. 其他内容 ===== -->
     <!-- 附加可调项联动指标（如高炉鼓风含湿）：展示推导公式，透明可审计 -->
     <template v-if="multiIndicators.length">
-      <CollapseSection :title="'衍生指标 · ' + (multiIndicators[0] ? multiIndicators[0].label : '')" tone="amber" :show-more="false">
+      <CollapseSection :title="t('衍生指标 · ') + (multiIndicators[0] ? multiIndicators[0].label : '')" tone="amber" :show-more="false">
       <div class="couple-box">
         <div v-for="ind in multiIndicators" :key="ind.key" class="multi-ind">
           <div class="couple-top">
-            <span class="cb-badge m">机理</span>
-            <span class="cb-target">指标：<b>{{ ind.label }}</b></span>
+            <span class="cb-badge m">{{ t('机理') }}</span>
+            <span class="cb-target">{{ t('指标：') }}<b>{{ ind.label }}</b></span>
             <span class="cb-val">{{ f(ind.value) }}<i>{{ ind.unit }}</i></span>
           </div>
-          <p class="cb-basis"><b>公式：</b>{{ ind.formula }}</p>
-          <p class="cb-basis2">当前 风量 {{ f(setpointVal) }} m³/h、{{ ind.label }} {{ f(extraVal(ind.key)) }} {{ ind.unit }}</p>
+          <p class="cb-basis"><b>{{ t('公式：') }}</b>{{ ind.formula }}</p>
+          <p class="cb-basis2">{{ t('当前 风量') }} {{ f(setpointVal) }} m³/h、{{ ind.label }} {{ f(extraVal(ind.key)) }} {{ ind.unit }}</p>
           <p class="cb-basis2" v-if="ind.basis">{{ ind.basis }}</p>
         </div>
       </div>
@@ -94,29 +94,29 @@
     </template>
 
     <!-- 减碳影响依据（耦合透明度）：让"为什么调整设备会影响碳排"对用户可见、可审计 -->
-    <CollapseSection v-if="coupling" title="减碳影响依据 · 耦合透明度" tone="green" :show-more="false">
+    <CollapseSection v-if="coupling" :title="t('减碳影响依据 · 耦合透明度')" tone="green" :show-more="false">
     <div class="couple-box">
       <div class="couple-top">
         <span class="cb-badge" :class="sourceClass">{{ sourceLabel }}</span>
-        <span class="cb-target">驱动参数：<b>{{ paramLabel(coupling.target) }}</b></span>
-        <button class="cb-cal" @click="showWizard = true">用本厂数据校准</button>
+        <span class="cb-target">{{ t('驱动参数：') }}<b>{{ paramLabel(coupling.target) }}</b></span>
+        <button class="cb-cal" @click="showWizard = true">{{ t('用本厂数据校准') }}</button>
       </div>
-      <p class="cb-basis"><b>依据：</b>{{ coupling.basis }}</p>
+      <p class="cb-basis"><b>{{ t('依据：') }}</b>{{ coupling.basis }}</p>
       <div class="cb-rows">
-        <div class="cb-row"><span>当前设定</span><b>{{ f(setpointVal) }} <i>{{ sp ? sp.unit : '' }}</i></b></div>
+        <div class="cb-row"><span>{{ t('当前设定') }}</span><b>{{ f(setpointVal) }} <i>{{ sp ? sp.unit : '' }}</i></b></div>
         <div class="cb-row" v-for="(v, k) in derivedNow" :key="k">
-          <span>推算 {{ paramLabel(k) }}</span>
-          <b>{{ f(v) }} <i v-if="baseParams[k] != null">(基准 {{ f(baseParams[k]) }} → {{ pct(v, baseParams[k]) }})</i></b>
+          <span>{{ t('推算') }} {{ paramLabel(k) }}</span>
+          <b>{{ f(v) }} <i v-if="baseParams[k] != null">({{ t('基准') }} {{ f(baseParams[k]) }} → {{ pct(v, baseParams[k]) }})</i></b>
         </div>
-        <div class="cb-row"><span>不确定度</span><b>{{ coupling.uncertainty || '—' }}</b></div>
+        <div class="cb-row"><span>{{ t('不确定度') }}</span><b>{{ coupling.uncertainty || '—' }}</b></div>
       </div>
-      <p class="cb-note data" v-if="coupling.source === 'data'">✓ 已用本厂数据标定（{{ coupling.n }} 个样本，R²（拟合优度）={{ coupling.r2 }}），刷新/重启后自动加载。</p>
+      <p class="cb-note data" v-if="coupling.source === 'data'">{{ t('✓ 已用本厂数据标定（{n} 个样本，R²（拟合优度）={r2}），刷新/重启后自动加载。', { n: coupling.n, r2: coupling.r2 }) }}</p>
     </div>
     </CollapseSection>
 
-    <CollapseSection title="活动数据 → 碳引擎" tone="teal" :show-more="false">
+    <CollapseSection :title="t('活动数据 → 碳引擎')" tone="teal" :show-more="false">
     <div class="feeds">{{ feedsText }}</div>
-    <div class="note">碳排放 = 活动数据 × 排放因子；接入 SCADA / EMS 后显示实测值。</div>
+    <div class="note">{{ t('碳排放 = 活动数据 × 排放因子；接入 SCADA / EMS 后显示实测值。') }}</div>
     </CollapseSection>
 
     <CalibrationWizard
@@ -138,10 +138,13 @@ import CollapseSection from './CollapseSection.vue'
 import TrendChart from './TrendChart.vue'
 import DeviceGlyph from './DeviceGlyph.vue'
 import TftStrategyPanel from './TftStrategyPanel.vue'
+import { lazyDialog } from '../utils/asyncComp'
+import { t } from '../i18n'
 // 校准向导较重且仅在「用本厂数据校准」时按需打开：异步分包，降低首屏体积
 const CalibrationWizard = defineAsyncComponent(() => import('./CalibrationWizard.vue'))
-// 高炉数值仿真分析弹窗：仅在点击入口时按需加载
-const TftAnalysisDialog = defineAsyncComponent(() => import('./TftAnalysisDialog.vue'))
+// 高炉数值仿真分析弹窗：仅在点击入口时按需加载；lazyDialog 提供加载占位/失败重试/错误提示，
+// 避免动态 import 偶发失败时弹窗静默打不开
+const TftAnalysisDialog = lazyDialog(() => import('./TftAnalysisDialog.vue'))
 import { getCoupling, deriveProcessOpParams, paramLabel, PROCESS_MAP, DEVICE_MAP } from '../data/flowLibrary'
 import { buildRealtimeTftParams } from '../utils/tft'
 
@@ -161,7 +164,7 @@ const sp = computed(() => {
 // 喂给碳核算引擎的活动数据说明：优先设备自带，其次由耦合目标推断（可调设备无后端 feeds 字段）
 const feedsText = computed(() => {
   if (dev.value && dev.value.feeds) return dev.value.feeds
-  if (coupling.value && coupling.value.target) return `驱动 ${paramLabel(coupling.value.target)}（经碳引擎折算运行电耗 / 间接排放）`
+  if (coupling.value && coupling.value.target) return t('驱动 {target}（经碳引擎折算运行电耗 / 间接排放）', { target: paramLabel(coupling.value.target) })
   return '—'
 })
 // 所属工序类型 → 中文标签（避免直接显示英文工序类型键）
@@ -178,10 +181,10 @@ function onSetpoint(e) { if (dev.value) store.setDeviceSetpoint(dev.value.id, e.
 
 // 主设定项中文名（模板 setpoint.label 优先，其次 measures，兜底「设定值」）
 const spLabel = computed(() => {
-  const t = dev.value && DEVICE_MAP[dev.value.type]
-  if (t && t.setpoint && t.setpoint.label) return t.setpoint.label
+  const tpl = dev.value && DEVICE_MAP[dev.value.type]
+  if (tpl && tpl.setpoint && tpl.setpoint.label) return tpl.setpoint.label
   if (dev.value && dev.value.measures) return dev.value.measures
-  return '设定值'
+  return t('设定值')
 })
 // 附加可调项（如鼓风机鼓风湿度）：模板定义列表
 const extraSps = computed(() => {
@@ -202,7 +205,7 @@ function onExtraSetpoint(key, v) { if (dev.value) store.setDeviceExtraSetpoint(d
 // CEMS 说明性内容移入命令行窗口（避免面板冗余提示）：选中 CEMS 设备时推送一次
 watch(info, (v) => {
   if (v && v.device && v.device.type === 'cems') {
-    store.toast = 'CEMS（烟气连续排放监测系统）直接测得 CO₂ 排放（点源直接监测法），用于与因子法交叉校验；并非所有烟囱都需安装，主体核算仍以活动数据 × 因子为准。'
+    store.toast = t('CEMS（烟气连续排放监测系统）直接测得 CO₂ 排放（点源直接监测法），用于与因子法交叉校验；并非所有烟囱都需安装，主体核算仍以活动数据 × 因子为准。')
   }
 }, { immediate: true })
 
@@ -237,7 +240,7 @@ const showTftPanel = computed(() => !!info.value && info.value.unitType === 'bla
 const showTft = ref(false)
 function openTftAnalysis() {
   if (store.simMode) showTft.value = true
-  else store.toast = '高炉数值分析仅限仿真模式使用：请先开启仿真模式'
+  else store.showToast(t('高炉数值分析仅限仿真模式使用：请先开启仿真模式'), 'warn')
 }
 const extraSetpointsNow = computed(() => {
   const o = {}
@@ -266,7 +269,7 @@ const multiIndicators = computed(() => {
 })
 const sourceLabel = computed(() => {
   const s = coupling.value && coupling.value.source
-  return s === 'mechanism' ? '机理' : s === 'empirical' ? '经验' : s === 'data' ? '数据·已校准' : '未标定'
+  return s === 'mechanism' ? t('机理') : s === 'empirical' ? t('经验') : s === 'data' ? t('数据·已校准') : t('未标定')
 })
 const sourceClass = computed(() => {
   const s = coupling.value && coupling.value.source
@@ -322,13 +325,13 @@ function f(n) { return n == null ? '—' : Number(n).toLocaleString('zh-CN', { m
 .cb-badge.u { background: #888; }          /* 未标定 */
 .cb-target { font-size: 11px; color: var(--muted); }
 .cb-target b { color: var(--text); font-weight: 400; }
-.cb-val { margin-left: auto; font-size: 13px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.cb-val { margin-left: auto; font-size: 13px; color: var(--accent-d); font-variant-numeric: tabular-nums; }
 .cb-val i { font-size: 10px; color: var(--muted); font-style: normal; margin-left: 2px; }
 .multi-ind + .multi-ind { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
 .cb-basis2 { font-size: 10px; color: var(--muted); line-height: 1.6; margin: 4px 0 0; }
-.cb-cal { margin-left: auto; font-size: 10px; padding: 3px 8px; border-radius: 3px; border: 1px solid var(--accent);
-  background: transparent; color: var(--accent); cursor: pointer; }
-.cb-cal:hover { background: var(--accent); color: #fff; }
+.cb-cal { margin-left: auto; font-size: 10px; padding: 3px 8px; border-radius: 3px; border: 1px solid var(--accent2);
+  background: transparent; color: var(--accent2); cursor: pointer; }
+.cb-cal:hover { background: var(--accent2); color: #fff; }
 .cb-basis { font-size: 11px; line-height: 1.55; color: var(--text); margin: 8px 0 6px; }
 .cb-rows { display: flex; flex-direction: column; gap: 5px; }
 .cb-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; }

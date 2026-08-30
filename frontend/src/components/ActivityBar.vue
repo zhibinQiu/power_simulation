@@ -1,12 +1,12 @@
 <template>
-  <aside class="activitybar" role="navigation" aria-label="活动栏">
+  <aside class="activitybar" role="navigation" :aria-label="t('活动栏')">
     <button
       v-for="b in buttons"
       :key="b.id"
       class="act-btn"
       :class="{ on: store.activityView === b.id }"
-      :title="b.title"
-      :aria-label="b.title"
+      :title="t(b.title)"
+      :aria-label="t(b.title)"
       @click="onClick(b.id)"
     >
       <Icon :name="b.icon" :size="20" :stroke="1.5" />
@@ -14,7 +14,7 @@
     </button>
     <div class="act-sp"></div>
     <div class="act-bottom">
-      <button class="act-btn" title="收起/展开左侧栏" aria-label="收起/展开左侧栏" @click="store.toggleLeft()">
+      <button class="act-btn" :title="t('收起/展开左侧栏')" :aria-label="t('收起/展开左侧栏')" @click="store.toggleLeft()">
         <Icon name="panelLeft" :size="20" :stroke="1.5" />
       </button>
     </div>
@@ -24,14 +24,15 @@
 <script setup>
 import { useSimStore } from '../stores/sim'
 import Icon from './Icon.vue'
+import { t } from '../i18n'
 
 const store = useSimStore()
 
-// 活动栏：资源管理器 / 搜索 / 场景 / 连接
+// 活动栏：场景 / 资源管理器 / 搜索 / 连接
 const buttons = [
+  { id: 'scene', icon: 'scene3d', title: '场景', badge: null },
   { id: 'explorer', icon: 'open', title: '资源管理器', badge: null },
   { id: 'search', icon: 'search', title: '搜索', badge: null },
-  { id: 'scene', icon: 'scene3d', title: '场景', badge: null },
   { id: 'connections', icon: 'link', title: '连接（数据源管理）', badge: () => (store.dataSources || []).filter((s) => s.enabled !== false).length },
 ]
 

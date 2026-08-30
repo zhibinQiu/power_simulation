@@ -37,7 +37,11 @@ TRAIN_INTERVAL = 2.0   # 调度线程唤醒周期（秒）：按各模型的训�
 HISTORY_KEEP = 240     # 每模型保留的最大训练轨迹点数（超出抽稀）
 ARCHIVE_GAIN = 0.05    # 版本自动存档的最小相对提升（%）：只有更优才替换为新版本
 ARCHIVE_MIN_ITER_GAP = 8  # 自动存档最小迭代间隔：避免连续迭代产生过密版本
-REMINDER_GAIN = 0.3    # 手动模式提醒阈值（%）：相对提升超过该值生成系统提醒
+# 手动模式提醒：fitness 含实时负载因子（±4%）/ 预测工况因子（±15%）噪声，且 best_fitness
+# 取历史最小值会让噪声单向累积 —— 阈值过低且无冷却时，每次训练都会生成新提醒、前端反复响铃。
+# 因此提醒需要「显著进展」（REMINDER_GAIN）且距上次提醒超过冷却期（REMINDER_COOLDOWN）。
+REMINDER_GAIN = 1.0      # 手动模式提醒阈值（%）：相对上次提醒提升超过该值才生成提醒
+REMINDER_COOLDOWN = 300  # 手动模式提醒最小间隔（秒）：冷却期内不重复提醒
 
 
 def _time_in_window(cur: str, start: str, end: str) -> bool:
@@ -220,6 +224,7 @@ class OptimizerBase:
         self.pending_auto_apply = False    # 自动化控制待下发标记（新版本已就绪）
         self.reminder: Optional[Dict[str, Any]] = None  # 手动调优系统提醒
         self._last_reminded: Optional[float] = None    # 上次提醒时的强度（提醒基线）
+        self._next_remind_at = 0.0                     # 提醒冷却：下一次允许生成提醒的时间戳
 
     # ---------- 状态 ----------
     @property
@@ -320,6 +325,7 @@ class OptimizerBase:
             self.best_fitness = self.start_fitness
             self.best_values = list(init_values)
             self._last_reminded = self.start_fitness
+            self._next_remind_at = 0.0
             self.history.append({"iter": 0, "best": round(self.start_fitness, 2),
                                  "avg": round(self.start_fitness, 2)})
             self._init_search()
@@ -342,6 +348,7 @@ class OptimizerBase:
             self.running = False
             self.reminder = None
             self.pending_auto_apply = False
+            self._next_remind_at = 0.0
             if model is not None:
                 self.setup(model, factors)
             self._log("模型已重置（历史版本保留）")
@@ -406,8 +413,12 @@ class OptimizerBase:
             if self.auto_control:
                 self.reminder = None
             else:
+                # 提醒触发条件：相对上次提醒的显著提升（REMINDER_GAIN）+ 冷却节流（REMINDER_COOLDOWN）。
+                # best_fitness 是历史最小值，而 fitness 含实时负载/预测工况因子噪声，噪声会单向累积
+                # 使 best_fitness 持续「创新低」——若无阈值与冷却约束，每次训练都会生成新提醒 id，
+                # 前端去重失效导致反复响铃。故仅显著进展且距上次提醒超过冷却期才再次提醒。
                 reminded_base = self._last_reminded if self._last_reminded else self.start_fitness
-                if reminded_base != 0:
+                if reminded_base != 0 and time.time() >= self._next_remind_at:
                     rg = (reminded_base - self.best_fitness) / abs(reminded_base) * 100
                     if rg >= REMINDER_GAIN:
                         self.reminder = {
@@ -418,6 +429,7 @@ class OptimizerBase:
                             "ts": time.time(),
                         }
                         self._last_reminded = self.best_fitness
+                        self._next_remind_at = time.time() + REMINDER_COOLDOWN
                         self._log(f"训练取得进展：最优目标值 {self.best_fitness:.2f} {self._obj_unit()}（提升 {rg:.1f}%），已生成手动调优提醒")
             if self.iteration == 1:
                 obj_label = self.objective
@@ -572,6 +584,7 @@ class OptimizerBase:
                     self._log("已开启自动化控制：模型变优后自动把新版本参数下发到可调设备")
                 else:
                     self._last_reminded = self.best_fitness or self.start_fitness
+                    self._next_remind_at = 0.0
                     self._log("已关闭自动化控制：改为系统提醒手动调优")
             if "objective" in patch:
                 key = str(patch["objective"] or "intensity")

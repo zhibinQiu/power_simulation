@@ -2,15 +2,12 @@
   <!-- ============ 底栏状态条 ============ -->
   <footer class="statusbar">
     <span v-if="!store.license.activated" class="st lic-warn" @click="store.openAbout()"
-          title="产品未激活，点击在「关于本平台」中激活">
-      <span class="lic-tri">⚠</span> 产品未激活
+          :title="t('产品未激活，点击在「关于本平台」中激活')">
+      <span class="lic-tri">⚠</span> {{ t('产品未激活') }}
     </span>
-    <span class="st"><span class="feed-dot" :class="'feed-' + store.feedStatus"></span> 实时链路 <span class="v">{{ feedText }}</span></span>
-    <span class="st">{{ store.editMode ? '编排方案' : '流程模型' }} · <span class="v">{{ store.editMode ? store.scheme.nodes.length + ' 节点' : store.model.units.length + ' 工序' }}</span> / <span class="v">{{ store.editMode ? store.scheme.connections.length + ' 连线' : store.model.flows.length + ' 物流' }}</span></span>
-    <span class="st">监测点位 <span class="v">{{ deviceCount }}</span></span>
-    <span class="st">可调约束 <span class="v">{{ paramCount }}</span></span>
-    <span v-if="store.newsTickerOn" class="st spacer news-ticker" title="市场快讯 · 中国煤炭交易网（ctctc.cn）">
-      <span class="nt-label"><span class="feed-dot" :class="newsOn ? 'feed-open' : 'feed-init'"></span> 快讯</span>
+    <span class="st"><span class="feed-dot" :class="'feed-' + store.feedStatus"></span> {{ t('实时链路') }} <span class="v">{{ feedText }}</span></span>
+    <span v-if="store.newsTickerOn" class="st spacer news-ticker" :title="t('市场快讯 · 中国煤炭交易网（ctctc.cn）')">
+      <span class="nt-label"><span class="feed-dot" :class="newsOn ? 'feed-open' : 'feed-init'"></span> {{ t('快讯') }}</span>
       <span class="news-scroll" v-if="newsItems.length">
         <span class="news-track" :style="{ '--news-dur': newsDur + 's' }">
           <span class="news-list">
@@ -21,11 +18,11 @@
           </span>
         </span>
       </span>
-      <span v-else class="nt-empty">{{ newsError ? '快讯暂不可用' : '快讯加载中…' }}</span>
+      <span v-else class="nt-empty">{{ newsError ? t('快讯暂不可用') : t('快讯加载中…') }}</span>
     </span>
-    <span class="st" :class="store.strategy ? 'ok' : 'warnc'">{{ store.strategy ? '策略情景激活' : '基线情景' }}</span>
+    <span class="st" :class="store.strategy ? 'ok' : 'warnc'">{{ store.strategy ? t('策略情景激活') : t('基线情景') }}</span>
     <span class="st mono"><span class="v">{{ clock }}</span></span>
-    <span class="st st-notif" :class="{ open: notifOpen }" ref="notifBtn" @click="toggleNotif" title="系统通知">
+    <span class="st st-notif" :class="{ open: notifOpen }" ref="notifBtn" @click="toggleNotif" :title="t('系统通知')">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2a.5.5 0 0 1 .5.5v.542a4 4 0 0 1 3.001 3.865v2.69l.852 1.421a.5.5 0 0 1-.435.744H4.082a.5.5 0 0 1-.435-.744l.852-1.42v-2.69A4 4 0 0 1 7.5 3.042V2.5A.5.5 0 0 1 8 2zm-1.16 10h2.32a2.003 2.003 0 0 1-3.868-.568l1.548.568zm3.66-.003l-.99-1.65h-3.02l-.99 1.65h4.01z"/></svg>
       <span v-if="store.unreadNotifs > 0" class="ntf-badge">{{ store.unreadNotifs > 99 ? '99+' : store.unreadNotifs }}</span>
     </span>
@@ -35,16 +32,16 @@
   <transition name="fade">
     <div v-if="notifOpen" class="notif-center" @click.stop>
       <div class="notif-head">
-        <span class="ntf-title">系统通知</span>
+        <span class="ntf-title">{{ t('系统通知') }}</span>
         <span class="ntf-actions">
-          <button class="ntf-btn" @click="store.markAllNotificationsRead()" :disabled="!store.notifications.length">全部标为已读</button>
-          <button class="ntf-btn" @click="store.clearNotifications()" :disabled="!store.notifications.length">清空</button>
+          <button class="ntf-btn" @click="store.markAllNotificationsRead()" :disabled="!store.notifications.length">{{ t('全部标为已读') }}</button>
+          <button class="ntf-btn" @click="store.clearNotifications()" :disabled="!store.notifications.length">{{ t('清空') }}</button>
         </span>
       </div>
       <div class="notif-list" ref="listEl">
         <div v-if="!store.notifications.length" class="ntf-empty">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2a.5.5 0 0 1 .5.5v.542a4 4 0 0 1 3.001 3.865v2.69l.852 1.421a.5.5 0 0 1-.435.744H4.082a.5.5 0 0 1-.435-.744l.852-1.42v-2.69A4 4 0 0 1 7.5 3.042V2.5A.5.5 0 0 1 8 2zm-1.16 10h2.32a2.003 2.003 0 0 1-3.868-.568l1.548.568zm3.66-.003l-.99-1.65h-3.02l-.99 1.65h4.01z"/></svg>
-          <span>暂无系统通知</span>
+          <span>{{ t('暂无系统通知') }}</span>
         </div>
         <div v-for="n in sortedNotifs" :key="n.id" class="ntf-item" :class="['lv-' + n.level, { unread: !n.read }]" @click="store.markNotificationRead(n.id)">
           <span class="ntf-dot"></span>
@@ -55,7 +52,7 @@
             </div>
             <div class="ntf-body">{{ n.body }}</div>
           </div>
-          <button class="ntf-x" title="删除此通知" @click.stop="store.removeNotification(n.id)">×</button>
+          <button class="x-btn danger" :title="t('删除此通知')" @click.stop="store.removeNotification(n.id)">×</button>
         </div>
       </div>
     </div>
@@ -66,6 +63,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
+import { t } from '../i18n'
 
 const store = useSimStore()
 const clock = ref('')
@@ -102,19 +100,7 @@ function fmtTime(t) {
   return m ? `${m[2]}-${m[3]} ${m[4]}` : String(t || '')
 }
 
-const feedText = computed(() => ({ open: '已连接', closed: '已断开', error: '异常', init: '连接中…' }[store.feedStatus] || ''))
-const deviceCount = computed(() => {
-  const r = store.resultForView
-  if (!r || !r.units) return 0
-  return r.units.reduce((s, u) => s + (u.devices ? u.devices.length : 0), 0)
-})
-const paramCount = computed(() => {
-  const ps = store.paramSchema
-  if (!ps) return 0
-  let n = 0
-  for (const k in ps) { const e = ps[k]; n += (e.config ? e.config.length : 0) + (e.optim ? e.optim.length : 0) }
-  return n
-})
+const feedText = computed(() => ({ open: t('已连接'), closed: t('已断开'), error: t('异常'), init: t('连接中…') }[store.feedStatus] || ''))
 
 function tickClock() {
   const d = new Date(); const p = (x) => String(x).padStart(2, '0')

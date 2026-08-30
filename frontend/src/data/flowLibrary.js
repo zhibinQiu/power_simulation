@@ -418,13 +418,13 @@ export const PROCESS_TEMPLATES = [
 
 // 设备可减排影响的工艺类型（用于可调设备对 efDirect 的修正）
 export const PROCESS_MAP = Object.fromEntries(PROCESS_TEMPLATES.map((t) => [t.type, t]))
-// 工艺分组：炼钢(长/短流程统一) + 工辅。
-// 注：util(煤气发电/余热回收/碳捕集)类属节能减碳范畴，按设计统一在「策略」中展示，
+// 工艺分组：炼钢(长/短流程统一) + 工辅（鼓风机/热风炉等辅助生产工序）。
+// util(煤气发电/余热回收/碳捕集)类属节能减碳范畴，统一在「策略」中展示，
 // 不纳入左侧工艺资源管理树，仅保留模板供 3D 孪生与策略引用。
 export const ROUTE_GROUPS = {
   steel: PROCESS_TEMPLATES.filter((t) => t.route === 'steel'),
-  // 工辅分组 = 工辅路线 + 公用/节能减碳（煤气发电/余热回收/碳捕集），保证系统现有工辅在资源管理列表中可见
-  aux: PROCESS_TEMPLATES.filter((t) => t.route === 'aux' || t.route === 'util'),
+  // 工辅分组仅含工辅路线工艺（鼓风机/热风炉/引风机等辅助生产工序），不含公用/节能减碳（煤气发电/余热回收/碳捕集）
+  aux: PROCESS_TEMPLATES.filter((t) => t.route === 'aux'),
 }
 
 // ---------- 设备模板 ----------
@@ -515,6 +515,8 @@ export const DEVICE_COUPLE_REGISTRY = {
       nominal: 1250, uncertainty: '±1%',
       derive: (s) => ({ hot_blast_temp: Number(s) }),
     },
+    dedust_fan: fanElecCoupling('dedust_fan', 3000, 30),
+    vfd: fanElecCoupling('vfd', 40, 30),
     injector: {
       target: 'coal_inj/coke_rate', effect: 'reduce', source: 'empirical',
       basis: '喷吹煤粉(PCI)顶替焦炭，焦比下降≈喷煤增量×1.1（经验置换比 1.0–1.2）',
@@ -554,7 +556,8 @@ export const DEVICE_COUPLE_REGISTRY = {
     feeder: feedCoupling('feeder', 200, 0.04),
   },
   coke_oven: {
-    vfd: fanElecCoupling('vfd', 40),
+    dedust_fan: fanElecCoupling('dedust_fan', 3000, 9.5),
+    vfd: fanElecCoupling('vfd', 40, 9.5),
     blower: feedCoupling('blower', 5200, 0.03),
   },
   bof: {
@@ -572,6 +575,7 @@ export const DEVICE_COUPLE_REGISTRY = {
       },
     },
     vfd: fanElecCoupling('vfd', 40),
+    dedust_fan: fanElecCoupling('dedust_fan', 3000, 30),
     oxy_supply: {
       target: 'scrap/hot_metal_in', effect: 'reduce', source: 'empirical',
       basis: '全厂供氧集中供给转炉吹氧；供氧量↑→可氧化更多废钢→废钢比↑、铁水入炉↓，减少上游焦炉/高炉排放',
@@ -620,6 +624,7 @@ export const DEVICE_COUPLE_REGISTRY = {
       derive: (s, base) => ({ electricity: Math.max(60, (base.electricity || 360) * (Number(s) / 70)) }),
     },
     vfd: fanElecCoupling('vfd', 40),
+    dedust_fan: fanElecCoupling('dedust_fan', 3000, 360),
     blower: fanElecCoupling('blower', 5200),
     oxy_supply: {
       target: 'electricity', effect: 'reduce', source: 'empirical',
@@ -651,6 +656,7 @@ export const DEVICE_COUPLE_REGISTRY = {
   },
   rh_vacuum: {
     vfd: fanElecCoupling('vfd', 40),
+    pump: fanElecCoupling('pump', 300, 5),
     cool_pump: fanElecCoupling('cool_pump', 300),
     power_supply: {
       target: 'electricity', effect: 'reduce', source: 'empirical',
@@ -661,6 +667,7 @@ export const DEVICE_COUPLE_REGISTRY = {
   },
   caster: {
     vfd: fanElecCoupling('vfd', 40),
+    pump: fanElecCoupling('pump', 300, 15),
     cool_pump: fanElecCoupling('cool_pump', 300),
     belt_conv: feedCoupling('belt_conv', 2, 0.02),
     power_supply: {
@@ -688,6 +695,18 @@ export const DEVICE_COUPLE_REGISTRY = {
       nominal: 200, uncertainty: '±6%',
       derive: (s, base) => ({ electricity: Math.max(1, (base.electricity || 80) * (Number(s) / 200)) }),
     },
+  },
+  dri_midrex: {
+    burner: {
+      target: 'ng_rate', effect: 'reduce', source: 'empirical',
+      basis: '优化空燃比→还原气天然气消耗降低（约 4%/单位优化）',
+      nominal: 1.0, uncertainty: '±6%',
+      derive: (s, base) => {
+        const f = Number(s)
+        return { ng_rate: Math.max(0, (base.ng_rate || 300) * (1 - 0.04 * (f - 1))) }
+      },
+    },
+    vfd: fanElecCoupling('vfd', 40, 45),
   },
   waste_heat: {
     waste_heat_boiler: {
@@ -806,14 +825,15 @@ export function deriveProcessOpParams(processType, devices, base = {}) {
 }
 
 // 风机/泵类：功率 ∝ 转速³（亲和定律，机理确定），电耗随之变化
-function fanElecCoupling(deviceType, nominal) {
+// fallbackElec：工序参数缺少 electricity 字段时的兜底基准电耗（如焦炉/铁水预处理模板无电耗参数，取后端默认值），保证调整依然生效
+function fanElecCoupling(deviceType, nominal, fallbackElec = null) {
   return {
     target: 'electricity', effect: 'reduce', source: 'mechanism',
     basis: '风机/泵功率 ∝ 转速³（亲和定律）：变频调速节电，超调则增耗',
     nominal, uncertainty: '±3%',
     derive: (s, base) => {
       const r = Math.pow(Number(s) / nominal, 3)
-      const baseElec = base.electricity
+      const baseElec = base && base.electricity != null ? Number(base.electricity) : fallbackElec
       if (baseElec == null) return {}
       return { electricity: Math.max(0, baseElec * r) }
     },

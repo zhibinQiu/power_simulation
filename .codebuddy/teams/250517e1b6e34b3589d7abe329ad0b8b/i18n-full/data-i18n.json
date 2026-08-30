@@ -1,0 +1,38 @@
+[
+  {
+    "id": "msg-1788028212739-ys2xys",
+    "from": "team-lead",
+    "to": "@team",
+    "type": "broadcast",
+    "content": "【主编广播·i18n 插值规范（重要，全员必读）】我已完成两件事：①升级了 frontend/src/i18n/index.js 的 t()，支持参数插值（向后兼容，单参数调用完全不变）；②修复了已回报文件中的 13 处 t(`模板 ${x}`) 调用。\n\n请各位在改造时务必遵守：\n1. 禁止写 t(`...${x}...`) 模板字符串作 key —— 它会在调用前被求值成动态字符串（如「已打开策略「A」属性…」），en-US 词典永远无法命中，EN 模式会回退显示中文。这种 key 我无法生成词典条目。\n2. 一律改写成 t('模板 {占位}', { 占位: 值 })，例如：\n   - t('已打开策略「{name}」属性（所属工艺：{proc}）', { name: gs.name, proc: g.label })\n   - t('当前 {val} {unit}', { val: 42, unit: 'kg' })\n   词典条目与中文原文都写 {占位} 占位符，t() 查词后统一插值。\n3. 如果你已经写完但发现文件里有 t(`...${...}...`)，请自查修改为 {占位} 模式（我汇总词典时也会统一排查修复，但你改了我就不动了）。\n4. 汇报时请列出「全部 key 清单」（含插值模板 key 如 '已解析 · {n} 项操作'，写占位符形式），我会汇总生成完整 en-US.js 词典。\n\n另外提醒：若你负责的文件里有本地变量名遮蔽 t（如 `const t = ...`），记得改名避免冲突（sidebar-i18n 在 DeviceDetail.vue 遇到过，把局部变量改名 tpl 即可）。",
+    "timestamp": "2026-08-29T18:30:12.739Z",
+    "read": true
+  },
+  {
+    "id": "msg-1788028815906-csy3gh",
+    "from": "team-lead",
+    "to": "@team",
+    "type": "broadcast",
+    "content": "主编同步：① 已完成 en-US.js 词典增量合入（LeftSidebar/UnitCarbonDetail/DeviceDetail/MaterialInspector/TftAnalysisDialog/DataView/DataOverview/TrendChart/MultiTrendChart/CarbonBoxView，现共 920 条，0 重复）。② 请大家汇报时务必附上「完整静态 key 清单 + 插值模板 key 清单」，不要只报插值 key（box-i18n 只报了插值，主编已直接从源码提取补齐）。③ 插值统一 {占位} 模式、t(`...${x}...`) 动态 key 必须 0 处——已交付 10 个组件全部合规。④ 全部完成汇报后主编做最终 build + 英文模式回归验证，然后统一 shutdown。",
+    "timestamp": "2026-08-29T18:40:15.906Z",
+    "read": true
+  },
+  {
+    "id": "msg-1788029047046-nqf3hz",
+    "from": "team-lead",
+    "to": "data-i18n",
+    "type": "message",
+    "content": "收到，补充 key（偏离设定值 {dev}% / 数据超时 / 偏离历史正常区间 / 数据超时停机 / 盒子离线 / 云端实时 / 未上报 / 停机 / 传感器）已全部合入 en-US.js 词典。关于你待确认的遮蔽项：DataView fit/opt SVG 的 v-for=\"t in ...\" 与 script 局部 const t= 均为改动前既有、作用域内不含 t() 调用，属良性遮蔽，主编决定保留不改（避免超出 i18n 范围引入回归风险）；已记录在案，后续如需彻底消歧再统一改 tick。你的 4 文件已闭环。",
+    "timestamp": "2026-08-29T18:44:07.046Z",
+    "read": true
+  },
+  {
+    "id": "msg-1788029558275-5y4scs",
+    "from": "team-lead",
+    "to": "data-i18n",
+    "type": "message",
+    "content": "主编通报：全量缺失 key 兜底已完成，可以进入最终验证了。\n\n【本次改动】frontend/src/i18n/en-US.js 追加 580 条英文翻译（对应 /tmp/all_missing.txt 全部 581 个缺失 key，其中 569 个唯一 key，跨文件重复 key 只收录一次）。\n\n【已完成的校验】\n1. 运行时覆盖：从 25 个组件提取 1346 个 t() key，全部中文 key 均在词典中命中（唯一排除项为 UnitCarbonDetail 的长文本 key，经逐字符核对与词典 340 行一致，是 JSON 转义编码差异的假象）\n2. 无重复 key：修复了我引入的 1 处重复（'生成碳资产报告'，组件共用同一 key，词典只保留一份）\n3. lint 0 错误\n4. vite build 构建通过（✓ built in 5.74s）\n\n【请你执行】最终 build + 英文回归验证：\n1. 切英文语言跑一遍核心链路：工具条（退出仿真/全屏/刷新行情/生成碳资产报告）、策略面板（训练/聚类/预测/拟合/版本管理）、碳合规面板（控排企业/CEA 交易/年度策略）、报告面板（生成引擎/分析深度/导出报告）、数据总览/历史对话框、TFT 分析、命令控制台（help 文本里的 \\n 字面量）\n2. 重点检查插值 {占位} 渲染是否正常（如「约 {value}」类）\n3. 发现英文文案不通顺或缺失回退中文的，列清单回报，我来统一修订\n\n词典现在是 1917 个 key，你在回归中如有新增文案需求（补 key），先列给我，避免和其他队友同时改词典产生冲突。",
+    "timestamp": "2026-08-29T18:52:38.275Z",
+    "read": true
+  }
+]

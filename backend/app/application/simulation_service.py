@@ -5,12 +5,13 @@ API 路由与前端契约保持不变。
 """
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, List, Optional
 
 from ..carbon_engine import cached_simulate, conservation_audit, sim_cache_stats
 from ..devices import library_payload
 from ..factors import default_factors
-from ..llm_strategy import chat_completion, llm_parse
+from ..llm_strategy import chat_completion, chat_completion_stream, llm_parse
 from ..models import ParseResult, ParsedOp, ProcessModel, SimulateRequest, SimulateResponse
 from ..nl_parser import apply_ops, parse_strategy
 from ..param_schema import PARAM_SCHEMA, TECHS_INFO, UNIT_TYPES_INFO
@@ -18,7 +19,16 @@ from .. import presets
 
 # 各模式系统提示词（与前端 CMD_MODES 保持一致）
 CHAT_MODE_PROMPTS = {
-    "chat": "你是一个友好的中文聊天助手，轻松自然地陪用户闲聊，口语化、简洁。",
+    "chat": (
+        "你是「本析智擎」，钢铁企业能碳智控平台的智能助手，专注钢铁企业节能减碳与平台系统数据。"
+        "职责范围：1) 钢铁企业节能减碳问询与策略——能耗分析、碳排放核算（工序碳排、碳元素守恒）、"
+        "节能降碳措施、关键工艺指标（焦比、高炉利用系数、转炉/电炉工序、吨钢综合能耗等）；"
+        "2) 平台系统相关数据问询——设备状态、仿真系统参数与运行、能碳一体机管理、数据指标查询。"
+        "超出以上范围的闲聊或与钢铁能碳无关的话题（天气、娱乐、新闻、情感等），一律礼貌回绝，"
+        "说明自己只回答钢铁企业节能减碳与系统数据相关的问题，并引导用户提出相关问询。"
+        "回答专业、简洁、条理清晰，可适当引用钢铁行业常识，但不得编造具体数值；"
+        "涉及平台实时数据时，提示以平台实际数据为准。"
+    ),
     "code": "你是一个资深程序员助手。优先给出可运行、带注释的代码，并解释关键思路；遇到报错帮助定位问题。",
     "plan": "你是一个项目规划助手。把用户诉求拆成有序、可执行的步骤，标注依赖与优先级，输出清单式计划。",
 }
@@ -115,6 +125,24 @@ class SimulationService:
             return {"ok": False, "mode": mode,
                     "reply": "（模型未配置或未连通：请在后端设置 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL 后重启）"}
         return {"ok": True, "mode": mode, "reply": reply}
+
+    def chat_stream(self, text: str, history: List, mode: str):
+        """流式聊天：按 SSE（data: {"delta": "..."}）逐段产出增量回复文本，供前端逐字渲染。
+
+        未连通 LLM 时产出兜底提示（同样以 SSE 格式，保证前端流式链路可解析）。
+        """
+        sys_prompt = CHAT_MODE_PROMPTS.get(mode, CHAT_MODE_PROMPTS["chat"])
+        messages = [{"role": "system", "content": sys_prompt}]
+        for pair in (history or [])[-12:]:
+            if isinstance(pair, (list, tuple)) and len(pair) == 2:
+                messages.append({"role": pair[0], "content": str(pair[1])})
+        messages.append({"role": "user", "content": text})
+        sent = False
+        for chunk in chat_completion_stream(messages):
+            sent = True
+            yield f"data: {json.dumps({'delta': chunk}, ensure_ascii=False)}\n\n"
+        if not sent:
+            yield f"data: {json.dumps({'delta': '（模型未配置或未连通：请在后端设置 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL 后重启）'}, ensure_ascii=False)}\n\n"
 
 
 # 模块级单例（应用服务无状态，可安全共享）

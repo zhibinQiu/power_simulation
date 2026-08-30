@@ -11,7 +11,7 @@ export default function _buildCokeOven(bodyMat) {
     const g = new THREE.Group()
     const L = 28; const D = 14; const H = 12
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x00ccff
+    const neonColor = 0x2c6e9e
 
 
     // === 1. 焦炉本体（多孔炭化室 + 燃烧室交替） ===
@@ -43,8 +43,8 @@ export default function _buildCokeOven(bodyMat) {
         // 炉门内可见火焰（橙黄，每孔门上端渗火）
         const doorFlare = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.6, 0.15),
             new THREE.MeshStandardMaterial({
-                color: 0xff8844, emissive: 0xff4400, emissiveIntensity: 1.5,
-                transparent: true, opacity: 0.6, depthWrite: false
+                color: 0xff8844, emissive: 0xcc3a00, emissiveIntensity: 0.8,
+                transparent: true, opacity: 0.65, depthWrite: false
             }))
         doorFlare.position.set(doorX, 3.0, D * 0.44); g.add(doorFlare)
         doorFlares.push(doorFlare)
@@ -80,7 +80,7 @@ export default function _buildCokeOven(bodyMat) {
     for (let i = 0; i < 5; i++) {
         const coke = new THREE.Mesh(new THREE.BoxGeometry(1.0 + Math.random() * 0.4, 0.6 + Math.random() * 0.3, 0.8 + Math.random() * 0.4),
             new THREE.MeshStandardMaterial({
-                roughness: 0.2, metalness: 0.2, emissive: 0xff4400, emissiveIntensity: 0.6
+                roughness: 0.3, metalness: 0.2, emissive: 0xcc3a00, emissiveIntensity: 0.35
             }))
         coke.position.set(L * 0.36 + 2 + Math.random() * 3, 1.0 + Math.random(), (Math.random() - 0.5) * D * 0.5)
         g.add(coke)
@@ -117,7 +117,7 @@ export default function _buildCokeOven(bodyMat) {
 
     // === 8. 霓虹装饰 ===
     const cokeRing1 = new THREE.Mesh(new THREE.TorusGeometry(L * 0.4, 0.12, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.4, roughness: 0.2 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     cokeRing1.rotation.x = Math.PI / 2; cokeRing1.position.set(0, 1.2, 0); g.add(cokeRing1)
 
     // === 9. 动画钩子 ===
@@ -140,7 +140,7 @@ export default function _buildCokeOven(bodyMat) {
             obj: coke, phase: i * 0.16, period: 5.5,
             srcPos: new THREE.Vector3(L * 0.32, 4.0, 0),
             dstPos: new THREE.Vector3(L * 0.42, 1.0, -D * 0.35),
-            srcColor: 0xff4411, dstColor: 0x5a5a5a, scalePulse: 0.1,
+            srcColor: 0xb04a24, dstColor: 0x5a5a5a, scalePulse: 0.1,
         })
     }
 

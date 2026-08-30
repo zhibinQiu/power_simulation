@@ -11,7 +11,7 @@ export default function _buildBlastFurnace(bodyMat) {
     const g = new THREE.Group()
     const steel = mat(PAL.steel, { metalness: 0.5, roughness: 0.35 })
     const brickMat = mat(0x8a7060, { metalness: 0.05, roughness: 0.6 })
-    const neonColor = 0x00ccff
+    const neonColor = 0x2c6e9e
     // 无厂房框架，仅保留高炉本体与附属设备
 
     // 高炉主体按Y轴缩放到合适高度
@@ -93,8 +93,8 @@ export default function _buildBlastFurnace(bodyMat) {
     const cohesiveZone = new THREE.Mesh(
         new THREE.CylinderGeometry(5.0, 5.5, 10, 24),
         mat(0x8a4020, {
-            roughness: 0.3, metalness: 0.1, emissive: 0xff4400, emissiveIntensity: 0.35,
-            transparent: true, opacity: 0.75, depthWrite: false
+            roughness: 0.35, metalness: 0.1, emissive: 0xcc3a00, emissiveIntensity: 0.25,
+            transparent: true, opacity: 0.8, depthWrite: false
         })
     )
     cohesiveZone.position.y = 30
@@ -105,7 +105,7 @@ export default function _buildBlastFurnace(bodyMat) {
     const drippingZone = new THREE.Mesh(
         new THREE.CylinderGeometry(7.0, 7.5, 10, 24),
         mat(0x4a3530, {
-            roughness: 0.3, metalness: 0.15, emissive: 0xcc3300, emissiveIntensity: 0.4,
+            roughness: 0.3, metalness: 0.15, emissive: 0x8a4018, emissiveIntensity: 0.4,
             transparent: true, opacity: 0.7, depthWrite: false
         })
     )
@@ -215,8 +215,8 @@ export default function _buildBlastFurnace(bodyMat) {
         const flare = new THREE.Mesh(
             new THREE.SphereGeometry(0.35, 8, 6),
             new THREE.MeshStandardMaterial({
-                color: 0xffaa44, emissive: 0xff6600, emissiveIntensity: 1.5,
-                roughness: 0.1, metalness: 0.05, transparent: true, opacity: 0.7, depthWrite: false
+                color: 0xc67a3c, emissive: 0xcc4a10, emissiveIntensity: 0.8,
+                roughness: 0.25, metalness: 0.05, transparent: true, opacity: 0.75, depthWrite: false
             })
         )
         flare.position.set(Math.cos(ang) * 7.5, 14.5, Math.sin(ang) * 7.5)
@@ -324,12 +324,12 @@ export default function _buildBlastFurnace(bodyMat) {
     // ========== 九、霓虹装饰 ==========
     // 炉缸霓虹环
     const bfRing1 = new THREE.Mesh(new THREE.TorusGeometry(9.2, 0.15, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.6, roughness: 0.2 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     bfRing1.rotation.x = Math.PI / 2; bfRing1.position.set(0, 10, 0); mainGroup.add(bfRing1)
 
     // 炉身中部霓虹环
     const bfRing2 = new THREE.Mesh(new THREE.TorusGeometry(5.8, 0.12, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.4, roughness: 0.2 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     bfRing2.rotation.x = Math.PI / 2; bfRing2.position.set(0, 35, 0); mainGroup.add(bfRing2)
 
     // ========== 十、动画钩子数据 ==========
@@ -365,10 +365,10 @@ export default function _buildBlastFurnace(bodyMat) {
     g.userData._burdenBaseY = 0
 
     // === 物料转变动画：烧结矿+球团+焦炭(多层)→高炉冶炼→铁水+炉渣 ===
-    // 颜色与连线载运体一致：sinter(0x5a7088)→hot_metal(0xff4422)
+    // 颜色与连线载运体一致：sinter(0x5a7088)→hot_metal(0xb05030)
     const bfFlow = []
     // 铁矿石/烧结矿 → 铁水 转变
-    const hotMetalColor = 0xff4422
+    const hotMetalColor = 0xb05030
     const bfSinterColor = 0x5a7088
 
     // 炉料下降颗粒（从炉喉到炉缸）
@@ -398,7 +398,7 @@ export default function _buildBlastFurnace(bodyMat) {
         bfFlow.push({
             obj: drop, kind: 'iron', phase: di * 0.25, period: 3.5,
             srcPos: new THREE.Vector3(ix, iy, iz), dstPos: new THREE.Vector3(ix + 2, iy + 0.5, iz + 1),
-            srcColor: hotMetalColor, dstColor: 0xff7733, scalePulse: 0.15,
+            srcColor: hotMetalColor, dstColor: 0xb55a34, scalePulse: 0.15,
         })
     })
 

@@ -4,10 +4,10 @@
     <div class="cw-card">
       <div class="cw-head">
         <div>
-          <div class="cw-title">耦合校准向导</div>
-          <div class="cw-sub">{{ procLabel }} · {{ devLabel }} → 驱动参数 <b>{{ primaryTarget }}</b></div>
+          <div class="cw-title">{{ t('耦合校准向导') }}</div>
+          <div class="cw-sub">{{ procLabel }} · {{ devLabel }} → {{ t('驱动参数') }} <b>{{ primaryTarget }}</b></div>
         </div>
-        <button class="cw-x" @click="$emit('close')">✕</button>
+        <button class="x-btn lg" @click="$emit('close')" :aria-label="t('关闭')">✕</button>
       </div>
 
       <div class="cw-body">
@@ -15,20 +15,20 @@
         <div class="cw-step">
           <span class="cw-n">1</span>
           <div>
-            <div class="cw-h">本厂历史数据（设备设定值 → {{ primaryTarget }}）</div>
+            <div class="cw-h">{{ t('本厂历史数据（设备设定值 → {target}）', { target: primaryTarget }) }}</div>
             <div class="cw-hint">
-              每行一组：<code>设定值({{ devUnit }}) , {{ primaryTarget }}</code>
-              （逗号/空格/制表符分隔，首行若为表头将自动跳过）。至少 3 组样本。
+              {{ t('每行一组：') }}<code>{{ t('设定值') }}({{ devUnit }}) , {{ primaryTarget }}</code>
+              {{ t('（逗号/空格/制表符分隔，首行若为表头将自动跳过）。至少 3 组样本。') }}
             </div>
             <textarea v-model="raw" class="cw-ta" spellcheck="false"
-              :placeholder="'例如：\n' + samplePlaceholder"></textarea>
+              :placeholder="t('例如：') + '\n' + samplePlaceholder"></textarea>
             <div class="cw-tools">
               <label class="cw-file">
-                上传 CSV
+                {{ t('上传 CSV') }}
                 <input type="file" accept=".csv,.txt" @change="onFile" hidden />
               </label>
-              <button class="cw-btn ghost" @click="loadSample">载入样例</button>
-              <span class="cw-cnt" v-if="rows.length">已解析 {{ rows.length }} 组</span>
+              <button class="cw-btn ghost" @click="loadSample">{{ t('载入样例') }}</button>
+              <span class="cw-cnt" v-if="rows.length">{{ t('已解析 {n} 组', { n: rows.length }) }}</span>
             </div>
           </div>
         </div>
@@ -37,43 +37,43 @@
         <div class="cw-step" v-if="fit">
           <span class="cw-n">2</span>
           <div>
-            <div class="cw-h">线性回归结果</div>
+            <div class="cw-h">{{ t('线性回归结果') }}</div>
             <div class="cw-fit">
               <span class="cw-eq">y = <b>{{ fmt(fit.a,4) }}</b> + <b>{{ fmt(fit.b,6) }}</b> · x</span>
-              <span class="cw-stat">R²（拟合优度）= <b>{{ fit.r2.toFixed(3) }}</b></span>
+              <span class="cw-stat">R²（{{ t('拟合优度') }}）= <b>{{ fit.r2.toFixed(3) }}</b></span>
               <span class="cw-stat">n = <b>{{ fit.n }}</b></span>
               <span class="cw-stat">± <b>{{ fit.unc.toFixed(1) }}%</b></span>
             </div>
             <div class="cw-preview" v-if="preview">
-              <div class="cw-pv">名义点 {{ coupling.nominal }} → 推算 <b>{{ primaryTarget }}</b> = {{ fmt(preview.baseVal) }}
-                <i>（占基准 {{ fmt(preview.baseVal) }}%）</i></div>
-              <div class="cw-pv">最低 {{ fmt(preview.lo) }} → {{ fmt(preview.atLo) }}
+              <div class="cw-pv">{{ t('名义点') }} {{ coupling.nominal }} → {{ t('推算') }} <b>{{ primaryTarget }}</b> = {{ fmt(preview.baseVal) }}
+                <i>（{{ t('占基准') }} {{ fmt(preview.baseVal) }}%）</i></div>
+              <div class="cw-pv">{{ t('最低') }} {{ fmt(preview.lo) }} → {{ fmt(preview.atLo) }}
                 <i>({{ pct(preview.atLo, preview.baseVal) }})</i></div>
-              <div class="cw-pv">最高 {{ fmt(preview.hi) }} → {{ fmt(preview.atHi) }}
+              <div class="cw-pv">{{ t('最高') }} {{ fmt(preview.hi) }} → {{ fmt(preview.atHi) }}
                 <i>({{ pct(preview.atHi, preview.baseVal) }})</i></div>
-              <div class="cw-pv sub" v-if="secondarySpec">次级联动：{{ secondarySpec.key }}
-                = 基准 + {{ secondarySpec.ratio }} × ({{ primaryTarget }} − 基准)</div>
+              <div class="cw-pv sub" v-if="secondarySpec">{{ t('次级联动：') }} {{ secondarySpec.key }}
+                = {{ t('基准') }} + {{ secondarySpec.ratio }} × ({{ primaryTarget }} − {{ t('基准') }})</div>
             </div>
           </div>
         </div>
         <div class="cw-warn" v-else-if="raw.trim() && rows.length < 3">
-          ⚠ 数据不足或无法解析（需 ≥3 组数值）。
+          ⚠ {{ t('数据不足或无法解析（需 ≥3 组数值）。') }}
         </div>
 
         <!-- 3. 应用 -->
         <div class="cw-step" v-if="fit">
           <span class="cw-n">3</span>
           <div>
-            <div class="cw-h">应用标定</div>
+            <div class="cw-h">{{ t('应用标定') }}</div>
             <div class="cw-hint">
-              将用本厂系数覆盖默认「{{ coupling.source === 'data' ? '已校准' : (coupling.source==='mechanism'?'机理':'经验') }}」耦合，
-              并持久化到浏览器（刷新/重启后自动加载）。
+              {{ t('将用本厂系数覆盖默认「') }}{{ coupling.source === 'data' ? t('已校准') : (coupling.source==='mechanism'?t('机理'):t('经验')) }}{{ t('」耦合，') }}
+              {{ t('并持久化到浏览器（刷新/重启后自动加载）。') }}
             </div>
             <div class="cw-actions">
-              <button class="cw-btn primary" :disabled="!canApply" @click="apply">✓ 应用并生效</button>
-              <button class="cw-btn danger" v-if="isCalibrated" @click="clear">恢复默认耦合</button>
+              <button class="cw-btn primary" :disabled="!canApply" @click="apply">✓ {{ t('应用并生效') }}</button>
+              <button class="cw-btn danger" v-if="isCalibrated" @click="clear">{{ t('恢复默认耦合') }}</button>
             </div>
-            <div class="cw-ok" v-if="appliedNow">✓ 已写入 COUPLING_OVERRIDES，设备推算立即生效。</div>
+            <div class="cw-ok" v-if="appliedNow">✓ {{ t('已写入 COUPLING_OVERRIDES，设备推算立即生效。') }}</div>
           </div>
         </div>
       </div>
@@ -84,6 +84,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { t } from '../i18n'
 import { getCoupling, makeCalibratedDerive, applyCalibration, clearCalibration, DEVICE_MAP, PROCESS_MAP } from '../data/flowLibrary'
 import { useSimStore } from '../stores/sim'
 
@@ -236,8 +237,6 @@ function pct(v, base) {
 .cw-title { font-size: 14px; font-weight: 700; }
 .cw-sub { font-size: 12px; color: #6b7785; margin-top: 3px; }
 .cw-sub b { color: #0860A8; }
-.cw-x { border: none; background: transparent; font-size: 14px; color: #8a96a3; cursor: pointer; }
-.cw-x:hover { color: #222; }
 .cw-body { padding: 14px 18px 20px; }
 .cw-step { display: flex; gap: 12px; margin-bottom: 16px; }
 .cw-n { flex: 0 0 22px; height: 22px; border-radius: 50%; background: #0860A8; color: #fff;

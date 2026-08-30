@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { t } from '../i18n'
 import { api, openFeed } from '../api/client'
 import { buildScheme, makeProcessNode, makeDeviceNode, makeMaterialNode, PROCESS_MAP, MATERIAL_MAP, PROCESS_ADJUSTABLE, DEVICE_MAP, DEVICE_COUPLE_REGISTRY, deriveProcessOpParams, materialFamily, loadCalibrations, NODE_NW, NODE_HEADER, NODE_PORT_Y0, NODE_GAP, nodeHeight, PROCESS_TEMPLATES, applySetpointResponse, migrateLegacyDevices, treeLayoutNodes } from '../data/flowLibrary'
 import { computeScheme } from '../flow/compute'
@@ -156,21 +157,24 @@ export const useSimStore = defineStore('sim', {
     license: { activated: false, machineId: '', boundMachine: '', activatedAt: '', checked: false },
     aboutDialog: false,   // 关于本平台弹窗开关（内嵌平台激活；StatusBar / 帮助菜单 / App 共用）
     toast: '',
+    toastType: 'info',    // 类型化 Toast：success / info / warn / error（ToastLayer 渲染）
+    confirmDialog: { open: false, title: '', message: '', okText: '', cancelText: '', danger: false }, // 确认弹窗（ConfirmDialog 渲染）
+    _confirmResolver: null, // confirm() 挂起的 Promise resolve
     scenario: 'steel',           // 当前仿真场景（四大控排）：steel 钢铁(默认) / cement 水泥 / chemical 化工 / nonferrous 有色
     processRoute: 'short',       // 当前流程：short 短流程(默认) / long 长流程；数字孪生默认展示短流程
     scenarios: [
-      { id: 'steel', label: '钢铁' },
-      { id: 'cement', label: '水泥' },
-      { id: 'chemical', label: '化工' },
-      { id: 'nonferrous', label: '有色' },
+      { id: 'steel', label: t('钢铁') },
+      { id: 'cement', label: t('水泥') },
+      { id: 'chemical', label: t('化工') },
+      { id: 'nonferrous', label: t('有色') },
     ],
     envMode: 'industrial',      // 场景环境：void 虚空 / industrial 工业(默认) / desert 沙漠 / city 城市 / coast 海滩
     envModes: [
-      { id: 'void', label: '虚空' },
-      { id: 'industrial', label: '工业' },
-      { id: 'desert', label: '沙漠' },
-      { id: 'city', label: '城市' },
-      { id: 'coast', label: '海滩' },
+      { id: 'void', label: t('虚空') },
+      { id: 'industrial', label: t('工业') },
+      { id: 'desert', label: t('沙漠') },
+      { id: 'city', label: t('城市') },
+      { id: 'coast', label: t('海滩') },
     ],
     envNonce: 0,                // 触发中间 3D 场景切换环绕环境
     sceneRev: 0,
@@ -197,7 +201,8 @@ export const useSimStore = defineStore('sim', {
     energyFlowOn: false,      // 能流分析视图：中间 3D 场景替换为能流桑基图（工具 → 能源 → 能流分析切换）
     boxManageOn: false,       // 能碳一体机管理视图：中间 3D 场景替换为云端设备识别 + 设备关联管理（视图 → 能碳一体机管理切换）
     boxCloudSource: 'unknown',// 能碳一体机管理：云端连接状态（live / degraded / unknown），由 CarbonBoxView 轮询后写回，供 App.vue 顶部 view-banner 实时显示
-    inspectorView: 'auto',    // 右侧检视器显式视图：'auto'（按选中推导）| 'park' 园区构成 | 'materials' 原料库 | 'strategy' 减排策略 | 'report' 报告面板         // 底栏（命令行窗口 + 状态条）是否展开
+    overviewOn: false,         // HMI人机交互屏：中间 3D 场景替换为全厂实时运行大屏（视图 → HMI人机交互屏切换）
+    inspectorView: 'auto',    // 右侧检视器显式视图：'auto'（按选中推导）| 'park' 园区构成 | 'materials' 原料库 | 'strategy' 减排策略 | 'report' 报告面板 | 'agent' 本析智擎对话
     reportPayload: null,      // 「导出报告」请求载荷（baseline/strategy/ops/...），供右侧报告面板消费
     selectedStrategyId: null, // 左侧策略库选中的策略
     deviceHistory: {},        // 各设备历史读数序列：devId -> [{t, v}]
@@ -218,8 +223,8 @@ export const useSimStore = defineStore('sim', {
     // 工艺级策略管理：每个工序可绑定独立策略（自然语言 → 解析 → 测试 → 保存 → 绑定）
     unitStrategies: {},     // { [unitId]: { enabled, text, parsed, delta, scenarioName } }
     processStrategyEnabled: {},  // { [processType]: boolean } — 在左侧工艺列表中勾选
-    // 实时数据源配置（文件菜单「连接数据源」设置：平台 MQTT 实时数据 / 自定义 WebSocket / HTTP 轮询）
-    dataSource: { type: 'sim', url: '', interval: 1000, name: 'Mqtt 实时数据' },
+    // 实时数据源配置（连接面板/「连接数据源」设置：能碳一体机 MQTT 云端实时 / 模拟数据）
+    dataSource: { type: 'sim', url: '', interval: 1000, name: '能碳一体机' },
     // MQTT 实时数据源状态（来自 /api/realtime/source）
     mqttSource: null,
     // ---- 左侧活动栏（VS Code 式）与多数据源管理 ----
@@ -270,6 +275,8 @@ export const useSimStore = defineStore('sim', {
     viewModeOn: (s) => s.dataViewOn || s.carbonMarketOn || s.carbonCalcOn || s.energyFlowOn || s.boxManageOn,
     // 未读系统通知数（底栏铃铛徽标）
     unreadNotifs: (s) => s.notifications.filter((n) => !n.read).length,
+    // 「本析智擎」：右侧检视器当前是否为智能体对话界面
+    agentOn: (s) => s.inspectorView === 'agent',
     selectedUnit: (s) => s.model.units.find((u) => u.id === s.selectedUnitId) || null,
     selectedResult: (s) => {
       if (!s.selectedUnitId || !s.baseline) return null
@@ -459,7 +466,7 @@ export const useSimStore = defineStore('sim', {
   },
   actions: {
     // 命令行窗口：追加一条日志（k：cmd 命令回显 / out·sys 一般信息 / guide 引导输入 / tip 提醒 / warn·err 警告报错 / bot 聊天 / sim 仿真记录）
-    pushCmd(t, k = 'out') { this.cmdLog.push({ t, k }) },
+    pushCmd(msg, k = 'out') { this.cmdLog.push({ t: msg, k }) },
     clearCmdLog() { this.cmdLog = [] },
     // —— 系统通知中心（底栏铃铛）——
     // 新增一条系统通知，自动附带 toast 提示；列表最多保留 50 条
@@ -468,6 +475,25 @@ export const useSimStore = defineStore('sim', {
       this.notifications.push(n)
       if (this.notifications.length > 50) this.notifications.splice(0, this.notifications.length - 50)
       return n.id
+    },
+    // 类型化 Toast（ToastLayer 渲染，3.4s 自动消失）：type = success / info / warn / error
+    showToast(msg, type = 'info') {
+      this.toast = msg
+      this.toastType = type
+    },
+    // 确认弹窗（ConfirmDialog 渲染）：返回 Promise<boolean>
+    confirm({ title, message, okText = t('确定'), cancelText = t('取消'), danger = false } = {}) {
+      this.confirmDialog = { open: true, title, message, okText, cancelText, danger }
+      return new Promise((resolve) => { this._confirmResolver = resolve })
+    },
+    // ConfirmDialog 回调：确认 true / 取消 false，并解除挂起 Promise
+    confirmResolve(val) {
+      this.confirmDialog.open = false
+      if (this._confirmResolver) {
+        const r = this._confirmResolver
+        this._confirmResolver = null
+        r(val)
+      }
     },
     markNotificationRead(id) {
       const n = this.notifications.find((x) => x.id === id)
@@ -551,14 +577,14 @@ export const useSimStore = defineStore('sim', {
         await this._runRefresh()  // 首屏立即重算（不走防抖），保证 KPI 就绪
         await this.loadStrategies()
         this.ready = true
-        this.notify('success', '系统就绪', `数字孪生已载入 ${this.model.units.length} 个工序、${this.model.flows.length} 条物流，实时链路与优化模型已就绪。`)
+        this.notify('success', t('系统就绪'), t('数字孪生已载入 {units} 个工序、{flows} 条物流，实时链路与优化模型已就绪。', { units: this.model.units.length, flows: this.model.flows.length }))
         this._startFeed()
         // AI 优化模型：同步训练上下文并轮询状态（后台定时训练由后端调度，前端展示「逐渐变优」）
         this.syncOptimizerContext().then(() => this.refreshOptimizers())
         this.startOptimizerPolling()
       } catch (e) {
-        this.toast = '初始化失败：' + e.message
-        this.notify('error', '初始化失败', e.message)
+        this.toast = t('初始化失败：') + e.message
+        this.notify('error', t('初始化失败'), e.message)
       }
     },
     // ---------- 平台激活 ----------
@@ -642,7 +668,7 @@ export const useSimStore = defineStore('sim', {
     },
     async runExperiment() {
       if (!this.parsed || !this.parsed.ops.length) {
-        this.toast = '请先输入并解析策略'
+        this.toast = t('请先输入并解析策略')
         return
       }
       this.busy = true
@@ -654,20 +680,23 @@ export const useSimStore = defineStore('sim', {
           // 仿真模式：记录当前生效策略 ops，后续属性修改重算时一并携带，使对比 after 持续实时
           this.simOps = JSON.parse(JSON.stringify(this.parsed.ops || []))
           this.simCurrent = r.strategy ? JSON.parse(JSON.stringify(r.strategy)) : null
-          this._simLog('strategy', '策略仿真', (this.parsedText || '').slice(0, 60) || `应用 ${this.parsed.ops.length} 项操作`, 'exp')
+          this._simLog('strategy', t('策略仿真'), (this.parsedText || '').slice(0, 60) || t('应用 {n} 项操作', { n: this.parsed.ops.length }), 'exp')
         }
         this.sceneRev++   // 触发中间孪生平台随之变化（重算热力着色/CO2 占比）
       } finally {
         this.busy = false
       }
     },
-    clearExperiment() {
+    // 清除策略实验状态。silent=true：不重置 simCurrent、不记录「清除策略」——
+    // 用于「应用策略 / 应用 AI 最优参数」这类参数已落地模型的场景，
+    // 由调用方自行以应用后结果刷新 simCurrent，避免对比窗口出现矛盾的「清除策略」记录。
+    clearExperiment(silent = false) {
       this.strategy = null
       this.delta = null
       this.simOps = []
-      if (this.simMode) {
+      if (this.simMode && !silent) {
         this.simCurrent = this.baseline ? JSON.parse(JSON.stringify(this.baseline)) : null
-        this._simLog('strategy', '清除策略', '恢复当前参数下的基线结果')
+        this._simLog('strategy', t('清除策略'), t('恢复当前参数下的基线结果'))
       }
       this.sceneRev++   // 切换回基线后，孪生平台同步恢复
     },
@@ -694,8 +723,8 @@ export const useSimStore = defineStore('sim', {
             const rk = `${m.id}:${m.reminder.id}`
             if (!this.optimizerSeenReminders[rk]) {
               this.optimizerSeenReminders = { ...this.optimizerSeenReminders, [rk]: true }
-              this.toast = `「${(AI_MODEL_MAP[m.id] || {}).name || '优化模型'}」训练取得新进展：最优强度 ${m.reminder.best_fitness} kgCO₂/t（较上版提升 ${m.reminder.improvement_pct}%）。已生成调优提醒，可在属性面板手动应用优化参数`
-              this.notify('info', `「${(AI_MODEL_MAP[m.id] || {}).name || '优化模型'}」训练新进展`, `最优强度 ${m.reminder.best_fitness} kgCO₂/t，较上版提升 ${m.reminder.improvement_pct}%。可在属性面板手动应用优化参数。`)
+              this.toast = t('「{model}」训练取得新进展：最优强度 {fitness} kgCO₂/t（较上版提升 {pct}%）。已生成调优提醒，可在属性面板手动应用优化参数', { model: (AI_MODEL_MAP[m.id] || {}).name || '优化模型', fitness: m.reminder.best_fitness, pct: m.reminder.improvement_pct })
+              this.notify('info', t('「{model}」训练新进展', { model: (AI_MODEL_MAP[m.id] || {}).name || '优化模型' }), t('最优强度 {fitness} kgCO₂/t，较上版提升 {pct}%。可在属性面板手动应用优化参数。', { fitness: m.reminder.best_fitness, pct: m.reminder.improvement_pct }))
             }
           }
         }
@@ -712,15 +741,15 @@ export const useSimStore = defineStore('sim', {
           this.baseline = r.sim
           this.clearExperiment()
           this.parsed = null
-          this.toast = `AI 自动化控制：已按「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」最新版本自动下发参数到可调设备`
-          this.notify('success', 'AI 自动化控制', `已按「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」最新版本自动下发参数到可调设备。`)
-          this.pushCmd(`AI 自动化控制已下发：应用「${r.name || id}」版本参数（最优 ${(r.best_fitness ?? 0).toFixed(2)} kgCO₂/t，提升 ${r.improvement_pct ?? 0}%）`, 'sim')
+          this.toast = t('AI 自动化控制：已按「{model}」最新版本自动下发参数到可调设备', { model: (AI_MODEL_MAP[id] || {}).name || '优化模型' })
+          this.notify('success', t('AI 自动化控制'), t('已按「{model}」最新版本自动下发参数到可调设备。', { model: (AI_MODEL_MAP[id] || {}).name || '优化模型' }))
+          this.pushCmd(t('AI 自动化控制已下发：应用「{model}」版本参数（最优 {fitness} kgCO₂/t，提升 {pct}%）', { model: r.name || id, fitness: (r.best_fitness ?? 0).toFixed(2), pct: r.improvement_pct ?? 0 }), 'sim')
           this._pushModelToFeed()
           await this._runRefresh()
         }
       } catch (e) {
-        this.toast = 'AI 自动化控制下发失败：' + e.message
-        this.notify('error', 'AI 自动化控制下发失败', e.message)
+        this.toast = t('AI 自动化控制下发失败：') + e.message
+        this.notify('error', t('AI 自动化控制下发失败'), e.message)
       }
       try { await api.ackOptimizer(id) } catch (e) { /* 忽略确认失败 */ }
       this.optimizerAutoApplying = { ...this.optimizerAutoApplying, [id]: false }
@@ -739,18 +768,18 @@ export const useSimStore = defineStore('sim', {
       await this.syncOptimizerContext()   // 训练对象始终是最新流程
       try {
         const r = await api.startOptimizer(id)
-        if (r) this.toast = `已开启「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」自动训练：后台将随实时传感器数据定时迭代`
+        if (r) this.toast = t('已开启「{model}」自动训练：后台将随实时传感器数据定时迭代', { model: (AI_MODEL_MAP[id] || {}).name || '优化模型' })
       } catch (e) {
-        this.toast = '开启自动训练失败：' + e.message
+        this.toast = t('开启自动训练失败：') + e.message
       }
       await this.refreshOptimizers()
     },
     async stopOptimizer(id) {
       try {
         const r = await api.stopOptimizer(id)
-        if (r) this.toast = `已暂停「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」自动训练`
+        if (r) this.toast = t('已暂停「{model}」自动训练', { model: (AI_MODEL_MAP[id] || {}).name || '优化模型' })
       } catch (e) {
-        this.toast = '暂停训练失败：' + e.message
+        this.toast = t('暂停训练失败：') + e.message
       }
       await this.refreshOptimizers()
     },
@@ -758,7 +787,7 @@ export const useSimStore = defineStore('sim', {
       try {
         await api.trainOptimizer(id, steps)
       } catch (e) {
-        this.toast = '训练失败：' + e.message
+        this.toast = t('训练失败：') + e.message
       }
       await this.refreshOptimizers()
     },
@@ -766,18 +795,18 @@ export const useSimStore = defineStore('sim', {
       await this.syncOptimizerContext()
       try {
         const r = await api.resetOptimizer(id)
-        if (r) this.toast = `「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」已重置`
+        if (r) this.toast = t('「{model}」已重置', { model: (AI_MODEL_MAP[id] || {}).name || '优化模型' })
       } catch (e) {
-        this.toast = '重置失败：' + e.message
+        this.toast = t('重置失败：') + e.message
       }
       await this.refreshOptimizers()
     },
     async setOptimizerHyper(id, patch) {
       try {
         const r = await api.setOptimizerHyper(id, patch)
-        if (r) this.toast = '算法超参数已保存，下一轮训练生效'
+        if (r) this.toast = t('算法超参数已保存，下一轮训练生效')
       } catch (e) {
-        this.toast = '保存超参数失败：' + e.message
+        this.toast = t('保存超参数失败：') + e.message
       }
       await this.refreshOptimizers()
     },
@@ -788,17 +817,23 @@ export const useSimStore = defineStore('sim', {
       try {
         r = await api.applyOptimizer(id)
       } catch (e) {
-        this.toast = '应用最优参数失败：' + e.message
-        this.notify('error', '应用最优参数失败', e.message)
+        this.toast = t('应用最优参数失败：') + e.message
+        this.notify('error', t('应用最优参数失败'), e.message)
         return
       }
       this.model = r.model
       this.baseline = r.sim
-      this.clearExperiment()
+      // 仿真模式：静默清实验状态（避免误记「清除策略」），以应用后结果刷新对比 after
+      this.clearExperiment(this.simMode)
       this.parsed = null
-      this.toast = `已将「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」最优参数应用到流程`
-      this.notify('success', '已应用最优参数', `已将「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」最优参数应用到流程，强度 ${(r.best_fitness ?? 0).toFixed(2)} kgCO₂/t。`)
-      this.pushCmd(`已应用 AI 优化模型「${r.name || id}」最优参数：强度 ${(r.best_fitness ?? 0).toFixed(2)} kgCO₂/t，较初始 ${r.improvement_pct ?? 0}%`, 'sim')
+      // 仿真模式：记录应用 AI 最优参数变更，纳入仿真前后对比
+      if (this.simMode) {
+        this._simLog('strategy', t('应用 AI 最优参数'), (AI_MODEL_MAP[id] || {}).name || id, 'opt_' + id)
+        this.simCurrent = r.sim ? JSON.parse(JSON.stringify(r.sim)) : null
+      }
+      this.toast = t('已将「{model}」最优参数应用到流程', { model: (AI_MODEL_MAP[id] || {}).name || '优化模型' })
+      this.notify('success', t('已应用最优参数'), t('已将「{model}」最优参数应用到流程，强度 {fitness} kgCO₂/t。', { model: (AI_MODEL_MAP[id] || {}).name || '优化模型', fitness: (r.best_fitness ?? 0).toFixed(2) }))
+      this.pushCmd(t('已应用 AI 优化模型「{model}」最优参数：强度 {fitness} kgCO₂/t，较初始 {pct}%', { model: r.name || id, fitness: (r.best_fitness ?? 0).toFixed(2), pct: r.improvement_pct ?? 0 }), 'sim')
       this._pushModelToFeed()
       await this._runRefresh()
       await this.refreshOptimizers()
@@ -809,11 +844,11 @@ export const useSimStore = defineStore('sim', {
         const r = await api.setOptimizerSettings(id, patch)
         if (r && typeof r.auto_control === 'boolean') {
           this.toast = r.auto_control
-            ? `已开启「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」自动化控制：模型变优后自动下发参数到可调设备`
-            : `已关闭「${(AI_MODEL_MAP[id] || {}).name || '优化模型'}」自动化控制：改为系统提醒手动调优`
+            ? t('已开启「{model}」自动化控制：模型变优后自动下发参数到可调设备', { model: (AI_MODEL_MAP[id] || {}).name || '优化模型' })
+            : t('已关闭「{model}」自动化控制：改为系统提醒手动调优', { model: (AI_MODEL_MAP[id] || {}).name || '优化模型' })
         }
       } catch (e) {
-        this.toast = '保存控制设置失败：' + e.message
+        this.toast = t('保存控制设置失败：') + e.message
       }
       await this.refreshOptimizers()
     },
@@ -823,21 +858,21 @@ export const useSimStore = defineStore('sim', {
       try {
         r = await api.archiveOptimizer(id)
       } catch (e) {
-        this.toast = '保存版本失败：' + e.message
+        this.toast = t('保存版本失败：') + e.message
         return
       }
       this.toast = r.promoted
-        ? '已保存为新版本并替换为当前版本（历史版本仍保留）'
-        : '已保存为候选版本（未超过当前版本，未替换）'
+        ? t('已保存为新版本并替换为当前版本（历史版本仍保留）')
+        : t('已保存为候选版本（未超过当前版本，未替换）')
       await this.refreshOptimizers()
     },
     // 在历史模型版本间切换（旧版本保留，可随时切回）
     async switchOptimizerVersion(id, versionId) {
       try {
         await api.switchOptimizerVersion(id, versionId)
-        this.toast = '已切换模型版本'
+        this.toast = t('已切换模型版本')
       } catch (e) {
-        this.toast = '切换版本失败：' + e.message
+        this.toast = t('切换版本失败：') + e.message
       }
       await this.refreshOptimizers()
     },
@@ -873,7 +908,7 @@ export const useSimStore = defineStore('sim', {
       if (!this.parsed || !this.parsed.ops.length) return
       await api.createStrategy(name || '未命名策略', '', this.parsedText, this.parsed.ops)
       await this.loadStrategies()
-      this.toast = '策略已保存到策略库'
+      this.toast = t('策略已保存到策略库')
     },
     async removeStrategy(sid) {
       await api.deleteStrategy(sid)
@@ -883,15 +918,21 @@ export const useSimStore = defineStore('sim', {
       // 仿真模式：记录策略应用（退出仿真时恢复，见 exitSim 快照）；同一策略重复应用合并为一条
       if (this.simMode) {
         const sname = ((this.strategies || []).find((s) => s.id === sid) || {}).name || sid
-        this._simLog('strategy', '应用策略', sname, 'apply_' + sid)
+        this._simLog('strategy', t('应用策略'), sname, 'apply_' + sid)
       }
       const r = await api.applyStrategy(sid, this._applyDeviceOpParams(this.model), this.factors)
       this.model = r.model
       this.baseline = r.sim
-      this.clearExperiment()
+      // 仿真模式：策略参数已落地模型，直接以应用后结果刷新「仿真前后对比」after
+      //（此前遗漏：应用策略后对比窗口 after 不更新，该调节内容未纳入对比计算）
+      this.clearExperiment(this.simMode)
+      if (this.simMode) {
+        this.simOps = []   // 参数已落地，清除未落地叠加操作，避免后续重算重复应用
+        this.simCurrent = r.sim ? JSON.parse(JSON.stringify(r.sim)) : null
+      }
       this.parsed = null
       this._pushModelToFeed()
-      this.toast = '策略已应用到当前流程'
+      this.toast = t('策略已应用到当前流程')
       this.sceneRev++
     },
     // ---- 前端手动编辑流程（后端自适应重算）----
@@ -981,7 +1022,7 @@ export const useSimStore = defineStore('sim', {
         const ml = ((MATERIAL_MAP[id] || {}).label) || id
         let prev = _simParamSnapshot && _simParamSnapshot.materialOverrides[id] && _simParamSnapshot.materialOverrides[id].carbon
         if (prev == null) prev = (this.materialOverrides[id] || {}).carbon   // 快照缺省回退当前值
-        this._simLog('factor', `${ml} · 隐含碳因子`, `${fmtNum(prev)} → ${fmtNum(v)} tCO₂/${(MATERIAL_MAP[id] || {}).unit || ''}`, `mc_${id}`)
+        this._simLog('factor', t('{name} · 隐含碳因子', { name: ml }), `${fmtNum(prev)} → ${fmtNum(v)} tCO₂/${(MATERIAL_MAP[id] || {}).unit || ''}`, `mc_${id}`)
       }
       this.materialOverrides = { ...this.materialOverrides, [id]: { ...(this.materialOverrides[id] || {}), carbon: v } }
       if (this.simMode) this.refresh()
@@ -991,13 +1032,13 @@ export const useSimStore = defineStore('sim', {
       // 仿真模式：记录物料属性变更（备注仅提示已更新，避免超长文案）
       if (this.simMode) {
         const ml = ((MATERIAL_MAP[id] || {}).label) || id
-        const keyLabel = ({ density: '堆密度', transport_ef: '运输排放因子', moisture: '含水率', note: '备注' })[key] || key
+        const keyLabel = ({ density: t('堆密度'), transport_ef: t('运输排放因子'), moisture: t('含水率'), note: t('备注') })[key] || key
         if (key === 'note') {
-          this._simLog('factor', `${ml} · 备注`, '已更新', `ma_${id}_${key}`)
+          this._simLog('factor', t('{name} · 备注', { name: ml }), t('已更新'), `ma_${id}_${key}`)
         } else {
           let prev = _simParamSnapshot && _simParamSnapshot.materialOverrides[id] && _simParamSnapshot.materialOverrides[id][key]
           if (prev == null) prev = (this.materialOverrides[id] || {})[key]   // 快照缺省回退当前值
-          this._simLog('factor', `${ml} · ${keyLabel}`, `${fmtNum(prev)} → ${fmtNum(val)}`, `ma_${id}_${key}`)
+          this._simLog('factor', t('{name} · {keyLabel}', { name: ml, keyLabel }), `${fmtNum(prev)} → ${fmtNum(val)}`, `ma_${id}_${key}`)
         }
       }
       this.materialOverrides = { ...this.materialOverrides, [id]: { ...(this.materialOverrides[id] || {}), [key]: val } }
@@ -1013,7 +1054,7 @@ export const useSimStore = defineStore('sim', {
         const ml = ((MATERIAL_MAP[id] || {}).name) || id
         let prev = _simParamSnapshot && _simParamSnapshot.materialOverrides[id] && _simParamSnapshot.materialOverrides[id].composition
         prev = prev && prev[key] != null ? prev[key] : (cur[key] != null ? cur[key] : '—')
-        this._simLog('factor', `${ml} · 成分 ${key}`, `${fmtNum(prev)} → ${fmtNum(v)} %`, `mc_${id}_${key}`)
+        this._simLog('factor', t('{name} · 成分 {key}', { name: ml, key }), `${fmtNum(prev)} → ${fmtNum(v)} %`, `mc_${id}_${key}`)
       }
       this.materialOverrides = { ...this.materialOverrides, [id]: { ...(this.materialOverrides[id] || {}), composition: { ...cur, [key]: v } } }
       if (this.simMode) this.refresh()
@@ -1040,7 +1081,7 @@ export const useSimStore = defineStore('sim', {
       }))
       if (this.simMode) {
         const ml = ((MATERIAL_MAP[id] || {}).name) || id
-        this._simLog('factor', `${ml} · 配煤混合`, `已更新（${arr.length} 种煤）`, `pcblend_${id}`)
+        this._simLog('factor', t('{name} · 配煤混合', { name: ml }), t('已更新（{n} 种煤）', { n: arr.length }), `pcblend_${id}`)
       }
       this.materialOverrides = { ...this.materialOverrides, [id]: { ...(this.materialOverrides[id] || {}), blend: arr } }
       if (this.simMode) this.refresh()
@@ -1074,6 +1115,15 @@ export const useSimStore = defineStore('sim', {
     toggleLeft() { this.leftOpen = !this.leftOpen },
     toggleRight() { this.rightOpen = !this.rightOpen },
     toggleBottom() { this.bottomOpen = !this.bottomOpen },
+    // 「本析智擎」：顶栏按钮切换右侧检视器 ↔ 智能体对话界面（AgentChatView）
+    toggleAgent() {
+      if (this.inspectorView === 'agent') {
+        this.inspectorView = 'auto'
+      } else {
+        this.inspectorView = 'agent'
+        this.rightOpen = true
+      }
+    },
     // 进入非数字孪生视图：记录进入前布局状态并收起左/右/下侧边栏（沉浸模式）；
     // 用户可随时通过顶栏按钮 / 左侧活动栏重新展开
     _collapsePanels() {
@@ -1144,6 +1194,11 @@ export const useSimStore = defineStore('sim', {
       this.boxManageOn = !this.boxManageOn
       if (this.boxManageOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this._collapsePanels() }
       else { this._restorePanels() }
+    },
+    // HMI人机交互屏：与 3D 场景互斥切换（开 HMI 关 3D，关 HMI 还原 3D）
+    toggleOverview() {
+      this.overviewOn = !this.overviewOn
+      if (this.overviewOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false }
     },
     toggleFullscreen() {
       this.fullscreenOn = !this.fullscreenOn
@@ -1251,7 +1306,7 @@ export const useSimStore = defineStore('sim', {
         historyPast: JSON.parse(JSON.stringify(this.historyPast)),
         historyFuture: JSON.parse(JSON.stringify(this.historyFuture)),
       }
-      this.toast = '已进入仿真模式：所有修改仅预览，退出后自动恢复'
+      this.toast = t('已进入仿真模式：所有修改仅预览，退出后自动恢复')
     },
     exitSim() {
       if (!this.simMode) return
@@ -1289,7 +1344,7 @@ export const useSimStore = defineStore('sim', {
       }
       this.refresh()
       this.sceneRev++
-      this.toast = '已退出仿真模式，恢复仿真前状态'
+      this.toast = t('已退出仿真模式，恢复仿真前状态')
     },
     // 一键把当前全部参数保存为策略（供仿真模式「保存策略」按钮调用）
     async saveCurrentAsStrategy(name) {
@@ -1309,19 +1364,19 @@ export const useSimStore = defineStore('sim', {
       }
       const created = await api.createStrategy(sname, `仿真模式保存的当前参数快照 · ${new Date().toLocaleString()}`, sname, ops)
       await this.loadStrategies()
-      this.toast = `策略「${sname}」已保存，可在策略资源管理中查看`
+      this.toast = t('策略「{name}」已保存，可在策略资源管理中查看', { name: sname })
       return created
     },
     // 更新已保存策略（名称/描述/原文/操作），调 PUT /api/strategies/{sid}
     async updateStrategy(sid, patch) {
       await api.updateStrategy(sid, patch)
       await this.loadStrategies()
-      this.toast = '策略信息已更新'
+      this.toast = t('策略信息已更新')
     },
     // 策略详情面板「策略仿真」按钮：内置预置策略进入仿真并解析测试；自定义策略加载并应用（退出后自动恢复）
     async runStrategySimulation(sid) {
       const st = this.selectedStrategy
-      if (!st) { this.toast = '策略不存在或已删除'; return }
+      if (!st) { this.toast = t('策略不存在或已删除'); return }
       if (st.source === 'preset') {
         if (!this.simMode) this.enterSim()
         this.strategyInput = st.raw_text || st.name || ''
@@ -1331,27 +1386,27 @@ export const useSimStore = defineStore('sim', {
           await this.parse(this.strategyInput)
           if (this.parsed && this.parsed.ops.length) {
             await this.runExperiment()
-            this.toast = `已对内置策略「${st.name}」完成仿真，可在右上角对比结果`
+            this.toast = t('已对内置策略「{name}」完成仿真，可在右上角对比结果', { name: st.name })
           } else {
-            this.toast = '该内置策略解析结果为空'
+            this.toast = t('该内置策略解析结果为空')
           }
         } catch (e) {
-          this.toast = '内置策略仿真失败：' + (e.message || e)
+          this.toast = t('内置策略仿真失败：') + (e.message || e)
         }
         return
       }
       if (!this.simMode) this.enterSim()
       try {
         await this.applyStrategy(sid)
-        this.toast = `策略「${st.name || '未命名'}」已加载到仿真模式，可实时对比`
+        this.toast = t('策略「{name}」已加载到仿真模式，可实时对比', { name: st.name || '未命名' })
       } catch (e) {
-        this.toast = '策略加载失败：' + (e.message || e)
+        this.toast = t('策略加载失败：') + (e.message || e)
       }
     },
     // 请求在命令行输入策略名称后保存（仿真模式「保存策略」按钮）
     requestSaveStrategy() {
       this.pendingSaveStrategy = true
-      this.toast = '请在下方命令行输入策略名称后回车保存'
+      this.toast = t('请在下方命令行输入策略名称后回车保存')
     },
     // 顶栏「重置视图」按钮 -> SceneViewer watch 该计数 -> scene.resetView()
     resetView() { this.viewResetNonce++ },
@@ -1359,7 +1414,7 @@ export const useSimStore = defineStore('sim', {
     setScenario(id) {
       if (id === this.scenario) return
       this.scenario = id
-      if (id !== 'steel') this.toast = '当前仅支持「钢铁」控排场景'
+      if (id !== 'steel') this.toast = t('当前仅支持「钢铁」控排场景')
     },
     // 切换核心孪生外围环绕环境（森林/城市/沙漠/海岸），触发中间 3D 场景重建
     setEnvMode(id) {
@@ -1374,6 +1429,9 @@ export const useSimStore = defineStore('sim', {
     addDataSource(ds) {
       const id = (ds && ds.id) || 'src_' + Date.now()
       const src = Object.assign({ id, type: 'sim', url: '', interval: 1000, name: '新建数据源', enabled: true, mapping: {} }, ds, { id })
+      const { cleaned, dropped } = this._stripBindingConflicts(id, src.mapping)
+      src.mapping = cleaned
+      if (dropped) this.showToast(t('已跳过 {n} 个与其它数据源冲突的设备映射：同一设备只能绑定一个数据源', { n: dropped }), 'warn')
       this.dataSources.push(src)
       this.activeDataSourceId = id
       this.dataSource = src
@@ -1385,14 +1443,19 @@ export const useSimStore = defineStore('sim', {
     updateDataSource(id, patch) {
       const idx = this.dataSources.findIndex((s) => s.id === id)
       if (idx < 0) return
-      const next = { ...this.dataSources[idx], ...patch, id }
+      let next = { ...this.dataSources[idx], ...patch, id }
+      if (patch.mapping) {
+        const { cleaned, dropped } = this._stripBindingConflicts(id, next.mapping)
+        next = { ...next, mapping: cleaned }
+        if (dropped) this.showToast(t('已跳过 {n} 个与其它数据源冲突的设备映射：同一设备只能绑定一个数据源', { n: dropped }), 'warn')
+      }
       this.dataSources[idx] = next
       if (this.activeDataSourceId === id) this.dataSource = next
       this._saveDataSource()
       this._connectFeed()
     },
     removeDataSource(id) {
-      if (id === 'sim') { this.toast = '平台 Mqtt 实时数据源不可删除'; return }
+      if (id === 'sim') { this.toast = t('平台内置的「能碳一体机」数据源不可删除'); return }
       const idx = this.dataSources.findIndex((s) => s.id === id)
       if (idx < 0) return
       this.dataSources.splice(idx, 1)
@@ -1425,6 +1488,28 @@ export const useSimStore = defineStore('sim', {
       this._saveDataSource()
       this._connectFeed()
     },
+    // 同一设备只能绑定一个数据源：返回除 exceptId 之外、已把该内部设备 id 映射为读数的数据源名称；未绑定返回 null
+    isDeviceBoundByOther(deviceId, exceptId) {
+      for (const s of this.dataSources || []) {
+        if (s.id === exceptId) continue
+        const m = s.mapping || {}
+        if (Object.values(m).includes(deviceId)) return s.name || s.id
+      }
+      return null
+    },
+    // 剔除与其它数据源冲突 / 本数据源内重复的映射项（同一内部设备只能被一个数据源绑定一次）
+    _stripBindingConflicts(id, mapping) {
+      const cleaned = {}
+      const seen = new Set()
+      let dropped = 0
+      for (const [ext, int] of Object.entries(mapping || {})) {
+        if (!int || seen.has(int)) { dropped++; continue }
+        if (this.isDeviceBoundByOther(int, id)) { dropped++; continue }
+        seen.add(int)
+        cleaned[ext] = int
+      }
+      return { cleaned, dropped }
+    },
     _saveDataSource() {
       try { localStorage.setItem('sim_data_sources', JSON.stringify(this.dataSources)) } catch (e) {}
     },
@@ -1453,8 +1538,38 @@ export const useSimStore = defineStore('sim', {
         } catch (e) {}
       }
       if (!this.dataSources.length) {
-        this.dataSources = [{ id: 'sim', type: 'sim', url: '', interval: 1000, name: 'Mqtt 实时数据', enabled: true, mapping: {} }]
+        // 默认内置两条数据源：能碳一体机 Mqtt 实时（启用）+ 模拟数据（停用，按需开启，便于无真实设备时演示）
+        this.dataSources = [
+          { id: 'sim', type: 'sim', url: '', interval: 1000, name: '能碳一体机', enabled: true, mapping: {} },
+          { id: 'local', type: 'local', url: '', interval: 1000, name: '模拟数据', enabled: false, mapping: {} },
+        ]
       }
+      // v3 精简：平台仅保留两条内置数据源（能碳一体机 Mqtt 实时 + 模拟数据）。
+      // 移除 ws/http 等自定义类型与多余实例（若有），固定 id=type，规范化名称，保证两条始终存在。
+      const v3Canonical = []
+      for (const s of this.dataSources || []) {
+        if (!s || (s.type !== 'sim' && s.type !== 'local')) continue
+        const c = v3Canonical.find((x) => x.type === s.type)
+        if (c) {
+          c.mapping = { ...(s.mapping || {}), ...(c.mapping || {}) }
+          if (s.enabled) c.enabled = true
+          if (s.interval) c.interval = s.interval
+        } else {
+          v3Canonical.push({ ...s, id: s.type })
+        }
+      }
+      if (!v3Canonical.some((s) => s.type === 'sim')) {
+        v3Canonical.unshift({ id: 'sim', type: 'sim', url: '', interval: 1000, name: '能碳一体机', enabled: true, mapping: {} })
+      }
+      if (!v3Canonical.some((s) => s.type === 'local')) {
+        v3Canonical.push({ id: 'local', type: 'local', url: '', interval: 1000, name: '模拟数据', enabled: false, mapping: {} })
+      }
+      for (const s of v3Canonical) {
+        if (s.type === 'sim' && (!s.name || s.name === 'Mqtt 实时数据' || s.name.indexOf('Mqtt') === 0)) s.name = '能碳一体机'
+        if (s.type === 'local' && (!s.name || s.name === '本地模拟数据' || s.name.indexOf('本地模拟') === 0)) s.name = '模拟数据'
+      }
+      this.dataSources = v3Canonical
+      this._saveDataSource()
       const active = this.dataSources.find((s) => s.id === this.activeDataSourceId)
         || this.dataSources.find((s) => s.enabled) || this.dataSources[0]
       this.activeDataSourceId = active.id
@@ -1475,7 +1590,7 @@ export const useSimStore = defineStore('sim', {
     // 为指定工序解析并运行策略实验
     async runUnitStrategy(unitId) {
       const us = this.unitStrategies[unitId]
-      if (!us || !us.text) { this.toast = '请先输入策略文本'; return }
+      if (!us || !us.text) { this.toast = t('请先输入策略文本'); return }
       this.parsing = true
       try {
         const parsed = await api.parse(us.text, this.model)
@@ -1483,7 +1598,7 @@ export const useSimStore = defineStore('sim', {
         this.parsed = parsed
         this.parsedText = us.text
       } finally { this.parsing = false }
-      if (!us.parsed || !us.parsed.ops.length) { this.toast = '策略解析无有效操作'; return }
+      if (!us.parsed || !us.parsed.ops.length) { this.toast = t('策略解析无有效操作'); return }
       this.busy = true
       try {
         const r = await api.simulate(this._applyDeviceOpParams(this.model), us.parsed.ops, this.factors)
@@ -1494,26 +1609,26 @@ export const useSimStore = defineStore('sim', {
           this.simOps = JSON.parse(JSON.stringify(us.parsed.ops || []))
           this.simCurrent = r.strategy ? JSON.parse(JSON.stringify(r.strategy)) : null
           const uname = (this.model.units.find((x) => x.id === unitId) || {}).name || unitId
-          this._simLog('strategy', `${uname} · 工序策略`, (us.text || '').slice(0, 60), `us_${unitId}`)
+          this._simLog('strategy', t('{name} · 工序策略', { name: uname }), (us.text || '').slice(0, 60), `us_${unitId}`)
         }
         this.sceneRev++
       } finally { this.busy = false }
-      this.toast = '策略仿真测试完成，可查看对比结果。'
+      this.toast = t('策略仿真测试完成，可查看对比结果。')
     },
     // 保存策略并绑定到工序
     async saveUnitStrategy(unitId, name) {
       const us = this.unitStrategies[unitId]
-      if (!us || !us.parsed || !us.parsed.ops.length) { this.toast = '暂无有效的策略可保存'; return }
+      if (!us || !us.parsed || !us.parsed.ops.length) { this.toast = t('暂无有效的策略可保存'); return }
       const sname = name || (us.text ? us.text.slice(0, 30) : '未命名策略')
       await api.createStrategy(sname, '', us.text, us.parsed.ops)
       await this.loadStrategies()
       this.unitStrategies[unitId].scenarioName = sname
-      this.toast = '策略已保存并绑定到当前工序'
+      this.toast = t('策略已保存并绑定到当前工序')
     },
     // 运行所有已启用的工序策略
     async runAllEnabledStrategies() {
       const enabled = Object.entries(this.unitStrategies).filter(([, v]) => v.enabled && v.parsed)
-      if (!enabled.length) { this.toast = '没有已启用的策略可运行'; return }
+      if (!enabled.length) { this.toast = t('没有已启用的策略可运行'); return }
       this.busy = true
       try {
         const allOps = enabled.flatMap(([, v]) => v.parsed ? v.parsed.ops : [])
@@ -1523,11 +1638,11 @@ export const useSimStore = defineStore('sim', {
         if (this.simMode) {
           this.simOps = JSON.parse(JSON.stringify(allOps || []))
           this.simCurrent = r.strategy ? JSON.parse(JSON.stringify(r.strategy)) : null
-          this._simLog('strategy', '运行全部策略', `已启用 ${enabled.length} 个工序策略`, 'all')
+          this._simLog('strategy', t('运行全部策略'), t('已启用 {n} 个工序策略', { n: enabled.length }), 'all')
         }
         this.sceneRev++
       } finally { this.busy = false; }
-      this.toast = `已运行 ${enabled.length} 个工序策略`
+      this.toast = t('已运行 {n} 个工序策略', { n: enabled.length })
     },
     // 获取工序策略状态（供组件查询）
     getUnitStrategy(unitId) { return this.unitStrategies[unitId] || null },
@@ -1605,7 +1720,7 @@ export const useSimStore = defineStore('sim', {
       this.refresh()
       this.scheme.activeGroupId = null   // 退出编排后 3D 孪生回到顶层场景
       this.editMode = false
-      this.toast = '已应用编排方案，刷新孪生视图'
+      this.toast = t('已应用编排方案，刷新孪生视图')
       this._saveScheme()   // 持久化编排结果，刷新后保持最后一次编排状态
       // sceneRev 的触发由 SceneViewer 的 editMode watch 统一管理，
       // 确保 DOM 可见 + resize 完成后再 rebuildScene，避免 canvas 0x0 导致相机投影矩阵 NaN
@@ -1624,7 +1739,7 @@ export const useSimStore = defineStore('sim', {
       this._saveScheme()   // 持久化当前模板方案，刷新后保持
       // 编排模式下载入模板后自动适配视图：新方案分行排布，让画布尽量占满屏幕
       if (this.editMode) this.flowZoomFit()
-      this.toast = route === 'short' ? '已载入短流程炼钢模板' : '已载入长流程炼钢模板'
+      this.toast = route === 'short' ? t('已载入短流程炼钢模板') : t('已载入长流程炼钢模板')
     },
     // 持久化当前编排方案：完成编排（exitEdit）、载入模板、清空画布、调节设备设定值时写入，
     // 使刷新后保持最后一次编排结果，而不是回退到默认流程。
@@ -1670,9 +1785,9 @@ export const useSimStore = defineStore('sim', {
       this.refresh()
       this.sceneRev++                    // 触发 3D 孪生按新方案重建
       this.entered = true
-      const label = route === 'short' ? '钢铁企业 · 短流程' : '钢铁企业 · 长流程'
-      this.toast = '已打开项目：' + label
-      this.pushCmd('已打开项目：' + label + '，已按全流程重建数字孪生。', 'cmd')
+      const label = route === 'short' ? t('钢铁企业 · 短流程') : t('钢铁企业 · 长流程')
+      this.toast = t('已打开项目：{label}', { label })
+      this.pushCmd(t('已打开项目：{label}，已按全流程重建数字孪生。', { label }), 'cmd')
     },
     // 等待初始化完成（欢迎页进入前兜底，避免 init 未就绪时操作方案）
     async waitReady() {
@@ -1683,7 +1798,15 @@ export const useSimStore = defineStore('sim', {
         }, 80)
       })
     },
+    // 仿真模式下流程结构已锁定：结构编辑不参与仿真前后对比，直接拒绝并提示
+    //（仿真模式只预览参数/策略类调节；流程结构调整请先退出仿真再编排）
+    _simEditBlocked() {
+      if (!this.simMode) return false
+      this.toast = t('仿真模式下流程结构已锁定：请先退出仿真再编排流程')
+      return true
+    },
     clearScheme() {
+      if (this._simEditBlocked()) return
       this._histCapture('clear_' + uid('h'))
       this.scheme = { nodes: [], connections: [], devices: [], groups: [], activeGroupId: null }
       this.selectedFlowId = null
@@ -1692,6 +1815,7 @@ export const useSimStore = defineStore('sim', {
     },
     // 从左栏拖入创建节点（kind: process|device|material）
     addFlowNode(kind, type, x, y) {
+      if (this._simEditBlocked()) return null
       this._clearBrowse()               // 拖入后右侧切到节点属性，而非资源浏览属性
       this.inspectorView = 'auto'
       this._histCapture('add_' + uid('h'))
@@ -1730,6 +1854,7 @@ export const useSimStore = defineStore('sim', {
       for (const n of mem) { n.x += dx; n.y += dy }
     },
     removeFlowNode(id) {
+      if (this._simEditBlocked()) return
       this._histCapture('del_' + uid('h'))
       this.scheme.nodes = this.scheme.nodes.filter((n) => n.id !== id)
       this.scheme.connections = this.scheme.connections.filter((c) => c.from !== id && c.to !== id)
@@ -1889,6 +2014,7 @@ export const useSimStore = defineStore('sim', {
     // 端口连线（支持多输入/多输出/反馈）；同一输入口仅保留一条连接。
     // 类型约束：输出端口物料必须与输入端口物料匹配（同族即匹配），否则拒绝连线。
     addConnection(from, fromPort, to, toPort, material, feedback = false) {
+      if (this._simEditBlocked()) return false
       if (from === to) return false
       const fn = this.scheme.nodes.find((n) => n.id === from)
       const tn = this.scheme.nodes.find((n) => n.id === to)
@@ -1907,10 +2033,12 @@ export const useSimStore = defineStore('sim', {
       return true
     },
     removeConnection(id) {
+      if (this._simEditBlocked()) return
       this._histCapture('rmconn_' + uid('h'))
       this.scheme.connections = this.scheme.connections.filter((c) => c.id !== id)
     },
     updatePortMaterial(nodeId, dir, portId, material) {
+      if (this._simEditBlocked()) return
       this._histCapture('pm_' + nodeId + dir + portId)
       const n = this.scheme.nodes.find((x) => x.id === nodeId)
       if (!n || !n.ports) return
@@ -1925,7 +2053,7 @@ export const useSimStore = defineStore('sim', {
       // 同一种类不能多次出现（如输入中不能出现两次煤粉）：同方向同物料端口去重
       if (arr.some((p) => p.material === material)) {
         const m = MATERIAL_MAP[material]
-        this.toast = `「${m ? m.name : material}」已在该${dir === 'in' ? '输入' : '输出'}中，同一种类不能重复添加`
+        this.toast = t('「{name}」已在该{direction}中，同一种类不能重复添加', { name: m ? m.name : material, direction: dir === 'in' ? t('输入') : t('输出') })
         return
       }
       arr.push({ id: uid(dir === 'in' ? 'in' : 'out'), material })
@@ -2324,22 +2452,22 @@ export const useSimStore = defineStore('sim', {
     async linkMqttDevice(cloudId, localId) {
       await api.linkMqttDevice(cloudId, localId)
       this.mqttSource = await api.realtimeSource()   // 重新拉取完整状态（含关联表与云端设备）
-      this.toast = `已关联：${cloudId} → ${localId}，数据开始同步`
+      this.toast = t('已关联：{cloud} → {local}，数据开始同步', { cloud: cloudId, local: localId })
     },
     async unlinkMqttDevice(cloudId) {
       await api.unlinkMqttDevice(cloudId)
       this.mqttSource = await api.realtimeSource()
-      this.toast = `已解除关联：${cloudId}，数据停止同步`
+      this.toast = t('已解除关联：{cloud}，数据停止同步', { cloud: cloudId })
     },
     _connectFeed() {
       // 关闭旧连接（各数据源的 WebSocket 或 HTTP 轮询定时器）
       for (const c of this._conns || []) { try { c.close && c.close() } catch (e) {} }
       this._conns = []
       this.sourceStatus = {}
-      // 仅连接启用的数据源；若全部停用/为空，则保底回落到平台 Mqtt 实时数据源
+      // 仅连接启用的数据源；若全部停用/为空，则保底回落到能碳一体机 MQTT 数据源
       let sources = (this.dataSources || []).filter((s) => s.enabled !== false)
       if (!sources.length) {
-        const sim = { id: 'sim', type: 'sim', url: '', interval: 1000, name: 'Mqtt 实时数据', enabled: true, mapping: {} }
+        const sim = { id: 'sim', type: 'sim', url: '', interval: 1000, name: '能碳一体机', enabled: true, mapping: {} }
         this.dataSources = [sim]
         this.activeDataSourceId = 'sim'
         this.dataSource = sim
@@ -2442,9 +2570,9 @@ export const useSimStore = defineStore('sim', {
           clearTimeout(this._feedNotifTimer)
           this._feedNotifTimer = setTimeout(() => {
             if (this.feedStatus !== next) return
-            if (next === 'open') this.notify('success', '实时链路已恢复', '实时数据链路已重新连接，工况数据持续更新。')
-            else if (next === 'error') this.notify('error', '实时链路异常', '实时数据链路异常，请检查数据源配置。')
-            else if (next === 'closed') this.notify('warn', '实时链路已断开', '实时数据链路已断开，仿真将基于最近一次数据继续运行。')
+            if (next === 'open') this.notify('success', t('实时链路已恢复'), t('实时数据链路已重新连接，工况数据持续更新。'))
+            else if (next === 'error') this.notify('error', t('实时链路异常'), t('实时数据链路异常，请检查数据源配置。'))
+            else if (next === 'closed') this.notify('warn', t('实时链路已断开'), t('实时数据链路已断开，仿真将基于最近一次数据继续运行。'))
           }, 1500)
         }
       }

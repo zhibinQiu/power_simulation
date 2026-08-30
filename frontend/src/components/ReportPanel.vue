@@ -1,28 +1,28 @@
 <template>
   <div class="report-panel">
     <div class="rp-tabs">
-      <button :class="{ active: tab === 'view' }" @click="switchTab('view')">当前报告</button>
-      <button :class="{ active: tab === 'history' }" @click="switchTab('history')">历史记录</button>
+      <button :class="{ active: tab === 'view' }" @click="switchTab('view')">{{ t('当前报告') }}</button>
+      <button :class="{ active: tab === 'history' }" @click="switchTab('history')">{{ t('历史记录') }}</button>
     </div>
 
     <!-- 当前报告视图 -->
     <div v-if="tab === 'view'" class="rp-body">
       <div v-if="!payload" class="rp-empty">
-        尚未发起报告生成。<br />请先运行仿真 / 应用策略，再点击工具条「数据 → 报告 → 导出报告」。
+        {{ t('尚未发起报告生成。') }}<br />{{ t('请先运行仿真 / 应用策略，再点击工具条「数据 → 报告 → 导出报告」。') }}
       </div>
 
       <!-- 参数配置：进入面板先配置，点击「生成报告」才开始 -->
       <div v-else-if="phase === 'config'" class="rp-config">
-        <div class="rp-config-title">报告参数配置</div>
-        <div class="rp-config-hint">配置生成参数后点击「生成报告」开始生成，可选择 AI 分析深度与报告范围。</div>
+        <div class="rp-config-title">{{ t('报告参数配置') }}</div>
+        <div class="rp-config-hint">{{ t('配置生成参数后点击「生成报告」开始生成，可选择 AI 分析深度与报告范围。') }}</div>
 
         <label class="rp-field">
-          <span class="rp-field-label">报告标题</span>
-          <input v-model="cfg.title" type="text" class="rp-input" placeholder="自定义报告标题" />
+          <span class="rp-field-label">{{ t('报告标题') }}</span>
+          <input v-model="cfg.title" type="text" class="rp-input" :placeholder="t('自定义报告标题')" />
         </label>
 
         <div class="rp-field">
-          <span class="rp-field-label">生成引擎</span>
+          <span class="rp-field-label">{{ t('生成引擎') }}</span>
           <div class="rp-opt-group">
             <label
               v-for="opt in engineOpts"
@@ -33,29 +33,29 @@
               <input v-model="cfg.engine" type="radio" :value="opt.id" />
               <span class="rp-opt-dot"></span>
               <span class="rp-opt-text">
-                <b>{{ opt.label }}</b>
-                <i>{{ opt.desc }}</i>
+                <b>{{ t(opt.label) }}</b>
+                <i>{{ t(opt.desc) }}</i>
               </span>
             </label>
           </div>
         </div>
 
         <label class="rp-field">
-          <span class="rp-field-label">分析深度</span>
+          <span class="rp-field-label">{{ t('分析深度') }}</span>
           <select v-model="cfg.depth" class="rp-select">
-            <option value="brief">精简（每段 80~150 字）</option>
-            <option value="standard">标准（每段 150~300 字）</option>
-            <option value="deep">深入（每段 300~500 字）</option>
+            <option value="brief">{{ t('精简（每段 80~150 字）') }}</option>
+            <option value="standard">{{ t('标准（每段 150~300 字）') }}</option>
+            <option value="deep">{{ t('深入（每段 300~500 字）') }}</option>
           </select>
         </label>
 
         <label class="rp-check">
           <input v-model="cfg.withAppendix" type="checkbox" />
           <span class="rp-check-box"></span>
-          <span class="rp-check-text">包含附录（全流程明细表 + 工序核算台账）</span>
+          <span class="rp-check-text">{{ t('包含附录（全流程明细表 + 工序核算台账）') }}</span>
         </label>
 
-        <button class="rp-btn primary rp-gen-btn" @click="startGenerate">生成报告</button>
+        <button class="rp-btn primary rp-gen-btn" @click="startGenerate">{{ t('生成报告') }}</button>
       </div>
 
       <!-- 生成中：实时进度 -->
@@ -69,27 +69,27 @@
             <span class="rp-progress-stage">{{ stageText }}</span>
           </div>
         </div>
-        <p class="rp-progress-hint">正在生成报告，请稍候…（AI 分析阶段可能需要 1~3 分钟）</p>
+        <p class="rp-progress-hint">{{ t('正在生成报告，请稍候…（AI 分析阶段可能需要 1~3 分钟）') }}</p>
       </div>
 
       <!-- 生成失败 -->
       <div v-else-if="phase === 'error'" class="rp-center rp-error">
-        <p>报告生成失败</p>
+        <p>{{ t('报告生成失败') }}</p>
         <p class="rp-err-msg">{{ error }}</p>
-        <button class="rp-btn primary" @click="backToConfig">返回配置</button>
+        <button class="rp-btn primary" @click="backToConfig">{{ t('返回配置') }}</button>
       </div>
 
       <!-- 报告展示 -->
       <template v-else-if="report && phase === 'done'">
         <div class="rp-toolbar">
           <span class="rp-badge" :class="report.engine">
-            {{ report.engine === 'llm' ? 'AI 生成' : '标准模板' }}
+            {{ report.engine === 'llm' ? t('AI 生成') : t('标准模板') }}
           </span>
           <a class="rp-link" :href="report.url" target="_blank" rel="noopener">
-            新页面查看 ↗
+            {{ t('新页面查看 ↗') }}
           </a>
-          <button class="rp-btn" title="下载 Markdown 文件" @click="download">下载</button>
-          <button class="rp-btn" title="复制 Markdown 全文" @click="copy">复制</button>
+          <button class="rp-btn" :title="t('下载 Markdown 文件')" @click="download">{{ t('下载') }}</button>
+          <button class="rp-btn" :title="t('复制 Markdown 全文')" @click="copy">{{ t('复制') }}</button>
         </div>
         <div class="rp-meta-line">
           <span>{{ report.title }}</span>
@@ -97,27 +97,27 @@
         </div>
         <div class="rp-scroll" v-html="html"></div>
         <div class="rp-foot">
-          <button class="rp-btn" @click="backToConfig">重新生成</button>
+          <button class="rp-btn" @click="backToConfig">{{ t('重新生成') }}</button>
         </div>
       </template>
     </div>
 
     <!-- 历史记录视图 -->
     <div v-else class="rp-body">
-      <div v-if="histLoading" class="rp-center"><span class="rp-spinner"></span><p>加载历史报告…</p></div>
-      <div v-else-if="!hist.length" class="rp-empty">暂无历史报告。</div>
+      <div v-if="histLoading" class="rp-center"><span class="rp-spinner"></span><p>{{ t('加载历史报告…') }}</p></div>
+      <div v-else-if="!hist.length" class="rp-empty">{{ t('暂无历史报告。') }}</div>
       <ul v-else class="rp-hist">
         <li v-for="h in hist" :key="h.id" class="rp-hist-item">
           <div class="rp-hist-title">{{ h.title }}</div>
           <div class="rp-hist-meta">
-            <span class="rp-badge" :class="h.engine">{{ h.engine === 'llm' ? 'AI' : '模板' }}</span>
+            <span class="rp-badge" :class="h.engine">{{ h.engine === 'llm' ? t('AI') : t('模板') }}</span>
             <span>{{ h.created_at }}</span>
-            <span>{{ h.length }} 字</span>
+            <span>{{ h.length }} {{ t('字') }}</span>
           </div>
           <div class="rp-hist-actions">
-            <button class="rp-btn primary" @click="openHistory(h.id)">查看</button>
-            <a class="rp-link" :href="h.url" target="_blank" rel="noopener">新页打开 ↗</a>
-            <button class="rp-btn danger" title="删除此条历史" @click="delHistory(h.id)">删除</button>
+            <button class="rp-btn primary" @click="openHistory(h.id)">{{ t('查看') }}</button>
+            <a class="rp-link" :href="h.url" target="_blank" rel="noopener">{{ t('新页打开 ↗') }}</a>
+            <button class="rp-btn danger" :title="t('删除此条历史')" @click="delHistory(h.id)">{{ t('删除') }}</button>
           </div>
         </li>
       </ul>
@@ -130,6 +130,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
 import { renderMarkdown } from '../utils/markdown'
+import { playSound } from '../utils/feedback'
+import { t } from '../i18n'
 
 const store = useSimStore()
 const tab = ref('view')
@@ -152,16 +154,16 @@ const engineOpts = [
 ]
 
 const STAGE_TEXT = {
-  queued: '任务排队中',
-  ctx: '组装仿真数据',
-  llm_summary: 'AI 撰写执行摘要',
-  llm_baseline_insight: 'AI 分析基线数据',
-  llm_strategy_eval: 'AI 评估策略效果',
-  llm_suggestions: 'AI 撰写优化建议',
-  template: '生成模板分析',
-  render: '渲染报告',
-  save: '保存报告',
-  done: '完成',
+  queued: t('任务排队中'),
+  ctx: t('组装仿真数据'),
+  llm_summary: t('AI 撰写执行摘要'),
+  llm_baseline_insight: t('AI 分析基线数据'),
+  llm_strategy_eval: t('AI 评估策略效果'),
+  llm_suggestions: t('AI 撰写优化建议'),
+  template: t('生成模板分析'),
+  render: t('渲染报告'),
+  save: t('保存报告'),
+  done: t('完成'),
 }
 const stageText = computed(() => STAGE_TEXT[stage.value] || stage.value || '')
 
@@ -174,7 +176,7 @@ function pushProgressLine() {
   const st = stageText.value || '…'
   const filled = Math.round(pct / 10)
   const bar = '█'.repeat(filled) + '░'.repeat(10 - filled)
-  const line = `[报告生成] ${bar} ${pct}% · ${st}`
+  const line = `[${t('报告生成')}] ${bar} ${pct}% · ${st}`
   if (progressLineIdx >= 0 && store.cmdLog[progressLineIdx]) {
     store.cmdLog.splice(progressLineIdx, 1, { t: line, k: 'out' })
   } else {
@@ -193,7 +195,7 @@ function finishProgressLine(t, k = 'out') {
 
 function defaultTitle() {
   const parts = [payload.value?.strategy_name, payload.value?.scenario].filter(Boolean)
-  return parts.join(' · ') || '节能减碳分析报告'
+  return parts.join(' · ') || t('节能减碳分析报告')
 }
 
 // 每次点击「导出报告」（reportNonce 递增）：进入面板 → 参数配置（不自动生成）
@@ -228,13 +230,15 @@ async function startGenerate() {
       depth: cfg.value.depth,
       with_appendix: cfg.value.withAppendix,
     })
-    if (!res || res.ok === false) throw new Error((res && res.error) || '任务创建失败')
-    store.pushCmd(`报告生成任务已提交：${cfg.value.title.trim() || defaultTitle()}（引擎 ${cfg.value.engine} · 深度 ${cfg.value.depth}）。`, 'out')
+    if (!res || res.ok === false) throw new Error((res && res.error) || t('任务创建失败'))
+    store.pushCmd(`${t('报告生成任务已提交')}：${cfg.value.title.trim() || defaultTitle()}（${t('引擎')} ${cfg.value.engine} · ${t('深度')} ${cfg.value.depth}）。`, 'out')
+    store.showToast(t('报告生成任务已提交，正在后台生成…'), 'info')
     pollTask(res.task_id)
   } catch (e) {
     error.value = e.message || String(e)
     phase.value = 'error'
-    finishProgressLine(`报告生成失败：${error.value}`, 'err')
+    store.showToast(`${t('报告生成失败')}：${error.value}`, 'error')
+    finishProgressLine(`${t('报告生成失败')}：${error.value}`, 'err')
   }
 }
 
@@ -243,25 +247,29 @@ function pollTask(taskId) {
   stopPoll()
   const tick = async () => {
     try {
-      const t = await api.getReportTask(taskId)
-      if (!t || t.ok === false) {
-        error.value = (t && t.error) || '任务查询失败'
+      const task = await api.getReportTask(taskId)
+      if (!task || task.ok === false) {
+        error.value = (task && task.error) || t('任务查询失败')
         phase.value = 'error'
-        finishProgressLine(`报告生成失败：${error.value}`, 'err')
+        finishProgressLine(`${t('报告生成失败')}：${error.value}`, 'err')
         return
       }
-      progress.value = t.progress || 0
-      stage.value = t.stage || ''
+      progress.value = task.progress || 0
+      stage.value = task.stage || ''
       pushProgressLine()
-      if (t.done) {
-        if (t.ok) {
-          report.value = t.result
+      if (task.done) {
+        if (task.ok) {
+          report.value = task.result
           phase.value = 'done'
-          finishProgressLine(`报告生成完成：${report.value.title || '未命名'}（${report.value.length ?? ''} 字），可在右侧报告面板查看、下载或新页打开。`, 'guide')
+          playSound('done')   // 任务完成的积极听觉反馈
+          store.showToast(t('AI 分析报告生成完成'), 'success')
+          finishProgressLine(`${t('报告生成完成')}：${report.value.title || t('未命名')}（${report.value.length ?? ''} ${t('字')}），${t('可在右侧报告面板查看、下载或新页打开。')}`, 'guide')
         } else {
-          error.value = t.error || '报告生成失败'
+          error.value = task.error || t('报告生成失败')
           phase.value = 'error'
-          finishProgressLine(`报告生成失败：${error.value}`, 'err')
+          playSound('error')
+          store.showToast(`${t('报告生成失败')}：${error.value}`, 'error')
+          finishProgressLine(`${t('报告生成失败')}：${error.value}`, 'err')
         }
         return
       }
@@ -269,7 +277,7 @@ function pollTask(taskId) {
     } catch (e) {
       error.value = String(e.message || e)
       phase.value = 'error'
-      finishProgressLine(`报告生成失败：${error.value}`, 'err')
+      finishProgressLine(`${t('报告生成失败')}：${error.value}`, 'err')
     }
   }
   tick()
@@ -308,7 +316,7 @@ async function openHistory(id) {
   try {
     const res = await api.getReport(id)
     if (!res || res.ok === false) {
-      error.value = (res && res.error) || '加载失败'
+      error.value = (res && res.error) || t('加载失败')
       return
     }
     report.value = res
@@ -321,7 +329,7 @@ async function openHistory(id) {
 }
 
 async function delHistory(id) {
-  if (!window.confirm('确定删除这条历史报告？')) return
+  if (!(await store.confirm({ title: t('删除历史报告'), message: t('确定删除这条历史报告？'), okText: t('删除'), danger: true }))) return
   try {
     await api.deleteReport(id)
   } catch (e) {
@@ -335,7 +343,7 @@ function download() {
   const blob = new Blob([report.value.markdown], { type: 'text/markdown;charset=utf-8' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = (report.value.title || '节能减碳分析报告') + '.md'
+  a.download = (report.value.title || t('节能减碳分析报告')) + '.md'
   a.click()
   URL.revokeObjectURL(a.href)
 }
@@ -344,9 +352,9 @@ async function copy() {
   if (!report.value) return
   try {
     await navigator.clipboard.writeText(report.value.markdown)
-    store.toast = '报告 Markdown 已复制到剪贴板'
+    store.showToast(t('报告 Markdown 已复制到剪贴板'), 'success')
   } catch (e) {
-    store.toast = '复制失败，请手动选择复制'
+    store.showToast(t('复制失败，请手动选择复制'), 'warn')
   }
 }
 </script>
@@ -358,13 +366,13 @@ async function copy() {
   flex: 1; padding: 5px 0; font-size: 11px; border: 1px solid var(--line);
   border-radius: 3px; background: transparent; color: var(--muted); cursor: pointer;
 }
-.rp-tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.rp-tabs button.active { background: var(--accent); border-color: var(--accent-d); color: #fff; font-weight: 600; }
 .rp-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 10px 12px; }
 .rp-empty { margin: 24px 6px; text-align: center; color: var(--muted); font-size: 11px; line-height: 1.8; }
 .rp-center { margin: 32px 6px; text-align: center; color: var(--muted); font-size: 11px; line-height: 1.8; }
 .rp-spinner {
   display: inline-block; width: 22px; height: 22px; border: 2px solid var(--line);
-  border-top-color: var(--accent); border-radius: 50%; animation: rp-spin 0.8s linear infinite;
+  border-top-color: var(--accent-d); border-radius: 50%; animation: rp-spin 0.8s linear infinite;
 }
 @keyframes rp-spin { to { transform: rotate(360deg); } }
 .rp-error p { color: var(--red); }
@@ -374,7 +382,7 @@ async function copy() {
   background: #fff; color: var(--text); cursor: pointer;
 }
 .rp-btn:hover { border-color: var(--accent2); color: var(--accent2); }
-.rp-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.rp-btn.primary { background: var(--accent); border-color: var(--accent-d); color: #fff; }
 .rp-btn.primary:hover { opacity: 0.88; color: #fff; }
 .rp-btn.danger { color: var(--red); border-color: var(--red); }
 .rp-btn.danger:hover { background: var(--red); color: #fff; }
@@ -382,7 +390,7 @@ async function copy() {
 .rp-badge { font-size: 10px; padding: 2px 8px; border-radius: 3px; font-weight: 600; white-space: nowrap; }
 .rp-badge.llm { background: #e3f2fd; color: #0a58ca; border: 1px solid #0d6efd; }
 .rp-badge.template { background: #f0f0f0; color: var(--muted); border: 1px solid var(--line); }
-.rp-link { font-size: 11px; color: var(--accent); text-decoration: none; margin-left: auto; }
+.rp-link { font-size: 11px; color: var(--accent-d); text-decoration: none; margin-left: auto; }
 .rp-link:hover { text-decoration: underline; }
 .rp-meta-line { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0 4px; font-size: 10px; color: var(--muted); }
 .rp-meta-line span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -399,12 +407,12 @@ async function copy() {
   width: 100%; box-sizing: border-box; padding: 4px 8px; font-size: 11px;
   border: 1px solid var(--line); border-radius: 3px; background: var(--panel); color: var(--text); outline: none;
 }
-.rp-input:focus { border-color: var(--accent); }
+.rp-input:focus { border-color: var(--accent-d); }
 .rp-select {
   width: 100%; box-sizing: border-box; padding: 4px 8px; font-size: 11px;
   border: 1px solid var(--line); border-radius: 3px; background: var(--panel); color: var(--text); outline: none;
 }
-.rp-select:focus { border-color: var(--accent); }
+.rp-select:focus { border-color: var(--accent-d); }
 .rp-opt-group { display: flex; flex-direction: column; gap: 6px; }
 .rp-opt {
   position: relative; display: flex; align-items: center; gap: 8px; padding: 6px 8px;
@@ -412,13 +420,13 @@ async function copy() {
   background: var(--panel); color: var(--text);
 }
 .rp-opt:hover { border-color: var(--accent2); }
-.rp-opt.active { border-color: var(--accent); background: var(--accent-l); }
+.rp-opt.active { border-color: var(--accent-d); background: var(--accent-l); }
 .rp-opt input { position: absolute; opacity: 0; width: 0; height: 0; }
 .rp-opt-dot {
   width: 13px; height: 13px; border-radius: 50%; flex: none; box-sizing: border-box;
   border: 2px solid var(--faint); background: var(--panel); position: relative;
 }
-.rp-opt.active .rp-opt-dot { border-color: var(--accent); }
+.rp-opt.active .rp-opt-dot { border-color: var(--accent-d); }
 .rp-opt.active .rp-opt-dot::after {
   content: ''; position: absolute; inset: 2px; border-radius: 50%; background: var(--accent);
 }
@@ -431,7 +439,7 @@ async function copy() {
   width: 14px; height: 14px; border-radius: 3px; flex: none; box-sizing: border-box; position: relative;
   border: 1.5px solid var(--faint); background: var(--panel);
 }
-.rp-check input:checked + .rp-check-box { border-color: var(--accent); background: var(--accent); }
+.rp-check input:checked + .rp-check-box { border-color: var(--accent-d); background: var(--accent); }
 .rp-check input:checked + .rp-check-box::after {
   content: ''; position: absolute; left: 4px; top: 1px; width: 3px; height: 7px;
   border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg);
@@ -448,7 +456,7 @@ async function copy() {
   transition: width 0.4s ease;
 }
 .rp-progress-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
-.rp-progress-pct { font-size: 18px; font-weight: 700; color: var(--accent); }
+.rp-progress-pct { font-size: 18px; font-weight: 700; color: var(--accent-d); }
 .rp-progress-stage { font-size: 11px; color: var(--muted); }
 .rp-progress-hint { margin-top: 14px; text-align: center; font-size: 11px; color: var(--muted); }
 

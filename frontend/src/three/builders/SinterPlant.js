@@ -11,7 +11,7 @@ export default function _buildSinterPlant(bodyMat) {
     const g = new THREE.Group()
     const L = 24; const D = 10; const H = 8
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x00ccff
+    const neonColor = 0x2c6e9e
 
 
     // === 1. 矿槽 + 布料系统 ===
@@ -63,8 +63,8 @@ export default function _buildSinterPlant(bodyMat) {
         const nx = -strandLen / 2 + 1 + (i - 2.5) * 0.8
         const flame = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.8, 8),
             new THREE.MeshStandardMaterial({
-                color: 0xffaa44, emissive: 0xff6600, emissiveIntensity: 2.5,
-                roughness: 0.1, metalness: 0.05, transparent: true, opacity: 0.6, depthWrite: false
+                color: 0xc67a3c, emissive: 0xcc4a10, emissiveIntensity: 1.0,
+                roughness: 0.25, metalness: 0.05, transparent: true, opacity: 0.65, depthWrite: false
             }))
         flame.rotation.x = -Math.PI / 2
         flame.position.set(nx, palletY + 0.6, (Math.random() - 0.5) * D * 0.4)
@@ -109,7 +109,7 @@ export default function _buildSinterPlant(bodyMat) {
     chimney.position.set(strandLen / 2 + 4, palletY + 9, D * 0.6); g.add(chimney)
     // 烟囱顶部霓虹环
     const chimneyRing = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.1, 6, 16),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.6, roughness: 0.1 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     chimneyRing.position.set(strandLen / 2 + 4, palletY + 14, D * 0.6); g.add(chimneyRing)
     // 成品输送带（连到筛分出口）
     const beltMat = mat(0x3a3a3a, { roughness: 0.6, metalness: 0.1 })
@@ -124,7 +124,7 @@ export default function _buildSinterPlant(bodyMat) {
 
     // === 8. 霓虹装饰 ===
     const sinterRing = new THREE.Mesh(new THREE.TorusGeometry(strandLen * 0.5, 0.12, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.4, roughness: 0.2 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     sinterRing.rotation.x = Math.PI / 2; sinterRing.position.set(0, 2.0, 0); g.add(sinterRing)
 
     // === 9. 动画钩子 ===

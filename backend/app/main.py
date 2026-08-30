@@ -94,9 +94,10 @@ mqtt_source.start()
 try:
     realtime.seed_history(presets.default_model())
 except Exception as _e:  # pragma: no cover
-    print("seed history warn:", _e)
+    # 预填失败不打印到命令行，改为前端弹窗通知（前端连接后可见）
+    realtime.manager.notify("warn", "设备历史预填未完成", f"启动时按 MQTT 实时读数预填设备历史失败：{_e}")
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8010)
+    uvicorn.run(app, host="127.0.0.1", port=8010, access_log=False)

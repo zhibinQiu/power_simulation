@@ -1,5 +1,6 @@
 // 碳合规（企业履约台账 / 策略 / 预警 / 行情库表）API
 // 对应后端 /api/carbon-assistant 下 carbon_compliance router
+import { t } from '../i18n'
 const base = '/api/carbon-assistant'
 
 async function jfetch(url, opts = {}) {
@@ -204,7 +205,7 @@ export const carbonComplianceApi = {
       body: fd,
     })
     const json = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(json?.detail || json?.message || '导入失败')
+    if (!res.ok) throw new Error(json?.detail || json?.message || t('导入失败'))
     return json
   },
   // 策略报告下载

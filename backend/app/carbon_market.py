@@ -676,10 +676,3 @@ def forecast_series(instrument: str = "cea", days: int = 10,
     }
 
 
-def market_forecast(instrument: str = "cea", days: int = 10,
-                    method: str = "linear") -> dict[str, Any]:
-    """行情预测别名：供报告生成等服务调用，透传预测方法。"""
-    return forecast_series(instrument=instrument, days=days, method=method)
-
-
-market_quotes = fetch_quotes  # 行情别名：供报告生成等服务调用

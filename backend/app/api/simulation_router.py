@@ -11,6 +11,7 @@ import json
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from ..application.optimizer_service import optimizer_service
@@ -204,6 +205,16 @@ class ChatRequest(BaseModel):
 def chat(req: ChatRequest):
     """命令行窗口的自然语言对话端点。无 LLM key / 网络异常时返回 ok=False 与兜底提示。"""
     return simulation_service.chat(req.text, req.history, req.mode)
+
+
+@router.post("/api/chat/stream")
+def chat_stream(req: ChatRequest):
+    """流式聊天端点（SSE）：逐段推送增量文本，前端逐字渲染；失败时流内产出兜底提示。"""
+    return StreamingResponse(
+        simulation_service.chat_stream(req.text, req.history, req.mode),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ------------------------- AI 优化模型（GA / PSO / RL 在线训练） -------------------------

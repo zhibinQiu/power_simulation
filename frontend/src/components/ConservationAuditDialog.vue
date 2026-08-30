@@ -1,24 +1,24 @@
 <template>
   <teleport to="body">
     <div v-if="state.open" class="audit-mask" @click.self="close">
-      <div class="audit-modal" role="dialog" aria-label="碳素流守恒审计">
+      <div class="audit-modal" role="dialog" :aria-label="t('碳素流守恒审计')">
         <div class="am-head">
           <div class="am-title">
             <Icon name="bolt" :size="15" />
-            <span>碳素流守恒审计</span>
+            <span>{{ t('碳素流守恒审计') }}</span>
           </div>
-          <button class="am-x" @click="close" title="关闭 (Esc)">✕</button>
+          <button class="x-btn lg" @click="close" :title="t('关闭 (Esc)')">✕</button>
         </div>
         <div class="am-body">
           <div class="am-row">
-            <button class="am-run" @click="runAudit" :disabled="loadingA">{{ loadingA ? '计算中…' : '运行守恒审计' }}</button>
-            <span class="am-hint">逐工序核对碳输入 = 排CO₂ + 固钢 + 入渣 + 捕集 + 产品携出</span>
+            <button class="am-run" @click="runAudit" :disabled="loadingA">{{ t(loadingA ? '计算中…' : '运行守恒审计') }}</button>
+            <span class="am-hint">{{ t('逐工序核对碳输入 = 排CO₂ + 固钢 + 入渣 + 捕集 + 产品携出') }}</span>
           </div>
           <div v-if="auditErr" class="am-err">{{ auditErr }}</div>
           <div v-if="audit" class="am-table">
             <div class="am-th">
-              <span>工序</span><span>碳输入</span><span>排CO₂</span><span>固钢</span>
-              <span>入渣</span><span>捕集</span><span>产品碳</span><span>残差</span>
+              <span>{{ t('工序') }}</span><span>{{ t('碳输入') }}</span><span>{{ t('排CO₂') }}</span><span>{{ t('固钢') }}</span>
+              <span>{{ t('入渣') }}</span><span>{{ t('捕集') }}</span><span>{{ t('产品碳') }}</span><span>{{ t('残差') }}</span>
             </div>
             <div v-for="u in audit.units" :key="u.id" class="am-tr">
               <span>{{ u.name }}</span>
@@ -31,7 +31,7 @@
               <span :class="{ warn: Math.abs(u.residual) > 0.01 }">{{ fmt(u.residual) }}</span>
             </div>
             <div class="am-tr am-total">
-              <span>全厂</span>
+              <span>{{ t('全厂') }}</span>
               <span>{{ fmt(audit.totals.carbon_in) }}</span>
               <span>{{ fmt(audit.totals.carbon_to_co2) }}</span>
               <span>{{ fmt(audit.totals.carbon_to_steel) }}</span>
@@ -43,7 +43,7 @@
           </div>
           <div v-if="audit" class="am-note">{{ audit.note }}</div>
           <div v-if="audit && hasSankey" class="am-sankey">
-            <div class="am-sankey-title">碳素流桑基图</div>
+            <div class="am-sankey-title">{{ t('碳素流桑基图') }}</div>
             <CarbonSankey />
           </div>
         </div>
@@ -59,6 +59,7 @@ import { auditState, closeAuditDialog } from '../stores/audit'
 import { api } from '../api/client'
 import Icon from './Icon.vue'
 import CarbonSankey from './CarbonSankey.vue'
+import { t } from '../i18n'
 
 const store = useSimStore()
 const state = auditState
@@ -77,7 +78,7 @@ async function runAudit() {
   try {
     audit.value = await api.audit(store.model)
   } catch (e) {
-    auditErr.value = '审计失败：' + (e.message || e)
+    auditErr.value = t('审计失败：{msg}', { msg: e.message || e })
   } finally {
     loadingA.value = false
   }
@@ -97,9 +98,8 @@ watch(() => state.open, (v) => {
   background: var(--panel); border: 1px solid var(--border); border-radius: 4px; box-shadow: var(--shadow); }
 .am-head { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-bottom: 1px solid var(--border);
   background: var(--panel-2); position: sticky; top: 0; }
+.am-head .x-btn.lg { margin-left: auto; }
 .am-title { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text); font-weight: 500; }
-.am-x { margin-left: auto; background: transparent; border: none; color: var(--muted); font-size: 14px; cursor: pointer; padding: 2px 6px; border-radius: 5px; }
-.am-x:hover { color: var(--text); background: var(--panel-3); }
 .am-body { padding: 14px; }
 .am-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .am-row label { font-size: 11px; color: var(--muted); flex: 0 0 auto; }

@@ -1,15 +1,17 @@
 <template>
   <aside class="inspector">
     <!-- 宽度拖拽手柄（左侧边缘） -->
-    <div class="inspector-rsz" :class="{ dragging: rszDragging }" @mousedown.prevent="onRszStart" title="拖拽调整宽度"></div>
+    <div class="inspector-rsz" :class="{ dragging: rszDragging }" @mousedown.prevent="onRszStart" :title="t('拖拽调整宽度')"></div>
     <div class="sidebar-head">
       <span class="ttl">{{ headTitle }}</span>
       <span class="spacer"></span>
-      <span class="mono mode-tag">{{ modeTag }}</span>
-      <button v-if="mode !== 'overview' || store.selectedGroupId || store.selectedFlowId" class="x-btn" title="返回总览" @click="store.closeInspector()">✕</button>
+      <button v-if="mode !== 'overview' || store.selectedGroupId || store.selectedFlowId" class="x-btn" :title="t('返回总览')" @click="store.closeInspector()">✕</button>
     </div>    <div class="inspector-body" :class="{ scrolling }" @scroll="onScroll">
+      <!-- 本析智擎：智能体对话界面（工具栏「本析智擎」切换，替换右侧属性弹窗，中间 3D 场景保持） -->
+      <AgentChatView v-if="mode === 'agent'" />
+
       <!-- 报告面板（工具条「数据 → 报告 → 导出报告」，含历史报告管理） -->
-      <ReportPanel v-if="mode === 'report'" />
+      <ReportPanel v-else-if="mode === 'report'" />
 
       <!-- 场景/列表/左侧工艺目录点击实例：统一只用一个工序实例属性面板（能耗/碳排放/碳平衡/实时监测/可调节/核算台账/关联设备） -->
       <UnitCarbonDetail v-else-if="mode === 'unit'" />
@@ -28,20 +30,20 @@
         <template v-for="sid in layout.state.order" :key="sid">
           <CollapseSection
             v-if="sid === 'plant'"
-            title="全厂总览"
+            :title="t('全厂总览')"
             tone="blue"
             drag-id="plant"
             v-model="layout.state.open[sid]"
             @drop="layout.move($event.from, $event.to, $event.position)"
           >
             <div class="chips">
-              <div class="chip2 e"><span>综合能耗</span><b>{{ fmt(plantEnergy.total) }}</b><i>GJ/h</i></div>
-              <div class="chip2 e"><span>单位能耗</span><b>{{ fmt(plantEnergy.intensity) }}</b><i>kgce/t</i></div>
-              <div class="chip2 e"><span>电耗</span><b>{{ fmt(plantElec) }}</b><i>MWh/h</i></div>
-              <div class="chip2 c"><span>总排放</span><b :style="{color:co2Color}">{{ fmt(totals.co2_total) }}</b><i>tCO₂/h</i></div>
-              <div class="chip2 c"><span>吨钢强度</span><b>{{ fmt(totals.intensity) }}</b><i>kg/t</i></div>
-              <div class="chip2"><span>钢产量</span><b>{{ fmt(totals.steel_output) }}</b><i>t/h</i></div>
-              <div class="chip2 c"><span>碳利用率</span><b>{{ (totals.carbon_utilization*100).toFixed(1) }}</b><i>%</i></div>
+              <div class="chip2 e"><span>{{ t('综合能耗') }}</span><b>{{ fmt(plantEnergy.total) }}</b><i>GJ/h</i></div>
+              <div class="chip2 e"><span>{{ t('单位能耗') }}</span><b>{{ fmt(plantEnergy.intensity) }}</b><i>kgce/t</i></div>
+              <div class="chip2 e"><span>{{ t('电耗') }}</span><b>{{ fmt(plantElec) }}</b><i>MWh/h</i></div>
+              <div class="chip2 c"><span>{{ t('总排放') }}</span><b :style="{color:co2Color}">{{ fmt(totals.co2_total) }}</b><i>tCO₂/h</i></div>
+              <div class="chip2 c"><span>{{ t('吨钢强度') }}</span><b>{{ fmt(totals.intensity) }}</b><i>kg/t</i></div>
+              <div class="chip2"><span>{{ t('钢产量') }}</span><b>{{ fmt(totals.steel_output) }}</b><i>t/h</i></div>
+              <div class="chip2 c"><span>{{ t('碳利用率') }}</span><b>{{ (totals.carbon_utilization*100).toFixed(1) }}</b><i>%</i></div>
             </div>
             <div class="scope">
               <div class="scope-bar">
@@ -49,31 +51,31 @@
                 <i class="scope-indirect" :style="{ width: indirectPct + '%' }"></i>
               </div>
               <div class="scope-legend">
-                <span>直接 {{ fmt(totals.co2_direct) }} ({{ directPct }}%)</span>
-                <span>间接 {{ fmt(totals.co2_indirect) }} ({{ indirectPct }}%)</span>
+                <span>{{ t('直接') }} {{ fmt(totals.co2_direct) }} ({{ directPct }}%)</span>
+                <span>{{ t('间接') }} {{ fmt(totals.co2_indirect) }} ({{ indirectPct }}%)</span>
               </div>
             </div>
           </CollapseSection>
 
           <CollapseSection
             v-else-if="sid === 'strategy' && store.strategy"
-            title="策略节能减碳效果"
+            :title="t('策略节能减碳效果')"
             tone="green"
             drag-id="strategy"
             v-model="layout.state.open[sid]"
             @drop="layout.move($event.from, $event.to, $event.position)"
           >
             <div class="strat-cmp">
-              <div class="sc-item"><span>节能量</span><b class="good">{{ fmt(stratCmp.energyRed) }}</b><i>GJ/h</i></div>
-              <div class="sc-item"><span>节能率</span><b class="good">{{ stratCmp.energyPct }}%</b><i>较基线</i></div>
-              <div class="sc-item"><span>减排量</span><b class="good">{{ fmt(stratCmp.co2Red) }}</b><i>tCO₂/h</i></div>
-              <div class="sc-item"><span>减排率</span><b class="good">{{ stratCmp.co2Pct }}%</b><i>较基线</i></div>
+              <div class="sc-item"><span>{{ t('节能量') }}</span><b class="good">{{ fmt(stratCmp.energyRed) }}</b><i>GJ/h</i></div>
+              <div class="sc-item"><span>{{ t('节能率') }}</span><b class="good">{{ stratCmp.energyPct }}%</b><i>{{ t('较基线') }}</i></div>
+              <div class="sc-item"><span>{{ t('减排量') }}</span><b class="good">{{ fmt(stratCmp.co2Red) }}</b><i>tCO₂/h</i></div>
+              <div class="sc-item"><span>{{ t('减排率') }}</span><b class="good">{{ stratCmp.co2Pct }}%</b><i>{{ t('较基线') }}</i></div>
             </div>
           </CollapseSection>
 
           <CollapseSection
             v-else-if="sid === 'top'"
-            title="排放最高工序"
+            :title="t('排放最高工序')"
             tone="red"
             drag-id="top"
             v-model="layout.state.open[sid]"
@@ -97,7 +99,7 @@
 
       <!-- 物料库（点击左侧「物料」） -->
       <template v-else-if="mode === 'materials'">
-        <div class="park-sum">共 {{ materialList.length }} 种物料（原料/中间产物/能源/副产品），点击查看隐含碳因子与配置。</div>
+        <div class="park-sum">{{ t('共') }} {{ materialList.length }} {{ t('种物料（原料/中间产物/能源/副产品），点击查看隐含碳因子与配置。') }}</div>
         <div class="lview">
           <div v-for="m in materialList" :key="m.id" class="lrow click" :class="{active: store.selectedMaterialId===m.id}" @click="store.selectMaterial(m.id)">
             <div class="l-stack">
@@ -112,10 +114,12 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 import { energyOf } from '../utils/energy'
 import { useSimStore, UNIT_TYPES } from '../stores/sim'
 import { MATERIALS } from '../data/flowLibrary'
+import { t } from '../i18n'
+const AgentChatView = defineAsyncComponent(() => import('../views/AgentChatView.vue'))
 import UnitCarbonDetail from './UnitCarbonDetail.vue'
 import DeviceDetail from './DeviceDetail.vue'
 import FlowInspector from './FlowInspector.vue'
@@ -125,12 +129,13 @@ import StrategyDetailPanel from './StrategyDetailPanel.vue'
 import ReportPanel from './ReportPanel.vue'
 import { useDragLayout } from '../composables/useDragSort'
 
-/* 总览面板模块布局：顺序 + 折叠状态持久化到 localStorage（打开面板恢复上次状态） */
-const ovLayoutKey = ref('insp-layout:overview')
+/* 总览面板模块布局：顺序 + 折叠状态持久化到 localStorage（打开面板恢复上次状态）
+ * v2：默认全部折叠（ISA-101 少即是多），不再继承 v1 持久化的展开状态 */
+const ovLayoutKey = ref('insp-layout:overview:v2')
 const layout = useDragLayout(
   ovLayoutKey,
   ['plant', 'strategy', 'top'],
-  { plant: true, strategy: true, top: true },
+  { plant: false, strategy: false, top: false },
 )
 
 /* 宽度拖拽手柄：将事件转发给 App.vue 处理（与左侧栏一致） */
@@ -157,21 +162,21 @@ function onScroll() {
 
 const mode = computed(() => store.inspectorMode)
 const headTitle = computed(() => {
-  if (mode.value === 'report') return '报告面板'
-  if (mode.value === 'park') return '园区构成'
-  if (mode.value === 'materials') return '物料库'
-  if (mode.value === 'material') return '物料属性'
-  if (mode.value === 'strategyDetail') return '策略属性'
-  if (store.editMode) return '编排属性'
-  if (store.selectedGroupId) return '小组属性'
-  if (store.selectedFlowId) return '工艺属性'
+  if (mode.value === 'agent') return t('本析智擎')
+  if (mode.value === 'report') return t('报告面板')
+  if (mode.value === 'park') return t('园区构成')
+  if (mode.value === 'materials') return t('物料库')
+  if (mode.value === 'material') return t('物料属性')
+  if (mode.value === 'strategyDetail') return t('策略属性')
+  if (store.editMode) return t('编排属性')
+  if (store.selectedGroupId) return t('小组属性')
+  if (store.selectedFlowId) return t('工艺属性')
   if (mode.value === 'device') {
     const d = store.deviceDetail
-    return (d && d.device && d.device.adjustable) ? '可调设备' : '计量设备'
+    return (d && d.device && d.device.adjustable) ? t('可调设备') : t('计量设备')
   }
-  return ({ overview: '检视器 · 总览', unit: '工序属性' }[mode.value] || '检视器')
+  return ({ overview: t('检视器 · 总览'), unit: t('工序属性') }[mode.value] || t('检视器'))
 })
-const modeTag = computed(() => ({ material: '物料', overview: '总览', unit: '工序', device: '设备', park: '园区', materials: '物料', strategyDetail: '策略', report: '报告' }[mode.value] || ''))
 
 const totals = computed(() => {
   const base = store.resultForView ? store.resultForView.totals : {
@@ -258,11 +263,10 @@ function fmt(n) { return (n == null ? '—' : Number(n).toLocaleString('zh-CN', 
 
 <style scoped>
 /* .x-btn / .scope* / .park-sum 已统一定义于全局 main.css，此处不再重复 */
-/* 总览指标卡：按「能耗 / 碳排」类别加柔和淡色底（仅本面板局部，全局 chip2 不受影响） */
-.chip2.e { background: rgba(0,114,189,.055); border-color: rgba(0,114,189,.18); }
-.chip2.c { background: rgba(46,158,99,.055); border-color: rgba(46,158,99,.18); }
-.app.sim-dark .chip2.e { background: rgba(61,165,255,.10); border-color: rgba(61,165,255,.26); }
-.app.sim-dark .chip2.c { background: rgba(62,207,142,.10); border-color: rgba(62,207,142,.26); }
+/* 本析智擎对话界面 absolute 铺满面板（覆盖 padding，视觉通栏） */
+.inspector-body { position: relative; }
+/* 总览指标卡：统一中性底色（与全局面板一致），不再按能耗/碳排区分彩色底，避免视觉杂乱；
+ * 语义色仅保留在数值上（co2Color 强度警示），卡片本身一色到底 */
 .te-row { align-items: flex-start; padding-top: 9px; padding-bottom: 9px; }
 .te-bar { display: block; height: 4px; border-radius: 2px; background: var(--panel-2); overflow: hidden; margin-top: 5px; }
 .te-bar > i { display: block; height: 100%; border-radius: 2px; }
@@ -274,6 +278,6 @@ function fmt(n) { return (n == null ? '—' : Number(n).toLocaleString('zh-CN', 
 }
 .sc-item span { font-size: 10px; color: var(--muted); }
 .sc-item b { font-size: 16px; font-variant-numeric: tabular-nums; }
-.sc-item b.good { color: var(--green, #2E9E63); }
+.sc-item b.good { color: var(--green, #2E8B57); }
 .sc-item i { font-style: normal; font-size: 10px; color: var(--muted); }
 </style>

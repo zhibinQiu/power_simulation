@@ -11,7 +11,7 @@ export default function _buildReheatFurnace(bodyMat) {
     const g = new THREE.Group()
     const L = 22; const D = 10; const H = 10
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x00ccff
+    const neonColor = 0x2c6e9e
 
 
     // === 1. 炉体（长条形步进式加热炉：装料端→预热→加热→均热→出料端） ===
@@ -38,7 +38,7 @@ export default function _buildReheatFurnace(bodyMat) {
         for (const sz of [-0.8, 0.8]) {
             const slab = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.4, 1.2),
                 new THREE.MeshStandardMaterial({
-                    roughness: 0.2, metalness: 0.1, emissive: 0xff5522, emissiveIntensity: 0.3 + i * 0.1
+                    roughness: 0.2, metalness: 0.1, emissive: 0xbf5a2e, emissiveIntensity: 0.3 + i * 0.1
                 }))
             slab.position.set(slabX, 3.35, sz); g.add(slab)
             slab.name = i < 2 ? 'coldSlab' : i >= 4 ? 'soakingSlab' : 'heatingSlab'
@@ -64,8 +64,8 @@ export default function _buildReheatFurnace(bodyMat) {
             // 火焰锥
             const flame = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.8, 8),
                 new THREE.MeshStandardMaterial({
-                    color: 0xff8844, emissive: 0xff4400, emissiveIntensity: 1.5,
-                    roughness: 0.1, metalness: 0.05, transparent: true, opacity: 0.5, depthWrite: false
+                    color: 0xff8844, emissive: 0xcc3a00, emissiveIntensity: 0.8,
+                    roughness: 0.3, metalness: 0.05, transparent: true, opacity: 0.55, depthWrite: false
                 }))
             flame.rotation.x = Math.PI
             flame.position.set(bx, 4.0, s * D * 0.2)
@@ -86,8 +86,8 @@ export default function _buildReheatFurnace(bodyMat) {
         // 炉门内可见火焰
         const doorFlare = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.0, D * 0.4),
             new THREE.MeshStandardMaterial({
-                color: 0xff7722, emissive: 0xff4400, emissiveIntensity: 1.2,
-                transparent: true, opacity: 0.5, depthWrite: false
+                color: 0xff8844, emissive: 0xcc3a00, emissiveIntensity: 0.8,
+                transparent: true, opacity: 0.55, depthWrite: false
             }))
         doorFlare.position.set(doorX, 2.5, 0); g.add(doorFlare)
     }
@@ -108,7 +108,7 @@ export default function _buildReheatFurnace(bodyMat) {
 
     // === 7. 霓虹 ===
     const reheatRing = new THREE.Mesh(new THREE.TorusGeometry(L * 0.42, 0.12, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.4, roughness: 0.2 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     reheatRing.rotation.x = Math.PI / 2; reheatRing.position.set(0, 2.0, 0); g.add(reheatRing)
 
     // === 8. 动画钩子 ===
@@ -121,7 +121,7 @@ export default function _buildReheatFurnace(bodyMat) {
     g.userData._reheatDoorFlares = []
 
     // === 物料转变动画：冷坯→加热→热坯 ===
-    // billet→hot_billet: 0xff5522→0xffaa44
+    // billet→hot_billet: 0xbf5a2e→0xc67a3c
     const heatFlow = []
     for (let i = 0; i < slabCount; i++) {
         const slab = internalSlabs[i]
@@ -129,8 +129,8 @@ export default function _buildReheatFurnace(bodyMat) {
             obj: slab, phase: i * 0.16, period: 6.5,
             srcPos: new THREE.Vector3(slab.position.x, 3.3, 0),
             dstPos: new THREE.Vector3(slab.position.x, 3.3, 0),
-            srcColor: i < 2 ? 0x666666 : i < 4 ? 0xff5522 : 0xff7733,
-            dstColor: i < 2 ? 0xff5522 : i < 4 ? 0xff7733 : 0xffaa44,
+            srcColor: i < 2 ? 0x666666 : i < 4 ? 0xbf5a2e : 0xb55a34,
+            dstColor: i < 2 ? 0xbf5a2e : i < 4 ? 0xb55a34 : 0xc67a3c,
             scalePulse: 0.12,
         })
     }

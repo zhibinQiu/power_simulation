@@ -10,7 +10,7 @@ import { PAL, mat, boxMesh, steelTex, tankShellTex, wallPanelTex } from './utils
 export default function _buildFurnace(bodyMat) {
     const g = new THREE.Group()
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x00ccff
+    const neonColor = 0x2c6e9e
 
 
     // === 1. 炉体 ===
@@ -86,9 +86,9 @@ export default function _buildFurnace(bodyMat) {
     // === 3. 炉内熔池（液态钢水） ===
     const meltPool = new THREE.Mesh(
         new THREE.CylinderGeometry(3.5, 4.2, 2.5, 24),
-        mat(0xff8822, {
-            roughness: 0.05, metalness: 0.05, emissive: 0xcc3300, emissiveIntensity: 0.8,
-            transparent: true, opacity: 0.75, depthWrite: false
+        mat(0xbf6a30, {
+            roughness: 0.15, metalness: 0.05, emissive: 0x8a4018, emissiveIntensity: 0.5,
+            transparent: true, opacity: 0.8, depthWrite: false
         })
     )
     meltPool.position.y = 2.0; g.add(meltPool)
@@ -141,11 +141,11 @@ export default function _buildFurnace(bodyMat) {
 
     // === 7. 霓虹装饰 ===
     const eafRing = new THREE.Mesh(new THREE.TorusGeometry(5.7, 0.15, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.5, roughness: 0.2 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     eafRing.rotation.x = Math.PI / 2; eafRing.position.set(0, 4.5, 0); g.add(eafRing)
 
     const eafRing2 = new THREE.Mesh(new THREE.TorusGeometry(4.8, 0.12, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.4, roughness: 0.2 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     eafRing2.rotation.x = Math.PI / 2; eafRing2.position.set(0, 8.0, 0); g.add(eafRing2)
 
     // === 7.5 检修平台（2层） ===
@@ -174,7 +174,7 @@ export default function _buildFurnace(bodyMat) {
     g.userData._eafSlagMat = slagLayer.material
 
     // === 物料转变动画：废钢(灰块)→电弧熔化→液态钢水(橙红) ===
-    // 颜色与连线载运体一致：scrap(0x8899aa)→crude_steel(0xff8822)
+    // 颜色与连线载运体一致：scrap(0x8899aa)→crude_steel(0xbf6a30)
     const eafFlow = []
     for (let i = 0; i < 8; i++) {
         const ang = (i / 8) * Math.PI * 2; const r = 1.8 + Math.random() * 2.0
@@ -185,7 +185,7 @@ export default function _buildFurnace(bodyMat) {
             obj: scrap, phase: i * 0.12, period: 7.5,
             srcPos: new THREE.Vector3(Math.cos(ang) * r, 6.0, Math.sin(ang) * r),
             dstPos: new THREE.Vector3(Math.cos(ang) * r * 0.2, 2.0, Math.sin(ang) * r * 0.2),
-            srcColor: 0x8899aa, dstColor: 0xff8822, scalePulse: 0.18,
+            srcColor: 0x8899aa, dstColor: 0xbf6a30, scalePulse: 0.18,
         })
     }
     // 渣层分离颗粒
@@ -198,7 +198,7 @@ export default function _buildFurnace(bodyMat) {
             obj: slagP, kind: 'slag', phase: i * 0.25, period: 5.0,
             srcPos: new THREE.Vector3(slagP.position.x, 2.5, slagP.position.z),
             dstPos: new THREE.Vector3(slagP.position.x, 4.8, slagP.position.z),
-            srcColor: 0xff7733, dstColor: 0x998877, scalePulse: 0.2,
+            srcColor: 0xb55a34, dstColor: 0x998877, scalePulse: 0.2,
         })
     }
 

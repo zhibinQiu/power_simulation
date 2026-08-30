@@ -5,6 +5,11 @@ export function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+// HTML 属性值转义（额外转义双引号，用于 data-chart 等属性）
+function escapeAttr(s) {
+  return escapeHtml(s).replace(/"/g, '&quot;')
+}
+
 function inline(s) {
   let t = escapeHtml(s)
   t = t.replace(/`([^`]+)`/g, (m, c) => '<code>' + c + '</code>')
@@ -26,11 +31,24 @@ export function renderMarkdown(src, opts = {}) {
     if (!trimmed) { i++; continue }
 
     if (trimmed.startsWith('```')) {
+      // 语言标注：```lang（如 ```python / ```echarts），echarts 特殊处理为图表容器
+      const lm = trimmed.match(/^```\s*([\w.+-]+)?/)
+      const lang = (lm && lm[1] ? lm[1] : '').trim().toLowerCase()
       const buf = []
       i++
       while (i < lines.length && !lines[i].trim().startsWith('```')) { buf.push(lines[i]); i++ }
       i++
-      out.push('<pre class="rp-code"><code>' + escapeHtml(buf.join('\n')) + '</code></pre>')
+      const code = buf.join('\n')
+      if (lang === 'echarts' || lang === 'chart' || lang === 'echart') {
+        // echarts 图表：容器带 data-chart(JSON option)，由前端 echarts 初始化；
+        // 内部保留 JSON 降级预览（初始化前/无 JS 渲染时可见）
+        out.push(
+          '<div class="md-chart" data-chart="' + escapeAttr(code.trim()) + '">' +
+          '<pre class="rp-code md-chart-fallback"><code>' + escapeHtml(code) + '</code></pre></div>',
+        )
+      } else {
+        out.push('<pre class="rp-code"' + (lang ? ' data-lang="' + escapeAttr(lang) + '"' : '') + '><code>' + escapeHtml(code) + '</code></pre>')
+      }
       continue
     }
 

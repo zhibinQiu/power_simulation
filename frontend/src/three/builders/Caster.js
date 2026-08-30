@@ -11,7 +11,7 @@ export default function _buildCaster(bodyMat) {
     const g = new THREE.Group()
     const L = 30; const W = 8; const D = 10; const H = 14
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x00ccff
+    const neonColor = 0x2c6e9e
 
 
     // === 1. 钢水罐（ladle turret — 回转台） ===
@@ -73,7 +73,7 @@ export default function _buildCaster(bodyMat) {
         }
         const segThick = 0.7 - i * 0.04
         const seg = new THREE.Mesh(new THREE.BoxGeometry(2.0, segThick, 1.6),
-            new THREE.MeshStandardMaterial({ roughness: 0.25, metalness: 0.1, emissive: 0xff4400, emissiveIntensity: 0.6 - i * 0.06 }))
+            new THREE.MeshStandardMaterial({ roughness: 0.3, metalness: 0.1, emissive: 0xcc3a00, emissiveIntensity: 0.35 - i * 0.04 }))
         seg.position.set(segX, segY, 0)
         seg.rotation.z = segAng || 0
         g.add(seg)
@@ -135,8 +135,8 @@ export default function _buildCaster(bodyMat) {
     for (let i = 0; i < 12; i++) {
         const spark = new THREE.Mesh(new THREE.SphereGeometry(0.06 + Math.random() * 0.06, 4, 4),
             new THREE.MeshBasicMaterial({
-                color: 0xffaa44, emissive: 0xff8800, transparent: true,
-                opacity: 0.8, depthWrite: false
+                color: 0xc67a3c, transparent: true,
+                opacity: 0.85, depthWrite: false
             }))
         spark.position.set(5.5, 1.2 + Math.random() * 1, 0.5 + Math.random() * 0.5)
         sparkGroup.add(spark)
@@ -146,7 +146,7 @@ export default function _buildCaster(bodyMat) {
     // === 8. 铸坯穿行条（strand moving through — 水平段下方） ===
     const strand = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.6, 1.6),
         new THREE.MeshStandardMaterial({
-            roughness: 0.2, metalness: 0.1, emissive: 0xff4400, emissiveIntensity: 1.5,
+            roughness: 0.25, metalness: 0.1, emissive: 0xcc3a00, emissiveIntensity: 0.8,
             transparent: true, opacity: 0.8, depthWrite: false
         }))
     strand.position.set(2.0, 0.6, 0); g.add(strand)
@@ -173,10 +173,10 @@ export default function _buildCaster(bodyMat) {
 
     // === 10. 霓虹 ===
     const casterLine = new THREE.Mesh(new THREE.BoxGeometry(L * 0.9, 0.05, 0.15),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.5 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     casterLine.position.set(0, 0.3, 0); g.add(casterLine)
     const casterRing = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.1, 8, 16),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.4, roughness: 0.2 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     casterRing.rotation.x = Math.PI / 2; casterRing.position.set(0, 3.5, 0); g.add(casterRing)
 
     // === 11. 动画钩子 ===
@@ -191,14 +191,14 @@ export default function _buildCaster(bodyMat) {
     g.userData._casterSparks = sparkGroup.children
 
     // === 物料转变动画：液态钢水→结晶凝固→全固态铸坯 ===
-    // 颜色与连线载运体一致：liquid_steel(0xff7733)→billet(0xff5522)
+    // 颜色与连线载运体一致：liquid_steel(0xb55a34)→billet(0xbf5a2e)
     const casterFlow = []
     for (let i = 0; i < segCount; i++) {
         const t = i / (segCount - 1); const colorProgress = t
         const seg = internalSlabs[i]
         const sp = segPos(t)
-        const srcClr = colorProgress < 0.25 ? 0xff7733 : colorProgress < 0.5 ? 0xdd4400 : 0xcc3311
-        const dstClr = colorProgress < 0.25 ? 0xdd4400 : colorProgress < 0.5 ? 0xcc3311 : 0xff5522
+        const srcClr = colorProgress < 0.25 ? 0xb55a34 : colorProgress < 0.5 ? 0xb03a1a : 0xa04020
+        const dstClr = colorProgress < 0.25 ? 0xb03a1a : colorProgress < 0.5 ? 0xa04020 : 0xbf5a2e
         casterFlow.push({
             obj: seg, phase: i * 0.12, period: 6.5,
             srcPos: new THREE.Vector3(sp.x, sp.y, 0), dstPos: new THREE.Vector3(sp.x, sp.y, 0),

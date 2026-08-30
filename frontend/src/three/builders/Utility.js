@@ -9,7 +9,7 @@ import { PAL, mat, boxMesh, steelTex } from './utils.js'
 export default function _buildUtility(bodyMat) {
     const g = new THREE.Group()
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x00ccff
+    const neonColor = 0x2c6e9e
 
 
     // === 1. 燃气轮机（gas turbine） ===
@@ -105,7 +105,7 @@ export default function _buildUtility(bodyMat) {
 
     // === 8. 霓虹 ===
     const utilRing = new THREE.Mesh(new THREE.TorusGeometry(8, 0.1, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.4, roughness: 0.2 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     utilRing.rotation.x = Math.PI / 2; utilRing.position.set(0, 1.0, 0); g.add(utilRing)
 
     // === 9. 动画钩子 ===

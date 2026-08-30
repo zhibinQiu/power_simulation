@@ -458,7 +458,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
 
 .cm-error {
   padding: 6px 10px; border-radius: 5px; font-size: 12px; color: var(--red);
-  background: rgba(209, 75, 75, 0.08); border: 1px solid rgba(209, 75, 75, 0.3);
+  background: rgba(188, 59, 48, 0.08); border: 1px solid rgba(188, 59, 48, 0.3);
 }
 
 /* —— 行情卡片：扁平面板 + 顶部 2px 主题色指示条（VS Code tab 顶部指示条同语汇） —— */
@@ -504,7 +504,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
   font-size: 12.5px; font-weight: 500;
   font-family: var(--mono); font-variant-numeric: tabular-nums;
 }
-.cm-src { font-weight: 500 !important; color: var(--accent); }
+.cm-src { font-weight: 500 !important; color: var(--accent-d); }
 
 /* —— 走势图面板 —— */
 .cm-chart-box {
@@ -537,7 +537,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
 .cm-range-label { color: var(--muted); flex: none; }
 .cm-range-text {
   font-family: var(--mono); font-variant-numeric: tabular-nums;
-  color: var(--accent); font-size: 11px; letter-spacing: .2px;
+  color: var(--accent-d); font-size: 11px; letter-spacing: .2px;
 }
 .cm-range-reset {
   margin-left: auto; flex: none;
@@ -546,7 +546,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
   border-radius: 4px; padding: 1px 8px; cursor: pointer;
   transition: color .15s, border-color .15s;
 }
-.cm-range-reset:hover { color: var(--accent); border-color: var(--accent); }
+.cm-range-reset:hover { color: var(--accent-d); border-color: var(--accent-d); }
 .cm-range-sliders { position: relative; padding-top: 2px; }
 .cm-range-track { position: relative; height: 22px; }
 .cm-range-track::before {
@@ -631,7 +631,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
   transition: background 0.4s;
 }
 .cm-ticker.flash { background: var(--accent-l); }
-.cm-ticker a { color: var(--accent); text-decoration: none; }
+.cm-ticker a { color: var(--accent-d); text-decoration: none; }
 .cm-ticker a:hover { text-decoration: underline; }
 .cm-ticker-dot {
   width: 6px; height: 6px; border-radius: 2px; flex: none;

@@ -1,71 +1,88 @@
 <template>
   <div class="area-scene">
-    <div ref="host" class="scene-host"></div>
+    <div ref="host" v-show="!view2D" class="scene-host"></div>
+    <Twin2DView v-if="view2D" class="scene-host"/>
+
+    <!-- 左上角工具组（图标按钮）：2D/3D 切换 / 亮度 / 刷新视角 / 自动环视 -->
+    <div v-if="!store.editMode" class="twin-left-tools" :style="{ top: store.scheme.activeGroupId ? '58px' : '12px' }">
+      <button type="button" class="twin-tool-btn" :class="{ on: view2D }" @click="toggleView2D()" :title="view2D ? t('切换到 3D 数字孪生视图') : t('切换到 2D 工艺流程图（ISA-101 人机界面）')">
+        <Icon :name="view2D ? 'scene3d' : 'front'"/>
+      </button>
+      <button type="button" class="twin-tool-btn" :class="{ on: showBrightness }" @click.stop="showBrightness = !showBrightness" :title="t('画面亮度（点击展开滑条）')">
+        <Icon name="brightness"/>
+      </button>
+      <button type="button" class="twin-tool-btn" @click="store.resetView()" :title="t('刷新视角：重置为园区俯瞰')">
+        <Icon name="target"/>
+      </button>
+      <button type="button" class="twin-tool-btn" :class="{ on: store.autoRotate }" @click="store.setAutoRotate(!store.autoRotate)" :title="t('相机自动环绕旋转')">
+        <Icon name="rotate"/>
+      </button>
+      <div v-if="showBrightness" class="twin-bright-pop" @click.stop>
+        <div class="twin-bp-title">{{ t('画面亮度') }}</div>
+        <div class="twin-bp-row">
+          <span class="twin-bp-label">{{ t('暗') }}</span>
+          <input type="range" class="twin-bp-range" min="0.3" max="2.5" step="0.05"
+                 :value="store.brightness" @input="store.setBrightness(+($event.target.value))" />
+          <span class="twin-bp-label">{{ t('亮') }}</span>
+          <span class="twin-bp-val">{{ (store.brightness * 100).toFixed(0) }}%</span>
+        </div>
+      </div>
+    </div>
 
     <!-- 3D 小组子场景：左上角返回顶层浮层（非编辑态下点击小组标签进入） -->
     <div v-if="!store.editMode && store.scheme.activeGroupId" class="group-scene-bar">
-      <button type="button" class="gs-back" @click="store.exitGroup()">← 返回顶层</button>
+      <button type="button" class="gs-back" @click="store.exitGroup()">{{ t('← 返回顶层') }}</button>
       <span class="gs-title">▦ {{ groupSceneName }}</span>
     </div>
 
-    <!-- 仿真模式：右上角实时显示仿真前后能源/碳排放对比（大卡片 · 细粒度分组 + 可视化） -->
-    <div v-if="store.simMode && store.simBaseline" class="sim-compare" :class="{ 'sc-folded': scFolded }">
-      <div class="sc-head">
-        <span class="sc-title">仿真前后对比</span>
-        <span class="sc-badge">仿真模式</span>
-        <button class="sc-fold" type="button" @click="scFolded = !scFolded" :title="scFolded ? '展开' : '收起'">{{ scFolded ? '▸' : '▾' }}</button>
-      </div>
-
-      <template v-if="!scFolded">
-        <!-- 左右两栏对比：碳排放 | 能耗（本次更改明细已由命令行窗口实时输出） -->
-        <div class="sc-cols" v-if="compareRows.length">
-          <div class="sc-col" v-for="g in compareRows" :key="g.key">
-            <div class="sc-gname">{{ g.name }}</div>
-            <div class="sc-row" v-for="r in g.rows" :key="r.key">
-              <div class="sc-r1">
-                <span class="sc-name" :title="r.name">{{ r.name }}</span>
-                <span class="sc-fv">
-                  <i>{{ r.beforeText }}</i><em>→</em><b>{{ r.afterText }}</b><small>{{ r.u }}</small>
-                </span>
-                <span class="sc-delta" :class="r.cls">{{ r.arrow }} {{ r.deltaText }}</span>
-              </div>
-              <!-- 重叠对比条：灰=优化前底，彩=优化后从同一起点覆盖，差值=露出的灰尾（减少）或超出的彩段（增加） -->
-              <div class="sc-bar">
-                <div class="sc-bar-before" :title="'优化前 ' + r.beforeText + ' ' + r.u" :style="{ width: r.beforePct + '%' }"></div>
-                <div class="sc-bar-after" :class="r.cls" :title="'优化后 ' + r.afterText + ' ' + r.u" :style="{ width: r.afterPct + '%' }"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="sc-empty" v-else>尚未执行前后对比：点击左侧策略，在属性面板使用「策略仿真」测试</div>
-      </template>
-
-      <button class="sc-save" type="button" @click="store.requestSaveStrategy()">保存策略</button>
+    <!-- 全屏模式浮动工具（右上角）：全屏时顶栏/工具栏已隐藏，「HMI人机交互屏」切换与「退出全屏」入口移至内容区 -->
+    <div v-if="store.fullscreenOn" class="twin-fs-tools">
+      <button type="button" class="fs-tool-btn" :title="t('切换到 HMI人机交互屏')" @click="store.toggleOverview()">
+        <Icon name="eye" :size="16" :stroke="1.6"/>
+      </button>
+      <button type="button" class="fs-tool-btn" :title="t('退出全屏')" @click="store.toggleFullscreen()">
+        <Icon name="fullscreen" :size="16" :stroke="1.6"/>
+      </button>
     </div>
 
     <!-- 点击 3D 场景中模型旁的小铭牌 → 右侧统一展示该工序实例的属性面板（无浮窗冗余） -->
 
     <div v-if="!ok" class="scene-fallback">
-      <div class="fb-title">3D 场景无法初始化</div>
-      <div class="fb-msg">{{ lastErr || '当前环境不支持 WebGL，无法渲染 3D 场景。' }}</div>
-      <div class="fb-hint">请使用支持 WebGL 的现代浏览器（Chrome / Edge / Firefox），并确认未禁用“硬件加速”。</div>
-      <button class="fb-retry" type="button" @click="retry">重试</button>
+      <div class="fb-title">{{ t('3D 场景无法初始化') }}</div>
+      <div class="fb-msg">{{ lastErr || t('当前环境不支持 WebGL，无法渲染 3D 场景。') }}</div>
+      <div class="fb-hint">{{ t('请使用支持 WebGL 的现代浏览器（Chrome / Edge / Firefox），并确认未禁用“硬件加速”。') }}</div>
+      <button class="fb-retry" type="button" @click="retry">{{ t('重试') }}</button>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { t } from '../i18n'
 import { useSimStore } from '../stores/sim'
 import { TwinScene } from '../three/scene'
+import Icon from './Icon.vue'
+import Twin2DView from './Twin2DView.vue'
 
 const store = useSimStore()
 const host = ref(null)
 const ok = ref(true)
 const lastErr = ref('')
+const view2D = ref(false)
 let scene = null
 let ro = null
 let introDone = false
+
+// 2D/3D 视图切换：2D 视图是全新画布（独立工艺流程图），切换时暂停/恢复 3D 渲染循环
+function toggleView2D() {
+  view2D.value = !view2D.value
+  if (!scene) return
+  scene.setPaused(view2D.value || store.editMode || document.hidden)
+  if (!view2D.value) {
+    // 从 2D 返回 3D：canvas 刚恢复可见，等布局完成后重建场景避免 0 尺寸 NaN
+    nextTick(() => { if (scene) { scene.resize(); scene.setPaused(store.editMode || document.hidden) } })
+  }
+}
 
 function rebuildScene() {
   if (!scene || !store.ready || !store.model || !store.model.units || !store.model.units.length) return
@@ -116,78 +133,6 @@ function retry() {
   initScene()
 }
 
-// 仿真模式：右上角仿真前后能源/碳排放对比（simBaseline 为进入仿真时的快照）
-const scFolded = ref(false)
-
-// 兼容字段取值：前端估算结果用 energy，后端完整结果用 energy_total
-function pick(o, ...keys) {
-  if (!o) return null
-  for (const k of keys) { const v = o[k]; if (v != null && !isNaN(v)) return v }
-  return null
-}
-const fmt1 = (n) => (n == null ? '—' : Number(n).toFixed(1))
-// 千分位格式化：大数更易读（如 1,234.5）
-const fmtN = (n) => (n == null ? '—' : Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 1, maximumFractionDigits: 1 }))
-const fmtPct = (p) => ((p > 0 ? '+' : '') + p.toFixed(1) + '%')
-// 基线 vs 当前是否发生实质变化（未应用策略时兜底引导判断）
-function hasDelta(b, c) {
-  for (const k of ['co2_total', 'energy_total', 'energy', 'intensity']) {
-    if (b[k] != null && c[k] != null && Math.abs(b[k] - c[k]) > 1e-9) return true
-  }
-  return false
-}
-
-// 分组对比：仅碳排放 / 能耗 两组，左右两栏展示，每行含重叠对比条 + 变化徽章
-const compareRows = computed(() => {
-  const base = store.simBaseline && store.simBaseline.totals
-  if (!base) return []
-  const cur = (store.simCurrent && store.simCurrent.totals)
-    || (store.strategy && store.strategy.totals)
-    || (store.resultForView && store.resultForView.totals) || null
-  if (!cur) return []
-  if (!store.simCurrent && !store.strategy && !hasDelta(base, cur)) return []  // 尚无对比内容 → 显示引导
-
-  const defs = [
-    { key: 'co2', name: '碳排放', rows: [
-      { key: 'co2_total', name: '总排放量', a: pick(base, 'co2_total'), b: pick(cur, 'co2_total'), u: 'tCO₂/h', dir: 'down' },
-      { key: 'co2_direct', name: '直接排放(范围一)', a: pick(base, 'co2_direct'), b: pick(cur, 'co2_direct'), u: 'tCO₂/h', dir: 'down' },
-      { key: 'co2_indirect', name: '间接排放(范围二)', a: pick(base, 'co2_indirect'), b: pick(cur, 'co2_indirect'), u: 'tCO₂/h', dir: 'down' },
-      { key: 'intensity', name: '吨钢碳排放强度', a: pick(base, 'intensity'), b: pick(cur, 'intensity'), u: 'kgCO₂/t', dir: 'down' },
-    ] },
-    { key: 'energy', name: '能耗', rows: [
-      { key: 'energy_total', name: '综合能耗', a: pick(base, 'energy_total', 'energy'), b: pick(cur, 'energy_total', 'energy'), u: 'GJ/h', dir: 'down' },
-      { key: 'energy_intensity', name: '单位产品综合能耗', a: pick(base, 'energy_intensity'), b: pick(cur, 'energy_intensity'), u: 'kgce/t', dir: 'down' },
-      { key: 'elec', name: '电耗', a: pick(base, 'elec'), b: pick(cur, 'elec'), u: 'MWh/h', dir: 'down' },
-      { key: 'fuel_energy', name: '燃料能耗', a: pick(base, 'fuel_energy'), b: pick(cur, 'fuel_energy'), u: 'GJ/h', dir: 'down' },
-    ] },
-  ]
-
-  return defs.map((g) => ({
-    key: g.key, name: g.name,
-    rows: g.rows
-      .filter((r) => r.a != null && r.b != null)
-      .map((r) => {
-        const d = r.b - r.a
-        const maxV = Math.max(Math.abs(r.a), Math.abs(r.b), 1e-9)
-        const beforePct = Math.max(2, (Math.abs(r.a) / maxV) * 100)
-        const afterPct = Math.max(2, (Math.abs(r.b) / maxV) * 100)
-        const relPct = r.a !== 0 ? (d / r.a) * 100 : null
-        const good = r.dir === 'up' ? d >= 0 : r.dir === 'down' ? d <= 0 : true
-        const cls = r.dir === 'neutral' ? 'neu' : (good ? 'good' : 'bad')
-        const num = (n) => (r.pct100 ? n * 100 : n)
-        return {
-          ...r,
-          beforeText: fmtN(num(r.a)), afterText: fmtN(num(r.b)), d,
-          arrow: d > 1e-9 ? '▲' : d < -1e-9 ? '▼' : '–',
-          deltaText: r.pct100 ? fmtPct(num(d))
-            : (r.dir === 'neutral' ? fmt1(d)
-              : (relPct == null ? fmt1(d) : fmtPct(relPct))),
-          cls, beforePct, afterPct,
-        }
-      }),
-  })).filter((g) => g.rows.length)
-})
-
 onMounted(() => {
   initScene()
 })
@@ -213,7 +158,7 @@ watch(() => store.scheme.activeGroupId, (gid) => {
 })
 const groupSceneName = computed(() => {
   const g = (store.scheme.groups || []).find((x) => x.id === store.scheme.activeGroupId)
-  return g ? g.name : '设备小组'
+  return g ? g.name : t('设备小组')
 })
 
 watch(() => store.resultForView, (r) => {
@@ -230,12 +175,12 @@ watch(() => store.simCurrent, (r) => {
 })
 
 // 页面隐藏时暂停渲染循环，减少后台 CPU/GPU 占用；恢复可见或离开编排态时继续
-function onVis() { if (scene) scene.setPaused(store.editMode || document.hidden) }
+function onVis() { if (scene) scene.setPaused(view2D.value || store.editMode || document.hidden) }
 document.addEventListener('visibilitychange', onVis)
 
 watch(() => store.editMode, async (v) => {
   if (!scene) return
-  scene.setPaused(v || document.hidden)
+  scene.setPaused(view2D.value || v || document.hidden)
   if (!v) {
     // 从编排态退出：canvas 刚从 display:none 变为可见，需要等 DOM 布局完成、
     // resize 恢复渲染器尺寸后，再重建 3D 场景。
@@ -249,7 +194,6 @@ watch(() => store.editMode, async (v) => {
 watch(() => store.selectedUnitId, (id) => { scene && scene.setSelected(id) })
 watch(() => store.autoRotate, (v) => { scene && scene.setAutoRotate(v) })
 watch(() => store.brightness, (v) => { scene && scene.setBrightness(v) })
-watch(() => store.patrolOn, (v) => { scene && scene.setPatrol(v) })
 
 // 顶栏「重置视图」按钮：重置 3D 相机视角
 watch(() => store.viewResetNonce, () => { if (scene) scene.resetView() })
@@ -273,10 +217,18 @@ watch(() => store.live, (l) => { scene && scene.updateLive(l) })
 
 onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVis)
+  document.removeEventListener('click', onBrightDocClick)
   window.removeEventListener('resize', onResize)
   if (ro) { ro.disconnect(); ro = null }
   if (scene) scene.dispose()
 })
+
+// 亮度弹层：点击外部关闭
+const showBrightness = ref(false)
+function onBrightDocClick(e) {
+  if (showBrightness.value && !e.target.closest('.twin-left-tools')) showBrightness.value = false
+}
+onMounted(() => document.addEventListener('click', onBrightDocClick))
 </script>
 
 <style scoped>
@@ -285,97 +237,60 @@ onBeforeUnmount(() => {
 /* 3D 场景占满剩余空间，对比面板按内容自适应高度 */
 .scene-host { position: relative; flex: 1 1 0; min-height: 0; }
 
+/* 左上角工具组 · 图标按钮竖排（亮度 / 刷新视角 / 自动环视） */
+.twin-left-tools {
+  position: absolute; left: 12px; z-index: 6; transition: top .15s;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.twin-tool-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer; color: var(--text);
+  box-shadow: var(--shadow);
+  transition: background .12s, color .12s, transform .12s;
+}
+/* UI 规则：hover/选中态背景非白色，不再绘制边框（border 透明保留占位） */
+.twin-tool-btn:hover { background: var(--panel-2); color: var(--accent-d); border-color: transparent; }
+.twin-tool-btn:active { transform: translateY(0); }
+.twin-tool-btn.on { background: var(--accent); color: #fff; border-color: transparent; }
+.twin-tool-btn.on:hover { background: var(--accent-d); color: #fff; }
+.app.sim-dark .twin-tool-btn { background: var(--panel); border-color: var(--border); color: var(--text); box-shadow: var(--shadow); }
+.app.sim-dark .twin-tool-btn:hover { background: var(--panel-3); color: #fff; border-color: transparent; }
+.app.sim-dark .twin-tool-btn.on { background: var(--accent); color: #fff; border-color: transparent; }
+.twin-bright-pop {
+  position: absolute; top: 0; left: calc(100% + 8px); min-width: 190px; z-index: 90;
+  background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 9px 11px;
+}
+.twin-bright-pop .twin-bp-title { font-size: 10px; color: var(--muted); letter-spacing: .5px; margin-bottom: 8px; }
+.twin-bright-pop .twin-bp-row { display: flex; align-items: center; gap: 6px; }
+.twin-bright-pop .twin-bp-range { flex: 1; min-width: 0; height: 4px; margin: 0; cursor: pointer; accent-color: var(--accent-d); }
+.twin-bright-pop .twin-bp-label { font-size: 9px; color: var(--faint); flex: 0 0 auto; }
+.twin-bright-pop .twin-bp-val { font-size: 10px; color: var(--muted); min-width: 30px; text-align: right; }
+.app.sim-dark .twin-bright-pop { background: rgba(30, 33, 30, 0.95); border-color: rgba(255, 255, 255, 0.12); }
+.app.sim-dark .twin-bright-pop .twin-bp-title { color: #A6A49C; }
+.app.sim-dark .twin-bright-pop .twin-bp-label { color: #75746C; }
+.app.sim-dark .twin-bright-pop .twin-bp-val { color: #C6C4BC; }
+
 /* 3D 小组子场景 · 左上角返回顶层浮层（工具栏在场景外部独立成行，不再遮挡，恢复默认左上角位置） */
-.group-scene-bar { position: absolute; top: 12px; left: 12px; z-index: 6; display: flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.72); border: 1px solid rgba(0, 114, 189, 0.2); border-radius: 4px; padding: 6px 10px; backdrop-filter: blur(6px); }
+.group-scene-bar { position: absolute; top: 12px; left: 12px; z-index: 6; display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 10px; box-shadow: var(--shadow); }
 .gs-back {
   display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px;
-  background: transparent; border: 1px solid var(--border); border-radius: 4px;
+  background: transparent; border: 1px solid var(--border); border-radius: var(--radius);
   cursor: pointer; color: var(--text); font-size: 11px; font-weight: 600; font-family: var(--ui);
   line-height: 1; white-space: nowrap;
   transition: background .1s, color .1s, border-color .1s;
 }
-.gs-back:hover { background: var(--panel-3); color: var(--text); border-color: var(--accent); }
+.gs-back:hover { background: var(--panel-3); color: var(--text); border-color: var(--accent-d); }
 .gs-back:active { background: var(--sel); }
-.gs-title { font-size: 12px; font-weight: 600; color: #23374D; }
+.gs-title { font-size: 12px; font-weight: 600; color: var(--text); }
 
-/* 仿真模式 · 右上角悬浮对比窗口（毛玻璃透明，宽度 400px，悬浮在 3D 场景上部右侧） */
-.sim-compare {
-  position: absolute; top: 12px; right: 12px; z-index: 5;
-  width: 400px; max-width: calc(100% - 24px);
-  max-height: calc(100% - 24px);
-  overflow-y: auto;
-  background: rgba(255, 255, 255, 0.72);
-  -webkit-backdrop-filter: blur(10px) saturate(1.3);
-  backdrop-filter: blur(10px) saturate(1.3);
-  border: 1px solid rgba(15, 23, 42, 0.10);
-  border-radius: 4px;
-  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.14);
-  padding: 10px 12px;
-  color: #1c1c1c;
+/* 全屏模式浮动工具（右上角）：切换 HMI人机交互屏 / 退出全屏（全屏时工具栏隐藏，入口移至内容区；按钮样式见 main.css .fs-tool-btn 统一） */
+.twin-fs-tools {
+  position: absolute; top: 12px; right: 12px; z-index: 30;
+  display: flex; align-items: center; gap: 8px;
 }
-.sim-compare.sc-folded { height: auto; max-height: none; }
-.sim-compare::-webkit-scrollbar { width: 4px; }
-.sim-compare::-webkit-scrollbar-thumb { background: #c9ced4; border-radius: 2px; }
-.sc-head { position: sticky; top: -10px; background: rgba(255, 255, 255, 0.84); z-index: 1; display: flex; align-items: center; gap: 8px; margin-bottom: 9px; padding-top: 10px; }
-.sc-title { font-size: 12px; font-weight: 700; color: #1c1c1c; flex: 1; }
-.sc-badge { font-size: 9px; color: #2E9E63; border: 1px solid rgba(46,158,99,.45); border-radius: 20px; padding: 1px 7px; white-space: nowrap; }
-.sc-fold { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; background: #f2f4f6; border: 1px solid #dde2e7; border-radius: 4px; cursor: pointer; color: #4a5560; font-size: 10px; line-height: 1; }
-.sc-fold:hover { background: #e6eaee; color: #1c1c1c; }
-
-/* 左右两栏对比：碳排放 | 能耗 */
-.sc-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; margin-top: 2px; }
-.sc-col { background: rgba(248, 250, 251, 0.6); border: 1px solid #e8edf2; border-radius: 8px; padding: 8px 9px 6px; min-width: 0; }
-.sc-gname { font-size: 10px; font-weight: 700; color: #0072BD; margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px solid #e8edf2; }
-.sc-row { margin-bottom: 7px; }
-/* 窄窗口下每行两行布局：第一行名称（省略号），第二行 数值 → 数值 + 变化徽章 */
-.sc-r1 { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 6px; font-size: 10.5px; }
-.sc-name { color: #6a6a6a; flex: 1 1 100%; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sc-fv { flex: 1 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 4px; color: #4a4a4a; font-size: 10px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.sc-fv i { font-style: normal; color: #8a8f96; }
-.sc-fv em { font-style: normal; color: #c9ced4; }
-.sc-fv b { font-weight: 600; color: #1c1c1c; }
-.sc-fv small { color: #8a8f96; }
-.sc-delta { flex: 0 0 auto; font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.sc-delta.good { color: #2E9E63; }
-.sc-delta.bad { color: #D14B4B; }
-.sc-delta.neu { color: #4a5560; }
-/* 重叠对比条：单轨，灰=优化前全宽底，彩=优化后从同一起点覆盖；露出的灰尾=减少量，超出的彩段=增加量 */
-.sc-bar { position: relative; height: 8px; border-radius: 4px; background: #eef1f4; margin-top: 4px; }
-.sc-bar-before, .sc-bar-after { position: absolute; left: 0; top: 0; height: 100%; border-radius: 4px; transition: width .3s ease; }
-.sc-bar-before { background: #cdd2d8; }
-.sc-bar-after.good { background: #2E9E63; }
-.sc-bar-after.bad { background: #D14B4B; }
-.sc-bar-after.neu { background: #0072BD; }
-
-.sc-empty { font-size: 10.5px; color: #8a8f96; line-height: 1.5; padding: 4px 0 2px; }
-.sc-save { margin-top: 10px; width: 100%; padding: 6px 0; font-size: 11px; font-weight: 600; color: #ffffff; background: #0072BD; border: none; border-radius: 6px; cursor: pointer; }
-.sc-save:hover { background: #005A93; }
-
-/* ===== 仿真模式（sim-dark）· 对比窗口 VS Code 深色风格 ===== */
-.app.sim-dark .sim-compare { background: rgba(22, 27, 34, 0.78); border-color: rgba(255, 255, 255, 0.07); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45); color: var(--text); }
-.app.sim-dark .sim-compare::-webkit-scrollbar-thumb { background: #2F3A49; }
-.app.sim-dark .sc-head { background: rgba(22, 27, 34, 0.84); }
-.app.sim-dark .sc-title { color: var(--text); }
-.app.sim-dark .sc-badge { color: var(--green); border-color: rgba(62, 207, 142, .45); }
-.app.sim-dark .sc-fold { background: var(--panel-3); border-color: var(--border); color: var(--muted); }
-.app.sim-dark .sc-fold:hover { background: #2C3644; color: var(--text); }
-.app.sim-dark .sc-col { background: rgba(29, 36, 46, 0.55); border-color: rgba(255, 255, 255, 0.06); }
-.app.sim-dark .sc-gname { color: var(--accent); border-bottom-color: var(--border); }
-.app.sim-dark .sc-name { color: var(--muted); }
-.app.sim-dark .sc-fv { color: var(--text); }
-.app.sim-dark .sc-fv i { color: var(--faint); }
-.app.sim-dark .sc-fv em { color: #3A4656; }
-.app.sim-dark .sc-fv b { color: var(--text); }
-.app.sim-dark .sc-fv small { color: var(--faint); }
-.app.sim-dark .sc-delta.good { color: var(--green); }
-.app.sim-dark .sc-delta.bad { color: var(--red); }
-.app.sim-dark .sc-delta.neu { color: var(--muted); }
-.app.sim-dark .sc-bar { background: var(--rail); }
-.app.sim-dark .sc-bar-before { background: #39424F; }
-.app.sim-dark .sc-bar-after.good { background: var(--green); }
-.app.sim-dark .sc-bar-after.bad { background: var(--red); }
-.app.sim-dark .sc-bar-after.neu { background: var(--accent); }
-.app.sim-dark .sc-empty { color: var(--faint); }
-.app.sim-dark .sc-save { background: var(--accent); }
-.app.sim-dark .sc-save:hover { background: var(--accent-d); }
 </style>

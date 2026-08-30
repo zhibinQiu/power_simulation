@@ -1,7 +1,7 @@
 <template>
   <aside class="sidebar">
     <!-- 宽度拖拽手柄（右侧边缘） -->
-    <div class="sidebar-rsz" @mousedown.prevent="emit('rsz', $event)" title="拖拽调整宽度"></div>
+    <div class="sidebar-rsz" @mousedown.prevent="emit('rsz', $event)" :title="t('拖拽调整宽度')"></div>
     <div class="sidebar-head">
       <Icon :name="headIcon" :size="15" class="head-ic" />
       <span class="ttl">{{ headTitle }}</span>
@@ -12,23 +12,13 @@
     <!-- 三标签：工艺 / 物料 / 策略 -->
     <div class="tabbar">
       <div class="tab" :class="{ active: tab === 'process' }" @click="onTab('process')">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="5" cy="6" r="2.3"/><circle cx="5" cy="18" r="2.3"/><circle cx="19" cy="12" r="2.3"/>
-          <path d="M7 6h5a5 5 0 0 1 5 5M7 18h5a5 5 0 0 0 5-5"/>
-        </svg>
-        <span>工艺</span>
+        <span>{{ t('工艺') }}</span>
       </div>
       <div class="tab" :class="{ active: tab === 'material' }" @click="onTab('material')">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3 20 7.5 V16.5 L12 21 4 16.5 V7.5 Z"/><path d="M4 7.5 12 12 20 7.5"/><path d="M12 12 V21"/>
-        </svg>
-        <span>物料</span>
+        <span>{{ t('物料') }}</span>
       </div>
       <div class="tab" :class="{ active: tab === 'strategy' }" @click="onTab('strategy')">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M13 2 4 14h6l-1 8 9-12h-6z"/>
-        </svg>
-        <span>策略</span>
+        <span>{{ t('策略') }}</span>
       </div>
     </div>
 
@@ -44,23 +34,22 @@
             <span class="tch-count">{{ group.length }}</span>
           </div>
           <div class="tchildren" v-show="groupOpen(key)">
-            <div v-for="t in group" :key="t.type" class="tnode">
-              <div class="tchild leaf click" :class="{ active: processActive(t), drag: store.editMode }"
-                   :id="t.route === 'aux' ? 'tree-leaf-' + t.type : undefined"
-                   :draggable="store.editMode"
-                   @dragstart="onDrag($event, 'process', t.type)"
-                   @click="onProcessClick(t)"
-                   @contextmenu.prevent="onLeafContext($event, { kind: 'process', type: t.type })">
-                <span v-if="devSubItems(t).length" class="twisty" :class="{ open: isOpen('dev_' + t.type) }" @click.stop="toggleDev('dev_' + t.type)">
+            <div v-for="nd in group" :key="nd.type" class="tnode">
+              <div class="tchild leaf click" :class="{ active: processActive(nd), drag: store.editMode && !store.simMode }"
+                   :id="nd.route === 'aux' ? 'tree-leaf-' + nd.type : undefined"
+                   :draggable="store.editMode && !store.simMode"
+                   @dragstart="onDrag($event, 'process', nd.type)"
+                   @click="onProcessClick(nd)"
+                   @contextmenu.prevent="onLeafContext($event, { kind: 'process', type: nd.type })">
+                <span v-if="devSubItems(nd).length" class="twisty" :class="{ open: isOpen('dev_' + nd.type) }" @click.stop="toggleDev('dev_' + nd.type)">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </span>
-                <span class="tch-dot" v-if="inScene('process', t.type)" title="已部署至场景"></span>
-                <span class="tc-tt">{{ t.label }}</span>
-                <span class="tch-count" v-if="devSubItems(t).length">{{ devSubItems(t).length }}</span>
+                <span class="tch-dot" v-if="inScene('process', nd.type)" :title="t('已部署至场景')"></span>
+                <span class="tc-tt">{{ nd.label }}</span>
               </div>
-              <div class="tchildren" v-if="devSubItems(t).length"
-                   v-show="isOpen('dev_' + t.type)">
-                <div v-for="d in devSubItems(t)" :key="d.id"
+              <div class="tchildren" v-if="devSubItems(nd).length"
+                   v-show="isOpen('dev_' + nd.type)">
+                <div v-for="d in devSubItems(nd)" :key="d.id"
                      class="tchild leaf dev-leaf click" :class="{ active: store.deviceDetailId === d.id }"
                      @click="store.openDeviceDetail(d.id)">
                   <span class="tc-tt">{{ d.label }}</span>
@@ -83,8 +72,8 @@
           </div>
           <div class="tchildren" v-show="expanded['g_mat_' + g.key]">
             <div v-for="m in g.items" :key="m.id" class="tchild leaf flat click"
-                 :class="{ active: store.selectedMaterialId === m.id, drag: store.editMode }"
-                 :draggable="store.editMode"
+                 :class="{ active: store.selectedMaterialId === m.id, drag: store.editMode && !store.simMode }"
+                 :draggable="store.editMode && !store.simMode"
                  @dragstart="onDrag($event, 'material', m.id)"
                  @click="store.selectMaterial(m.id)"
                  @contextmenu.prevent="onLeafContext($event, { kind: 'material', id: m.id })">
@@ -94,70 +83,24 @@
         </div>
       </div>
 
-      <!-- 策略：直接展示 内置（各工艺策略 + 系统预置）/ AI优化模型（系统缺省）/ 自定义（仿真模式下保存的策略） -->
+      <!-- 策略：直接展示 AI优化模型（系统缺省）/ 自定义（仿真模式下保存的策略）/ 工艺流程优化（各工艺策略 + 系统预置） -->
       <div v-else>
 
-          <!-- 内置：按工艺分组展示各工艺策略（含系统预置策略，归入对应工艺） -->
-          <div class="tnode">
-            <div class="tch sub hdr" @click="toggle('g_strat_builtin')">
-              <span class="twisty" :class="{ open: expanded.g_strat_builtin }">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-              </span>
-              <span class="tch-tt">内置</span>
-              <span class="tch-count">{{ presetStrategies.length + greenCount }}</span>
-            </div>
-            <div class="tchildren" v-show="expanded.g_strat_builtin">
-
-              <!-- 工艺分组：组内 = 该工艺绿色策略 + 归入该工艺的系统预置策略（统一展示，不再区分内置/非内置） -->
-              <div v-for="g in greenGroups" :key="g.type" class="tnode">
-                <div class="tch sub2" @click="toggle('g_strat_green_' + g.type)">
-                  <span class="twisty" :class="{ open: expanded['g_strat_green_' + g.type] }">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                  </span>
-                  <span class="tch-dot" v-if="inScene('process', g.type)" title="该工艺已部署至场景"></span>
-                  <span class="tch-tt">{{ g.label }}</span>
-                  <span class="tch-count">{{ g.items.length }}</span>
-                </div>
-                <div class="tchildren" v-show="expanded['g_strat_green_' + g.type]">
-                  <div v-for="gs in g.items" :key="gs.id" class="tchild leaf flat click"
-                       :class="{ active: gs.preset ? store.selectedStrategyId === gs.id : isGreenSelected(g, gs) }"
-                       :title="gs.preset ? '点击查看策略属性（底部「策略仿真」进入仿真模式测试）' : '点击查看策略属性，可在右侧启用/停用'"
-                       @click="gs.preset ? onPresetClick(gs) : onGreenClick(g, gs)">
-                    <span class="tch-dot" v-if="gs.preset ? gs.applied : isGreenActive(g.type, gs.id)"
-                          :title="gs.preset ? '已应用' : '已启用'"></span>
-                    <span class="tc-tt">{{ gs.name }}</span>
-                    <span class="tc-tag pre" v-if="!gs.preset && isGreenActive(g.type, gs.id)">已启用</span>
-                  </div>
-                </div>
-              </div>
-              <div v-if="!greenGroups.length" class="empty-hint">暂无工艺策略</div>
-
-            </div>
-          </div>
-
-          <!-- AI优化模型：系统缺省（默认）AI 优化模型，位于「自定义」上方 -->
+          <!-- AI优化模型：系统缺省（默认）AI 优化模型 -->
           <div class="tnode">
             <div class="tch sub hdr" @click="toggle('g_strat_ai')">
               <span class="twisty" :class="{ open: expanded.g_strat_ai }">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
               </span>
-              <span class="tch-tt">AI优化模型</span>
+              <span class="tch-tt">{{ t('AI优化模型') }}</span>
               <span class="tch-count">{{ AI_MODELS.length }}</span>
             </div>
             <div class="tchildren" v-show="expanded.g_strat_ai">
-              <div class="tchild leaf flat click"
-                   :class="{ active: store.selectedStrategyId === 'ai::overview' }"
-                   title="按类别浏览全部 AI 优化模型，点击进入对应训练面板"
-                   @click="onAiOverviewClick">
-                <span class="tc-tt">模型列表（按类别）</span>
-                <span class="tc-tag ai">AI</span>
-              </div>
               <div v-for="m in AI_MODELS" :key="m.id" class="tchild leaf flat click"
                    :class="{ active: store.selectedStrategyId === m.id }"
-                   :title="'点击查看 AI 优化模型「' + m.name + '」训练面板'"
+                   :title="t('点击查看 AI 优化模型「{name}」训练面板', { name: m.name })"
                    @click="onAiClick(m)">
                 <span class="tc-tt">{{ m.name }}</span>
-                <span class="tc-tag ai">AI</span>
               </div>
             </div>
           </div>
@@ -168,23 +111,62 @@
               <span class="twisty" :class="{ open: expanded.g_strat_custom }">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
               </span>
-              <span class="tch-tt">自定义（仿真保存）</span>
+              <span class="tch-tt">{{ t('自定义（仿真保存）') }}</span>
               <span class="tch-count">{{ customStrategies.length }}</span>
             </div>
             <div class="tchildren" v-show="expanded.g_strat_custom">
               <div v-for="s in customStrategies" :key="s._key" class="tchild leaf flat click"
                    :class="{ active: store.selectedStrategyId === s.id }"
-                   :title="'点击查看策略属性（名称/数值调整可编辑，底部可「策略仿真」）'"
+                   :title="t('点击查看策略属性（名称/数值调整可编辑，底部可「策略仿真」）')"
                    @click="onCustomClick(s)"
                    @contextmenu.prevent="onStratContext($event, s)">
-                <span class="tch-dot" v-if="s.applied" title="已应用"></span>
-                <span class="tc-tt">{{ s.name || '未命名策略' }}</span>
-                <span class="tc-tag saved">自定义</span>
-                <button class="strat-del" title="删除策略" @click.stop="doRemoveStrategy(s)">✕</button>
+                <span class="tch-dot" v-if="s.applied" :title="t('已应用')"></span>
+                <span class="tc-tt">{{ s.name || t('未命名策略') }}</span>
+                <span class="tc-tag saved">{{ t('自定义') }}</span>
+                <button class="x-btn danger" :title="t('删除策略')" @click.stop="doRemoveStrategy(s)">✕</button>
               </div>
               <div v-if="!customStrategies.length" class="empty-hint">
-                暂无自定义策略：进入仿真模式调整参数后，点击 3D 场景右上角「保存策略」即可创建
+                {{ t('暂无自定义策略：进入仿真模式调整参数后，点击 3D 场景右上角「保存策略」即可创建') }}
               </div>
+            </div>
+          </div>
+
+          <!-- 工艺流程优化：按工艺分组展示各工艺策略（含系统预置策略，归入对应工艺）；
+               工艺分组默认展开（2级策略条目直接可见），twisty 可折叠 -->
+          <div class="tnode">
+            <div class="tch sub hdr" @click="toggle('g_strat_builtin')">
+              <span class="twisty" :class="{ open: expanded.g_strat_builtin }">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </span>
+              <span class="tch-tt">{{ t('工艺流程优化') }}</span>
+              <span class="tch-count">{{ presetStrategies.length + greenCount }}</span>
+            </div>
+            <div class="tchildren" v-show="expanded.g_strat_builtin">
+
+              <!-- 工艺分组：组内 = 该工艺绿色策略 + 归入该工艺的系统预置策略（统一展示，不再区分内置/非内置） -->
+              <div v-for="g in greenGroups" :key="g.type" class="tnode">
+                <div class="tch sub2" @click="toggleStratGroup(g.type)">
+                  <span class="twisty" :class="{ open: stratGroupOpen(g.type) }">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </span>
+                  <span class="tch-dot" v-if="inScene('process', g.type)" :title="t('该工艺已部署至场景')"></span>
+                  <span class="tch-tt">{{ g.label }}</span>
+                  <span class="tch-count">{{ g.items.length }}</span>
+                </div>
+                <div class="tchildren" v-show="stratGroupOpen(g.type)">
+                  <div v-for="gs in g.items" :key="gs.id" class="tchild leaf flat click"
+                       :class="{ active: gs.preset ? store.selectedStrategyId === gs.id : isGreenSelected(g, gs) }"
+                       :title="gs.preset ? t('点击查看策略属性（底部「策略仿真」进入仿真模式测试）') : t('点击查看策略属性，可在右侧启用/停用')"
+                       @click="gs.preset ? onPresetClick(gs) : onGreenClick(g, gs)">
+                    <span class="tch-dot" v-if="gs.preset ? gs.applied : isGreenActive(g.type, gs.id)"
+                          :title="gs.preset ? t('已应用') : t('已启用')"></span>
+                    <span class="tc-tt">{{ gs.name }}</span>
+                    <span class="tc-tag pre" v-if="!gs.preset && isGreenActive(g.type, gs.id)">{{ t('已启用') }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-if="!greenGroups.length" class="empty-hint">{{ t('暂无工艺策略') }}</div>
+
             </div>
           </div>
       </div>
@@ -209,15 +191,16 @@ import { openContextMenu } from '../composables/contextMenu'
 import SearchPanel from './SearchPanel.vue'
 import ScenePanel from './ScenePanel.vue'
 import ConnectionsPanel from './ConnectionsPanel.vue'
+import { t } from '../i18n'
 
 const store = useSimStore()
 const emit = defineEmits(['rsz'])
 // 活动栏面板头部：标题/图标随当前活动面板切换（VS Code 式）
 const headMeta = {
-  explorer: { title: '资源管理器', icon: 'open' },
-  search: { title: '搜索', icon: 'search' },
-  scene: { title: '场景', icon: 'scene' },
-  connections: { title: '连接', icon: 'database' },
+  explorer: { title: t('资源管理器'), icon: 'open' },
+  search: { title: t('搜索'), icon: 'search' },
+  scene: { title: t('场景'), icon: 'scene3d' },
+  connections: { title: t('连接'), icon: 'link' },
 }
 const headTitle = computed(() => (headMeta[store.activityView] || headMeta.explorer).title)
 const headIcon = computed(() => (headMeta[store.activityView] || headMeta.explorer).icon)
@@ -229,10 +212,11 @@ function onScroll() {
   clearTimeout(scrollTimer)
   scrollTimer = setTimeout(() => { scrolling.value = false }, 2000)
 }
-// 工艺树含「公用/节能」分组：节能减碳措施（煤气发电/余热回收/碳捕集）在工艺树中展示与拖拽编排
+// 工艺树分组：炼钢 + 工辅（鼓风机/热风炉等辅助生产工序）；
+// 节能减碳措施（煤气发电/余热回收/碳捕集）统一在「策略」中展示，不进入工艺树
 const routeGroups = ROUTE_GROUPS
-const routeLabel = { steel: '炼钢', aux: '工辅' }
-// 策略分类：内置 = 各工艺策略（含系统预置归入对应工艺）；自定义 = 仿真模式下保存的策略
+const routeLabel = { steel: t('炼钢'), aux: t('工辅') }
+// 策略分类：工艺流程优化 = 各工艺策略（含系统预置归入对应工艺）；自定义 = 仿真模式下保存的策略
 // 系统预置策略 → 归入的工艺类型（与 backend presets 顺序一一对应；余热+碳捕集归节能减碳）
 const PRESET_PROCESS = [
   'blast_furnace', // 氢冶金替代高炉
@@ -273,9 +257,9 @@ function isGreenSelected(g, gs) {
 const prodIds = new Set(PRODUCTS.map((p) => p.id))
 const materialTrees = computed(() => {
   const groups = [
-    { key: 'raw', label: '原料', items: [] },
-    { key: 'mid', label: '中间产物', items: [] },
-    { key: 'prod', label: '产品', items: [] },
+    { key: 'raw', label: t('原料'), items: [] },
+    { key: 'mid', label: t('中间产物'), items: [] },
+    { key: 'prod', label: t('产品'), items: [] },
   ]
   for (const m of MATERIALS) {
     if (prodIds.has(m.id)) groups[2].items.push(m)
@@ -326,19 +310,16 @@ const devByType = computed(() => {
   }
   return m
 })
-// 设备分组默认展开可见；twisty 点击折叠/展开（未设置的 key 视为展开）
-function isOpen(key) { return expanded[key] !== false }
-function toggleDev(key) { expanded[key] = expanded[key] === false }
-// 工艺子组是否含可下钻的设备子项；无则标题不显示下拉箭头（如「工辅」）
+// 设备子项默认折叠；twisty 点击展开/折叠（未设置的 key 视为折叠）
+function isOpen(key) { return expanded[key] === true }
+function toggleDev(key) { expanded[key] = !expanded[key] }
+// 分组标题是否可折叠（显示下拉箭头）：分组下含工艺节点即可折叠，炼钢/工辅均为一级菜单
 function groupHasDevs(key) {
-  // 工辅工艺的设备子项仅是其自身（工辅自身即设备），无下钻层级，不显示展开箭头
-  if (key === 'aux') return false
   const group = routeGroups[key] || []
-  return group.some((t) => devByType.value[t.type] && devByType.value[t.type].all.length)
+  return group.length > 0
 }
-// 分组展开状态：工辅分组无下钻层级，始终展开直接列出其下工艺节点；其余分组按 expanded 折叠/展开
+// 分组展开状态：按 expanded 折叠/展开（炼钢/工辅均为一级菜单，点击标题展开具体工艺）
 function groupOpen(key) {
-  if (key === 'aux') return true
   return !!expanded['g_' + key]
 }
 // 工艺节点下的设备子项：工辅工艺的设备子项仅是其自身，直接作为叶子展示，不再次下钻。
@@ -383,11 +364,12 @@ watch(() => store.deviceDetailId, async (id) => {
   document.getElementById('tree-leaf-' + dd.device.type)?.scrollIntoView({ block: 'nearest' })
 })
 
-// 资源管理器展开状态：默认展开「工艺」「物料」及其分组
+// 资源管理器展开状态：工艺默认展开到工艺级别（二级：炼钢/工辅分组及其中工艺节点），
+// 工艺节点下的设备子项、物料/策略分组默认折叠（少即是多）
 const expanded = reactive({
-  process: true, g_steel: true, g_aux: true,
-  aux: false, material: false, g_mat_raw: true, g_mat_mid: true, g_mat_prod: true,
-  strategy: false, g_strat_builtin: true, g_strat_ai: true, g_strat_custom: true,
+  process: false, g_steel: true, g_aux: true,
+  aux: false, material: false, g_mat_raw: false, g_mat_mid: false, g_mat_prod: false,
+  strategy: false, g_strat_builtin: false, g_strat_ai: false, g_strat_custom: false,
 })
 // 工艺/策略目录不再有右侧专属属性面板（工序顺序已下线），切换时右侧显示总览
 const viewMap = { process: 'overview', aux: 'park', material: 'materials', strategy: 'overview' }
@@ -395,46 +377,41 @@ const viewMap = { process: 'overview', aux: 'park', material: 'materials', strat
 // 切换目录：非编排态时右侧同步显示该类目视图；编排态下保持右侧「编排属性」不被抢占
 function onTab(key) { tab.value = key; expanded[key] = true; if (!store.editMode) store.setInspectorView(viewMap[key]) }
 function toggle(key) { expanded[key] = !expanded[key] }
+// 「工艺流程优化」下的工艺分组默认折叠（仅显示一级分组标题）；twisty 点击展开/折叠
+function stratGroupOpen(type) { return expanded['g_strat_green_' + type] === true }
+function toggleStratGroup(type) {
+  const k = 'g_strat_green_' + type
+  expanded[k] = !expanded[k]
+}
 
-// 点击内置预置策略：打开右侧「策略属性」面板（底部「策略仿真」进入仿真模式解析测试）
+// 点击工艺流程优化策略：打开右侧「策略属性」面板（底部「策略仿真」进入仿真模式解析测试）
 function onPresetClick(s) {
   if (store.busy) return
   store.selectStrategy(s.id)
-  store.toast = `已打开内置策略「${s.name || '未命名'}」：点击底部「策略仿真」解析应用`
+  store.toast = t('已打开工艺流程优化策略「{name}」：点击底部「策略仿真」解析应用', { name: s.name || t('未命名') })
 }
 // 点击 AI 优化模型：打开右侧「策略属性」训练面板（随实时数据后台定时训练、模型逐渐变优）
 function onAiClick(m) {
   if (store.busy) return
   store.selectStrategy(m.id)
-  store.toast = `已打开 AI 优化模型「${m.name}」训练面板：可开始自动训练/训练一轮/应用最优参数`
-}
-// 点击「模型列表（按类别）」：打开右侧 AI 优化模型列表（时序预测 / 参数优化 / 聚类分析多类别，点击进入对应模型）
-function onAiOverviewClick() {
-  if (store.busy) return
-  store.selectStrategy('ai::overview')
-  store.toast = '已打开 AI 优化模型列表：按类别浏览，点击模型卡片进入对应训练面板'
+  store.toast = t('已打开 AI 优化模型「{name}」训练面板：可开始自动训练/训练一轮/应用最优参数', { name: m.name })
 }
 // 点击工艺策略（某工艺对应的绿色策略）：打开右侧「策略属性」面板（只读 + 启用/停用开关 + 查看工艺）
 function onGreenClick(g, gs) {
   if (store.busy) return
   store.selectGreenStrategy(g.type, gs.id)
-  store.toast = `已打开策略「${gs.name}」属性（所属工艺：${g.label}）：可在右侧启用/停用该策略`
+  store.toast = t('已打开策略「{name}」属性（所属工艺：{proc}）：可在右侧启用/停用该策略', { name: gs.name, proc: g.label })
 }
 // 点击自定义策略（仿真模式下保存）：打开右侧「策略属性」面板（名称/数值调整可编辑，底部「策略仿真」按钮加载）
 function onCustomClick(s) {
   if (store.busy) return
   store.selectStrategy(s.id)
-  store.toast = `已打开策略「${s.name || '未命名'}」属性：可编辑名称与数值调整，点击底部「策略仿真」加载进仿真模式`
+  store.toast = t('已打开策略「{name}」属性：可编辑名称与数值调整，点击底部「策略仿真」加载进仿真模式', { name: s.name || t('未命名') })
 }
-// 删除自定义策略
+// 删除自定义策略（成功/失败反馈由 store.removeStrategy 统一给出）
 async function doRemoveStrategy(s) {
-  if (!window.confirm(`确认删除策略「${s.name || '未命名'}」？`)) return
-  try {
-    await store.removeStrategy(s.id)
-    store.toast = `已删除策略「${s.name || '未命名'}」`
-  } catch (e) {
-    store.toast = '删除失败：' + (e.message || e)
-  }
+  if (!(await store.confirm({ title: t('删除策略'), message: t('确认删除策略「{name}」？', { name: s.name || t('未命名') }), okText: t('删除'), danger: true }))) return
+  await store.removeStrategy(s.id)
 }
 // 该资源是否已在当前场景（3D 孪生）中存在：工艺按产线 units 中是否已含该类型判断
 function inScene(kind, type) {
@@ -445,7 +422,7 @@ function inScene(kind, type) {
 // 左侧仅作浏览：点击查看属性（右侧显示属性与实时数据）；
 // 仅在编排态下条目可拖拽，拖入编排画布生成节点（不改动运行中的产线）。
 function onDrag(e, kind, type) {
-  if (!store.editMode) return
+  if (!store.editMode || store.simMode) return
   e.dataTransfer.setData('application/flow-node', JSON.stringify({ kind, type }))
   e.dataTransfer.setData('text/plain', type)
   e.dataTransfer.effectAllowed = 'copy'
@@ -454,18 +431,18 @@ function onDrag(e, kind, type) {
 function onLeafContext(e, p) {
   const items = []
   if (p.kind === 'process') {
-    items.push({ label: '查看属性', icon: 'process', action: () => onProcessClickFromType(p.type) })
+    items.push({ label: t('查看属性'), icon: 'process', action: () => onProcessClickFromType(p.type) })
   } else if (p.kind === 'material') {
-    items.push({ label: '查看属性', icon: 'material', action: () => store.selectMaterial(p.id) })
+    items.push({ label: t('查看属性'), icon: 'material', action: () => store.selectMaterial(p.id) })
   }
   openContextMenu(e.clientX, e.clientY, items)
 }
 // 自定义策略右键：查看属性 / 删除
 function onStratContext(e, s) {
   const items = [
-    { label: '查看属性', icon: 'bolt', action: () => onCustomClick(s) },
+    { label: t('查看属性'), icon: 'bolt', action: () => onCustomClick(s) },
     { sep: true },
-    { label: '删除策略', icon: 'trash', danger: true, action: () => doRemoveStrategy(s) },
+    { label: t('删除策略'), icon: 'trash', danger: true, action: () => doRemoveStrategy(s) },
   ]
   openContextMenu(e.clientX, e.clientY, items)
 }
@@ -503,20 +480,14 @@ function onStratContext(e, s) {
 .tch.sub2 .tch-tt { font-size: 12px; font-weight: 400; letter-spacing: .08px; color: var(--text); }
 .tch.sub2 .twisty { width: 14px; opacity: .5; }
 
-/* 策略来源标签（内置 / 自定义） */
+/* 策略来源标签（工艺流程优化 / 自定义） */
 .tc-tag { font-size: 9px; color: #fff; padding: 1px 5px; border-radius: 4px; white-space: nowrap; flex: 0 0 auto; }
 .tc-tag.pre { background: var(--accent); }
 .tc-tag.saved { background: var(--green); }
-.tc-tag.ai { background: var(--purple, #7c5cff); }
 
 /* 自定义策略条目：hover / 选中时显示删除按钮（VS Code 行内操作按钮） */
-.strat-del {
-  display: none; flex: 0 0 auto; width: 18px; height: 18px; line-height: 1;
-  text-align: center; border: none; background: transparent; color: var(--faint);
-  font-size: 11px; cursor: pointer; border-radius: 4px; padding: 0;
-}
-.tchild:hover .strat-del, .tchild.active .strat-del { display: inline-block; }
-.strat-del:hover { color: var(--red); background: rgba(209,75,75,.12); }
+.tchild .x-btn.danger { display: none; flex: 0 0 auto; }
+.tchild:hover .x-btn.danger, .tchild.active .x-btn.danger { display: inline-grid; }
 
 /* 空列表提示 */
 .empty-hint { font-size: 10px; color: var(--faint); padding: 10px 14px; line-height: 1.6; }

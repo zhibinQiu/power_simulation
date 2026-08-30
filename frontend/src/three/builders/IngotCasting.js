@@ -10,7 +10,7 @@ export default function _buildIngotCasting(bodyMat) {
     const g = new THREE.Group()
     const L = 22; const D = 12; const H = 14
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x00ccff
+    const neonColor = 0x2c6e9e
 
 
     // === 1. 钢包（ladle） ===
@@ -48,7 +48,7 @@ export default function _buildIngotCasting(bodyMat) {
         // 锭模内钢水（可见）
         const steelInside = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 4.0, 16),
             new THREE.MeshStandardMaterial({
-                roughness: 0.05, metalness: 0.1, emissive: 0xcc3300, emissiveIntensity: 0.7,
+                roughness: 0.05, metalness: 0.1, emissive: 0x8a4018, emissiveIntensity: 0.7,
                 transparent: true, opacity: 0.7, depthWrite: false
             }))
         steelInside.position.set(mx, 3.5, mz)
@@ -82,7 +82,7 @@ export default function _buildIngotCasting(bodyMat) {
 
     // === 6. 霓虹 ===
     const ingotRing = new THREE.Mesh(new THREE.TorusGeometry(2.5, 0.1, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.4, roughness: 0.2 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     ingotRing.rotation.x = Math.PI / 2; ingotRing.position.set(0, 3.5, 0); g.add(ingotRing)
 
     // === 7. 动画钩子 ===
@@ -93,14 +93,14 @@ export default function _buildIngotCasting(bodyMat) {
     g.userData._internalSlabs = internalMolds
 
     // === 物料转变动画：钢水→模铸凝固→钢锭 ===
-    // 颜色与连线载运体一致：crude_steel(0xff8822)→billet(0xff5522)
+    // 颜色与连线载运体一致：crude_steel(0xbf6a30)→billet(0xbf5a2e)
     const ingotFlow = []
     internalMolds.forEach((steel, i) => {
         ingotFlow.push({
             obj: steel, phase: i * 0.12, period: 7.0,
             srcPos: new THREE.Vector3(steel.position.x, 3.5, steel.position.z),
             dstPos: new THREE.Vector3(steel.position.x, 3.5, steel.position.z),
-            srcColor: 0xff8822, dstColor: 0xff5522,
+            srcColor: 0xbf6a30, dstColor: 0xbf5a2e,
         })
     })
 

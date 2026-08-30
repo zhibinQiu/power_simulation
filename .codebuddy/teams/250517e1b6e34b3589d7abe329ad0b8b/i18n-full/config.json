@@ -1,0 +1,85 @@
+{
+  "name": "i18n-full",
+  "mainConversationId": "250517e1b6e34b3589d7abe329ad0b8b",
+  "workspacePath": "/Users/qiuzhibin/project/simulation",
+  "createdAt": "2026-08-29T18:17:07.436Z",
+  "options": {
+    "workspacePath": "/Users/qiuzhibin/project/simulation",
+    "isAutoTeam": false
+  },
+  "isAutoTeam": false,
+  "members": [
+    {
+      "memberId": "box-i18n@i18n-full",
+      "name": "box-i18n",
+      "role": "改造 CarbonBoxView 接入翻译",
+      "sessionId": "aaf1baff16b24c4fa9e863d19e306844"
+    },
+    {
+      "memberId": "compliance-i18n@i18n-full",
+      "name": "compliance-i18n",
+      "role": "改造碳合规相关组件接入翻译",
+      "sessionId": "75b641f9cac3498f96f6dfda5a46884b"
+    },
+    {
+      "memberId": "strategy-i18n@i18n-full",
+      "name": "strategy-i18n",
+      "role": "改造策略面板组件接入翻译",
+      "sessionId": "a8ad3a7b24d24e62bb35db3699c8397c"
+    },
+    {
+      "memberId": "data-i18n@i18n-full",
+      "name": "data-i18n",
+      "role": "改造数据视图组件接入翻译",
+      "sessionId": "62072c09451b4826b78dc13279ec948a"
+    },
+    {
+      "memberId": "tft-i18n@i18n-full",
+      "name": "tft-i18n",
+      "role": "改造 TftAnalysisDialog 接入翻译",
+      "sessionId": "1cfd8c423e7c4863ab1ebebcddd9fcd0"
+    },
+    {
+      "memberId": "flow-i18n@i18n-full",
+      "name": "flow-i18n",
+      "role": "改造流程编排组件接入翻译",
+      "sessionId": "02f2b11bef8442a58096269226d1e6b1"
+    },
+    {
+      "memberId": "sidebar-i18n@i18n-full",
+      "name": "sidebar-i18n",
+      "role": "改造侧栏检视组件接入翻译",
+      "sessionId": "53bca803d88a4fc4a613675eb8a392ca"
+    },
+    {
+      "memberId": "dialogs-i18n@i18n-full",
+      "name": "dialogs-i18n",
+      "role": "改造对话框组件接入翻译",
+      "sessionId": "bf628be646554242b5af898c8b5c32f3"
+    },
+    {
+      "memberId": "shell-i18n@i18n-full",
+      "name": "shell-i18n",
+      "role": "改造外壳组件接入翻译",
+      "sessionId": "7b6989ce39494f90991ebabdea57145b"
+    },
+    {
+      "memberId": "scene-i18n@i18n-full",
+      "name": "scene-i18n",
+      "role": "改造场景组件接入翻译",
+      "sessionId": "c440435620df45fdbfc6181dccf7fcd2"
+    },
+    {
+      "memberId": "app-i18n@i18n-full",
+      "name": "app-i18n",
+      "role": "改造 App 与视图接入翻译",
+      "sessionId": "73b22b789419400eb71d7d1049b3e47f"
+    },
+    {
+      "memberId": "store-i18n@i18n-full",
+      "name": "store-i18n",
+      "role": "改造 store 与 API 接入翻译",
+      "sessionId": "9b7aa72300524b93951bac6a09fd21e3"
+    }
+  ]
+}

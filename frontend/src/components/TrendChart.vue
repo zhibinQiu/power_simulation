@@ -4,6 +4,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { t } from '../i18n'
 
 const props = defineProps({
   data: { type: Array, default: () => [] },   // [{t, v}]
@@ -34,7 +35,7 @@ function draw() {
   if (!pts.length) {
     ctx.fillStyle = '#6B7F92'
     ctx.font = '11px ui-monospace, monospace'
-    ctx.fillText('暂无数据', 8, h / 2)
+    ctx.fillText(t('暂无数据'), 8, h / 2)
     return
   }
 

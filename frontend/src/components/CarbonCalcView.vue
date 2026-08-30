@@ -4,7 +4,7 @@
     <!-- 关闭/返回等操作已由顶栏工具栏提供 -->
     <div class="cc-body">
       <div v-if="!result" class="cc-empty">
-        暂无仿真结果，请先运行一次仿真后查看碳排核算。
+        {{ t('暂无仿真结果，请先运行一次仿真后查看碳排核算。') }}
       </div>
       <template v-else>
         <div class="cc-cards">
@@ -20,19 +20,19 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" v-html="s.icon"></svg>
               </div>
               <div>
-                <div class="cc-card-code">{{ s.code }}</div>
-                <div class="cc-card-sub">{{ s.sub }}</div>
+                <div class="cc-card-code">{{ t(s.code) }}</div>
+                <div class="cc-card-sub">{{ t(s.sub) }}</div>
               </div>
             </div>
-            <p class="cc-card-desc">{{ s.desc }}</p>
+            <p class="cc-card-desc">{{ t(s.desc) }}</p>
             <div class="cc-card-tags">
-              <span v-for="(tag, i) in s.tags" :key="i" class="cc-tag" :class="tag.type">{{ tag.label }}</span>
+              <span v-for="(tag, i) in s.tags" :key="i" class="cc-tag" :class="tag.type">{{ t(tag.label) }}</span>
             </div>
             <div class="cc-card-value">
               <span class="cc-v-num">{{ fmt(cardValue(s.id), 1) }}</span>
               <span class="cc-v-unit">tCO₂/h</span>
             </div>
-            <div class="cc-card-hint">当前核算 CO₂排放（t/h）— 长流程</div>
+            <div class="cc-card-hint">{{ t('当前核算 CO₂排放（t/h）— 长流程') }}</div>
           </div>
         </div>
 
@@ -42,14 +42,14 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" v-html="current.icon"></svg>
             </div>
             <div>
-              <div class="cc-detail-title">{{ current.title }}</div>
-              <div class="cc-detail-desc">{{ current.desc }}</div>
+              <div class="cc-detail-title">{{ t(current.title) }}</div>
+              <div class="cc-detail-desc">{{ t(current.desc) }}</div>
             </div>
           </div>
 
           <div class="cc-scope-row">
             <div v-for="(tag, i) in current.tags" :key="i" class="cc-scope-box" :class="tag.type">
-              <div class="cc-scope-label">{{ tag.label }}</div>
+              <div class="cc-scope-label">{{ t(tag.label) }}</div>
               <div class="cc-scope-val">{{ scopeTotal(tag.key) }}</div>
             </div>
           </div>
@@ -58,7 +58,7 @@
             <table class="cc-table">
               <thead>
                 <tr>
-                  <th v-for="c in columns" :key="c.key" :class="`text-${c.align || 'right'}`">{{ c.label }}</th>
+                  <th v-for="c in columns" :key="c.key" :class="`text-${c.align || 'right'}`">{{ t(c.label) }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -66,13 +66,13 @@
                   <td v-for="c in columns" :key="c.key" :class="`text-${c.align || 'right'}`">
                     <template v-if="c.key === 'name'">{{ row.name }}</template>
                     <template v-else-if="c.key === 'intensity'">{{ fmt(row[c.key]) }} <span class="cc-unit">kgCO₂/t</span></template>
-                    <template v-else-if="c.key === 'control'">{{ row.control }}</template>
+                    <template v-else-if="c.key === 'control'">{{ t(row.control) }}</template>
                     <template v-else>{{ fmt(row[c.key]) }}</template>
                   </td>
                 </tr>
                 <tr class="total">
                   <td v-for="c in columns" :key="c.key" :class="`text-${c.align || 'right'}`">
-                    <template v-if="c.key === 'name'">合计</template>
+                    <template v-if="c.key === 'name'">{{ t('合计') }}</template>
                     <template v-else-if="c.key === 'intensity'">{{ fmt(totalRow[c.key]) }} <span class="cc-unit">kgCO₂/t</span></template>
                     <template v-else-if="c.key === 'control'"></template>
                     <template v-else>{{ fmt(totalRow[c.key]) }}</template>
@@ -83,7 +83,7 @@
           </div>
 
           <div class="cc-tip">
-            切换提示：选择核算标准后，返回“能碳总览”页面，碳排放核算边界和顶部CO₂总量将按所选标准重新计算呈现。
+            {{ t('切换提示：选择核算标准后，返回“能碳总览”页面，碳排放核算边界和顶部CO₂总量将按所选标准重新计算呈现。') }}
           </div>
         </div>
       </template>
@@ -94,6 +94,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useSimStore } from '../stores/sim'
+import { t } from '../i18n'
 
 const store = useSimStore()
 const result = computed(() => store.resultForView)
@@ -274,12 +275,12 @@ const close = () => store.toggleCarbonCalc()
 .cc-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
   padding: 12px; cursor: pointer; transition: border-color .12s, background .12s; }
 .cc-card:hover { background: var(--panel-3); border-color: var(--accent2); }
-.cc-card.active { background: var(--accent-l); border-color: var(--accent); }
+.cc-card.active { background: var(--accent-l); border-color: var(--accent-d); }
 .cc-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .cc-card-icon { width: 30px; height: 30px; border-radius: 6px; flex: none;
   display: flex; align-items: center; justify-content: center;
   color: var(--accent2); background: var(--panel-3); border: 1px solid var(--line); }
-.cc-card.active .cc-card-icon { color: var(--accent); border-color: var(--accent); background: var(--accent-l); }
+.cc-card.active .cc-card-icon { color: var(--accent-d); border-color: var(--accent-d); background: var(--accent-l); }
 .cc-card-icon svg { width: 18px; height: 18px; }
 .cc-card-code { font-size: 13px; font-weight: 600; color: var(--text); }
 .cc-card-sub { font-size: 10px; color: var(--muted); margin-top: 1px; }
@@ -287,10 +288,10 @@ const close = () => store.toggleCarbonCalc()
 .cc-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
 .cc-tag { font-size: 10px; padding: 2px 7px; border-radius: 4px; white-space: nowrap;
   background: var(--panel); border: 1px solid var(--border); color: var(--muted); }
-.cc-card.active .cc-tag { color: var(--accent); border-color: var(--accent); }
+.cc-card.active .cc-tag { color: var(--accent-d); border-color: var(--accent-d); }
 .cc-card-value { display: flex; align-items: baseline; gap: 5px; margin-bottom: 2px; }
 .cc-v-num { font-size: 22px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
-.cc-card.active .cc-v-num { color: var(--accent); }
+.cc-card.active .cc-v-num { color: var(--accent-d); }
 .cc-v-unit { font-size: 11px; color: var(--muted); }
 .cc-card-hint { font-size: 10px; color: var(--muted); }
 

@@ -355,14 +355,14 @@ export function calcTFT(inputs, config = DEFAULT_TFT_CONFIG) {
 // ---- 4. 热状态判定（文档 §6：TFT 阈值判定规则）----
 export function evalTftStatus(tft, config = DEFAULT_TFT_CONFIG) {
   if (tft < config.tftLow) {
-    return { code: 'low', label: 'TFT 偏低', color: '#e06c5a',
+    return { code: 'low', label: 'TFT 偏低', color: 'var(--red)',
       desc: '风口燃烧能量不足，易出现燃料燃烧不完全、炉温偏凉' }
   }
   if (tft > config.tftHigh) {
-    return { code: 'high', label: 'TFT 偏高', color: '#e8a23d',
+    return { code: 'high', label: 'TFT 偏高', color: 'var(--yellow)',
       desc: '风口燃烧过热，易造成设备损耗、炉况热过载' }
   }
-  return { code: 'ok', label: '热制度正常', color: '#3fae6a',
+  return { code: 'ok', label: '热制度正常', color: 'var(--green)',
     desc: '炉内热制度稳定，燃料燃烧状态良好' }
 }
 

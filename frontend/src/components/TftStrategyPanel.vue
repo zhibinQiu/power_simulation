@@ -1,8 +1,8 @@
 <template>
   <div class="tft-panel">
     <div class="sec tft-head-row">
-      <span>{{ isSystem ? '风口热制度 · TFT（理论火焰温度）系统分析' : '风口热制度 · TFT（理论火焰温度）策略提示' }}</span>
-      <span class="tft-src">焓平衡真值</span>
+      <span>{{ isSystem ? t('风口热制度 · TFT（理论火焰温度）系统分析') : t('风口热制度 · TFT（理论火焰温度）策略提示') }}</span>
+      <span class="tft-src">{{ t('焓平衡真值') }}</span>
     </div>
     <div class="tft-card" v-if="ctx">
       <div class="tft-top">
@@ -12,7 +12,7 @@
         </div>
         <span class="tft-badge" :style="{ color: status.color, borderColor: status.color }">{{ status.label }}</span>
       </div>
-      <div class="tft-range">目标区间 {{ cfg.tftLow }} – {{ cfg.tftHigh }} ℃</div>
+      <div class="tft-range">{{ t('目标区间') }} {{ cfg.tftLow }} – {{ cfg.tftHigh }} ℃</div>
 
       <!-- 温度刻度条：绿色区为合规区间，圆点为当前 TFT -->
       <div class="tft-bar">
@@ -30,7 +30,7 @@
 
       <!-- 计算过程：TFT 公式代入具体数值（鼓风显热 + Σ燃料净放热）÷ (炉腹煤气总量 × cp) -->
       <div class="tft-calc" v-if="ctx.res">
-        <div class="tft-calc-title">TFT 计算过程 · 焓平衡代入</div>
+        <div class="tft-calc-title">{{ t('TFT 计算过程 · 焓平衡代入') }}</div>
         <div class="tft-calc-row">
           <span>鼓风显热 Q<sub>air</sub> = B × cp<sub>air</sub> × t<sub>g</sub></span>
           <b>{{ fmt(ctx.res.Q_sensible_air) }} MJ/tFe</b>
@@ -77,16 +77,16 @@
 
       <!-- 设备级：当前设备调节影响（基于算法探测的真实影响方向） -->
       <div class="tft-dev" v-if="!isSystem && devImpact && devImpact.length">
-        <div class="tft-dev-title">当前设备调节影响</div>
+        <div class="tft-dev-title">{{ t('当前设备调节影响') }}</div>
         <div class="tft-imp" v-for="(im, i) in devImpact" :key="i">
-          <span class="tft-imp-op">{{ im.dir }}{{ im.label }}（±{{ im.step }}{{ im.unit }}）</span>
+          <span class="tft-imp-op">{{ t(im.dir) }}{{ im.label }}（±{{ im.step }}{{ im.unit }}）</span>
           <span class="tft-imp-delta" :style="{ color: im.delta >= 0 ? '#e8a23d' : '#6ab0f3' }">{{ deltaLabel(im.delta) }}</span>
         </div>
       </div>
 
       <!-- 操作建议：系统级=全部可调设备完整建议；设备级=仅当前设备建议 -->
       <div class="tft-dev-title" style="margin-top: 10px">
-        {{ isSystem ? '系统操作建议 · 全部可调设备' : '操作建议 · 当前设备' }}
+        {{ isSystem ? t('系统操作建议 · 全部可调设备') : t('操作建议 · 当前设备') }}
       </div>
       <div class="tft-adv" v-for="(a, i) in advices" :key="i">
         <span class="tft-adv-dir" :style="{ background: a.dir === '✓' ? 'var(--accent2)' : a.dir === '!' ? '#888' : status.color }">{{ a.dir }}</span>
@@ -98,17 +98,18 @@
       </div>
 
       <div class="tft-note">
-        焓平衡真值：TFT = (鼓风显热 + Σ燃料净放热) ÷ (炉腹煤气总量 × cp)。cp = {{ cfg.cp }} MJ/(Nm³·℃)。
-        工况参数直接取自系统实际值（铁水产量/风量/风温/富氧/鼓风湿度/焦比/喷煤，随可调设备设定实时折算）；
-        判定区间、比风量基准、燃料基础参数为可配置超参数（算法文档 §9.1）。
+        {{ t('焓平衡真值：TFT = (鼓风显热 + Σ燃料净放热) ÷ (炉腹煤气总量 × cp)。') }}cp = {{ cfg.cp }} MJ/(Nm³·℃)。
+        {{ t('工况参数直接取自系统实际值（铁水产量/风量/风温/富氧/鼓风湿度/焦比/喷煤，随可调设备设定实时折算）；') }}
+        {{ t('判定区间、比风量基准、燃料基础参数为可配置超参数（算法文档 §9.1）。') }}
       </div>
     </div>
-    <div class="tft-err" v-else>工况参数无效，无法计算 TFT（请检查生铁产量 / 鼓风量）。</div>
+    <div class="tft-err" v-else>{{ t('工况参数无效，无法计算 TFT（请检查生铁产量 / 鼓风量）。') }}</div>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { t } from '../i18n'
 import {
   DEFAULT_TFT_CONFIG, collectTftContext,
   buildDeviceTftAdvices, buildSystemTftAdvices,

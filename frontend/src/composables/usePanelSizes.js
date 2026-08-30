@@ -12,6 +12,10 @@ function startDrag(e, { vertical, invert = false, initial, clamp, onDone }) {
   const startVal = initial.value
   const extent = vertical ? window.innerHeight : window.innerWidth
   const raf = { id: null }
+  // 拖拽期间禁用 .app 的 grid 过渡：否则每次更新列宽都会重新触发 0.22s 过渡动画，
+  // 布局永远追着鼠标跑（不跟手），且中间 stage 慢速过渡与 SceneViewer 的 canvas
+  // 立即 setSize 不同步造成闪烁。松开后恢复，面板开合动画不受影响。
+  document.body.classList.add('panel-dragging')
   const onMove = (ev) => {
     if (raf.id) return
     raf.id = requestAnimationFrame(() => {
@@ -28,6 +32,7 @@ function startDrag(e, { vertical, invert = false, initial, clamp, onDone }) {
     window.removeEventListener('mouseup', onUp)
     document.body.style.userSelect = ''
     document.body.style.cursor = ''
+    document.body.classList.remove('panel-dragging')
     onDone(initial.value)
   }
   window.addEventListener('mousemove', onMove)

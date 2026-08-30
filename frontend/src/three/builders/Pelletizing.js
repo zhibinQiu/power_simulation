@@ -10,7 +10,7 @@ export default function _buildPelletizing(bodyMat) {
     const g = new THREE.Group()
     const L = 28; const D = 16; const H = 12
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x00ccff
+    const neonColor = 0x2c6e9e
 
     // === 1. 造球盘（granulating disc ±45°倾斜旋转） ===
     const pelletDiscs = []
@@ -112,7 +112,7 @@ export default function _buildPelletizing(bodyMat) {
 
     // === 5. 霓虹 ===
     const pelRing = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.12, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.4, roughness: 0.2 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     pelRing.rotation.x = Math.PI / 2; pelRing.position.set(L * 0.38, 1.5, 0); g.add(pelRing)
 
     // === 6. 动画钩子 ===
@@ -147,7 +147,7 @@ export default function _buildPelletizing(bodyMat) {
             obj: kilnP, phase: i * 0.3, period: 5.0,
             srcPos: new THREE.Vector3(L * 0.2 - 6, 8.0, kilnP.position.z),
             dstPos: new THREE.Vector3(L * 0.2 + 6, 8.0, kilnP.position.z),
-            srcColor: 0x4a6078, dstColor: 0xff5533, scalePulse: 0.1,
+            srcColor: 0x4a6078, dstColor: 0xb05a36, scalePulse: 0.1,
         })
     }
 

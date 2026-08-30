@@ -18,6 +18,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue'
+import { t } from '../i18n'
 
 const props = defineProps({
   // 多条序列：[{id, label, color, unit?, pts: [{t, v}]}]
@@ -55,7 +56,7 @@ function draw() {
   if (!series.length) {
     ctx.fillStyle = '#6B7F92'
     ctx.font = '11px ui-monospace, monospace'
-    ctx.fillText('暂无数据', 8, h / 2)
+    ctx.fillText(t('暂无数据'), 8, h / 2)
     return
   }
 

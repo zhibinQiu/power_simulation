@@ -1,48 +1,37 @@
 <template>
   <div class="scn-wrap" :class="{ 'drop-back': dropBackOver }"
        @dragover="onBackOver" @dragleave="onBackLeave" @drop="onDropBack">
-    <!-- 场景概要（标题由侧边栏头部统一显示，这里只保留统计） -->
-    <div class="scn-head">
-      <div class="scn-stats">
-        <span class="scn-badge">{{ units.length }} 道工序</span>
-        <span v-if="units.length">设备 <b>{{ deviceCount }}</b></span>
-        <span v-if="units.length">实时排放 <b>{{ fmt(liveTotalCo2) }}</b> tCO₂/h</span>
-      </div>
-    </div>
-
     <!-- 编排态提示 -->
     <div v-if="store.editMode" class="scn-edit-hint">
-      编排模式：以下为当前编排所对应场景的资源树，保存编排后场景将按此更新。
+      {{ t('编排模式：以下为当前编排所对应场景的资源树，保存编排后场景将按此更新。') }}
     </div>
 
     <!-- 场景资源树：工序 → 设备（实时读数） -->
     <div class="scn-body tree" @scroll="onScroll" :class="{ scrolling }">
       <div v-if="!units.length" class="empty-hint">
-        场景暂无部署工序。<br/>可从「资源管理器」把工艺拖入编排画布完成部署。
+        {{ t('场景暂无部署工序。') }}<br/>{{ t('可从「资源管理器」把工艺拖入编排画布完成部署。') }}
       </div>
       <div v-for="u in units" :key="u.id" class="tnode">
         <div class="tch sub" :class="{ active: store.selectedUnitId === u.id }"
              :title="u.type" @click="store.selectUnit(u.id)">
-          <span class="twisty" :class="{ open: open[u.id] !== false }" @click.stop="toggle(u.id)">
+          <span class="twisty" :class="{ open: open[u.id] === true }" @click.stop="toggle(u.id)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </span>
-          <span class="tch-dot" title="已部署至场景"></span>
+          <span class="tch-dot" :title="t('已部署至场景')"></span>
           <span class="tch-tt">{{ u.name || (PROCESS_MAP[u.type] || {}).label || u.type }}</span>
-          <span class="tch-count">{{ devsOf(u.id).length }}</span>
         </div>
-        <div class="tchildren" v-show="open[u.id] !== false">
-          <div v-if="!devsOf(u.id).length" class="empty-hint sm">该工序暂无设备</div>
+        <div class="tchildren" v-show="open[u.id] === true">
+          <div v-if="!devsOf(u.id).length" class="empty-hint sm">{{ t('该工序暂无设备') }}</div>
           <div v-for="d in devsOf(u.id)" :key="d.id" class="tchild leaf dev-leaf click"
                :class="{ active: store.deviceDetailId === d.id, 'drag-src': dragId === d.id }"
                :draggable="!store.editMode"
-               :title="(d.measures ? d.label + '（' + d.measures + '）' : d.label) + ' · 拖拽至「数据分析与策略」作为数据源'"
+               :title="(d.measures ? d.label + '（' + d.measures + '）' : d.label) + t(' · 拖拽至「数据分析与策略」作为数据源')"
                @click="store.openDeviceDetail(d.id)"
                @dragstart="onDevDrag($event, d)"
                @dragend="onDevDragEnd">
             <span class="tc-tt">{{ d.label }}</span>
-            <span v-if="d.adjustable" class="adj-badge" title="可调设备：设定值可调节">可调</span>
+            <span v-if="d.adjustable" class="adj-badge" :title="t('可调设备：设定值可调节')">{{ t('可调') }}</span>
             <span class="dev-live">{{ fmt(d.live) }}<span v-if="d.unit" class="dev-unit">{{ d.unit }}</span></span>
-            <span v-if="!store.editMode" class="drag-hint" title="拖拽到「数据分析与策略」作为数据源">↕</span>
           </div>
         </div>
       </div>
@@ -52,12 +41,14 @@
 
 <script setup>
 import { reactive, ref, computed } from 'vue'
+import { t } from '../i18n'
 import { useSimStore } from '../stores/sim'
 import { PROCESS_MAP } from '../data/flowLibrary'
 
 const store = useSimStore()
+// 场景菜单默认折叠设备子项（仅显示工序一级），点击 twisty 展开设备（二级）
 const open = reactive({})
-function toggle(key) { open[key] = open[key] === false ? true : false }
+function toggle(key) { open[key] = !open[key] }
 
 // 当前编排所对应场景的工序集合（运行态 = 已部署产线；编排态 = 编排画布中的方案节点）
 const units = computed(() => {
@@ -76,13 +67,6 @@ const units = computed(() => {
 function devsOf(unitId) {
   return store.allDevices.filter((d) => d.unitId === unitId)
 }
-const deviceCount = computed(() => store.allDevices.length)
-// 实时排放总量：优先取最新遥测，其次取当前方案计算结果
-const liveTotalCo2 = computed(() => {
-  if (store.live && store.live.total_co2 != null) return store.live.total_co2
-  const r = store.resultForView
-  return r && r.totals ? r.totals.co2_total : 0
-})
 function fmt(v) {
   if (v == null || isNaN(v)) return '—'
   return typeof v === 'number' ? v.toFixed(1) : String(v)
@@ -130,7 +114,7 @@ function onDropBack(e) {
     const src = JSON.parse(raw)
     if (src && src._back && src.id) {
       store.removeDvSource(src.id)
-      store.toast = `已把「${src.label || src.id}」移出工况数据源，如需重新添加请再次拖入`
+      store.showToast(t('已把「{name}」移出工况数据源，如需重新添加请再次拖入', { name: src.label || src.id }), 'info')
     }
   } catch (err) {}
 }
@@ -139,16 +123,15 @@ function onDropBack(e) {
 <style scoped>
 .scn-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .scn-wrap.drop-back { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-l); }
-.scn-head { flex: 0 0 auto; padding: 8px 10px 6px; border-bottom: 1px solid var(--border); }
-.scn-badge { font-size: 10px; color: var(--accent); background: var(--accent-l); border-radius: 8px; padding: 1px 7px; }
-.scn-stats { display: flex; gap: 12px; align-items: center; font-size: 10.5px; color: var(--muted); }
-.scn-stats b { color: var(--text); font-variant-numeric: tabular-nums; }
 .scn-edit-hint { flex: 0 0 auto; margin: 6px 10px 0; padding: 6px 8px; font-size: 10.5px; line-height: 1.6; color: var(--warn, #9a6b08); background: var(--warn-l, rgba(255,180,0,.08)); border: 1px solid var(--warn-b, rgba(255,180,0,.25)); border-radius: 6px; }
 .scn-body { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 6px 12px; }
 .scn-body.scrolling { scrollbar-width: thin; }
+/* 工序行字体与资源管理器中对应工艺/物料条目（.tc-tt）保持一致：12px / 400 / 字距 .08px，
+   覆盖全局 .tch.sub .tch-tt 的 500 字重与 .15px 字距，避免同一工艺词在两棵树的观感差异 */
+.scn-body .tch.sub .tch-tt { font-weight: 400; letter-spacing: .08px; }
 .empty-hint { padding: 14px 10px; color: var(--faint); font-size: 11.5px; line-height: 1.7; }
 .empty-hint.sm { padding: 6px 10px; font-size: 10.5px; }
-.adj-badge { flex: 0 0 auto; font-size: 9px; line-height: 1.7; color: var(--accent); background: var(--accent-l); border-radius: 5px; padding: 0 5px; }
+.adj-badge { flex: 0 0 auto; font-size: 9px; line-height: 1.7; color: var(--accent-d); background: var(--accent-l); border-radius: 5px; padding: 0 5px; }
 .dev-live { margin-left: auto; font-size: 10.5px; color: var(--accent2); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
 .dev-unit { margin-left: 2px; color: var(--faint); font-size: 10px; }
 .dev-leaf {
@@ -157,11 +140,4 @@ function onDropBack(e) {
 }
 .dev-leaf:active { cursor: grabbing; }
 .dev-leaf.drag-src { opacity: .45; }
-.drag-hint {
-  flex: 0 0 auto; margin-left: 4px;
-  font-size: 10px; color: var(--faint);
-  border: 1px dashed var(--line); border-radius: 3px;
-  padding: 0 4px; line-height: 15px;
-}
-.dev-leaf:hover .drag-hint { color: var(--accent); border-color: var(--accent); }
 </style>

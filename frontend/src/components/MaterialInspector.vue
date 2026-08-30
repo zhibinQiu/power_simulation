@@ -1,51 +1,51 @@
 <template>
   <div class="mat-insp">
     <template v-if="mat">
-      <CollapseSection :title="'物料属性 · ' + (mat ? mat.name : '')" tone="blue" :show-more="false">
-      <p class="sec-desc">该类物料可作为原料或中间产物：在「编辑流程」中从左侧拖入画布生成源节点，再从输出端口连入工艺输入端口。</p>
+      <CollapseSection :title="t('物料属性 · ') + (mat ? mat.name : '')" tone="blue" :show-more="false">
+      <p class="sec-desc">{{ t('该类物料可作为原料或中间产物：在「编辑流程」中从左侧拖入画布生成源节点，再从输出端口连入工艺输入端口。') }}</p>
       <div class="card">
-        <div class="kv2"><span>类别</span><b>{{ mat.cat }}</b></div>
-        <div class="kv2"><span>单位</span><b>{{ mat.unit }}</b></div>
+        <div class="kv2"><span>{{ t('类别') }}</span><b>{{ mat.cat }}</b></div>
+        <div class="kv2"><span>{{ t('单位') }}</span><b>{{ mat.unit }}</b></div>
       </div>
       </CollapseSection>
 
-      <CollapseSection title="隐含碳因子" tone="amber" :show-more="false">
+      <CollapseSection :title="t('隐含碳因子')" tone="amber" :show-more="false">
       <div class="card">
         <div class="param-row">
-          <div class="pr-top"><span>当前值</span><b>{{ fmt(carbon) }} <span class="u">tCO₂/{{ mat.unit }}</span></b></div>
+          <div class="pr-top"><span>{{ t('当前值') }}</span><b>{{ fmt(carbon) }} <span class="u">tCO₂/{{ mat.unit }}</span></b></div>
           <div class="num-row">
             <input type="number" class="num" min="0" max="5" step="0.001" :value="carbon" @input="onCarbon($event.target.value)" />
             <span class="num-unit">tCO₂/{{ mat.unit }}</span>
           </div>
           <div class="pr-hint">
-            范围 0–5 tCO₂/{{ mat.unit }}；当前为 <b>{{ isOverride ? '会话覆盖值' : '库默认值' }}</b>，用于碳足迹核算与估算。
+            {{ t('范围 0–5 tCO₂/{unit}；当前为', { unit: mat.unit }) }} <b>{{ isOverride ? t('会话覆盖值') : t('库默认值') }}</b>，{{ t('用于碳足迹核算与估算。') }}
           </div>
         </div>
-        <button v-if="isOverride" class="reset" @click="store.setMaterialCarbon(mat.id, mat.carbon)">恢复库默认值</button>
+        <button v-if="isOverride" class="reset" @click="store.setMaterialCarbon(mat.id, mat.carbon)">{{ t('恢复库默认值') }}</button>
       </div>
       </CollapseSection>
 
-      <CollapseSection v-if="fuelFactor" title="燃料排放因子 · NCV（低位发热量） / CC（单位热值含碳量）" tone="amber" :show-more="false">
+      <CollapseSection v-if="fuelFactor" :title="t('燃料排放因子 · NCV（低位发热量） / CC（单位热值含碳量）')" tone="amber" :show-more="false">
       <div class="card">
         <div class="kv2">
-          <span>NCV（低位发热量）</span>
+          <span>{{ t('NCV（低位发热量）') }}</span>
           <span class="kv-edit">
             <input type="number" class="num" step="0.001" :value="fuelFactor.ncv" @change="onFuel('ncv', $event.target.value)" />
             <span class="num-unit">{{ fuelUnit }}</span>
           </span>
         </div>
         <div class="kv2">
-          <span>CC（单位热值含碳量）</span>
+          <span>{{ t('CC（单位热值含碳量）') }}</span>
           <span class="kv-edit">
             <input type="number" class="num" step="0.0004" :value="fuelFactor.cc" @change="onFuel('cc', $event.target.value)" />
             <span class="num-unit">tC/GJ</span>
           </span>
         </div>
-        <div class="pr-hint">燃烧排放 = 用量 × NCV（低位发热量） × CC（单位热值含碳量） × 3.667；编辑后应用于全部仿真与 3D 孪生。</div>
+        <div class="pr-hint">{{ t('燃烧排放 = 用量 × NCV（低位发热量） × CC（单位热值含碳量） × 3.667；编辑后应用于全部仿真与 3D 孪生。') }}</div>
       </div>
       </CollapseSection>
 
-      <CollapseSection title="物理与物流参数" tone="teal" :show-more="false">
+      <CollapseSection :title="t('物理与物流参数')" tone="teal" :show-more="false">
       <div class="card">
         <div class="kv2" v-for="a in attributeDefs" :key="a.key">
           <span>{{ a.label }}</span>
@@ -55,17 +55,17 @@
           </span>
         </div>
         <div class="kv2">
-          <span>说明备注</span>
-          <input class="num note-input" :value="attrVal('note', '')" @change="onNote($event.target.value)" placeholder="可选备注" />
+          <span>{{ t('说明备注') }}</span>
+          <input class="num note-input" :value="attrVal('note', '')" @change="onNote($event.target.value)" :placeholder="t('可选备注')" />
         </div>
-        <div class="pr-hint">以上为物料级自定义配置（随方案保存），用于台账与物流碳备注；不影响核心碳核算引擎。</div>
+        <div class="pr-hint">{{ t('以上为物料级自定义配置（随方案保存），用于台账与物流碳备注；不影响核心碳核算引擎。') }}</div>
       </div>
       </CollapseSection>
 
-      <CollapseSection v-if="compFields && mat.id !== 'pulverized_coal'" title="详细化学成分" tone="green" :show-more="false">
+      <CollapseSection v-if="compFields && mat.id !== 'pulverized_coal'" :title="t('详细化学成分')" tone="green" :show-more="false">
       <div class="card">
         <div class="kv2" v-for="f in mainCompFields" :key="f.key">
-          <span>{{ f.label }}</span>
+          <span>{{ t(f.label) }}</span>
           <span class="kv-edit">
             <input type="number" class="num" :min="f.min" :max="f.max" :step="f.step"
                    :value="compVal(f.key)" @change="onComp(f, $event.target.value)" />
@@ -73,10 +73,10 @@
           </span>
         </div>
         <template v-if="ashCompFields.length">
-          <div class="ash-sub-t">灰分组成（占灰分质量分数 %）</div>
+          <div class="ash-sub-t">{{ t('灰分组成（占灰分质量分数 %）') }}</div>
           <div class="ash-sub">
             <div class="kv2" v-for="f in ashCompFields" :key="f.key">
-              <span>{{ f.label }}</span>
+              <span>{{ t(f.label) }}</span>
               <span class="kv-edit">
                 <input type="number" class="num" :min="f.min" :max="f.max" :step="f.step"
                        :value="compVal(f.key)" @change="onComp(f, $event.target.value)" />
@@ -86,13 +86,13 @@
           </div>
         </template>
         <div class="pr-hint">{{ compHint }}</div>
-        <button v-if="isCompOverride" class="reset" @click="resetComp">恢复库默认成分</button>
+        <button v-if="isCompOverride" class="reset" @click="resetComp">{{ t('恢复库默认成分') }}</button>
       </div>
       </CollapseSection>
 
-      <CollapseSection v-if="mat.id === 'pulverized_coal'" title="喷吹煤粉 · 配煤混合（N 种煤）" tone="green" :show-more="false">
+      <CollapseSection v-if="mat.id === 'pulverized_coal'" :title="t('喷吹煤粉 · 配煤混合（N 种煤）')" tone="green" :show-more="false">
       <div class="card">
-        <div class="pr-hint">喷吹煤粉由多种煤按设定比例混合磨制。设置每种煤的占比与成分，系统按质量分数加权折算有效成分，联动 TFT / 置换比 RR / CO₂ / 炉渣碱度。默认混合（无烟煤/烟煤各 50%）加权 == 原单一煤粉值，数值中性。</div>
+        <div class="pr-hint">{{ t('喷吹煤粉由多种煤按设定比例混合磨制。设置每种煤的占比与成分，系统按质量分数加权折算有效成分，联动 TFT / 置换比 RR / CO₂ / 炉渣碱度。默认混合（无烟煤/烟煤各 50%）加权 == 原单一煤粉值，数值中性。') }}</div>
 
         <div class="pc-coal" v-for="(b, i) in coalBlend" :key="b.id">
           <div class="pc-coal-head">
@@ -101,20 +101,20 @@
               <input type="number" class="num" min="0" max="100" step="1" :value="(b.ratio*100).toFixed(0)" @change="onCoalRatio(i, $event.target.value)" />
               <span class="num-unit">%</span>
             </span>
-            <button v-if="coalBlend.length > 1" class="pc-del" @click="removeCoal(i)" title="删除该煤种">✕</button>
+            <button v-if="coalBlend.length > 1" class="x-btn danger" @click="removeCoal(i)" :title="t('删除该煤种')">✕</button>
           </div>
           <div class="kv2" v-for="f in pcMainFields" :key="f.key">
-            <span>{{ f.label }}</span>
+            <span>{{ t(f.label) }}</span>
             <span class="kv-edit">
               <input type="number" class="num" :min="0" :step="f.step" :value="b.comp[f.key]" @change="onCoalComp(i, f.key, $event.target.value)" />
               <span class="num-unit">%</span>
             </span>
           </div>
           <details class="pc-ash">
-            <summary>灰分组成（占灰分质量分数 %）</summary>
+            <summary>{{ t('灰分组成（占灰分质量分数 %）') }}</summary>
             <div class="ash-sub">
               <div class="kv2" v-for="f in pcAshFields" :key="f.key">
-                <span>{{ f.label }}</span>
+                <span>{{ t(f.label) }}</span>
                 <span class="kv-edit">
                   <input type="number" class="num" :min="0" :step="f.step" :value="b.comp[f.key]" @change="onCoalComp(i, f.key, $event.target.value)" />
                   <span class="num-unit">%</span>
@@ -124,30 +124,30 @@
           </details>
         </div>
 
-        <button class="pc-add" @click="addCoal">+ 添加煤种</button>
+        <button class="pc-add" @click="addCoal">+ {{ t('添加煤种') }}</button>
 
         <div class="pc-weighted">
-          <div class="pc-w-title">加权有效成分（随上方配比实时联动）</div>
+          <div class="pc-w-title">{{ t('加权有效成分（随上方配比实时联动）') }}</div>
           <div class="kv2" v-for="f in pcAllFields" :key="'w'+f.key">
-            <span>{{ f.label }}</span><b class="mono">{{ fmtW(weightedComp[f.key]) }}</b>
+            <span>{{ t(f.label) }}</span><b class="mono">{{ fmtW(weightedComp[f.key]) }}</b>
           </div>
         </div>
 
-        <button v-if="isBlendOverride" class="reset" @click="store.clearCoalBlend('pulverized_coal')">恢复默认混合（无烟煤/烟煤各 50%）</button>
+        <button v-if="isBlendOverride" class="reset" @click="store.clearCoalBlend('pulverized_coal')">{{ t('恢复默认混合（无烟煤/烟煤各 50%）') }}</button>
       </div>
       </CollapseSection>
 
-      <CollapseSection title="相关工艺 · 输入 / 输出" tone="green" :show-more="false">
+      <CollapseSection :title="t('相关工艺 · 输入 / 输出')" tone="green" :show-more="false">
       <div class="card" v-if="usedIn.length">
         <div v-for="u in usedIn" :key="u.type" class="used-row">
           <span class="ur-name">{{ u.label }}</span>
-          <span class="ur-tag" :class="u.role">{{ u.role === 'in' ? '输入' : '输出' }}</span>
+          <span class="ur-tag" :class="u.role">{{ u.role === 'in' ? t('输入') : t('输出') }}</span>
         </div>
       </div>
-      <div class="card note" v-else>暂无工艺引用该物料。</div>
+      <div class="card note" v-else>{{ t('暂无工艺引用该物料。') }}</div>
       </CollapseSection>
     </template>
-    <div v-else class="empty">未选择物料，请从左侧「原料」栏点击查看。</div>
+    <div v-else class="empty">{{ t('未选择物料，请从左侧「原料」栏点击查看。') }}</div>
   </div>
 </template>
 
@@ -156,6 +156,7 @@ import { computed } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { PROCESS_MAP } from '../data/flowLibrary'
 import CollapseSection from './CollapseSection.vue'
+import { t } from '../i18n'
 
 const store = useSimStore()
 const mat = computed(() => store.selectedMaterial)
@@ -217,12 +218,12 @@ function resetComp() { store.clearMaterialComp(mat.value.id) }
 const compHint = computed(() => {
   if (!mat.value || !compFields.value) return ''
   const id = mat.value.id
-  if (id === 'coke') return '干基工业分析典型值（FC+A+V≈100%）；灰分组成为灰分内部构成（各项之和≈100%），焦灰中 CaO/SiO₂/MgO/Al₂O₃ 全部入渣，参与炉渣二元碱度计算。'
-  if (id === 'coal') return '炼焦煤工业分析+元素分析典型值（FC+V+A+M≈100%）；灰分组成为灰分内部构成，用于焦炭灰分溯源与配煤参考。'
-  if (id === 'pulverized_coal') return '喷吹煤粉（PCI）成分典型值；元素碳 C / 氢 H 驱动置换比与 TFT 计算（与 tft.js 默认值对齐）；灰分组成为灰分内部构成，煤灰入渣参与炉渣二元碱度计算。'
-  if (id === 'limestone') return '石灰石（熔剂）典型成分；CaO 为炉渣碱度的主要外源，入炉受热分解 CaCO₃→CaO+CO₂（LOI≈42% 为分解失重，亦为熔剂碳排放来源）。'
-  if (id === 'iron_ore') return '天然块矿典型成分；SiO₂/Al₂O₃ 脉石为酸性物来源，入炉比例与品位共同影响渣量与炉渣二元碱度。'
-  return '化学成分（质量分数 %）典型值；TFe 品位与碱度（CaO/SiO₂）用于炉料结构与渣量对标，烧结/球团成分参与炉渣二元碱度计算。'
+  if (id === 'coke') return t('干基工业分析典型值（FC+A+V≈100%）；灰分组成为灰分内部构成（各项之和≈100%），焦灰中 CaO/SiO₂/MgO/Al₂O₃ 全部入渣，参与炉渣二元碱度计算。')
+  if (id === 'coal') return t('炼焦煤工业分析+元素分析典型值（FC+V+A+M≈100%）；灰分组成为灰分内部构成，用于焦炭灰分溯源与配煤参考。')
+  if (id === 'pulverized_coal') return t('喷吹煤粉（PCI）成分典型值；元素碳 C / 氢 H 驱动置换比与 TFT 计算（与 tft.js 默认值对齐）；灰分组成为灰分内部构成，煤灰入渣参与炉渣二元碱度计算。')
+  if (id === 'limestone') return t('石灰石（熔剂）典型成分；CaO 为炉渣碱度的主要外源，入炉受热分解 CaCO₃→CaO+CO₂（LOI≈42% 为分解失重，亦为熔剂碳排放来源）。')
+  if (id === 'iron_ore') return t('天然块矿典型成分；SiO₂/Al₂O₃ 脉石为酸性物来源，入炉比例与品位共同影响渣量与炉渣二元碱度。')
+  return t('化学成分（质量分数 %）典型值；TFe 品位与碱度（CaO/SiO₂）用于炉料结构与渣量对标，烧结/球团成分参与炉渣二元碱度计算。')
 })
 
 // ---- 喷吹煤粉配煤混合编辑器（N 种煤）----
@@ -266,7 +267,7 @@ function addCoal() {
   const n = _cloneBlend()
   _coalSeq++
   n.push({
-    id: 'custom_' + Date.now() + '_' + _coalSeq, name: '自定义煤' + _coalSeq, ratio: 0.2,
+    id: 'custom_' + Date.now() + '_' + _coalSeq, name: t('自定义煤') + _coalSeq, ratio: 0.2,
     comp: { c: 80, h: 4, fc: 80, ash: 10, h2o: 5, decomp: 0.35, carbon_pct: 69.95, ash_cao: 5, ash_sio2: 44, ash_al2o3: 28, ash_mgo: 1.5, ash_fe2o3: 9, ash_base: 1.3, ash_so3: 2.2 },
   })
   _commit(n)
@@ -274,9 +275,9 @@ function addCoal() {
 function removeCoal(i) { const n = _cloneBlend(); if (n.length <= 1) return; n.splice(i, 1); _commit(n) }
 function fmtW(v) { return v == null || !Number.isFinite(Number(v)) ? '—' : Number(v).toFixed(2) }
 const attributeDefs = [
-  { key: 'density', label: '堆密度', unit: 'kg/m³', def: 1500, step: 10 },
-  { key: 'transport_factor', label: '运输排放因子', unit: 'kgCO₂/t·km', def: 0.1, step: 0.01 },
-  { key: 'moisture', label: '含水率', unit: '%', def: 0, step: 0.5 },
+  { key: 'density', label: t('堆密度'), unit: 'kg/m³', def: 1500, step: 10 },
+  { key: 'transport_factor', label: t('运输排放因子'), unit: 'kgCO₂/t·km', def: 0.1, step: 0.01 },
+  { key: 'moisture', label: t('含水率'), unit: '%', def: 0, step: 0.5 },
 ]
 function attrVal(key, def) {
   const ov = store.materialOverrides[mat.value.id]
@@ -307,13 +308,13 @@ function onNote(val) { store.setMaterialAttr(mat.value.id, 'note', val) }
 .pc-coal { border: 1px solid var(--line); border-radius: 4px; padding: 8px 9px; margin-top: 8px; }
 .pc-coal + .pc-coal { margin-top: 8px; }
 .pc-coal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.pc-name { flex: 1; min-width: 0; font-size: 11px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 3px; }
+.pc-name { flex: 1; min-width: 0; font-size: 11px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 3px;
+  background: var(--input, var(--bg)); color: var(--text); }
+.pc-name:focus { border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent-l); outline: none; }
 .pc-ratio { display: inline-flex; align-items: center; gap: 3px; }
 .pc-ratio .num { width: 56px; }
-.pc-del { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 3px; width: 22px; height: 22px; cursor: pointer; font-size: 11px; line-height: 1; }
-.pc-del:hover { color: #e06c5a; border-color: #e06c5a; }
-.pc-add { margin-top: 8px; width: 100%; border: 1px dashed var(--accent2, #5f8294); background: rgba(95,130,148,.08); color: var(--accent2, #5f8294); border-radius: 3px; padding: 6px; cursor: pointer; font-size: 11.5px; }
-.pc-add:hover { background: rgba(95,130,148,.16); }
+.pc-add { margin-top: 8px; width: 100%; border: 1px solid var(--accent2); background: transparent; color: var(--accent2); border-radius: 3px; padding: 6px; cursor: pointer; font-size: 11.5px; }
+.pc-add:hover { background: var(--accent2); color: #fff; }
 .pc-ash { margin-top: 6px; }
 .pc-ash summary { font-size: 10.5px; color: var(--green, #4f9d6b); cursor: pointer; user-select: none; }
 .pc-ash[open] summary { margin-bottom: 4px; }

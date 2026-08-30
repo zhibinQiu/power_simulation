@@ -4,7 +4,7 @@
     <!-- 关闭/返回等操作已由顶栏工具栏提供 -->
     <div class="ef-body">
       <div v-if="!hasData" class="ef-empty">
-        暂无仿真结果，请先运行一次仿真后查看能流分析。
+        {{ t('暂无仿真结果，请先运行一次仿真后查看能流分析。') }}
       </div>
       <div v-else class="ef-chart">
         <EnergySankey />
@@ -17,6 +17,7 @@
 import { computed } from 'vue'
 import EnergySankey from './EnergySankey.vue'
 import { useSimStore } from '../stores/sim'
+import { t } from '../i18n'
 
 const store = useSimStore()
 const hasData = computed(() => !!(store.resultForView && store.resultForView.sankey_energy && store.resultForView.sankey_energy.nodes && store.resultForView.sankey_energy.nodes.length))

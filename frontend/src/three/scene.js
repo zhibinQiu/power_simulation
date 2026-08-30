@@ -38,13 +38,13 @@ const PAL = {
 // 物料运输意象注册表：按 flow.material 区分「模型 + 运输媒介」。
 // 状态映射（由 style 推导）：molten/liquid -> 液体（走「流槽」）；gas -> 气体（走「管道」）；granular/chunk/slab -> 固体（走「传送带」）。
 const MAT_VIS = {
-  // 熔体（液体）：铁水 / 钢水 —— 走「流槽」（赛博朋克霓虹橙→霓虹粉紫渐变）
-  hot_metal:     { style: 'molten', color: 0xff4422, emissive: 0xff3311, emi: 0.55 },
-  pre_hm:        { style: 'molten', color: 0xff5528, emissive: 0xff4418, emi: 0.55 },
-  steel:         { style: 'molten', color: 0xff8822, emissive: 0xff7711, emi: 0.55 },
-  crude_steel:   { style: 'molten', color: 0xff8822, emissive: 0xff7711, emi: 0.55 },
-  refined_steel: { style: 'molten', color: 0xffaa44, emissive: 0xff9922, emi: 0.55 },
-  water:         { style: 'liquid', color: 0x00ccff },
+  // 熔体（液体）：铁水 / 钢水 —— 走「流槽」（低饱和工业熔融金属橙红，非霓虹）
+  hot_metal:     { style: 'molten', color: 0xb05030, emissive: 0x7c2e16, emi: 0.45 },
+  pre_hm:        { style: 'molten', color: 0xb55a34, emissive: 0x803318, emi: 0.45 },
+  steel:         { style: 'molten', color: 0xbf6a30, emissive: 0x8a4018, emi: 0.45 },
+  crude_steel:   { style: 'molten', color: 0xbf6a30, emissive: 0x8a4018, emi: 0.45 },
+  refined_steel: { style: 'molten', color: 0xc67a3c, emissive: 0x94501c, emi: 0.45 },
+  water:         { style: 'liquid', color: 0x3a6e8f },
   // 散料（固体）：走「传送带」（提亮配色，避免暗场发黑）
   sinter:        { style: 'granular', color: 0x7d93ab },
   pellet:        { style: 'granular', color: 0x6f8aa6 },
@@ -56,15 +56,15 @@ const MAT_VIS = {
   // 不规则块（固体）：废钢
   scrap:         { style: 'chunk', color: 0x5a6a80 },
   // 板坯 / 钢材
-  billet:        { style: 'slab', color: 0xff5522, emissive: 0xff4411, emi: 0.50 },
-  steel_product: { style: 'slab', color: 0x6a8aaa },
-  // 气体：走「管道」（霓虹青/紫气流色）
-  ldg:           { style: 'gas', color: 0x00eeaa },
-  cog:           { style: 'gas', color: 0x44ffcc },
-  bfg:           { style: 'gas', color: 0x22ccaa },
-  oxygen:        { style: 'gas', color: 0x00bbff },
-  ngas:          { style: 'gas', color: 0x8866cc },
-  co2:           { style: 'gas', color: 0xff4466 },
+  billet:        { style: 'slab', color: 0xbf5a2e, emissive: 0x80301a, emi: 0.40 },
+  steel_product: { style: 'slab', color: 0x5f7690 },
+  // 气体：走「管道」（低饱和工业气流色）
+  ldg:           { style: 'gas', color: 0x3f8f7a },
+  cog:           { style: 'gas', color: 0x5a9a8f },
+  bfg:           { style: 'gas', color: 0x4a8a80 },
+  oxygen:        { style: 'gas', color: 0x3a7aa0 },
+  ngas:          { style: 'gas', color: 0x7a6f95 },
+  co2:           { style: 'gas', color: 0xa05a4c },
   _default:      { style: 'chunk', color: 0x5a6a80 },
 }
 
@@ -136,16 +136,6 @@ const SCALE = 1 // 世界单位 = 米（示意）
 const UNIT_SCALE = 2.4  // 工艺本体整体放大系数（用户要求模型更大、更醒目）
 const GROUP_SCENE_GAIN = 1.6  // 小组子场景（groupScene）成员模型再放大系数：进入小组后模型更大更醒目
 
-// —— 虚拟巡视（手动操纵机器狗）参数 ——
-const PATROL_DOG_SCALE = 1.6    // 机器狗整体放大（加高身形，厂区尺度下更醒目）
-const PATROL_SPEED = 26         // 行走速度（世界单位/秒），按住 Shift 加速
-const PATROL_TURN = 1.6         // 原地旋转角速度（弧度/秒，≈92°/s）
-const PATROL_RADIUS = 3.2       // 机器狗碰撞半径（含步幅余量）
-const PATROL_CAM_BACK = 22      // 第三人称相机后撤距离
-const PATROL_CAM_UP = 12        // 相机高度
-const PATROL_CAM_AHEAD = 30     // 视点前置距离
-const PATROL_CAM_LOOK_Y = 7     // 视点高度（对准工艺立面下半段）
-
 // 赛博朋克材质工厂（高金属感、低粗糙度、蓝黑基底的工业科技质感）
 function mat(color, o = {}) {
   return new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.48, metalness: 0.42 }, o))
@@ -188,7 +178,7 @@ function _drawLabelCard(ctx, focused, role, slim, main, light, h = LABEL_H) {
   if (light) {
     // ===== VS Code 浅色卡片 =====
     // 柔和投影（浅色下用淡灰，不喧宾夺主）
-    ctx.shadowColor = focused ? 'rgba(0,114,189,0.30)' : 'rgba(0,0,0,0.12)'
+    ctx.shadowColor = focused ? 'rgba(0,94,148,0.30)' : 'rgba(0,0,0,0.12)'
     ctx.shadowBlur = focused ? 10 : 5
     ctx.shadowOffsetX = 0
     ctx.shadowOffsetY = focused ? 0 : 1
@@ -204,7 +194,7 @@ function _drawLabelCard(ctx, focused, role, slim, main, light, h = LABEL_H) {
     // 边框：聚焦 = 强调蓝 2px；普通 = 细浅灰（简约 VS Code 风，无装饰条）
     ctx.beginPath()
     _roundRect(ctx, 1, 1, W - 2, H - 2, r)
-    ctx.strokeStyle = focused ? 'rgba(0,114,189,0.9)' : 'rgba(214,219,225,1)'
+    ctx.strokeStyle = focused ? 'rgba(0,94,148,0.9)' : 'rgba(214,219,225,1)'
     ctx.lineWidth = focused ? 2 : 1
     ctx.stroke()
     return
@@ -822,12 +812,12 @@ function fmtShort(v) {
 }
 
 
-// 碳排放占比 → 赛博霓虹色阶（霓虹青 → 霓虹紫 → 霓虹粉）
+// 碳排放占比 → 工业色阶（钢蓝 → 琥珀 → 砖红，与右侧「排放占比」图例一致）
 const SHARE_SCALE_MAX = 0.25
 const _SHARE_STOPS = [
-  [0, 180, 230],    // 霓虹青（低占比）
-  [130, 100, 250],  // 霓虹紫（中占比）
-  [255, 70, 120],   // 霓虹粉（高占比）
+  [61, 110, 140],    // 钢蓝（低占比）
+  [201, 162, 59],    // 琥珀（中占比）
+  [192, 86, 76],     // 砖红（高占比）
 ]
 function _lerpStop(a, b, t) {
   return [
@@ -938,20 +928,6 @@ export class TwinScene {
     this.onFocusGroup = null    // 单击小组标签/成员 → 聚焦（相机+选中），由宿主绑定
     this.onSelectGroup = null   // 双击小组标签/成员 → 进入小组子场景回调（组 id），由宿主绑定
     this.onSelectDevice = null
-    // 虚拟巡视状态（手动操纵：WASD 平移 / ZX 旋转；建筑与工艺为刚体，不可穿越）
-    this.patrol = false
-    this.patrolRobot = null
-    this.patrolPos = new THREE.Vector3(0, 0.5, 0)   // 机器狗地面坐标（提升避免视觉上被底座/地面遮挡）
-    this.patrolYaw = 0                            // 机器狗朝向（弧度，0 = 面向 +Z）
-    this.patrolMoving = false                     // 本帧是否在移动（驱动步态动画）
-    this.patrolBlocked = false                    // 本帧是否被刚体挡住
-    this._patrolKeys = new Set()                  // 当前按下的按键集合
-    this._patrolSolids = []                       // 刚体障碍（XZ 平面 AABB 列表）
-    this._patrolBounds = null                     // 厂区可行走边界
-    this._patrolLook = new THREE.Vector3()
-    this._onPatrolKeyDown = null
-    this._onPatrolKeyUp = null
-    this._onPatrolBlur = null
     this._focus = null
     this.focusedId = null          // 当前聚焦/选中的工序（用于同步高亮其唯一标签与选中环）
     this.focusedFlowId = null      // 当前聚焦的管道连线标签
@@ -993,16 +969,27 @@ export class TwinScene {
   //   画面锐利、无插值放大发虚；低 DPR 屏为 1，不额外消耗。
   // - 仅当渲染像素面积超过约 500 万（≈4K 全屏 ×DPR2 以上）时降级到 1.5，
   //   避免超大视口下显存/填充率爆炸。
+  // - 带滞回（hysteresis）：同屏拖动窗口时像素面积会在 500 万阈值附近来回浮动，
+  //   若每次都重算会让 pixel ratio 在 1.5 ↔ 2.0 之间反复跳变（canvas 物理尺寸突变、
+  //   重建绘制缓冲），肉眼可见闪烁。因此同屏下仅当目标与当前档位差 ≥0.6（即档位
+  //   真正变化）才切换；跨屏拖动（devicePixelRatio 变化）时立即跟随新档位。
   _pickPixelRatio() {
     const dpr = window.devicePixelRatio || 1
     const w = this.container.clientWidth || window.innerWidth
     const h = this.container.clientHeight || window.innerHeight
-    return (w * h * dpr * dpr > 5e6) ? Math.min(dpr, 1.5) : Math.min(dpr, 2)
+    const target = (w * h * dpr * dpr > 5e6) ? Math.min(dpr, 1.5) : Math.min(dpr, 2)
+    // 跨屏拖动（DPR 变化）：直接采用新档位
+    if (this._dpr !== dpr) return target
+    // 同屏窗口拖动：档位差 < 0.6 时维持当前值，消除阈值边界抖动
+    if (this._pr !== undefined && Math.abs(target - this._pr) < 0.6) return this._pr
+    return target
   }
 
   _init() {
     const w = this.container.clientWidth || window.innerWidth
     const h = this.container.clientHeight || window.innerHeight
+    this._cw = w
+    this._ch = h
     this.scene = new THREE.Scene()
     this.scene.background = new THREE.Color(0xeef2f6)
 
@@ -1010,7 +997,10 @@ export class TwinScene {
     this.camera.position.set(0, 460, 205)   // 厂区正前方，高位远距离俯瞰完整园区
 
     this.renderer = this._createRenderer()
-    this.renderer.setPixelRatio(this._pickPixelRatio())
+    const pr = this._pickPixelRatio()
+    this._pr = pr
+    this._dpr = window.devicePixelRatio || 1
+    this.renderer.setPixelRatio(pr)
     this.renderer.setSize(w, h)
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     // 工业摄影风 - 略压高光 + 强对比，使金属/墙面更具写实质感（参考图风格）
@@ -1029,12 +1019,6 @@ export class TwinScene {
     this._interacting = false
     this.controls.addEventListener('start', () => { this._interacting = true })
     this.controls.addEventListener('end', () => { this._interacting = false })
-    // 调试：移动相机时实时打印相机位置与目标点，便于确定最终机位参数
-    this.controls.addEventListener('change', () => {
-      const p = this.camera.position, t = this.controls.target
-      console.log('[CAM] pos=', p.x.toFixed(1), p.y.toFixed(1), p.z.toFixed(1),
-        ' tgt=', t.x.toFixed(1), t.y.toFixed(1), t.z.toFixed(1))
-    })
     // 灯光：建好并保存引用，颜色/强度在 setEnvironment 中按场景（虚空暗色 / 其他亮色）动态切换
     this._initLights()
 
@@ -1046,7 +1030,13 @@ export class TwinScene {
 
     this._animate = this._animate.bind(this)
     this._raf = requestAnimationFrame(this._animate)
-    window.addEventListener('resize', () => this.resize())
+    // window resize 同样走 RAF 节流：拖动窗口时 resize 事件高频触发，避免
+    // 每事件直接调用 resize() 造成重复 setSize/setPixelRatio 而闪烁
+    this._onWinResize = () => {
+      if (this._resizeRaf) return
+      this._resizeRaf = requestAnimationFrame(() => { this._resizeRaf = null; this.resize() })
+    }
+    window.addEventListener('resize', this._onWinResize)
     this.renderer.domElement.addEventListener('click', (e) => this._onPick(e))
     this.renderer.domElement.addEventListener('dblclick', (e) => this._onDblPick(e))
   }
@@ -1454,7 +1444,7 @@ export class TwinScene {
       this._fillN.color.set(0xd7e2ec); this._fillN.intensity = 0.55
       // 工业场景不启用霓虹点光（保持克制沉稳）
       if (this._neon) this._neon.forEach((l) => { l.visible = false })
-      // 描边：MATLAB 蓝（与系统 UI 强调色 #0072BD 一致）
+      // 描边：信息蓝（与系统 UI 强调色一致）
       if (this._edgeMaterials) this._edgeMaterials.forEach((m) => { m.color.set(0x0072bd); m.opacity = 0.6 })
       if (!this._hasUserBrightness) this.renderer.toneMappingExposure = 1.0
     } else {
@@ -1475,18 +1465,16 @@ export class TwinScene {
     }
   }
 
-  // 虚空场景应用：近黑深空背景 + 多层地平线霓虹辉光 + 远景密集工业剪影 + 多层霓虹尘埃/数据流粒子（极致赛博朋克工业虚空）
-  // 虚空场景：仅保留星空背景（深空 + 星点），移除全部圆环/剪影/辉光/粒子等装饰
+  // 虚空场景应用：近黑深空背景（纯净深邃、无星点）+ 半透明悬空地台
   _applyVoidStage() {
     const cfg = ENV.void
     // 深空近黑背景
     this.scene.background = new THREE.Color(0x02040a)
-    // 不使用雾，保证远处星点清晰
+    // 不使用雾
     this.scene.fog = null
-    // 星空已存在则跳过重建
-    if (!this.scene.getObjectByName('voidStars')) {
-      this.scene.add(this._makeStarField())
-    }
+    // 清理残留星空（虚空场景不再展示星点背景）
+    const stars = this.scene.getObjectByName('voidStars')
+    if (stars) { this.scene.remove(stars); this._disposeTree(stars) }
     // 半透明地台已存在则跳过重建
     if (!this.scene.getObjectByName('voidGround')) {
       this.scene.add(this._makeVoidGround())
@@ -1494,7 +1482,7 @@ export class TwinScene {
   }
 
   // 半透明赛博地台：径向渐变贴图（中心较实、边缘淡出），悬浮于厂区下方，
-  // 仅作地坪、不含任何圆环/网格/装饰，延续虚空场景"极简只留星空"的调性
+  // 仅作地坪、不含任何圆环/网格/装饰，延续虚空场景"极简纯净"的调性
   _makeVoidGround() {
     const size = 512
     const c = document.createElement('canvas')
@@ -1524,65 +1512,6 @@ export class TwinScene {
     return mesh
   }
 
-  // 星空背景：大量星点散布于巨大球壳，模拟深空星空（无雾，保证远处星点清晰）
-  _makeStarField() {
-    const group = new THREE.Group()
-    group.name = 'voidStars'
-
-    // 圆形星点贴图（径向渐变白→透明），避免方块点
-    const makeStarTex = () => {
-      const c = document.createElement('canvas')
-      c.width = c.height = 64
-      const ctx = c.getContext('2d')
-      const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32)
-      g.addColorStop(0, 'rgba(255,255,255,1)')
-      g.addColorStop(0.25, 'rgba(255,255,255,0.85)')
-      g.addColorStop(0.5, 'rgba(255,255,255,0.25)')
-      g.addColorStop(1, 'rgba(255,255,255,0)')
-      ctx.fillStyle = g
-      ctx.fillRect(0, 0, 64, 64)
-      const tex = new THREE.CanvasTexture(c)
-      tex.colorSpace = THREE.SRGBColorSpace
-      return tex
-    }
-    const starTex = makeStarTex()
-
-    // 两层星：主层（小而亮、纯白）+ 次层（略大、淡蓝、偏暗），营造星海纵深
-    const buildLayer = (count, rMin, rMax, sizePx, opacity, tint) => {
-      const pos = new Float32Array(count * 3)
-      const col = new Float32Array(count * 3)
-      const base = new THREE.Color(tint)
-      for (let i = 0; i < count; i++) {
-        // 球面均匀分布
-        const u = Math.random(), v = Math.random()
-        const theta = 2 * Math.PI * u
-        const phi = Math.acos(2 * v - 1)
-        const r = rMin + Math.random() * (rMax - rMin)
-        pos[i * 3] = r * Math.sin(phi) * Math.cos(theta)
-        pos[i * 3 + 1] = r * Math.cos(phi)
-        pos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta)
-        // 亮度抖动
-        const b = 0.55 + Math.random() * 0.45
-        col[i * 3] = base.r * b
-        col[i * 3 + 1] = base.g * b
-        col[i * 3 + 2] = base.b * b
-      }
-      const geo = new THREE.BufferGeometry()
-      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-      geo.setAttribute('color', new THREE.BufferAttribute(col, 3))
-      const mat = new THREE.PointsMaterial({
-        size: sizePx, map: starTex, vertexColors: true,
-        transparent: true, opacity, depthWrite: false,
-        blending: THREE.AdditiveBlending, sizeAttenuation: false,
-      })
-      return new THREE.Points(geo, mat)
-    }
-
-    group.add(buildLayer(2800, 2200, 5200, 6, 0.95, 0xffffff))
-    group.add(buildLayer(1000, 1800, 4200, 12, 0.40, 0xaecbff))
-    return group
-  }
-
   // 拆除上一次环绕环境（地表 + 装饰 + 水面），释放几何/材质/贴图
   _teardownEnvironment() {
     if (this.environment) {
@@ -1599,7 +1528,7 @@ export class TwinScene {
     this.water = null
     this._waterBase = null
     this._coastWater = null
-    // 清理虚空星空（如果切换到非虚空模式）
+    // 兜底清理虚空星空（正常流程已不再生成，防止历史残留）
     const vs = this.scene.getObjectByName('voidStars')
     if (vs) { this.scene.remove(vs); this._disposeTree(vs) }
     // 清理虚空半透明地台
@@ -2045,9 +1974,6 @@ export class TwinScene {
       this._buildPlatform(bounds.hx, bounds.hz)
       this._applyThemeColors(this.envMode)
     }
-
-    // 巡视进行中重建模型（编排新增/删除工艺）：刚体清单需同步刷新，否则会撞上"空气墙"或穿过新装置
-    if (this.patrol) this._collectPatrolSolids()
 
     if (!this._firstFramed) {
       this._firstFramed = true
@@ -2864,15 +2790,15 @@ export class TwinScene {
     const tw = ctx.measureText(tagText).width
     const padX = 6
     _roundRect(ctx, x, 21 - 11, tw + padX * 2, 22, 7)
-    ctx.fillStyle = 'rgba(0,90,147,0.12)'
+    ctx.fillStyle = 'rgba(0,75,118,0.12)'
     ctx.fill()
-    ctx.fillStyle = '#0072BD'
+    ctx.fillStyle = '#005E94'
     ctx.fillText(tagText, x + padX, 21 + 1)
 
     // 右侧「点击 ▸」提示（可交互暗示）
     ctx.textAlign = 'right'
     ctx.font = `600 11px ${LABEL_FONT}`
-    ctx.fillStyle = light ? '#0072BD' : '#6ecfff'
+    ctx.fillStyle = light ? '#005E94' : '#6ecfff'
     ctx.fillText('点击 ▸', LABEL_W - 13, 21)
 
     // 第二行：汇总能耗 ⚡ 左对齐 / 碳排 ☁ 右对齐（与工艺标签一致）
@@ -2883,7 +2809,7 @@ export class TwinScene {
     ctx.fillText('⚡ ' + enStr, 14, 46)
     ctx.textAlign = 'right'
     const co2Str = co2 != null ? fmtShort(co2) : '—'
-    ctx.fillStyle = light ? '#0072BD' : '#6ecfff'
+    ctx.fillStyle = light ? '#005E94' : '#6ecfff'
     ctx.fillText('☁ ' + co2Str, LABEL_W - 15, 46)
 
     tex.needsUpdate = true
@@ -2951,7 +2877,7 @@ export class TwinScene {
       // 工序名（深色，与管道标签物料名同款；过长自动截断）
       ctx.textAlign = 'left'
       ctx.font = `bold 16px ${LABEL_FONT}`
-      ctx.fillStyle = focused ? '#005A93' : '#1C1C1C'
+      ctx.fillStyle = focused ? '#004B76' : '#1C1C1C'
       const maxNameW = LABEL_W - 30
       let text = obj.name
       if (ctx.measureText(text).width > maxNameW) {
@@ -2964,7 +2890,7 @@ export class TwinScene {
       ctx.fillStyle = '#5a6472'
       ctx.fillText('⚡ ' + fmtShort(e), 15, 46)
       ctx.textAlign = 'right'
-      ctx.fillStyle = obj.co2Css || '#0072BD'
+      ctx.fillStyle = obj.co2Css || '#005E94'
       ctx.fillText('☁ ' + fmtShort(c), LABEL_W - 15, 46)
       ctx.shadowBlur = 0; ctx.shadowOffsetY = 0
       tex.needsUpdate = true
@@ -3167,7 +3093,7 @@ export class TwinScene {
     // 运输速度（浅色场景 MATLAB 蓝小字；深色场景亮青，与工序标签「点击 ▸」同款）
     ctx.textAlign = 'right'
     ctx.font = `600 11px ${LABEL_FONT}`
-    ctx.fillStyle = light ? (color || '#0072BD') : '#6ecfff'
+    ctx.fillStyle = light ? (color || '#005E94') : '#6ecfff'
     ctx.fillText(speed + ' m/s', LABEL_W - 15, LABEL_H / 2)
 
     ctx.shadowBlur = 0; ctx.shadowOffsetY = 0
@@ -3651,304 +3577,6 @@ export class TwinScene {
 
   resetView() { this.playResetOrbit() }
 
-  // ————————————————————————— 虚拟巡视（手动操纵四足巡检机器狗）—————————————————————————
-  // 交互：W/S 前进后退 · A/D 左右平移 · Z/X 原地左右旋转 · Shift 加速（方向键与 WASD/ZX 同义）。
-  // 物理：园区建筑（厂房/堆场/办公/发电厂/储罐/冷却塔…）与全部工艺装置均为刚体，
-  //       以 XZ 平面 AABB 参与碰撞；分轴推进实现「贴墙滑行」而非硬卡死；厂区围墙为外边界。
-  setPatrol(on) {
-    if (on) {
-      if (this.autoRotate) this.setAutoRotate(false)
-      this._startPatrol()
-    } else {
-      this._stopPatrol()
-    }
-  }
-
-  // 四足巡检机器狗（局部 +Z 为前进方向）。相比早期版本整体加高：髋部抬升、腿节加长，
-  // 并对整体做放大，使其在厂区尺度下更醒目、第三人称视点更接近真实巡检高度。
-  _buildPatrolRobot() {
-    if (this.patrolRobot) return this.patrolRobot
-    const g = new THREE.Group()
-    const steel = mat(0x8a96a6, { metalness: 0.5, roughness: 0.5 })
-    const white = mat(0xe8eef5, { metalness: 0.25, roughness: 0.55 })
-    const dark = mat(0x2c3138, { metalness: 0.3, roughness: 0.8 })
-    const jointMat = mat(0x4a525c, { metalness: 0.6, roughness: 0.4 })
-
-    const HIP = 3.0   // 髋关节离地高度（放大前的局部单位）；足底恰好落在 y≈0
-
-    // 躯干（机械狗主梁）
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.30, 3.6), white); torso.position.set(0, HIP + 0.75, 0); g.add(torso)
-    const hump = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.60, 1.5), white); hump.position.set(0, HIP + 1.55, -0.25); g.add(hump)
-    // 颈 + 头（前探）
-    const neck = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.75, 0.75), white); neck.position.set(0, HIP + 1.15, 1.95); g.add(neck)
-    const head = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.00, 1.20), white); head.position.set(0, HIP + 1.30, 2.72); g.add(head)
-    // 面罩 + 青色发光双眼（朝前）
-    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.38, 0.07), new THREE.MeshStandardMaterial({ color: 0x0a2230, emissive: 0x123042, emissiveIntensity: 0.6, metalness: 0.2, roughness: 0.4 }))
-    visor.position.set(0, HIP + 1.36, 3.33); g.add(visor)
-    for (const ex of [-0.26, 0.26]) {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 12), new THREE.MeshBasicMaterial({ color: 0x66e6ff }))
-      eye.position.set(ex, HIP + 1.36, 3.36); g.add(eye)
-    }
-    // 头顶天线 + 暖橙扫描信标
-    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.75, 8), steel); ant.position.set(0, HIP + 2.05, 2.65); g.add(ant)
-    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 12), new THREE.MeshBasicMaterial({ color: 0xff7a1e })); beacon.position.set(0, HIP + 2.50, 2.65); g.add(beacon)
-    this._patrolBeacon = beacon
-    // 尾部传感器
-    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.12, 0.85, 8), dark); tail.position.set(0, HIP + 0.95, -2.05); tail.rotation.x = -0.7; g.add(tail)
-
-    // 四足（对角步态）：每条腿为以髋为枢轴的 group，便于摆动动画
-    const legs = []
-    const legDefs = [
-      { x: -0.62, z: 1.50, phase: 0 },        // 前左
-      { x: 0.62, z: 1.50, phase: Math.PI },   // 前右
-      { x: -0.62, z: -1.50, phase: Math.PI }, // 后左
-      { x: 0.62, z: -1.50, phase: 0 },        // 后右
-    ]
-    for (const d of legDefs) {
-      const lg = new THREE.Group()
-      lg.position.set(d.x, HIP, d.z)
-      const thigh = new THREE.Mesh(new THREE.BoxGeometry(0.32, 1.45, 0.32), jointMat); thigh.position.set(0, -0.725, 0); lg.add(thigh)
-      const knee = new THREE.Mesh(new THREE.SphereGeometry(0.20, 10, 10), dark); knee.position.set(0, -1.45, 0); lg.add(knee)
-      const shin = new THREE.Mesh(new THREE.BoxGeometry(0.26, 1.35, 0.26), jointMat); shin.position.set(0, -2.125, 0); lg.add(shin)
-      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.50, 0.20, 0.68), dark); foot.position.set(0, -2.90, 0.05); lg.add(foot)
-      g.add(lg)
-      legs.push({ group: lg, phase: d.phase })
-    }
-    this._patrolLegs = legs
-
-    // 巡检照明（照亮脚下与前方工艺地面）
-    const lamp = new THREE.PointLight(0xbfe9ff, 14, 34, 2); lamp.position.set(0, HIP + 1.2, 1.2); g.add(lamp)
-    g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
-    g.scale.setScalar(PATROL_DOG_SCALE)   // 整体加高放大
-    g.visible = false
-    this.scene.add(g)
-    this.patrolRobot = g
-    return g
-  }
-
-  // 采集刚体障碍：全部工艺装置本体 + 园区建筑 + 厂区构筑物，统一折算为 XZ 平面 AABB。
-  // 工艺只取 body（不含碳足迹光斑与标签精灵），否则包围盒会被撑到数十米、寸步难行。
-  _collectPatrolSolids() {
-    const solids = []
-    const box = new THREE.Box3()
-    const pushObj = (obj, pad, tag) => {
-      if (!obj) return
-      obj.updateWorldMatrix(true, true)
-      box.setFromObject(obj)
-      if (!Number.isFinite(box.min.x) || !Number.isFinite(box.max.x)) return
-      if ((box.max.y - Math.max(0, box.min.y)) < 1.2) return   // 地坪/道路/绿化带等扁平装饰不算障碍
-      solids.push({ minX: box.min.x - pad, maxX: box.max.x + pad, minZ: box.min.z - pad, maxZ: box.max.z + pad, tag })
-    }
-    this.unitGroups.forEach((g, id) => pushObj(g.body, 1.5, 'unit:' + id))
-    if (this.scenery) for (const c of this.scenery.children) pushObj(c, 1.0, 'scenery')
-    this._patrolSolids = solids
-    // 围墙内边界（预留机器狗半径 + 贴墙绿化带）
-    const m = PATROL_RADIUS + 9
-    this._patrolBounds = { minX: -PARK.halfX + m, maxX: PARK.halfX - m, minZ: -PARK.halfZ + m, maxZ: PARK.halfZ - m }
-  }
-
-  // 以机器狗为半径 r 的圆盘，与任一刚体 AABB 相交则判定为撞上
-  _patrolHit(x, z, r) {
-    const list = this._patrolSolids
-    for (let i = 0; i < list.length; i++) {
-      const s = list[i]
-      if (x > s.minX - r && x < s.maxX + r && z > s.minZ - r && z < s.maxZ + r) return true
-    }
-    return false
-  }
-
-  // 出生点：工艺主线起点旁的 +Z 侧通道；若被刚体占用则向外螺旋搜索最近空位
-  _findPatrolSpawn() {
-    let px = -PARK.halfX + 80, pz = 60
-    const yaw = Math.PI / 2   // 面向 +X（沿工艺主线顺流方向）
-    const box = new THREE.Box3()
-    let minX = Infinity, maxZ = -Infinity
-    this.unitGroups.forEach((g) => {
-      if (!g.body) return
-      g.body.updateWorldMatrix(true, true)
-      box.setFromObject(g.body)
-      if (Number.isFinite(box.min.x)) minX = Math.min(minX, box.min.x)
-      if (Number.isFinite(box.max.z)) maxZ = Math.max(maxZ, box.max.z)
-    })
-    if (Number.isFinite(minX)) px = minX - 34
-    if (Number.isFinite(maxZ)) pz = maxZ + 26
-    const b = this._patrolBounds
-    const cl = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
-    for (let ring = 0; ring < 46; ring++) {
-      const s = ring * 13
-      const cands = ring === 0
-        ? [[0, 0]]
-        : [[0, s], [0, -s], [s, 0], [-s, 0], [s, s], [-s, s], [s, -s], [-s, -s]]
-      for (const [dx, dz] of cands) {
-        const x = b ? cl(px + dx, b.minX, b.maxX) : px + dx
-        const z = b ? cl(pz + dz, b.minZ, b.maxZ) : pz + dz
-        if (!this._patrolHit(x, z, PATROL_RADIUS)) return { x, z, yaw }
-      }
-    }
-    return { x: px, z: pz, yaw }
-  }
-
-  _patrolForward(out) {
-    return (out || new THREE.Vector3()).set(Math.sin(this.patrolYaw), 0, Math.cos(this.patrolYaw))
-  }
-
-  _patrolRight(out) {
-    return (out || new THREE.Vector3()).set(-Math.cos(this.patrolYaw), 0, Math.sin(this.patrolYaw))
-  }
-
-  _startPatrol() {
-    this._buildPatrolRobot()
-    this._collectPatrolSolids()
-    const spawn = this._findPatrolSpawn()
-    this.patrolPos.set(spawn.x, 0.5, spawn.z)
-    this.patrolYaw = spawn.yaw
-    this.patrolMoving = false
-    this.patrolBlocked = false
-    this._patrolKeys.clear()
-    this.patrol = true
-    this._intro = null
-    this._focus = null
-    this.controls.enabled = false
-    this.controls.autoRotate = false
-    this.patrolRobot.visible = true
-    this._bindPatrolKeys()
-    this._syncPatrolRobot()
-    // 相机瞬时就位，避免入场第一帧从远处猛拉
-    const f = this._patrolForward()
-    this.camera.position.set(
-      this.patrolPos.x - f.x * PATROL_CAM_BACK,
-      PATROL_CAM_UP,
-      this.patrolPos.z - f.z * PATROL_CAM_BACK,
-    )
-    this._patrolLook.set(
-      this.patrolPos.x + f.x * PATROL_CAM_AHEAD,
-      PATROL_CAM_LOOK_Y,
-      this.patrolPos.z + f.z * PATROL_CAM_AHEAD,
-    )
-    this.camera.lookAt(this._patrolLook)
-  }
-
-  _stopPatrol() {
-    this.patrol = false
-    this._unbindPatrolKeys()
-    if (this.patrolRobot) this.patrolRobot.visible = false
-    this.controls.enabled = true
-    // 让 OrbitControls 从当前巡视落点平稳接管（视点对齐巡视最后看向处）
-    if (this._patrolLook.lengthSq() > 0) this.controls.target.copy(this._patrolLook)
-    this.controls.update()
-  }
-
-  // 键盘接管：只在巡视模式内生效，且输入框聚焦时让位给文本输入
-  _bindPatrolKeys() {
-    if (this._onPatrolKeyDown) return
-    const CODES = new Set([
-      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyZ', 'KeyX',
-      'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight',
-    ])
-    const typing = () => {
-      const el = document.activeElement
-      return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
-    }
-    this._onPatrolKeyDown = (e) => {
-      if (!this.patrol || typing() || e.ctrlKey || e.metaKey || e.altKey) return
-      if (!CODES.has(e.code)) return
-      e.preventDefault()
-      this._patrolKeys.add(e.code)
-    }
-    this._onPatrolKeyUp = (e) => { this._patrolKeys.delete(e.code) }
-    this._onPatrolBlur = () => { this._patrolKeys.clear() }
-    window.addEventListener('keydown', this._onPatrolKeyDown, true)
-    window.addEventListener('keyup', this._onPatrolKeyUp, true)
-    window.addEventListener('blur', this._onPatrolBlur)
-  }
-
-  _unbindPatrolKeys() {
-    if (this._onPatrolKeyDown) window.removeEventListener('keydown', this._onPatrolKeyDown, true)
-    if (this._onPatrolKeyUp) window.removeEventListener('keyup', this._onPatrolKeyUp, true)
-    if (this._onPatrolBlur) window.removeEventListener('blur', this._onPatrolBlur)
-    this._onPatrolKeyDown = this._onPatrolKeyUp = this._onPatrolBlur = null
-    this._patrolKeys.clear()
-  }
-
-  _stepPatrol(dt) {
-    const k = this._patrolKeys
-    const d = Math.min(dt, 0.05)   // 限制单帧步长，掉帧时也不会一步跨过刚体
-    // 旋转：Z 左旋 / X 右旋
-    let turn = 0
-    if (k.has('KeyZ') || k.has('ArrowLeft')) turn += 1
-    if (k.has('KeyX') || k.has('ArrowRight')) turn -= 1
-    if (turn) this.patrolYaw += turn * PATROL_TURN * d
-    // 平移：W/S 前后、A/D 左右横移
-    let fw = 0, sd = 0
-    if (k.has('KeyW') || k.has('ArrowUp')) fw += 1
-    if (k.has('KeyS') || k.has('ArrowDown')) fw -= 1
-    if (k.has('KeyD')) sd += 1
-    if (k.has('KeyA')) sd -= 1
-    this.patrolMoving = !!(fw || sd)
-    if (this.patrolMoving) {
-      const f = this._patrolForward(this._tmpFwd || (this._tmpFwd = new THREE.Vector3()))
-      const r = this._patrolRight(this._tmpRight || (this._tmpRight = new THREE.Vector3()))
-      const vx = f.x * fw + r.x * sd
-      const vz = f.z * fw + r.z * sd
-      const len = Math.hypot(vx, vz) || 1
-      const boost = (k.has('ShiftLeft') || k.has('ShiftRight')) ? 2.1 : 1
-      const step = PATROL_SPEED * boost * d
-      this._movePatrol((vx / len) * step, (vz / len) * step)
-    } else {
-      this.patrolBlocked = false
-    }
-    this._syncPatrolRobot()
-    this._updatePatrolCamera(d)
-  }
-
-  // 分轴推进：X、Z 分别试探，被刚体挡住的轴不动 —— 表现为「贴着立面滑行」而非整体卡死
-  _movePatrol(vx, vz) {
-    const R = PATROL_RADIUS
-    const b = this._patrolBounds
-    let moved = false
-    let nx = this.patrolPos.x + vx
-    if (b) nx = Math.max(b.minX, Math.min(b.maxX, nx))
-    if (nx !== this.patrolPos.x && !this._patrolHit(nx, this.patrolPos.z, R)) { this.patrolPos.x = nx; moved = true }
-    let nz = this.patrolPos.z + vz
-    if (b) nz = Math.max(b.minZ, Math.min(b.maxZ, nz))
-    if (nz !== this.patrolPos.z && !this._patrolHit(this.patrolPos.x, nz, R)) { this.patrolPos.z = nz; moved = true }
-    this.patrolBlocked = !moved
-  }
-
-  // 机器狗姿态刷新：行走 / 驻足两套步态与呼吸感浮动
-  _syncPatrolRobot() {
-    const robot = this.patrolRobot
-    if (!robot) return
-    const now = performance.now()
-    const walking = this.patrolMoving && !this.patrolBlocked
-    const bob = walking ? Math.sin(now * 0.012) * 0.16 : Math.sin(now * 0.0025) * 0.05
-    robot.position.set(this.patrolPos.x, 0.5 + bob, this.patrolPos.z)
-    robot.rotation.y = this.patrolYaw
-    if (this._patrolLegs) {
-      const amp = walking ? 0.34 : 0.05
-      const gt = now * (walking ? 0.016 : 0.004)
-      for (const l of this._patrolLegs) l.group.rotation.x = Math.sin(gt + l.phase) * amp
-    }
-    if (this._patrolBeacon) this._patrolBeacon.scale.setScalar(1 + Math.sin(now * 0.006) * 0.25)
-  }
-
-  // 第三人称跟随机位：狗在前、相机在其后上方，视点前置到工艺立面高度
-  _updatePatrolCamera(dt) {
-    const f = this._patrolForward(this._tmpCam || (this._tmpCam = new THREE.Vector3()))
-    const eyeX = this.patrolPos.x - f.x * PATROL_CAM_BACK
-    const eyeZ = this.patrolPos.z - f.z * PATROL_CAM_BACK
-    this._patrolLook.set(
-      this.patrolPos.x + f.x * PATROL_CAM_AHEAD,
-      PATROL_CAM_LOOK_Y,
-      this.patrolPos.z + f.z * PATROL_CAM_AHEAD,
-    )
-    const a = 1 - Math.pow(0.0015, dt)   // 帧率无关的平滑跟随
-    this.camera.position.x += (eyeX - this.camera.position.x) * a
-    this.camera.position.z += (eyeZ - this.camera.position.z) * a
-    this.camera.position.y += (PATROL_CAM_UP - this.camera.position.y) * a
-    this.camera.lookAt(this._patrolLook)
-  }
-
   // 计算「俯瞰全厂」相机机位与视点：基于实际工序包围盒（而非固定厂界）
   _frameAll() {
     const cam = this.camera
@@ -4236,7 +3864,7 @@ export class TwinScene {
     if (this._lastFrame == null) this._lastFrame = now
     const elapsed = now - this._lastFrame
     // 拖拽/聚焦/漫游/入场动画期间全帧率（≈60fps）保证画面流畅锐利；静止时 30fps 降低功耗
-    const active = this._interacting || this._intro || this._focus || this.patrol
+    const active = this._interacting || this._intro || this._focus
     if (elapsed < (active ? 16 : 33)) return
     const dt = Math.min(0.05, elapsed / 1000)
     this._lastFrame = now
@@ -4690,8 +4318,6 @@ export class TwinScene {
       this._stepFocus(dt)
     } else if (this._intro) {
       this._stepIntro(dt)
-    } else if (this.patrol) {
-      this._stepPatrol(dt)
     } else {
       this.controls.update()
     }
@@ -4806,10 +4432,20 @@ export class TwinScene {
     const h = this.container.clientHeight || window.innerHeight
     // 防御：canvas display:none 时容器尺寸为 0，不可设置投影矩阵（会导致 NaN）
     if (w <= 0 || h <= 0) return
+    // 同尺寸短路：拖拽面板期间 ResizeObserver 可能以相同尺寸重复触发，
+    // 跳过重复 setSize 可避免 canvas 反复重建导致的画面闪烁
+    if (w === this._cw && h === this._ch) return
+    this._cw = w
+    this._ch = h
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
-    // 窗口尺寸变化后同步渲染分辨率（跨屏拖动、全屏切换时保持锐利）
-    this.renderer.setPixelRatio(this._pickPixelRatio())
+    // 仅当 pixel ratio 档位变化（如跨屏 DPR 变化）时才重建绘制缓冲；
+    // 窗口拖动时同屏 pixel ratio 恒定，只更新画布尺寸即可，避免画面闪烁
+    const pr = this._pickPixelRatio()
+    if (pr !== this._pr) {
+      this._pr = pr
+      this.renderer.setPixelRatio(pr)
+    }
     this.renderer.setSize(w, h)
   }
 
@@ -4834,7 +4470,9 @@ export class TwinScene {
 
   dispose() {
     cancelAnimationFrame(this._raf)
-    this._unbindPatrolKeys()
+    this._raf = null
+    if (this._resizeRaf) { cancelAnimationFrame(this._resizeRaf); this._resizeRaf = null }
+    if (this._onWinResize) window.removeEventListener('resize', this._onWinResize)
     this._clearModel()
     this._teardownEnvironment()
     this.controls.dispose()

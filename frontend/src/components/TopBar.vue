@@ -55,13 +55,16 @@
 
     <!-- 顶栏右侧快捷操作（浅色图标按钮，与工具条统一） -->
     <div class="top-actions">
-      <button class="tbtn" @click="$emit('export')" title="导出分析报告"><Icon name="export"/><span>导出</span></button>
-      <button class="tbtn" @click="$emit('help')" title="宣传手册 (F1)"><Icon name="help"/></button>
+      <button class="tbtn" @click="$emit('export')" :title="t('导出分析报告')"><Icon name="export"/><span>{{ t('导出') }}</span></button>
+      <!-- 本析智擎：右侧属性弹窗 ↔ 智能体对话界面（中间 3D 场景保持） -->
+      <button class="tbtn" :class="{ on: store.agentOn }" @click="$emit('toggle-agent')"
+              :title="t('本析智擎：切换右侧属性面板为智能体对话界面')"><Icon name="robot"/><span>{{ t('本析智擎') }}</span></button>
+      <button class="tbtn" @click="$emit('help')" :title="t('宣传手册 (F1)')"><Icon name="help"/></button>
       <span class="tdiv"></span>
-      <button class="tbtn" :class="{ on: store.leftOpen }" :title="store.leftOpen ? '收起左侧栏' : '展开左侧栏'" @click="store.toggleLeft()"><Icon name="panelLeft"/></button>
-      <button class="tbtn" :class="{ on: store.rightOpen }" :title="store.rightOpen ? '收起右侧栏' : '展开右侧栏'" @click="store.toggleRight()"><Icon name="panelRight"/></button>
+      <button class="tbtn" :class="{ on: store.leftOpen }" :title="store.leftOpen ? t('收起左侧栏') : t('展开左侧栏')" @click="store.toggleLeft()"><Icon name="panelLeft"/></button>
+      <button class="tbtn" :class="{ on: store.rightOpen }" :title="store.rightOpen ? t('收起右侧栏') : t('展开右侧栏')" @click="store.toggleRight()"><Icon name="panelRight"/></button>
       <span class="tdiv"></span>
-      <button class="tbtn" :class="{ on: store.bottomOpen }" :title="store.bottomOpen ? '收起命令行窗口' : '展开命令行窗口'" @click="store.toggleBottom()"><Icon name="panelBottom"/></button>
+      <button class="tbtn" :class="{ on: store.bottomOpen }" :title="store.bottomOpen ? t('收起命令行窗口') : t('展开命令行窗口')" @click="store.toggleBottom()"><Icon name="panelBottom"/></button>
     </div>
   </header>
 </template>
@@ -70,9 +73,10 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useSimStore } from '../stores/sim'
 import Icon from './Icon.vue'
+import { t } from '../i18n'
 
 defineProps({ menus: { type: Array, required: true } })
-defineEmits(['export', 'help'])
+defineEmits(['export', 'help', 'toggle-agent'])
 
 const store = useSimStore()
 const openMenu = ref(null)

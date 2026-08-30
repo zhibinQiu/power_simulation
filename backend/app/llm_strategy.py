@@ -160,10 +160,8 @@ def _call_llm(messages: List[dict], timeout: float = 25.0, response_format=None,
             data = json.loads(resp.read().decode("utf-8"))
         msg = data["choices"][0]["message"]
         content = (msg.get("content") or "").strip()
-        # reasoning 类模型（如 deepseek-v4-pro）先产出 reasoning_content；
-        # 仅非 JSON 模式回退，避免污染结构化解析。
-        if not content and not is_json:
-            content = (msg.get("reasoning_content") or "").strip()
+        # 只返回正式回复 content；reasoning_content（思考过程）可能重述系统提示词，
+        # 直接透传给用户会造成提示词泄漏，因此不采用。
         return content
     except (urllib.error.URLError, urllib.error.HTTPError, KeyError, IndexError,
             ValueError, TimeoutError, OSError):
@@ -174,6 +172,61 @@ def chat_completion(messages: List[dict], timeout: float = 30.0,
                     max_tokens: int = 1500) -> Optional[str]:
     """通用聊天补全（OpenAI 兼容接口）。无 key / 网络异常返回 None，由调用方兜底。"""
     return _call_llm(messages, timeout=timeout, response_format=None, max_tokens=max_tokens)
+
+
+def chat_completion_stream(messages: List[dict], timeout: float = 300.0,
+                           max_tokens: int = 2048):
+    """通用聊天补全（OpenAI 兼容接口，流式）。
+
+    逐段产出增量文本（str）；未配置 key / 网络异常时不产出任何内容，由调用方兜底提示。
+    底层按 SSE（data: {...} / data: [DONE]）逐行解析 choices[0].delta。
+    """
+    base_url, api_key, model = _llm_cfg()
+    if not api_key:
+        return
+    url = f"{base_url}/chat/completions"
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.7,
+        "max_tokens": max_tokens,
+        "stream": True,
+    }
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=body, method="POST", headers={
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+        "Accept": "text/event-stream",
+    })
+    # 绕过本机 HTTPS_PROXY（与 _call_llm 一致），直达远端兼容接口
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        resp = opener.open(req, timeout=timeout)
+        for raw in resp:  # urllib 响应按行迭代
+            line = raw.decode("utf-8", "ignore").strip()
+            if not line.startswith("data:"):
+                continue
+            data = line[5:].strip()
+            if not data or data == "[DONE]":
+                continue
+            try:
+                obj = json.loads(data)
+            except ValueError:
+                continue
+            choices = obj.get("choices") or []
+            if not choices:
+                continue
+            delta = choices[0].get("delta") or {}
+            # 只输出正式回复 content，不透传 reasoning_content（思考过程），
+            # 避免把系统提示词等内部内容泄漏给用户。
+            # 注意：不能对增量做 strip —— LLM 流式输出中空格常作为独立增量
+            # （或单词末尾的尾随空格），strip 会把英文单词之间的空格吃掉，
+            # 前端逐字拼接后出现英文单词粘连。仅过滤空增量，原样透传。
+            text = delta.get("content") or ""
+            if text:
+                yield text
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
+        return
 
 
 def _extract_json(text: str) -> Optional[dict]:

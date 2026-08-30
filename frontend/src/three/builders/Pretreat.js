@@ -9,7 +9,7 @@ import { PAL, mat, boxMesh, steelTex, tankShellTex } from './utils.js'
 export default function _buildPretreat(bodyMat) {
     const g = new THREE.Group()
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x00ccff
+    const neonColor = 0x2c6e9e
 
 
     // === 1. 鱼雷罐车 ===
@@ -39,9 +39,9 @@ export default function _buildPretreat(bodyMat) {
     // === 2. 内部铁水 ===
     const ironMelt = new THREE.Mesh(
         new THREE.CylinderGeometry(2.0, 2.3, 5.5, 24),
-        mat(0xff4422, {
-            roughness: 0.05, metalness: 0.05, emissive: 0xcc2200, emissiveIntensity: 0.8,
-            transparent: true, opacity: 0.7, depthWrite: false
+        mat(0xc05a30, {
+            roughness: 0.15, metalness: 0.05, emissive: 0x8a3010, emissiveIntensity: 0.5,
+            transparent: true, opacity: 0.75, depthWrite: false
         }))
     ironMelt.rotation.z = Math.PI / 2
     ironMelt.position.y = 2.8; g.add(ironMelt)
@@ -109,7 +109,7 @@ export default function _buildPretreat(bodyMat) {
 
     // === 7. 霓虹 ===
     const pretRing = new THREE.Mesh(new THREE.TorusGeometry(2.5, 0.1, 8, 24),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.4, roughness: 0.2 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     pretRing.rotation.y = Math.PI / 2; pretRing.position.set(0, 5.5, 0); g.add(pretRing)
 
     // === 8. 动画钩子 ===
@@ -120,7 +120,7 @@ export default function _buildPretreat(bodyMat) {
     g.userData._pretreatSpray = sprayParticles
 
     // === 物料转变动画：铁水(橙红)→喷吹脱硫→纯净铁水(亮橙)+渣层(灰) ===
-    // 颜色与连线载运体一致：hot_metal(0xff4422)→pretreated_hot_metal(0xff7733)
+    // 颜色与连线载运体一致：hot_metal(0xb05030)→pretreated_hot_metal(0xb55a34)
     const pretreatFlow = []
     const ironGlow = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6),
         new THREE.MeshStandardMaterial({ roughness: 0.12, metalness: 0.08 }))
@@ -128,7 +128,7 @@ export default function _buildPretreat(bodyMat) {
     pretreatFlow.push({
         obj: ironGlow, phase: 0, period: 5.5,
         srcPos: new THREE.Vector3(0, 2.8, 0), dstPos: new THREE.Vector3(0, 2.8, 0),
-        srcColor: 0xff4422, dstColor: 0xff7733, scalePulse: 0.15,
+        srcColor: 0xb05030, dstColor: 0xb55a34, scalePulse: 0.15,
     })
     // 喷枪注入脱硫剂
     for (let i = 0; i < 5; i++) {

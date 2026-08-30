@@ -15,25 +15,25 @@
           <span v-if="groupRenaming !== g.id" class="gname" @click.stop="store.selectFlowGroup(g.id)"
                 @dblclick.stop="startGroupRename(g)">{{ g.name }}</span>
           <input v-else class="gname-in" :value="g.name" @click.stop @mousedown.stop
-                 @input="g.name = $event.target.value" @keydown.enter.prevent="endGroupRename"
+                 @input="g.name = $event.target.value; store.schemeDirty = true" @keydown.enter.prevent="endGroupRename"
                  @keydown.esc.prevent="endGroupRename" @blur="endGroupRename" />
-          <span v-if="g.members && g.members.length" class="ncount" title="小组内设备台数">×{{ g.members.length }}</span>
-          <span class="ndel" @mousedown.stop @click.stop="store.removeFlowGroup(g.id)" title="删除小组">✕</span>
+          <span v-if="g.members && g.members.length" class="ncount" :title="t('小组内设备台数')">×{{ g.members.length }}</span>
+          <button class="x-btn danger" @mousedown.stop @click.stop="store.removeFlowGroup(g.id)" :title="t('删除小组')">✕</button>
         </div>
         <div class="nbody">
           <div v-for="(p, i) in groupPorts(g, 'in')" :key="'gi' + i"
                :class="gphClass(g, 'in', p.material)" :style="portStyle(g, 'in', i)"
-               :title="'输入：' + matName(p.material)"
+               :title="t('输入：') + matName(p.material)"
                @mousedown.stop="onGroupPortDown(g, 'in', p, $event)">
             <span class="pdot"></span><span class="plbl">{{ matName(p.material) }}</span>
           </div>
           <div v-for="(p, i) in groupPorts(g, 'out')" :key="'go' + i"
                :class="gphClass(g, 'out', p.material)" :style="portStyle(g, 'out', i)"
-               :title="'输出：' + matName(p.material)"
+               :title="t('输出：') + matName(p.material)"
                @mousedown.stop="onGroupPortDown(g, 'out', p, $event)">
             <span class="plbl">{{ matName(p.material) }}</span><span class="pdot"></span>
           </div>
-          <div v-if="!g.members || !g.members.length" class="gempty">空组 · 双击进入子编排<br/>拖入设备卡片归入此组</div>
+          <div v-if="!g.members || !g.members.length" class="gempty">{{ t('空组 · 双击进入子编排') }}<br/>{{ t('拖入设备卡片归入此组') }}</div>
         </div>
       </div>
       <!-- 底层连线：与选中卡片无关的连线保持「卡片在上」的原状 -->
@@ -67,38 +67,38 @@
           <span class="nhd" :style="{ background: nodeColor(n) }"></span>
           <span v-if="renaming !== n.id" class="nname" @click.stop="store.selectFlow(n.id)" @dblclick.stop="startRename(n)">{{ n.name }}</span>
           <input v-else class="nname-in" :value="n.name" @click.stop @mousedown.stop
-                 @input="n.name = $event.target.value" @keydown.enter.prevent="endRename"
+                 @input="n.name = $event.target.value; store.schemeDirty = true" @keydown.enter.prevent="endRename"
                  @keydown.esc.prevent="endRename" @blur="endRename" />
-          <span v-if="(n.count || 1) > 1" class="ncount" title="台数">×{{ n.count }}</span>
-          <span class="ndel" @mousedown.stop @click.stop="store.removeFlowNode(n.id)" title="删除节点">✕</span>
+          <span v-if="(n.count || 1) > 1" class="ncount" :title="t('台数')">×{{ n.count }}</span>
+          <button class="x-btn danger" @mousedown.stop @click.stop="store.removeFlowNode(n.id)" :title="t('删除节点')">✕</button>
         </div>
         <div class="nbody">
           <div v-if="n.kind === 'process'" v-for="(p, i) in n.ports.in" :key="p.id"
                :class="phClass(n, 'in', p.id)" :style="portStyle(n, 'in', i)"
                @mousedown.stop="onPortDown(n, 'in', p.id, $event)"
                @dblclick.stop="onPortDbl(n, 'in', p.id, $event)"
-               :title="'输入：' + matName(p.material)">
+               :title="t('输入：') + matName(p.material)">
             <span class="pdot"></span><span class="plbl">{{ matName(p.material) }}</span>
           </div>
           <div v-if="n.kind === 'process'" v-for="(p, i) in n.ports.out" :key="p.id"
                :class="phClass(n, 'out', p.id)" :style="portStyle(n, 'out', i)"
                @mousedown.stop="onPortDown(n, 'out', p.id, $event)"
                @dblclick.stop="onPortDbl(n, 'out', p.id, $event)"
-               :title="'输出：' + matName(p.material)">
+               :title="t('输出：') + matName(p.material)">
             <span class="plbl">{{ matName(p.material) }}</span><span class="pdot"></span>
           </div>
           <!-- 添加入口：工辅等无输入端口（或需更多端口）时，点此弹出浮层自由添加输入/输出端口 -->
-          <span v-if="n.kind === 'process'" class="addport" title="添加输入/输出端口"
+          <span v-if="n.kind === 'process'" class="addport" :title="t('添加输入/输出端口')"
                 @mousedown.stop @click.stop="onAddPort(n, $event)">＋</span>
           <div v-if="n.kind === 'material'" :class="phClass(n, 'out', n.ports.out[0].id)" :style="portStyle(n, 'out', 0)"
                @mousedown.stop="onPortDown(n, 'out', n.ports.out[0].id, $event)"
                @dblclick.stop="onPortDbl(n, 'out', n.ports.out[0].id, $event)"
-               :title="'输出：' + matName(n.ports.out[0].material)">
+               :title="t('输出：') + matName(n.ports.out[0].material)">
             <span class="plbl">{{ matName(n.ports.out[0].material) }}</span><span class="pdot"></span>
           </div>
           <div v-if="n.kind === 'device'" class="devbox">
             <DeviceGlyph :type="devIcon(n.type)" :color="n.metering ? 'var(--muted)' : 'var(--accent2)'" :size="20" />
-            <span class="devtag" :class="n.metering ? 'tag-met' : 'tag-adj'">{{ n.metering ? '计量·只读' : '可调·' + (n.setpoint ?? '—') }}</span>
+            <span class="devtag" :class="n.metering ? 'tag-met' : 'tag-adj'">{{ n.metering ? t('计量·只读') : t('可调·') + (n.setpoint ?? '—') }}</span>
           </div>
         </div>
         <div v-if="estOf(n.id) && n.kind === 'process'" class="nest">≈ {{ fmtCo2(estOf(n.id).co2) }} tCO₂/h</div>
@@ -107,18 +107,18 @@
 
     <!-- 端口编辑浮层：方向可切换（输入/输出），支持自由增删端口 -->
     <div v-if="editingPort" class="port-pop" :style="popStyle" @mousedown.stop @click.stop>
-      <div class="pp-t">端口编辑（{{ editingPort.dir === 'in' ? '输入' : '输出' }}）</div>
+      <div class="pp-t">{{ t('端口编辑（') }}{{ editingPort.dir === 'in' ? t('输入') : t('输出') }}{{ t('）') }}</div>
       <div class="pp-dir">
-        <button :class="{ on: editingPort.dir === 'in' }" @click="setEditDir('in')">输入</button>
-        <button :class="{ on: editingPort.dir === 'out' }" @click="setEditDir('out')">输出</button>
+        <button :class="{ on: editingPort.dir === 'in' }" @click="setEditDir('in')">{{ t('输入') }}</button>
+        <button :class="{ on: editingPort.dir === 'out' }" @click="setEditDir('out')">{{ t('输出') }}</button>
       </div>
       <select v-model="editingPort.material" @change="applyPortMaterial">
         <option v-for="m in MATERIALS" :key="m.id" :value="m.id">{{ m.name }}（{{ m.cat }}）</option>
       </select>
       <div class="pp-btns">
-        <button @click="addPortHere">＋ 添加{{ editingPort.dir === 'in' ? '输入' : '输出' }}端口</button>
-        <button v-if="editingPort.portId" class="danger" @click="removePortHere">－ 删当前</button>
-        <button @click="editingPort = null">关闭</button>
+        <button @click="addPortHere">＋ {{ t('添加') }}{{ editingPort.dir === 'in' ? t('输入') : t('输出') }}{{ t('端口') }}</button>
+        <button v-if="editingPort.portId" class="danger" @click="removePortHere">－ {{ t('删当前') }}</button>
+        <button @click="editingPort = null">{{ t('关闭') }}</button>
       </div>
     </div>
 
@@ -126,20 +126,20 @@
 
     <!-- 子编排面包屑：进入小组后显示当前组名并提供返回 -->
     <div v-if="store.scheme.activeGroupId" class="group-crumb">
-      <button class="crumb-back" @click="store.exitGroup()">← 返回全部流程</button>
-      <span class="crumb-name">小组：{{ activeGroupName }}</span>
-      <span class="crumb-hint">双击成员卡片可编辑 · 拖入新设备自动归入本组</span>
+      <button class="crumb-back" @click="store.exitGroup()">← {{ t('返回全部流程') }}</button>
+      <span class="crumb-name">{{ t('小组：') }}{{ activeGroupName }}</span>
+      <span class="crumb-hint">{{ t('双击成员卡片可编辑 · 拖入新设备自动归入本组') }}</span>
     </div>
 
     <div class="flow-legend">
-      <span><i class="ln"></i>固体/液体物料</span>
-      <span><i class="ln gas"></i>气体/能源管道</span>
-      <span class="muted">双击端口改物料 · 拖端口连线 · 点连线删除 · 双击小组卡片进入子编排</span>
+      <span><i class="ln"></i>{{ t('固体/液体物料') }}</span>
+      <span><i class="ln gas"></i>{{ t('气体/能源管道') }}</span>
+      <span class="muted">{{ t('双击端口改物料 · 拖端口连线 · 点连线删除 · 双击小组卡片进入子编排') }}</span>
     </div>
 
     <div v-if="!visibleNodes.length" class="flow-empty">
-      <template v-if="store.scheme.activeGroupId">该小组内暂无设备。从左侧拖入设备卡片归入本组，或双击小组卡片从外部画布把设备拖进来。</template>
-      <template v-else>画布为空。从左侧「主工艺线 / 设备 / 原料」拖入节点，或点击顶部工具条「编排 → 长流程模板 / 短流程模板」一键载入。</template>
+      <template v-if="store.scheme.activeGroupId">{{ t('该小组内暂无设备。从左侧拖入设备卡片归入本组，或双击小组卡片从外部画布把设备拖进来。') }}</template>
+      <template v-else>{{ t('画布为空。从左侧「主工艺线 / 设备 / 原料」拖入节点，或点击顶部工具条「编排 → 长流程模板 / 短流程模板」一键载入。') }}</template>
     </div>
   </div>
 </template>
@@ -150,6 +150,7 @@ import { useSimStore } from '../stores/sim'
 import { MATERIALS, MATERIAL_MAP, PROCESS_MAP, DEVICE_MAP, materialFamily } from '../data/flowLibrary'
 import DeviceGlyph from './DeviceGlyph.vue'
 import { openContextMenu } from '../composables/contextMenu'
+import { t } from '../i18n'
 
 const store = useSimStore()
 const canvasEl = ref(null)
@@ -525,12 +526,12 @@ function onUp(e) {
       // 命中了端口但方向/类型不匹配 -> 给出明确提示
       const needDir = d.fromDir === 'out' ? 'in' : 'out'
       if (hit.dir !== needDir) {
-        store.toast = '连线方向错误：请从「输出」端口拖向另一节点的「输入」端口'
+        store.showToast(t('连线方向错误：请从「输出」端口拖向另一节点的「输入」端口'), 'warn')
       } else {
         const tn = store.scheme.nodes.find((x) => x.id === hit.nodeId)
         const tp = (hit.dir === 'in' ? tn.ports.in : tn.ports.out).find((x) => x.id === hit.portId)
         const dm = dragOutMaterial()
-        store.toast = `物料类型不匹配，不能连线：输出「${matName(dm)}」→ 输入「${matName(tp ? tp.material : '')}」`
+        store.showToast(t('物料类型不匹配，不能连线：输出「') + matName(dm) + t('」→ 输入「') + matName(tp ? tp.material : '') + t('」'), 'warn')
       }
     }
     tempConn.value = null
@@ -633,11 +634,11 @@ function duplicateGroup(g) {
 function onGroupContext(e, g) {
   e.preventDefault()
   const items = [
-    { label: '选中 / 聚焦小组', icon: 'target', action: () => store.selectFlowGroup(g.id) },
+    { label: t('选中 / 聚焦小组'), icon: 'target', action: () => store.selectFlowGroup(g.id) },
     { sep: true },
-    { label: '重命名', icon: 'pencil', accel: 'F2', action: () => startGroupRename(g) },
-    { label: '复制小组', icon: 'copy', accel: 'Ctrl+D', action: () => duplicateGroup(g) },
-    { label: '删除小组', icon: 'trash', accel: 'Del', danger: true, action: () => store.removeFlowGroup(g.id) },
+    { label: t('重命名'), icon: 'pencil', accel: 'F2', action: () => startGroupRename(g) },
+    { label: t('复制小组'), icon: 'copy', accel: 'Ctrl+D', action: () => duplicateGroup(g) },
+    { label: t('删除小组'), icon: 'trash', accel: 'Del', danger: true, action: () => store.removeFlowGroup(g.id) },
   ]
   openContextMenu(e.clientX, e.clientY, items)
 }
@@ -646,12 +647,12 @@ function onGroupContext(e, g) {
 function onNodeContext(e, n) {
   e.preventDefault()
   const items = [
-    { label: '选中 / 聚焦节点', icon: 'target', action: () => store.selectFlow(n.id) },
+    { label: t('选中 / 聚焦节点'), icon: 'target', action: () => store.selectFlow(n.id) },
   ]
   items.push({ sep: true })
-  items.push({ label: '重命名', icon: 'pencil', accel: 'F2', action: () => startRename(n) })
-  items.push({ label: '复制节点', icon: 'copy', accel: 'Ctrl+D', action: () => duplicateNode(n) })
-  items.push({ label: '删除节点', icon: 'trash', accel: 'Del', danger: true, action: () => store.removeFlowNode(n.id) })
+  items.push({ label: t('重命名'), icon: 'pencil', accel: 'F2', action: () => startRename(n) })
+  items.push({ label: t('复制节点'), icon: 'copy', accel: 'Ctrl+D', action: () => duplicateNode(n) })
+  items.push({ label: t('删除节点'), icon: 'trash', accel: 'Del', danger: true, action: () => store.removeFlowNode(n.id) })
   openContextMenu(e.clientX, e.clientY, items)
 }
 
@@ -706,7 +707,7 @@ onBeforeUnmount(() => {
 .fgroup.sel { border-color: var(--accent2); box-shadow: 0 0 0 1px rgba(26,127,212,.5); }
 .fgroup .gname { flex: 1; font-size: 12px; white-space: normal; word-break: break-all; line-height: 1.35;
   overflow: hidden; cursor: pointer; }
-.fgroup .gname-in { flex: 1; min-width: 0; font-size: 12px; background: var(--bg); color: var(--text);
+.fgroup .gname-in { flex: 1; min-width: 0; font-size: 12px; background: var(--input, var(--bg)); color: var(--text);
   border: 1px solid var(--accent); border-radius: 4px; padding: 1px 5px; outline: none; }
 .fgroup .gempty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
   color: var(--muted); font-size: 11px; line-height: 1.8; text-align: center; pointer-events: none; }
@@ -730,12 +731,10 @@ onBeforeUnmount(() => {
 .nh .nhd { width: 9px; height: 9px; border-radius: 3px; flex: 0 0 auto; }
 .nname { flex: 1; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .nname-in { flex: 1; min-width: 0; font-size: 12px; background: var(--bg); color: var(--text); border: 1px solid var(--accent); border-radius: 4px; padding: 1px 5px; outline: none; }
-.ndel { color: var(--muted); cursor: pointer; font-size: 12px; padding: 0 2px; }
-.ndel:hover { color: var(--red); }
 .nbody { position: relative; padding: 6px 0; }
 .addport { position: absolute; right: 6px; top: 3px; font-size: 12px; line-height: 1; color: var(--muted);
   cursor: pointer; padding: 2px 4px; z-index: 3; border: 1px solid transparent; border-radius: 4px; }
-.addport:hover { color: var(--accent); border-color: var(--border); background: var(--panel-2); }
+.addport:hover { color: var(--accent-d); border-color: var(--border); background: var(--panel-2); }
 /* 端口浮在卡片上方：连线的线头锚点（圆点）与物料标签不被卡片盖住，
    一眼看出连线接入了哪个出入口；非端口处连线仍位于卡片下方（现状不变） */
 .ph { position: absolute; display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted); white-space: nowrap; cursor: crosshair;
@@ -758,7 +757,7 @@ onBeforeUnmount(() => {
 .pp-t { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
 .pp-dir { display: flex; gap: 4px; margin-bottom: 6px; }
 .pp-dir button { flex: 1; padding: 3px 0; font-size: 11px; }
-.pp-dir button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.pp-dir button.on { background: var(--accent); color: #fff; border-color: var(--accent-d); }
 .pp-btns { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .pp-btns button { padding: 4px 8px; font-size: 12px; }
 .flow-legend { position: absolute; bottom: 12px; left: 12px; display: flex; gap: 14px; align-items: center; z-index: 20;

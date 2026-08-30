@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """碳资产助手服务：报告任务编排。
 
-提供 submit_report_task / get_task / list_tasks / cancel_report_task，
+提供 submit_report_task / get_task / cancel_report_task，
 与 pdf_trans 项目同名模块保持接口对齐。
 
 当前项目使用内存任务表 + 后台线程执行报告生成，结果持久化到 report_store。
@@ -183,10 +183,3 @@ def get_task(task_id: str) -> Optional[Dict]:
     """获取任务状态。"""
     with _lock:
         return dict(_tasks.get(task_id, {})) if task_id in _tasks else None
-
-
-def list_tasks(limit: int = 50) -> List[Dict]:
-    """按时间倒序列出任务。"""
-    with _lock:
-        items = sorted(_tasks.values(), key=lambda x: x["created_at"], reverse=True)
-        return [dict(t) for t in items[:limit]]

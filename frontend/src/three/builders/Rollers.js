@@ -10,7 +10,7 @@ export default function buildRollers(bodyMat) {
     const g = new THREE.Group()
     const L = 30; const D = 6; const H = 12
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x00ccff
+    const neonColor = 0x2c6e9e
 
 
     // === 1. 轧机机架（粗轧R1→R2→精轧F1-F6） ===
@@ -58,7 +58,7 @@ export default function buildRollers(bodyMat) {
     // 粗轧坯
     const roughSlab = new THREE.Mesh(new THREE.BoxGeometry(4, 0.8, 1.6),
         new THREE.MeshStandardMaterial({
-            roughness: 0.2, metalness: 0.1, emissive: 0xff5522, emissiveIntensity: 0.5,
+            roughness: 0.2, metalness: 0.1, emissive: 0xbf5a2e, emissiveIntensity: 0.5,
             transparent: true, opacity: 0.7, depthWrite: false
         }))
     roughSlab.position.set(standPositions[0], 2.0, 0); g.add(roughSlab)
@@ -67,7 +67,7 @@ export default function buildRollers(bodyMat) {
     // 精轧带钢
     const finalStrip = new THREE.Mesh(new THREE.BoxGeometry(4, 0.15, 1.2),
         new THREE.MeshStandardMaterial({
-            roughness: 0.15, metalness: 0.15, emissive: 0xcc5533, emissiveIntensity: 0.4,
+            roughness: 0.15, metalness: 0.15, emissive: 0xa0502c, emissiveIntensity: 0.4,
             transparent: true, opacity: 0.6, depthWrite: false
         }))
     finalStrip.position.set(standPositions[standCount - 1], 1.8, 0); g.add(finalStrip)
@@ -108,7 +108,7 @@ export default function buildRollers(bodyMat) {
 
     // === 7. 轧线霓虹 ===
     const rollLine = new THREE.Mesh(new THREE.BoxGeometry(L * 0.85, 0.04, 0.12),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.5 }))
+        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
     rollLine.position.set(0, 1.0, 0); g.add(rollLine)
 
     // === 7.5 辊道传送台 ===
@@ -150,7 +150,7 @@ export default function buildRollers(bodyMat) {
             obj: bar, phase: i * 0.25, period: 4.5,
             srcPos: new THREE.Vector3(-L * 0.42, 2.2, 0),
             dstPos: new THREE.Vector3(L * 0.42, 2.0, 0),
-            srcColor: 0xff9955, dstColor: 0xcc5533, scalePulse: 0.08,
+            srcColor: 0xc0764a, dstColor: 0xa0502c, scalePulse: 0.08,
         })
     }
 

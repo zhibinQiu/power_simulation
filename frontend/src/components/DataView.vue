@@ -4,31 +4,31 @@
        @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
     <!-- 左侧：数据源（从左侧「场景」资源树拖入，可多选） -->
     <div class="dv-sheets">
-      <div class="dv-src-tip">{{ source === 'local' ? '场景设备 · 从左侧资源树拖入数据源' : '云端时序库（TDengine）' }}</div>
+      <div class="dv-src-tip">{{ source === 'local' ? t('场景设备 · 从左侧资源树拖入数据源') : t('云端时序库（TDengine）') }}</div>
       <div class="dv-sel-bar">
-        <button @click="selectAll" :disabled="!sheetDevs.length">全选</button>
-        <button @click="clearSel" :disabled="!selIds.length">清空</button>
-        <span class="dv-sel-count" :class="{ on: selIds.length >= 2 }">已选 {{ selIds.length }} 台</span>
+        <button @click="selectAll" :disabled="!sheetDevs.length">{{ t('全选') }}</button>
+        <button @click="clearSel" :disabled="!selIds.length">{{ t('清空') }}</button>
+        <span class="dv-sel-count" :class="{ on: selIds.length >= 2 }">{{ t('已选') }} {{ selIds.length }} {{ t('台') }}</span>
       </div>
       <!-- 空态：拖拽引导（本地模式从左侧场景资源树拖入；云端模式列出时序设备） -->
       <div v-if="!sheetDevs.length" class="dv-drop-hint">
         <template v-if="source === 'local'">
           <svg class="dv-drop-ico" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <p class="dv-drop-t1">将左侧「场景」资源树中的<br />设备拖拽到此处作为数据源</p>
-          <p class="dv-drop-t2">拖入后可点击多选（同图对比 / 聚类分析）；<br />不需要时可直接拖回左侧场景移除</p>
+          <p class="dv-drop-t1">{{ t('将左侧「场景」资源树中的') }}<br />{{ t('设备拖拽到此处作为数据源') }}</p>
+          <p class="dv-drop-t2">{{ t('拖入后可点击多选（同图对比 / 聚类分析）；') }}<br />{{ t('不需要时可直接拖回左侧场景移除') }}</p>
         </template>
         <template v-else>
-          <p class="dv-drop-t1">暂无云端时序设备</p>
+          <p class="dv-drop-t1">{{ t('暂无云端时序设备') }}</p>
         </template>
       </div>
       <div class="dv-sheet" :class="{ active: d.id === curId, sel: selIds.includes(d.id) }"
            v-for="d in sheetDevs" :key="d.id"
            :draggable="source === 'local'"
-           :title="`${d.label || d.id} · ${d.unitName || ''} · 点击选中/取消 · 拖回场景可移除`"
+           :title="`${d.label || d.id} · ${d.unitName || ''} · ${t('点击选中/取消')} · ${t('拖回场景可移除')}`"
            @click="toggleSel(d.id)"
            @dragstart="onSheetDragStart($event, d)" @dragend="onSheetDragEnd">
         <input type="checkbox" class="sh-cb" :checked="selIds.includes(d.id)" @click.stop="toggleSel(d.id)" />
-        <span class="sh-icon" :style="{ background: d.color || '#0072BD' }"></span>
+        <span class="sh-icon" :style="{ background: d.color || '#005E94' }"></span>
         <span class="sh-body">
           <span class="sh-top">
             <span class="sh-name">{{ d.label || d.id }}</span>
@@ -36,11 +36,11 @@
           </span>
           <span class="sh-unit">{{ d.unitName || d.unitType || '' }}</span>
         </span>
-        <button v-if="source === 'local'" class="sh-del" title="移出数据源" @click.stop="removeSource(d.id)">×</button>
+        <button v-if="source === 'local'" class="sh-del" :title="t('移出数据源')" @click.stop="removeSource(d.id)">×</button>
       </div>
       <div v-if="source === 'local' && sheetDevs.length" class="dv-clear-all" @click="clearSources">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
-        清空全部数据源
+        {{ t('清空全部数据源') }}
       </div>
     </div>
 
@@ -49,41 +49,41 @@
       <!-- 表格上方统计行：设备名、属性选择已移至左侧面板，这里仅保留时间段选择 -->
       <div class="dv-stats">
         <!-- 时间段选择（快捷范围 + 自定义起止） -->
-        <div class="dv-time" title="选择时间段">
+        <div class="dv-time" :title="t('选择时间段')">
           <button v-for="r in timeQuick" :key="r.v" class="dv-tq"
-                  :class="{ on: !customMode && rangeQuick === r.v }" @click="setRange(r.v)">{{ r.label }}</button>
-          <button class="dv-tq" :class="{ on: customMode }" @click="customMode = !customMode">自定义</button>
+                  :class="{ on: !customMode && rangeQuick === r.v }" @click="setRange(r.v)">{{ t(r.label) }}</button>
+          <button class="dv-tq" :class="{ on: customMode }" @click="customMode = !customMode">{{ t('自定义') }}</button>
           <template v-if="customMode">
             <input type="datetime-local" class="dv-ti" v-model="customStart" @change="applyCustom" />
             <span class="dv-t-sep">→</span>
             <input type="datetime-local" class="dv-ti" v-model="customEnd" @change="applyCustom" />
-            <button class="dv-tq" @click="clearCustom">清除</button>
+            <button class="dv-tq" @click="clearCustom">{{ t('清除') }}</button>
           </template>
         </div>
       </div>
 
       <!-- 视图切换 tab（统一工具栏） -->
       <div class="dv-view-bar">
-        <button class="dv-mode" :class="{ on: viewMode === 'chart' }" @click="goChart">原始数据</button>
-        <button class="dv-mode" :class="{ on: viewMode === 'seq' }" @click="goSeq">时序预测</button>
+        <button class="dv-mode" :class="{ on: viewMode === 'chart' }" @click="goChart">{{ t('原始数据') }}</button>
+        <button class="dv-mode" :class="{ on: viewMode === 'seq' }" @click="goSeq">{{ t('时序预测') }}</button>
         <button class="dv-mode" :class="{ on: viewMode === 'cluster' }" :disabled="selDevs.length < 2"
-                title="多选 ≥2 台设备后可用" @click="goCluster">聚类分析</button>
+                :title="t('多选 ≥2 台设备后可用')" @click="goCluster">{{ t('聚类分析') }}</button>
         <button class="dv-mode" :class="{ on: viewMode === 'fit' }"
-                title="联动右侧「数据拟合」策略，显示拟合方程与曲线" @click="goFit">数据拟合</button>
+                :title="t('联动右侧「数据拟合」策略，显示拟合方程与曲线')" @click="goFit">{{ t('数据拟合') }}</button>
         <button class="dv-mode" :class="{ on: viewMode === 'opt' }"
-                title="联动右侧「参数优化」策略，显示优化进度与最优参数" @click="goOpt">参数优化</button>
+                :title="t('联动右侧「参数优化」策略，显示优化进度与最优参数')" @click="goOpt">{{ t('参数优化') }}</button>
       </div>
 
       <!-- 中间：原始数据视图（含折线图、同图对比、历史列表切换） -->
       <div class="dv-chart-wrap" v-if="viewMode === 'chart'">
         <div class="dv-chart-toolbar">
-          <span class="dv-chart-title">原始数据 · {{ selDevs.length }} 台设备</span>
+          <span class="dv-chart-title">{{ t('原始数据') }} · {{ selDevs.length }} {{ t('台设备') }}</span>
           <div class="dv-chart-actions">
             <div v-if="selDevs.length >= 2" class="dv-mode-switch mini">
-              <button class="dv-mode" :class="{ on: compareMode === 'normalized' }" @click="compareMode = 'normalized'">归一化 (%)</button>
-              <button class="dv-mode" :class="{ on: compareMode === 'raw' }" @click="compareMode = 'raw'">原始值</button>
+              <button class="dv-mode" :class="{ on: compareMode === 'normalized' }" @click="compareMode = 'normalized'">{{ t('归一化') }} (%)</button>
+              <button class="dv-mode" :class="{ on: compareMode === 'raw' }" @click="compareMode = 'raw'">{{ t('原始值') }}</button>
             </div>
-            <button class="dv-mode" :class="{ on: chartOverlay === 'list' }" @click="toggleListOverlay">{{ chartOverlay === 'list' ? '图表' : '列表' }}</button>
+            <button class="dv-mode" :class="{ on: chartOverlay === 'list' }" @click="toggleListOverlay">{{ chartOverlay === 'list' ? t('图表') : t('列表') }}</button>
           </div>
         </div>
         <div class="dv-chart-body">
@@ -94,10 +94,10 @@
                 <thead>
                   <tr>
                     <th class="idx">#</th>
-                    <th>时间</th>
-                    <th class="num">读数<em v-if="d.unitName || d.unit"> ({{ d.unitName || d.unit }})</em></th>
-                    <th class="num">变化量</th>
-                    <th>状态</th>
+                    <th>{{ t('时间') }}</th>
+                    <th class="num">{{ t('读数') }}<em v-if="d.unitName || d.unit"> ({{ d.unitName || d.unit }})</em></th>
+                    <th class="num">{{ t('变化量') }}</th>
+                    <th>{{ t('状态') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -106,96 +106,96 @@
                     <td class="mono">{{ fmtTime(r.t) }}</td>
                     <td class="num mono">{{ fmt(r.v) }}</td>
                     <td class="num mono" :class="deltaCls(listDelta(r, d))">{{ deltaTxt(listDelta(r, d)) }}</td>
-                    <td><span class="badge" :class="statusClsFor(r.v, d)">{{ statusTextFor(r.v, d) }}</span></td>
+                    <td><span class="badge" :class="statusClsFor(r.v, d)">{{ t(statusTextFor(r.v, d)) }}</span></td>
                   </tr>
                   <tr v-if="!listRowsOf(d).length">
                     <td class="empty" colspan="5">
-                      <span v-if="cloudBusy">云端历史查询中…</span>
+                      <span v-if="cloudBusy">{{ t('云端历史查询中…') }}</span>
                       <span v-else-if="cloudErr">{{ cloudErr }}</span>
-                      <span v-else-if="source === 'cloud'">该时间范围内无云端数据</span>
-                      <span v-else-if="rangeEmpty">所选时间段内无数据</span>
-                      <span v-else>暂无历史数据</span>
+                      <span v-else-if="source === 'cloud'">{{ t('该时间范围内无云端数据') }}</span>
+                      <span v-else-if="rangeEmpty">{{ t('所选时间段内无数据') }}</span>
+                      <span v-else>{{ t('暂无历史数据') }}</span>
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <div v-if="!selDevs.length" class="dv-chart-empty">请勾选左侧设备</div>
+            <div v-if="!selDevs.length" class="dv-chart-empty">{{ t('请勾选左侧设备') }}</div>
           </div>
           <template v-else>
             <TrendChart v-if="selDevs.length === 1 && chartRows.length"
-                        :data="chartRows" :color="curDev.color || '#0072BD'"
+                        :data="chartRows" :color="curDev.color || '#005E94'"
                         :height="0" :grid="true" :axis="true" />
             <MultiTrendChart v-else-if="selDevs.length >= 2 && compareSeries.length"
                              :series="compareSeries" :mode="compareMode" :height="0" :axis="true" />
             <div v-else class="dv-chart-empty">
-              <span v-if="cloudBusy">云端历史查询中…</span>
+              <span v-if="cloudBusy">{{ t('云端历史查询中…') }}</span>
               <span v-else-if="cloudErr">{{ cloudErr }}</span>
-              <span v-else-if="source === 'cloud' && !sheetDevs.length">暂无云端时序设备</span>
-              <span v-else-if="source === 'cloud'">该时间范围内无云端数据</span>
-              <span v-else-if="rangeEmpty">所选时间段内无数据</span>
-              <span v-else>暂无历史数据</span>
+              <span v-else-if="source === 'cloud' && !sheetDevs.length">{{ t('暂无云端时序设备') }}</span>
+              <span v-else-if="source === 'cloud'">{{ t('该时间范围内无云端数据') }}</span>
+              <span v-else-if="rangeEmpty">{{ t('所选时间段内无数据') }}</span>
+              <span v-else>{{ t('暂无历史数据') }}</span>
             </div>
             <div class="dv-chart-stats" v-if="chartStats.length">
               <div v-for="s in chartStats" :key="s.id" class="dv-stat-card" :style="{ '--c': s.color }">
                 <div class="dv-stat-title">{{ s.name }}<em v-if="s.unit">({{ s.unit }})</em></div>
-                <div class="dv-stat-line"><span>实时</span><b>{{ fmt(s.last) }}</b></div>
-                <div class="dv-stat-line"><span>采样</span><b>{{ s.count }}</b></div>
-                <div class="dv-stat-line"><span>均值</span><b>{{ fmt(s.avg) }}</b></div>
-                <div class="dv-stat-line"><span>峰值</span><b>{{ fmt(s.max) }}</b></div>
-                <div class="dv-stat-line"><span>谷值</span><b>{{ fmt(s.min) }}</b></div>
+                <div class="dv-stat-line"><span>{{ t('实时') }}</span><b>{{ fmt(s.last) }}</b></div>
+                <div class="dv-stat-line"><span>{{ t('采样') }}</span><b>{{ s.count }}</b></div>
+                <div class="dv-stat-line"><span>{{ t('均值') }}</span><b>{{ fmt(s.avg) }}</b></div>
+                <div class="dv-stat-line"><span>{{ t('峰值') }}</span><b>{{ fmt(s.max) }}</b></div>
+                <div class="dv-stat-line"><span>{{ t('谷值') }}</span><b>{{ fmt(s.min) }}</b></div>
               </div>
             </div>
           </template>
         </div>
         <div class="dv-chart-foot" v-if="(chartRows.length || compareSeries.length) && chartOverlay !== 'list'">
-          <span v-if="selDevs.length === 1">区间 {{ fmtTime(chartRows[0].t) }} → {{ fmtTime(chartRows[chartRows.length - 1].t) }} · 采样 {{ chartRows.length }} 点</span>
-          <span v-else>说明：归一化模式把各设备 min-max 缩放到 0~100%，消除量纲差异以便对比趋势形态；原始值模式按各设备真实量纲同图。</span>
+          <span v-if="selDevs.length === 1">{{ t('区间') }} {{ fmtTime(chartRows[0].t) }} → {{ fmtTime(chartRows[chartRows.length - 1].t) }} · {{ t('采样') }} {{ chartRows.length }} {{ t('点') }}</span>
+          <span v-else>{{ t('说明：归一化模式把各设备 min-max 缩放到 0~100%，消除量纲差异以便对比趋势形态；原始值模式按各设备真实量纲同图。') }}</span>
         </div>
       </div>
 
       <!-- 中间：时序预测（单设备，联动右侧「时序预测」策略） -->
       <div class="dv-chart-wrap" v-else-if="viewMode === 'seq'">
         <div class="dv-compare-bar">
-          <span class="dv-compare-title">时序预测 · {{ curDev.label || curDev.id || '-' }}</span>
-          <span class="dv-sub">预测未来 {{ seqForecastN }} 步趋势</span>
+          <span class="dv-compare-title">{{ t('时序预测') }} · {{ curDev.label || curDev.id || '-' }}</span>
+          <span class="dv-sub">{{ t('预测未来') }} {{ seqForecastN }} {{ t('步趋势') }}</span>
         </div>
         <div class="dv-compare-chart">
-          <TrendChart v-if="seqRows.length" :data="seqRows" :color="curDev.color || '#0072BD'" :height="0" :grid="true" :axis="true" />
+          <TrendChart v-if="seqRows.length" :data="seqRows" :color="curDev.color || '#005E94'" :height="0" :grid="true" :axis="true" />
           <div v-else class="dv-chart-empty">
-            <span v-if="cloudBusy">云端历史查询中…</span>
+            <span v-if="cloudBusy">{{ t('云端历史查询中…') }}</span>
             <span v-else-if="cloudErr">{{ cloudErr }}</span>
-            <span v-else-if="source === 'cloud' && !sheetDevs.length">暂无云端时序设备</span>
-            <span v-else-if="source === 'cloud'">该时间范围内无云端数据</span>
-            <span v-else-if="rangeEmpty">所选时间段内无数据</span>
-            <span v-else>暂无历史数据</span>
+            <span v-else-if="source === 'cloud' && !sheetDevs.length">{{ t('暂无云端时序设备') }}</span>
+            <span v-else-if="source === 'cloud'">{{ t('该时间范围内无云端数据') }}</span>
+            <span v-else-if="rangeEmpty">{{ t('所选时间段内无数据') }}</span>
+            <span v-else>{{ t('暂无历史数据') }}</span>
           </div>
         </div>
         <div class="dv-chart-foot" v-if="seqRows.length">
-          <span>区间 {{ fmtTime(seqRows[0].t) }} → {{ fmtTime(seqRows[seqRows.length - 1].t) }}</span>
-          <span>采样 {{ seqRows.length }} 点（含预测）</span>
+          <span>{{ t('区间') }} {{ fmtTime(seqRows[0].t) }} → {{ fmtTime(seqRows[seqRows.length - 1].t) }}</span>
+          <span>{{ t('采样') }} {{ seqRows.length }} {{ t('点（含预测）') }}</span>
         </div>
       </div>
 
       <!-- 中间：聚类分析（多设备，联动右侧「聚类分析」策略） -->
       <div class="dv-chart-wrap" v-else-if="viewMode === 'cluster'">
         <div class="dv-compare-bar">
-          <span class="dv-compare-title">聚类分析 · {{ selDevs.length }} 台设备</span>
-          <span class="dv-sub">簇数 {{ clusterK ? clusterK + ' 组' : '自动' }}（配置见右侧属性面板）</span>
+          <span class="dv-compare-title">{{ t('聚类分析') }} · {{ selDevs.length }} {{ t('台设备') }}</span>
+          <span class="dv-sub">{{ t('簇数') }} {{ clusterK ? clusterK + ' ' + t('组') : t('自动') }}（{{ t('配置见右侧属性面板') }}）</span>
         </div>
-        <div v-if="clusterBusy" class="dv-chart-empty">聚类分析中…</div>
+        <div v-if="clusterBusy" class="dv-chart-empty">{{ t('聚类分析中…') }}</div>
         <div v-else-if="clusterErr" class="dv-chart-empty">{{ clusterErr }}</div>
         <div v-else-if="clusterRes" class="dv-cluster-body">
           <div class="dv-cluster-meta">
-            <span>设备 {{ clusterRes.n }} 台</span>
-            <span>分组 {{ clusterRes.k }} 组</span>
-            <span>轮廓系数 <b class="dv-sil" :class="silCls(clusterRes.silhouette)">{{ clusterRes.silhouette }}</b></span>
+            <span>{{ t('设备') }} {{ clusterRes.n }} {{ t('台') }}</span>
+            <span>{{ t('分组') }} {{ clusterRes.k }} {{ t('组') }}</span>
+            <span>{{ t('轮廓系数') }} <b class="dv-sil" :class="silCls(clusterRes.silhouette)">{{ clusterRes.silhouette }}</b></span>
             <span class="dv-cluster-note">{{ clusterRes.notes }}</span>
           </div>
           <div v-for="c in clusterRes.clusters" :key="c.cluster" class="dv-cluster-card">
             <div class="dv-cluster-head">
-              <span class="dv-cluster-tag">组 {{ c.cluster + 1 }}</span>
-              <span class="dv-cluster-size">{{ c.size }} 台</span>
+              <span class="dv-cluster-tag">{{ t('组') }} {{ c.cluster + 1 }}</span>
+              <span class="dv-cluster-size">{{ c.size }} {{ t('台') }}</span>
               <span class="dv-cluster-summary">{{ c.summary }}</span>
             </div>
             <div class="dv-cluster-devs">
@@ -209,7 +209,7 @@
             <table class="dv-cluster-feat">
               <thead>
                 <tr>
-                  <th>设备</th>
+                  <th>{{ t('设备') }}</th>
                   <th v-for="f in clusterRes.feature_names" :key="f">{{ clusterRes.feature_labels[f] }}</th>
                 </tr>
               </thead>
@@ -222,29 +222,29 @@
             </table>
           </div>
         </div>
-        <div v-else class="dv-chart-empty">请多选 ≥2 台设备（进入本视图后自动执行聚类分析）</div>
+        <div v-else class="dv-chart-empty">{{ t('请多选 ≥2 台设备（进入本视图后自动执行聚类分析）') }}</div>
       </div>
 
       <!-- 中间：数据拟合（联动右侧「数据拟合」策略 ai::fit，显示拟合方程与曲线） -->
       <div class="dv-chart-wrap" v-else-if="viewMode === 'fit'">
         <div class="dv-compare-bar">
-          <span class="dv-compare-title">数据拟合 · 策略联动</span>
-          <span v-if="fitSt" class="dv-link-tag">ai::fit{{ fitRes ? ' · ' + fitRes.method_label : ' · 未训练' }}</span>
+          <span class="dv-compare-title">{{ t('数据拟合') }} · {{ t('策略联动') }}</span>
+          <span v-if="fitSt" class="dv-link-tag">ai::fit{{ fitRes ? ' · ' + fitRes.method_label : ' · ' + t('未训练') }}</span>
         </div>
         <div v-if="!fitSt" class="dv-chart-empty">
-          未选择「数据拟合」策略：请在右侧属性面板点击「数据拟合」，训练后此处显示拟合方程与曲线
+          {{ t('未选择「数据拟合」策略：请在右侧属性面板点击「数据拟合」，训练后此处显示拟合方程与曲线') }}
         </div>
         <div v-else-if="!fitRes" class="dv-chart-empty">
-          拟合模型尚未训练：请在右侧属性面板点击「开始训练」
+          {{ t('拟合模型尚未训练：请在右侧属性面板点击「开始训练」') }}
         </div>
         <div v-else class="dv-fit-body">
           <div class="dv-cluster-meta">
-            <span>方法 <b>{{ fitRes.method_label }}</b></span>
-            <span>样本 <b>{{ fitRes.n }}</b> 点</span>
-            <span>拟合优度 R² <b class="dv-sil" :class="silCls(fitRes.r2)">{{ fitRes.r2 }}</b></span>
+            <span>{{ t('方法') }} <b>{{ fitRes.method_label }}</b></span>
+            <span>{{ t('样本') }} <b>{{ fitRes.n }}</b> {{ t('点') }}</span>
+            <span>{{ t('拟合优度') }} R² <b class="dv-sil" :class="silCls(fitRes.r2)">{{ fitRes.r2 }}</b></span>
             <span class="dv-cluster-note">{{ fitTargetLabel }}</span>
           </div>
-          <div class="dv-fit-eq">拟合方程 <code>{{ fitRes.equation }}</code></div>
+          <div class="dv-fit-eq">{{ t('拟合方程') }} <code>{{ fitRes.equation }}</code></div>
           <svg v-if="fitSvg" class="dv-chart-svg" :viewBox="fitSvg.viewBox">
             <g class="dv-axis">
               <line :x1="fitSvg.PL" :y1="fitSvg.Y0" :x2="fitSvg.W - fitSvg.PR" :y2="fitSvg.Y0" />
@@ -261,7 +261,7 @@
             <path v-if="fitSvg.extPath" class="dv-fit-ext" :d="fitSvg.extPath" fill="none" />
             <circle v-for="p in fitSvg.actual" :key="p.x" class="dv-fit-dot" :cx="p.x" :cy="p.y" r="2.4" />
             <text v-if="fitSvg.hasExt" class="dv-tick" :x="fitSvg.W - fitSvg.PR - 4" :y="fitSvg.PT + 2" text-anchor="end">
-              虚线为外推预测段
+              {{ t('虚线为外推预测段') }}
             </text>
           </svg>
         </div>
@@ -270,23 +270,23 @@
       <!-- 中间：参数优化（联动右侧「参数优化」策略 ai::ga/pso/rl，显示优化进度与最优参数） -->
       <div class="dv-chart-wrap" v-else>
         <div class="dv-compare-bar">
-          <span class="dv-compare-title">参数优化 · 策略联动</span>
-          <span v-if="optSt" class="dv-link-tag">{{ optIdLabel }} · {{ optSt.running ? '优化中' : '就绪' }}</span>
+          <span class="dv-compare-title">{{ t('参数优化') }} · {{ t('策略联动') }}</span>
+          <span v-if="optSt" class="dv-link-tag">{{ optIdLabel }} · {{ optSt.running ? t('优化中') : t('就绪') }}</span>
         </div>
         <div v-if="!optSt" class="dv-chart-empty">
-          未选择「参数优化」策略：请在右侧属性面板点击「参数优化」并开始训练
+          {{ t('未选择「参数优化」策略：请在右侧属性面板点击「参数优化」并开始训练') }}
         </div>
         <template v-else>
           <div class="dv-cluster-meta">
-            <span>优化目标 <b>{{ optObjLabel }}</b></span>
-            <span>迭代 <b>{{ optSt.iteration || 0 }}</b></span>
-            <span>最优值 <b>{{ fmtOpt(optSt.best_fitness) }} {{ optSt.objective_unit }}</b></span>
+            <span>{{ t('优化目标') }} <b>{{ optObjLabel }}</b></span>
+            <span>{{ t('迭代') }} <b>{{ optSt.iteration || 0 }}</b></span>
+            <span>{{ t('最优值') }} <b>{{ fmtOpt(optSt.best_fitness) }} {{ optSt.objective_unit }}</b></span>
             <span v-if="optSt.improvement_pct != null">
-              较初始 <b class="dv-sil" :class="silCls(optSt.improvement_pct)">{{ optSt.improvement_pct }}%</b>
+              {{ t('较初始') }} <b class="dv-sil" :class="silCls(optSt.improvement_pct)">{{ optSt.improvement_pct }}%</b>
             </span>
           </div>
           <div v-if="optHist.length >= 2" class="dv-opt-body">
-            <div class="dv-opt-sub">最优目标值收敛曲线（迭代 → 目标值）</div>
+            <div class="dv-opt-sub">{{ t('最优目标值收敛曲线（迭代 → 目标值）') }}</div>
             <svg class="dv-chart-svg" :viewBox="optSvg.viewBox">
               <g class="dv-axis">
                 <line :x1="optSvg.PL" :y1="optSvg.Y0" :x2="optSvg.W - optSvg.PR" :y2="optSvg.Y0" />
@@ -306,10 +306,10 @@
           <table v-if="optSt.best_params && optSt.best_params.length" class="dv-cluster-feat dv-opt-tbl">
             <thead>
               <tr>
-                <th>参数</th>
-                <th>当前值</th>
-                <th>初始值</th>
-                <th>变化</th>
+                <th>{{ t('参数') }}</th>
+                <th>{{ t('当前值') }}</th>
+                <th>{{ t('初始值') }}</th>
+                <th>{{ t('变化') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -331,6 +331,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
+import { t } from '../i18n'
 import TrendChart from './TrendChart.vue'
 import MultiTrendChart from './MultiTrendChart.vue'
 
@@ -441,7 +442,7 @@ async function loadCloudDevices() {
   try {
     const r = await api.boxDevicesRealtime()
     cloudDevs.value = (r && r.devices) || []
-    if (!cloudDevs.value.length) cloudErr.value = '云端未返回设备（cloud-agent 未部署或云端不可达）'
+    if (!cloudDevs.value.length) cloudErr.value = t('云端未返回设备（cloud-agent 未部署或云端不可达）')
   } catch (e) {
     cloudErr.value = (e && e.message) ? e.message : String(e)
   } finally {
@@ -469,7 +470,7 @@ async function loadCloudHist(d) {
     })
     if (!r || r.ok === false) {
       cloudHist.value[d.name] = []
-      cloudErr.value = (r && r.error) || '云端查询失败'
+      cloudErr.value = (r && r.error) || t('云端查询失败')
     } else {
       // agent 返回毫秒时间戳，统一转 epoch 秒与本视图 fmtTime 对齐；
       // 兼容毫秒/秒/数字字符串，非法时间戳丢弃（修复时间全为 1970-01-01）
@@ -570,7 +571,7 @@ watch(timeWindow, () => {
 
 // ==================== 同图趋势对比 ====================
 const compareMode = ref('normalized')   // 'normalized' 归一化 / 'raw' 原始值
-const PALETTE = ['#0072BD', '#E07B39', '#3AA655', '#9B59B6', '#C0392B', '#16A085', '#D35400', '#2980B9', '#8E44AD', '#27AE60']
+const PALETTE = ['#005E94', '#E07B39', '#3AA655', '#9B59B6', '#BC3B30', '#16A085', '#D35400', '#2980B9', '#8E44AD', '#27AE60']
 const colorFor = (id) => {
   const i = selDevs.value.findIndex((d) => d.id === id)
   return PALETTE[(i < 0 ? 0 : i) % PALETTE.length]
@@ -728,8 +729,8 @@ const fitTargetLabel = computed(() => {
   const st = fitSt.value
   if (!st) return ''
   if (Array.isArray(st.targets)) {
-    const t = st.targets.find((x) => x.id === st.target)
-    if (t) return `拟合对象：${t.label}`
+    const tg = st.targets.find((x) => x.id === st.target)
+    if (tg) return `${t('拟合对象')}：${tg.label}`
   }
   return st.target || ''
 })
@@ -738,7 +739,7 @@ const fitTargetLabel = computed(() => {
 const fmtAxis = (v) => {
   if (v == null || !isFinite(v)) return ''
   const a = Math.abs(v)
-  if (a >= 1e4) return (v / 1e4).toFixed(1) + '万'
+  if (a >= 1e4) return (v / 1e4).toFixed(1) + t('万')
   if (a >= 1e3) return (v / 1e3).toFixed(1) + 'k'
   if (a >= 100) return v.toFixed(0)
   if (a >= 1) return v.toFixed(1)
@@ -787,7 +788,7 @@ const optSt = computed(() =>
 const optHist = computed(() => (optSt.value && Array.isArray(optSt.value.history) ? optSt.value.history : []))
 const optIdLabel = computed(() => {
   const id = store.selectedStrategyId || ''
-  return id === 'ai::ga' ? '遗传算法' : id === 'ai::pso' ? '粒子群' : id === 'ai::rl' ? '强化学习' : id
+  return id === 'ai::ga' ? t('遗传算法') : id === 'ai::pso' ? t('粒子群') : id === 'ai::rl' ? t('强化学习') : id
 })
 const optObjLabel = computed(() => {
   const st = optSt.value
@@ -1087,7 +1088,7 @@ defineExpose({ close, refresh })
 .dv-dot { width: 6px; height: 6px; border-radius: 2px; flex: 0 0 auto; }
 .dv-sub { color: var(--muted); font-size: 11px; }
 .dv-live2 { display: flex; align-items: baseline; gap: 4px; margin-left: auto; }
-.dv-live-v { font-size: 16px; font-weight: 500; color: var(--accent); font-family: var(--mono); }
+.dv-live-v { font-size: 16px; font-weight: 500; color: var(--accent-d); font-family: var(--mono); }
 /* ---- 数据源切换（场景设备 / 云端时序） ---- */
 .dv-source { display: flex; flex: 0 0 auto; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; background: var(--panel); }
 .dv-src { padding: 2px 10px; font-size: 11px; line-height: 16px; color: var(--muted); background: transparent; border: none; cursor: pointer; }
@@ -1136,11 +1137,10 @@ defineExpose({ close, refresh })
   pointer-events: none;
 }
 .dv-stat-card {
-  background: color-mix(in srgb, var(--panel-2) 90%, transparent);
+  background: var(--panel-2);
   border: 1px solid var(--border); border-left: 3px solid var(--c);
-  border-radius: 5px; padding: 5px 8px;
+  border-radius: var(--radius); padding: 5px 8px;
   font-size: 11px; color: var(--muted);
-  backdrop-filter: blur(2px);
 }
 .dv-stat-title { margin-bottom: 3px; color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dv-stat-title em { font-style: normal; margin-left: 3px; color: var(--faint); font-weight: 400; }
@@ -1160,7 +1160,7 @@ defineExpose({ close, refresh })
 .dv-cluster-meta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 11px; }
 .dv-sil { font-family: var(--mono); font-size: 13px; }
 .dv-sil.good { color: var(--green); }
-.dv-sil.mid { color: var(--accent); }
+.dv-sil.mid { color: var(--accent-d); }
 .dv-sil.low { color: var(--red); }
 .dv-cluster-note { color: var(--faint); font-size: 10px; }
 .dv-cluster-card {
@@ -1247,7 +1247,7 @@ defineExpose({ close, refresh })
 .dv-sel-bar button:hover:not(:disabled) { color: var(--text); }
 .dv-sel-bar button:disabled { opacity: .4; cursor: not-allowed; }
 .dv-sel-count { margin-left: auto; font-size: 11px; color: var(--faint); }
-.dv-sel-count.on { color: var(--accent); font-weight: 600; }
+.dv-sel-count.on { color: var(--accent-d); font-weight: 600; }
 .dv-sheet {
   display: flex; align-items: center; gap: 6px;
   padding: 7px 8px;
@@ -1269,7 +1269,7 @@ defineExpose({ close, refresh })
 .dv-sheet.sel { box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 1px var(--accent); }
 .dv-sheet .sh-cb {
   flex: 0 0 auto; width: 14px; height: 14px; margin: 0; padding: 0; box-sizing: border-box;
-  accent-color: var(--accent); cursor: pointer;
+  accent-color: var(--accent-d); cursor: pointer;
 }
 .dv-sheet[draggable='true'] { cursor: grab; }
 .dv-sheet[draggable='true']:active { cursor: grabbing; }
@@ -1278,7 +1278,7 @@ defineExpose({ close, refresh })
 .dv-sheet .sh-top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .dv-sheet .sh-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dv-sheet .sh-live { font-family: var(--mono); font-size: 11px; color: var(--faint); flex: 0 0 auto; }
-.dv-sheet.active .sh-live { color: var(--accent); }
+.dv-sheet.active .sh-live { color: var(--accent-d); }
 .dv-sheet .sh-unit {
   color: var(--faint); font-size: 10px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1295,7 +1295,7 @@ defineExpose({ close, refresh })
   color: var(--faint); text-align: center;
   border: 1px dashed var(--line); border-radius: 6px;
 }
-.dv-drop-ico { color: var(--accent); opacity: .75; }
+.dv-drop-ico { color: var(--accent-d); opacity: .75; }
 .dv-drop-t1 { font-size: 11px; line-height: 1.55; color: var(--muted); }
 .dv-drop-t2 { font-size: 10px; color: var(--faint); }
 /* 右侧表格空态的大拖拽引导 */
@@ -1313,7 +1313,7 @@ defineExpose({ close, refresh })
   font-size: 13px; line-height: 1; border-radius: 3px; cursor: pointer;
 }
 .dv-sheet:hover .sh-del { display: flex; }
-.dv-sheet .sh-del:hover { color: var(--red); background: rgba(209,75,75,.12); }
+.dv-sheet .sh-del:hover { color: var(--red); background: rgba(188,59,48,.12); }
 .dv-clear-all {
   display: flex; align-items: center; justify-content: center; gap: 5px;
   margin-top: 6px; padding: 5px 0;
@@ -1333,7 +1333,7 @@ defineExpose({ close, refresh })
   background: var(--panel-3); border: 1px solid var(--border); border-radius: 5px;
 }
 .dv-fit-eq code {
-  font-family: var(--mono); color: var(--accent);
+  font-family: var(--mono); color: var(--accent-d);
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px;
   padding: 1px 6px; margin-left: 4px; font-size: 12px;
 }

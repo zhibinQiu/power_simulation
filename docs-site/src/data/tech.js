@@ -1306,40 +1306,25 @@ curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/upda
 - **平台地坪与网格**：随环境模式切换配色与霓虹网格（void 模式）；
 - **聚焦/选中高亮**：点击工序聚焦相机并高亮唯一标签与选中环，\`focus\`/框架视图（\`frameAll\`）一键复位。
 
-## 二、虚拟巡视（四足巡检机器狗）
-
-场景内置可操控的巡检机器狗（第一人称 / 第三人称跟随视角）：
-
-| 项 | 值 | 说明 |
-| --- | --- | --- |
-| PATROL_SPEED | 26 世界单位/秒 | 行走速度，按住 Shift 加速 |
-| PATROL_TURN | 1.6 rad/s | 原地旋转角速度（≈92°/s） |
-| PATROL_RADIUS | 3.2 | 碰撞半径（含步幅余量） |
-| PATROL_CAM_BACK / UP / AHEAD | 22 / 12 / 30 | 第三人称相机后撤/高度/前置 |
-
-- 支持 **XZ 平面刚体碰撞**（AABB 障碍清单，\`_patrolSolids\`）与厂区可行走边界；
-- 步态动画随移动/转向驱动；**编排新增/删除工艺时会同步刷新刚体清单**，避免撞上「空气墙」；
-- 巡视中切换环境模式同样生效。
-
-## 三、热力图与物流动画
+## 二、热力图与物流动画
 
 - **热力图 heat layers**：按 \`UnitResult.heat\`（0~1）为工序外壳着色，直观呈现各工序热负荷/排放强弱；
 - **物流动画 flows**：物流连线上的粒子/进度动画，展示 hot_metal / scrap / steel / dri 的流向与速率；
 - 热风炉等容器类工序支持外壳半透明显示内部结构。
 
-## 四、Pinia 全局状态（stores/sim.js）
+## 三、Pinia 全局状态（stores/sim.js）
 
 - 流程编排：工序/物流的增删改、撤销重做（history）、方案保存；
 - 仿真状态：baseline / strategy / delta、实验对比（同时仿真多方案）；
 - 策略：解析结果、已保存策略、应用状态；
 - 设备：实时遥测读数、历史趋势、设备设定（滑块）；
-- 环境模式与巡视模式状态、3D 聚焦目标。
+- 环境模式状态、3D 聚焦目标。
 
-## 五、桑基图（碳流可视化）
+## 四、桑基图（碳流可视化）
 
 仿真结果生成 Sankey 图数据（燃料源 → 工序 → 去向，链路值 tC/h），可视化展示碳素流分配、固碳与捕集去向。
 
-## 六、分析类面板
+## 五、分析类面板
 
 | 面板 | 入口 | 说明 |
 | --- | --- | --- |
@@ -1351,7 +1336,7 @@ curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/upda
 | 碳市场行情（CarbonMarketView） | 视图菜单 → 碳市场 | 行情卡片 + CEA 蜡烛图 / CCER 折线 + 线性回归预测与置信带；15s 轮询，详情见「碳市场行情服务」章节 |
 | 数据校准（CalibrationWizard） | 工具菜单 → 数据校准 | 选择设备 → 输入标准/读数标定点 → 线性回归拟合校准曲线 → 预览误差 → 应用/重置（校准系数持久化） |
 
-## 七、系统级 UI 组件（欢迎页 / 活动栏 / 状态栏）
+## 六、系统级 UI 组件（欢迎页 / 活动栏 / 状态栏）
 
 面向整体工作台的壳层组件，承载模式选择、面板切换与全局信息展示：
 
@@ -1365,14 +1350,14 @@ curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/upda
 | ConnectionsPanel | 连接面板：三种数据源（模拟/WebSocket/HTTP）运行状态展示与在线启停，入口直达数据源配置 |
 | CarbonBoxView | 能碳一体机管理（视图 → 能碳一体机管理）：原「数据概览」+「设备管理」合并为单界面——工具栏（盒子接入/新建设备/刷新）、云端数据链路（Broker $SYS 统计 + CloudCore 状态 + 证书与 Token，由云端 cloud-agent 经 MQTT 长连接推送，非 SSH；云端状态四态：云端实时/数据过期/部分异常/不可达）、实时消息流与发测试消息、设备管理（DeviceModel/Device 五协议 CRUD + v1beta1 YAML 生成，config/box_devices.json + 一键下发云端 K3s）、拓扑图 + 云端 CRD 生效态；盒子接入（edgecore.yaml 模板渲染 + 云端 CA 重签 1 年 token/caHash + 完整部署命令：① keadm join → ② 配置下发 → ③ 云建设备 → ④ box-deploy 采集包 → ⑤ 路由验证）；云端设备关联 / 边缘节点 / twins 实时值 / CloudHub 端口显示已移除；总体架构：云端 K3s + CloudCore 控制平面，盒子边缘仅装 EdgeCore（无本地控制平面，运行 Pod / mosquitto / mapper，DMI 采集 + 云边协同断点续传） |
 
-## 八、数据源管理与系统设置
+## 七、数据源管理与系统设置
 
 - **DataSourceDialog**（文件 → 连接数据源…）：配置三种实时数据来源——Mqtt 实时（默认，读数来自后端 MQTT 订阅，Broker 在「能碳一体机管理」视图前端配置）、WebSocket（ws:// 服务器）、HTTP 轮询（REST 接口）；每项支持启停、采样间隔与「测试连接」；配置持久化到本地，重启自动应用；
 - **SystemSettingsDialog**（文件 → 设置…）：按页签分组——布局（面板显隐）、场景（仿真情景 / 环境）、实时链路（数据源启停）、LLM（模型名 / API 密钥 / API 地址，可选，未配置自动回退本地规则与本地模板报告）；
 - 两种对话框状态存于 Pinia（\`showDataSource\` / \`showSettings\`），数据源配置与连接面板共享同一状态源。
 
-## 九、命令行窗口（CommandConsole）
+## 八、命令行窗口（CommandConsole）
 
-底部命令行为交互中枢：聊天 / 代码 / 规划三模式 + 孪生控制命令（run/sim/stop/reset/overview/home/patrol/view/edit/done/clear），走 \`POST /api/chat\`；内置策略与工序策略的自然语言输入则走 \`POST /api/parse\`（LLM 优先、启发式回退）。`,
+底部命令行为交互中枢：聊天 / 代码 / 规划三模式 + 孪生控制命令（run/sim/stop/reset/overview/home/view/edit/done/clear），走 \`POST /api/chat\`；内置策略与工序策略的自然语言输入则走 \`POST /api/parse\`（LLM 优先、启发式回退）。`,
   },
 ]

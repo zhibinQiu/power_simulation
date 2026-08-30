@@ -3,11 +3,12 @@
 #  一键启动脚本：工业能碳智控平台
 #
 #  用法:
-#    ./start.sh               开发模式：后端(8010) + 前端 dev(5173) + 文档站 dev(5174)
-#    ./start.sh --prod        生产模式：构建前端/文档站产物 + 后端托管(8010) + 文档站 preview(40183)
+#    ./start.sh               开发模式：后端(8010) + 前端 dev(5173) + 文档站 dev(5174) + 门户(40200)
+#    ./start.sh --prod        生产模式：构建前端/文档站产物 + 后端托管(8010) + 文档站 preview(40183) + 门户(40200)
 #    ./start.sh --backend     仅启动后端
 #    ./start.sh --frontend    仅启动前端 dev
 #    ./start.sh --no-docs     不启动独立文档网站
+#    ./start.sh --no-portal   不启动门户网站
 #    ./start.sh --help        查看帮助
 #
 #  说明:
@@ -25,6 +26,7 @@ MODE="dev"        # dev | prod
 RUN_BACKEND=1
 RUN_FRONTEND=1
 RUN_DOCS=1
+RUN_PORTAL=1
 
 for arg in "$@"; do
   case "$arg" in
@@ -32,6 +34,7 @@ for arg in "$@"; do
     --backend)  RUN_FRONTEND=0 ;;
     --frontend) RUN_BACKEND=0 ;;
     --no-docs)  RUN_DOCS=0 ;;
+    --no-portal) RUN_PORTAL=0 ;;
     -h|--help)
       sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
@@ -57,10 +60,12 @@ fi
 BACKEND_PID=""
 FRONTEND_PID=""
 DOCS_PID=""
+PORTAL_PID=""
 
 cleanup() {
   echo ""
   echo "==> 正在停止服务..."
+  [ -n "$PORTAL_PID" ] && kill "$PORTAL_PID" 2>/dev/null || true
   [ -n "$DOCS_PID" ] && kill "$DOCS_PID" 2>/dev/null || true
   [ -n "$FRONTEND_PID" ] && kill "$FRONTEND_PID" 2>/dev/null || true
   [ -n "$BACKEND_PID" ] && kill "$BACKEND_PID" 2>/dev/null || true
@@ -128,6 +133,15 @@ if [ "$RUN_DOCS" = "1" ]; then
   fi
 fi
 
+# ---- 启动门户网站（平台门户静态站点 platform/homePage） ----
+if [ "$RUN_PORTAL" = "1" ]; then
+  echo "==> [门户] 启动静态网站 (127.0.0.1:40200)..."
+  (cd "$ROOT/platform/homePage" && python3 -m http.server 40200 --bind 127.0.0.1) > "$LOG_DIR/portal.log" 2>&1 &
+  PORTAL_PID=$!
+  echo "   PID: $PORTAL_PID    日志: $LOG_DIR/portal.log"
+  wait_ready "http://127.0.0.1:40200" "门户" || true
+fi
+
 # ---- 输出访问地址 ----
 echo ""
 echo "=============================================="
@@ -135,10 +149,12 @@ echo "  ✅ 服务已启动"
 if [ "$MODE" = "prod" ]; then
   echo "  访问: http://127.0.0.1:8010  (后端托管前端产物)"
   [ "$RUN_DOCS" = "1" ] && echo "  文档站: http://127.0.0.1:40183  (宣传手册/使用手册/技术文档)"
+  [ "$RUN_PORTAL" = "1" ] && echo "  门户: http://127.0.0.1:40200  (平台门户网站)"
 else
   echo "  前端: http://127.0.0.1:5173"
   echo "  后端: http://127.0.0.1:8010  (API / WebSocket)"
   [ "$RUN_DOCS" = "1" ] && echo "  文档站: http://127.0.0.1:5174  (宣传手册/使用手册/技术文档)"
+  [ "$RUN_PORTAL" = "1" ] && echo "  门户: http://127.0.0.1:40200  (平台门户网站)"
 fi
 echo "  按 Ctrl+C 停止全部服务"
 echo "=============================================="

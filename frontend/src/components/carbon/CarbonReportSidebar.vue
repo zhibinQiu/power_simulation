@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { carbonAssistantApi } from '../../api/carbonAssistant.js'
 import { carbonComplianceApi } from '../../api/carbonCompliance.js'
 import { renderMarkdown, parseToc } from '../../utils/markdown.js'
+import { t } from '../../i18n'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -37,7 +38,7 @@ const methodOptions = [
 
 const reportType = ref('compliance_analysis')
 const forecastMethod = ref('linear')
-const title = ref('碳资产管理综合分析报告')
+const title = ref(t('碳资产管理综合分析报告'))
 const period = ref('2026年度')
 const focus = ref(['compliance', 'trading'])
 const extra = ref('')
@@ -97,7 +98,7 @@ let pollTimer = null
 async function startAnalysis() {
   if (submitting.value) return
   if (reportType.value === 'compliance_analysis' && !enterpriseId.value) {
-    statusMsg.value = '履约综合分析需要先选择控排企业'
+    statusMsg.value = t('履约综合分析需要先选择控排企业')
     return
   }
   submitting.value = true
@@ -114,10 +115,10 @@ async function startAnalysis() {
       compliance_year: reportType.value === 'compliance_analysis' ? complianceYear.value : null,
     })
     trackingTask.value = res
-    statusMsg.value = `任务已提交（${res.task_id}），正在生成…`
+    statusMsg.value = t('任务已提交（{task_id}），正在生成…', { task_id: res.task_id })
     pollTask(res.task_id)
   } catch (e) {
-    statusMsg.value = '提交失败：' + e.message
+    statusMsg.value = t('提交失败：') + e.message
     submitting.value = false
   }
 }
@@ -132,19 +133,19 @@ function pollTask(taskId) {
         clearPoll()
         submitting.value = false
         if (t.status === 'completed' && t.report_id) {
-          statusMsg.value = '报告生成完成'
+          statusMsg.value = t('报告生成完成')
           await loadReports()
           await showReport(t.report_id)
         } else if (t.status === 'failed') {
-          statusMsg.value = '生成失败：' + (t.message || '未知错误')
+          statusMsg.value = t('生成失败：') + (t.message || t('未知错误'))
         } else {
-          statusMsg.value = '任务已取消'
+          statusMsg.value = t('任务已取消')
         }
       }
     } catch (e) {
       clearPoll()
       submitting.value = false
-      statusMsg.value = '任务查询失败：' + e.message
+      statusMsg.value = t('任务查询失败：') + e.message
     }
   }, 1500)
 }
@@ -153,9 +154,9 @@ async function cancelRunning() {
   if (!trackingTask.value) return
   try {
     await carbonAssistantApi.cancelTask(trackingTask.value.task_id)
-    statusMsg.value = '正在取消任务…'
+    statusMsg.value = t('正在取消任务…')
   } catch (e) {
-    statusMsg.value = '取消失败：' + e.message
+    statusMsg.value = t('取消失败：') + e.message
   }
 }
 
@@ -199,11 +200,11 @@ async function showReport(id) {
   selected.value = id
   try {
     const data = await carbonAssistantApi.getReport(id)
-    const md = data.markdown || data.content || '无内容'
+    const md = data.markdown || data.content || t('无内容')
     preview.value = md
     summary.value = extractSummary(md)
   } catch (e) {
-    preview.value = '读取报告失败：' + e.message
+    preview.value = t('读取报告失败：') + e.message
     summary.value = ''
   }
 }
@@ -246,14 +247,14 @@ async function removeReport(id) {
     if (selected.value === id) { selected.value = null; preview.value = ''; summary.value = '' }
     await loadReports()
   } catch (e) {
-    statusMsg.value = '删除失败：' + e.message
+    statusMsg.value = t('删除失败：') + e.message
   }
 }
 
 function downloadReport(id, titleText) {
   const a = document.createElement('a')
   a.href = `/api/carbon-assistant/reports/${id}/download`
-  a.download = `${titleText || '碳资产报告'}.md`
+  a.download = `${titleText || t('碳资产报告')}.md`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
@@ -271,17 +272,17 @@ onBeforeUnmount(clearPoll)
   <Transition name="slide">
     <div v-if="open" class="carbon-report-sidebar" @click.stop>
       <div class="header">
-        <h3>碳资产报告中心</h3>
-        <button class="close" @click="open = false" aria-label="关闭">×</button>
+        <h3>{{ t('碳资产报告中心') }}</h3>
+        <button class="x-btn lg" @click="open = false" :aria-label="t('关闭')">×</button>
       </div>
 
       <div class="body">
         <!-- 生成新报告 -->
         <section class="section">
-          <h4>生成新报告</h4>
+          <h4>{{ t('生成新报告') }}</h4>
 
           <div class="field">
-            <span>报告类型</span>
+            <span>{{ t('报告类型') }}</span>
             <div class="opt-cards">
               <button
                 v-for="opt in typeOptions"
@@ -289,72 +290,72 @@ onBeforeUnmount(clearPoll)
                 :class="['opt-card', { active: reportType === opt.key }]"
                 @click="reportType = opt.key"
               >
-                <div class="opt-name">{{ opt.label }}</div>
-                <div class="opt-desc">{{ opt.desc }}</div>
+                <div class="opt-name">{{ t(opt.label) }}</div>
+                <div class="opt-desc">{{ t(opt.desc) }}</div>
               </button>
             </div>
           </div>
 
           <div class="field">
-            <span>价格预测方法</span>
+            <span>{{ t('价格预测方法') }}</span>
             <div class="opt-cards inline">
               <button
                 v-for="opt in methodOptions"
                 :key="opt.key"
                 :class="['opt-card', 'mini', { active: forecastMethod === opt.key }]"
-                :title="opt.desc"
+                :title="t(opt.desc)"
                 @click="forecastMethod = opt.key"
-              >{{ opt.label }}</button>
+              >{{ t(opt.label) }}</button>
             </div>
           </div>
 
           <label class="field">
-            <span>报告标题</span>
-            <input v-model="title" type="text" placeholder="例如：2026年度碳资产管理综合分析报告" />
+            <span>{{ t('报告标题') }}</span>
+            <input v-model="title" type="text" :placeholder="t('例如：2026年度碳资产管理综合分析报告')" />
           </label>
           <label class="field">
-            <span>核算周期</span>
-            <input v-model="period" type="text" placeholder="例如：2026年度" />
+            <span>{{ t('核算周期') }}</span>
+            <input v-model="period" type="text" :placeholder="t('例如：2026年度')" />
           </label>
           <div v-if="reportType === 'compliance_analysis'" class="field">
-            <span>控排企业（履约综合分析必选）</span>
+            <span>{{ t('控排企业') }}（{{ t('履约综合分析必选') }}）</span>
             <select v-model="enterpriseId">
-              <option value="" disabled>请选择企业</option>
+              <option value="" disabled>{{ t('请选择企业') }}</option>
               <option v-for="e in enterprises" :key="e.id" :value="e.id">{{ e.name }}</option>
             </select>
-            <div class="sub-hint">履约年份按核算周期中的年份自动识别（{{ complianceYear }} 年）</div>
+            <div class="sub-hint">{{ t('履约年份按核算周期中的年份自动识别') }}（{{ complianceYear }} {{ t('年') }}）</div>
           </div>
           <div class="field">
-            <span>分析重点</span>
+            <span>{{ t('分析重点') }}</span>
             <div class="tags">
               <button
                 v-for="opt in focusOptions"
                 :key="opt.key"
                 :class="['tag', { active: focus.includes(opt.key) }]"
                 @click="toggleFocus(opt.key)"
-              >{{ opt.label }}</button>
+              >{{ t(opt.label) }}</button>
             </div>
           </div>
           <label class="field">
-            <span>补充说明</span>
-            <textarea v-model="extra" rows="3" placeholder="补充企业背景、减排目标、CCER计划等…"></textarea>
+            <span>{{ t('补充说明') }}</span>
+            <textarea v-model="extra" rows="3" :placeholder="t('补充企业背景、减排目标、CCER计划等…')"></textarea>
           </label>
 
           <button class="submit" :disabled="submitting" @click="startAnalysis">
             <span v-if="submitting" class="spinner"></span>
-            {{ submitting ? '生成中…' : '生成碳资产报告' }}
+            {{ submitting ? t('生成中…') : t('生成碳资产报告') }}
           </button>
           <div v-if="statusMsg" class="status">{{ statusMsg }}</div>
         </section>
 
         <!-- 运行中任务 -->
         <section v-if="trackingTask" class="section">
-          <h4>运行中任务</h4>
+          <h4>{{ t('运行中任务') }}</h4>
           <div class="task-card" :class="trackingTask.status">
             <div class="task-head">
               <span class="task-title">{{ trackingTask.title }}</span>
               <span class="task-state" :class="trackingTask.status">
-                {{ { pending: '排队中', running: '生成中', completed: '完成', failed: '失败', cancelled: '已取消' }[trackingTask.status] || trackingTask.status }}
+                {{ { pending: t('排队中'), running: t('生成中'), completed: t('完成'), failed: t('失败'), cancelled: t('已取消') }[trackingTask.status] || trackingTask.status }}
               </span>
             </div>
             <div class="progress">
@@ -367,65 +368,65 @@ onBeforeUnmount(clearPoll)
                 v-if="['pending', 'running'].includes(trackingTask.status)"
                 class="cancel"
                 @click="cancelRunning"
-              >取消</button>
+              >{{ t('取消') }}</button>
             </div>
           </div>
         </section>
 
         <!-- 历史报告 -->
         <section class="section">
-          <h4>历史报告（{{ total }}）</h4>
+          <h4>{{ t('历史报告') }}（{{ total }}）</h4>
           <div class="filters">
             <input
               v-model="keyword"
               type="text"
               class="search"
-              placeholder="搜索标题 / 场景…"
+              :placeholder="t('搜索标题 / 场景…')"
               @keyup.enter="search"
             />
             <select v-model="typeFilter" @change="search">
-              <option value="">全部类型</option>
-              <option v-for="(label, key) in typeLabels" :key="key" :value="key">{{ label }}</option>
+              <option value="">{{ t('全部类型') }}</option>
+              <option v-for="(label, key) in typeLabels" :key="key" :value="key">{{ t(label) }}</option>
             </select>
-            <button class="mini-btn" @click="search">搜索</button>
+            <button class="mini-btn" @click="search">{{ t('搜索') }}</button>
           </div>
 
           <ul class="report-list">
             <li v-for="r in reports" :key="r.id" :class="{ active: selected === r.id }">
               <div class="info" @click="showReport(r.id)">
                 <div class="title">
-                  <span class="type-tag" :class="r.report_type">{{ typeLabels[r.report_type] || '报告' }}</span>
+                  <span class="type-tag" :class="r.report_type">{{ typeLabels[r.report_type] ? t(typeLabels[r.report_type]) : t('报告') }}</span>
                   {{ r.title }}
                 </div>
-                <div class="meta">{{ r.created_at }} · {{ r.length }} 字</div>
+                <div class="meta">{{ r.created_at }} · {{ r.length }} {{ t('字') }}</div>
               </div>
               <div class="actions">
-                <button @click="viewHtml(r.id)" title="HTML 阅读页查看">📖</button>
-                <button @click="downloadReport(r.id, r.title)" title="下载 Markdown">⬇</button>
-                <button @click="removeReport(r.id)" title="删除">🗑</button>
+                <button @click="viewHtml(r.id)" :title="t('HTML 阅读页查看')">📖</button>
+                <button @click="downloadReport(r.id, r.title)" :title="t('下载 Markdown')">⬇</button>
+                <button @click="removeReport(r.id)" :title="t('删除')">🗑</button>
               </div>
             </li>
-            <li v-if="!reports.length" class="empty">暂无报告</li>
+            <li v-if="!reports.length" class="empty">{{ t('暂无报告') }}</li>
           </ul>
 
           <div v-if="total > pageSize" class="pager">
-            <button :disabled="page <= 1" @click="prevPage">上一页</button>
+            <button :disabled="page <= 1" @click="prevPage">{{ t('上一页') }}</button>
             <span>{{ page }} / {{ Math.max(1, Math.ceil(total / pageSize)) }}</span>
-            <button :disabled="page * pageSize >= total" @click="nextPage">下一页</button>
+            <button :disabled="page * pageSize >= total" @click="nextPage">{{ t('下一页') }}</button>
           </div>
         </section>
 
         <!-- 结论摘要 + 预览 -->
         <section v-if="summary" class="section">
-          <h4>先看结论</h4>
+          <h4>{{ t('先看结论') }}</h4>
           <div class="summary">{{ summary }}</div>
         </section>
 
         <section v-if="preview" class="section preview">
-          <h4>报告预览</h4>
+          <h4>{{ t('报告预览') }}</h4>
           <!-- 目录（大纲）：vscode 风格 outline，点击滚动到对应章节 -->
           <nav v-if="toc.length" class="report-toc">
-            <div class="toc-title">目录</div>
+            <div class="toc-title">{{ t('目录') }}</div>
             <button v-for="item in toc" :key="item.id" class="toc-item" :class="'lvl' + item.level" @click="scrollToHeading(item.id)">
               {{ item.text }}
             </button>
@@ -469,18 +470,6 @@ onBeforeUnmount(clearPoll)
   font-weight: 600;
   color: var(--text);
 }
-.close {
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-}
-.close:hover { color: var(--red); background: var(--panel-3); }
 .body {
   flex: 1;
   overflow-y: auto;
@@ -522,7 +511,7 @@ onBeforeUnmount(clearPoll)
 .field input:focus,
 .field textarea:focus,
 .filters input:focus {
-  border-color: var(--accent);
+  border-color: var(--accent-d);
   box-shadow: 0 0 0 1px var(--accent-l);
 }
 .field select {
@@ -554,10 +543,10 @@ onBeforeUnmount(clearPoll)
   cursor: pointer;
   transition: border-color 0.12s, background 0.12s;
 }
-.opt-card:hover { border-color: var(--accent); }
+.opt-card:hover { border-color: var(--accent-d); }
 .opt-card.active {
   background: var(--accent-l);
-  border-color: var(--accent);
+  border-color: var(--accent-d);
   color: var(--accent-d);
 }
 .opt-card .opt-name { font-size: 12px; font-weight: 600; }
@@ -580,7 +569,7 @@ onBeforeUnmount(clearPoll)
 .tag.active {
   background: var(--accent);
   color: #fff;
-  border-color: var(--accent);
+  border-color: var(--accent-d);
 }
 .submit {
   width: 100%;
@@ -645,8 +634,8 @@ onBeforeUnmount(clearPoll)
   flex-shrink: 0;
 }
 .task-state.running { background: var(--accent-l); color: var(--accent-d); }
-.task-state.completed { background: rgba(46, 158, 99, 0.14); color: var(--green); }
-.task-state.failed { background: rgba(209, 75, 75, 0.14); color: var(--red); }
+.task-state.completed { background: rgba(46, 139, 87, 0.14); color: var(--green); }
+.task-state.failed { background: rgba(188, 59, 48, 0.14); color: var(--red); }
 .task-state.cancelled { background: var(--panel-3); color: var(--muted); }
 .progress {
   height: 4px;
@@ -672,14 +661,14 @@ onBeforeUnmount(clearPoll)
 .task-pct { color: var(--accent-d); font-weight: 600; }
 .cancel {
   padding: 2px 10px;
-  border: 1px solid rgba(209, 75, 75, 0.5);
+  border: 1px solid rgba(188, 59, 48, 0.5);
   border-radius: 4px;
   background: transparent;
   color: var(--red);
   font-size: 11px;
   cursor: pointer;
 }
-.cancel:hover { background: rgba(209, 75, 75, 0.12); }
+.cancel:hover { background: rgba(188, 59, 48, 0.12); }
 /* 筛选 */
 .filters {
   display: flex;
@@ -697,7 +686,7 @@ onBeforeUnmount(clearPoll)
   font-size: 12px;
   cursor: pointer;
 }
-.mini-btn:hover { border-color: var(--accent); color: var(--accent-d); }
+.mini-btn:hover { border-color: var(--accent-d); color: var(--accent-d); }
 /* 报告列表 */
 .report-list {
   list-style: none;
@@ -715,7 +704,7 @@ onBeforeUnmount(clearPoll)
   border-radius: 4px;
   cursor: pointer;
 }
-.report-list li.active { border-color: var(--accent); background: var(--accent-l); }
+.report-list li.active { border-color: var(--accent-d); background: var(--accent-l); }
 .report-list li:hover:not(.active) { border-color: var(--border); background: var(--panel-3); }
 .report-list .info {
   flex: 1;
@@ -754,7 +743,7 @@ onBeforeUnmount(clearPoll)
   padding: 3px;
   border-radius: 3px;
 }
-.report-list .actions button:hover { color: var(--accent); background: var(--panel-3); }
+.report-list .actions button:hover { color: var(--accent-d); background: var(--panel-3); }
 .empty {
   color: var(--muted);
   font-size: 12px;
@@ -784,7 +773,7 @@ onBeforeUnmount(clearPoll)
 .summary {
   padding: 10px 12px;
   background: var(--accent-l);
-  border: 1px solid rgba(0, 114, 189, 0.35);
+  border: 1px solid rgba(0, 94, 148, 0.35);
   border-radius: 4px;
   font-size: 12px;
   color: var(--text);
@@ -827,7 +816,7 @@ onBeforeUnmount(clearPoll)
   text-overflow: ellipsis;
 }
 .toc-item:hover {
-  color: var(--accent);
+  color: var(--accent-d);
   background: var(--panel-3);
 }
 .toc-item.lvl1 { padding-left: 8px; font-weight: 600; color: var(--text); }
@@ -949,7 +938,7 @@ onBeforeUnmount(clearPoll)
   margin: 12px 0;
 }
 .carbon-report-sidebar .report-md a {
-  color: var(--accent);
+  color: var(--accent-d);
   text-decoration: none;
 }
 .carbon-report-sidebar .report-md a:hover { text-decoration: underline; }

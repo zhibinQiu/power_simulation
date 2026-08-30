@@ -14,7 +14,7 @@
           <!-- 资源树：盒子节点 + 模型 + 设备（设备配置已并入通信拓扑图，无单独 tab） -->
           <div class="cbx-tree">
             <div class="cbx-tree-sec" @click="expanded.boxes = !expanded.boxes">
-              <span class="cbx-tree-arrow">{{ expanded.boxes ? '▾' : '▸' }}</span> 盒子节点
+              <span class="cbx-tree-arrow">{{ expanded.boxes ? '▾' : '▸' }}</span> {{ t('盒子节点') }}
               <span class="cbx-tree-count">{{ topoBoxes.length }}</span>
             </div>
             <div v-show="expanded.boxes" class="cbx-tree-children">
@@ -26,16 +26,16 @@
                   <span class="cbx-tree-tag" :class="{ ok: readyOk(b.ready), err: b.ready === false }">{{ readyZh(b.ready) }}</span>
                 </div>
                 <div v-show="expanded['box-' + b.name]" class="cbx-tree-children">
-                  <div v-for="d in boxDevices(b)" :key="d.name" class="cbx-tree-leaf" @click="onDevClick(d)" :title="(d._cloud ? '云端设备（点击查看实时）' : '待下发设备（点击编辑配置）') + '：' + d.name + (modelOf(d) ? '（模型 ' + modelOf(d) + '）' : '')">
+                  <div v-for="d in boxDevices(b)" :key="d.name" class="cbx-tree-leaf" @click="onDevClick(d)" :title="(d._cloud ? t('云端设备（点击查看实时）') : t('待下发设备（点击编辑配置）')) + '：' + d.name + (modelOf(d) ? '（' + t('模型') + ' ' + modelOf(d) + '）' : '')">
                     <span class="cbx-dot" :class="{ on: d.state === 'online' }"></span><span class="cbx-tree-label">{{ d.name }}</span><span class="cbx-tree-tag" v-if="modelOf(d)">{{ modelOf(d) }}</span>
                   </div>
-                  <div v-if="!boxDevices(b).length" class="cbx-tree-empty">暂无设备</div>
+                  <div v-if="!boxDevices(b).length" class="cbx-tree-empty">{{ t('暂无设备') }}</div>
                 </div>
               </div>
               <div v-if="topoUnmounted.length" class="cbx-tree-node">
                 <div class="cbx-tree-row" @click="expanded.unmounted = !expanded.unmounted">
                   <span class="cbx-tree-arrow">{{ expanded.unmounted ? '▾' : '▸' }}</span>
-                  <span class="cbx-tree-label">未挂载</span><span class="cbx-tree-count">{{ topoUnmounted.length }}</span>
+                  <span class="cbx-tree-label">{{ t('未挂载') }}</span><span class="cbx-tree-count">{{ topoUnmounted.length }}</span>
                 </div>
                 <div v-show="expanded.unmounted" class="cbx-tree-children">
                   <div v-for="d in topoUnmounted" :key="d.name" class="cbx-tree-leaf" @click="openDevRealtime(d)">{{ d.name }}</div>
@@ -43,22 +43,22 @@
               </div>
             </div>
             <div class="cbx-tree-sec" @click="expanded.models = !expanded.models">
-              <span class="cbx-tree-arrow">{{ expanded.models ? '▾' : '▸' }}</span> 模型
+              <span class="cbx-tree-arrow">{{ expanded.models ? '▾' : '▸' }}</span> {{ t('模型') }}
               <span class="cbx-tree-count">{{ mergedModels.length }}</span>
             </div>
             <div v-show="expanded.models" class="cbx-tree-children">
-              <div v-for="m in mergedModels" :key="m.name" class="cbx-tree-leaf" @click="openEditModel(m)" :title="'模型（点击修改点位）：' + m.name">▦ {{ m.name }}<span class="cbx-tree-tag" v-if="modelPropCount(m)">{{ modelPropCount(m) }} 属性</span></div>
-              <div v-if="!mergedModels.length" class="cbx-tree-empty">暂无模型</div>
+              <div v-for="m in mergedModels" :key="m.name" class="cbx-tree-leaf" @click="openEditModel(m)" :title="t('模型（点击修改点位）') + '：' + m.name">▦ {{ m.name }}<span class="cbx-tree-tag" v-if="modelPropCount(m)">{{ modelPropCount(m) }} {{ t('属性') }}</span></div>
+              <div v-if="!mergedModels.length" class="cbx-tree-empty">{{ t('暂无模型') }}</div>
             </div>
             <div class="cbx-tree-sec" @click="expanded.devs = !expanded.devs">
-              <span class="cbx-tree-arrow">{{ expanded.devs ? '▾' : '▸' }}</span> 设备
+              <span class="cbx-tree-arrow">{{ expanded.devs ? '▾' : '▸' }}</span> {{ t('设备') }}
               <span class="cbx-tree-count">{{ mergedDevices.length }}</span>
             </div>
             <div v-show="expanded.devs" class="cbx-tree-children">
-              <div v-for="d in mergedDevices" :key="d.name" class="cbx-tree-leaf" @click="onDevClick(d)" :title="(d._cloud ? '云端设备（点击查看实时）' : '待下发设备（点击编辑配置）') + '：' + d.name + (modelOf(d) ? '（模型 ' + modelOf(d) + '）' : '')">
+              <div v-for="d in mergedDevices" :key="d.name" class="cbx-tree-leaf" @click="onDevClick(d)" :title="(d._cloud ? t('云端设备（点击查看实时）') : t('待下发设备（点击编辑配置）')) + '：' + d.name + (modelOf(d) ? '（' + t('模型') + ' ' + modelOf(d) + '）' : '')">
                 <span class="cbx-dot" :class="{ on: d.state === 'online' }"></span>{{ d.name }}<span class="cbx-tree-tag" v-if="modelOf(d)">{{ modelOf(d) }}</span>
               </div>
-              <div v-if="!mergedDevices.length" class="cbx-tree-empty">暂无设备</div>
+              <div v-if="!mergedDevices.length" class="cbx-tree-empty">{{ t('暂无设备') }}</div>
             </div>
           </div>
         </div>
@@ -71,46 +71,46 @@
         <!-- 云端状态全局提示（集中展示，避免下方各区块重复出现“云端不可达”tag） -->
         <div class="cbx-banner" :class="overview.cloud_source === 'degraded' ? 'warn' : 'err'"
              v-if="overview.cloud_source && overview.cloud_source !== 'live'">
-          <template v-if="overview.cloud_source === 'stale'">⚠ 云端推送已中断：当前节点/CloudCore 状态为过期缓存，非实时数据。{{ overview.cloud_error }}</template>
-          <template v-else-if="overview.cloud_source === 'degraded'">⚠ 云端部分服务异常：以下云端数据可能为缓存或不完整。</template>
-          <template v-else>⚠ 云端不可达：以下云端数据不可用。请检查云端服务（cloud-agent / CloudHub 10002 / MQTT 41883）。</template>
+          <template v-if="overview.cloud_source === 'stale'">{{ t('⚠ 云端推送已中断：当前节点/CloudCore 状态为过期缓存，非实时数据。') }}{{ overview.cloud_error }}</template>
+          <template v-else-if="overview.cloud_source === 'degraded'">{{ t('⚠ 云端部分服务异常：以下云端数据可能为缓存或不完整。') }}</template>
+          <template v-else>{{ t('⚠ 云端不可达：以下云端数据不可用。请检查云端服务（cloud-agent / CloudHub 10002 / MQTT 41883）。') }}</template>
           <template v-if="overview.demo_note">{{ overview.demo_note }}</template>
         </div>
         <!-- ① 通信拓扑图：平台 → 云端 → 边端 → 设备端（连线标注实际协议） -->
         <section class="cbx-sec">
           <div class="cbx-sec-head">
-            <b>通信拓扑图</b>
-            <span class="cbx-sec-hint">拖动模块可自定义布局，连线自动跟随</span>
+            <b>{{ t('通信拓扑图') }}</b>
+            <span class="cbx-sec-hint">{{ t('拖动模块可自定义布局，连线自动跟随') }}</span>
             <span class="cbx-sec-spacer"></span>
-            <button class="cbx-op cbx-xs" @click="autoLayoutTopo()" title="恢复四列自动布局，清除所有模块的手动拖拽位置">自动布局</button>
+            <button class="cbx-op cbx-xs" @click="autoLayoutTopo()" :title="t('恢复四列自动布局，清除所有模块的手动拖拽位置')">{{ t('自动布局') }}</button>
           </div>
           <div ref="topoCanvasRef" class="cbx-topo cbx-topo-canvas">
             <div class="cbx-topo-lanes">
               <!-- 平台列 -->
               <div class="cbx-topo-lane">
-                <div class="cbx-topo-lane-title">平台</div>
+                <div class="cbx-topo-lane-title">{{ t('平台') }}</div>
                 <div :ref="setNodeRef('n_platform')" class="cbx-topo-mod platform">
                   <div class="cbx-topo-mod-head">
-                    <span class="cbx-topo-mod-name">工业能碳智控平台</span>
-                    <span class="cbx-topo-mod-badge ok">运行中</span>
+                    <span class="cbx-topo-mod-name">{{ t('工业能碳智控平台') }}</span>
+                    <span class="cbx-topo-mod-badge ok">{{ t('运行中') }}</span>
                   </div>
-                  <div class="cbx-topo-mod-sub">Web 前端 ⇄ FastAPI :8010<br/>平台服务</div>
+                  <div class="cbx-topo-mod-sub">{{ t('Web 前端 ⇄ FastAPI :8010') }}<br/>{{ t('平台服务') }}</div>
                   <div class="cbx-topo-mod-ops">
-                    <button class="cbx-op cbx-xs" @click="refreshAll()" title="刷新全部数据">⟳ 刷新</button>
+                    <button class="cbx-op cbx-xs" @click="refreshAll()" :title="t('刷新全部数据')">⟳ {{ t('刷新') }}</button>
                   </div>
                 </div>
               </div>
               <!-- 云端列 -->
               <div class="cbx-topo-lane">
-                <div class="cbx-topo-lane-title">云端<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openBoxConfig" title="配置云端 Broker 地址/账号与 agent Token/端口，保存后自动热更新重连">云端配置</button></div>
+                <div class="cbx-topo-lane-title">{{ t('云端') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openBoxConfig" :title="t('配置云端 Broker 地址/账号与 agent Token/端口，保存后自动热更新重连')">{{ t('云端配置') }}</button></div>
                 <div :ref="setNodeRef('n_agent')" class="cbx-topo-mod agent" :class="{ down: !agentStatusOk }">
                   <div class="cbx-topo-mod-head">
                     <span class="cbx-topo-mod-name">cloud-agent</span>
-                    <span class="cbx-topo-mod-badge" :class="{ ok: agentStatusOk }">{{ agentStatusOk ? '在线' : '离线' }}</span>
+                    <span class="cbx-topo-mod-badge" :class="{ ok: agentStatusOk }">{{ agentStatusOk ? t('在线') : t('离线') }}</span>
                   </div>
-                  <div class="cbx-topo-mod-sub">HTTP :42083 · Bearer<br/>{{ agentStatusOk ? '已连通' : '未连通（需配置 Token）' }}</div>
+                  <div class="cbx-topo-mod-sub">HTTP :42083 · Bearer<br/>{{ agentStatusOk ? t('已连通') : t('未连通（需配置 Token）') }}</div>
                   <div class="cbx-topo-mod-ops">
-                    <button class="cbx-op cbx-xs" :disabled="!!restartingKey" @click="restartAgent()" title="重启云端 cloud-agent systemd 服务（2 秒后自动拉起）">{{ restartingKey === 'systemd:cloud-agent' ? '重启中…' : '↻ 重启' }}</button>
+                    <button class="cbx-op cbx-xs" :disabled="!!restartingKey" @click="restartAgent()" :title="t('重启云端 cloud-agent systemd 服务（2 秒后自动拉起）')">{{ restartingKey === 'systemd:cloud-agent' ? t('重启中…') : '↻ ' + t('重启') }}</button>
                   </div>
                 </div>
                 <div :ref="setNodeRef('n_cloudcore')" class="cbx-topo-mod cloudcore" :class="{ down: overview.cloud_source !== 'live' || (overview.cloudcore && overview.cloudcore.phase !== 'Running') }">
@@ -120,93 +120,93 @@
                   </div>
                   <div class="cbx-topo-mod-sub">CloudHub :10002 · KubeEdge CRD<br/>{{ cloudCfg.host || '172.19.134.45' }}</div>
                   <div class="cbx-topo-mod-ops">
-                    <button class="cbx-op cbx-xs" :disabled="!!restartingKey" @click="restartCloudcore()" title="重启云端 kubeedge 命名空间下的 cloudcore 工作负载">{{ restartingKey === 'deployment:cloudcore' ? '重启中…' : '↻ 重启' }}</button>
+                    <button class="cbx-op cbx-xs" :disabled="!!restartingKey" @click="restartCloudcore()" :title="t('重启云端 kubeedge 命名空间下的 cloudcore 工作负载')">{{ restartingKey === 'deployment:cloudcore' ? t('重启中…') : '↻ ' + t('重启') }}</button>
                   </div>
                 </div>
                 <div :ref="setNodeRef('n_broker')" class="cbx-topo-mod broker">
                   <div class="cbx-topo-mod-head">
                     <span class="cbx-topo-mod-name">MQTT Broker</span>
-                    <span class="cbx-topo-mod-badge ok">运行中</span>
+                    <span class="cbx-topo-mod-badge ok">{{ t('运行中') }}</span>
                   </div>
-                  <div class="cbx-topo-mod-sub">TCP :41883 · WS :41083<br/>订阅 {{ fmtNum(stats.subscriptions) }} · 运行 {{ fmtUptime(stats.uptime) }}</div>
+                  <div class="cbx-topo-mod-sub">TCP :41883 · WS :41083<br/>{{ t('订阅') }} {{ fmtNum(stats.subscriptions) }} · {{ t('运行') }} {{ fmtUptime(stats.uptime) }}</div>
                   <div class="cbx-topo-mod-ops">
-                    <button class="cbx-op cbx-xs" :disabled="!!restartingKey" @click="restartBroker()" title="重启云端 MQTT Broker（nengtan-cloud-broker systemd 服务，短暂断连后自动重连）">{{ restartingKey === 'systemd:nengtan-cloud-broker' ? '重启中…' : '↻ 重启' }}</button>
+                    <button class="cbx-op cbx-xs" :disabled="!!restartingKey" @click="restartBroker()" :title="t('重启云端 MQTT Broker（nengtan-cloud-broker systemd 服务，短暂断连后自动重连）')">{{ restartingKey === 'systemd:nengtan-cloud-broker' ? t('重启中…') : '↻ ' + t('重启') }}</button>
                   </div>
                 </div>
               </div>
               <!-- 边端列（EdgeCore 盒子） -->
               <div class="cbx-topo-lane edge">
-                <div class="cbx-topo-lane-title">边端<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openOnboard" title="新盒子接入：生成 edgecore.yaml 配置">盒子接入</button></div>
+                <div class="cbx-topo-lane-title">{{ t('边端') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openOnboard" :title="t('新盒子接入：生成 edgecore.yaml 配置')">{{ t('盒子接入') }}</button></div>
                 <div v-for="b in topoBoxes" :key="b.name" :ref="setBoxNodeRef(b.name)" class="cbx-topo-mod box" :class="{ down: b.ready === false }">
                   <div class="cbx-topo-mod-head">
                     <span class="cbx-topo-mod-name">{{ b.name }}</span>
                     <span class="cbx-topo-mod-badge" :class="{ ok: readyOk(b.ready), err: b.ready === false }">{{ readyZh(b.ready) }}</span>
                   </div>
-                  <div class="cbx-topo-mod-sub">EdgeCore<template v-if="b.version && b.version !== '—'"> · v{{ b.version }}</template><template v-if="b.roles && b.roles !== '—'"> · {{ roleZh(b.roles) }}</template><br/>edgecore MQTT :1883 · {{ b.source === 'mqtt' ? 'MQTT 识别' : 'K8s Agent' }} · {{ devCountOf(b.name) }} 台待下发</div>
+                  <div class="cbx-topo-mod-sub">EdgeCore<template v-if="b.version && b.version !== '—'"> · v{{ b.version }}</template><template v-if="b.roles && b.roles !== '—'"> · {{ roleZh(b.roles) }}</template><br/>edgecore MQTT :1883 · {{ b.source === 'mqtt' ? t('MQTT 识别') : 'K8s Agent' }} · {{ devCountOf(b.name) }} {{ t('台待下发') }}</div>
                   <!-- 盒子当前运行的服务/模型（云端部署，盒子周期上报 state/{box}/services） -->
                   <div class="cbx-topo-svcs">
                     <template v-if="b.services && b.services.length">
                       <div v-for="s in b.services" :key="s.name" class="cbx-topo-svc" :title="(s.command || '') + (s.url ? '\n' + s.url : '')">
                         <span class="cbx-topo-svc-dot" :class="{ on: s.running || s.status === 'running' }"></span>
                         <span class="cbx-topo-svc-name">{{ s.name }}</span>
-                        <span class="cbx-topo-svc-type">{{ s.type || '' }}{{ s.running === false || s.status === 'stopped' ? ' · 已停止' : '' }}</span>
+                        <span class="cbx-topo-svc-type">{{ s.type || '' }}{{ s.running === false || s.status === 'stopped' ? ' · ' + t('已停止') : '' }}</span>
                       </div>
                     </template>
-                    <div v-else class="cbx-topo-svc-empty">暂无云端部署应用</div>
+                    <div v-else class="cbx-topo-svc-empty">{{ t('暂无云端部署应用') }}</div>
                   </div>
                   <div class="cbx-topo-mod-ops">
-                    <button class="cbx-op cbx-xs" @click="openBoxEdgeCfg(b)" title="配置盒子现场可达 IP / SSH 凭据（重启 Mapper 前必须配置且探测可达）">盒子IP</button>
-                    <button class="cbx-op cbx-xs" @click="openAppDeploy(b)" title="云端部署模型/服务到盒子（经云端 Broker 命令主题下发，盒子订阅执行）">⬇ 部署</button>
-                    <button class="cbx-op cbx-xs" :disabled="!!restartingKey || !edgeIpOk(b)" @click="restartMapper(b)" :title="edgeIpOk(b) ? '重启该盒子上的 box-mapper systemd 服务（云端 agent 经 SSH 到边缘盒子执行 systemctl restart box-mapper）' : '未配置盒子 IP 或探测不通，无法重启 Mapper（先点「盒子IP」配置现场可达地址）'">{{ restartingKey === 'edge:box-mapper' ? '重启中…' : '↻ 重启 Mapper' }}</button>
+                    <button class="cbx-op cbx-xs" @click="openBoxEdgeCfg(b)" :title="t('配置盒子现场可达 IP / SSH 凭据（重启 Mapper 前必须配置且探测可达）')">{{ t('盒子IP') }}</button>
+                    <button class="cbx-op cbx-xs" @click="openAppDeploy(b)" :title="t('云端部署模型/服务到盒子（经云端 Broker 命令主题下发，盒子订阅执行）')">⬇ {{ t('部署') }}</button>
+                    <button class="cbx-op cbx-xs" :disabled="!!restartingKey || !edgeIpOk(b)" @click="restartMapper(b)" :title="edgeIpOk(b) ? t('重启该盒子上的 box-mapper systemd 服务（云端 agent 经 SSH 到边缘盒子执行 systemctl restart box-mapper）') : t('未配置盒子 IP 或探测不通，无法重启 Mapper（先点「盒子IP」配置现场可达地址）')">{{ restartingKey === 'edge:box-mapper' ? t('重启中…') : '↻ ' + t('重启 Mapper') }}</button>
                   </div>
                 </div>
-                <div v-if="!topoBoxes.length" class="cbx-topo-empty">未识别到盒子节点（云端未连接）。</div>
+                <div v-if="!topoBoxes.length" class="cbx-topo-empty">{{ t('未识别到盒子节点（云端未连接）。') }}</div>
               </div>
               <!-- 设备端列（采集设备总览，不按盒子分组） -->
               <div class="cbx-topo-lane dev">
-                <div class="cbx-topo-lane-title">设备端<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openModelCreate" title="新建设备模型（DeviceModel）">＋ 模型</button><button class="cbx-op cbx-xs" @click="openCreate()" title="设备接入：新建采集设备并默认关联到盒子">＋ 设备</button></div>
+                <div class="cbx-topo-lane-title">{{ t('设备端') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openModelCreate" :title="t('新建设备模型（DeviceModel）')">＋ {{ t('模型') }}</button><button class="cbx-op cbx-xs" @click="openCreate()" :title="t('设备接入：新建采集设备并默认关联到盒子')">＋ {{ t('设备') }}</button></div>
                 <div :ref="setNodeRef('n_devs')" class="cbx-topo-mod devgroup">
                   <div class="cbx-topo-mod-head">
-                    <span class="cbx-topo-mod-name">采集设备</span>
-                    <span class="cbx-topo-mod-badge ok">{{ topoAllCloudDevs.length + topoAllLocalDevs.length + topoUnmounted.length }} 台</span>
+                    <span class="cbx-topo-mod-name">{{ t('采集设备') }}</span>
+                    <span class="cbx-topo-mod-badge ok">{{ topoAllCloudDevs.length + topoAllLocalDevs.length + topoUnmounted.length }} {{ t('台') }}</span>
                   </div>
-                  <div class="cbx-topo-mod-sub">边缘采集 MQTT :1883<template v-if="allDevProtos.length"> · 协议：{{ allDevProtos.join(' · ') }}</template></div>
+                  <div class="cbx-topo-mod-sub">{{ t('边缘采集 MQTT :1883') }}<template v-if="allDevProtos.length"> · {{ t('协议') }}：{{ allDevProtos.join(' · ') }}</template></div>
                   <div class="cbx-topo-devlist">
                     <div v-if="topoAllCloudDevs.length" class="cbx-topo-devgroup">
-                      <div class="cbx-topo-devlabel">云端真实</div>
-                      <div v-for="d in topoAllCloudDevs" :key="'c' + d.name" class="cbx-topo-dev cloud" :class="{ on: d.state === 'online' }" @click="openDevRealtime(d)" :title="'Device CRD：' + d.name + (d.model ? '（模型 ' + d.model + '）' : '') + '（点击查看实时数据）'">
+                      <div class="cbx-topo-devlabel">{{ t('云端真实') }}</div>
+                      <div v-for="d in topoAllCloudDevs" :key="'c' + d.name" class="cbx-topo-dev cloud" :class="{ on: d.state === 'online' }" @click="openDevRealtime(d)" :title="'Device CRD：' + d.name + (d.model ? '（' + t('模型') + ' ' + d.model + '）' : '') + t('（点击查看实时数据）')">
                         <span class="cbx-topo-dev-dot"></span>
                         <span class="cbx-topo-dev-name">{{ d.name }}</span>
                         <span class="cbx-topo-dev-sub">{{ stateZh(d.state) }}<template v-if="protoOfDev(d)"> · {{ protoOfDev(d) }}</template><template v-if="d.model"> · {{ d.model }}</template></span>
                         <span class="cbx-topo-dev-val" :class="{ 'cbx-invalid': isInvalidReading(d.primary) }">{{ fmtPrimary(d.primary) }}</span>
                         <span class="cbx-topo-dev-ops">
-                          <button class="cbx-op cbx-tiny" @click.stop="openEditDev(d)" title="编辑该设备配置">✎ 配置</button>
+                          <button class="cbx-op cbx-tiny" @click.stop="openEditDev(d)" :title="t('编辑该设备配置')">✎ {{ t('配置') }}</button>
                         </span>
                       </div>
                     </div>
                     <div v-if="topoAllLocalDevs.length" class="cbx-topo-devgroup">
-                      <div class="cbx-topo-devlabel">待下发</div>
-                      <div v-for="d in topoAllLocalDevs" :key="'l' + d.name" class="cbx-topo-dev pending" @click="openDevRealtime(d)" :title="'待下发：' + d.name">
+                      <div class="cbx-topo-devlabel">{{ t('待下发') }}</div>
+                      <div v-for="d in topoAllLocalDevs" :key="'l' + d.name" class="cbx-topo-dev pending" @click="openDevRealtime(d)" :title="t('待下发') + '：' + d.name">
                         <span class="cbx-topo-dev-dot"></span>
                         <span class="cbx-topo-dev-name">{{ d.name }}</span>
-                        <span class="cbx-topo-dev-sub">待下发<template v-if="d.protocol"> · {{ d.protocol }}</template></span>
+                        <span class="cbx-topo-dev-sub">{{ t('待下发') }}<template v-if="d.protocol"> · {{ d.protocol }}</template></span>
                         <span class="cbx-topo-dev-val" :class="{ 'cbx-invalid': isInvalidReading(d.primary) }">{{ fmtPrimary(d.primary) }}</span>
                         <span class="cbx-topo-dev-ops">
-                          <button class="cbx-op cbx-tiny" @click.stop="openEditDev(d)" title="编辑该设备配置">✎ 配置</button>
-                          <button class="cbx-op cbx-tiny" @click.stop="onApplyOneDev(d)" :disabled="applying" title="一键下发该设备到云端 K3s（保存本地并立即下发，无需单独保存）">{{ applying ? '下发中…' : '⤓ 下发' }}</button>
+                          <button class="cbx-op cbx-tiny" @click.stop="openEditDev(d)" :title="t('编辑该设备配置')">✎ {{ t('配置') }}</button>
+                          <button class="cbx-op cbx-tiny" @click.stop="onApplyOneDev(d)" :disabled="applying" :title="t('一键下发该设备到云端 K3s（保存本地并立即下发，无需单独保存）')">{{ applying ? t('下发中…') : '⤓ ' + t('下发') }}</button>
                         </span>
                       </div>
                     </div>
                     <div v-if="topoUnmounted.length" class="cbx-topo-devgroup">
-                      <div class="cbx-topo-devlabel">未挂载</div>
-                      <div v-for="d in topoUnmounted" :key="d.name" class="cbx-topo-dev pending" @click="openDevRealtime(d)" :title="'待下发：' + d.name">
+                      <div class="cbx-topo-devlabel">{{ t('未挂载') }}</div>
+                      <div v-for="d in topoUnmounted" :key="d.name" class="cbx-topo-dev pending" @click="openDevRealtime(d)" :title="t('待下发') + '：' + d.name">
                         <span class="cbx-topo-dev-dot"></span>
                         <span class="cbx-topo-dev-name">{{ d.name }}</span>
                         <span class="cbx-topo-dev-sub"><template v-if="d.protocol">{{ d.protocol }}</template></span>
                         <span class="cbx-topo-dev-val" :class="{ 'cbx-invalid': isInvalidReading(d.primary) }">{{ fmtPrimary(d.primary) }}</span>
                       </div>
                     </div>
-                    <div v-if="!topoAllCloudDevs.length && !topoAllLocalDevs.length && !topoUnmounted.length" class="cbx-topo-dev-empty">暂无设备</div>
+                    <div v-if="!topoAllCloudDevs.length && !topoAllLocalDevs.length && !topoUnmounted.length" class="cbx-topo-dev-empty">{{ t('暂无设备') }}</div>
                   </div>
                 </div>
               </div>
@@ -231,55 +231,55 @@
         <!-- ② 资源列表：盒子 / 模型 / 设备（三列并排总览，点击行可快速跳转编辑/实时） -->
         <section class="cbx-sec">
           <div class="cbx-sec-head">
-            <b>资源列表</b>
-            <span class="cbx-sec-hint">{{ topoBoxes.length }} 盒 · {{ mergedModels.length }} 模型 · {{ mergedDevices.length }} 设备</span>
+            <b>{{ t('资源列表') }}</b>
+            <span class="cbx-sec-hint">{{ topoBoxes.length }} {{ t('盒') }} · {{ mergedModels.length }} {{ t('模型') }} · {{ mergedDevices.length }} {{ t('设备') }}</span>
           </div>
           <div class="cbx-reslist">
             <!-- 盒子列表 -->
             <div class="cbx-rescol">
-              <div class="cbx-rescol-head">盒子列表<span class="cbx-rescol-n">{{ topoBoxes.length }}</span></div>
+              <div class="cbx-rescol-head">{{ t('盒子列表') }}<span class="cbx-rescol-n">{{ topoBoxes.length }}</span></div>
               <div class="cbx-rescol-body">
-                <div v-for="b in topoBoxes" :key="b.name" class="cbx-resrow" @click="openDevRealtime({ name: b.name })" :title="'盒子节点：' + b.name">
+                <div v-for="b in topoBoxes" :key="b.name" class="cbx-resrow" @click="openDevRealtime({ name: b.name })" :title="t('盒子节点') + '：' + b.name">
                   <span class="cbx-dot" :class="{ on: readyOk(b.ready) }"></span>
                   <span class="cbx-res-name">{{ b.name }}</span>
                   <span class="cbx-res-tag" :class="{ ok: readyOk(b.ready), err: b.ready === false }">{{ readyZh(b.ready) }}</span>
-                  <span class="cbx-res-sub">EdgeCore<template v-if="b.version && b.version !== '—'"> v{{ b.version }}</template> · {{ devCountOf(b.name) }} 台待下发</span>
+                  <span class="cbx-res-sub">EdgeCore<template v-if="b.version && b.version !== '—'"> v{{ b.version }}</template> · {{ devCountOf(b.name) }} {{ t('台待下发') }}</span>
                 </div>
-                <div v-if="!topoBoxes.length" class="cbx-res-empty">未识别到盒子节点</div>
+                <div v-if="!topoBoxes.length" class="cbx-res-empty">{{ t('未识别到盒子节点') }}</div>
               </div>
             </div>
             <!-- 模型列表 -->
             <div class="cbx-rescol">
-              <div class="cbx-rescol-head">▦ 模型列表<span class="cbx-rescol-n">{{ mergedModels.length }}</span></div>
+              <div class="cbx-rescol-head">▦ {{ t('模型列表') }}<span class="cbx-rescol-n">{{ mergedModels.length }}</span></div>
               <div class="cbx-rescol-body">
-                <div v-for="m in mergedModels" :key="m.name" class="cbx-resrow" @click="openEditModel(m)" :title="'模型（点击修改点位）：' + m.name">
+                <div v-for="m in mergedModels" :key="m.name" class="cbx-resrow" @click="openEditModel(m)" :title="t('模型（点击修改点位）') + '：' + m.name">
                   <span class="cbx-res-name">{{ m.name }}</span>
-                  <span class="cbx-res-tag ok" v-if="m._cloud">已下发</span>
-                  <span class="cbx-res-tag" v-else>未下发</span>
-                  <span class="cbx-res-sub"><template v-if="m.protocol">{{ m.protocol }}</template> · {{ modelPropCount(m) }} 属性</span>
+                  <span class="cbx-res-tag ok" v-if="m._cloud">{{ t('已下发') }}</span>
+                  <span class="cbx-res-tag" v-else>{{ t('未下发') }}</span>
+                  <span class="cbx-res-sub"><template v-if="m.protocol">{{ m.protocol }}</template> · {{ modelPropCount(m) }} {{ t('属性') }}</span>
                 </div>
-                <div v-if="!mergedModels.length" class="cbx-res-empty">暂无模型</div>
+                <div v-if="!mergedModels.length" class="cbx-res-empty">{{ t('暂无模型') }}</div>
               </div>
             </div>
             <!-- 设备列表 -->
             <div class="cbx-rescol">
-              <div class="cbx-rescol-head">◈ 设备列表<span class="cbx-rescol-n">{{ mergedDevices.length }}</span></div>
+              <div class="cbx-rescol-head">◈ {{ t('设备列表') }}<span class="cbx-rescol-n">{{ mergedDevices.length }}</span></div>
               <div class="cbx-rescol-body">
-                <div v-for="d in mergedDevices" :key="d.name" class="cbx-resrow" @click="onDevClick(d)" :title="(d._cloud ? '云端设备（点击查看实时）' : '待下发设备（点击编辑配置）') + '：' + d.name + (modelOf(d) ? '（模型 ' + modelOf(d) + '）' : '')">
+                <div v-for="d in mergedDevices" :key="d.name" class="cbx-resrow" @click="onDevClick(d)" :title="(d._cloud ? t('云端设备（点击查看实时）') : t('待下发设备（点击编辑配置）')) + '：' + d.name + (modelOf(d) ? '（' + t('模型') + ' ' + modelOf(d) + '）' : '')">
                   <span class="cbx-dot" :class="{ on: d.state === 'online' }"></span>
                   <span class="cbx-res-name">{{ d.name }}</span>
                   <span class="cbx-res-tag" :class="{ ok: d.state === 'online', err: d.state === 'offline' }">{{ devStateZh(d) }}</span>
                   <span class="cbx-res-sub">{{ modelOf(d) || '—' }}<template v-if="d.node"> · {{ d.node }}</template><template v-else-if="d.protocol"> · {{ d.protocol }}</template></span>
                   <span class="cbx-res-ops">
-                    <button class="cbx-op cbx-tiny" @click.stop="openEditDev(d)" title="编辑该设备配置">✎ 配置</button>
+                    <button class="cbx-op cbx-tiny" @click.stop="openEditDev(d)" :title="t('编辑该设备配置')">✎ {{ t('配置') }}</button>
                     <template v-if="d._cloud">
-                      <button class="cbx-op cbx-tiny" @click.stop="openCloudHistory(d)" title="云端时序库（TDengine）历史读数曲线">历史</button>
-                      <button class="cbx-op cbx-tiny" @click.stop="openIngest(d)" title="手动上报 twins（回写设备状态）">⬆ 上报</button>
-                      <button class="cbx-op cbx-tiny danger" @click.stop="delCloud('device', d.name, d.namespace || 'default')" title="删除云端 Device CRD">🗑 删除</button>
+                      <button class="cbx-op cbx-tiny" @click.stop="openCloudHistory(d)" :title="t('云端时序库（TDengine）历史读数曲线')">{{ t('历史') }}</button>
+                      <button class="cbx-op cbx-tiny" @click.stop="openIngest(d)" :title="t('手动上报 twins（回写设备状态）')">⬆ {{ t('上报') }}</button>
+                      <button class="cbx-op cbx-tiny danger" @click.stop="delCloud('device', d.name, d.namespace || 'default')" :title="t('删除云端 Device CRD')">🗑 {{ t('删除') }}</button>
                     </template>
                   </span>
                 </div>
-                <div v-if="!mergedDevices.length" class="cbx-res-empty">暂无设备</div>
+                <div v-if="!mergedDevices.length" class="cbx-res-empty">{{ t('暂无设备') }}</div>
               </div>
             </div>
           </div>
@@ -287,27 +287,27 @@
         <!-- ③ 证书与 Token 有效期（独立区块：云端 agent 实时采集云端 CA/服务证书与共享 token） -->
         <section class="cbx-sec" v-if="(overview.certs || []).length || overview.token">
           <div class="cbx-sec-head">
-            <b>证书与 Token 有效期</b>
-            <span class="cbx-sec-hint">云端 agent 实时采集 · 剩余不足 30 天红色告警</span>
+            <b>{{ t('证书与 Token 有效期') }}</b>
+            <span class="cbx-sec-hint">{{ t('云端 agent 实时采集 · 剩余不足 30 天红色告警') }}</span>
           </div>
           <div class="cbx-certlist">
             <div v-for="c in overview.certs || []" :key="c.cn" class="cbx-certrow">
               <code>{{ c.cn }}</code>
               <span class="cbx-cert-exp">{{ c.expires }}</span>
-              <span class="cbx-cert-days" :class="{ warn: (c.remain_days ?? 999) < 30 }">{{ c.remain_days ?? '—' }} 天</span>
+              <span class="cbx-cert-days" :class="{ warn: (c.remain_days ?? 999) < 30 }">{{ c.remain_days ?? '—' }} {{ t('天') }}</span>
             </div>
             <div v-if="overview.token" class="cbx-certrow">
               <code>token</code>
               <span class="cbx-cert-exp">{{ overview.token.expires }}</span>
-              <span class="cbx-cert-days" :class="{ warn: (overview.token.remain_days ?? 999) < 30 }">{{ overview.token.remain_days ?? '—' }} 天</span>
+              <span class="cbx-cert-days" :class="{ warn: (overview.token.remain_days ?? 999) < 30 }">{{ overview.token.remain_days ?? '—' }} {{ t('天') }}</span>
             </div>
           </div>
         </section>
         <!-- ③ 实时消息流（云端 Broker → 本平台） -->
         <section class="cbx-sec">
           <div class="cbx-sec-head">
-            <b>实时消息流</b>
-            <span class="cbx-sec-sub">最近 {{ messages.length }} 条</span>
+            <b>{{ t('实时消息流') }}</b>
+            <span class="cbx-sec-sub">{{ t('最近') }} {{ messages.length }} {{ t('条') }}</span>
           </div>
           <div ref="msgLogRef" class="cbx-msglog">
             <div v-for="(m, i) in messages" :key="i" class="cbx-msgrow">
@@ -315,24 +315,24 @@
               <code class="cbx-msg-topic">{{ m.topic }}</code>
               <span class="cbx-msg-payload">{{ m.payload }}</span>
             </div>
-            <div v-if="!messages.length" class="cbx-empty">暂无消息。</div>
+            <div v-if="!messages.length" class="cbx-empty">{{ t('暂无消息。') }}</div>
           </div>
         </section>
 
         <!-- ④-1 云端实时日志（agent MQTT cloud/logs 推送 → 平台 WS /api/ws/cloud 实时转发） -->
         <section class="cbx-sec">
           <div class="cbx-sec-head">
-            <b>云端实时日志</b>
-            <span class="cbx-sec-sub" :class="{ warn: cloudWsState !== 'open' }">{{ cloudWsState === 'open' ? 'WebSocket 实时推送中' : '推送未连接（轮询兜底）' }}</span>
+            <b>{{ t('云端实时日志') }}</b>
+            <span class="cbx-sec-sub" :class="{ warn: cloudWsState !== 'open' }">{{ cloudWsState === 'open' ? t('WebSocket 实时推送中') : t('推送未连接（轮询兜底）') }}</span>
             <span v-if="cloudLogs.cloudcore" class="cbx-sec-sub">
-              {{ cloudLogs.cloudcore.name }} · {{ cloudLogs.cloudcore.ready ? '就绪' : '未就绪' }} · {{ cloudLogs.cloudcore.phase }} · 重启 {{ cloudLogs.cloudcore.restarts }} 次 · 最近 {{ (cloudLogs.lines || []).length }} 行
+              {{ cloudLogs.cloudcore.name }} · {{ cloudLogs.cloudcore.ready ? t('就绪') : t('未就绪') }} · {{ cloudLogs.cloudcore.phase }} · {{ t('重启') }} {{ cloudLogs.cloudcore.restarts }} {{ t('次') }} · {{ t('最近') }} {{ (cloudLogs.lines || []).length }} {{ t('行') }}
             </span>
             <span v-else-if="cloudLogs.error" class="cbx-sec-sub warn">{{ cloudLogs.error }}</span>
-            <span v-else class="cbx-sec-sub">采集器启动中…</span>
+            <span v-else class="cbx-sec-sub">{{ t('采集器启动中…') }}</span>
             <span class="cbx-sec-spacer"></span>
             <button class="cbx-op cbx-xs" :disabled="!!restartingKey" @click="restartCloudcore"
-                    :title="agentStatusOk ? '重启云端 cloudcore 工作负载（kubectl rollout restart）' : '需先配置并连通云端 Agent'">
-              {{ restartingKey === 'deployment:cloudcore' ? '重启中…' : '重启 CloudCore' }}
+                    :title="agentStatusOk ? t('重启云端 cloudcore 工作负载（kubectl rollout restart）') : t('需先配置并连通云端 Agent')">
+              {{ restartingKey === 'deployment:cloudcore' ? t('重启中…') : t('重启 CloudCore') }}
             </button>
           </div>
           <div ref="cloudLogRef" class="cbx-msglog cbx-cloudlog">
@@ -340,18 +340,18 @@
               <span class="cbx-msgtime">{{ fmtTime(l.t) }}</span>
               <code class="cbx-cloudline">{{ l.line }}</code>
             </div>
-            <div v-if="!(cloudLogs.lines || []).length" class="cbx-empty">暂无日志。</div>
+            <div v-if="!(cloudLogs.lines || []).length" class="cbx-empty">{{ t('暂无日志。') }}</div>
           </div>
         </section>
 
         <!-- ④ 发测试消息（向云端 Broker 发布） -->
         <section class="cbx-sec">
-          <div class="cbx-sec-head"><b>发测试消息</b></div>
+          <div class="cbx-sec-head"><b>{{ t('发测试消息') }}</b></div>
           <div class="cbx-form">
             <div class="cbx-form-row">
-              <label>主题</label><input v-model="pubForm.topic" class="cbx-input" style="width:260px" placeholder="data/box-001/device-1"/>
-              <label>载荷</label><input v-model="pubForm.payload" class="cbx-input" style="flex:1" placeholder='{"device":"device-1","value":88.8}'/>
-              <button class="cbx-op primary" @click="doPublish">发布</button>
+              <label>{{ t('主题') }}</label><input v-model="pubForm.topic" class="cbx-input" style="width:260px" placeholder="data/box-001/device-1"/>
+              <label>{{ t('载荷') }}</label><input v-model="pubForm.payload" class="cbx-input" style="flex:1" placeholder='{"device":"device-1","value":88.8}'/>
+              <button class="cbx-op primary" @click="doPublish">{{ t('发布') }}</button>
             </div>
           </div>
         </section>
@@ -362,32 +362,32 @@
 
     <!-- 状态栏 -->
     <footer class="cbx-statusbar">
-      <span class="cbx-st-item"><span class="cbx-dot" :class="{ on: overview.cloud_source === 'live' }"></span>云端 {{ overview.cloud_source === 'live' ? '在线' : (overview.cloud_source === 'stale' ? '数据过期' : (overview.cloud_source === 'degraded' ? '部分异常' : '不可达')) }}</span>
-      <span class="cbx-st-item">模型 {{ devices.models?.length || 0 }} · 设备 {{ devices.devices?.length || 0 }}</span>
-      <span class="cbx-st-item">消息 {{ messages.length }} 条</span>
+      <span class="cbx-st-item"><span class="cbx-dot" :class="{ on: overview.cloud_source === 'live' }"></span>{{ t('云端') }} {{ overview.cloud_source === 'live' ? t('在线') : (overview.cloud_source === 'stale' ? t('数据过期') : (overview.cloud_source === 'degraded' ? t('部分异常') : t('不可达'))) }}</span>
+      <span class="cbx-st-item">{{ t('模型') }} {{ devices.models?.length || 0 }} · {{ t('设备') }} {{ devices.devices?.length || 0 }}</span>
+      <span class="cbx-st-item">{{ t('消息') }} {{ messages.length }} {{ t('条') }}</span>
       <span class="cbx-st-grow"></span>
       <span class="cbx-st-item">{{ cloudCfg.host || '172.19.134.45' }}</span>
-      <span class="cbx-st-item">3s 自动刷新</span>
+      <span class="cbx-st-item">3s {{ t('自动刷新') }}</span>
     </footer>
 
         <!-- 手动上报 twins 弹窗（对应云端管理台「上报」：SSH kubectl patch 回写 Device.status.twins） -->
         <div v-if="ingestOpen" class="cbx-mask" @click.self="ingestOpen = false">
           <div class="cbx-dialog">
             <div class="cbx-dialog-head">
-              <b>手动上报 twins：<code>{{ ingestForm.device }}</code></b>
-              <button class="cbx-op danger" @click="ingestOpen = false">✕</button>
+              <b>{{ t('手动上报 twins：') }}<code>{{ ingestForm.device }}</code></b>
+              <button class="x-btn lg" @click="ingestOpen = false" :aria-label="t('关闭')">✕</button>
             </div>
             <div class="cbx-form">
               <div class="cbx-form-row">
-                <label>命名空间</label>
+                <label>{{ t('命名空间') }}</label>
                 <input v-model="ingestForm.namespace" class="cbx-input" style="width:120px"/>
-                <label>属性</label>
+                <label>{{ t('属性') }}</label>
                 <input v-model="ingestForm.property" class="cbx-input" style="width:140px" placeholder="weight"/>
-                <label>值</label>
+                <label>{{ t('值') }}</label>
                 <input v-model="ingestForm.value" class="cbx-input" style="width:140px" placeholder="12.5"/>
               </div>
               <div class="cbx-form-row" style="margin-top:10px">
-                <button class="cbx-op primary" @click="doIngest" :disabled="ingesting">{{ ingesting ? '上报中…' : '上报' }}</button>
+                <button class="cbx-op primary" @click="doIngest" :disabled="ingesting">{{ ingesting ? t('上报中…') : t('上报') }}</button>
                 <span class="cbx-deploy-msg" :class="{ err: ingestErr }">{{ ingestMsg }}</span>
               </div>
             </div>
@@ -398,66 +398,66 @@
         <div v-if="editOpen" class="cbx-mask" @click.self="editOpen = false">
           <div class="cbx-dialog cbx-dialog-lg">
             <div class="cbx-dialog-head">
-              <b>{{ editTarget === 'model' ? '修改模型' : '修改设备' }}：<code>{{ editForm.modelName }}</code></b>
-              <button class="cbx-op danger" @click="editOpen = false">✕</button>
+              <b>{{ editTarget === 'model' ? t('修改模型') : t('修改设备') }}：<code>{{ editForm.modelName }}</code></b>
+              <button class="x-btn lg" @click="editOpen = false" :aria-label="t('关闭')">✕</button>
             </div>
             <div class="cbx-form">
               <div class="cbx-form-row">
-                <label>协议</label>
+                <label>{{ t('协议') }}</label>
                 <select v-model="editForm.protocol" class="cbx-select">
-                  <option value="modbus">Modbus（RTU / TCP）</option>
+                  <option value="modbus">{{ t('Modbus（RTU / TCP）') }}</option>
                   <option value="opcua">OPC-UA</option>
                   <option value="bluetooth">Bluetooth</option>
-                  <option value="lora">LoRaWAN（LoRa 网关）</option>
-                  <option value="cellular">5G/4G 模块自监控</option>
+                  <option value="lora">{{ t('LoRaWAN（LoRa 网关）') }}</option>
+                  <option value="cellular">{{ t('5G/4G 模块自监控') }}</option>
                 </select>
               </div>
               <div class="cbx-form-row">
                 <template v-if="editTarget !== 'model'">
-                  <label>模型</label>
-                  <select v-model="editForm.modelName" class="cbx-select" @change="onPickEditModel" title="切换模型会带出该模型的协议与属性点位">
-                    <option value="" disabled>请选择模型…</option>
-                    <option v-for="m in devices.models || []" :key="m.name" :value="m.name">{{ m.name }}（{{ m.protocol }} · {{ (m.properties || []).length }} 属性）</option>
+                  <label>{{ t('模型') }}</label>
+                  <select v-model="editForm.modelName" class="cbx-select" @change="onPickEditModel" :title="t('切换模型会带出该模型的协议与属性点位')">
+                    <option value="" disabled>{{ t('请选择模型…') }}</option>
+                    <option v-for="m in devices.models || []" :key="m.name" :value="m.name">{{ m.name }}（{{ m.protocol }} · {{ (m.properties || []).length }} {{ t('属性') }}）</option>
                   </select>
-                  <button class="cbx-op cbx-xs" @click="openModelCreate" title="先创建 DeviceModel 再选择">＋ 新建模型</button>
-                  <label>设备名</label><input v-model="editForm.deviceName" class="cbx-input" placeholder="box-device"/>
+                  <button class="cbx-op cbx-xs" @click="openModelCreate" :title="t('先创建 DeviceModel 再选择')">＋ {{ t('新建模型') }}</button>
+                  <label>{{ t('设备名') }}</label><input v-model="editForm.deviceName" class="cbx-input" placeholder="box-device"/>
                 </template>
                 <template v-else>
-                  <label>模型名</label><input v-model="editForm.modelName" class="cbx-input" placeholder="box-metric-model" disabled/>
-                  <span class="cbx-sec-sub">模型为共享配置：点位变更对引用它的所有设备同时生效，无单独设备名</span>
+                  <label>{{ t('模型名') }}</label><input v-model="editForm.modelName" class="cbx-input" placeholder="box-metric-model" disabled/>
+                  <span class="cbx-sec-sub">{{ t('模型为共享配置：点位变更对引用它的所有设备同时生效，无单独设备名') }}</span>
                 </template>
               </div>
               <div v-if="editTarget !== 'model'" class="cbx-form-row">
-                <label>绑定流程设备</label>
-                <select v-model="editForm.boundDevice" class="cbx-select" style="width:300px" title="从现有系统流程的设备中选择：保存后该设备的云端读数将同步到所选流程设备实例（关联制）">
-                  <option value="">不绑定</option>
+                <label>{{ t('绑定流程设备') }}</label>
+                <select v-model="editForm.boundDevice" class="cbx-select" style="width:300px" :title="t('从现有系统流程的设备中选择：保存后该设备的云端读数将同步到所选流程设备实例（关联制）')">
+                  <option value="">{{ t('不绑定') }}</option>
                   <optgroup v-for="grp in procGroups" :key="grp.unit" :label="grp.unit">
                     <option v-for="d in grp.devices" :key="d.id" :value="d.id">{{ d.label || d.name }}（{{ d.id }}）</option>
                   </optgroup>
                 </select>
-                <label v-if="editForm.boundDevice" style="margin-left:10px">换算系数</label>
-                <input v-if="editForm.boundDevice" v-model.number="editForm.boundFactor" type="number" step="any" class="cbx-input" style="width:90px" title="云端原始读数 × 此系数 = 同步到流程设备的读数（如传感器 kg/min → t/h 填 0.06；无需换算填 1）"/>
-                <span class="cbx-sec-sub">未选择则解除当前绑定</span>
+                <label v-if="editForm.boundDevice" style="margin-left:10px">{{ t('换算系数') }}</label>
+                <input v-if="editForm.boundDevice" v-model.number="editForm.boundFactor" type="number" step="any" class="cbx-input" style="width:90px" :title="t('云端原始读数 × 此系数 = 同步到流程设备的读数（如传感器 kg/min → t/h 填 0.06；无需换算填 1）')"/>
+                <span class="cbx-sec-sub">{{ t('未选择则解除当前绑定') }}</span>
               </div>
               <div v-if="editTarget !== 'model'" class="cbx-form-row">
-                <label>绑定云端设备</label>
-                <select v-model="editForm.cloudDevice" class="cbx-select" style="width:300px" title="选择盒子已上报、平台已识别的云端真实设备：保存后该设备的实时读数将归入此设备">
-                  <option value="">不绑定（按设备名自动匹配）</option>
+                <label>{{ t('绑定云端设备') }}</label>
+                <select v-model="editForm.cloudDevice" class="cbx-select" style="width:300px" :title="t('选择盒子已上报、平台已识别的云端真实设备：保存后该设备的实时读数将归入此设备')">
+                  <option value="">{{ t('不绑定（按设备名自动匹配）') }}</option>
                   <optgroup v-for="g in cloudUnboundGroups" :key="g.label" :label="g.label">
                     <option v-for="c in g.items" :key="c.name" :value="c.name">{{ c.name }}（{{ stateZh(c.state) }}<template v-if="c.model"> · {{ c.model }}</template>）</option>
                   </optgroup>
                 </select>
-                <span class="cbx-sec-sub">未选择则按设备名自动匹配</span>
+                <span class="cbx-sec-sub">{{ t('未选择则按设备名自动匹配') }}</span>
               </div>
               <div class="cbx-form-row">
-                <label>命名空间</label><input v-model="editForm.namespace" class="cbx-input" style="width:110px"/>
+                <label>{{ t('命名空间') }}</label><input v-model="editForm.namespace" class="cbx-input" style="width:110px"/>
                 <template v-if="editTarget !== 'model'">
-                  <label>调度节点（盒子）</label>
-                  <select v-model="editForm.nodeName" class="cbx-input" style="width:170px" title="从识别到的盒子中选择，或保留原值">
+                  <label>{{ t('调度节点（盒子）') }}</label>
+                  <select v-model="editForm.nodeName" class="cbx-input" style="width:170px" :title="t('从识别到的盒子中选择，或保留原值')">
                     <option v-for="n in overview.nodes || []" :key="n.name" :value="n.name">{{ n.name }}（{{ readyZh(n.ready) }}）</option>
-                    <option v-if="!(overview.nodes || []).some((n) => n.name === editForm.nodeName)" :value="editForm.nodeName">{{ editForm.nodeName }}（未识别）</option>
+                    <option v-if="!(overview.nodes || []).some((n) => n.name === editForm.nodeName)" :value="editForm.nodeName">{{ editForm.nodeName }}（{{ t('未识别') }}）</option>
                   </select>
-                  <label>采集周期(ms)</label><input v-model.number="editForm.collectCycle" type="number" class="cbx-input" style="width:100px"/>
+                  <label>{{ t('采集周期(ms)') }}</label><input v-model.number="editForm.collectCycle" type="number" class="cbx-input" style="width:100px"/>
                 </template>
               </div>
 
@@ -467,21 +467,21 @@
               <!-- Modbus 协议参数 -->
               <template v-if="editForm.protocol === 'modbus'">
                 <div class="cbx-form-row">
-                  <label>通信方式</label>
+                  <label>{{ t('通信方式') }}</label>
                   <select v-model="editForm.comm.commType" class="cbx-select">
-                    <option value="serial">串口 RTU</option>
+                    <option value="serial">{{ t('串口 RTU') }}</option>
                     <option value="tcp">TCP</option>
                   </select>
                   <label>slaveID</label><input v-model.number="editForm.comm.slaveID" type="number" class="cbx-input" style="width:70px"/>
                   <template v-if="editForm.comm.commType === 'serial'">
-                    <label>串口</label><input v-model="editForm.comm.serialPort" class="cbx-input" style="width:150px"/>
-                    <label>波特率</label><input v-model.number="editForm.comm.baudRate" type="number" class="cbx-input" style="width:80px"/>
-                    <label>校验</label>
+                    <label>{{ t('串口') }}</label><input v-model="editForm.comm.serialPort" class="cbx-input" style="width:150px"/>
+                    <label>{{ t('波特率') }}</label><input v-model.number="editForm.comm.baudRate" type="number" class="cbx-input" style="width:80px"/>
+                    <label>{{ t('校验') }}</label>
                     <select v-model="editForm.comm.parity" class="cbx-select"><option>none</option><option>even</option><option>odd</option></select>
                   </template>
                   <template v-else>
                     <label>IP</label><input v-model="editForm.comm.tcpIP" class="cbx-input" style="width:130px"/>
-                    <label>端口</label><input v-model.number="editForm.comm.tcpPort" type="number" class="cbx-input" style="width:70px"/>
+                    <label>{{ t('端口') }}</label><input v-model.number="editForm.comm.tcpPort" type="number" class="cbx-input" style="width:70px"/>
                   </template>
                 </div>
               </template>
@@ -489,50 +489,50 @@
               <template v-else-if="editForm.protocol === 'opcua'">
                 <div class="cbx-form-row">
                   <label>URL</label><input v-model="editForm.opcua.url" class="cbx-input" style="width:220px" placeholder="opc.tcp://127.0.0.1:4840"/>
-                  <label>用户名</label><input v-model="editForm.opcua.userName" class="cbx-input" style="width:100px"/>
-                  <label>密码</label><input v-model="editForm.opcua.password" class="cbx-input" style="width:100px"/>
+                  <label>{{ t('用户名') }}</label><input v-model="editForm.opcua.userName" class="cbx-input" style="width:100px"/>
+                  <label>{{ t('密码') }}</label><input v-model="editForm.opcua.password" class="cbx-input" style="width:100px"/>
                 </div>
               </template>
               <!-- Bluetooth 协议参数 -->
               <template v-else-if="editForm.protocol === 'bluetooth'">
                 <div class="cbx-form-row">
-                  <label>MAC 地址</label><input v-model="editForm.bluetooth.macAddress" class="cbx-input" style="width:170px" placeholder="AA:BB:CC:DD:EE:FF"/>
+                  <label>{{ t('MAC 地址') }}</label><input v-model="editForm.bluetooth.macAddress" class="cbx-input" style="width:170px" placeholder="AA:BB:CC:DD:EE:FF"/>
                 </div>
               </template>
               <!-- LoRaWAN 协议参数（盒子侧 LoRa 网关 + ChirpStack，上行走本地 mosquitto） -->
               <template v-else-if="editForm.protocol === 'lora'">
                 <div class="cbx-form-row">
                   <label>Broker</label><input v-model="editForm.lora.broker" class="cbx-input" style="width:140px" placeholder="127.0.0.1"/>
-                  <label>端口</label><input v-model.number="editForm.lora.port" type="number" class="cbx-input" style="width:70px"/>
-                  <label>应用ID</label><input v-model="editForm.lora.applicationID" class="cbx-input" style="width:70px" placeholder="1"/>
+                  <label>{{ t('端口') }}</label><input v-model.number="editForm.lora.port" type="number" class="cbx-input" style="width:70px"/>
+                  <label>{{ t('应用ID') }}</label><input v-model="editForm.lora.applicationID" class="cbx-input" style="width:70px" placeholder="1"/>
                   <label>DevEUI</label><input v-model="editForm.lora.devEUI" class="cbx-input" style="width:160px" placeholder="0011223344556677"/>
                 </div>
                 <div class="cbx-form-row">
                   <label>AppKey</label><input v-model="editForm.lora.appKey" class="cbx-input" style="width:170px"/>
-                  <label>频段</label>
+                  <label>{{ t('频段') }}</label>
                   <select v-model="editForm.lora.region" class="cbx-select"><option>CN470</option><option>EU868</option><option>US915</option></select>
-                  <label>数据率</label>
+                  <label>{{ t('数据率') }}</label>
                   <select v-model="editForm.lora.dataRate" class="cbx-select"><option>SF7BW125</option><option>SF9BW125</option><option>SF12BW125</option></select>
                 </div>
               </template>
               <!-- 5G/4G 模块自监控协议参数 -->
               <template v-else-if="editForm.protocol === 'cellular'">
                 <div class="cbx-form-row">
-                  <label>AT 串口</label><input v-model="editForm.cellular.serialPort" class="cbx-input" style="width:140px" placeholder="/dev/ttyUSB2"/>
-                  <label>波特率</label><input v-model.number="editForm.cellular.baudRate" type="number" class="cbx-input" style="width:90px"/>
+                  <label>{{ t('AT 串口') }}</label><input v-model="editForm.cellular.serialPort" class="cbx-input" style="width:140px" placeholder="/dev/ttyUSB2"/>
+                  <label>{{ t('波特率') }}</label><input v-model.number="editForm.cellular.baudRate" type="number" class="cbx-input" style="width:90px"/>
                   <label>APN</label><input v-model="editForm.cellular.apn" class="cbx-input" style="width:110px" placeholder="cmnet"/>
-                  <label>蜂窝网卡</label><input v-model="editForm.cellular.iface" class="cbx-input" style="width:90px" placeholder="wwan0"/>
+                  <label>{{ t('蜂窝网卡') }}</label><input v-model="editForm.cellular.iface" class="cbx-input" style="width:90px" placeholder="wwan0"/>
                 </div>
               </template>
 
               </template>
               <!-- 属性点位 -->
               <div class="cbx-sec-head" style="margin-top:8px">
-                <b>属性点位</b>
-                <button class="cbx-op" @click="addEditProp">＋ 添加</button>
+                <b>{{ t('属性点位') }}</b>
+                <button class="cbx-op" @click="addEditProp">＋ {{ t('添加') }}</button>
               </div>
               <div v-for="(p, i) in editForm.properties" :key="i" class="cbx-prop-row">
-                <input v-model="p.name" class="cbx-input" style="width:110px" placeholder="属性名"/>
+                <input v-model="p.name" class="cbx-input" style="width:110px" :placeholder="t('属性名')"/>
                 <select v-model="p.type" class="cbx-select">
                   <option v-for="t in ['float','int','double','string','boolean']" :key="t">{{ t }}</option>
                 </select>
@@ -543,7 +543,7 @@
                   <select v-model="p.registerType" class="cbx-select">
                     <option v-for="r in ['holdingRegister','inputRegister','coil','discreteInput']" :key="r">{{ r }}</option>
                   </select>
-                  <input v-model.number="p.register" type="number" class="cbx-input" style="width:70px" placeholder="寄存器"/>
+                  <input v-model.number="p.register" type="number" class="cbx-input" style="width:70px" :placeholder="t('寄存器')"/>
                   <input v-model="p.scale" class="cbx-input" style="width:60px" placeholder="scale"/>
                 </template>
                 <template v-else-if="editForm.protocol === 'opcua'">
@@ -553,7 +553,7 @@
                   <input v-model="p.characteristicUUID" class="cbx-input" style="width:170px" placeholder="characteristicUUID"/>
                 </template>
                 <template v-else-if="editForm.protocol === 'lora'">
-                  <input v-model="p.payloadKey" class="cbx-input" style="width:170px" placeholder="上行JSON键 payloadKey"/>
+                  <input v-model="p.payloadKey" class="cbx-input" style="width:170px" :placeholder="t('上行JSON键 payloadKey')"/>
                   <input v-model="p.scale" class="cbx-input" style="width:60px" placeholder="scale"/>
                 </template>
                 <template v-else-if="editForm.protocol === 'cellular'">
@@ -561,21 +561,21 @@
                     <option v-for="k in ['signal','csq','rsrp','rsrq','sinr','iccid','imsi','imei','reg','rx_rate','tx_rate']" :key="k">{{ k }}</option>
                   </select>
                 </template>
-                <input v-model="p.unit" class="cbx-input" style="width:60px" placeholder="单位"/>
-                <button class="cbx-op danger" @click="editForm.properties.splice(i, 1)">✕</button>
+                <input v-model="p.unit" class="cbx-input" style="width:60px" :placeholder="t('单位')"/>
+                <button class="x-btn danger" @click="editForm.properties.splice(i, 1)" :title="t('删除属性')">✕</button>
               </div>
 
               <div class="cbx-form-row" style="margin-top:10px">
-                <button class="cbx-op primary" @click="applyEditDev" :disabled="editSaving || applying" title="保存到本地并立即下发云端 K3s（无需单独保存）">{{ editSaving || applying ? '下发中…' : '保存并下发' }}</button>
-                <button class="cbx-op" @click="dryRunEdit" :disabled="editSaving">生成 YAML 预览</button>
+                <button class="cbx-op primary" @click="applyEditDev" :disabled="editSaving || applying" :title="t('保存到本地并立即下发云端 K3s（无需单独保存）')">{{ editSaving || applying ? t('下发中…') : t('保存并下发') }}</button>
+                <button class="cbx-op" @click="dryRunEdit" :disabled="editSaving">{{ t('生成 YAML 预览') }}</button>
                 <span class="cbx-sec-sub" v-if="editErr" style="color:var(--red)">{{ editErr }}</span>
                 <span class="cbx-deploy-msg" :class="{ err: editErr }">{{ editMsg }}</span>
               </div>
 
               <div v-if="editPreview" class="cbx-preview" style="margin-top:8px">
                 <div class="cbx-preview-head">
-                  <b>YAML 预览（{{ editPreviewMode }}）</b>
-                  <button class="cbx-op" @click="copyEditYaml">复制</button>
+                  <b>{{ t('YAML 预览（') }}<code>{{ editPreviewMode }}</code>{{ t('）') }}</b>
+                  <button class="cbx-op" @click="copyEditYaml">{{ t('复制') }}</button>
                 </div>
                 <pre class="cbx-code">{{ editPreview }}</pre>
               </div>
@@ -587,19 +587,19 @@
         <div v-if="devRtOpen" class="cbx-mask" @click.self="closeDevRealtime">
           <div class="cbx-dialog cbx-dialog-xl">
             <div class="cbx-dialog-head">
-              <b>实时数据：<code>{{ devRtName }}</code></b>
-              <span v-if="devRt" class="cbx-tag" :class="{ ok: devRt.state === 'reporting' }">{{ devRt.state === 'reporting' ? '上报中' : '等待上报' }}</span>
-              <span v-if="devRt" class="cbx-sec-hint">节点 {{ devRt.node }} · 模型 {{ devRt.model }} · 每 3s 自动刷新</span>
-              <button class="cbx-op danger" @click="closeDevRealtime">✕</button>
+              <b>{{ t('实时数据：') }}<code>{{ devRtName }}</code></b>
+              <span v-if="devRt" class="cbx-tag" :class="{ ok: devRt.state === 'reporting' }">{{ devRt.state === 'reporting' ? t('上报中') : t('等待上报') }}</span>
+              <span v-if="devRt" class="cbx-sec-hint">{{ t('节点') }} {{ devRt.node }} · {{ t('模型') }} {{ devRt.model }} · {{ t('每 3s 自动刷新') }}</span>
+              <button class="x-btn lg" @click="closeDevRealtime" :aria-label="t('关闭')">✕</button>
             </div>
             <div v-if="devRt && devRt.twins && devRt.twins.length" class="cbx-rt">
               <!-- 属性切换 -->
               <div class="cbx-rt-tabs">
                 <button v-for="t in devRt.twins" :key="t.propertyName"
                         class="cbx-rt-tab" :class="{ active: rtSelProp === t.propertyName }"
-                        @click="rtSel = t.propertyName" :title="'切换查看 ' + t.propertyName + ' 趋势'">
+                        @click="rtSel = t.propertyName" :title="t('切换查看') + ' ' + t.propertyName + t('趋势')">
                   <code>{{ t.propertyName }}</code>
-                  <span class="cbx-rt-cur">{{ t.invalid ? '无有效数据' : fmtPrimary(t.reported) }}</span>
+                  <span class="cbx-rt-cur">{{ t.invalid ? t('无有效数据') : fmtPrimary(t.reported) }}</span>
                   <span class="cbx-rt-unit">{{ t.unit }}</span>
                 </button>
               </div>
@@ -637,27 +637,27 @@
               <!-- 当前读数摘要 -->
               <div v-if="rtCur" class="cbx-rt-currow">
                 <span class="cbx-rt-curlabel">{{ rtSelProp }}</span>
-                <b class="cbx-rt-curval">{{ rtCur.invalid ? '无有效数据' : fmtPrimary(rtCur.reported) }}</b>
+                <b class="cbx-rt-curval">{{ rtCur.invalid ? t('无有效数据') : fmtPrimary(rtCur.reported) }}</b>
                 <span class="cbx-rt-unit">{{ rtCur.unit }}</span>
-                <span class="cbx-rt-upd">更新于 {{ rtCur.timestamp ? fmtAgo(rtCur.timestamp) : '—' }} · 采样 {{ rtSeries.length }} 点</span>
+                <span class="cbx-rt-upd">{{ t('更新于') }} {{ rtCur.timestamp ? fmtAgo(rtCur.timestamp) : '—' }} · {{ t('采样') }} {{ rtSeries.length }} {{ t('点') }}</span>
               </div>
 
               <!-- 全部属性一览（补充） -->
               <table class="cbx-table">
-                <thead><tr><th>属性</th><th>reported（实时值）</th><th>单位</th><th>timestamp</th><th>采样点数</th></tr></thead>
+                <thead><tr><th>{{ t('属性') }}</th><th>reported（{{ t('实时值') }}）</th><th>{{ t('单位') }}</th><th>timestamp</th><th>{{ t('采样点数') }}</th></tr></thead>
                 <tbody>
                   <tr v-for="t in devRt.twins" :key="t.propertyName">
                     <td><code>{{ t.propertyName }}</code></td>
-                    <td class="val"><span :class="{ 'cbx-invalid': t.invalid }">{{ t.invalid ? '无有效数据' : fmtPrimary(t.reported) }}</span></td>
+                    <td class="val"><span :class="{ 'cbx-invalid': t.invalid }">{{ t.invalid ? t('无有效数据') : fmtPrimary(t.reported) }}</span></td>
                     <td>{{ t.unit || '' }}</td>
                     <td>{{ t.timestamp ? fmtAgo(t.timestamp) : '—' }}</td>
                     <td>{{ (devRt.history[t.propertyName] || []).length }}</td>
                   </tr>
                 </tbody>
               </table>
-              <p class="cbx-note">读数双源融合：① 云端 twins（边缘 Mapper 实时同步）；② 盒子 MQTT 直报 data/#（平台订阅，时间戳更新时优先）。双源均无数据说明盒子侧采集或上报异常，可先确认概览「链路状态」cloud/crds 推送是否新鲜。盒子运行期无需 IP，数据由盒子主动上报。折线图为 3s 滑动窗口、最多 120 点；「无有效数据」多为传感器无信号或未标定。</p>
+              <p class="cbx-note">{{ t('读数双源融合：① 云端 twins（边缘 Mapper 实时同步）；② 盒子 MQTT 直报 data/#（平台订阅，时间戳更新时优先）。双源均无数据说明盒子侧采集或上报异常，可先确认概览「链路状态」cloud/crds 推送是否新鲜。盒子运行期无需 IP，数据由盒子主动上报。折线图为 3s 滑动窗口、最多 120 点；「无有效数据」多为传感器无信号或未标定。') }}</p>
             </div>
-            <div v-else class="cbx-empty">该设备暂无实时上报数据（设备可能未下发云端，或边缘未上报）。</div>
+            <div v-else class="cbx-empty">{{ t('该设备暂无实时上报数据（设备可能未下发云端，或边缘未上报）。') }}</div>
           </div>
         </div>
 
@@ -665,32 +665,32 @@
         <div v-if="onboardOpen" class="cbx-mask" @click.self="onboardOpen = false">
           <div class="cbx-dialog cbx-dialog-xl">
             <div class="cbx-dialog-head">
-              <b>盒子一键接入（自解压脚本：box-deploy 采集包 + edgecore.yaml + rootCA + token）</b>
-              <button class="cbx-op danger" @click="onboardOpen = false">✕</button>
+              <b>{{ t('盒子一键接入（自解压脚本：box-deploy 采集包 + edgecore.yaml + rootCA + token）') }}</b>
+              <button class="x-btn lg" @click="onboardOpen = false" :aria-label="t('关闭')">✕</button>
             </div>
             <div class="cbx-form">
               <div class="cbx-form-row">
-                <label>盒子主机名</label><input v-model="onboardForm.hostname" class="cbx-input" placeholder="edge-box"/>
-                <label>云端 CloudCore IP</label><input v-model="onboardForm.cloudIP" class="cbx-input" placeholder="172.19.134.45"/>
-                <label>盒子 IP（可选，远程一键时作为直达地址）</label><input v-model="onboardForm.boxIP" class="cbx-input" placeholder="192.168.1.20"/>
-                <button class="cbx-op primary" :disabled="!onboardForm.cloudIP || onboardBusy" @click="doOnboard">{{ onboardBusy ? '生成中…' : '生成一键脚本' }}</button>
+                <label>{{ t('盒子主机名') }}</label><input v-model="onboardForm.hostname" class="cbx-input" placeholder="edge-box"/>
+                <label>{{ t('云端 CloudCore IP') }}</label><input v-model="onboardForm.cloudIP" class="cbx-input" placeholder="172.19.134.45"/>
+                <label>{{ t('盒子 IP（可选，远程一键时作为直达地址）') }}</label><input v-model="onboardForm.boxIP" class="cbx-input" placeholder="192.168.1.20"/>
+                <button class="cbx-op primary" :disabled="!onboardForm.cloudIP || onboardBusy" @click="doOnboard">{{ onboardBusy ? t('生成中…') : t('生成一键脚本') }}</button>
               </div>
-              <p class="cbx-note">一键脚本内置 box-deploy 采集部署包（mapper + mosquitto + 云边协同断点续传，约 18 MB），盒子执行一条 <code>bash onboard_box.sh</code> 即完成：① EdgeCore 接入（keadm join）→ ② rootCA / edgecore.yaml 下发 → ③ 部署包解包 → ④ config.json 自动定制（boxId / broker）→ ⑤ 一键部署 → ⑥ 链路自检。幂等，可重复执行。</p>
+              <p class="cbx-note">{{ t('一键脚本内置 box-deploy 采集部署包（mapper + mosquitto + 云边协同断点续传，约 18 MB），盒子执行一条') }} <code>bash onboard_box.sh</code> {{ t('即完成：① EdgeCore 接入（keadm join）→ ② rootCA / edgecore.yaml 下发 → ③ 部署包解包 → ④ config.json 自动定制（boxId / broker）→ ⑤ 一键部署 → ⑥ 链路自检。幂等，可重复执行。') }}</p>
             </div>
             <div v-if="onboardResult" class="cbx-onboard">
               <div class="cbx-kv">
-                <div><span>共享 Token</span><code class="wrap">{{ onboardResult.token }}</code></div>
-                <div><span>CA 指纹</span><code class="wrap">{{ onboardResult.caHash }}</code></div>
-                <div v-if="onboardResult.token_expires"><span>Token 有效期至</span><b>{{ onboardResult.token_expires }}</b></div>
-                <div><span>一键脚本</span><b>{{ onboardResult.script_name }} · {{ (onboardResult.script_size / 1024 / 1024).toFixed(1) }} MB</b><code class="wrap">sha256 {{ onboardResult.script_sha256 }}</code></div>
-                <div v-if="onboardResult.script_generated_at"><span>生成时间</span><b>{{ onboardResult.script_generated_at }}</b></div>
+                <div><span>{{ t('共享 Token') }}</span><code class="wrap">{{ onboardResult.token }}</code></div>
+                <div><span>{{ t('CA 指纹') }}</span><code class="wrap">{{ onboardResult.caHash }}</code></div>
+                <div v-if="onboardResult.token_expires"><span>{{ t('Token 有效期至') }}</span><b>{{ onboardResult.token_expires }}</b></div>
+                <div><span>{{ t('一键脚本') }}</span><b>{{ onboardResult.script_name }} · {{ (onboardResult.script_size / 1024 / 1024).toFixed(1) }} MB</b><code class="wrap">sha256 {{ onboardResult.script_sha256 }}</code></div>
+                <div v-if="onboardResult.script_generated_at"><span>{{ t('生成时间') }}</span><b>{{ onboardResult.script_generated_at }}</b></div>
               </div>
               <div class="cbx-onboard-actions">
-                <button class="cbx-op primary" @click="downloadOnboardScript">⬇ 下载 onboard_box.sh</button>
-                <button class="cbx-op" :disabled="remoteRunning" @click="doOnboardRemote">{{ remoteRunning ? '远程接入中…' : '远程一键接入（云端 agent 推送执行）' }}</button>
+                <button class="cbx-op primary" @click="downloadOnboardScript">⬇ {{ t('下载 onboard_box.sh') }}</button>
+                <button class="cbx-op" :disabled="remoteRunning" @click="doOnboardRemote">{{ remoteRunning ? t('远程接入中…') : t('远程一键接入（云端 agent 推送执行）') }}</button>
               </div>
               <p class="cbx-note" v-if="onboardResult.script_hint">{{ onboardResult.script_hint }}</p>
-              <p class="cbx-note">远程接入前提：① 平台 ⇄ 云端 agent 已配置（总览 → 配置）；② agent config.json 已配置 edge（盒子可达地址）。盒子无直达 IP 时请下载脚本后到现场执行。</p>
+              <p class="cbx-note">{{ t('远程接入前提：① 平台 ⇄ 云端 agent 已配置（总览 → 配置）；② agent config.json 已配置 edge（盒子可达地址）。盒子无直达 IP 时请下载脚本后到现场执行。') }}</p>
               <div v-if="remoteSteps.length" class="cbx-remote-steps">
                 <div v-for="(s, i) in remoteSteps" :key="i" class="cbx-remote-step">
                   <b :class="s.ok ? 'ok' : 'fail'">{{ s.ok ? '✔' : '✘' }} {{ i + 1 }}. {{ s.name }}</b>
@@ -698,46 +698,46 @@
                 </div>
               </div>
               <details class="cbx-details" :open="ghResult">
-                <summary>GitHub 托管（盒子现场一条 curl 命令接入，免传 18MB 脚本）</summary>
+                <summary>{{ t('GitHub 托管（盒子现场一条 curl 命令接入，免传 18MB 脚本）') }}</summary>
                 <div class="cbx-form">
                   <div class="cbx-form-row">
                     <label>GitHub owner</label><input v-model="ghForm.owner" class="cbx-input" placeholder="zhibinQiu"/>
                     <label>repo</label><input v-model="ghForm.repo" class="cbx-input" placeholder="power_simulation"/>
-                    <label>分支</label><input v-model="ghForm.branch" class="cbx-input" placeholder="master"/>
-                    <button class="cbx-op" :disabled="ghBusy" @click="saveGithubConfig">{{ ghBusy ? '保存中…' : '保存配置' }}</button>
+                    <label>{{ t('分支') }}</label><input v-model="ghForm.branch" class="cbx-input" placeholder="master"/>
+                    <button class="cbx-op" :disabled="ghBusy" @click="saveGithubConfig">{{ ghBusy ? t('保存中…') : t('保存配置') }}</button>
                   </div>
                   <div class="cbx-form-row">
-                    <label>GitHub PAT（公开仓库盒子现场拉取无需验证；仅「同步写入」需要，留空沿用已保存）</label>
+                    <label>{{ t('GitHub PAT（公开仓库盒子现场拉取无需验证；仅「同步写入」需要，留空沿用已保存）') }}</label>
                     <input v-model="ghForm.token" type="password" class="cbx-input" placeholder="ghp_…"/>
-                    <button class="cbx-op primary" :disabled="ghBusy || !onboardForm.cloudIP" @click="syncGithub">{{ ghBusy ? '同步中（含 13MB 部署包，约 10~30s）…' : '同步到 GitHub' }}</button>
-                    <button class="cbx-op" :disabled="ghExportBusy || !onboardForm.cloudIP" @click="exportBoxConfig">{{ ghExportBusy ? '生成中…' : '⬇ 导出 box-config.json' }}</button>
+                    <button class="cbx-op primary" :disabled="ghBusy || !onboardForm.cloudIP" @click="syncGithub">{{ ghBusy ? t('同步中（含 13MB 部署包，约 10~30s）…') : t('同步到 GitHub') }}</button>
+                    <button class="cbx-op" :disabled="ghExportBusy || !onboardForm.cloudIP" @click="exportBoxConfig">{{ ghExportBusy ? t('生成中…') : '⬇ ' + t('导出 box-config.json') }}</button>
                   </div>
-                  <p class="cbx-note">「导出 box-config.json」：现场凭此配置 + 仓库脚本即可接入（放盒子 <code>/opt/weight-bridge/box-config.json</code>，命令见下方）。</p>
+                  <p class="cbx-note">{{ t('「导出 box-config.json」：现场凭此配置 + 仓库脚本即可接入（放盒子') }} <code>/opt/weight-bridge/box-config.json</code>{{ t('，命令见下方）。') }}</p>
                 </div>
                 <div v-if="ghResult && ghResult.ok" class="cbx-kv">
-                  <div><span>盒子现场命令（任意盒子 root 执行，自动拉部署包/证书/配置 + keadm join + 自检）</span><code class="wrap">{{ ghResult.command }}</code></div>
-                  <div v-if="ghResult.caHash"><span>CA 指纹</span><code class="wrap">{{ ghResult.caHash }}</code></div>
+                  <div><span>{{ t('盒子现场命令（任意盒子 root 执行，自动拉部署包/证书/配置 + keadm join + 自检）') }}</span><code class="wrap">{{ ghResult.command }}</code></div>
+                  <div v-if="ghResult.caHash"><span>{{ t('CA 指纹') }}</span><code class="wrap">{{ ghResult.caHash }}</code></div>
                 </div>
                 <div v-if="ghExport && ghExport.ok" class="cbx-kv">
-                  <div><span>现场用法（配置文件已放盒子 /opt/weight-bridge/box-config.json 时，一条命令完成接入）</span><code class="wrap">curl -fsSL {{ ghLauncherUrl }} | bash</code></div>
-                  <div><span>显式指定配置路径</span><code class="wrap">curl -fsSL {{ ghLauncherUrl }} | bash -s -- -c /path/box-config.json</code></div>
-                  <div><span>box-config.json 内容（保存到盒子 /opt/weight-bridge/box-config.json）</span><pre class="cbx-code">{{ ghExport.content }}</pre></div>
-                  <div v-if="!ghExport.token_set" class="cbx-note">token 留空：云端未取到共享 token，不影响部署 —— 脚本自动从仓库 <code>onboard/token</code> 拉取，也可手工填入。</div>
+                  <div><span>{{ t('现场用法（配置文件已放盒子 /opt/weight-bridge/box-config.json 时，一条命令完成接入）') }}</span><code class="wrap">curl -fsSL {{ ghLauncherUrl }} | bash</code></div>
+                  <div><span>{{ t('显式指定配置路径') }}</span><code class="wrap">curl -fsSL {{ ghLauncherUrl }} | bash -s -- -c /path/box-config.json</code></div>
+                  <div><span>{{ t('box-config.json 内容（保存到盒子 /opt/weight-bridge/box-config.json）') }}</span><pre class="cbx-code">{{ ghExport.content }}</pre></div>
+                  <div v-if="!ghExport.token_set" class="cbx-note">{{ t('token 留空：云端未取到共享 token，不影响部署 —— 脚本自动从仓库') }} <code>onboard/token</code> {{ t('拉取，也可手工填入。') }}</div>
                 </div>
                 <div v-if="ghResult && ghResult.files" class="cbx-remote-steps">
                   <div v-for="(f, i) in ghResult.files" :key="i" class="cbx-remote-step">
                     <b :class="f.ok ? 'ok' : 'fail'">{{ f.ok ? '✔' : '✘' }} {{ f.path }}（{{ (f.size / 1024 / 1024).toFixed(1) }} MB）</b>
                   </div>
                 </div>
-                <p class="cbx-note">托管说明：平台将「引导脚本 + box-deploy 部署包 + edgecore.yaml + rootCA + token」同步至仓库 <code>onboard/</code> 目录（幂等覆盖）；edgecore.yaml 由盒子端按配置自动替换，token 重签后无需重推。仓库内含共享 token 与 rootCA，公开前请评估风险。盒子现场执行 <code>curl -fsSL {{ ghResult ? ghResult.launcher_url : '…' }} | bash</code> 即完成接入。</p>
+                <p class="cbx-note">{{ t('托管说明：平台将「引导脚本 + box-deploy 部署包 + edgecore.yaml + rootCA + token」同步至仓库') }} <code>onboard/</code> {{ t('目录（幂等覆盖）；edgecore.yaml 由盒子端按配置自动替换，token 重签后无需重推。仓库内含共享 token 与 rootCA，公开前请评估风险。盒子现场执行') }} <code>curl -fsSL {{ ghResult ? ghResult.launcher_url : '…' }} | bash</code> {{ t('即完成接入。') }}</p>
               </details>
               <details class="cbx-details">
-                <summary>高级：edgecore.yaml</summary>
-                <div class="cbx-preview-head"><span></span><button class="cbx-op" @click="copyOnboard">复制</button></div>
+                <summary>{{ t('高级：edgecore.yaml') }}</summary>
+                <div class="cbx-preview-head"><span></span><button class="cbx-op" @click="copyOnboard">{{ t('复制') }}</button></div>
                 <pre class="cbx-code">{{ onboardResult.edgecore }}</pre>
               </details>
               <details class="cbx-details">
-                <summary>高级：手工部署命令（备选）</summary>
+                <summary>{{ t('高级：手工部署命令（备选）') }}</summary>
                 <pre class="cbx-code">{{ onboardResult.commands.join('\n') }}</pre>
               </details>
             </div>
@@ -748,79 +748,79 @@
         <div v-if="createOpen" class="cbx-mask" @click.self="createOpen = false">
           <div class="cbx-dialog cbx-dialog-xl">
             <div class="cbx-dialog-head">
-              <b>新建设备</b>
-              <button class="cbx-op danger" @click="createOpen = false">✕</button>
+              <b>{{ t('新建设备') }}</b>
+              <button class="x-btn lg" @click="createOpen = false" :aria-label="t('关闭')">✕</button>
             </div>
             <div class="cbx-form">
               <div class="cbx-form-row">
-                <label>协议</label>
+                <label>{{ t('协议') }}</label>
                 <select v-model="form.protocol" class="cbx-select">
-                  <option value="modbus">Modbus（RTU / TCP）</option>
+                  <option value="modbus">{{ t('Modbus（RTU / TCP）') }}</option>
                   <option value="opcua">OPC-UA</option>
                   <option value="bluetooth">Bluetooth</option>
-                  <option value="lora">LoRaWAN（LoRa 网关）</option>
-                  <option value="cellular">5G/4G 模块自监控</option>
+                  <option value="lora">{{ t('LoRaWAN（LoRa 网关）') }}</option>
+                  <option value="cellular">{{ t('5G/4G 模块自监控') }}</option>
                 </select>
               </div>
               <div class="cbx-form-row">
-                <label>模型</label>
-                <select v-model="form.modelName" class="cbx-select" @change="onPickModel" title="选择已创建的 DeviceModel 复用；留空则保存时自动创建与设备同名的模型">
-                  <option value="">（自动创建同名模型）</option>
-                  <option v-for="m in devices.models || []" :key="m.name" :value="m.name">{{ m.name }}（{{ m.protocol }} · {{ (m.properties || []).length }} 属性）</option>
+                <label>{{ t('模型') }}</label>
+                <select v-model="form.modelName" class="cbx-select" @change="onPickModel" :title="t('选择已创建的 DeviceModel 复用；留空则保存时自动创建与设备同名的模型')">
+                  <option value="">{{ t('（自动创建同名模型）') }}</option>
+                  <option v-for="m in devices.models || []" :key="m.name" :value="m.name">{{ m.name }}（{{ m.protocol }} · {{ (m.properties || []).length }} {{ t('属性') }}）</option>
                 </select>
-                <button class="cbx-op cbx-xs" @click="openModelCreate" title="先创建 DeviceModel 再选择">＋ 新建模型</button>
-                <label>设备名</label><input v-model="form.deviceName" class="cbx-input" placeholder="box-device"/>
+                <button class="cbx-op cbx-xs" @click="openModelCreate" :title="t('先创建 DeviceModel 再选择')">＋ {{ t('新建模型') }}</button>
+                <label>{{ t('设备名') }}</label><input v-model="form.deviceName" class="cbx-input" placeholder="box-device"/>
               </div>
               <div class="cbx-form-row">
-                <label>绑定流程设备</label>
-                <select v-model="form.boundDevice" class="cbx-select" style="width:300px" title="从现有系统流程的设备中选择：保存后该设备的云端读数将同步到所选流程设备实例（关联制）">
-                  <option value="">不绑定</option>
+                <label>{{ t('绑定流程设备') }}</label>
+                <select v-model="form.boundDevice" class="cbx-select" style="width:300px" :title="t('从现有系统流程的设备中选择：保存后该设备的云端读数将同步到所选流程设备实例（关联制）')">
+                  <option value="">{{ t('不绑定') }}</option>
                   <optgroup v-for="grp in procGroups" :key="grp.unit" :label="grp.unit">
                     <option v-for="d in grp.devices" :key="d.id" :value="d.id">{{ d.label || d.name }}（{{ d.id }}）</option>
                   </optgroup>
                 </select>
-                <label v-if="form.boundDevice" style="margin-left:10px">换算系数</label>
-                <input v-if="form.boundDevice" v-model.number="form.boundFactor" type="number" step="any" class="cbx-input" style="width:90px" title="云端原始读数 × 此系数 = 同步到流程设备的读数（如传感器 kg/min → t/h 填 0.06；无需换算填 1）"/>
-                <span class="cbx-sec-sub">保存后云端读数同步到该流程设备</span>
+                <label v-if="form.boundDevice" style="margin-left:10px">{{ t('换算系数') }}</label>
+                <input v-if="form.boundDevice" v-model.number="form.boundFactor" type="number" step="any" class="cbx-input" style="width:90px" :title="t('云端原始读数 × 此系数 = 同步到流程设备的读数（如传感器 kg/min → t/h 填 0.06；无需换算填 1）')"/>
+                <span class="cbx-sec-sub">{{ t('保存后云端读数同步到该流程设备') }}</span>
               </div>
               <div class="cbx-form-row">
-                <label>绑定云端设备</label>
-                <select v-model="form.cloudDevice" class="cbx-select" style="width:300px" title="选择盒子已上报、平台已识别的云端真实设备：保存后该设备的实时读数将归入此设备（云端身份优先于此名匹配）" @change="onPickCloudDevice">
-                  <option value="">不绑定（按设备名自动匹配）</option>
+                <label>{{ t('绑定云端设备') }}</label>
+                <select v-model="form.cloudDevice" class="cbx-select" style="width:300px" :title="t('选择盒子已上报、平台已识别的云端真实设备：保存后该设备的实时读数将归入此设备（云端身份优先于此名匹配）')" @change="onPickCloudDevice">
+                  <option value="">{{ t('不绑定（按设备名自动匹配）') }}</option>
                   <optgroup v-for="g in cloudUnboundGroups" :key="g.label" :label="g.label">
                     <option v-for="c in g.items" :key="c.name" :value="c.name">{{ c.name }}（{{ stateZh(c.state) }}<template v-if="c.model"> · {{ c.model }}</template>）</option>
                   </optgroup>
-                  <option v-if="!cloudUnbound.length" value="" disabled>未识别到云端设备（盒子需已接入并上报读数）</option>
+                  <option v-if="!cloudUnbound.length" value="" disabled>{{ t('未识别到云端设备（盒子需已接入并上报读数）') }}</option>
                 </select>
-                <span class="cbx-sec-sub">选中后自动采用该云端设备名（一键转平台设备）</span>
+                <span class="cbx-sec-sub">{{ t('选中后自动采用该云端设备名（一键转平台设备）') }}</span>
               </div>
               <div class="cbx-form-row">
-                <label>命名空间</label><input v-model="form.namespace" class="cbx-input" style="width:90px" placeholder="default"/>
-                <label>调度节点</label>
-                <select v-model="form.nodeName" class="cbx-input" title="从识别到的盒子中选择">
+                <label>{{ t('命名空间') }}</label><input v-model="form.namespace" class="cbx-input" style="width:90px" placeholder="default"/>
+                <label>{{ t('调度节点') }}</label>
+                <select v-model="form.nodeName" class="cbx-input" :title="t('从识别到的盒子中选择')">
                   <option v-for="n in overview.nodes || []" :key="n.name" :value="n.name">{{ n.name }}（{{ readyZh(n.ready) }}）</option>
                 </select>
-                <label>采集周期(ms)</label><input v-model.number="form.collectCycle" type="number" class="cbx-input" style="width:100px"/>
+                <label>{{ t('采集周期(ms)') }}</label><input v-model.number="form.collectCycle" type="number" class="cbx-input" style="width:100px"/>
               </div>
 
               <!-- Modbus 协议参数 -->
               <template v-if="form.protocol === 'modbus'">
                 <div class="cbx-form-row">
-                  <label>通信方式</label>
+                  <label>{{ t('通信方式') }}</label>
                   <select v-model="form.comm.commType" class="cbx-select">
-                    <option value="serial">串口 RTU</option>
+                    <option value="serial">{{ t('串口 RTU') }}</option>
                     <option value="tcp">TCP</option>
                   </select>
                   <label>slaveID</label><input v-model.number="form.comm.slaveID" type="number" class="cbx-input" style="width:70px"/>
                   <template v-if="form.comm.commType === 'serial'">
-                    <label>串口</label><input v-model="form.comm.serialPort" class="cbx-input" style="width:110px"/>
-                    <label>波特率</label><input v-model.number="form.comm.baudRate" type="number" class="cbx-input" style="width:80px"/>
-                    <label>校验</label>
+                    <label>{{ t('串口') }}</label><input v-model="form.comm.serialPort" class="cbx-input" style="width:110px"/>
+                    <label>{{ t('波特率') }}</label><input v-model.number="form.comm.baudRate" type="number" class="cbx-input" style="width:80px"/>
+                    <label>{{ t('校验') }}</label>
                     <select v-model="form.comm.parity" class="cbx-select"><option>none</option><option>even</option><option>odd</option></select>
                   </template>
                   <template v-else>
                     <label>IP</label><input v-model="form.comm.tcpIP" class="cbx-input" style="width:120px"/>
-                    <label>端口</label><input v-model.number="form.comm.tcpPort" type="number" class="cbx-input" style="width:70px"/>
+                    <label>{{ t('端口') }}</label><input v-model.number="form.comm.tcpPort" type="number" class="cbx-input" style="width:70px"/>
                   </template>
                 </div>
               </template>
@@ -828,49 +828,49 @@
               <template v-else-if="form.protocol === 'opcua'">
                 <div class="cbx-form-row">
                   <label>URL</label><input v-model="form.opcua.url" class="cbx-input" style="width:200px" placeholder="opc.tcp://127.0.0.1:4840"/>
-                  <label>用户名</label><input v-model="form.opcua.userName" class="cbx-input" style="width:100px"/>
-                  <label>密码</label><input v-model="form.opcua.password" class="cbx-input" style="width:100px"/>
+                  <label>{{ t('用户名') }}</label><input v-model="form.opcua.userName" class="cbx-input" style="width:100px"/>
+                  <label>{{ t('密码') }}</label><input v-model="form.opcua.password" class="cbx-input" style="width:100px"/>
                 </div>
               </template>
               <!-- Bluetooth 协议参数 -->
               <template v-else-if="form.protocol === 'bluetooth'">
                 <div class="cbx-form-row">
-                  <label>MAC 地址</label><input v-model="form.bluetooth.macAddress" class="cbx-input" style="width:160px" placeholder="AA:BB:CC:DD:EE:FF"/>
+                  <label>{{ t('MAC 地址') }}</label><input v-model="form.bluetooth.macAddress" class="cbx-input" style="width:160px" placeholder="AA:BB:CC:DD:EE:FF"/>
                 </div>
               </template>
               <!-- LoRaWAN 协议参数（盒子侧 LoRa 网关 + ChirpStack，上行走本地 mosquitto） -->
               <template v-else-if="form.protocol === 'lora'">
                 <div class="cbx-form-row">
                   <label>Broker</label><input v-model="form.lora.broker" class="cbx-input" style="width:130px" placeholder="127.0.0.1"/>
-                  <label>端口</label><input v-model.number="form.lora.port" type="number" class="cbx-input" style="width:70px"/>
-                  <label>应用ID</label><input v-model="form.lora.applicationID" class="cbx-input" style="width:70px" placeholder="1"/>
+                  <label>{{ t('端口') }}</label><input v-model.number="form.lora.port" type="number" class="cbx-input" style="width:70px"/>
+                  <label>{{ t('应用ID') }}</label><input v-model="form.lora.applicationID" class="cbx-input" style="width:70px" placeholder="1"/>
                   <label>DevEUI</label><input v-model="form.lora.devEUI" class="cbx-input" style="width:150px" placeholder="0011223344556677"/>
                 </div>
                 <div class="cbx-form-row">
                   <label>AppKey</label><input v-model="form.lora.appKey" class="cbx-input" style="width:160px"/>
-                  <label>频段</label>
+                  <label>{{ t('频段') }}</label>
                   <select v-model="form.lora.region" class="cbx-select"><option>CN470</option><option>EU868</option><option>US915</option></select>
-                  <label>数据率</label>
+                  <label>{{ t('数据率') }}</label>
                   <select v-model="form.lora.dataRate" class="cbx-select"><option>SF7BW125</option><option>SF9BW125</option><option>SF12BW125</option></select>
                 </div>
               </template>
               <!-- 5G/4G 模块自监控协议参数 -->
               <template v-else-if="form.protocol === 'cellular'">
                 <div class="cbx-form-row">
-                  <label>AT 串口</label><input v-model="form.cellular.serialPort" class="cbx-input" style="width:130px" placeholder="/dev/ttyUSB2"/>
-                  <label>波特率</label><input v-model.number="form.cellular.baudRate" type="number" class="cbx-input" style="width:90px"/>
+                  <label>{{ t('AT 串口') }}</label><input v-model="form.cellular.serialPort" class="cbx-input" style="width:130px" placeholder="/dev/ttyUSB2"/>
+                  <label>{{ t('波特率') }}</label><input v-model.number="form.cellular.baudRate" type="number" class="cbx-input" style="width:90px"/>
                   <label>APN</label><input v-model="form.cellular.apn" class="cbx-input" style="width:100px" placeholder="cmnet"/>
-                  <label>蜂窝网卡</label><input v-model="form.cellular.iface" class="cbx-input" style="width:90px" placeholder="wwan0"/>
+                  <label>{{ t('蜂窝网卡') }}</label><input v-model="form.cellular.iface" class="cbx-input" style="width:90px" placeholder="wwan0"/>
                 </div>
               </template>
 
               <!-- 属性点位 -->
               <div class="cbx-sec-head" style="margin-top:8px">
-                <b>属性点位</b>
-                <button class="cbx-op" @click="addProp">＋ 添加</button>
+                <b>{{ t('属性点位') }}</b>
+                <button class="cbx-op" @click="addProp">＋ {{ t('添加') }}</button>
               </div>
               <div v-for="(p, i) in form.properties" :key="i" class="cbx-prop-row">
-                <input v-model="p.name" class="cbx-input" style="width:110px" placeholder="属性名"/>
+                <input v-model="p.name" class="cbx-input" style="width:110px" :placeholder="t('属性名')"/>
                 <select v-model="p.type" class="cbx-select">
                   <option v-for="t in ['float','int','double','string','boolean']" :key="t">{{ t }}</option>
                 </select>
@@ -881,7 +881,7 @@
                   <select v-model="p.registerType" class="cbx-select">
                     <option v-for="r in ['holdingRegister','inputRegister','coil','discreteInput']" :key="r">{{ r }}</option>
                   </select>
-                  <input v-model.number="p.register" type="number" class="cbx-input" style="width:70px" placeholder="寄存器"/>
+                  <input v-model.number="p.register" type="number" class="cbx-input" style="width:70px" :placeholder="t('寄存器')"/>
                   <input v-model="p.scale" class="cbx-input" style="width:60px" placeholder="scale"/>
                 </template>
                 <template v-else-if="form.protocol === 'opcua'">
@@ -891,7 +891,7 @@
                   <input v-model="p.characteristicUUID" class="cbx-input" style="width:170px" placeholder="characteristicUUID"/>
                 </template>
                 <template v-else-if="form.protocol === 'lora'">
-                  <input v-model="p.payloadKey" class="cbx-input" style="width:170px" placeholder="上行JSON键 payloadKey"/>
+                  <input v-model="p.payloadKey" class="cbx-input" style="width:170px" :placeholder="t('上行JSON键 payloadKey')"/>
                   <input v-model="p.scale" class="cbx-input" style="width:60px" placeholder="scale"/>
                 </template>
                 <template v-else-if="form.protocol === 'cellular'">
@@ -899,21 +899,21 @@
                     <option v-for="k in ['signal','csq','rsrp','rsrq','sinr','iccid','imsi','imei','reg','rx_rate','tx_rate']" :key="k">{{ k }}</option>
                   </select>
                 </template>
-                <input v-model="p.unit" class="cbx-input" style="width:60px" placeholder="单位"/>
-                <button class="cbx-op danger" @click="form.properties.splice(i, 1)">✕</button>
+                <input v-model="p.unit" class="cbx-input" style="width:60px" :placeholder="t('单位')"/>
+                <button class="x-btn danger" @click="form.properties.splice(i, 1)" :title="t('删除属性')">✕</button>
               </div>
 
               <div class="cbx-form-row" style="margin-top:10px">
-                <button class="cbx-op primary" @click="dryRun()">生成 YAML 预览</button>
-                <button class="cbx-op primary" @click="applyDev()" title="保存到本地 box_devices.json 并立即下发云端 K3s（无需单独保存）">下发到云端</button>
+                <button class="cbx-op primary" @click="dryRun()">{{ t('生成 YAML 预览') }}</button>
+                <button class="cbx-op primary" @click="applyDev()" :title="t('保存到本地 box_devices.json 并立即下发云端 K3s（无需单独保存）')">{{ t('下发到云端') }}</button>
                 <span class="cbx-sec-sub" v-if="formErr" style="color:var(--red)">{{ formErr }}</span>
               </div>
 
               <!-- YAML 预览 -->
               <div v-if="preview" class="cbx-preview">
                 <div class="cbx-preview-head">
-                  <b>YAML 预览</b>
-                  <button class="cbx-op" @click="copyPreview">复制</button>
+                  <b>{{ t('YAML 预览') }}</b>
+                  <button class="cbx-op" @click="copyPreview">{{ t('复制') }}</button>
                 </div>
                 <pre class="cbx-code">{{ preview }}</pre>
               </div>
@@ -925,32 +925,32 @@
         <div v-if="modelCreateOpen" class="cbx-mask" @click.self="modelCreateOpen = false">
           <div class="cbx-dialog cbx-dialog-lg">
             <div class="cbx-dialog-head">
-              <b>新建模型（DeviceModel）</b>
-              <span class="cbx-sec-hint">保存后可在「设备接入」中选择该模型</span>
-              <button class="cbx-op danger" @click="modelCreateOpen = false">✕</button>
+              <b>{{ t('新建模型（DeviceModel）') }}</b>
+              <span class="cbx-sec-hint">{{ t('保存后可在「设备接入」中选择该模型') }}</span>
+              <button class="x-btn lg" @click="modelCreateOpen = false" :aria-label="t('关闭')">✕</button>
             </div>
             <div class="cbx-form">
               <div class="cbx-form-row">
-                <label>协议</label>
+                <label>{{ t('协议') }}</label>
                 <select v-model="modelForm.protocol" class="cbx-select">
-                  <option value="modbus">Modbus（RTU / TCP）</option>
+                  <option value="modbus">{{ t('Modbus（RTU / TCP）') }}</option>
                   <option value="opcua">OPC-UA</option>
                   <option value="bluetooth">Bluetooth</option>
-                  <option value="lora">LoRaWAN（LoRa 网关）</option>
-                  <option value="cellular">5G/4G 模块自监控</option>
+                  <option value="lora">{{ t('LoRaWAN（LoRa 网关）') }}</option>
+                  <option value="cellular">{{ t('5G/4G 模块自监控') }}</option>
                 </select>
-                <label>命名空间</label><input v-model="modelForm.namespace" class="cbx-input" style="width:110px" placeholder="default"/>
+                <label>{{ t('命名空间') }}</label><input v-model="modelForm.namespace" class="cbx-input" style="width:110px" placeholder="default"/>
               </div>
               <div class="cbx-form-row">
-                <label>模型名</label><input v-model="modelForm.modelName" class="cbx-input" placeholder="box-metric-model"/>
-                <span class="cbx-sec-sub">模型名 = DeviceModel CRD 的 metadata.name，设备通过它引用</span>
+                <label>{{ t('模型名') }}</label><input v-model="modelForm.modelName" class="cbx-input" placeholder="box-metric-model"/>
+                <span class="cbx-sec-sub">{{ t('模型名 = DeviceModel CRD 的 metadata.name，设备通过它引用') }}</span>
               </div>
               <div class="cbx-sec-head" style="margin-top:8px">
-                <b>属性点位</b>
-                <button class="cbx-op" @click="addModelProp">＋ 添加</button>
+                <b>{{ t('属性点位') }}</b>
+                <button class="cbx-op" @click="addModelProp">＋ {{ t('添加') }}</button>
               </div>
               <div v-for="(p, i) in modelForm.properties" :key="i" class="cbx-prop-row">
-                <input v-model="p.name" class="cbx-input" style="width:110px" placeholder="属性名"/>
+                <input v-model="p.name" class="cbx-input" style="width:110px" :placeholder="t('属性名')"/>
                 <select v-model="p.type" class="cbx-select">
                   <option v-for="t in ['float','int','double','string','boolean']" :key="t">{{ t }}</option>
                 </select>
@@ -961,7 +961,7 @@
                   <select v-model="p.registerType" class="cbx-select">
                     <option v-for="r in ['holdingRegister','inputRegister','coil','discreteInput']" :key="r">{{ r }}</option>
                   </select>
-                  <input v-model.number="p.register" type="number" class="cbx-input" style="width:70px" placeholder="寄存器"/>
+                  <input v-model.number="p.register" type="number" class="cbx-input" style="width:70px" :placeholder="t('寄存器')"/>
                   <input v-model="p.scale" class="cbx-input" style="width:60px" placeholder="scale"/>
                 </template>
                 <template v-else-if="modelForm.protocol === 'opcua'">
@@ -971,7 +971,7 @@
                   <input v-model="p.characteristicUUID" class="cbx-input" style="width:170px" placeholder="characteristicUUID"/>
                 </template>
                 <template v-else-if="modelForm.protocol === 'lora'">
-                  <input v-model="p.payloadKey" class="cbx-input" style="width:170px" placeholder="上行JSON键 payloadKey"/>
+                  <input v-model="p.payloadKey" class="cbx-input" style="width:170px" :placeholder="t('上行JSON键 payloadKey')"/>
                   <input v-model="p.scale" class="cbx-input" style="width:60px" placeholder="scale"/>
                 </template>
                 <template v-else-if="modelForm.protocol === 'cellular'">
@@ -979,21 +979,21 @@
                     <option v-for="k in ['signal','csq','rsrp','rsrq','sinr','iccid','imsi','imei','reg','rx_rate','tx_rate']" :key="k">{{ k }}</option>
                   </select>
                 </template>
-                <input v-model="p.unit" class="cbx-input" style="width:60px" placeholder="单位"/>
-                <button class="cbx-op danger" @click="modelForm.properties.splice(i, 1)">✕</button>
+                <input v-model="p.unit" class="cbx-input" style="width:60px" :placeholder="t('单位')"/>
+                <button class="x-btn danger" @click="modelForm.properties.splice(i, 1)" :title="t('删除属性')">✕</button>
               </div>
 
               <div class="cbx-form-row" style="margin-top:10px">
-                <button class="cbx-op primary" @click="modelDryRun()">生成 YAML 预览</button>
-                <button class="cbx-op primary" @click="applyModelForm()" title="保存到本地 box_devices.json 并立即下发云端 K3s（无需单独保存）">下发到云端</button>
+                <button class="cbx-op primary" @click="modelDryRun()">{{ t('生成 YAML 预览') }}</button>
+                <button class="cbx-op primary" @click="applyModelForm()" :title="t('保存到本地 box_devices.json 并立即下发云端 K3s（无需单独保存）')">{{ t('下发到云端') }}</button>
                 <span class="cbx-sec-sub" v-if="modelFormErr" style="color:var(--red)">{{ modelFormErr }}</span>
               </div>
 
               <!-- YAML 预览 -->
               <div v-if="modelPreview" class="cbx-preview">
                 <div class="cbx-preview-head">
-                  <b>YAML 预览</b>
-                  <button class="cbx-op" @click="copyModelPreview">复制</button>
+                  <b>{{ t('YAML 预览') }}</b>
+                  <button class="cbx-op" @click="copyModelPreview">{{ t('复制') }}</button>
                 </div>
                 <pre class="cbx-code">{{ modelPreview }}</pre>
               </div>
@@ -1005,29 +1005,29 @@
     <div v-if="boxCfgOpen" class="cbx-mask" @click.self="boxCfgOpen = false">
       <div class="cbx-dialog">
         <div class="cbx-dialog-head">
-          <b>云端 Broker 配置</b>
-          <button class="cbx-op danger" @click="boxCfgOpen = false">✕</button>
+          <b>{{ t('云端 Broker 配置') }}</b>
+          <button class="x-btn lg" @click="boxCfgOpen = false" :aria-label="t('关闭')">✕</button>
         </div>
         <div class="cbx-form">
           <div class="cbx-form-row">
-            <label>Broker 地址</label><input v-model="boxCfg.host" class="cbx-input" style="flex:1" placeholder="127.0.0.1"/>
-            <label>端口</label><input v-model.number="boxCfg.port" type="number" class="cbx-input" style="width:90px" placeholder="41883"/>
+            <label>{{ t('Broker 地址') }}</label><input v-model="boxCfg.host" class="cbx-input" style="flex:1" placeholder="127.0.0.1"/>
+            <label>{{ t('端口') }}</label><input v-model.number="boxCfg.port" type="number" class="cbx-input" style="width:90px" placeholder="41883"/>
           </div>
           <div class="cbx-form-row">
-            <label>用户名</label><input v-model="boxCfg.username" class="cbx-input" style="flex:1" placeholder="可选"/>
-            <label>密码</label><input v-model="boxCfg.password" type="password" class="cbx-input" style="flex:1" placeholder="可选"/>
+            <label>{{ t('用户名') }}</label><input v-model="boxCfg.username" class="cbx-input" style="flex:1" :placeholder="t('可选')"/>
+            <label>{{ t('密码') }}</label><input v-model="boxCfg.password" type="password" class="cbx-input" style="flex:1" :placeholder="t('可选')"/>
           </div>
-          <p class="cbx-note">保存后立即断开并按新配置重连（热更新），配置持久化到 box_config.json。</p>
-          <div class="cbx-form-sep">云端 Agent（数据通道：MQTT cloud/# 推送读 + HTTP 写，替代 SSH）</div>
+          <p class="cbx-note">{{ t('保存后立即断开并按新配置重连（热更新），配置持久化到 box_config.json。') }}</p>
+          <div class="cbx-form-sep">{{ t('云端 Agent（数据通道：MQTT cloud/# 推送读 + HTTP 写，替代 SSH）') }}</div>
           <div class="cbx-form-row">
-            <label>Agent 端口</label><input v-model.number="boxCfg.agent_port" type="number" class="cbx-input" style="width:90px" placeholder="42083"/>
-            <label>Agent Token</label><input v-model="boxCfg.agent_token" class="cbx-input" style="flex:1" placeholder="与云端 install_agent.sh --token 一致"/>
-            <label>命名空间</label><input v-model="boxCfg.namespace" class="cbx-input" style="width:110px" placeholder="default"/>
+            <label>{{ t('Agent 端口') }}</label><input v-model.number="boxCfg.agent_port" type="number" class="cbx-input" style="width:90px" placeholder="42083"/>
+            <label>{{ t('Agent Token') }}</label><input v-model="boxCfg.agent_token" class="cbx-input" style="flex:1" :placeholder="t('与云端 install_agent.sh --token 一致')"/>
+            <label>{{ t('命名空间') }}</label><input v-model="boxCfg.namespace" class="cbx-input" style="width:110px" placeholder="default"/>
           </div>
-          <div class="cbx-form-hint">云端部署 cloud-agent 后填写此处的 Token/端口（安装命令见「一键下发」区块），保存即生效：概览/CRD/日志经 MQTT 长连接实时推送，下发/删除/回写走 HTTP，全程无需 SSH。</div>
+          <div class="cbx-form-hint">{{ t('云端部署 cloud-agent 后填写此处的 Token/端口（安装命令见「一键下发」区块），保存即生效：概览/CRD/日志经 MQTT 长连接实时推送，下发/删除/回写走 HTTP，全程无需 SSH。') }}</div>
           <div class="cbx-form-row">
-            <button class="cbx-op primary" :disabled="boxCfgSaving" @click="saveBoxConfig">{{ boxCfgSaving ? '保存中…' : '保存并重连' }}</button>
-            <button class="cbx-op" @click="boxCfgOpen = false">取消</button>
+            <button class="cbx-op primary" :disabled="boxCfgSaving" @click="saveBoxConfig">{{ boxCfgSaving ? t('保存中…') : t('保存并重连') }}</button>
+            <button class="cbx-op" @click="boxCfgOpen = false">{{ t('取消') }}</button>
           </div>
         </div>
       </div>
@@ -1037,30 +1037,30 @@
     <div v-if="edgeCfgOpen" class="cbx-mask" @click.self="edgeCfgOpen = false">
       <div class="cbx-dialog">
         <div class="cbx-dialog-head">
-          <b>盒子连接配置（{{ edgeCfgBox || '' }}）</b>
-          <button class="cbx-op danger" @click="edgeCfgOpen = false">✕</button>
+          <b>{{ t('盒子连接配置（') }}<code>{{ edgeCfgBox || '' }}</code>{{ t('）') }}</b>
+          <button class="x-btn lg" @click="edgeCfgOpen = false" :aria-label="t('关闭')">✕</button>
         </div>
         <div class="cbx-form">
           <div class="cbx-form-row">
-            <label>盒子 IP</label><input v-model="edgeCfg.host" class="cbx-input" style="flex:1" placeholder="现场可达地址（内网 IP / 跳板机 / frp）"/>
-            <label>端口</label><input v-model.number="edgeCfg.port" type="number" class="cbx-input" style="width:90px" placeholder="22"/>
+            <label>{{ t('盒子 IP') }}</label><input v-model="edgeCfg.host" class="cbx-input" style="flex:1" :placeholder="t('现场可达地址（内网 IP / 跳板机 / frp）')"/>
+            <label>{{ t('端口') }}</label><input v-model.number="edgeCfg.port" type="number" class="cbx-input" style="width:90px" placeholder="22"/>
           </div>
           <div class="cbx-form-row">
-            <label>用户名</label><input v-model="edgeCfg.user" class="cbx-input" style="flex:1" placeholder="root"/>
-            <label>密码</label><input v-model="edgeCfg.password" type="password" class="cbx-input" style="flex:1" placeholder="SSH 密码（或填密钥）"/>
+            <label>{{ t('用户名') }}</label><input v-model="edgeCfg.user" class="cbx-input" style="flex:1" placeholder="root"/>
+            <label>{{ t('密码') }}</label><input v-model="edgeCfg.password" type="password" class="cbx-input" style="flex:1" :placeholder="t('SSH 密码（或填密钥）')"/>
           </div>
           <div class="cbx-form-row">
-            <label>密钥</label><input v-model="edgeCfg.key" class="cbx-input" style="flex:1" placeholder="/root/.ssh/id_rsa（可选）"/>
+            <label>{{ t('密钥') }}</label><input v-model="edgeCfg.key" class="cbx-input" style="flex:1" :placeholder="t('/root/.ssh/id_rsa（可选）')"/>
           </div>
-          <div class="cbx-form-hint">盒子运行期无直达 IP；此处为部署/现场运维时可达地址（现场内网 / 手机热点 / frp）。<br/>
-            IP 为空或 SSH 探测不通时，「重启 Mapper」等 SSH 操作将被拒绝。保存后自动探测连通性。</div>
+          <div class="cbx-form-hint">{{ t('盒子运行期无直达 IP；此处为部署/现场运维时可达地址（现场内网 / 手机热点 / frp）。') }}<br/>
+            {{ t('IP 为空或 SSH 探测不通时，「重启 Mapper」等 SSH 操作将被拒绝。保存后自动探测连通性。') }}</div>
           <div class="cbx-form-row">
-            <button class="cbx-op primary" :disabled="edgeCfgSaving" @click="saveEdgeCfg">{{ edgeCfgSaving ? '保存中…' : '保存并探测' }}</button>
-            <button class="cbx-op" :disabled="edgeCfgChecking" @click="checkEdgeCfg()">{{ edgeCfgChecking ? '探测中…' : '∿ 仅探测' }}</button>
+            <button class="cbx-op primary" :disabled="edgeCfgSaving" @click="saveEdgeCfg">{{ edgeCfgSaving ? t('保存中…') : t('保存并探测') }}</button>
+            <button class="cbx-op" :disabled="edgeCfgChecking" @click="checkEdgeCfg()">{{ edgeCfgChecking ? t('探测中…') : '∿ ' + t('仅探测') }}</button>
             <span v-if="edgeCfgCheckResult" class="cbx-edge-check" :class="{ ok: edgeCfgCheckResult.reachable, bad: !edgeCfgCheckResult.reachable }">
-              {{ edgeCfgCheckResult.reachable ? '✓ 可达' : '✗ 不可达' }}
+              {{ edgeCfgCheckResult.reachable ? t('✓ 可达') : t('✗ 不可达') }}
             </span>
-            <button class="cbx-op" @click="edgeCfgOpen = false">取消</button>
+            <button class="cbx-op" @click="edgeCfgOpen = false">{{ t('取消') }}</button>
           </div>
         </div>
       </div>
@@ -1070,33 +1070,33 @@
     <div v-if="appDeployOpen" class="cbx-mask" @click.self="appDeployOpen = false">
       <div class="cbx-dialog">
         <div class="cbx-dialog-head">
-          <b>云端部署到盒子（{{ appDeployForm.box }}）</b>
-          <button class="cbx-op danger" @click="appDeployOpen = false">✕</button>
+          <b>{{ t('云端部署到盒子（') }}<code>{{ appDeployForm.box }}</code>{{ t('）') }}</b>
+          <button class="x-btn lg" @click="appDeployOpen = false" :aria-label="t('关闭')">✕</button>
         </div>
         <div class="cbx-form">
           <div class="cbx-form-row">
-            <label>类型</label>
+            <label>{{ t('类型') }}</label>
             <select v-model="appDeployForm.type" class="cbx-input" style="width:150px">
-              <option value="service">服务（可运行进程）</option>
-              <option value="model">模型（仅存储）</option>
+              <option value="service">{{ t('服务（可运行进程）') }}</option>
+              <option value="model">{{ t('模型（仅存储）') }}</option>
             </select>
-            <label>名称</label><input v-model="appDeployForm.name" class="cbx-input" style="flex:1" placeholder="如 carbon-emission-model / predict-svc"/>
+            <label>{{ t('名称') }}</label><input v-model="appDeployForm.name" class="cbx-input" style="flex:1" :placeholder="t('如 carbon-emission-model / predict-svc')"/>
           </div>
           <div class="cbx-form-row">
-            <label>下载地址</label><input v-model="appDeployForm.url" class="cbx-input" style="flex:1" placeholder="https://…/model.tar.gz 或脚本 URL（盒子侧下载安装）"/>
+            <label>{{ t('下载地址') }}</label><input v-model="appDeployForm.url" class="cbx-input" style="flex:1" :placeholder="t('https://…/model.tar.gz 或脚本 URL（盒子侧下载安装）')"/>
           </div>
           <div class="cbx-form-row" v-if="appDeployForm.type === 'service'">
-            <label>启动命令</label><input v-model="appDeployForm.command" class="cbx-input" style="flex:1" placeholder="如 python3 run.py（相对应用目录，可空=只安装不启动）"/>
+            <label>{{ t('启动命令') }}</label><input v-model="appDeployForm.command" class="cbx-input" style="flex:1" :placeholder="t('如 python3 run.py（相对应用目录，可空=只安装不启动）')"/>
           </div>
           <div class="cbx-form-row" v-if="appDeployForm.type === 'service'">
-            <label>参数</label><input v-model="appDeployForm.args" class="cbx-input" style="flex:1" placeholder="空格分隔，如 --port 8000"/>
-            <label>版本</label><input v-model="appDeployForm.version" class="cbx-input" style="width:110px" placeholder="1.0.0"/>
+            <label>{{ t('参数') }}</label><input v-model="appDeployForm.args" class="cbx-input" style="flex:1" :placeholder="t('空格分隔，如 --port 8000')"/>
+            <label>{{ t('版本') }}</label><input v-model="appDeployForm.version" class="cbx-input" style="width:110px" placeholder="1.0.0"/>
           </div>
-          <div class="cbx-form-hint">指令经云端 Broker 命令主题 <code>cmd/{{ appDeployForm.box }}/deploy</code> 下发，盒子 mapper 订阅执行；<br/>
-            执行结果回报 <code>state/{{ appDeployForm.box }}/deploy</code>，运行服务周期上报到卡片。</div>
+          <div class="cbx-form-hint">{{ t('指令经云端 Broker 命令主题') }} <code>cmd/{{ appDeployForm.box }}/deploy</code> {{ t('下发，盒子 mapper 订阅执行；') }}<br/>
+            {{ t('执行结果回报') }} <code>state/{{ appDeployForm.box }}/deploy</code>{{ t('，运行服务周期上报到卡片。') }}</div>
           <div class="cbx-form-row">
-            <button class="cbx-op primary" :disabled="appDeploySaving" @click="doAppDeploy">{{ appDeploySaving ? '下发中…' : '下发部署' }}</button>
-            <button class="cbx-op" @click="appDeployOpen = false">取消</button>
+            <button class="cbx-op primary" :disabled="appDeploySaving" @click="doAppDeploy">{{ appDeploySaving ? t('下发中…') : t('下发部署') }}</button>
+            <button class="cbx-op" @click="appDeployOpen = false">{{ t('取消') }}</button>
           </div>
         </div>
       </div>
@@ -1111,6 +1111,7 @@
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
+import { t } from '../i18n'
 // 云端时序历史查询弹窗（TDengine）：异步分包，点开才加载
 const CloudHistoryDialog = defineAsyncComponent(() => import('./CloudHistoryDialog.vue'))
 
@@ -1118,8 +1119,8 @@ const store = useSimStore()
 
 // ---- 单页布局（设备配置已并入通信拓扑图，无 tab）----
 const expanded = reactive({ boxes: true, models: true, devs: true, unmounted: false })
-const sideTitle = '资源'
-const sideCount = computed(() => `${topoBoxes.value?.length || 0} 盒 · ${mergedModels.value.length} 模型 · ${mergedDevices.value.length} 设备`)
+const sideTitle = t('资源')
+const sideCount = computed(() => `${topoBoxes.value?.length || 0} ${t('盒')} · ${mergedModels.value.length} ${t('模型')} · ${mergedDevices.value.length} ${t('设备')}`)
 
 // 合并界面：原「数据概览」+「设备管理」二合一（云端设备关联 / 边缘节点 / twins 实时值 / CloudHub 端口已移除）
 
@@ -1202,7 +1203,7 @@ async function loadDevices() { try { devices.value = await api.boxDevices() } ca
 const procGroups = computed(() => {
   const g = {}
   for (const d of store.allDevices) {
-    const k = d.unitName || d.unitType || '其他'
+    const k = d.unitName || d.unitType || t('其他')
     ;(g[k] = g[k] || []).push(d)
   }
   return Object.keys(g).map((k) => ({ unit: k, devices: g[k] }))
@@ -1265,27 +1266,27 @@ function addModelProp() {
 function copyModelPreview() { navigator.clipboard?.writeText(modelPreview.value) }
 async function modelDryRun() {
   modelFormErr.value = ''
-  if (!modelForm.modelName.trim()) { modelFormErr.value = '请输入模型名'; return }
+  if (!modelForm.modelName.trim()) { modelFormErr.value = t('请输入模型名'); return }
   try {
     const r = await api.boxUpdateModel({ ...modelForm, mode: 'dryRun' })
     modelPreview.value = r.yamls?.model || ''
   } catch (e) { modelFormErr.value = e.message || e }
 }
 async function saveModel() {
-  if (!modelForm.modelName.trim()) { modelFormErr.value = '请输入模型名'; return }
-  if (!(modelForm.properties || []).length) { modelFormErr.value = '请至少添加一个属性点位'; return }
+  if (!modelForm.modelName.trim()) { modelFormErr.value = t('请输入模型名'); return }
+  if (!(modelForm.properties || []).length) { modelFormErr.value = t('请至少添加一个属性点位'); return }
   modelFormErr.value = ''
   try {
     const r = await api.boxUpdateModel({ ...modelForm, mode: 'apply' })
-    store.toast = `模型已保存：${modelForm.modelName}（可在「设备接入」中选择）`
+    store.showToast(`${t('模型已保存')}：${modelForm.modelName}（${t('可在「设备接入」中选择')}）`, 'success')
     await loadDevices()
     modelCreateOpen.value = false
   } catch (e) { modelFormErr.value = e.message || e }
 }
 // 一键下发模型：保存到本地 box_devices.json 后立即下发云端 K3s（无需单独「保存」）
 async function applyModelForm() {
-  if (!modelForm.modelName.trim()) { modelFormErr.value = '请输入模型名'; return }
-  if (!(modelForm.properties || []).length) { modelFormErr.value = '请至少添加一个属性点位'; return }
+  if (!modelForm.modelName.trim()) { modelFormErr.value = t('请输入模型名'); return }
+  if (!(modelForm.properties || []).length) { modelFormErr.value = t('请至少添加一个属性点位'); return }
   modelFormErr.value = ''
   try {
     await api.boxUpdateModel({ ...modelForm, mode: 'apply' })
@@ -1318,8 +1319,8 @@ const cloudUnboundGroups = computed(() => {
   const on = list.filter((c) => c.state === 'online')
   const off = list.filter((c) => c.state !== 'online')
   const groups = []
-  if (on.length) groups.push({ label: '在线', items: on })
-  if (off.length) groups.push({ label: '离线', items: off })
+  if (on.length) groups.push({ label: t('在线'), items: on })
+  if (off.length) groups.push({ label: t('离线'), items: off })
   return groups
 })
 function onPickCloudDevice() {
@@ -1360,18 +1361,19 @@ function openIngest(d) {
   ingestOpen.value = true
 }
 async function doIngest() {
-  ingesting.value = true; ingestErr.value = false; ingestMsg.value = '上报中…'
+  ingesting.value = true; ingestErr.value = false; ingestMsg.value = t('上报中…')
   try {
     const r = await api.boxIngestDeviceValue(ingestForm.device, ingestForm.namespace, ingestForm.property, ingestForm.value)
     if (r.ok) {
-      ingestMsg.value = `已回写云端 twins：${ingestForm.property}=${r.reported}（${r.timestamp}）`
-      store.toast = ingestMsg.value
+      ingestMsg.value = `${t('已回写云端 twins')}：${ingestForm.property}=${r.reported}（${r.timestamp}）`
+      store.showToast(ingestMsg.value, 'success')
       setTimeout(() => loadCloudCrd(true), 600)
     } else {
       ingestErr.value = true
-      ingestMsg.value = r.error || r.stderr || '上报失败'
+      ingestMsg.value = r.error || r.stderr || t('上报失败')
+      store.showToast(ingestMsg.value, 'error')
     }
-  } catch (e) { ingestErr.value = true; ingestMsg.value = e.message || String(e) }
+  } catch (e) { ingestErr.value = true; ingestMsg.value = e.message || String(e); store.showToast(ingestMsg.value, 'error') }
   finally { ingesting.value = false }
 }
 
@@ -1387,7 +1389,7 @@ const agentStatusOk = ref(false)
 function fmtFresh(ts) {
   if (!ts) return '—'
   const s = Math.floor(Date.now() / 1000 - ts)
-  return s < 90 ? `${s}s 前` : `${Math.floor(s / 60)}m 前`
+  return s < 90 ? `${s}s ${t('前')}` : `${Math.floor(s / 60)}m ${t('前')}`
 }
 async function loadAgentStatus() {
   try {
@@ -1405,16 +1407,16 @@ async function restartCloud(payload, label, confirmText) {
   try {
     const r = await api.boxCloudRestart(payload)
     if (r && r.ok) {
-      const msg = ((r.stdout && r.stdout.trim()) || r.info || '成功')
-      alert('已触发重启「' + label + '」：' + msg + (r.info ? '\n' + r.info : ''))
+      const msg = ((r.stdout && r.stdout.trim()) || r.info || t('成功'))
+      store.showToast(t('已触发重启「') + label + t('」') + '：' + msg + (r.info ? ' ' + r.info : ''), 'success')
       await refreshFast()
       loadAgentStatus()
       setTimeout(() => { loadCloudLogs(); loadAgentStatus() }, 8000)  // 重启完成后二次刷新
     } else {
-      alert('重启「' + label + '」失败：' + ((r && (r.stderr || r.error)) || '未知错误'))
+      store.showToast(t('重启「') + label + t('」失败') + '：' + ((r && (r.stderr || r.error)) || t('未知错误')), 'error')
     }
   } catch (e) {
-    alert('重启请求失败：' + (e.message || e))
+    store.showToast(t('重启请求失败') + '：' + (e.message || e), 'error')
   } finally {
     restartingKey.value = ''
   }
@@ -1423,37 +1425,37 @@ function restartCloudcore() {
   return restartCloud(
     { kind: 'deployment', name: 'cloudcore', namespace: 'kubeedge' },
     'CloudCore',
-    '确认重启云端 kubeedge 命名空间下的 cloudcore 工作负载？\n' +
-    '将触发边缘节点重新注册（约 1-2 分钟恢复在线），请确认当前无正在进行的下发操作。'
+    t('确认重启云端 kubeedge 命名空间下的 cloudcore 工作负载？') + '\n' +
+    t('将触发边缘节点重新注册（约 1-2 分钟恢复在线），请确认当前无正在进行的下发操作。')
   )
 }
 function restartAgent() {
   return restartCloud(
     { kind: 'systemd', name: 'cloud-agent' },
     'cloud-agent',
-    '确认重启云端 cloud-agent 服务？\n' +
-    '系统会在 2 秒后自动拉起（先返回结果再重启自身），期间平台约数秒无法连接云端 agent。'
+    t('确认重启云端 cloud-agent 服务？') + '\n' +
+    t('系统会在 2 秒后自动拉起（先返回结果再重启自身），期间平台约数秒无法连接云端 agent。')
   )
 }
 function restartBroker() {
   return restartCloud(
     { kind: 'systemd', name: 'nengtan-cloud-broker' },
     'MQTT Broker',
-    '确认重启云端 MQTT Broker（nengtan-cloud-broker）？\n' +
-    '将短暂断开边缘盒子与平台的 MQTT 长连接，约数秒后自动重连，请确认当前无正在进行的下发/上报操作。'
+    t('确认重启云端 MQTT Broker（nengtan-cloud-broker）？') + '\n' +
+    t('将短暂断开边缘盒子与平台的 MQTT 长连接，约数秒后自动重连，请确认当前无正在进行的下发/上报操作。')
   )
 }
 function restartMapper(b) {
   if (!edgeIpOk(b)) {
-    alert('未配置盒子 IP 或探测不通，无法重启 Mapper。\n请先点击「盒子IP」填写现场可达地址（内网 IP / 跳板机 / frp）并保存。')
+    store.showToast(t('未配置盒子 IP 或探测不通，无法重启 Mapper。请先点击「盒子IP」填写现场可达地址（内网 IP / 跳板机 / frp）并保存。'), 'warn')
     return
   }
   return restartCloud(
     { kind: 'edge', name: 'box-mapper' },
     'box-mapper（' + b.name + '）',
-    '确认重启边端盒子「' + b.name + '」的 box-mapper 服务？\n' +
-    '云端 agent 将经 SSH 到边缘盒子执行 systemctl restart box-mapper（需已在盒子卡片「盒子IP」配置现场可达地址且探测通过）。\n' +
-    '注意：盒子处于现场内网/无直达 IP 时云端 SSH 无法直达，该操作会失败，需现场运维重启。'
+    t('确认重启边端盒子「') + b.name + t('」的 box-mapper 服务？') + '\n' +
+    t('云端 agent 将经 SSH 到边缘盒子执行 systemctl restart box-mapper（需已在盒子卡片「盒子IP」配置现场可达地址且探测通过）。') + '\n' +
+    t('注意：盒子处于现场内网/无直达 IP 时云端 SSH 无法直达，该操作会失败，需现场运维重启。')
   )
 }
 
@@ -1506,16 +1508,16 @@ async function saveEdgeCfg() {
     })
     if (r && r.ok !== false) {
       edgeCfgCheckResult.value = (r.check && r.check.reachable != null) ? { reachable: !!r.check.reachable } : null
-      store.toast = edgeCfgCheckResult.value && edgeCfgCheckResult.value.reachable
-        ? '盒子 IP 已保存且探测可达'
-        : '盒子 IP 已保存（当前探测不可达，重启 Mapper 将被拒绝）'
+      store.showToast(edgeCfgCheckResult.value && edgeCfgCheckResult.value.reachable
+        ? t('盒子 IP 已保存且探测可达')
+        : t('盒子 IP 已保存（当前探测不可达，重启 Mapper 将被拒绝）'), edgeCfgCheckResult.value && edgeCfgCheckResult.value.reachable ? 'success' : 'warn')
       edgeCfgOpen.value = false
       loadOverview()
     } else {
-      store.toast = '保存失败：' + ((r && r.error) || '未知错误')
+      store.showToast(t('保存失败') + '：' + ((r && r.error) || t('未知错误')), 'error')
     }
   } catch (e) {
-    store.toast = '保存失败：' + (e.message || e)
+    store.showToast(t('保存失败') + '：' + (e.message || e), 'error')
   } finally { edgeCfgSaving.value = false }
 }
 async function checkEdgeCfg(silent = false) {
@@ -1524,11 +1526,11 @@ async function checkEdgeCfg(silent = false) {
     const r = await api.boxEdgeCheck((edgeCfg.host || '').trim(), Number(edgeCfg.port) || 22)
     edgeCfgCheckResult.value = { reachable: !!(r && r.reachable) }
     if (!silent) {
-      store.toast = edgeCfgCheckResult.value.reachable ? '✓ 盒子可达' : '✗ 盒子不可达：' + ((r && r.error) || '')
+      store.showToast(edgeCfgCheckResult.value.reachable ? t('✓ 盒子可达') : t('✗ 盒子不可达') + '：' + ((r && r.error) || ''), edgeCfgCheckResult.value.reachable ? 'success' : 'warn')
     }
   } catch (e) {
     edgeCfgCheckResult.value = { reachable: false }
-    if (!silent) store.toast = '探测失败：' + (e.message || e)
+    if (!silent) store.showToast(t('探测失败') + '：' + (e.message || e), 'error')
   } finally { edgeCfgChecking.value = false }
 }
 function edgeIpOk(b) {
@@ -1553,8 +1555,8 @@ function openAppDeploy(b) {
 }
 async function doAppDeploy() {
   const name = (appDeployForm.name || '').trim()
-  if (!name) { store.toast = '请填写应用名称'; return }
-  if (!(appDeployForm.url || '').trim()) { store.toast = '请填写下载地址'; return }
+  if (!name) { store.showToast(t('请填写应用名称'), 'warn'); return }
+  if (!(appDeployForm.url || '').trim()) { store.showToast(t('请填写下载地址'), 'warn'); return }
   appDeploySaving.value = true
   try {
     const r = await api.boxAppCmd({
@@ -1568,14 +1570,14 @@ async function doAppDeploy() {
       version: (appDeployForm.version || '1.0.0').trim(),
     })
     if (r && r.ok !== false) {
-      store.toast = '部署指令已下发（盒子执行后回报，卡片将显示运行服务）'
+      store.showToast(t('部署指令已下发（盒子执行后回报，卡片将显示运行服务）'), 'success')
       appDeployOpen.value = false
       setTimeout(() => { loadOverview() }, 3000)
     } else {
-      store.toast = '下发失败：' + ((r && r.error) || '未知错误')
+      store.showToast(t('下发失败') + '：' + ((r && r.error) || t('未知错误')), 'error')
     }
   } catch (e) {
-    store.toast = '下发失败：' + (e.message || e)
+    store.showToast(t('下发失败') + '：' + (e.message || e), 'error')
   } finally { appDeploySaving.value = false }
 }
 async function applyDevices(name = '', dryRun = false, modelName = '') {
@@ -1584,18 +1586,18 @@ async function applyDevices(name = '', dryRun = false, modelName = '') {
     const r = await api.boxApplyDevices(name, dryRun, modelName)
     if (!r.ok) throw new Error((r.error || '') + (r.stderr ? ' ' + r.stderr : ''))
     const list = (r.applied || []).join('、')
-    if (dryRun) store.toast = `预览：${list}（未下发）`
-    else store.toast = `下发成功：${list}`
+    if (dryRun) store.showToast(t('预览：') + `${list}` + t('（未下发）'), 'warn')
+    else store.showToast(t('下发成功') + '：' + list, 'success')
     return r
   } catch (e) {
-    store.toast = '下发失败：' + (e.message || e)
+    store.showToast(t('下发失败') + '：' + (e.message || e), 'error')
     throw e
   } finally { applying.value = false }
 }
 // 拓扑图设备行「⤓ 下发」：单个设备下发，失败仅 toast 提示
 async function onApplyOneDev(d) {
   if (applying.value) return
-  if (!confirm(`确认将设备「${d.name}」下发到云端 K3s？`)) return
+  if (!confirm(t('确认将设备「') + `${d.name}` + t('」下发到云端 K3s？'))) return
   try { await applyDevices(d.name) } catch (e) { /* 失败已 toast */ }
 }
 
@@ -1618,7 +1620,7 @@ async function openBoxConfig() {
       boxCfg.namespace = cc.value.namespace || 'default'
     }
     boxCfgOpen.value = true
-  } catch (e) { store.toast = '加载配置失败：' + (e.message || e) }
+  } catch (e) { store.showToast(t('加载配置失败') + '：' + (e.message || e), 'error') }
 }
 async function saveBoxConfig() {
   boxCfgSaving.value = true
@@ -1639,15 +1641,15 @@ async function saveBoxConfig() {
     ])
     const ok = r.status === 'fulfilled' && r.value && r.value.ok !== false
     if (ok) {
-      store.toast = 'Broker + Agent 配置已保存并热更新'
+      store.showToast(t('Broker + Agent 配置已保存并热更新'), 'success')
       boxCfgOpen.value = false
       store.mqttSource = await api.realtimeSource()   // 立即刷新链路状态（含重连结果）
       await loadOverview()
     } else {
       const err = (r.status === 'fulfilled' && r.value && r.value.error) || (r.status === 'rejected' && r.reason && r.reason.message) || ''
-      store.toast = '保存失败：' + (err || '请检查配置')
+      store.showToast(t('保存失败') + '：' + (err || t('请检查配置')), 'error')
     }
-  } catch (e) { store.toast = '保存失败：' + (e.message || e) }
+  } catch (e) { store.showToast(t('保存失败') + '：' + (e.message || e), 'error') }
   finally { boxCfgSaving.value = false }
 }
 
@@ -1676,22 +1678,22 @@ async function applyDev() {
     await syncBound(form.cloudDevice || form.deviceName, form.boundDevice, form.boundFactor != null ? form.boundFactor : 1)
     const cs = r.cloud_sync || {}
     // 保存即自动同步云端（后端已下发）
-    store.toast = `设备 ${form.deviceName} 已保存` + (cs.ok ? '，已同步云端' : `，云端同步失败：${cs.error || '未知错误'}（本地已保存）`) + (form.boundDevice ? `，已绑定流程设备 ${form.boundDevice}${form.boundFactor !== 1 ? `（读数×${form.boundFactor}）` : ''}` : '')
+    store.showToast(`${t('设备')} ${form.deviceName} ${t('已保存')}` + (cs.ok ? t('，已同步云端') : `，${t('云端同步失败')}：${cs.error || t('未知错误')}（${t('本地已保存')}）`) + (form.boundDevice ? `，${t('已绑定流程设备')} ${form.boundDevice}${form.boundFactor !== 1 ? `（${t('读数')}×${form.boundFactor}）` : ''}` : ''), cs.ok ? 'success' : 'warn')
     await loadDevices()
   } catch (e) { formErr.value = e.message || e }
 }
 // 仅删除云端 CRD（对应云端管理台 /api/devices/delete；不动本地配置）
 async function delCloud(kind, name, namespace) {
   const k = kind === 'devicemodel' ? 'model' : 'device'
-  if (!window.confirm(`确认删除云端 CRD「${name}」？`)) return
+  if (!(await store.confirm({ title: t('删除云端 CRD'), message: t('确认删除云端 CRD「') + `${name}` + t('」？'), okText: t('删除'), danger: true }))) return
   try {
     const r = await api.boxDeleteDevice(k, name, namespace, true, false)
-    if (r.cloud && r.cloud.ok) store.toast = `云端 CRD 已删除：${name}`
-    else store.toast = `删除失败：${(r.cloud && (r.cloud.stderr || r.cloud.error)) || '云端不可达'}`
+    if (r.cloud && r.cloud.ok) store.showToast(t('云端 CRD 已删除') + '：' + name, 'success')
+    else store.showToast(t('删除失败') + '：' + ((r.cloud && (r.cloud.stderr || r.cloud.error)) || t('云端不可达')), 'error')
     await loadCloudCrd(true)
-  } catch (e) { store.toast = '删除失败：' + (e.message || e) }
+  } catch (e) { store.showToast(t('删除失败') + '：' + (e.message || e), 'error') }
 }
-async function copyPreview() { try { await navigator.clipboard.writeText(preview.value); store.toast = 'YAML 已复制' } catch (e) {} }
+async function copyPreview() { try { await navigator.clipboard.writeText(preview.value); store.showToast(t('YAML 已复制'), 'success') } catch (e) {} }
 
 // ---- Tab4 盒子一键接入（自解压脚本：box-deploy 包 + edgecore.yaml + rootCA + token）----
 const onboardForm = reactive({ hostname: 'edge-box', cloudIP: '172.19.134.45', boxIP: '' })
@@ -1733,8 +1735,8 @@ async function saveGithubConfig() {
   ghBusy.value = true
   try {
     const r = await api.boxGithubConfigSave({ owner: ghForm.owner, repo: ghForm.repo, branch: ghForm.branch, token: ghForm.token })
-    store.toast = r.ok ? 'GitHub 配置已保存' : (r.error || '保存失败')
-  } catch (e) { store.toast = '保存失败：' + (e.message || e) }
+    store.showToast(r.ok ? t('GitHub 配置已保存') : (r.error || t('保存失败')), r.ok ? 'success' : 'error')
+  } catch (e) { store.showToast(t('保存失败') + '：' + (e.message || e), 'error') }
   finally { ghBusy.value = false }
 }
 async function syncGithub() {
@@ -1743,8 +1745,8 @@ async function syncGithub() {
   try {
     const r = await api.boxGithubPush(onboardForm.cloudIP)
     ghResult.value = r
-    store.toast = r.ok ? '已同步到 GitHub：盒子现场可一条命令接入' : ('同步失败：' + (r.error || '见文件状态'))
-  } catch (e) { store.toast = '同步失败：' + (e.message || e) }
+    store.showToast(r.ok ? t('已同步到 GitHub：盒子现场可一条命令接入') : (t('同步失败') + '：' + (r.error || t('见文件状态'))), r.ok ? 'success' : 'error')
+  } catch (e) { store.showToast(t('同步失败') + '：' + (e.message || e), 'error') }
   finally { ghBusy.value = false }
 }
 async function exportBoxConfig() {
@@ -1753,24 +1755,24 @@ async function exportBoxConfig() {
   try {
     const r = await api.boxConfigExport(onboardForm.cloudIP, onboardForm.hostname)
     ghExport.value = r
-    store.toast = r.ok ? '已生成 box-config.json：复制内容保存到盒子 /opt/weight-bridge/box-config.json 即可' : (r.error || '导出失败')
-  } catch (e) { store.toast = '导出失败：' + (e.message || e) }
+    store.showToast(r.ok ? t('已生成 box-config.json：复制内容保存到盒子 /opt/weight-bridge/box-config.json 即可') : (r.error || t('导出失败')), r.ok ? 'success' : 'error')
+  } catch (e) { store.showToast(t('导出失败') + '：' + (e.message || e), 'error') }
   finally { ghExportBusy.value = false }
 }
 async function doOnboard() {
   onboardBusy.value = true
   try {
     const r = await api.boxOnboard(onboardForm.hostname, onboardForm.cloudIP, onboardForm.boxIP)
-    if (!r.ok) { store.toast = r.error || '生成失败'; return }
+    if (!r.ok) { store.showToast(r.error || t('生成失败'), 'error'); return }
     onboardResult.value = r
     remoteSteps.value = []
-  } catch (e) { store.toast = '生成失败：' + (e.message || e) }
+  } catch (e) { store.showToast(t('生成失败') + '：' + (e.message || e), 'error') }
   finally { onboardBusy.value = false }
 }
 async function downloadOnboardScript() {
   try {
     const r = await api.boxOnboardScript()
-    if (!r.ok) { store.toast = r.error || '脚本未生成'; return }
+    if (!r.ok) { store.showToast(r.error || t('脚本未生成'), 'error'); return }
     // base64 -> Blob 落盘（脚本约 18 MB，atob 一次性可接受）
     const bin = atob(r.script_b64)
     const bytes = new Uint8Array(bin.length)
@@ -1782,8 +1784,8 @@ async function downloadOnboardScript() {
     a.download = r.script_name || 'onboard_box.sh'
     document.body.appendChild(a); a.click(); a.remove()
     URL.revokeObjectURL(url)
-    store.toast = `已下载 ${r.script_name}（${(r.script_size / 1024 / 1024).toFixed(1)} MB）`
-  } catch (e) { store.toast = '下载失败：' + (e.message || e) }
+    store.showToast(`${t('已下载')} ${r.script_name}（${(r.script_size / 1024 / 1024).toFixed(1)} MB）`, 'success')
+  } catch (e) { store.showToast(t('下载失败') + '：' + (e.message || e), 'error') }
 }
 async function doOnboardRemote() {
   remoteRunning.value = true
@@ -1795,11 +1797,11 @@ async function doOnboardRemote() {
       boxIP: onboardForm.boxIP,
     })
     remoteSteps.value = r.steps || []
-    store.toast = r.ok ? '远程一键接入完成：盒子已接入云端' : ('远程一键接入失败：' + (r.error || '见步骤日志'))
-  } catch (e) { store.toast = '远程一键接入失败：' + (e.message || e) }
+    store.showToast(r.ok ? t('远程一键接入完成：盒子已接入云端') : (t('远程一键接入失败') + '：' + (r.error || t('见步骤日志'))), r.ok ? 'success' : 'error')
+  } catch (e) { store.showToast(t('远程一键接入失败') + '：' + (e.message || e), 'error') }
   finally { remoteRunning.value = false }
 }
-async function copyOnboard() { try { await navigator.clipboard.writeText(onboardResult.value.edgecore); store.toast = 'edgecore.yaml 已复制' } catch (e) {} }
+async function copyOnboard() { try { await navigator.clipboard.writeText(onboardResult.value.edgecore); store.showToast(t('edgecore.yaml 已复制'), 'success') } catch (e) {} }
 
 // ---- 实时数据（并入数据概览） ----
 const rtDevices = ref([])
@@ -1886,17 +1888,17 @@ function scrollMsgLog() {
   if (el) el.scrollTop = el.scrollHeight
 }
 async function doPublish() {
-  if (!pubForm.topic.trim()) { store.toast = '请先填写主题（建议 data/box-xxx/device-xxx 格式，发布后可在上方「实时消息流」看到回显，data/# 会同时刷新设备实时数据）'; return }
+  if (!pubForm.topic.trim()) { store.showToast(t('请先填写主题（建议 data/box-xxx/device-xxx 格式，发布后可在上方「实时消息流」看到回显，data/# 会同时刷新设备实时数据）'), 'warn'); return }
   try {
     const r = await api.boxPublish(pubForm.topic, pubForm.payload)
-    store.toast = r.ok
+    store.showToast(r.ok
       ? (pubForm.topic.trim().startsWith('data/')
-          ? `已发布到 ${r.topic} → 见上方「实时消息流」，实时数据已刷新`
-          : `已发布到 ${r.topic} → 见上方「实时消息流」`)
-      : '发布失败：' + (r.error || '')
+          ? t('已发布到 {topic} → 见上方「实时消息流」，实时数据已刷新', { topic: r.topic })
+          : t('已发布到 {topic} → 见上方「实时消息流」', { topic: r.topic }))
+      : t('发布失败') + '：' + (r.error || ''), r.ok ? 'success' : 'error')
     await loadMessages()
     nextTick(scrollMsgLog)
-  } catch (e) { store.toast = '发布失败：' + (e.message || e) }
+  } catch (e) { store.showToast(t('发布失败') + '：' + (e.message || e), 'error') }
 }
 
 async function refreshAll() {
@@ -1950,9 +1952,9 @@ function modelPropCount(m) {
   return m.property_count || 0
 }
 function devStateZh(d) {
-  if (d.state === 'online') return '在线'
-  if (d.state === 'offline') return '离线'
-  return '待下发'
+  if (d.state === 'online') return t('在线')
+  if (d.state === 'offline') return t('离线')
+  return t('待下发')
 }
 // 设备行点击：已下发云端 → 实时数据；仅本地 → 编辑配置
 function onDevClick(d) {
@@ -1971,16 +1973,16 @@ function isInvalidReading(v) {
   return INVALID_READING_VALUES.includes(v)
 }
 function fmtPrimary(v) {
-  if (isInvalidReading(v)) return '无有效数据'
+  if (isInvalidReading(v)) return t('无有效数据')
   if (v == null) return '—'
   return typeof v === 'number' ? (Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2)) : String(v)
 }
 function fmtAgo(epoch) {
   if (!epoch) return ''
   const s = Math.floor(Date.now() / 1000 - epoch)
-  if (s < 60) return `${s}s 前`
-  if (s < 3600) return `${Math.floor(s / 60)}m 前`
-  return `${Math.floor(s / 3600)}h 前`
+  if (s < 60) return `${s}s ${t('前')}`
+  if (s < 3600) return `${Math.floor(s / 60)}m ${t('前')}`
+  return `${Math.floor(s / 3600)}h ${t('前')}`
 }
 function fmtNum(v) {
   if (v == null) return '—'
@@ -1993,7 +1995,7 @@ function fmtUptime(s) {
   const d = Math.floor(s / 86400)
   const h = Math.floor((s % 86400) / 3600)
   const m = Math.floor((s % 3600) / 60)
-  return d ? `${d}天${h}小时` : (h ? `${h}小时${m}分` : `${m}分`)
+  return d ? `${d}${t('天')}${h}${t('小时')}` : (h ? `${h}${t('小时')}${m}${t('分')}` : `${m}${t('分')}`)
 }
 function fmtTime(t) {
   if (!t) return ''
@@ -2073,29 +2075,29 @@ const PHASE_ZH = {
   ImagePullBackOff: '镜像拉取失败', ErrImagePull: '镜像拉取错误', Terminating: '终止中',
 }
 function phaseZh(s) {
-  if (!s) return '未知'
-  return PHASE_ZH[s] || s
+  if (!s) return t('未知')
+  return t(PHASE_ZH[s]) || s
 }
 // K8s 节点角色统一中文：control-plane/edge/master → 中文
 const ROLE_ZH = { edge: '边端', 'control-plane': '控制面', master: '控制面', worker: '工作节点', '<none>': '普通节点' }
 function roleZh(r) {
   if (!r || r === '—') return '—'
-  return ROLE_ZH[String(r).toLowerCase()] || r
+  return t(ROLE_ZH[String(r).toLowerCase()]) || r
 }
 // 状态统一中文：online→在线 / offline→离线 / 未知
 function stateZh(s) {
-  if (s === 'online') return '在线'
-  if (s === 'offline') return '离线'
-  if (s === 'Ready' || s === 'ready') return '就绪'
-  if (s === 'NotReady') return '未就绪'
-  if (s === 'unknown' || !s) return '未知'
+  if (s === 'online') return t('在线')
+  if (s === 'offline') return t('离线')
+  if (s === 'Ready' || s === 'ready') return t('就绪')
+  if (s === 'NotReady') return t('未就绪')
+  if (s === 'unknown' || !s) return t('未知')
   return s
 }
 // 盒子三态中文：true=就绪 / false=未就绪 / null=状态未知（云端数据过期时后端置 null，避免旧缓存冒充实时）
 function readyZh(r) {
-  if (r === true) return '就绪'
-  if (r === false) return '未就绪'
-  return '状态未知'
+  if (r === true) return t('就绪')
+  if (r === false) return t('未就绪')
+  return t('状态未知')
 }
 function readyOk(r) {
   return r === true
@@ -2297,24 +2299,24 @@ function recalcLinks() {
   const AG = R(nodeRefs.n_agent)
   const CC = R(nodeRefs.n_cloudcore)
   const BK = R(nodeRefs.n_broker)
-  if (A && AG) defs.push({ f: A, t: AG, cls: 'red', mk: 'red', both: false, label: '写 HTTP :42083 · Bearer' })
-  if (BK && A) defs.push({ f: BK, t: A, cls: 'green', mk: 'green', both: false, label: '读 MQTT :41883 长连接' })
-  if (AG && CC) defs.push({ f: AG, t: CC, cls: 'blue', mk: 'blue', both: false, label: 'kubectl 本地 apply · delete · rollout', vertical: true })
-  if (CC && BK) defs.push({ f: CC, t: BK, cls: 'blue', mk: 'blue', both: false, label: 'MQTT 推送 cloud/state · crds · logs', vertical: true })
+  if (A && AG) defs.push({ f: A, t: AG, cls: 'red', mk: 'red', both: false, label: t('写 HTTP :42083 · Bearer') })
+  if (BK && A) defs.push({ f: BK, t: A, cls: 'green', mk: 'green', both: false, label: t('读 MQTT :41883 长连接') })
+  if (AG && CC) defs.push({ f: AG, t: CC, cls: 'blue', mk: 'blue', both: false, label: t('kubectl 本地 apply · delete · rollout'), vertical: true })
+  if (CC && BK) defs.push({ f: CC, t: BK, cls: 'blue', mk: 'blue', both: false, label: t('MQTT 推送 cloud/state · crds · logs'), vertical: true })
   const DEVS = R(nodeRefs.n_devs)
   const boxCount = topoBoxes.value.length
   topoBoxes.value.forEach((box, idx) => {
     const B = R(boxNodeRefs.value[box.name])
     if (!CC || !B) return
-    defs.push({ f: CC, t: B, cls: 'blue', mk: 'blue', both: true, label: '双向 WebSocket :10002', fyOff: -0.42, tyOff: -0.42 })
-    if (BK) defs.push({ f: B, t: BK, cls: 'green', mk: 'green', both: false, label: '上报 MQTT data/#', fyOff: 0.42, tyOff: 0.42 })
-    defs.push({ f: CC, t: B, cls: 'blue', mk: 'blue', both: true, label: 'DMI DeviceTwin 同步', fyOff: 0.42, tyOff: 0.42 })
+    defs.push({ f: CC, t: B, cls: 'blue', mk: 'blue', both: true, label: t('双向 WebSocket :10002'), fyOff: -0.42, tyOff: -0.42 })
+    if (BK) defs.push({ f: B, t: BK, cls: 'green', mk: 'green', both: false, label: t('上报 MQTT data/#'), fyOff: 0.42, tyOff: 0.42 })
+    defs.push({ f: CC, t: B, cls: 'blue', mk: 'blue', both: true, label: t('DMI DeviceTwin 同步'), fyOff: 0.42, tyOff: 0.42 })
     if (DEVS) {
       // 盒子 → 设备端总览：标注该盒子的真实边缘采集协议（动态），多盒子时在模块左缘按序分散锚点
       const protos = devProtosOf(box.name)
       defs.push({
         f: B, t: DEVS, cls: 'green', mk: 'green', both: false,
-        label: protos.length ? '边缘采集 MQTT :1883 · ' + protos.join(' · ') : '边缘采集 MQTT :1883',
+        label: protos.length ? t('边缘采集 MQTT :1883') + ' · ' + protos.join(' · ') : t('边缘采集 MQTT :1883'),
         tyOff: boxCount > 1 ? (idx - (boxCount - 1) / 2) * 0.3 : 0,
       })
     }
@@ -2523,26 +2525,26 @@ async function dryRunEdit() {
       const r = await api.boxUpdateModel({ ...editForm, mode: 'dryRun' })
       editPreview.value = r.yamls.model
       editPreviewMode.value = 'dryRun'
-      editMsg.value = '已生成模型 YAML 预览（未保存、未下发）'
+      editMsg.value = t('已生成模型 YAML 预览（未保存、未下发）')
     } else {
       const r = await api.boxCreateDevice({ ...editForm, mode: 'dryRun' })
       editPreview.value = r.yamls.model + '\n---\n' + r.yamls.device
       editPreviewMode.value = 'dryRun'
-      editMsg.value = '已生成预览（未保存、未下发）'
+      editMsg.value = t('已生成预览（未保存、未下发）')
     }
   } catch (e) { editErr.value = true; editMsg.value = e.message || e }
 }
 async function saveEditModel() {
-  editSaving.value = true; editErr.value = false; editMsg.value = '保存中…'
+  editSaving.value = true; editErr.value = false; editMsg.value = t('保存中…')
   try {
     const r = await api.boxUpdateModel({ ...editForm, mode: 'apply' })
     const n = (r.synced_devices || []).length
     const cs = r.cloud_sync || {}
     // 保存后后端已自动下发模型 + 引用设备到云端（云端及时同步）
-    let tip = `模型已更新：${editForm.modelName}` + (n ? `，同步重刷 ${n} 台设备` : '')
-    tip += cs.ok ? '，已同步云端' : `，云端同步失败：${cs.error || '未知错误'}（本地已保存）`
+    let tip = t('模型已更新：{name}', { name: editForm.modelName }) + (n ? t('，同步重刷 {n} 台设备', { n }) : '')
+    tip += cs.ok ? t('，已同步云端') : t('，云端同步失败：{err}（本地已保存）', { err: cs.error || t('未知错误') })
     editMsg.value = tip
-    store.toast = `模型配置已更新：${editForm.modelName}` + (cs.ok ? '，已同步云端' : '，云端同步失败')
+    store.showToast(t('模型配置已更新：{name}', { name: editForm.modelName }) + (cs.ok ? t('，已同步云端') : t('，云端同步失败')), cs.ok ? 'success' : 'warn')
     await loadDevices()
     editOpen.value = false
   } catch (e) { editErr.value = true; editMsg.value = e.message || e }
@@ -2550,7 +2552,7 @@ async function saveEditModel() {
 }
 async function saveEditDev() {
   if (editTarget.value === 'model') return saveEditModel()
-  editSaving.value = true; editErr.value = false; editMsg.value = '保存中…'
+  editSaving.value = true; editErr.value = false; editMsg.value = t('保存中…')
   try {
     const r = await api.boxCreateDevice({ ...editForm, mode: 'apply' })
     const n = (r.synced_devices || []).filter((x) => x !== editForm.deviceName).length
@@ -2559,11 +2561,11 @@ async function saveEditDev() {
     // 绑定流程设备：云端身份（cloudDevice || deviceName）<-> 所选流程设备（含读数换算系数）；未选择则解除原绑定
     await syncBound(editForm.cloudDevice || editForm.deviceName, editForm.boundDevice, editForm.boundFactor != null ? editForm.boundFactor : 1)
     // 保存即自动同步云端（后端已下发 + 改名联动删除云端旧 CRD）
-    let tip = `已保存：${editForm.deviceName}` + (n ? `，模型点位同步 ${n} 台设备` : '') + (editForm.boundDevice ? `，已绑定流程设备 ${editForm.boundDevice}${editForm.boundFactor !== 1 ? `（读数×${editForm.boundFactor}）` : ''}` : '')
-    if (renamedFrom) tip += `（由「${renamedFrom}」改名）`
-    tip += cs.ok ? '；已同步云端' : `；云端同步失败：${cs.error || '未知错误'}（本地已保存）`
+    let tip = t('已保存：{name}', { name: editForm.deviceName }) + (n ? t('，模型点位同步 {n} 台设备', { n }) : '') + (editForm.boundDevice ? t('，已绑定流程设备 {dev}{factor}', { dev: editForm.boundDevice, factor: editForm.boundFactor !== 1 ? `（${t('读数')}×${editForm.boundFactor}）` : '' }) : '')
+    if (renamedFrom) tip += t('（由「{name}」改名）', { name: renamedFrom })
+    tip += cs.ok ? t('；已同步云端') : t('；云端同步失败：{err}（本地已保存）', { err: cs.error || t('未知错误') })
     editMsg.value = tip
-    store.toast = `设备配置已保存：${editForm.deviceName}` + (cs.ok ? '，已同步云端' : '，云端同步失败（本地已保存）')
+    store.showToast(t('设备配置已保存：{name}', { name: editForm.deviceName }) + (cs.ok ? t('，已同步云端') : t('，云端同步失败（本地已保存）')), cs.ok ? 'success' : 'warn')
     await loadDevices()
     editOpen.value = false
   } catch (e) { editErr.value = true; editMsg.value = e.message || e }
@@ -2572,23 +2574,23 @@ async function saveEditDev() {
 async function applyEditDev() {
   if (editTarget.value === 'model') {
     // 保存模型并下发（后端已自动同步：模型 + 引用它的所有设备一起 apply）
-    editSaving.value = true; editErr.value = false; editMsg.value = '保存并下发中…'
+    editSaving.value = true; editErr.value = false; editMsg.value = t('保存并下发中…')
     try {
       const r = await api.boxUpdateModel({ ...editForm, mode: 'apply' })
       editPreview.value = ''
       const n = (r.synced_devices || []).length
       const cs = r.cloud_sync || {}
-      let tip = `模型已保存并下发：${editForm.modelName}` + (n ? `（同步 ${n} 台设备）` : '')
-      if (!cs.ok) tip += `；云端同步失败：${cs.error || '未知错误'}（本地已保存）`
+      let tip = t('模型已保存并下发：{name}', { name: editForm.modelName }) + (n ? t('（同步 {n} 台设备）', { n }) : '')
+      if (!cs.ok) tip += t('；云端同步失败：{err}（本地已保存）', { err: cs.error || t('未知错误') })
       editMsg.value = tip
-      store.toast = tip
+      store.showToast(tip, cs.ok ? 'success' : 'warn')
       await loadDevices()
       editOpen.value = false
     } catch (e) { editErr.value = true; editMsg.value = e.message || e }
     finally { editSaving.value = false }
     return
   }
-  editSaving.value = true; editErr.value = false; editMsg.value = '保存并下发中…'
+  editSaving.value = true; editErr.value = false; editMsg.value = t('保存并下发中…')
   try {
     const r = await api.boxCreateDevice({ ...editForm, mode: 'apply' })
     editPreview.value = ''
@@ -2597,12 +2599,12 @@ async function applyEditDev() {
     // 绑定流程设备：云端身份（cloudDevice || deviceName）<-> 所选流程设备（含读数换算系数）；未选择则解除原绑定
     await syncBound(editForm.cloudDevice || editForm.deviceName, editForm.boundDevice, editForm.boundFactor != null ? editForm.boundFactor : 1)
     // 后端已自动完成：下发新设备 + 改名联动删除云端旧 CRD（云端及时同步）
-    let tip = `已保存并下发：${editForm.deviceName}`
-    if (editForm.boundDevice) tip += `，已绑定流程设备 ${editForm.boundDevice}${editForm.boundFactor !== 1 ? `（读数×${editForm.boundFactor}）` : ''}`
-    if (renamedFrom) tip += `（由「${renamedFrom}」改名，云端旧设备${cs.ok ? '已删除' : '删除失败'}）`
-    if (!cs.ok) tip += `；云端同步失败：${cs.error || '未知错误'}（本地已保存）`
+    let tip = t('已保存并下发：{name}', { name: editForm.deviceName })
+    if (editForm.boundDevice) tip += t('，已绑定流程设备 {dev}{factor}', { dev: editForm.boundDevice, factor: editForm.boundFactor !== 1 ? `（${t('读数')}×${editForm.boundFactor}）` : '' })
+    if (renamedFrom) tip += t('（由「{name}」改名，云端旧设备{del}）', { name: renamedFrom, del: cs.ok ? t('已删除') : t('删除失败') })
+    if (!cs.ok) tip += t('；云端同步失败：{err}（本地已保存）', { err: cs.error || t('未知错误') })
     editMsg.value = tip
-    store.toast = tip
+    store.showToast(tip, cs.ok ? 'success' : 'warn')
     await loadDevices()
     if (renamedFrom && renamedFrom !== editForm.deviceName) await loadCloudCrd(true)
     editOpen.value = false
@@ -2610,7 +2612,7 @@ async function applyEditDev() {
   finally { editSaving.value = false }
 }
 async function copyEditYaml() {
-  try { await navigator.clipboard.writeText(editPreview.value); store.toast = 'YAML 已复制' } catch (e) {}
+  try { await navigator.clipboard.writeText(editPreview.value); store.showToast(t('YAML 已复制'), 'success') } catch (e) {}
 }
 
 // ---- 单设备实时数据对话框（3s 轮询，折线图展示）----
@@ -2655,10 +2657,10 @@ const rtSeries = computed(() => {
   return hist.filter((h) => h.v != null && !isInvalidReading(h.v)).map((h) => ({ t: Number(h.t), v: Number(h.v) }))
 })
 const rtEmptyMsg = computed(() => {
-  if (!rtTwins.value.length) return '该设备暂无上报属性'
+  if (!rtTwins.value.length) return t('该设备暂无上报属性')
   const n = rtSeries.value.length
-  if (n === 0) return '该属性暂无趋势数据（设备上线后开始累积）'
-  return '趋势数据不足（需至少 2 个采样点）'
+  if (n === 0) return t('该属性暂无趋势数据（设备上线后开始累积）')
+  return t('趋势数据不足（需至少 2 个采样点）')
 })
 const rtView = '0 0 900 280'
 const rtPlot = { x0: 54, x1: 886, y0: 14, y1: 242 }
@@ -2872,7 +2874,7 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .cbx-res-tag { flex: none; font-size: 10px; padding: 0; color: var(--faint); }
 .cbx-res-tag.ok { color: var(--green); }
 .cbx-res-tag.err { color: var(--red); }
-.cbx-res-tag.local { color: var(--accent); }
+.cbx-res-tag.local { color: var(--accent-d); }
 .cbx-res-sub { flex: 1 1 auto; min-width: 0; font-size: 10.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
 .cbx-res-ops { display: inline-flex; gap: 2px; flex: none; }
 .cbx-res-ops .cbx-op.cbx-tiny { padding: 1px 5px; font-size: 9px; min-height: 16px; }
@@ -2918,14 +2920,14 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
   color: var(--text); font-size: 11px; padding: 4px 8px; outline: none;
   transition: border-color .12s, box-shadow .12s;
 }
-.cbx-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.cbx-input:focus { border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent); }
 .cbx-input::placeholder { color: var(--faint); }
 .cbx-select {
   border: 1px solid var(--border); border-radius: 2px; background: var(--panel);
   color: var(--text); font-size: 11px; padding: 3px 6px; outline: none; max-width: 240px;
   transition: border-color .12s, box-shadow .12s;
 }
-.cbx-select:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.cbx-select:focus { border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent); }
 .cbx-input.cbx-xs { width: 52px; }
 .cbx-input.cbx-sm { width: 110px; }
 .cbx-input.cbx-md { width: 230px; }
@@ -2943,7 +2945,7 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .cbx-yaml-tools { display: flex; gap: 6px; }
 .cbx-yaml {
   margin: 0; padding: 10px 12px; max-height: 260px; overflow: auto; flex: 1 1 auto;
-  background: var(--rail, #1a212b); color: #d7e0ea;
+  background: var(--rail, #171917); color: #E2E0DA;
   font: 11px/1.6 var(--mono, "Cascadia Code", Menlo, monospace); white-space: pre;
 }
 /* ---- 标签（VSCode badge 风格，语义色跟随主题） ---- */
@@ -2990,7 +2992,7 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
   background: var(--panel-2); border: 1px solid var(--border); border-radius: 3px;
   padding: 0 5px; font-size: 10px; color: var(--accent2);
 }
-.cbx-table td.val { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+.cbx-table td.val { color: var(--accent-d); font-weight: 600; font-variant-numeric: tabular-nums; }
 .cbx-invalid { color: var(--yellow) !important; font-style: italic; font-weight: 500; }
 .cbx-empty-td { text-align: center; color: var(--faint); padding: 18px !important; font-size: 11px; }
 /* 状态圆点：默认红色（未下发/离线），on 为绿色（在线/已下发） */
@@ -3038,17 +3040,17 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .cbx-row.linked { border-color: color-mix(in srgb, var(--green) 45%, transparent); background: color-mix(in srgb, var(--green) 8%, transparent); }
 .cbx-dev { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; flex-wrap: wrap; }
 .cbx-dev-id { font-weight: 600; color: var(--text); }
-.cbx-dev-val { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+.cbx-dev-val { color: var(--accent-d); font-weight: 600; font-variant-numeric: tabular-nums; }
 .cbx-dev-fields { font-size: 9.5px; color: var(--muted); background: var(--panel); border: 1px solid var(--border); border-radius: 3px; padding: 0 6px; }
 .cbx-dev-seen { font-size: 9.5px; color: var(--faint); }
 .cbx-arrow { color: var(--faint); }
-.cbx-local { color: var(--accent); font-weight: 600; }
+.cbx-local { color: var(--accent-d); font-weight: 600; }
 /* ---- 表单 ---- */
 .cbx-form { display: flex; flex-direction: column; gap: 8px; }
 .cbx-form-row { display: flex; align-items: center; gap: 8px; font-size: 11px; flex-wrap: wrap; }
 .cbx-form-row label { color: var(--muted); flex: none; }
 .cbx-form-sep {
-  margin: 4px 0 2px; padding: 4px 8px; font-size: 10.5px; color: var(--accent);
+  margin: 4px 0 2px; padding: 4px 8px; font-size: 10.5px; color: var(--accent-d);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   border-left: 2px solid var(--accent); border-radius: 2px;
 }
@@ -3082,7 +3084,7 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .cbx-op:active:not(:disabled) { background: var(--sel); }
 .cbx-op:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
 .cbx-op:disabled { opacity: .4; cursor: not-allowed; }
-.cbx-op.primary { color: #fff; background: var(--accent); border-color: var(--accent); font-weight: 500; }
+.cbx-op.primary { color: #fff; background: var(--accent); border-color: var(--accent-d); font-weight: 500; }
 .cbx-op.primary:hover:not(:disabled) { background: var(--accent-d); border-color: var(--accent-d); color: #fff; }
 .cbx-op.danger {
   color: var(--red);
@@ -3111,8 +3113,8 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .cbx-preview-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
 .cbx-preview-head b { font-size: 11px; color: var(--muted); }
 .cbx-code {
-  background: var(--rail, #1a212b); border: 1px solid var(--border); border-radius: 4px;
-  color: #c8d6e5; font-size: 10px; line-height: 1.6; padding: 10px 12px;
+  background: var(--rail, #171917); border: 1px solid var(--border); border-radius: 4px;
+  color: #D5D3CB; font-size: 10px; line-height: 1.6; padding: 10px 12px;
   overflow: auto; max-height: 300px; white-space: pre;
 }
 /* ---- 盒子一键接入 ---- */
@@ -3171,9 +3173,9 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
   font-weight: 600; letter-spacing: .2px; vertical-align: 1px;
 }
 .cbx-badge.model { color: var(--yellow); background: color-mix(in srgb, var(--yellow) 12%, transparent); }
-.cbx-badge.device { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.cbx-badge.device { color: var(--accent-d); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .cbx-twin-chip {
-  display: inline-block; font-size: 10px; color: var(--accent);
+  display: inline-block; font-size: 10px; color: var(--accent-d);
   background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 3px;
   padding: 1px 6px; margin: 1px 3px 1px 0; cursor: pointer; transition: background .1s;
 }
@@ -3205,6 +3207,7 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 }
 .cbx-dialog-head b { font-size: 13px; font-weight: 600; letter-spacing: .2px; }
 .cbx-dialog-head .cbx-op { margin-left: auto; }
+.cbx-dialog-head .x-btn.lg { margin-left: auto; }
 /* ---- 通信拓扑图（平台 → 云端 → 边端 → 设备端 四列 + SVG 连线锚定模块）---- */
 .cbx-topo { position: relative; }
 .cbx-topo-lanes { display: flex; align-items: flex-start; gap: 26px; flex-wrap: wrap; justify-content: space-between; }
@@ -3296,7 +3299,7 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .cbx-topo-dev-dot { width: 6px; height: 6px; border-radius: 1px; background: var(--faint); flex: none; }
 .cbx-topo-dev.on .cbx-topo-dev-dot { background: var(--green); }
 .cbx-topo-dev-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cbx-topo-dev-val { color: var(--accent); font-weight: 600; margin-left: auto; font-variant-numeric: tabular-nums; }
+.cbx-topo-dev-val { color: var(--accent-d); font-weight: 600; margin-left: auto; font-variant-numeric: tabular-nums; }
 .cbx-topo-dev-empty { font-size: 10px; color: var(--faint); padding: 2px 0; }
 .cbx-topo-empty { font-size: 10.5px; color: var(--faint); border: 1px dashed var(--border); border-radius: 4px; padding: 10px; }
 /* ---- 实时数据折线图弹窗 ---- */
@@ -3310,8 +3313,8 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 }
 .cbx-rt-tab:hover { border-color: var(--muted); background: var(--panel-3, var(--panel)); }
 .cbx-rt-tab code { color: var(--accent2); font-size: 10.5px; }
-.cbx-rt-tab.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.cbx-rt-tab .cbx-rt-cur { font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+.cbx-rt-tab.active { border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent); }
+.cbx-rt-tab .cbx-rt-cur { font-weight: 600; color: var(--accent-d); font-variant-numeric: tabular-nums; }
 .cbx-rt-tab .cbx-rt-unit { color: var(--faint); font-size: 9.5px; }
 .cbx-rt-chart {
   position: relative; border: 1px solid var(--border); border-radius: 4px;
@@ -3332,10 +3335,10 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
   box-shadow: 0 4px 14px rgba(0,0,0,.35); white-space: nowrap; z-index: 5;
 }
 .cbx-rt-tip-t { color: var(--muted); }
-.cbx-rt-tip-v { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+.cbx-rt-tip-v { color: var(--accent-d); font-weight: 600; font-variant-numeric: tabular-nums; }
 .cbx-rt-currow { display: flex; align-items: baseline; gap: 8px; font-size: 12px; padding: 0 2px; }
 .cbx-rt-curlabel { color: var(--muted); font-size: 10px; }
-.cbx-rt-curval { color: var(--accent); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+.cbx-rt-curval { color: var(--accent-d); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
 .cbx-rt-unit { color: var(--muted); }
 .cbx-rt-upd { color: var(--faint); font-size: 10px; margin-left: auto; }
 /* ---- VSCode 风格细滚动条（覆盖全部可滚动容器） ---- */

@@ -1,0 +1,29 @@
+[
+  {
+    "id": "msg-1788027859428-tta59t",
+    "from": "team-lead",
+    "to": "shell-i18n",
+    "type": "message",
+    "content": "收到，外壳 7 个组件 i18n 改造已确认记录（ReportPanel / CommandConsole / RibbonToolbar / SearchPanel / RightInspector / TaskProgress / ToastLayer）。两个局部变量遮蔽（t→task、t→tab）的处理方式正确。生成词典时会以原文作为 key 逐一核对符号与全角/半角形式。此成员工作完成，可待命，如需协助其他成员请告知。",
+    "timestamp": "2026-08-29T18:24:19.428Z",
+    "read": true
+  },
+  {
+    "id": "msg-1788028212739-ys2xys",
+    "from": "team-lead",
+    "to": "@team",
+    "type": "broadcast",
+    "content": "【主编广播·i18n 插值规范（重要，全员必读）】我已完成两件事：①升级了 frontend/src/i18n/index.js 的 t()，支持参数插值（向后兼容，单参数调用完全不变）；②修复了已回报文件中的 13 处 t(`模板 ${x}`) 调用。\n\n请各位在改造时务必遵守：\n1. 禁止写 t(`...${x}...`) 模板字符串作 key —— 它会在调用前被求值成动态字符串（如「已打开策略「A」属性…」），en-US 词典永远无法命中，EN 模式会回退显示中文。这种 key 我无法生成词典条目。\n2. 一律改写成 t('模板 {占位}', { 占位: 值 })，例如：\n   - t('已打开策略「{name}」属性（所属工艺：{proc}）', { name: gs.name, proc: g.label })\n   - t('当前 {val} {unit}', { val: 42, unit: 'kg' })\n   词典条目与中文原文都写 {占位} 占位符，t() 查词后统一插值。\n3. 如果你已经写完但发现文件里有 t(`...${...}...`)，请自查修改为 {占位} 模式（我汇总词典时也会统一排查修复，但你改了我就不动了）。\n4. 汇报时请列出「全部 key 清单」（含插值模板 key 如 '已解析 · {n} 项操作'，写占位符形式），我会汇总生成完整 en-US.js 词典。\n\n另外提醒：若你负责的文件里有本地变量名遮蔽 t（如 `const t = ...`），记得改名避免冲突（sidebar-i18n 在 DeviceDetail.vue 遇到过，把局部变量改名 tpl 即可）。",
+    "timestamp": "2026-08-29T18:30:12.739Z",
+    "read": true
+  },
+  {
+    "id": "msg-1788028815906-csy3gh",
+    "from": "team-lead",
+    "to": "@team",
+    "type": "broadcast",
+    "content": "主编同步：① 已完成 en-US.js 词典增量合入（LeftSidebar/UnitCarbonDetail/DeviceDetail/MaterialInspector/TftAnalysisDialog/DataView/DataOverview/TrendChart/MultiTrendChart/CarbonBoxView，现共 920 条，0 重复）。② 请大家汇报时务必附上「完整静态 key 清单 + 插值模板 key 清单」，不要只报插值 key（box-i18n 只报了插值，主编已直接从源码提取补齐）。③ 插值统一 {占位} 模式、t(`...${x}...`) 动态 key 必须 0 处——已交付 10 个组件全部合规。④ 全部完成汇报后主编做最终 build + 英文模式回归验证，然后统一 shutdown。",
+    "timestamp": "2026-08-29T18:40:15.906Z",
+    "read": true
+  }
+]

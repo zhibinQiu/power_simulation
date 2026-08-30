@@ -98,8 +98,8 @@ const layout = computed(() => {
 const vbH = computed(() => (layout.value ? layout.value.vbH : H))
 
 function sinkColor(id) {
-  if (id === 'es:product') return '#2E9E63'
-  if (id === 'es:recovery') return '#0072BD'
+  if (id === 'es:product') return '#2E8B57'
+  if (id === 'es:recovery') return '#005E94'
   return '#8b95a1'
 }
 
