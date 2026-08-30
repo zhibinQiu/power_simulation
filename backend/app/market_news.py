@@ -23,7 +23,7 @@ import re
 from html import unescape
 from typing import Any
 
-from .netutil import TtlCache, fetch_text, now_iso
+from .core.netutil import TtlCache, fetch_text, now_iso
 
 logger = logging.getLogger(__name__)
 

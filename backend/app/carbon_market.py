@@ -28,8 +28,8 @@ from html import unescape
 from pathlib import Path
 from typing import Any
 
+from .core.netutil import TtlCache, fetch_json, fetch_text, now_iso
 from .domain.market import create_forecast_method, create_quote_source
-from .netutil import TtlCache, fetch_json, fetch_text, now_iso
 
 logger = logging.getLogger(__name__)
 

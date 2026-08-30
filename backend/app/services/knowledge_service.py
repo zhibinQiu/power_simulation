@@ -20,7 +20,7 @@ import shutil
 import threading
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from .. import kb_settings
 
@@ -267,7 +267,6 @@ def rename_doc(doc_id: str, new_name: str) -> Dict[str, Any]:
         title = _safe_name(new_name)
         if not title:
             return {'ok': False, 'error': '文档名称不能为空'}
-        folder = _norm_folder(doc.get('folder', ''))
         if title == doc.get('title'):
             return {'ok': True, 'doc': doc}
         old_md = _doc_md_path(doc)

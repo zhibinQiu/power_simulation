@@ -9,12 +9,12 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from . import _shared
 from ._shared import (BOX_DEVICES_FILE, CLOUD_DEVICES, READINGS, _BOX_KEYS,
                       _DEVICE_ID_KEYS, _INVALID_READING_VALUES, _LOCK,
-                      _MAIN_PROPS, _PRIMARY_KEYS)
+                      _PRIMARY_KEYS)
 
 
 def _is_invalid_reading(v: Any) -> bool:

@@ -534,7 +534,7 @@
               <div v-for="(p, i) in editForm.properties" :key="i" class="cbx-prop-row">
                 <input v-model="p.name" class="cbx-input" style="width:110px" :placeholder="t('属性名')"/>
                 <select v-model="p.type" class="cbx-select">
-                  <option v-for="t in ['float','int','double','string','boolean']" :key="t">{{ t }}</option>
+                  <option v-for="tp in ['float','int','double','string','boolean']" :key="tp">{{ tp }}</option>
                 </select>
                 <select v-model="p.accessMode" class="cbx-select">
                   <option value="r">ReadOnly</option><option value="rw">ReadWrite</option>
@@ -595,12 +595,12 @@
             <div v-if="devRt && devRt.twins && devRt.twins.length" class="cbx-rt">
               <!-- 属性切换 -->
               <div class="cbx-rt-tabs">
-                <button v-for="t in devRt.twins" :key="t.propertyName"
-                        class="cbx-rt-tab" :class="{ active: rtSelProp === t.propertyName }"
-                        @click="rtSel = t.propertyName" :title="t('切换查看') + ' ' + t.propertyName + t('趋势')">
-                  <code>{{ t.propertyName }}</code>
-                  <span class="cbx-rt-cur">{{ t.invalid ? t('无有效数据') : fmtPrimary(t.reported) }}</span>
-                  <span class="cbx-rt-unit">{{ t.unit }}</span>
+                <button v-for="tp in devRt.twins" :key="tp.propertyName"
+                        class="cbx-rt-tab" :class="{ active: rtSelProp === tp.propertyName }"
+                        @click="rtSel = tp.propertyName" :title="t('切换查看') + ' ' + tp.propertyName + t('趋势')">
+                  <code>{{ tp.propertyName }}</code>
+                  <span class="cbx-rt-cur">{{ tp.invalid ? t('无有效数据') : fmtPrimary(tp.reported) }}</span>
+                  <span class="cbx-rt-unit">{{ tp.unit }}</span>
                 </button>
               </div>
 
@@ -646,12 +646,12 @@
               <table class="cbx-table">
                 <thead><tr><th>{{ t('属性') }}</th><th>reported（{{ t('实时值') }}）</th><th>{{ t('单位') }}</th><th>timestamp</th><th>{{ t('采样点数') }}</th></tr></thead>
                 <tbody>
-                  <tr v-for="t in devRt.twins" :key="t.propertyName">
-                    <td><code>{{ t.propertyName }}</code></td>
-                    <td class="val"><span :class="{ 'cbx-invalid': t.invalid }">{{ t.invalid ? t('无有效数据') : fmtPrimary(t.reported) }}</span></td>
-                    <td>{{ t.unit || '' }}</td>
-                    <td>{{ t.timestamp ? fmtAgo(t.timestamp) : '—' }}</td>
-                    <td>{{ (devRt.history[t.propertyName] || []).length }}</td>
+                  <tr v-for="tp in devRt.twins" :key="tp.propertyName">
+                    <td><code>{{ tp.propertyName }}</code></td>
+                    <td class="val"><span :class="{ 'cbx-invalid': tp.invalid }">{{ tp.invalid ? t('无有效数据') : fmtPrimary(tp.reported) }}</span></td>
+                    <td>{{ tp.unit || '' }}</td>
+                    <td>{{ tp.timestamp ? fmtAgo(tp.timestamp) : '—' }}</td>
+                    <td>{{ (devRt.history[tp.propertyName] || []).length }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -872,7 +872,7 @@
               <div v-for="(p, i) in form.properties" :key="i" class="cbx-prop-row">
                 <input v-model="p.name" class="cbx-input" style="width:110px" :placeholder="t('属性名')"/>
                 <select v-model="p.type" class="cbx-select">
-                  <option v-for="t in ['float','int','double','string','boolean']" :key="t">{{ t }}</option>
+                  <option v-for="tp in ['float','int','double','string','boolean']" :key="tp">{{ tp }}</option>
                 </select>
                 <select v-model="p.accessMode" class="cbx-select">
                   <option value="r">ReadOnly</option><option value="rw">ReadWrite</option>
@@ -952,7 +952,7 @@
               <div v-for="(p, i) in modelForm.properties" :key="i" class="cbx-prop-row">
                 <input v-model="p.name" class="cbx-input" style="width:110px" :placeholder="t('属性名')"/>
                 <select v-model="p.type" class="cbx-select">
-                  <option v-for="t in ['float','int','double','string','boolean']" :key="t">{{ t }}</option>
+                  <option v-for="tp in ['float','int','double','string','boolean']" :key="tp">{{ tp }}</option>
                 </select>
                 <select v-model="p.accessMode" class="cbx-select">
                   <option value="r">ReadOnly</option><option value="rw">ReadWrite</option>
@@ -2945,7 +2945,7 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .cbx-yaml-tools { display: flex; gap: 6px; }
 .cbx-yaml {
   margin: 0; padding: 10px 12px; max-height: 260px; overflow: auto; flex: 1 1 auto;
-  background: var(--rail, #171917); color: #E2E0DA;
+  background: var(--rail, #0F172A); color: #E8ECF2;
   font: 11px/1.6 var(--mono, "Cascadia Code", Menlo, monospace); white-space: pre;
 }
 /* ---- 标签（VSCode badge 风格，语义色跟随主题） ---- */
@@ -3113,7 +3113,7 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .cbx-preview-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
 .cbx-preview-head b { font-size: 11px; color: var(--muted); }
 .cbx-code {
-  background: var(--rail, #171917); border: 1px solid var(--border); border-radius: 4px;
+  background: var(--rail, #0F172A); border: 1px solid var(--border); border-radius: 4px;
   color: #D5D3CB; font-size: 10px; line-height: 1.6; padding: 10px 12px;
   overflow: auto; max-height: 300px; white-space: pre;
 }

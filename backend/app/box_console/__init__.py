@@ -10,7 +10,6 @@
 - edge:            盒子连接配置（IP/SSH 凭据）与云端部署指令（MQTT 命令主题）
 - realtime_data:   实时数据（twins 趋势 / 云端 CRD / 日志 / 消息流 / 测试发布）
 - onboard:         盒子接入（一键自解压脚本生成 / 下载 / 远程执行）
-- broker_config:   云端 Broker 配置（读/存，委托 mqtt_source 热更新）
 
 依赖方向：devices → cloud_ops → edge；realtime_data → devices/cloud_ops；
 onboard → overview；均单向，无循环导入。
@@ -48,11 +47,11 @@ from .realtime_data import (_cloud_twins_map, _parse_crd_ts, broker_stats, cloud
 from .onboard import (_generate_onboard, _pack_box_deploy, _render_onboard_script,
                       box_onboard_remote, onboard_node, onboard_script_download)
 
-# Broker 配置
-from .broker_config import get_config, update_config
-
 # 外部依赖模块引用（tests 等通过 box_console.cloud_agent / mqtt_source 访问）
 from .. import cloud_agent, mqtt_source  # noqa: F401,E402
+
+# Broker 配置（读/存，由 mqtt_source 统一热更新；直接 re-export 避免多余透传层）
+from ..mqtt_source import get_config, update_config  # noqa: E402
 
 __all__ = [
     # 共享状态

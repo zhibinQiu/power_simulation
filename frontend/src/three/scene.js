@@ -3428,11 +3428,11 @@ export class TwinScene {
         const carrier = this._makeMaterialCarrier(L.f.material)
         this._flowGroup.add(carrier.obj)
 
-        // 速度与标签
+        // 速度与标签（整体放慢载运体动画：速度约为原来的 1/2，显示数值同步下调）
         const rate = L.f.rate || 0
         const norm = Math.min(rate, 14000) / 14000
-        const vm = (0.6 + norm * 2.6).toFixed(1)
-        const speed = 0.09 + norm * 0.20
+        const vm = (0.4 + norm * 1.5).toFixed(1)
+        const speed = 0.045 + norm * 0.10
         const name = (MATERIAL_MAP[L.f.material] && MATERIAL_MAP[L.f.material].name) || L.f.material
         const mCarbon = (MATERIAL_MAP[L.f.material] && MATERIAL_MAP[L.f.material].carbon) || 0
         const flowCo2 = rate * mCarbon
@@ -3453,7 +3453,8 @@ export class TwinScene {
         this.flows.push({
           totalLen, carrierOffset, flowId: L.f.id,
           obj: carrier.obj, mat: carrier.mat, emi: carrier.emi, anim: carrier.anim,
-          label, t: Math.random(), phase: Math.random() * 6.28, speed,
+          label, labelLift: 5.5 - carrierOffset,          // 标签悬浮在载运体上方的固定高度（随动画一起移动）
+          t: Math.random(), phase: Math.random() * 6.28, speed,
           from: pa.clone(), to: pb.clone(),              // 连线端点，用于聚焦定位
           y: midPt.y, labelY: midPt.y + 5.5,             // 折线中点Y 及 标签世界Y
           wp, segLens, yDirs,                            // 折线路径（载运体沿折线移动，紧贴媒介）
@@ -4225,6 +4226,9 @@ export class TwinScene {
         base.y += (f.carrierOffset != null ? f.carrierOffset : 1.5)
       }
       f.obj.position.copy(base)
+      // 标签跟随载运体一起移动：像「伴随铭牌」始终悬浮在物料上方，
+      // 水平段贴带面/液面/管面，立管段随之升降（保持与载运体的固定相对高度）
+      if (f.label) f.label.position.set(base.x, base.y + (f.labelLift != null ? f.labelLift : 5.5), base.z)
       if (f.anim === 'molten' || f.anim === 'liquid') {
         // 熔体/液体：贴槽轻微起伏 + 自转 + 发光脉动
         f.obj.position.y += Math.sin(t * 3 + f.phase) * 0.12

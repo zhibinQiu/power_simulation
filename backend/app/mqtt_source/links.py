@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from . import _shared
 from ._shared import CLOUD_DEVICES, LINKS_FILE, _LOCK

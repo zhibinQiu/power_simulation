@@ -17,7 +17,6 @@ from .factors import (
     _base,                # 单工序结果基底
     METAL_C,              # 铁水/钢水溶解碳系数
     _clamp,               # 取值钳制（鼓风炉有效燃料比等边界处理）
-    PULVERIZED_COAL_COMP, # 喷吹煤粉元素/工业分析（置换比公式输入）
     BF_COAL_REF,          # 名义基准煤比 kg/tFe（喷煤置换零点）
     BF_OXY_COAL_PER_PCT,  # 富氧派生煤比：每 1% 富氧允许多喷煤粉 kg/tFe
     replacement_ratio,    # 喷煤置换比（Geerdes 公式）

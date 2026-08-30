@@ -1,0 +1,153 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - navigation [ref=e5]:
+      - generic [ref=e6] [cursor=pointer]: 文件
+      - generic [ref=e7] [cursor=pointer]: 仿真
+      - generic [ref=e8] [cursor=pointer]:
+        - text: 视图
+        - generic [ref=e305]:
+          - generic [ref=e306]:
+            - generic [ref=e307]: 数字孪生
+            - generic [ref=e308]: ›
+          - generic [ref=e309]:
+            - generic [ref=e310]: 碳资产管理
+            - generic [ref=e311]: ›
+          - generic [ref=e312]: 能碳一体机管理
+      - generic [ref=e9] [cursor=pointer]: 编辑
+      - generic [ref=e10] [cursor=pointer]: 工具
+      - generic [ref=e11] [cursor=pointer]: AI
+      - generic [ref=e12] [cursor=pointer]: 帮助
+    - generic [ref=e14]:
+      - button "导出" [ref=e15] [cursor=pointer]
+      - button "本析智擎" [ref=e20] [cursor=pointer]
+      - button "宣传手册 (F1)" [ref=e25] [cursor=pointer]
+      - button "收起左侧栏" [ref=e30] [cursor=pointer]
+      - button "展开右侧栏" [ref=e33] [cursor=pointer]
+      - button "展开命令行窗口" [ref=e37] [cursor=pointer]
+  - navigation "活动栏" [ref=e40]:
+    - button "场景" [ref=e41] [cursor=pointer]
+    - button "资源管理器" [ref=e45] [cursor=pointer]
+    - button "搜索" [ref=e48] [cursor=pointer]
+    - button "连接（数据源管理）" [ref=e52] [cursor=pointer]:
+      - generic [ref=e57]: "1"
+    - button "收起/展开左侧栏" [ref=e59] [cursor=pointer]
+  - complementary [ref=e62]:
+    - generic "拖拽调整宽度" [ref=e63]
+    - generic [ref=e64]: 资源管理器
+    - generic [ref=e68]:
+      - generic [ref=e69] [cursor=pointer]: 工艺
+      - generic [ref=e71] [cursor=pointer]: 物料
+      - generic [ref=e73] [cursor=pointer]: 策略
+    - generic [ref=e76]:
+      - generic [ref=e77]:
+        - generic [ref=e78] [cursor=pointer]:
+          - generic [ref=e82]: 炼钢
+          - generic [ref=e83]: "12"
+        - generic [ref=e84]:
+          - generic [ref=e86] [cursor=pointer]:
+            - generic "已部署至场景" [ref=e90]
+            - generic [ref=e91]: 烧结机
+          - generic [ref=e93] [cursor=pointer]:
+            - generic "已部署至场景" [ref=e97]
+            - generic [ref=e98]: 球团
+          - generic [ref=e100] [cursor=pointer]:
+            - generic "已部署至场景" [ref=e104]
+            - generic [ref=e105]: 焦炉
+          - generic [ref=e107] [cursor=pointer]:
+            - generic "已部署至场景" [ref=e111]
+            - generic [ref=e112]: 高炉
+          - generic [ref=e114] [cursor=pointer]:
+            - generic "已部署至场景" [ref=e118]
+            - generic [ref=e119]: 铁水预处理
+          - generic [ref=e121] [cursor=pointer]:
+            - generic "已部署至场景" [ref=e125]
+            - generic [ref=e126]: 转炉
+          - generic [ref=e128] [cursor=pointer]:
+            - generic "已部署至场景" [ref=e132]
+            - generic [ref=e133]: LF精炼
+          - generic [ref=e135] [cursor=pointer]:
+            - generic "已部署至场景" [ref=e139]
+            - generic [ref=e140]: RH精炼
+          - generic [ref=e142] [cursor=pointer]:
+            - generic "已部署至场景" [ref=e146]
+            - generic [ref=e147]: 连铸机
+          - generic [ref=e149] [cursor=pointer]:
+            - generic "已部署至场景" [ref=e153]
+            - generic [ref=e154]: 热轧机
+          - generic [ref=e155]: 电炉
+          - generic [ref=e161]: DRI竖炉
+      - generic [ref=e167]:
+        - generic [ref=e168] [cursor=pointer]:
+          - generic [ref=e172]: 工辅
+          - generic [ref=e173]: "14"
+        - generic [ref=e174]:
+          - generic [ref=e176] [cursor=pointer]:
+            - generic "已部署至场景" [ref=e177]
+            - generic [ref=e178]: 鼓风机
+          - generic [ref=e180] [cursor=pointer]:
+            - generic "已部署至场景" [ref=e181]
+            - generic [ref=e182]: 热风炉
+          - generic [ref=e184] [cursor=pointer]:
+            - generic "已部署至场景" [ref=e185]
+            - generic [ref=e186]: 引风机
+          - generic [ref=e188] [cursor=pointer]:
+            - generic "已部署至场景" [ref=e189]
+            - generic [ref=e190]: 喷吹系统
+          - generic [ref=e191]: 助燃风机
+          - generic [ref=e194]: 驱动供电
+          - generic [ref=e197]: 电极调节
+          - generic [ref=e200]: 皮带机
+          - generic [ref=e203]: 给料机
+          - generic [ref=e206]: 冷却水泵
+          - generic [ref=e209]: 辅助锅炉
+          - generic [ref=e212]: 空分制氧
+          - generic [ref=e216] [cursor=pointer]:
+            - generic "已部署至场景" [ref=e217]
+            - generic [ref=e218]: 供氧系统
+          - generic [ref=e219]: 供电系统
+  - main [ref=e222]:
+    - generic [ref=e226]:
+      - button "切换到 2D 工艺流程图（ISA-101 人机界面）" [ref=e227] [cursor=pointer]
+      - button "画面亮度（点击展开滑条）" [ref=e230] [cursor=pointer]
+      - button "刷新视角：重置为园区俯瞰" [ref=e237] [cursor=pointer]
+      - button "相机自动环绕旋转" [ref=e241] [cursor=pointer]
+  - generic [ref=e246]:
+    - generic [ref=e247]:
+      - button "运行仿真" [ref=e248] [cursor=pointer]
+      - button "HMI人机交互屏" [ref=e251] [cursor=pointer]
+    - button "全屏" [ref=e258] [cursor=pointer]
+  - contentinfo [ref=e265]:
+    - generic "产品未激活，点击在「关于本平台」中激活" [ref=e266] [cursor=pointer]:
+      - generic [ref=e267]: ⚠
+      - text: 产品未激活
+    - generic [ref=e268]:
+      - text: 实时链路
+      - generic [ref=e270]: 已连接
+    - generic "市场快讯 · 中国煤炭交易网（ctctc.cn）" [ref=e271]:
+      - generic [ref=e272]: 快讯
+      - generic [ref=e275]:
+        - generic [ref=e276]:
+          - generic [ref=e277]: 08-28 17:13钢材价格涨幅扩大：8月28日，上海地区螺纹钢均价3190元/吨，日环比上涨30元/吨，同比下跌100元/吨。北京地区螺纹钢均价3170元/吨，日环比上涨40元/吨，同比下跌60元/吨。（数据来源：上海钢联）
+          - generic [ref=e278]: 08-28 17:05CCI港口指数延续上涨走势：8月28日，CCI港口指数日环比均涨6元/吨。其中5500大卡880元/吨、5000大卡789元/吨、4500大卡706元/吨。
+          - generic [ref=e279]: 08-28 16:39进口蒙古炼焦煤价格小幅上涨：8月28日，甘其毛都蒙古低硫焦精煤（硫0.65灰10.5挥发28粘结82.5）场地价1910元/吨，日环比上涨40元/吨，同比上涨730元/吨；焦原煤（硫0.85灰18挥发25.5粘结80）场地价1665元/吨，日环比上涨10元/吨，同比上涨705元/吨。（数据来源：中国煤炭市场网）
+          - generic [ref=e280]: 08-28 16:38进口澳大利亚炼焦煤价格保持平稳：8月28日，京唐港澳大利亚低硫焦精煤（硫0.4灰9挥发26粘结87）场地价2320元/吨，日环比持平，同比上涨740元/吨。（数据来源：中国煤炭市场网）
+          - generic [ref=e281]: 08-28 16:37进口加拿大炼焦煤价格保持平稳：8月28日，京唐港加拿大低硫焦精煤（硫0.45灰9.5挥发22.5粘结80）场地价2280元/吨，日环比持平，同比上涨740元/吨。（数据来源：中国煤炭市场网）
+          - generic [ref=e282]: 08-28 16:37进口俄罗斯炼焦煤价格小幅上涨：8月28日，京唐港俄罗斯低硫焦精煤（硫0.3灰11挥发17.5粘结83）场地价1680元/吨，日环比上涨40元/吨，同比上涨360元/吨。（数据来源：中国煤炭市场网）
+          - generic [ref=e283]: 08-28 16:35动力煤竞价快讯：8月28日，阳泉地区动力用煤（发热量3500硫2.5）采购到厂均价520元/吨，较上个交易日（8月26日）持平。——单卡折价0.1486元。
+          - generic [ref=e284]: 08-28 16:24环渤海动力煤市场延续上涨走势：8月28日，CCTD环渤海动力煤参考价日环比上涨6-7元/吨。其中5500大卡879元/吨、4500大卡705元/吨，均上涨6元/吨；5000大卡789元/吨，上涨7元/吨。
+          - generic [ref=e285]: 08-28 15:02动力煤竞价快讯：8月28日，大同云冈地区动力用煤（发热量3800硫1）采购到厂均价469元/吨，较上个交易日（8月24日）上涨30元/吨。——单卡折价0.1234元。
+          - generic [ref=e286]: 08-28 14:59动力煤竞价快讯：8月28日，大同云冈地区动力用煤（发热量4300硫1）采购到厂均价579元/吨，较上个交易日（8月24日）上涨43元/吨。——单卡折价0.1347元。
+        - generic [ref=e287]:
+          - generic [ref=e288]: 08-28 17:13钢材价格涨幅扩大：8月28日，上海地区螺纹钢均价3190元/吨，日环比上涨30元/吨，同比下跌100元/吨。北京地区螺纹钢均价3170元/吨，日环比上涨40元/吨，同比下跌60元/吨。（数据来源：上海钢联）
+          - generic [ref=e289]: 08-28 17:05CCI港口指数延续上涨走势：8月28日，CCI港口指数日环比均涨6元/吨。其中5500大卡880元/吨、5000大卡789元/吨、4500大卡706元/吨。
+          - generic [ref=e290]: 08-28 16:39进口蒙古炼焦煤价格小幅上涨：8月28日，甘其毛都蒙古低硫焦精煤（硫0.65灰10.5挥发28粘结82.5）场地价1910元/吨，日环比上涨40元/吨，同比上涨730元/吨；焦原煤（硫0.85灰18挥发25.5粘结80）场地价1665元/吨，日环比上涨10元/吨，同比上涨705元/吨。（数据来源：中国煤炭市场网）
+          - generic [ref=e291]: 08-28 16:38进口澳大利亚炼焦煤价格保持平稳：8月28日，京唐港澳大利亚低硫焦精煤（硫0.4灰9挥发26粘结87）场地价2320元/吨，日环比持平，同比上涨740元/吨。（数据来源：中国煤炭市场网）
+          - generic [ref=e292]: 08-28 16:37进口加拿大炼焦煤价格保持平稳：8月28日，京唐港加拿大低硫焦精煤（硫0.45灰9.5挥发22.5粘结80）场地价2280元/吨，日环比持平，同比上涨740元/吨。（数据来源：中国煤炭市场网）
+          - generic [ref=e293]: 08-28 16:37进口俄罗斯炼焦煤价格小幅上涨：8月28日，京唐港俄罗斯低硫焦精煤（硫0.3灰11挥发17.5粘结83）场地价1680元/吨，日环比上涨40元/吨，同比上涨360元/吨。（数据来源：中国煤炭市场网）
+          - generic [ref=e294]: 08-28 16:35动力煤竞价快讯：8月28日，阳泉地区动力用煤（发热量3500硫2.5）采购到厂均价520元/吨，较上个交易日（8月26日）持平。——单卡折价0.1486元。
+          - generic [ref=e295]: 08-28 16:24环渤海动力煤市场延续上涨走势：8月28日，CCTD环渤海动力煤参考价日环比上涨6-7元/吨。其中5500大卡879元/吨、4500大卡705元/吨，均上涨6元/吨；5000大卡789元/吨，上涨7元/吨。
+          - generic [ref=e296]: 08-28 15:02动力煤竞价快讯：8月28日，大同云冈地区动力用煤（发热量3800硫1）采购到厂均价469元/吨，较上个交易日（8月24日）上涨30元/吨。——单卡折价0.1234元。
+          - generic [ref=e297]: 08-28 14:59动力煤竞价快讯：8月28日，大同云冈地区动力用煤（发热量4300硫1）采购到厂均价579元/吨，较上个交易日（8月24日）上涨43元/吨。——单卡折价0.1347元。
+    - generic [ref=e298]: 基线情景
+    - generic [ref=e299]: 2026-08-30 19:38:23
+    - generic "系统通知" [ref=e301] [cursor=pointer]: "1"

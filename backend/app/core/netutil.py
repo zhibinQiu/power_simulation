@@ -148,8 +148,6 @@ def _request(
 
         # 1) httpx 会话（保持 cookie、连接复用）
         try:
-            import httpx
-
             resp = _http_client(timeout).get(url, headers=headers)
             if resp.status_code in (403, 429) or resp.status_code >= 500:
                 raise _RetryableStatus(resp.status_code)

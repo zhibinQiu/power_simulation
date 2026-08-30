@@ -64,8 +64,32 @@ def _is_fresh(kind: str) -> bool:
     return bool(ts) and (time.time() - float(ts)) < ttl
 
 
+# agent 连接配置读盘缓存：配置变更不频繁，避免每个请求重复读盘 + JSON 解析。
+# 保存配置后调用 invalidate_cfg() 显式失效；即使未调用，TTL 兜底保证最终一致。
+_CFG_TTL = 10.0
+_cfg_cache: "Optional[Dict[str, Any]]" = None
+_cfg_cache_ts = 0.0
+
+
 def agent_cfg() -> Dict[str, Any]:
     """agent 连接配置：优先 box_devices.json cloud 字段，回退 broker host / 默认地址。"""
+    global _cfg_cache, _cfg_cache_ts
+    now = time.monotonic()
+    if _cfg_cache is not None and now - _cfg_cache_ts < _CFG_TTL:
+        return _cfg_cache
+    cfg = _load_agent_cfg()
+    _cfg_cache, _cfg_cache_ts = cfg, now
+    return cfg
+
+
+def invalidate_cfg() -> None:
+    """使 agent 连接配置缓存失效（保存云端配置后调用，保证立即生效）。"""
+    global _cfg_cache, _cfg_cache_ts
+    _cfg_cache, _cfg_cache_ts = None, 0.0
+
+
+def _load_agent_cfg() -> Dict[str, Any]:
+    """读盘解析 agent 连接配置（仅由 agent_cfg 在缓存过期时调用）。"""
     host, port, token, namespace = "", _DEFAULT_PORT, "", "default"
     try:
         with open(_DEVICES_PATH, "r", encoding="utf-8") as f:

@@ -21,8 +21,6 @@ export function setAccent(id) {
   localStorage.setItem(KEY, id)
 }
 
-export function getAccent() { return accent.value }
-
 const MODE_KEY = 'carbon-sim.theme-mode'
 const savedMode = localStorage.getItem(MODE_KEY)
 
@@ -34,5 +32,3 @@ export function setThemeMode(mode) {
   themeMode.value = mode
   localStorage.setItem(MODE_KEY, mode)
 }
-
-export function getThemeMode() { return themeMode.value }

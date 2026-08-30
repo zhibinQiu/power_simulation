@@ -3,26 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>工业能碳智控平台 v2.0.0 | 能碳一体化数字孪生平台</title>
+<title>海颐·能优算 | 工业能碳智控平台</title>
 <link rel="icon" href="assets/网页角标.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;800&family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --yellow:#ffb71b;
-  --yellow-hover:#f4a700;
-  --on-yellow:#151617;
-  --black:#000;
-  --header:#171917;
-  --ink:#151617;
-  --body:#4a4a4a;
-  --line:#e0e0e0;
-  --card:#f5f5f5;
-  --tab-gray:#d9d9d9;
+  /* 亮色硬朗：蓝为强调，无红无黑 */
+  --accent:#0069c0;
+  --accent-hover:#00519a;
+  --steel:#2f3e55;
+  --ink:#1b2333;
+  --body:#4a5568;
+  --line:#dfe3ea;
+  --gray:#f4f6f9;
   --link:#0069c0;
   --f-head:'Montserrat','PingFang SC','Microsoft YaHei',sans-serif;
-  --f-body:'Source Sans Pro','PingFang SC','Microsoft YaHei',sans-serif;
-  /* 流式布局变量：列宽与页眉高度随视口宽度按比例缩放（min 锁定当前桌面效果，vw 段适配更大/更小屏幕） */
+  --f-body:'Montserrat','PingFang SC','Microsoft YaHei',sans-serif;
   --w-content:110rem;
   --w-wide:124rem;
   --w-mid:118rem;
@@ -38,159 +35,147 @@ ul{list-style:none}
 .wrap{width:min(calc(100% - 6.4rem),var(--w-content));margin:0 auto;padding:0}
 h1,h2,h3,h4,h5{font-family:var(--f-head);color:var(--ink)}
 .sec{padding:8.4rem 0}
-.h2{font-size:3.4rem;font-weight:700;line-height:1.25;letter-spacing:-.02em}
+.h2{font-size:3.6rem;font-weight:800;line-height:1.2;letter-spacing:-.02em}
 
-/* 按钮（矩形黄钮） */
-.btn{display:inline-flex;align-items:center;gap:.67em;padding:1em 2.4em;font-family:var(--f-head);font-size:1.5rem;font-weight:600;background:var(--yellow);color:var(--on-yellow);border:none;cursor:pointer;transition:background .2s}
-.btn:hover{background:var(--yellow-hover)}
-.btn .arr{font-size:.8em}
-.btn-outline{display:inline-flex;align-items:center;gap:.67em;padding:.87em 2em;font-family:var(--f-head);font-size:1.5rem;font-weight:600;color:var(--yellow);border:0.2rem solid var(--yellow);background:transparent;cursor:pointer;transition:.2s}
-.btn-outline:hover{background:var(--yellow);color:var(--on-yellow)}
-/* 文本链接（蓝） */
-.tlink{font-family:var(--f-head);font-size:1.45rem;font-weight:600;color:var(--link)}
+/* 按钮：直角、粗体、无阴影 */
+.btn{display:inline-flex;align-items:center;gap:.8em;padding:1em 2.4em;font-family:var(--f-head);font-size:1.5rem;font-weight:700;background:var(--accent);color:#fff;border:none;cursor:pointer;transition:background .15s}
+.btn:hover{background:var(--accent-hover)}
+.btn .arr{font-size:.9em}
+.btn-outline{display:inline-flex;align-items:center;gap:.8em;padding:.9em 2em;font-family:var(--f-head);font-size:1.5rem;font-weight:700;color:var(--ink);border:0.15rem solid var(--line);background:transparent;cursor:pointer;transition:.15s}
+.btn-outline:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+.tlink{font-family:var(--f-head);font-size:1.45rem;font-weight:700;color:var(--accent)}
 .tlink:hover{text-decoration:underline}
 .tlink .arr{font-size:1.1rem}
 
-/* ============ 页眉（固定顶部，下滑压缩至半高；占位随页眉同步动画，下沿始终与内容相连） ============ */
+/* ============ 页眉 ============ */
 body{padding-top:var(--hh);transition:padding-top .3s ease}
 body.compact{padding-top:var(--hhc)}
-header.site{background:var(--header);height:var(--hh);display:flex;align-items:center;position:fixed;top:0;left:0;right:0;z-index:100;transition:height .3s ease}
+header.site{background:#fff;height:var(--hh);display:flex;align-items:center;position:fixed;top:0;left:0;right:0;z-index:100;border-bottom:0.1rem solid var(--line);transition:height .3s ease}
 body.compact header.site{height:var(--hhc)}
-.brand img{width:4.4rem;height:4.4rem;border-radius:23%;transition:.3s}
-body.compact .brand img{width:calc(4.4rem * .64);height:calc(4.4rem * .64);border-radius:23%}
+.brand img{width:4.4rem;height:4.4rem;transition:.3s}
+body.compact .brand img{width:calc(4.4rem * .64);height:calc(4.4rem * .64)}
 .brand .wm{transition:font-size .3s}
-.btn-pill{transition:padding .3s ease,background .2s}
-body.compact .btn-pill{padding-top:0.8rem;padding-bottom:0.8rem}
+.btn-pill{transition:padding .3s ease,background .15s}
 header.site .wrap{width:min(calc(100% - 3.2rem),var(--w-wide));padding:0;display:flex;align-items:center;justify-content:space-between}
 .brand{display:flex;align-items:center;gap:1.4rem}
-.brand .wm{color:#fff;font-family:var(--f-head);font-weight:700;font-size:2rem;line-height:1.2}
-.brand .wm small{display:block;font-weight:400;font-size:1.05rem;color:#9aa0a6;letter-spacing:.18em}
+.brand .wm{color:var(--ink);font-family:var(--f-head);font-weight:800;font-size:2rem;line-height:1.2;letter-spacing:.02em}
+.brand .wm small{display:block;font-weight:600;font-size:1.05rem;color:var(--accent);letter-spacing:.28em}
 .burger{width:4.4rem;height:4.4rem;background:none;border:none;cursor:pointer;display:none;place-items:center}
-.burger span{display:block;width:2.6rem;height:0.2rem;background:#fff;position:relative}
-.burger span::before,.burger span::after{content:"";position:absolute;left:0;width:2.6rem;height:0.2rem;background:#fff}
+.burger span{display:block;width:2.6rem;height:0.2rem;background:var(--ink);position:relative}
+.burger span::before,.burger span::after{content:"";position:absolute;left:0;width:2.6rem;height:0.2rem;background:var(--ink)}
 .burger span::before{top:-0.8rem}
 .burger span::after{top:0.8rem}
 
-/* 主导航（参照模板菜单栏） */
+/* 主导航 */
 nav.main{display:flex;align-items:center;gap:0.6rem;margin-left:4.8rem}
 .nav-item{position:relative}
-.nav-item > a{display:inline-flex;align-items:center;gap:.4em;padding:.56em .89em;color:#fff;font-family:var(--f-body);font-size:1.8rem;font-weight:600;border:0.15rem solid transparent;border-radius:99.9rem;transition:.2s}
-body.compact .nav-item > a{padding:.38em .82em;font-size:1.6rem}
-.nav-item > a .caret{font-size:1.1rem;color:#fff;transition:transform .2s}
-.nav-item:hover > a{background:#2a2d2a}
+.nav-item > a{display:inline-flex;align-items:center;gap:.4em;padding:.56em .89em;color:var(--ink);font-family:var(--f-head);font-size:1.7rem;font-weight:700;transition:.15s}
+body.compact .nav-item > a{padding:.38em .82em;font-size:1.5rem}
+.nav-item > a .caret{font-size:1.1rem;color:var(--ink);transition:transform .2s}
+.nav-item:hover > a{color:var(--accent)}
 .nav-item:hover > a .caret{transform:rotate(180deg)}
-.nav-drop{position:absolute;top:calc(100% + 1.4rem);left:0;min-width:25rem;background:#fff;border-radius:0.6rem;box-shadow:0 1.8rem 4.6rem rgba(0,0,0,.3);padding:1.2rem;opacity:0;visibility:hidden;transform:translateY(-0.6rem);transition:.22s;z-index:80}
+.nav-drop{position:absolute;top:calc(100% + 1.4rem);left:0;min-width:25rem;background:#fff;border:0.1rem solid var(--line);box-shadow:0 1.2rem 3rem rgba(26,32,44,.12);padding:0.6rem;opacity:0;visibility:hidden;transform:translateY(-0.6rem);transition:.2s;z-index:80}
 .nav-item:hover .nav-drop{opacity:1;visibility:visible;transform:none}
 .nav-drop::before{content:"";position:absolute;top:-1.4rem;left:0;right:0;height:1.4rem}
-.nav-drop a{display:flex;justify-content:space-between;align-items:center;padding:.7em .9em;font-size:1.6rem;font-family:var(--f-body);font-weight:400;color:var(--ink);border-radius:0.4rem;transition:.15s}
+.nav-drop a{display:flex;justify-content:space-between;align-items:center;padding:.7em .9em;font-size:1.5rem;font-family:var(--f-head);font-weight:600;color:var(--ink);transition:.12s}
 .nav-drop a small{font-family:var(--f-body);font-weight:400;font-size:1.2rem;color:#8a8a8a}
-.nav-drop a:hover{background:var(--card);padding-left:2rem}
+.nav-drop a:hover{background:var(--gray)}
 /* 页眉右侧 */
 .header-right{display:flex;align-items:center;gap:0.8rem;margin-left:auto}
-.h-icon{width:4.2rem;height:4.2rem;border-radius:50%;background:none;border:none;display:grid;place-items:center;color:#fff;cursor:pointer;transition:.2s}
-.h-icon:hover{background:#2a2d2a}
-.btn-pill{display:inline-flex;align-items:center;gap:.7em;margin-left:1rem;padding:.86em 1.86em;border-radius:99.9rem;background:var(--yellow);color:var(--on-yellow);font-family:var(--f-body);font-size:1.4rem;font-weight:600;border:none;cursor:pointer}
-.btn-pill:hover{background:var(--yellow-hover)}
-.btn-pill .arr{font-size:1.3rem}
+.h-icon{width:4.2rem;height:4.2rem;background:none;border:none;display:grid;place-items:center;color:var(--ink);cursor:pointer;transition:.15s}
+.h-icon:hover{color:var(--accent)}
 /* 搜索展开框 */
-.search-pop{position:absolute;top:100%;right:1.6rem;margin-top:0.6rem;background:#fff;border-radius:0.6rem;box-shadow:0 1.8rem 4.6rem rgba(0,0,0,.3);padding:1.4rem;display:none;z-index:90;width:36rem;flex-direction:column;align-items:stretch}
+.search-pop{position:absolute;top:100%;right:1.6rem;margin-top:0.6rem;background:#fff;border:0.1rem solid var(--line);box-shadow:0 1.2rem 3rem rgba(26,32,44,.12);padding:1.4rem;display:none;z-index:90;width:36rem;flex-direction:column;align-items:stretch}
 .search-pop.open{display:flex;gap:1rem}
 .search-row{display:flex;gap:1rem}
-.search-pop input{flex:1;padding:1.1rem 1.6rem;border:0.15rem solid var(--line);border-radius:0.4rem;font-size:1.45rem;font-family:var(--f-body);outline:none}
-.search-pop input:focus{border-color:var(--yellow)}
-.search-pop .search-row button{padding:0 2rem;border:none;background:var(--yellow);color:var(--on-yellow);font-family:var(--f-head);font-weight:600;font-size:1.4rem;border-radius:0.4rem;cursor:pointer}
-.search-pop .search-row button:hover{background:var(--yellow-hover)}
+.search-pop input{flex:1;padding:1.1rem 1.6rem;border:0.15rem solid var(--line);font-size:1.45rem;font-family:var(--f-body);outline:none}
+.search-pop input:focus{border-color:var(--accent)}
+.search-pop .search-row button{padding:0 2rem;border:none;background:var(--accent);color:#fff;font-family:var(--f-head);font-weight:700;font-size:1.4rem;cursor:pointer}
+.search-pop .search-row button:hover{background:var(--accent)}
 .search-results{margin-top:1rem;max-height:34rem;overflow:auto;display:none}
 .search-results.show{display:block}
-.search-result{display:flex;gap:1rem;align-items:flex-start;padding:1rem 1.2rem;border-radius:0.6rem;cursor:pointer}
-.search-result:hover{background:#f5f5f5}
-.search-result .sr-type{flex:none;font-size:1.1rem;color:#8a8a8a;padding-top: 0.3rem;white-space:nowrap}
+.search-result{display:flex;gap:1rem;align-items:flex-start;padding:1rem 1.2rem;cursor:pointer}
+.search-result:hover{background:var(--gray)}
+.search-result .sr-type{flex:none;font-size:1.1rem;color:#8a8a8a;padding-top:.3rem;white-space:nowrap}
 .search-result .sr-title{flex:1;font-size:1.4rem;color:var(--ink)}
 .search-empty{padding:1.2rem;text-align:center;color:#8a8a8a;font-size:1.4rem}
-.sr-hl{outline:0.3rem solid var(--yellow);outline-offset:0.3rem}
+.sr-hl{outline:0.3rem solid var(--accent);outline-offset:0.3rem}
 
 /* 全屏菜单 */
-.menu-overlay{position:fixed;inset:0;background:#0a0a0a;z-index:200;display:flex;align-items:center;opacity:0;pointer-events:none;transition:opacity .3s}
+.menu-overlay{position:fixed;inset:0;background:#fff;z-index:200;display:flex;align-items:center;opacity:0;pointer-events:none;transition:opacity .3s}
 .menu-overlay.open{opacity:1;pointer-events:auto}
 .menu-overlay .wrap{width:100%}
-.menu-close{position:absolute;top:2.8rem;right:4rem;background:none;border:none;color:#fff;font-size:3.4rem;cursor:pointer;line-height:1}
-.menu-links li{border-bottom:0.1rem solid #2a2c2a}
-.menu-links a{display:flex;justify-content:space-between;align-items:center;padding:.64em .15em;color:#fff;font-family:var(--f-head);font-weight:600;font-size:2.8rem;transition:.2s}
-.menu-links a small{font-family:var(--f-body);font-size:1.3rem;font-weight:400;color:#8a8f8a;letter-spacing:.1em}
-.menu-links a:hover{color:var(--yellow);padding-left:1.2rem}
+.menu-close{position:absolute;top:2.8rem;right:4rem;background:none;border:none;color:var(--ink);font-size:3.4rem;cursor:pointer;line-height:1}
+.menu-links li{border-bottom:0.15rem solid var(--line)}
+.menu-links li:first-child{border-top:0.15rem solid var(--line)}
+.menu-links a{display:flex;justify-content:space-between;align-items:center;padding:.64em .15em;color:var(--ink);font-family:var(--f-head);font-weight:800;font-size:2.8rem;transition:.15s}
+.menu-links a small{font-family:var(--f-body);font-size:1.3rem;font-weight:400;color:#8a8a8a;letter-spacing:.1em}
+.menu-links a:hover{color:var(--accent);padding-left:1.2rem}
 .menu-foot{margin-top:3.4rem;display:flex;gap:1.6rem}
 
 /* ============ Hero ============ */
-.hero{position:relative;background:#000;color:#fff;min-height:calc(100vh - var(--hh));display:flex;flex-direction:column;overflow:hidden}
-.hero::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.82) 0%,rgba(0,0,0,.45) 45%,rgba(0,0,0,0) 72%);z-index:1}
-/* 右侧图标 + 同色系光晕拓展（参照 JetBrains 风格） */
-.hero-visual{position:absolute;top:0;right:0;bottom:0;width:56%;pointer-events:none}
-.hero-visual .glow{position:absolute;border-radius:50%}
-.hg1{width:46vw;height:46vw;right:-6%;top:-10%;background:radial-gradient(circle at 45% 45%,rgba(47,92,255,.5),rgba(47,92,255,0) 66%);filter:blur(5rem)}
-.hg2{width:42vw;height:42vw;right:2%;top:26%;background:radial-gradient(circle at 55% 50%,rgba(63,178,110,.55),rgba(63,178,110,0) 62%);filter:blur(5.2rem)}
-.hg3{width:54vw;height:54vw;right:-14%;bottom:-22%;background:radial-gradient(circle at 50% 50%,rgba(18,62,128,.55),rgba(18,62,128,0) 68%);filter:blur(4.6rem)}
-.hg4{width:25vw;height:25vw;right:26%;top:6%;background:radial-gradient(circle at 50% 50%,rgba(87,120,220,.34),rgba(87,120,220,0) 66%);filter:blur(6rem)}
-.hero-visual img{position:absolute;right:17%;top:50%;transform:translateY(-50%);width:26.8rem;border-radius:23%;box-shadow:0 3.4rem 9rem rgba(0,0,0,.65),0 0 6rem rgba(47,92,255,.22)}
-.hero > .wrap{width:min(calc(100% - 6.4rem),var(--w-wide));position:relative;z-index:2;flex:1;display:flex;flex-direction:column;justify-content:center;padding-top:5.6rem;padding-bottom:6.4rem}
-.hero h1{color:#fff;font-size:4.6rem;font-weight:300;letter-spacing:-.01em;margin-bottom:2rem}
-.hero-ver{display:inline-block;vertical-align:middle;margin-left:1.4rem;font-size:1.9rem;font-weight:700;letter-spacing:.08em;color:var(--yellow);background:rgba(255,183,27,.1);border:1px solid rgba(255,183,27,.45);border-radius:9rem;padding:.35rem 1.2rem;transform:translateY(-.12em);white-space:nowrap}
-.hero h2{color:#fff;font-size:2.8rem;font-weight:700;line-height:1.35;max-width:60rem;margin-bottom:2rem}
-.hero p{font-size:1.6rem;color:#d5d5d5;max-width:52rem}
-.hero-cta{margin-top:3.2rem;display:flex;gap:1.6rem}
-/* 选项卡（文档流内 sticky 吸顶；到达菜单栏下沿时自然粘住，半高压缩）
-   负边距由脚本按选项卡真实高度注入，使 Hero 黑色背景精确覆盖到按钮下沿、与之齐平 */
-.hero-tabs{position:sticky;top:var(--hhc);z-index:90;background:transparent;margin-top:-5.6rem}
-.hero-tabs .wrap{width:min(calc(100% - 3.2rem),var(--w-wide));display:flex;gap:0.6rem}
-.hero-tabs button{width:19rem;padding:1.9rem 0;font-family:var(--f-head);font-size:1.5rem;font-weight:600;color:var(--ink);background:var(--tab-gray);border:none;cursor:pointer;transition:background .2s,padding .3s ease}
-.hero-tabs button:hover{background:#e6e6e6}
-.hero-tabs button.active{background:#fff}
-.hero-tabs.stuck{background:transparent}
-.hero-tabs.stuck button{padding:0.8rem 0;box-shadow:0 0 1.4rem rgba(0,0,0,.2)}
+.hero{position:relative;background:repeating-linear-gradient(90deg,rgba(47,62,85,.03) 0 1px,transparent 1px 3px),linear-gradient(160deg,#f5f6f8 0%,#e8ebef 55%,#d9dde3 100%);color:var(--ink);min-height:calc(100vh - var(--hh));display:flex;flex-direction:column;overflow:hidden;border-bottom:0.1rem solid var(--line)}
+.hero > .wrap{width:min(calc(100% - 6.4rem),var(--w-wide));position:relative;z-index:2;flex:1;display:flex;flex-direction:column;justify-content:center;padding-top:5.6rem;padding-bottom:8rem}
+.hero h1{color:var(--ink);font-size:5.4rem;font-weight:800;letter-spacing:-.02em;margin-bottom:2.4rem;line-height:1.1}
+.hero-ver{display:inline-block;vertical-align:middle;margin-left:1.4rem;font-size:1.5rem;font-weight:700;letter-spacing:.12em;color:var(--steel);border:0.15rem solid var(--steel);padding:.4rem 1.1rem;transform:translateY(-.12em);white-space:nowrap}
+.hero h2{color:var(--ink);font-size:2.6rem;font-weight:700;line-height:1.3;max-width:72rem;margin-bottom:2rem;letter-spacing:.06em}
+.hero p{font-size:1.7rem;color:var(--body);max-width:66rem}
+.hero-cta{margin-top:3.6rem;display:flex;gap:1.6rem}
+/* 选项卡 */
+.hero-tabs{position:sticky;top:var(--hhc);z-index:90;background:#fff;border-bottom:0.1rem solid var(--line);margin-top:-6.4rem}
+.hero-tabs .wrap{width:min(calc(100% - 3.2rem),var(--w-wide));display:flex;gap:0}
+.hero-tabs button{width:19rem;padding:1.9rem 0;font-family:var(--f-head);font-size:1.5rem;font-weight:700;color:var(--ink);background:transparent;border:none;border-bottom:0.4rem solid transparent;cursor:pointer;transition:.15s}
+.hero-tabs button:hover{background:var(--gray)}
+.hero-tabs button.active{border-bottom-color:var(--accent);background:#fff}
+.hero-tabs.stuck{box-shadow:0 0.6rem 1.6rem rgba(26,32,44,.08)}
+.aud-list{display:flex;flex-wrap:wrap;gap:1.6rem 3.6rem;margin-top:1.6rem}
+.aud-list span{font-size:1.6rem;color:var(--body);display:flex;align-items:center;gap:1rem}
+.aud-list span::before{content:"";width:0.9rem;height:0.9rem;flex:none;background:linear-gradient(160deg,#8a99b0,#4c5c75)}
 
 .tab-panel{display:none}
 .tab-panel.active{display:block}
 
 /* ============ WATCH VIDEO ============ */
 .watch-video{display:flex;align-items:center;justify-content:center;gap:1.8rem;padding:4.4rem 0 0.8rem;cursor:pointer}
-.watch-video span{font-family:var(--f-head);font-size:1.4rem;font-weight:600;letter-spacing:.14em}
-.watch-video .ycirc{width:7.4rem;height:7.4rem;border-radius:50%;background:var(--yellow);display:grid;place-items:center;transition:.25s}
-.watch-video:hover .ycirc{background:var(--yellow-hover);transform:scale(1.06)}
+.watch-video span{font-family:var(--f-head);font-size:1.4rem;font-weight:700;letter-spacing:.14em}
+.watch-video .ycirc{width:7.4rem;height:7.4rem;background:var(--accent);display:grid;place-items:center;transition:.2s}
+.watch-video:hover .ycirc{background:var(--accent-hover);transform:scale(1.04)}
 .watch-video .ycirc svg{margin-left:0.4rem}
 
 /* ============ 简介（图左文右） ============ */
 .split{display:grid;grid-template-columns:1fr 1fr;gap:6.4rem;align-items:center}
 
-/* ============ 产品灰卡 ============ */
+/* ============ 产品卡 ============ */
 .prod-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:2.6rem;margin-top:4rem}
-.prod-card{background:var(--card);padding:3rem 2.8rem 3.4rem;display:flex;flex-direction:column}
-.prod-card .pimg{height:18.9rem;display:grid;place-items:center;margin-bottom:2.2rem;overflow:hidden}
+.prod-card{background:#fff;border:0.1rem solid var(--line);padding:3rem 2.8rem 3.4rem;display:flex;flex-direction:column}
+.prod-card .idx{font-family:var(--f-head);font-size:3.2rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:1.6rem}
+.prod-card .pimg{height:17rem;display:grid;place-items:center;margin-bottom:2.2rem;overflow:hidden;background:var(--gray)}
 .prod-card .pimg img{max-height:100%;object-fit:cover;cursor:zoom-in;transition:filter .2s}
 .prod-card .pimg img:hover{filter:brightness(1.04)}
-.prod-card h3{font-size:1.9rem;font-weight:600;margin-bottom:0.6rem}
-.prod-card .cat{font-size:1.3rem;color:#8a8a8a;font-family:var(--f-head);margin-bottom:1.6rem}
-
+.prod-card h3{font-size:1.9rem;font-weight:800;margin-bottom:0.6rem}
+.prod-card .cat{font-size:1.2rem;color:var(--accent);font-family:var(--f-head);font-weight:700;letter-spacing:.1em;margin-bottom:1.6rem}
+.prod-card .prob{margin-bottom:1.5rem;padding:1.3rem 1.5rem;background:var(--gray);border-left:0.3rem solid var(--accent);font-size:1.4rem;line-height:1.75;color:var(--body)}
+.prod-card .prob b{display:block;margin-bottom:.3rem;font-size:1.2rem;font-family:var(--f-head);font-weight:800;letter-spacing:.1em;color:var(--steel)}
 .prod-card p{font-size:1.45rem;color:var(--body)}
-.prod-card ul{margin-top:1.6rem;font-size:1.4rem;color:var(--ink)}
-.prod-card ul li{padding-left:1.8rem;position:relative;margin-bottom:0.7rem}
-.prod-card ul li::before{content:"•";position:absolute;left:0.2rem;font-weight:700}
+.prod-card p b{display:block;margin-bottom:.3rem;font-size:1.2rem;font-family:var(--f-head);font-weight:800;letter-spacing:.1em;color:var(--accent)}
 
 /* 查看更多（两侧横线） */
 .more-wrap{display:flex;align-items:center;gap:2.8rem;margin-top:4.4rem}
 .more-wrap::before,.more-wrap::after{content:"";flex:1;height:0.1rem;background:var(--line)}
-.btn-more{display:inline-flex;align-items:center;gap:.55em;padding:.9em 2.35em;font-family:var(--f-head);font-size:1.45rem;font-weight:600;color:var(--ink);background:#fff;border:0.15rem solid var(--line);cursor:pointer;transition:.2s}
-.btn-more:hover{border-color:var(--ink)}
+.btn-more{display:inline-flex;align-items:center;gap:.55em;padding:.9em 2.35em;font-family:var(--f-head);font-size:1.45rem;font-weight:700;color:var(--ink);background:#fff;border:0.1rem solid var(--line);cursor:pointer;transition:.15s}
+.btn-more:hover{background:var(--accent);border-color:var(--accent);color:#fff}
 
-/* ============ 视频区（文左图右） ============ */
-.video-box{position:relative;background:#000;cursor:pointer;overflow:hidden}
+/* ============ 视频区 ============ */
+.video-box{position:relative;background:#fff;border:0.1rem solid var(--line);cursor:pointer;overflow:hidden}
 .video-box img{width:100%;opacity:.92;transition:.3s}
 .video-box:hover img{opacity:1}
-.play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:7.2rem;height:7.2rem;border-radius:50%;background:var(--yellow);display:grid;place-items:center;transition:.25s}
-.video-box:hover .play{background:var(--yellow-hover);transform:translate(-50%,-50%) scale(1.06)}
+.play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:7.2rem;height:7.2rem;background:var(--accent);display:grid;place-items:center;transition:.2s}
+.video-box:hover .play{background:var(--accent-hover);transform:translate(-50%,-50%) scale(1.04)}
 .play svg{margin-left:0.4rem}
-.video-cap{position:absolute;left:0;bottom:0;right:0;padding:1.4rem 2rem;font-size:1.3rem;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.75))}
+.video-cap{position:absolute;left:0;bottom:0;right:0;padding:1.4rem 2rem;font-size:1.3rem;color:#fff;background:linear-gradient(180deg,rgba(47,62,85,0),rgba(47,62,85,.88))}
 
-/* ============ 手风琴（主要特征） ============ */
-.features{background:var(--card)}
+/* ============ 手风琴 ============ */
+.features{background:var(--gray)}
 .feat-layout{display:grid;grid-template-columns:minmax(26rem,34rem) 1fr;gap:7.2rem;align-items:start}
 .feat-side{position:sticky;top:4rem}
 .feat-side .h2{font-size:3rem;margin-bottom:1.6rem}
@@ -198,13 +183,13 @@ body.compact .nav-item > a{padding:.38em .82em;font-size:1.6rem}
 .acc-item{background:#fff;border:0.1rem solid var(--line);border-top:none}
 .acc-item:first-child{border-top:0.1rem solid var(--line)}
 .acc-head{width:100%;display:flex;align-items:center;gap:2.6rem;padding:1.6rem 2.6rem;background:none;border:none;cursor:pointer;text-align:left;font-family:var(--f-head)}
-.acc-head .thumb{flex:none;width:12.8rem;height:8.6rem;object-fit:cover;background:#eee}
-.acc-head .name{flex:1;font-size:1.65rem;font-weight:600;color:var(--ink)}
-.acc-head .pm{flex:none;width:4rem;height:4rem;border-radius:50%;border:0.2rem solid var(--ink);background:transparent;display:grid;place-items:center;transition:.25s;position:relative}
-.acc-head .pm::before,.acc-head .pm::after{content:"";position:absolute;background:var(--ink);transition:.25s}
+.acc-head .name{flex:1;font-size:1.65rem;font-weight:800;color:var(--ink)}
+.acc-head .pm{flex:none;width:3.6rem;height:3.6rem;border:0.15rem solid var(--line);background:transparent;display:grid;place-items:center;transition:.2s;position:relative}
+.acc-head .pm::before,.acc-head .pm::after{content:"";position:absolute;background:var(--ink);transition:.2s}
 .acc-head .pm::before{width:1.5rem;height:0.22rem}
 .acc-head .pm::after{width:0.22rem;height:1.5rem}
-.acc-item.open .acc-head .pm{background:var(--yellow);border-color:var(--yellow)}
+.acc-item.open .acc-head .pm{background:var(--accent);border-color:var(--accent)}
+.acc-item.open .acc-head .pm::before,.acc-item.open .acc-head .pm::after{background:#fff}
 .acc-item.open .acc-head .pm::after{transform:rotate(90deg);opacity:0}
 .acc-body{max-height:0;overflow:hidden;transition:max-height .35s ease}
 .acc-body .inner{padding:0.4rem 2.6rem 2.8rem 3.6rem;font-size:1.5rem;color:var(--body);display:grid;grid-template-columns:1fr 1.15fr;gap:4rem;align-items:center}
@@ -213,92 +198,84 @@ body.compact .nav-item > a{padding:.38em .82em;font-size:1.6rem}
 /* 图片放大预览（lightbox） */
 .lightbox{position:fixed;inset:0;background:rgba(10,11,13,.92);display:none;align-items:center;justify-content:center;z-index:200;padding:4rem;cursor:zoom-out}
 .lightbox.open{display:flex}
-.lightbox img{max-width:92vw;max-height:88vh;border-radius:1rem;box-shadow:0 3rem 8rem rgba(0,0,0,.6)}
-.lightbox .lb-close{position:absolute;top:2.2rem;right: 2.6rem;width:4.6rem;height:4.6rem;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:2.6rem;border:none;cursor:pointer;display:grid;place-items:center}
+.lightbox img{max-width:92vw;max-height:88vh;border:0.2rem solid #fff;box-shadow:0 3rem 8rem rgba(0,0,0,.6)}
+.lightbox .lb-close{position:absolute;top:2.2rem;right:2.6rem;width:4.6rem;height:4.6rem;background:rgba(255,255,255,.14);color:#fff;font-size:2.6rem;border:0.15rem solid #fff;cursor:pointer;display:grid;place-items:center}
 .lightbox .lb-close:hover{background:rgba(255,255,255,.26)}
 .acc-body p+p{margin-top:1rem}
 
 /* ============ 平台愿景 ============ */
-.vision-head{text-align:center;margin-bottom:4rem}
-.vision-head .h2{margin-bottom:1.2rem}
-.vision-head p{font-family:var(--f-head);font-size:1.9rem;font-weight:600;color:var(--yellow)}
-.vision-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:2.6rem}
-.vision-card{background:var(--card);padding:3rem 2.8rem;border-top:0.5rem solid var(--yellow);box-shadow:0 0.6rem 2rem rgba(21,22,23,.06);transition:.25s}
-.vision-card:hover{box-shadow:0 1.4rem 3.4rem rgba(21,22,23,.12);transform:translateY(-0.4rem)}
-.vision-card h3{font-size:2.2rem;font-weight:700;margin-bottom:1.2rem}
-.vision-card p{font-size:1.5rem;line-height:1.9;color:var(--body)}
-@media(max-width:1080px){.vision-cards{grid-template-columns:1fr}}
+.vision-lead{margin-top:1.8rem;font-size:1.7rem;line-height:2.1;color:var(--body);max-width:80rem}
 
-/* ============ 前沿技术 ============ */
-.tech-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2rem;margin-top:3.6rem}
-.tech-item{background:#fff;border:0.1rem solid var(--line);padding:2.4rem 2.2rem;transition:.25s}
-.tech-item:hover{border-color:var(--yellow);box-shadow:0 1rem 2.6rem rgba(21,22,23,.08);transform:translateY(-0.3rem)}
-.tech-item h3{font-size:1.65rem;font-weight:700;margin-bottom:1rem;padding-left:1.2rem;border-left:0.4rem solid var(--yellow)}
-.tech-item p{font-size:1.4rem;line-height:1.8;color:var(--body)}
-@media(max-width:1080px){.tech-grid{grid-template-columns:1fr 1fr}}
+/* ============ 方案组件 ============ */
 
 /* ============ FAQ（双列） ============ */
 .faq-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 5.6rem;margin-top:3.6rem}
 .faq-item{border-top:0.1rem solid var(--line)}
-.faq-q{width:100%;display:flex;justify-content:space-between;align-items:center;gap:2rem;padding:2.2rem 0.4rem;background:none;border:none;cursor:pointer;text-align:left;font-family:var(--f-head);font-size:1.55rem;font-weight:600;color:var(--ink)}
-.faq-q .pm{flex:none;width:3.6rem;height:3.6rem;border-radius:50%;border:0.2rem solid var(--ink);position:relative;transition:.25s}
-.faq-q .pm::before,.faq-q .pm::after{content:"";position:absolute;top:50%;left:50%;background:var(--ink);transition:.25s}
+.faq-grid .faq-item:nth-last-child(-n+2){border-bottom:0.1rem solid var(--line)}
+.faq-q{width:100%;display:flex;justify-content:space-between;align-items:center;gap:2rem;padding:2.2rem 0.4rem;background:none;border:none;cursor:pointer;text-align:left;font-family:var(--f-head);font-size:1.55rem;font-weight:700;color:var(--ink)}
+.faq-q .pm{flex:none;width:3.2rem;height:3.2rem;border:0.15rem solid var(--line);position:relative;transition:.2s}
+.faq-q .pm::before,.faq-q .pm::after{content:"";position:absolute;top:50%;left:50%;background:var(--ink);transition:.2s}
 .faq-q .pm::before{width:1.4rem;height:0.2rem;transform:translate(-50%,-50%)}
 .faq-q .pm::after{width:0.2rem;height:1.4rem;transform:translate(-50%,-50%)}
-.faq-item.open .faq-q .pm{background:var(--yellow);border-color:var(--yellow)}
+.faq-item.open .faq-q .pm{background:var(--accent);border-color:var(--accent)}
+.faq-item.open .faq-q .pm::before,.faq-item.open .faq-q .pm::after{background:#fff}
 .faq-item.open .faq-q .pm::after{opacity:0}
 .faq-a{max-height:0;overflow:hidden;transition:max-height .3s ease}
 .faq-a p{padding:0 0.4rem 2.4rem;font-size:1.45rem;color:var(--body)}
 
-/* ============ 资源横卡（2列灰卡） ============ */
+/* ============ 资源横卡 ============ */
 .res-sec{margin-top:6.4rem}
 .res-sec:first-of-type{margin-top:0}
 .res-sec .h2{font-size:3rem;margin-bottom:3.2rem}
 .res-cards{display:grid;grid-template-columns:1fr 1fr;gap:2.6rem}
-.res-card{background:var(--card);display:flex;gap:0;transition:.25s}
-.res-card:hover{box-shadow:0 1.2rem 3rem rgba(0,0,0,.1)}
-.res-thumb{flex:none;width:12.8rem;position:relative;overflow:hidden;display:grid;place-items:center;color:#fff}
+.res-card{background:#fff;border:0.1rem solid var(--line);display:flex;gap:0;transition:.2s}
+.res-card:hover{border-color:var(--accent)}
+.res-thumb{flex:none;width:12.8rem;position:relative;overflow:hidden;display:grid;place-items:center;color:#33415c;background:linear-gradient(180deg,#f1f3f6,#dde1e7)}
 .res-thumb svg{width:4.4rem;height:4.4rem}
 .res-thumb img.cover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .res-thumb img.contain{width:72%;height:72%;object-fit:contain;position:relative;z-index:1}
-.res-thumb .vplay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:3.6rem;height:3.6rem;border-radius:50%;background:var(--yellow);display:grid;place-items:center;z-index:2}
+.res-thumb .vplay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:3.6rem;height:3.6rem;background:var(--accent);display:grid;place-items:center;z-index:2}
 .res-body{padding:2.4rem 2.6rem}
-.res-body .cat{font-size:1.3rem;color:#8a8a8a;font-family:var(--f-head);margin-bottom:0.4rem}
-.res-body h4{font-size:1.65rem;line-height:1.45;margin-bottom:1rem}
+.res-body .cat{font-size:1.2rem;color:var(--accent);font-family:var(--f-head);font-weight:700;letter-spacing:.1em;margin-bottom:0.4rem}
+.res-body h4{font-size:1.65rem;line-height:1.45;margin-bottom:1rem;font-weight:800}
 .res-body p{font-size:1.4rem;color:var(--body);margin-bottom:1.6rem}
 
-/* ============ CTA（深灰底三栏，参照 NVIDIA 布局） ============ */
-.cta{background:#1a1a1a}
+/* ============ CTA（红底） ============ */
+.cta{background:#f5f6f8;color:var(--ink)}
+.cta .h2, .cta h2{color:var(--ink)}
 .cta-grid{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:6.4rem;align-items:start}
-.cta-left h2{color:#fff;font-size:3rem;font-weight:700;margin-bottom:1.8rem}
-.cta-left p{font-size:1.5rem;color:#b3b3b3;max-width:40rem;margin-bottom:2.8rem}
+.cta-left h2{font-size:3rem;font-weight:800;margin-bottom:1.8rem}
+.cta-left p{font-size:1.5rem;color:var(--body);max-width:40rem;margin-bottom:2.8rem}
+.cta-left .btn{background:var(--accent);color:#fff}
+.cta-left .btn:hover{background:var(--accent-hover)}
 .cta-steps{grid-column:span 2;position:relative;display:grid;grid-template-columns:1fr 1fr;gap:6.4rem;padding-top:4rem}
-.cta-steps-label{position:absolute;top:0;left:50%;transform:translateX(-50%);font-family:var(--f-head);font-size:1.4rem;font-weight:600;color:#9a9a9a}
-.cta-step h4{color:#fff;font-size:1.7rem;font-weight:600;margin-bottom:1.2rem}
-.cta-step p{font-size:1.35rem;color:#9a9a9a;margin-bottom:1.8rem}
-.cta-step .step-link{font-family:var(--f-head);font-size:1.4rem;font-weight:600;color:var(--yellow)}
+.cta-steps-label{position:absolute;top:0;left:50%;transform:translateX(-50%);font-family:var(--f-head);font-size:1.4rem;font-weight:700;color:var(--body)}
+.cta-step{border-top:0.1rem solid var(--line);padding-top:2rem}
+.cta-step h4{font-size:1.7rem;font-weight:800;margin-bottom:1.2rem}
+.cta-step p{font-size:1.35rem;color:var(--body);margin-bottom:1.8rem}
+.cta-step .step-link{font-family:var(--f-head);font-size:1.4rem;font-weight:700;color:var(--accent)}
 .cta-step .step-link:hover{text-decoration:underline}
 .cta-step .step-link .arr{font-size:1.1rem}
 
-/* CTA 与页脚使用更窄的内容列（参照模板留白） */
+/* CTA 与页脚使用更窄的内容列 */
 .cta .wrap, footer .wrap{width:min(calc(100% - 13%),var(--w-mid));padding:0}
 
 /* ============ 页脚 ============ */
-footer{background:var(--black);color:#9a9a9a;padding:5.6rem 0 0}
+footer{background:var(--gray);color:var(--body);padding:5.6rem 0 0;border-top:0.1rem solid var(--line)}
 .foot-grid{display:flex;gap:7.2rem;align-items:flex-start}
 .foot-cols{display:contents}
 .foot-cols > div{min-width:11rem}
-footer h5{color:#fff;font-size:1.4rem;font-weight:700;margin-bottom:1.4rem}
+footer h5{color:var(--ink);font-size:1.4rem;font-weight:800;margin-bottom:1.4rem}
 footer ul{display:grid;gap:0.8rem;font-size:1.3rem}
-footer ul a:hover{color:#fff}
+footer ul a:hover{color:var(--accent)}
 .foot-cta{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:2rem}
 .foot-cta .btn-outline{font-size:1.35rem;padding:1.1rem 2.2rem}
 .foot-social{display:flex;gap:1.6rem}
-.soc{color:#fff;font-size:1.35rem;font-family:var(--f-head);cursor:pointer;transition:.2s}
-.soc:hover{color:var(--yellow)}
-.foot-bottom{margin-top:4.4rem;border-top:0.1rem solid #232323;padding:1.6rem 0 2rem;display:flex;justify-content:space-between;align-items:center;font-size:1.2rem;flex-wrap:wrap;gap:1.2rem}
+.soc{color:var(--ink);font-size:1.35rem;font-family:var(--f-head);font-weight:600;cursor:pointer;transition:.15s}
+.soc:hover{color:var(--accent)}
+.foot-bottom{margin-top:4.4rem;border-top:0.1rem solid var(--line);padding:1.6rem 0 2rem;display:flex;justify-content:space-between;align-items:center;font-size:1.2rem;flex-wrap:wrap;gap:1.2rem}
 .foot-bottom .legal{display:flex;gap:2.4rem;flex-wrap:wrap}
-.foot-bottom a:hover{color:#fff}
+.foot-bottom a:hover{color:var(--accent)}
 
 @media(max-width:1080px){
   .split,.feat-layout,.faq-grid,.res-cards,.prod-cards{grid-template-columns:1fr}
@@ -310,10 +287,9 @@ footer ul a:hover{color:#fff}
   .hero-tabs button{width:auto;flex:1;padding:1.6rem 0;font-size:1.4rem}
   .acc-body .inner{padding-left:2.6rem;grid-template-columns:1fr;align-items:center}
   .acc-body .inner img.shot{width:100%;max-width:100%}
-  .acc-head .thumb{display:none}
   .res-thumb{width:9.6rem}
   nav.main,.header-right{display:none}
-  .hero-visual{display:none}
+  .hero h1{font-size:3.6rem}
   .burger{display:grid}
   .search-pop{right:1.6rem;left:1.6rem}
   .search-pop input{flex:1;width:auto}
@@ -328,17 +304,16 @@ footer ul a:hover{color:#fff}
   <div class="wrap">
     <a class="brand" href="#top">
       <img src="assets/工业能碳智控平台应用图标.svg" alt="工业能碳智控平台">
-      <span class="wm">工业能碳智控平台<small>HAIYI INTELLIGENCE</small></span>
+      <span class="wm">海颐·能优算<small>工业能碳智控平台</small></span>
     </a>
     <nav class="main">
       <div class="nav-item">
         <a href="#ov-products" data-tab="0">产品与服务 <span class="caret">▾</span></a>
         <div class="nav-drop">
           <a href="#ov-vision" data-tab="0">平台愿景 <small>VISION</small></a>
-          <a href="#ov-products" data-tab="0">产品模块 <small>PRODUCTS</small></a>
-          <a href="#ov-tech" data-tab="0">前沿技术 <small>TECH</small></a>
-          <a href="#cap-features" data-tab="1">八大能力 <small>CAPABILITIES</small></a>
-          <a href="#cta" data-tab="0">预约演示 <small>TRIAL</small></a>
+          <a href="#ov-products" data-tab="0">方案组件 <small>COMPONENTS</small></a>
+          <a href="#ov-tech" data-tab="0">一站式方案 <small>SOLUTION</small></a>
+          <a href="#cap-features" data-tab="1">核心能力 <small>CAPABILITIES</small></a>
         </div>
       </div>
       <div class="nav-item">
@@ -362,7 +337,6 @@ footer ul a:hover{color:#fff}
       <button class="h-icon" id="searchBtn" aria-label="搜索">
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       </button>
-      <a class="btn-pill" href="#cta" data-tab="0">预约演示 <span class="arr">→</span></a>
     </div>
     <button class="burger" id="menuBtn" aria-label="菜单"><span></span></button>
     <div class="search-pop" id="searchPop">
@@ -381,17 +355,14 @@ footer ul a:hover{color:#fff}
   <div class="wrap">
     <ul class="menu-links">
       <li><a href="#ov-vision" data-tab="0">平台愿景 <small>VISION</small></a></li>
-      <li><a href="#cap-features" data-tab="1">八大能力 <small>CAPABILITIES</small></a></li>
-      <li><a href="#ov-products" data-tab="0">产品模块 <small>PRODUCTS</small></a></li>
-      <li><a href="#ov-tech" data-tab="0">前沿技术 <small>TECH</small></a></li>
+      <li><a href="#cap-features" data-tab="1">核心能力 <small>CAPABILITIES</small></a></li>
+      <li><a href="#ov-products" data-tab="0">方案组件 <small>COMPONENTS</small></a></li>
+      <li><a href="#ov-tech" data-tab="0">一站式方案 <small>SOLUTION</small></a></li>
       <li><a href="#ov-faq" data-tab="0">常见问题 <small>FAQ</small></a></li>
       <li><a href="#res-root" data-tab="2">资源与活动 <small>RESOURCES</small></a></li>
       <li><a href="#cta" data-tab="0">联系我们 <small>CONTACT</small></a></li>
     </ul>
-    <div class="menu-foot">
-      <a class="btn" href="#cta" data-tab="0">免费试用 <span class="arr">▸</span></a>
-      <a class="btn-outline" href="#cta" data-tab="0">联系我们 <span class="arr">▸</span></a>
-    </div>
+
   </div>
 </div>
 
@@ -399,17 +370,11 @@ footer ul a:hover{color:#fff}
 <section class="hero" id="top">
   <div class="wrap">
     <h1>工业能碳智控平台 <span class="hero-ver">v2.0.0</span></h1>
-    <h2>一位懂能、懂碳、懂市场的「数字专家」</h2>
-    <p>从数据采集、三维孪生到仿真寻优与自动控制，轻松管理您的整个「数字工厂」。</p>
+    <p>我们不为卖产品而来，我们为您的能碳难题而来，平台已有的软硬件资源全部免费，我们倡导以服务收费，以效果付费。</p>
     <div class="hero-cta">
       <a class="btn" href="http://36.151.146.71:40005/" target="_blank" rel="noopener">网页版 <span class="arr">▸</span></a>
       <a class="btn-outline" href="https://github.com/zhibinQiu/power_simulation/releases/download/v1.0.1/SteelCarbonTwin-windows-x64-setup.exe" download>应用下载 <span class="arr">▸</span></a>
     </div>
-  </div>
-  <div class="hero-visual">
-    <div class="glow hg1"></div>
-    <div class="glow hg2"></div>
-    <img src="assets/工业能碳智控平台应用图标.svg" alt="工业能碳智控平台应用图标">
   </div>
 </section>
 <div class="hero-tabs">
@@ -426,94 +391,67 @@ footer ul a:hover{color:#fff}
   <!-- 平台愿景 -->
   <section class="sec" id="ov-vision" style="padding-top:4rem">
     <div class="wrap">
-      <div class="vision-cards">
-        <div class="vision-card">
-          <h3>低耗能</h3>
-          <p>用 AI 的「精打细算」代替设备的「大拆大换」，同样的产量，烧得更少、耗得更低。</p>
-        </div>
-        <div class="vision-card">
-          <h3>低碳</h3>
-          <p>每一次生产决策都算得清碳、降得下碳，能耗、碳排与成本同步优化。</p>
-        </div>
-        <div class="vision-card">
-          <h3>保护地球</h3>
-          <p>面向钢铁、水泥、化工、有色等控排行业及更多高耗能行业，让绿色转型触手可及。</p>
-        </div>
+      <h2 class="h2">平台愿景</h2>
+      <p class="vision-lead">AI 赋能实干节能减碳，共筑星球可持续生态</p>
+    </div>
+  </section>
+
+  <!-- 面向对象 -->
+  <section class="sec" style="padding-top:4rem">
+    <div class="wrap">
+      <h2 class="h2">面向对象</h2>
+      <div class="aud-list">
+        <span>任何有节能减碳需求的企业</span>
+        <span>有节能减碳研究需求的科研院所</span>
+        <span>具有节能减碳产品的企业</span>
       </div>
     </div>
   </section>
 
-  <!-- 产品 -->
-  <section class="sec" id="ov-products" style="padding-top:0">
+  <!-- 企业难题 -->
+  <section class="sec" id="ov-tech" style="padding-top:4rem">
     <div class="wrap">
-      <h2 class="h2">产品</h2>
-      <p style="margin-top:1.6rem;font-size:1.6rem;color:var(--body);max-width:64rem">「云边协同」架构交付，软硬件模块自动连接，数据无缝通信。</p>
+      <h2 class="h2">一站式方案</h2>
+      <p style="margin-top:1.6rem;font-size:1.6rem;color:var(--body);max-width:64rem">不为卖产品而来——每一个组件，都为您的某个具体问题而存在。</p>
+    </div>
+
+    <!-- 方案组件 -->
+    <div class="wrap" id="ov-products" style="margin-top:3.6rem">
       <div class="prod-cards">
         <div class="prod-card">
+          <span class="idx">01</span>
           <div class="pimg"><img src="assets/工业能碳智控平台-电脑框-工艺流程3D.svg" alt="数字孪生引擎界面"></div>
+          <div class="prob"><b>企业问题</b>现有平台仅统计能耗、缺少碳核算，数据孤岛看不见全厂能流碳流，想节能减碳却没有可落地路径。</div>
           <h3>数字孪生引擎</h3>
-          <div class="cat">平台模块</div>
-          <p>全厂 20+ 工序设备真实比例三维呈现，物料流与能流颜色可视，拖拽即可自搭工艺流程。</p>
+          <p><b>平台能力</b>打通数据孤岛：20+ 工序设备 1:1 三维呈现，能流碳流一屏看清；拖拽自搭工艺流程，逐工序给出可落地节能路径。</p>
         </div>
         <div class="prod-card">
+          <span class="idx">02</span>
           <div class="pimg"><img src="assets/工业能碳智控平台-电脑框-高炉仿真分析.svg" alt=""></div>
+          <div class="prob"><b>企业问题</b>能源费用高却找不到真实降耗空间，技改投资回报不明。</div>
           <h3>能碳仿真寻优</h3>
-          <div class="cat">平台模块</div>
-          <p>零风险仿真沙盒 + 工序 AI 模型，策略调整即点即得，改前改后效益一目了然。</p>
+          <p><b>平台能力</b>零风险仿真沙盒，逐工序找出真实降耗空间，技改投入产出即点即算、回报一目了然。</p>
         </div>
         <div class="prod-card">
+          <span class="idx">03</span>
           <div class="pimg"><img src="assets/工业能碳智控平台-电脑框-策略分析.svg" alt=""></div>
+          <div class="prob"><b>企业问题</b>担心 AI 停留在仿真与纸面报告、优化算法影响生产，无法在现场产出可核验的减排成效。</div>
           <h3>本析智擎</h3>
-          <div class="cat">AI 智能助手</div>
-          <p>多智能体 AI 助手，自然语言直达设备数据、工艺仿真与碳市场行情，支持 MCP 双向接入。</p>
+          <p><b>平台能力</b>多智能体 AI 助手直达设备、工艺与碳市场——说得清，办得到；优化策略三级防护、真机验证后才落地执行，减排成效现场可核验。</p>
         </div>
         <div class="prod-card">
+          <span class="idx">04</span>
           <div class="pimg"><img src="assets/能碳一体机.svg" alt=""></div>
+          <div class="prob"><b>企业问题</b>缺少懂工艺、能源、碳管理的复合型人员，想节能减碳却无人可用。</div>
           <h3>能碳一体机</h3>
-          <div class="cat">边缘硬件</div>
-          <p>工厂现场智能感知设备，「不打扰、不改造」接入，断网续传不丢数据。</p>
+          <p><b>平台能力</b>免改造接入，自动采集、自动算碳、自动出报告——开箱即用，不依赖专业团队，无人也能管好。</p>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 前沿技术 -->
-  <section class="sec" id="ov-tech" style="padding-top:0">
-    <div class="wrap">
-      <h2 class="h2">前沿技术</h2>
-      <p style="margin-top:1.6rem;font-size:1.6rem;color:var(--body);max-width:64rem">以云边协同、AI 与实时数据技术为底座。</p>
-      <div class="tech-grid">
-        <div class="tech-item">
-          <h3>云边协同 · KubeEdge</h3>
-          <p>云端统一管理，边缘就近采集，AI 模型远程下发，断网不丢数据。</p>
-        </div>
-        <div class="tech-item">
-          <h3>3D 数字孪生</h3>
-          <p>全厂 20+ 工序设备真实比例建模，热力着色与物流粒子实时呈现。</p>
-        </div>
-        <div class="tech-item">
-          <h3>AI 优化模型引擎</h3>
-          <p>GA / PSO / RL / 时序预测 / 聚类五套在线模型自学习寻优。</p>
-        </div>
-        <div class="tech-item">
-          <h3>LLM 智能体</h3>
-          <p>自然语言策略解析、AI 分析报告与知识库，听得懂、说得出、做得到。</p>
-        </div>
-        <div class="tech-item">
-          <h3>碳市场行情感知</h3>
-          <p>CEA / CCER 实时行情自动获取，价格趋势智能预测。</p>
-        </div>
-        <div class="tech-item">
-          <h3>实时遥测</h3>
-          <p>MQTT + WebSocket 秒级推送，真实读数驱动数字工厂同步。</p>
-        </div>
-        <div class="tech-item">
-          <h3>时序数据库</h3>
-          <p>TDengine 云端落盘历史数据，支撑深度分析与趋势回放。</p>
-        </div>
-        <div class="tech-item">
-          <h3>三级安全防护</h3>
-          <p>参数边界 / 耦合一致性 / 执行确认，决策权始终在人。</p>
+        <div class="prod-card">
+          <span class="idx">05</span>
+          <div class="pimg"><img src="assets/工业能碳智控平台-电脑框-策略分析.svg" alt=""></div>
+          <div class="prob"><b>企业问题</b>政策强制披露、核查，不熟悉口径，补贴难以申领。</div>
+          <h3>能碳合规引擎</h3>
+          <p><b>平台能力</b>自动碳盘查与合规报告，自动对齐核查披露口径、补贴一键申报；经 CQC 能碳管理认证，专业又简单。</p>
         </div>
       </div>
     </div>
@@ -525,32 +463,36 @@ footer ul a:hover{color:#fff}
       <h2 class="h2">常见问题</h2>
       <div class="faq-grid">
         <div class="faq-item">
-          <button class="faq-q">什么是工业能碳智控平台？<span class="pm"></span></button>
-          <div class="faq-a"><p>连接「真实工厂」与「数字工厂」的能碳一体化管理平台：三维孪生看清全厂能流碳流，仿真沙盒零风险试错，优化策略在三级安全防护下执行。</p></div>
+          <button class="faq-q">平台是什么？<span class="pm"></span></button>
+          <div class="faq-a"><p>连接「真实工厂」与「数字工厂」的能碳一体化平台：三维孪生看清能流碳流，仿真沙盒零风险试错，策略在三级防护下执行。</p></div>
         </div>
         <div class="faq-item">
-          <button class="faq-q">「本析智擎」是什么？能做什么？<span class="pm"></span></button>
-          <div class="faq-a"><p>平台内置的多智能体 AI 助手，可调用设备数据、工艺仿真、碳市场行情与知识库，支持 MCP 双向接入。机器给建议，人做决定。</p></div>
+          <button class="faq-q">你们是卖软件和硬件的吗？<span class="pm"></span></button>
+          <div class="faq-a"><p>我们不为卖产品而来——先诊断您的问题，再匹配方案。硬件、软件、算法、实施整体交付，按效果负责。</p></div>
         </div>
         <div class="faq-item">
-          <button class="faq-q">平台如何接入我厂现有的数据系统？<span class="pm"></span></button>
-          <div class="faq-a"><p>通过能碳一体机：旁路对接现有计量系统，或直连电表、气表、流量计等现场设备，均支持断网续传。</p></div>
+          <button class="faq-q">「本析智擎」能做什么？<span class="pm"></span></button>
+          <div class="faq-a"><p>内置多智能体 AI 助手，可调用设备数据、工艺仿真、碳市场行情与知识库。机器给建议，人做决定。</p></div>
         </div>
         <div class="faq-item">
-          <button class="faq-q">仿真调整会影响真实生产吗？<span class="pm"></span></button>
+          <button class="faq-q">如何接入现有数据系统？<span class="pm"></span></button>
+          <div class="faq-a"><p>能碳一体机旁路对接计量系统，或直连电表、气表、流量计等现场设备，断网续传不丢数据。</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">仿真会影响真实生产吗？<span class="pm"></span></button>
           <div class="faq-a"><p>不会。仿真沙盒零风险试算，策略执行前自动展示「改前 vs 改后」的能耗、碳排与成本对比。</p></div>
         </div>
         <div class="faq-item">
-          <button class="faq-q">自动下发安全吗？决策权在谁手里？<span class="pm"></span></button>
+          <button class="faq-q">自动下发安全吗？<span class="pm"></span></button>
           <div class="faq-a"><p>三级防护（参数边界 / 耦合一致性 / 执行确认）+「自动/建议」双模协作，决策权始终在工程师手中。</p></div>
         </div>
         <div class="faq-item">
-          <button class="faq-q">平台支持哪些行业？<span class="pm"></span></button>
-          <div class="faq-a"><p>面向钢铁、水泥、化工、有色四大控排行业及更多高耗能行业；钢铁率先落地，其余行业同步就绪、同构复用。</p></div>
+          <button class="faq-q">支持哪些行业？<span class="pm"></span></button>
+          <div class="faq-a"><p>面向钢铁、水泥、化工、有色四大控排行业；钢铁率先落地，其余同构复用。</p></div>
         </div>
         <div class="faq-item">
-          <button class="faq-q">云边协同是如何分工的？<span class="pm"></span></button>
-          <div class="faq-a"><p>边缘就近采集感知，云端汇聚核算推演，模型与指令云端下发。现场的事就近办，深度的事云端想。</p></div>
+          <button class="faq-q">现场环境复杂、偶尔断网，数据会丢吗？<span class="pm"></span></button>
+          <div class="faq-a"><p>不会。边缘侧自动缓存，网络恢复后立即续传补全，全链路数据完整可追溯。</p></div>
         </div>
       </div>
     </div>
@@ -564,56 +506,56 @@ footer ul a:hover{color:#fff}
   <section class="sec" id="cap-video">
     <div class="wrap split">
       <div>
-        <h2 class="h2">观看不同工艺环节的相互通信</h2>
-        <p style="margin-top:1.8rem;font-size:1.6rem;color:var(--body)">跨工序、跨行业观察参数联动——如钢铁烧结与高炉、水泥回转窑与熟料碳强度，一处调整，全链可见。</p>
+        <h2 class="h2">跨工艺实时联动</h2>
+        <p style="margin-top:1.8rem;font-size:1.6rem;color:var(--body)">一处调整，全链可见——烧结与高炉、回转窑与熟料碳强度。</p>
       </div>
       <div class="video-box">
         <img src="assets/工业能碳智控平台-电脑框截图.svg" alt="平台三维数字孪生界面">
-        <div class="play"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="#151617"/></svg></div>
-        <div class="video-cap">三维数字孪生 · 全厂工艺流程实时联动</div>
+        <div class="play"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="#fff"/></svg></div>
+        <div class="video-cap">三维数字孪生 · 全厂工艺实时联动</div>
       </div>
     </div>
   </section>
 
-  <!-- 主要特征 -->
+  <!-- 核心能力 -->
   <section class="sec features" id="cap-features">
     <div class="wrap feat-layout">
       <div class="feat-side">
         <h2 class="h2">核心能力</h2>
-        <p>八大能力覆盖感知、核算、寻优、执行全链路。</p>
+        <p>感知、核算、寻优、执行——全链路覆盖。</p>
       </div>
       <div id="featAcc">
         <div class="acc-item">
-          <button class="acc-head"><span class="name">看得见 · 3D 数字孪生全厂工艺流程</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>钢铁、水泥、化工等全行业 20+ 工序设备真实比例三维呈现，物料流与能流颜色可视，想看哪道工序点哪里。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-工艺流程3D.svg" alt=""></div></div>
+          <button class="acc-head"><span class="name">看得见 · 3D 孪生全厂工艺</span><span class="pm"></span></button>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>钢铁、水泥等 20+ 工序设备 1:1 呈现，物料流与能流颜色可视，想看哪道工序点哪里。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-工艺流程3D.svg" alt=""></div></div>
         </div>
         <div class="acc-item">
-          <button class="acc-head"><span class="name">建得真 · 拖拽式工艺流程自搭与设备定制</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>像搭积木一样拖拽自搭工艺流程（钢铁炼铁→轧钢、水泥生料→粉磨），设备量程与规模按企业实际量身定制。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-工艺编排.svg" alt=""></div></div>
+          <button class="acc-head"><span class="name">建得真 · 拖拽自搭工艺流程</span><span class="pm"></span></button>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>像搭积木一样自搭流程（钢铁炼铁→轧钢、水泥生料→粉磨），设备量程与规模按企业实际定制。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-工艺编排.svg" alt=""></div></div>
         </div>
         <div class="acc-item">
-          <button class="acc-head"><span class="name">算得清 · 三账合一与全流程可追溯</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>能源、碳、成本三账合一自动核算，吨钢、吨熟料等单耗随手可查，每一笔从哪来到哪去都经得起核查。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-碳素流守恒审计.svg" alt=""></div></div>
+          <button class="acc-head"><span class="name">算得清 · 三账合一可追溯</span><span class="pm"></span></button>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>能源、碳、成本三账自动核算，吨钢、吨熟料等单耗随手可查，每一笔都经得起核查。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-碳素流守恒审计.svg" alt=""></div></div>
         </div>
         <div class="acc-item">
           <button class="acc-head"><span class="name">推演得准 · 零风险仿真沙盒</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>输入工艺参数立即算出能耗、碳排与成本；策略执行前自动展示「改前 vs 改后」效益对比，试错零风险。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-高炉仿真分析.svg" alt=""></div></div>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>输入工艺参数即得能耗、碳排与成本；改前改后自动对比，试错零风险。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-高炉仿真分析.svg" alt=""></div></div>
         </div>
         <div class="acc-item">
-          <button class="acc-head"><span class="name">想得出 · 自然语言交互与工序AI 模型</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>大白话下指令，钢铁行业说「焦比降低 5%」、水泥行业说「吨熟料煤耗降 3%」，AI 自动解析为可执行方案。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-实时数据列表.svg" alt=""></div></div>
+          <button class="acc-head"><span class="name">想得出 · 自然语言下达指令</span><span class="pm"></span></button>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>大白话下指令：说「焦比降低 5%」，AI 自动解析为可执行方案。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-实时数据列表.svg" alt=""></div></div>
         </div>
         <div class="acc-item">
-          <button class="acc-head"><span class="name">动得了 · 「感知—寻优—执行」自动闭环</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>优化结果在三级防护校验范围内自动下发到可调设备，一句话即可指挥仿真运行与切换。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-数据源管理.svg" alt=""></div></div>
+          <button class="acc-head"><span class="name">动得了 · 感知寻优执行闭环</span><span class="pm"></span></button>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>优化结果在三级防护校验内自动下发到可调设备，一句话指挥仿真运行与切换。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-数据源管理.svg" alt=""></div></div>
         </div>
         <div class="acc-item">
-          <button class="acc-head"><span class="name">守得住 · 三级安全防护墙</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>参数边界、耦合一致性、执行确认三级防护 +「自动/建议」双模协作——机器给建议、人做决定，决策权始终在工程师手中。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-碳素流守恒审计.svg" alt=""></div></div>
+          <button class="acc-head"><span class="name">守得住 · 三级安全防护</span><span class="pm"></span></button>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>参数边界、耦合一致性、执行确认三级防护 +「自动/建议」双模——机器给建议，人做决定。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-碳素流守恒审计.svg" alt=""></div></div>
         </div>
         <div class="acc-item">
-          <button class="acc-head"><span class="name">会汇报 · 行情感知与智能报告</span><span class="pm"></span></button>
-          <div class="acc-body"><div class="inner"><div class="txt"><p>碳价与原料价格每日自动更新、趋势智能预测；能耗与碳排盘点报告自动生成，一键导出 PDF / Word / Excel / PPT。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-碳核算报告.svg" alt=""></div></div>
+          <button class="acc-head"><span class="name">会汇报 · 行情感知与报告</span><span class="pm"></span></button>
+          <div class="acc-body"><div class="inner"><div class="txt"><p>碳价与原料价格每日更新、趋势预测；盘点报告自动生成，一键导出 PDF / Word / Excel / PPT。</p></div><img class="shot" src="assets/工业能碳智控平台-电脑框-碳核算报告.svg" alt=""></div></div>
         </div>
       </div>
     </div>
@@ -629,21 +571,21 @@ footer ul a:hover{color:#fff}
         <h2 class="h2">网络研讨会</h2>
         <div class="res-cards">
           <div class="res-card">
-            <div class="res-thumb" style="background:#2a302b"><svg viewBox="0 0 24 24" fill="none" stroke="#ffb71b" stroke-width="1.6" stroke-linecap="round"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
+            <div class="res-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="#33415c" stroke-width="1.6" stroke-linecap="round"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
             <div class="res-body">
               <div class="cat">网络研讨会</div>
-              <h4>15 分钟看懂：能碳仿真如何落地（以钢铁长流程为例）</h4>
-              <p>全流程数字孪生搭建与三账合一核算的完整路径，同样的方法适用于水泥、化工、有色等行业。</p>
-              <a class="tlink" href="#res-root">查看网络研讨会 <span class="arr">▸</span></a>
+              <h4>15 分钟看懂能碳仿真落地（钢铁长流程为例）</h4>
+              <p>全流程数字孪生与三账合一核算路径，水泥、化工、有色同法复用。</p>
+              <a class="tlink" href="#res-root">查看 <span class="arr">▸</span></a>
             </div>
           </div>
           <div class="res-card">
-            <div class="res-thumb" style="background:#2a302b"><svg viewBox="0 0 24 24" fill="none" stroke="#ffb71b" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
+            <div class="res-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="#33415c" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
             <div class="res-body">
               <div class="cat">网络研讨会</div>
-              <h4>「感知—寻优—执行」：能碳闭环的实战拆解</h4>
-              <p>三级安全防护墙与自动/建议双模协作机制的设计逻辑。</p>
-              <a class="tlink" href="#res-root">查看网络研讨会 <span class="arr">▸</span></a>
+              <h4>「感知—寻优—执行」能碳闭环实战拆解</h4>
+              <p>三级防护与自动/建议双模协作的设计逻辑。</p>
+              <a class="tlink" href="#res-root">查看 <span class="arr">▸</span></a>
             </div>
           </div>
         </div>
@@ -653,21 +595,21 @@ footer ul a:hover{color:#fff}
         <h2 class="h2">文章</h2>
         <div class="res-cards">
           <div class="res-card">
-            <div class="res-thumb" style="background:#2a302b"><svg viewBox="0 0 24 24" fill="none" stroke="#ffb71b" stroke-width="1.6" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/></svg></div>
+            <div class="res-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="#33415c" stroke-width="1.6" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/></svg></div>
             <div class="res-body">
               <div class="cat">文章</div>
-              <h4>节能减排与降本增效，从来不是二选一</h4>
-              <p>节能减碳空间藏在日常运行的「细枝末节」里——靠算法调度，把能耗和碳排「挤」出来。</p>
-              <a class="tlink" href="#res-root">阅读文章 <span class="arr">▸</span></a>
+              <h4>节能减排与降本增效不是二选一</h4>
+              <p>算法调度，把能耗和碳排「挤」出来。</p>
+              <a class="tlink" href="#res-root">阅读 <span class="arr">▸</span></a>
             </div>
           </div>
           <div class="res-card">
-            <div class="res-thumb" style="background:#2a302b"><svg viewBox="0 0 24 24" fill="none" stroke="#ffb71b" stroke-width="1.6" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/></svg></div>
+            <div class="res-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="#33415c" stroke-width="1.6" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/></svg></div>
             <div class="res-body">
               <div class="cat">文章</div>
-              <h4>一套平台、服务全行业：从钢铁到水泥化工有色</h4>
-              <p>面向全国碳市场四大重点控排行业，每个行业、每个工序都有专属算法。</p>
-              <a class="tlink" href="#res-root">阅读文章 <span class="arr">▸</span></a>
+              <h4>一套平台服务全行业</h4>
+              <p>面向四大控排行业，每行业、每工序都有专属算法。</p>
+              <a class="tlink" href="#res-root">阅读 <span class="arr">▸</span></a>
             </div>
           </div>
         </div>
@@ -682,20 +624,20 @@ footer ul a:hover{color:#fff}
   <div class="wrap">
     <div class="cta-grid">
       <div class="cta-left">
-        <h2>准备好开始了吗？</h2>
-        <p>如果您面临节能降碳挑战，我们的团队随时为您提供帮助。</p>
-        <a class="btn" href="#cta" style="font-size:1.4rem;padding:1.3rem 3rem">联系我们 <span class="arr">▸</span></a>
+        <h2>开始您的能碳优化</h2>
+        <p>面临节能降碳挑战？专家团队随时待命。</p>
+        <a class="btn" href="tel:15963564658" style="font-size:1.4rem;padding:1.3rem 3rem">15963564658（微信） <span class="arr">▸</span></a>
       </div>
       <div class="cta-steps">
         <div class="cta-step">
           <h4>预约产品演示</h4>
-          <p>与能碳专家交流，探讨平台如何落地到您的实际生产。</p>
-          <a class="step-link" href="#cta">开始咨询 <span class="arr">▸</span></a>
+          <p>与能碳专家交流，添加微信即可预约。</p>
+          <a class="step-link" href="#cta">添加微信预约 <span class="arr">▸</span></a>
         </div>
         <div class="cta-step">
           <h4>订阅最新动态</h4>
-          <p>获取平台更新、行业洞察与降碳实践资讯。</p>
-          <a class="step-link" href="#cta">订阅 <span class="arr">▸</span></a>
+          <p>添加微信获取平台更新与行业洞察。</p>
+          <a class="step-link" href="#cta">添加微信订阅 <span class="arr">▸</span></a>
         </div>
       </div>
     </div>
@@ -711,18 +653,18 @@ footer ul a:hover{color:#fff}
           <h5>产品</h5>
           <ul>
             <li><a href="#ov-vision" data-tab="0">平台愿景</a></li>
-            <li><a href="#ov-products" data-tab="0">产品模块</a></li>
-            <li><a href="#ov-tech" data-tab="0">前沿技术</a></li>
-            <li><a href="#cap-features" data-tab="1">八大能力</a></li>
-            <li><a href="#cta" data-tab="0">免费试用</a></li>
+            <li><a href="#ov-products" data-tab="0">方案组件</a></li>
+            <li><a href="#ov-tech" data-tab="0">解决方案</a></li>
+            <li><a href="#cap-features" data-tab="1">核心能力</a></li>
+            <li><a href="#cta">免费试用</a></li>
           </ul>
         </div>
         <div>
           <h5>支持</h5>
           <ul>
             <li><a href="#ov-faq" data-tab="0">常见问题</a></li>
-            <li><a href="#cta" data-tab="0">客户中心</a></li>
-            <li><a href="#cta" data-tab="0">平台支持</a></li>
+            <li><a href="#ov-faq" data-tab="0">客户中心</a></li>
+            <li><a href="#ov-faq" data-tab="0">平台支持</a></li>
           </ul>
         </div>
         <div>
@@ -735,14 +677,13 @@ footer ul a:hover{color:#fff}
         <div>
           <h5>关于</h5>
           <ul>
-            <li><a href="#cta" data-tab="0">联系我们</a></li>
+            <li><a href="#cta">联系我们</a></li>
             <li><a href="#cta" data-tab="0">加入我们</a></li>
             <li><a href="#cta" data-tab="0">新闻中心</a></li>
           </ul>
         </div>
       </div>
       <div class="foot-cta">
-        <a class="btn-outline" href="#cta" data-tab="0">了解更多关于我们的产品？ <span class="arr">▸</span></a>
         <div class="foot-social">
           <span class="soc" title="微博">微博</span>
           <span class="soc" title="知乎">知乎</span>
@@ -753,12 +694,10 @@ footer ul a:hover{color:#fff}
       </div>
     </div>
     <div class="foot-bottom">
-      <span>Copyright © 2026 工业能碳智控平台 · 海颐智能 · v2.0.0</span>
+      <span>© 2026 海颐·能优算 · 工业能碳智控平台</span>
       <div class="legal">
         <a href="#site-footer">法律声明</a>
         <a href="#site-footer">隐私声明</a>
-        <a href="#site-footer">Cookie 政策</a>
-        <a href="#site-footer">出口合规性</a>
         <a href="#site-footer">条款和条件</a>
         <a href="#site-footer">站点地图</a>
       </div>
@@ -844,10 +783,10 @@ document.addEventListener('click', function(e){
       index.push({el:card, pi:pi, title:title, text:card.textContent.replace(/\s+/g,' ').trim(), type:type});
     });
   }
-  collect('.prod-card','产品模块');
-  collect('.vision-card','平台愿景');
-  collect('.tech-item','前沿技术');
-  collect('.acc-item','八大能力');
+  collect('.prod-card','方案构成');
+  collect('.vision-lead','平台愿景');
+  collect('.prod-card','一站式方案');
+  collect('.acc-item','核心能力');
   collect('.res-card','资源');
   collect('.faq-item','常见问题');
 
@@ -894,24 +833,33 @@ document.addEventListener('click', function(e){
   input.addEventListener('keydown', function(e){ if(e.key==='Enter') run(this.value); });
 })();
 
-/* 下滑压缩页眉；选项卡 sticky 吸顶（文档流内自然粘住），触顶后压缩为半高 */
+/* 下滑压缩页眉；选项卡 sticky 吸顶（rAF 节流 + 缓存测量 + 边界缓冲，避免滚动卡顿） */
 var heroTabsEl = document.querySelector('.hero-tabs');
 var heroEl = document.querySelector('.hero');
-/* 把选项卡负边距精确设为自身高度，使 Hero 黑色背景覆盖到按钮下沿、与之齐平；
-   仅在高度变化时写入，避免每帧重排以及吸顶临界点的来回抖动 */
 var _lastTabH = 0;
 function syncTabMargin(){
   var h = heroTabsEl.offsetHeight;
   if(h !== _lastTabH){ heroTabsEl.style.marginTop = (-h) + 'px'; _lastTabH = h; }
 }
-function heroBottom(){ return heroEl.offsetTop + heroEl.offsetHeight; }
+function measure(){
+  _heroBottom = heroEl.offsetTop + heroEl.offsetHeight;
+  _stuckTop = parseFloat(getComputedStyle(heroTabsEl).top) || 0;
+}
+var _heroBottom = 0, _stuckTop = 0, _ticking = false, _compacted = false;
+measure();
 syncTabMargin();
-window.addEventListener('resize', syncTabMargin);
+window.addEventListener('resize', function(){ measure(); syncTabMargin(); });
 window.addEventListener('scroll', function(){
-  document.body.classList.toggle('compact', window.scrollY > 80);
-  /* 吸顶阈值 = Hero 底边 - sticky top（top 跟随流式页眉半高 var(--hhc)，从计算样式读取，不硬编码） */
-  var stuckTop = parseFloat(getComputedStyle(heroTabsEl).top) || 0;
-  heroTabsEl.classList.toggle('stuck', (window.scrollY + stuckTop) >= heroBottom());
+  if(_ticking) return;
+  _ticking = true;
+  requestAnimationFrame(function(){
+    var y = window.scrollY;
+    if(y > 120 && !_compacted){ _compacted = true; document.body.classList.add('compact'); }
+    else if(y < 60 && _compacted){ _compacted = false; document.body.classList.remove('compact'); }
+    var stuck = (y + _stuckTop) >= (_heroBottom + 4);
+    if(stuck !== heroTabsEl.classList.contains('stuck')) heroTabsEl.classList.toggle('stuck', stuck);
+    _ticking = false;
+  });
 }, {passive:true});
 
 /* 带 data-tab 的链接：先切 Tab 再锚定 */

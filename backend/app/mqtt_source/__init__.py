@@ -15,8 +15,8 @@
 """
 from __future__ import annotations
 
-# 状态与基础设施（先初始化 _shared，再导入子模块）
-from . import _shared
+# 状态与基础设施（先初始化 _shared，再导入子模块；_shared 同时作为包属性被外部引用）
+from . import _shared  # noqa: F401
 from ._shared import (BOX_APP_EVENTS, BOX_DEVICES_FILE, BOX_SERVICES,
                       BROKER_STATS, CLOUD_DEVICES, CONFIG_DIR, CONFIG_PATH,
                       DEFAULT_CFG, GC_TTL, LINKS_FILE, MESSAGE_LOG,

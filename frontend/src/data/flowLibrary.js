@@ -1334,7 +1334,7 @@ export function treeLayoutNodes(nodes, connections, opts = {}) {
 // 参数键 → 中文业务标签（单一来源：PROCESS_TEMPLATES 的 params）。
 // 用于「耦合透明度」等场景，把英文参数键（如 wind_rate）显示为业务标签（如 风量），
 // 避免在 UI 直接暴露英文键名。复合耦合目标键（如 coal_inj/coke_rate）单独补充。
-export const PARAM_LABELS = (() => {
+const PARAM_LABELS = (() => {
   const m = {}
   for (const p of PROCESS_TEMPLATES) {
     for (const pr of (p.params || [])) m[pr.key] = pr.label

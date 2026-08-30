@@ -23,8 +23,11 @@
       <!-- 策略详情（点击左侧「策略 → 自定义」） -->
       <StrategyDetailPanel v-else-if="mode === 'strategyDetail'" />
 
-      <!-- 编辑态：流程编排属性；非编辑态下点击小组/工艺节点也展示其编排属性 -->
-      <FlowInspector v-else-if="store.editMode || store.selectedGroupId || store.selectedFlowId" />
+      <!-- 编辑态：流程编排属性面板；非编辑态下点击工艺节点也展示其编排属性 -->
+      <FlowInspector v-else-if="store.editMode || store.selectedFlowId" />
+
+      <!-- 数字孪生（非编辑态）点击小组：数值展示型小组属性面板（成员工艺列表 + 实测值） -->
+      <GroupDetail v-else-if="store.selectedGroupId" />
 
       <!-- 总览（模块可上下拖拽重排，顺序/折叠状态持久化） -->
       <template v-else-if="mode === 'overview'">
@@ -124,6 +127,7 @@ const AgentChatView = defineAsyncComponent(() => import('../views/AgentChatView.
 import UnitCarbonDetail from './UnitCarbonDetail.vue'
 import DeviceDetail from './DeviceDetail.vue'
 import FlowInspector from './FlowInspector.vue'
+import GroupDetail from './GroupDetail.vue'
 import MaterialInspector from './MaterialInspector.vue'
 import CollapseSection from './CollapseSection.vue'
 import StrategyDetailPanel from './StrategyDetailPanel.vue'

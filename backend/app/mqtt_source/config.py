@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from . import _shared
 from ._shared import (CLOUD_DEVICES, READINGS, RUNTIME_CONFIG_PATH, _LOCK,

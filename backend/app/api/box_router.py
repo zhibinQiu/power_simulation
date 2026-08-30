@@ -302,9 +302,11 @@ def box_cloud_config():
 def box_cloud_config_update(req: BoxCloudConfigRequest):
     """保存云端 agent 连接配置（持久化到 box_devices.json 顶层 cloud，前端「总览 → 配置」）。"""
     try:
-        return box_console.update_cloud_config(req.model_dump())
+        result = box_console.update_cloud_config(req.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    cloud_agent.invalidate_cfg()  # 配置已变更，立即失效 agent_cfg 读盘缓存
+    return result
 
 
 @router.get("/box/cloud/agent/status")

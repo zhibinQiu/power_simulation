@@ -143,10 +143,7 @@ def delete_strategy(sid: str):
 def apply_strategy(sid: str, model: ProcessModel = Body(...),
                    factors: Optional[Dict[str, Any]] = Body(None)):
     """将已保存策略应用到当前流程。前端以 JSON body 提交 {model, factors}。"""
-    result = strategy_service.apply_to(sid, model, factors)
-    if "error" in result:
-        return result
-    return result
+    return strategy_service.apply_to(sid, model, factors)
 
 
 # ------------------------- 求解 / 分析能力（守恒审计） -------------------------

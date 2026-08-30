@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 
 from fastapi import APIRouter
 
@@ -27,12 +28,28 @@ _DEFAULT_CLOUD_HOST = "172.19.134.45"
 _DEFAULT_PUBLIC_HOST = os.getenv("DOCS_PUBLIC_HOST", "").strip() or "36.151.146.71"
 
 
+# 文档站对外地址缓存（60s TTL）：地址不常变，避免每次请求重复读盘解析。
+_cloud_host_cache = ""
+_cloud_host_ts = 0.0
+_HOST_TTL = 60.0
+
+
 def cloud_host() -> str:
-    """返回文档站对外访问地址。
+    """返回文档站对外访问地址（TTL 缓存）。
 
     文档站经 frp 隧道暴露公网，跳转链接固定使用公网地址（DOCS_PUBLIC_HOST
     优先，默认 36.151.146.71），不再使用云端内网 IP。
     """
+    global _cloud_host_cache, _cloud_host_ts
+    now = time.monotonic()
+    if _cloud_host_cache and now - _cloud_host_ts < _HOST_TTL:
+        return _cloud_host_cache
+    _cloud_host_cache = _resolve_cloud_host()
+    _cloud_host_ts = now
+    return _cloud_host_cache
+
+
+def _resolve_cloud_host() -> str:
     public = os.getenv("DOCS_PUBLIC_HOST", "").strip() or _DEFAULT_PUBLIC_HOST
     if public:
         return public

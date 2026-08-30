@@ -10,7 +10,7 @@
 - 注册 CORS 与各域路由
 - 挂载实时遥测（WebSocket，见 realtime.py）
 - 托管前端构建产物（SPA 回退）
-- 启动实时数据源（MQTT 订阅）与设备历史预填
+- lifespan 内启动实时数据源（MQTT 订阅）与设备历史预填
 
 迁移某业务域时，只需整体搬走对应 api/*_router.py 及其依赖模块，无需改动本文件。
 """
@@ -40,9 +40,24 @@ from .api.settings_router import router as settings_router
 
 
 async def _lifespan(app):
-    """应用生命周期：启动时后台初始化 Skills（内置 + 连接第三方 MCP server）。"""
+    """应用生命周期：后台初始化 Skills（内置 + MCP）+ 启动 MQTT 实时数据源 + 设备历史预填。
+
+    启动副作用统一收敛于此：import 模块不再产生任何副作用（组合根纯装配），
+    便于测试与工具脚本安全导入。
+    """
     from .skills.registry import init_registry
+
     init_registry(connect_mcp=True)
+    # 启动实时数据源（MQTT 订阅，参照参考项目 yunduan1 数据链路）：
+    # 后台线程连接云端 MQTT Broker 订阅主题（Broker 配置前端化：能碳一体机管理 -> 总览 -> 配置 Broker，
+    # 保存后热更新重连并持久化到 box_config.json），设备读数一律来自该真实数据源。
+    mqtt_source.start()
+    # 启动时为默认流程按 MQTT 真实读数预填设备历史（未上报的设备保持为空，不生成模拟数据）
+    try:
+        realtime.seed_history(presets.default_model())
+    except Exception as _e:  # pragma: no cover
+        # 预填失败不打印到命令行，改为前端弹窗通知（前端连接后可见）
+        realtime.manager.notify("warn", "设备历史预填未完成", f"启动时按 MQTT 实时读数预填设备历史失败：{_e}")
     yield
 
 app = FastAPI(title="工业能碳智控平台", version="2.0.0", lifespan=_lifespan)
@@ -103,18 +118,8 @@ if os.path.isdir(FRONTEND_DIST):
         return {"detail": "frontend not built"}
 
 
-# 启动实时数据源（MQTT 订阅，参照参考项目 yunduan1 数据链路）：
-# 后台线程连接云端 MQTT Broker 订阅主题（Broker 配置前端化：能碳一体机管理 -> 总览 -> 配置 Broker，
-# 保存后热更新重连并持久化到 box_config.json），设备读数一律来自该真实数据源。
-mqtt_source.start()
-
-# 启动时为默认流程按 MQTT 真实读数预填设备历史（未上报的设备保持为空，不生成模拟数据）
-try:
-    realtime.seed_history(presets.default_model())
-except Exception as _e:  # pragma: no cover
-    # 预填失败不打印到命令行，改为前端弹窗通知（前端连接后可见）
-    realtime.manager.notify("warn", "设备历史预填未完成", f"启动时按 MQTT 实时读数预填设备历史失败：{_e}")
-
+# 启动实时数据源（MQTT 订阅）与设备历史预填已移入 _lifespan，
+# import 本模块不再产生启动副作用，保证组合根纯装配。
 
 if __name__ == "__main__":
     import uvicorn

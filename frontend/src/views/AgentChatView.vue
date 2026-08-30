@@ -44,7 +44,7 @@
         </div>
         <div class="agent-inputbox">
           <div class="ai-inputrow">
-            <button class="ai-plus" :class="{ on: pickOpen }" :title="t('添加智能体 / 技能')" @click="togglePick($event)">＋</button>
+            <button class="ai-plus" :class="{ on: pickOpen }" :title="t('添加智能体 / 技能')" @click="togglePick($event)"></button>
             <textarea
               ref="idleInput"
               v-model="input"
@@ -106,7 +106,7 @@
       <div class="ac-inputbar">
         <div class="agent-inputbox">
           <div class="ai-inputrow">
-            <button class="ai-plus" :class="{ on: pickOpen }" :title="t('添加智能体 / 技能')" @click="togglePick($event)">＋</button>
+            <button class="ai-plus" :class="{ on: pickOpen }" :title="t('添加智能体 / 技能')" @click="togglePick($event)"></button>
             <textarea
               ref="chatInput"
               v-model="input"
@@ -1057,6 +1057,9 @@ export default {
 /* 聚焦时保持中性边框，不出现主题色描边 */
 .agent-inputbox:focus-within { border-color: var(--border); box-shadow: 0 1px 8px rgba(0, 0, 0, .08); }
 .ai-inputrow { display: flex; align-items: flex-end; gap: 8px; }
+/* 空闲态（初始输入框）更高、更醒目 */
+.agent-idle .agent-inputbox { padding: 12px 10px 12px 16px; }
+.agent-idle .ai-textarea { min-height: 50px; font-size: 15px; }
 .ai-textarea {
   flex: 1;
   border: none;
@@ -1087,24 +1090,33 @@ export default {
 .ai-send svg { width: 16px; height: 16px; }
 .ai-send:hover:not(:disabled) { background: var(--accent-d); }
 .ai-send:disabled { background: var(--border); cursor: not-allowed; }
-/* 加号按钮：弹出智能体/技能菜单 */
+/* 加号按钮：纯加号（伪元素十字），点击旋转 45° 变 × */
 .ai-plus {
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: 22px;
+  height: 22px;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px dashed var(--border);
-  border-radius: 8px;
-  background: var(--panel);
+  border: none;
+  background: transparent;
   color: var(--muted);
-  font-size: 16px;
-  line-height: 1;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all .15s;
+  transition: color .15s, background .15s;
 }
-.ai-plus:hover, .ai-plus.on { border-color: var(--accent-d); color: var(--accent-d); background: var(--accent-l); }
+.ai-plus::before, .ai-plus::after {
+  content: '';
+  position: absolute;
+  background: currentColor;
+  border-radius: 2px;
+  transition: transform .2s ease;
+}
+.ai-plus::before { width: 12px; height: 2px; }
+.ai-plus::after { width: 2px; height: 12px; }
+.ai-plus:hover, .ai-plus.on { color: var(--accent-d); background: var(--accent-l); }
+.ai-plus.on::before, .ai-plus.on::after { transform: rotate(45deg); }
 /* 底部行：当前智能体标签（点击可切换） */
 .ai-bottomrow {
   display: flex;

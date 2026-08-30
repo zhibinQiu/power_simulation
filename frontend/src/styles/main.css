@@ -1,55 +1,55 @@
 :root {
-  /* ===== 高绩效 HMI（ISA-101）· 门户「黄黑」品牌基因 =====
-     配色与字体参考 platform/homePage 门户（主黄 #FFB71B / 深黑 #171917 / 墨色 #151617），
+  /* ===== 高绩效 HMI（ISA-101）· 门户「冷白」品牌基因 =====
+     配色与字体参考 platform/homePage 门户（冷白 #F4F6F9 / 深蓝黑 #0F172A / 科技蓝 #2563EB），
      遵循 Siemens / Rockwell / PTC 工业设计系统原则（统一设计语言 + 动效与声音反馈）：
-     1. 浅灰底避免纯白眩光，靠背景明度分层而非边框线；边框细、线最少
+     1. 冷白底避免暖白/米黄，靠背景明度分层而非边框线；边框细、线最少
      2. 品牌黄仅用于「行动」语义（主按钮/选中/进度条/关键数值，黄底墨字）；
         状态色仅做语义（绿=正常 · 琥珀=警告 · 红=报警 · 青=信息），与品牌黄区分明度
      3. 字体：标题 Montserrat + 正文 Source Sans Pro（门户同款），中文回退 PingFang/YaHei
      4. 几何简约：弱阴影、小圆角、无渐变无毛玻璃、无装饰性元素      */
-  --bg: #F1F0EC;            /* 应用背景（ISA-101 灰白，暖调对齐门户白底） */
-  --panel: #FFFFFF;         /* 面板（白） */
-  --panel-2: #F6F5F1;       /* 二级面板底（暖浅灰） */
-  --panel-3: #EBEAE5;       /* 三级/分区条底 */
-  --bar: #F8F7F4;           /* 工具条底 */
-  --bar-d: #EFEEE9;         /* 菜单条底（比工具条深一档，用于深浅分层） */
-  --border: #D3D0C6;        /* 边框/分隔线（细、中性暖灰，比背景深一档，强光下分层清晰） */
-  --line: #D3D0C6;
-  --text: #23231F;          /* 主文字（门户墨色 #151617 提亮，保留暖调） */
-  --muted: #6B6A62;         /* 次要文字 */
-  --faint: #98978E;         /* 更弱文字 */
+  --bg: #EDF1F6;            /* 应用背景（冷白，金属质感，对齐门户浅蓝灰底 #F4F6F9） */
+  --panel: #FFFFFF;         /* 面板（纯白） */
+  --panel-2: #F4F7FA;       /* 二级面板底（冷浅灰） */
+  --panel-3: #E8EDF3;       /* 三级/分区条底 */
+  --bar: #F7FAFC;           /* 工具条底 */
+  --bar-d: #EDF1F6;         /* 菜单条底（比工具条深一档，用于深浅分层） */
+  --border: #D5DBE3;        /* 边框/分隔线（细、中性冷灰，比背景深一档，强光下分层清晰） */
+  --line: #D5DBE3;
+  --text: #1F2937;          /* 主文字（门户冷墨色，蓝灰调） */
+  --muted: #6B7280;         /* 次要文字 */
+  --faint: #98A2B3;         /* 更弱文字 */
   --accent: #F0A500;        /* 品牌黄（门户主色）：主按钮/选中/进度条/关键数值 */
   --accent-d: #A87200;      /* 深黄（文字强调/激活，浅底可读） */
   --accent-h: #D18F00;      /* 悬停底（黄底按钮 hover 变暗一档） */
-  --accent2: #6B6759;       /* 次级中性暖石板（图标/次要标识，冷静工业感） */
+  --accent2: #7A8699;       /* 次级中性冷石板（图标/次要标识，冷静金属感） */
   --accent-l: rgba(240,165,0,.14);   /* 浅黄底（选中行/分区底/悬停） */
-  --sel: #F3E4C0;           /* 列表选中行底（浅黄） */
-  --on-accent: #151617;     /* 黄底上的文字（门户墨色，黄底墨字） */
+  --sel: #E2EAF3;           /* 列表选中行底（冷蓝灰浅底，对齐门户科技蓝低饱和） */
+  --on-accent: #151617;     /* 黄底上的文字（黄底墨字） */
   --green: #2E8B57;         /* 正常/直接排放（ISA-101 绿=正常，仅状态语义） */
   --yellow: #A8811A;        /* 警告/范围二（ISA-101 黄=警告，橄榄琥珀与品牌金拉开区分） */
   --red: #BC3B30;           /* 报警/危险（ISA-101 红=报警） */
   --orange: #A85E2A;        /* 赭橙（范围一/未连接） */
-  --rail: #171917;          /* 深色面（门户 header 黑：toast/3D 降级/状态栏/顶栏） */
+  --rail: #0F172A;          /* 深色面（门户 header 深蓝黑：toast/3D 降级/状态栏/顶栏） */
   /* 顶栏 / 底栏：白天模式亮色（可由用户切换夜间模式，.app.sim-dark 覆盖为深色） */
-  --topbar-bg: #EFEEE9;             /* 菜单条底（比工具条深一档，亮色分层） */
-  --topbar-fg: #23231F;             /* 顶栏主文字 */
-  --topbar-fg-mute: #4A4942;        /* 顶栏次级文字（菜单项/快捷按钮） */
-  --topbar-hover-bg: rgba(0,0,0,.08);
-  --topbar-hover-fg: #171917;
-  --topbar-line: rgba(0,0,0,.12);   /* 顶栏底边线 */
-  --topbar-sep: rgba(0,0,0,.18);    /* 顶栏内分隔竖线 */
-  --sb-bg: #EFEEE9;                 /* 底栏背景（与顶栏同色系） */
-  --sb-fg: #4A4942;                 /* 底栏主文字 */
-  --sb-fg-strong: #23231F;
-  --sb-fg-faint: #98978E;
-  --sb-hover-bg: rgba(0,0,0,.06);
-  --sb-open-bg: rgba(0,0,0,.10);
-  --sb-line: rgba(0,0,0,.12);       /* 底栏分隔线/顶边线 */
-  --sb-icon: #3A3A34;               /* 底栏图标 */
+  --topbar-bg: #EDF1F6;             /* 菜单条底（比工具条深一档，亮色分层） */
+  --topbar-fg: #232A35;             /* 顶栏主文字 */
+  --topbar-fg-mute: #4A5568;        /* 顶栏次级文字（菜单项/快捷按钮） */
+  --topbar-hover-bg: rgba(15,23,42,.08);
+  --topbar-hover-fg: #0F172A;
+  --topbar-line: rgba(15,23,42,.12);   /* 顶栏底边线 */
+  --topbar-sep: rgba(15,23,42,.18);    /* 顶栏内分隔竖线 */
+  --sb-bg: #EDF1F6;                 /* 底栏背景（与顶栏同色系） */
+  --sb-fg: #4A5568;                 /* 底栏主文字 */
+  --sb-fg-strong: #232A35;
+  --sb-fg-faint: #98A2B3;
+  --sb-hover-bg: rgba(15,23,42,.06);
+  --sb-open-bg: rgba(15,23,42,.10);
+  --sb-line: rgba(15,23,42,.12);       /* 底栏分隔线/顶边线 */
+  --sb-icon: #3D4A5C;               /* 底栏图标 */
   --sb-ok: #1E7B4F;                 /* 底栏语义色（亮底可读的深色版本） */
   --sb-err: #B3372B;
   --sb-warn: #8F6509;
-  --feed-init: #B9B8B0;             /* 底栏数据源「连接中」圆点 */
+  --feed-init: #AEB8C6;             /* 底栏数据源「连接中」圆点 */
   --gas: #35808F;           /* 气体/能源管道（沉静青） */
   --ok: #2E8B57;            /* 通用「正常/通过」状态色 */
   --warn: #8F6509;          /* 通用「提醒/提示」文字色 */
@@ -70,35 +70,35 @@
   --sp-hint: 8px;       /* 提示文字与上方元素的间距 */
 }
 
-/* ===== 仿真模式 · 夜间主题（门户「暖炭黑 + 主黄」品牌基因，覆盖全部 CSS 变量） =====
-   与门户 header 深黑 #171917 / 主黄 #FFB71B / 墨色 #151617 保持一致：
-   炭黑面保留暖调（非蓝黑），黄做主行动色，状态色仅做语义，明度分层靠色阶而非描边 */
+/* ===== 仿真模式 · 夜间主题（门户「冷蓝黑 + 主黄」品牌基因，覆盖全部 CSS 变量） =====
+   与门户 header 深蓝黑 #0F172A / 主黄 #FFB71B 保持一致：
+   冷蓝黑面保留金属感（非暖炭黑），黄做主行动色，状态色仅做语义，明度分层靠色阶而非描边 */
 .app.sim-dark {
-  --bg: #171917;            /* 应用背景：门户 header 黑（暖炭黑） */
-  --panel: #1E211E;         /* 面板（炭黑） */
-  --panel-2: #262A26;       /* 二级面板底 */
-  --panel-3: #2E332E;       /* 三级/分区条底 */
-  --bar: #1B1E1B;           /* 工具条底 */
-  --bar-d: #141614;         /* 菜单条底 */
-  --border: #383D37;        /* 边框/分隔线（暖灰，克制） */
-  --line: #383D37;
-  --text: #ECEAE4;          /* 主文字（暖白，避免纯蓝白） */
-  --muted: #A6A49C;         /* 次要文字 */
-  --faint: #75746C;         /* 更弱文字 */
+  --bg: #141A26;            /* 应用背景：门户 header 深蓝黑（冷蓝黑） */
+  --panel: #1B2230;         /* 面板（深蓝灰） */
+  --panel-2: #212A3A;       /* 二级面板底 */
+  --panel-3: #28313F;       /* 三级/分区条底 */
+  --bar: #171E2B;           /* 工具条底 */
+  --bar-d: #111722;         /* 菜单条底 */
+  --border: #334052;        /* 边框/分隔线（冷灰，克制） */
+  --line: #334052;
+  --text: #E8ECF2;          /* 主文字（冷白，蓝灰调） */
+  --muted: #9AA6B8;         /* 次要文字 */
+  --faint: #6E7A8E;         /* 更弱文字 */
   --accent: #F5A90A;        /* 门户主金（降荧光更克制）：主按钮/选中/进度条/关键数值 */
   --accent-d: #E8A000;      /* 深金（文字强调，黑底可读） */
   --accent-h: #DB9200;      /* 悬停底 */
-  --accent2: #C9B37A;
+  --accent2: #9AA7B8;
   --accent-l: rgba(245,169,10,.15);   /* 浅金底 */
-  --sel: #3A2F10;           /* 列表选中行底（暗黄） */
+  --sel: #232F45;           /* 列表选中行底（暗蓝灰） */
   --on-accent: #151617;     /* 金底墨字 */
   --green: #43C98B;
   --yellow: #C9A02C;        /* 警告/范围二（橄榄琥珀，与品牌金拉开色相明度区分） */
   --red: #E86666;
   --orange: #DE8A4A;
-  --rail: #111311;          /* 深色面（比背景更深一档） */
+  --rail: #0F1520;          /* 深色面（比背景更深一档） */
   /* 顶栏 / 底栏：夜间模式深色（覆盖白天亮色变量） */
-  --topbar-bg: #171917;
+  --topbar-bg: #141A26;
   --topbar-fg: rgba(255,255,255,.92);
   --topbar-fg-mute: rgba(255,255,255,.88);
   --topbar-hover-bg: rgba(255,255,255,.14);
@@ -124,55 +124,55 @@
   --warn-b: rgba(201,160,44,.28);
   --purple: #A78BFA;
 
-  /* 属性面板风格（门户炭黑玻璃：比面板更深一档） */
-  --input: #111411;        /* 输入框底色（比面板更深） */
-  --sec-bg: #1E211E;       /* section 标题底 */
-  --sec-bg-o: #262B26;     /* section 展开时底 */
-  --sec-line: #383D37;     /* section 边框 / 分割线 */
+  /* 属性面板风格（门户深蓝黑玻璃：比面板更深一档） */
+  --input: #0E1420;        /* 输入框底色（比面板更深） */
+  --sec-bg: #1B2230;       /* section 标题底 */
+  --sec-bg-o: #222B3C;     /* section 展开时底 */
+  --sec-line: #334052;     /* section 边框 / 分割线 */
 
   --shadow: 0 1px 2px rgba(0,0,0,.45), 0 6px 18px rgba(0,0,0,.40);
 }
-/* 仿真模式：对少数硬编码浅色的兜底修补（门户暖炭黑 / 主黄） */
-.app.sim-dark .menu-drop { background: #1E211E; border-color: #383D37; box-shadow: var(--shadow); }
+/* 仿真模式：对少数硬编码浅色的兜底修补（门户冷蓝黑 / 主黄） */
+.app.sim-dark .menu-drop { background: #1B2230; border-color: #334052; box-shadow: var(--shadow); }
 .app.sim-dark .menu-drop .mi:hover { background: var(--accent-l); }
-.app.sim-dark .ribbon { background: #1E211E; }
-.app.sim-dark .cmdwin { background: #171A17; }
-.app.sim-dark .cmd-input-row { background: #171A17; }
-.app.sim-dark .tab.active { background: #1E211E; }
-.app.sim-dark .sidebar-head, .app.sim-dark .inspector-head { background: #1E211E; }
+.app.sim-dark .ribbon { background: #1B2230; }
+.app.sim-dark .cmdwin { background: #131A26; }
+.app.sim-dark .cmd-input-row { background: #131A26; }
+.app.sim-dark .tab.active { background: #1B2230; }
+.app.sim-dark .sidebar-head, .app.sim-dark .inspector-head { background: #1B2230; }
 .app.sim-dark .cmd-log { color: #fff; background: var(--panel); }  /* 仿真模式下日志字体统一白色 */
 .app.sim-dark .cmd-log .ln, .app.sim-dark .cmd-log .ln.cmd, .app.sim-dark .cmd-log .ln.guide,
 .app.sim-dark .cmd-log .ln.err, .app.sim-dark .cmd-log .ln.bot { color: #fff; }
 .app.sim-dark .cmd-log .ln.cmd::before, .app.sim-dark .cmd-log .ln.bot::before { color: #fff; }
 .app.sim-dark input[type="range"] { accent-color: var(--accent-d); }
-/* 输入框：门户炭黑玻璃感（比面板更深） */
+/* 输入框：门户深蓝黑玻璃感（比面板更深） */
 .app.sim-dark .num, .app.sim-dark .num-input {
   background: var(--input);
-  border-color: #31362F;
+  border-color: #3A475C;
   color: var(--text);
 }
 .app.sim-dark .num:focus, .app.sim-dark .num-input:focus {
-  background: #10130F;
+  background: #0E1420;
   border-color: var(--accent-d);
   box-shadow: 0 0 0 1px rgba(245,169,10,.28);
 }
 .app.sim-dark select {
   background-color: var(--input);
-  border-color: #31362F;
+  border-color: #3A475C;
   color: var(--text);
 }
-.app.sim-dark .pv-cell .pv-tag { border-color: #31362F; }
+.app.sim-dark .pv-cell .pv-tag { border-color: #3A475C; }
 .app.sim-dark .pv-cell .pv-x { color: #F08585; background: rgba(240,133,133,.14); }
 .app.sim-dark .pv-cell .pv-y { color: #8FCE6E; background: rgba(143,206,110,.14); }
 .app.sim-dark .pv-cell .pv-z { color: #5FB6C9; background: rgba(95,182,201,.14); }
-.app.sim-dark .pv-cell .pv-btn { background: #242824; border-color: #31362F; color: #A6A49C; }
+.app.sim-dark .pv-cell .pv-btn { background: #222B3C; border-color: #3A475C; color: #9AA6B8; }
 .app.sim-dark .pv-cell .pv-btn:hover { background: rgba(245,169,10,.18); color: #FFC42E; }
-.app.sim-dark .tiny-btn { background: transparent; border-color: #31362F; color: #A6A49C; }
-.app.sim-dark .tiny-btn:hover { background: rgba(245,169,10,.18); color: #ECEAE4; border-color: var(--accent-d); }
-.app.sim-dark .sub-label { color: #A6A49C; }
+.app.sim-dark .tiny-btn { background: transparent; border-color: #3A475C; color: #9AA6B8; }
+.app.sim-dark .tiny-btn:hover { background: rgba(245,169,10,.18); color: #E8ECF2; border-color: var(--accent-d); }
+.app.sim-dark .sub-label { color: #9AA6B8; }
 .app.sim-dark .sub-label::before { background: var(--accent); opacity: .75; }
-.app.sim-dark .chip2 { background: #242824; border-color: #383D37; }
-.app.sim-dark .note-box { background: transparent; border: none; color: #8F928A; }
+.app.sim-dark .chip2 { background: #222B3C; border-color: #334052; }
+.app.sim-dark .note-box { background: transparent; border: none; color: #8C97A8; }
 * { box-sizing: border-box; }
 html, body, #app { height: 100%; margin: 0; overflow: hidden; }
 body {
@@ -483,8 +483,8 @@ body.panel-dragging .app { transition: none; }
 .inspector .insp-title { font-size: 13px; color: var(--text); font-weight: 600; letter-spacing: .2px; }
 
 /* —— 暗黑仿真模式属性面板 ——：深色玻璃沉浸感 */
-.app.sim-dark .inspector { background: #1E211E; }
-.app.sim-dark .inspector-head { background: #1E211E; border-bottom-color: #31362F; }
+.app.sim-dark .inspector { background: #1B2230; }
+.app.sim-dark .inspector-head { background: #1B2230; border-bottom-color: #3A475C; }
 
 /* 左侧面板 Tab 条（VS Code 编辑器 tab 风格：激活白底 + 顶部主题色指示条） */
 .tabbar { display: flex; border-bottom: 1px solid var(--border); flex: 0 0 auto; background: var(--panel-2); }
@@ -691,7 +691,7 @@ body.panel-dragging .app { transition: none; }
 .notif-list { max-height: 300px; overflow-y: auto; padding: 4px; }
 .notif-list::-webkit-scrollbar { width: 8px; }
 .notif-list::-webkit-scrollbar-thumb { background: #c3d0dc; border-radius: 4px; }
-.app.sim-dark .notif-list::-webkit-scrollbar-thumb { background: #383D37; }
+.app.sim-dark .notif-list::-webkit-scrollbar-thumb { background: #334052; }
 .ntf-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 10px; color: var(--faint); }
 .ntf-empty svg { width: 26px; height: 26px; fill: currentColor; opacity: .55; }
 .ntf-item { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 5px; cursor: default;
@@ -727,15 +727,15 @@ input[type='checkbox'], input[type='radio'] { width: auto; padding: 0; border: n
 select:focus, input:focus, textarea:focus { outline: none; border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent-l); }
 textarea { resize: vertical; font-family: inherit; min-height: 56px; }
 .app.sim-dark select, .app.sim-dark input, .app.sim-dark textarea {
-  background: var(--input, #111411);
-  border-color: #31362F;
+  background: var(--input, #0E1420);
+  border-color: #3A475C;
   color: var(--text);
 }
 .app.sim-dark select:focus, .app.sim-dark input:focus, .app.sim-dark textarea:focus {
   border-color: var(--accent-d);
   box-shadow: 0 0 0 1px rgba(245,169,10,.28);
 }
-.app.sim-dark .sec { color: #A6A49C; }
+.app.sim-dark .sec { color: #9AA6B8; }
 .app.sim-dark .sec::before { background: var(--accent); opacity: .75; }
 .app.sim-dark .card { background: transparent; border: none; }
 
@@ -1198,10 +1198,10 @@ input[type=range]::-moz-range-thumb { width: 11px; height: 11px; background: var
 /* ============ Toast / 场景降级 ============ */
 .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--rail); color: #EAF1F7;
   padding: 9px 16px; border-radius: 4px; z-index: 200; font-size: 12px; box-shadow: var(--shadow); max-width: 80vw; }
-.scene-fallback { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); padding: 30px; text-align: center; background: #141612; }
-.scene-fallback .fb-title { font-size: 14px; color: #ECEAE4; }
+.scene-fallback { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); padding: 30px; text-align: center; background: #101623; }
+.scene-fallback .fb-title { font-size: 14px; color: #E8ECF2; }
 .scene-fallback .fb-msg { font-size: 12px; color: #7FC4D4; max-width: 520px; word-break: break-word; }
-.scene-fallback .fb-hint { font-size: 12px; color: #8F928A; max-width: 480px; }
+.scene-fallback .fb-hint { font-size: 12px; color: #8C97A8; max-width: 480px; }
 .scene-fallback .fb-retry { margin-top: 6px; padding: 6px 18px; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); border-radius: 4px; cursor: pointer; font-size: 12px; }
 .scene-fallback .fb-retry:hover { background: var(--accent-h); border-color: var(--accent-h); }
 
@@ -1219,7 +1219,7 @@ input[type=range]::-moz-range-thumb { width: 11px; height: 11px; background: var
 .cmd-log::-webkit-scrollbar-thumb, .ribbon-body::-webkit-scrollbar-thumb { background: #c3d0dc; border-radius: 4px; }
 .cmd-log::-webkit-scrollbar-track { background: transparent; }
 .app.sim-dark .panel-scroll ::-webkit-scrollbar-thumb,
-.app.sim-dark .cmd-log::-webkit-scrollbar-thumb, .app.sim-dark .ribbon-body::-webkit-scrollbar-thumb { background: #383D37; }
+.app.sim-dark .cmd-log::-webkit-scrollbar-thumb, .app.sim-dark .ribbon-body::-webkit-scrollbar-thumb { background: #334052; }
 
 /* ============ 交互动画（统一、克制：淡入/弹入/滑入） ============ */
 /* 用法：在要过渡的单个根元素外包 <transition name="fade|pop|slide">，元素需带 v-if */

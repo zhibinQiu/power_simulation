@@ -11,6 +11,8 @@
 - GET    /api/knowledge/doc/{id}/content  文档 Markdown 内容
 - GET    /api/knowledge/doc/{id}/raw      原始文件下载
 - GET    /api/knowledge/search            全文检索 ?q=
+
+返回值统一为 dict，由 FastAPI 自动 JSON 序列化。
 """
 from __future__ import annotations
 
@@ -18,39 +20,35 @@ import os
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 
 from ..services import knowledge_service as kb
 
 router = APIRouter(prefix='/api/knowledge', tags=['knowledge'])
 
 
-def _json(payload: dict) -> JSONResponse:
-    return JSONResponse(payload)
-
-
 @router.get('/tree')
 def tree():
-    return _json(kb.list_tree())
+    return kb.list_tree()
 
 
 @router.post('/folder')
 def create_folder(body: dict):
     name = str(body.get('name', '')).strip()
     parent = str(body.get('parent', '') or '').strip()
-    return _json(kb.create_folder(name, parent))
+    return kb.create_folder(name, parent)
 
 
 @router.put('/folder')
 def rename_folder(body: dict):
     path = str(body.get('path', '') or '').strip()
     name = str(body.get('name', '')).strip()
-    return _json(kb.rename_folder(path, name))
+    return kb.rename_folder(path, name)
 
 
 @router.delete('/folder')
 def delete_folder(path: str):
-    return _json(kb.delete_folder(path or ''))
+    return kb.delete_folder(path or '')
 
 
 @router.post('/upload')
@@ -58,25 +56,25 @@ async def upload(file: UploadFile = File(...), folder: str = Form('')):
     try:
         data = await file.read()
     except Exception as e:
-        return _json({'ok': False, 'error': f'读取上传文件失败：{e}'})
+        return {'ok': False, 'error': f'读取上传文件失败：{e}'}
     if not data:
-        return _json({'ok': False, 'error': '文件内容为空'})
-    return _json(kb.upload(file.filename or '未命名', data, folder or ''))
+        return {'ok': False, 'error': '文件内容为空'}
+    return kb.upload(file.filename or '未命名', data, folder or '')
 
 
 @router.put('/doc/{doc_id}')
 def rename_doc(doc_id: str, body: dict):
-    return _json(kb.rename_doc(doc_id, str(body.get('name', '')).strip()))
+    return kb.rename_doc(doc_id, str(body.get('name', '')).strip())
 
 
 @router.delete('/doc/{doc_id}')
 def delete_doc(doc_id: str):
-    return _json(kb.delete_doc(doc_id))
+    return kb.delete_doc(doc_id)
 
 
 @router.get('/doc/{doc_id}/content')
 def doc_content(doc_id: str):
-    return _json(kb.doc_content(doc_id))
+    return kb.doc_content(doc_id)
 
 
 @router.get('/doc/{doc_id}/raw')
@@ -95,4 +93,4 @@ def doc_raw(doc_id: str):
 
 @router.get('/search')
 def search(q: Optional[str] = ''):
-    return _json(kb.search(q or ''))
+    return kb.search(q or '')
