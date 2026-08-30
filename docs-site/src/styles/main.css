@@ -1,12 +1,82 @@
+/* ===== 能碳一体机 · 文档中心 =====
+   风格对齐平台 frontend（ISA-101 高绩效 HMI · 门户「冷白」品牌基因）：
+   冷白底 #EDF1F6 · 面板纯白 · 科技蓝 #2F6FED（平台默认主题色，仅「行动」语义）
+   顶栏/底栏白天模式亮色（对齐平台 --topbar-*）· 金属质感：冷灰层次 + 细边框 + 弱阴影 + 几何直角（3px 圆角）· 无渐变无毛玻璃 */
 :root {
-  --bg: #f4f6f9;
-  --panel: #ffffff;
-  --ink: #1f2937;
-  --muted: #6b7280;
-  --line: #e5e7eb;
-  --accent: #2563eb;
-  --nav-bg: #0f172a;
-  --nav-ink: #e2e8f0;
+  --bg: #EDF1F6;            /* 应用背景（冷白，金属质感，对齐平台 --bg） */
+  --panel: #FFFFFF;         /* 面板（纯白） */
+  --panel-2: #F4F7FA;       /* 二级面板底（冷浅灰） */
+  --panel-3: #E8EDF3;       /* 三级/分区条底 */
+  --bar: #F7FAFC;           /* 工具条底 */
+  --border: #D5DBE3;        /* 边框/分隔线（细、中性冷灰） */
+  --line: #D5DBE3;
+  --text: #1F2937;          /* 主文字（冷墨色，蓝灰调） */
+  --muted: #6B7280;         /* 次要文字 */
+  --faint: #98A2B3;         /* 更弱文字 */
+  /* 科技蓝（平台默认主题色，与 frontend .app[data-accent="blue"] 一致） */
+  --accent: #2F6FED;        /* 主色：主按钮/选中/进度条/关键数值 */
+  --accent-d: #1E4FAD;      /* 深蓝（文字强调/激活，浅底可读） */
+  --accent-h: #275FD2;      /* 悬停底 */
+  --accent-l: rgba(47,111,237,.14);   /* 浅蓝底（选中行/悬停） */
+  --accent2: #6E86B8;       /* 辅助蓝（冷石板蓝） */
+  --on-accent: #FFFFFF;     /* 蓝底上的文字（蓝底白字） */
+  --sel: #DCE6FA;           /* 列表选中行底（浅蓝） */
+  --rail: #0F172A;          /* 深色面（代码块/回顶按钮：深蓝黑） */
+  --rail-2: #1E293B;        /* 深色面次级（代码块边框分层） */
+  --green: #2E8B57;         /* 正常（状态语义） */
+  --red: #BC3B30;           /* 报警 */
+  --orange: #A85E2A;        /* 赭橙 */
+  --purple: #6B5BD2;        /* 紫色点缀（AI 标记等非语义） */
+  --gas: #35808F;           /* 沉静青 */
+  --shadow: 0 1px 2px rgba(0,0,0,.10);   /* 包豪斯：单层弱阴影 */
+  --radius: 3px;            /* 全局统一圆角（几何直角感） */
+  --mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, "Cascadia Code", "JetBrains Mono", "Courier New", monospace;
+  --ui: "Source Sans Pro", "Helvetica Neue", Helvetica, Arial, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --head: "Montserrat", "Source Sans Pro", "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+
+  /* 顶栏 / 底栏：白天模式亮色（对齐平台 --topbar-*，冷白分层） */
+  --nav-bg: #EDF1F6;
+  --nav-ink: #232A35;              /* 顶栏主文字 */
+  --nav-mute: #4A5568;             /* 顶栏次级文字（菜单项/快捷按钮） */
+  --nav-hover: rgba(15,23,42,.08); /* 悬停高亮 */
+  --nav-line: rgba(15,23,42,.12);  /* 底边线 */
+}
+
+/* ===== 夜间模式（平台 sim-dark 同款冷蓝黑，覆盖全部变量） ===== */
+body.dark {
+  --bg: #141A26;
+  --panel: #1B2230;
+  --panel-2: #212A3A;
+  --panel-3: #28313F;
+  --bar: #171E2B;
+  --border: #334052;
+  --line: #334052;
+  --text: #E8ECF2;
+  --muted: #9AA6B8;
+  --faint: #6E7A8E;
+  /* 科技蓝（夜间模式，与平台 sim-dark blue 一致） */
+  --accent: #5B8DEF;
+  --accent-d: #8FB4F5;
+  --accent-h: #4A7DE6;
+  --accent-l: rgba(91,141,239,.18);
+  --accent2: #9FB6DC;
+  --on-accent: #0B1220;
+  --sel: #1E2C4A;
+  --rail: #0F1520;
+  --rail-2: #111722;
+  --green: #43C98B;
+  --red: #E86666;
+  --orange: #DE8A4A;
+  --purple: #A78BFA;
+  --gas: #3FC0D4;
+  --shadow: 0 1px 2px rgba(0,0,0,.45), 0 6px 18px rgba(0,0,0,.40);
+
+  /* 顶栏 / 底栏：夜间模式深蓝黑（对齐平台 sim-dark topbar） */
+  --nav-bg: #141A26;
+  --nav-ink: rgba(255,255,255,.92);
+  --nav-mute: rgba(255,255,255,.88);
+  --nav-hover: rgba(255,255,255,.14);
+  --nav-line: rgba(255,255,255,.08);
 }
 
 * {
@@ -21,12 +91,12 @@ body {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  color: var(--ink);
+  font-family: var(--ui);
+  color: var(--text);
   background: var(--bg);
   font-size: 15px;
   line-height: 1.7;
+  transition: background .25s, color .25s;
 }
 
 #app,
@@ -36,16 +106,18 @@ body {
   flex-direction: column;
 }
 
-/* ---------- 顶部导航 ---------- */
+/* ---------- 顶部导航（深蓝黑，对齐平台门户 header） ---------- */
 .topbar {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 22px;
   padding: 0 24px;
-  height: 56px;
+  height: 54px;
   background: var(--nav-bg);
   color: var(--nav-ink);
   flex: none;
+  border-bottom: 1px solid var(--nav-line);
+  transition: background .25s;
 }
 
 .brand {
@@ -59,61 +131,93 @@ body {
 .brand-badge {
   width: 30px;
   height: 30px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #06b6d4, #3b82f6);
-  color: #fff;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--head);
   font-size: 13px;
   font-weight: 700;
+  letter-spacing: 1px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .brand-name {
-  font-size: 16px;
+  font-family: var(--head);
+  font-size: 15px;
   font-weight: 600;
-  color: #fff;
+  letter-spacing: .3px;
 }
 
 .nav {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   flex: 1;
 }
 
 .nav a {
-  color: #cbd5e1;
+  color: var(--nav-mute);
   text-decoration: none;
   padding: 6px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   font-size: 14px;
-  transition: background 0.15s, color 0.15s;
+  transition: background .15s, color .15s;
 }
 
 .nav a:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  background: var(--nav-hover);
+  color: var(--nav-ink);
 }
 
 .nav a.active {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  background: var(--accent);
+  color: var(--on-accent);
   font-weight: 600;
 }
 
 .topbar .back-platform {
-  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  color: var(--on-accent);
   text-decoration: none;
   font-size: 13px;
-  padding: 6px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  transition: all 0.15s;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: var(--radius);
+  transition: background .15s;
+  white-space: nowrap;
 }
 
 .topbar .back-platform:hover {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.5);
+  background: var(--accent-h);
+}
+
+/* 明暗切换按钮 */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--nav-line);
+  color: var(--nav-mute);
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.theme-toggle:hover {
+  background: var(--nav-hover);
+  color: var(--nav-ink);
+}
+
+.theme-toggle svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* ---------- 主区域 ---------- */
@@ -127,40 +231,38 @@ body {
 .home {
   min-height: 100%;
   overflow: auto;
-  background:
-    radial-gradient(800px 400px at 20% 0%, rgba(59, 130, 246, 0.12), transparent 60%),
-    radial-gradient(700px 380px at 85% 10%, rgba(6, 182, 212, 0.1), transparent 60%),
-    var(--bg);
+  background: var(--bg);
+  transition: background .25s;
 }
 
 .hero {
   max-width: 900px;
   margin: 0 auto;
-  padding: 72px 24px 36px;
+  padding: 64px 24px 32px;
   text-align: center;
 }
 
 .hero h1 {
-  font-size: 34px;
-  font-weight: 800;
+  font-family: var(--head);
+  font-size: 32px;
+  font-weight: 700;
   letter-spacing: 1px;
-  background: linear-gradient(120deg, #0f172a 20%, #3b82f6 60%, #06b6d4 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--rail);
+  transition: color .25s;
 }
 
+body.dark .hero h1 { color: var(--text); }
+
 .hero h1 .hero-ver {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 600;
   letter-spacing: 0;
   vertical-align: middle;
-  margin-left: 6px;
-  color: #e8590c;
-  -webkit-text-fill-color: currentColor;
-  background: none;
-  -webkit-background-clip: initial;
-  background-clip: initial;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .hero p {
@@ -169,23 +271,24 @@ body {
   font-size: 16px;
 }
 
+/* ---------- 文档入口卡片 ---------- */
 .cards {
   max-width: 960px;
   margin: 0 auto;
-  padding: 24px 24px 80px;
+  padding: 28px 24px 72px;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 20px;
+  gap: 16px;
 }
 
 .card {
-  --accent: #2563eb;
   background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 24px 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px 20px 20px;
   cursor: pointer;
-  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+  box-shadow: var(--shadow);
+  transition: transform .18s, box-shadow .18s, border-color .18s;
   position: relative;
   overflow: hidden;
 }
@@ -195,27 +298,29 @@ body {
   position: absolute;
   inset: 0 auto auto 0;
   width: 100%;
-  height: 4px;
+  height: 3px;
   background: var(--accent);
 }
 
 .card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.1);
-  border-color: var(--accent);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, .12);
+  border-color: var(--accent-d);
 }
 
 .card-num {
-  font-size: 13px;
+  font-family: var(--mono);
+  font-size: 12px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--faint);
   letter-spacing: 2px;
 }
 
 .card h2 {
   margin-top: 10px;
-  font-size: 20px;
-  font-weight: 700;
+  font-family: var(--head);
+  font-size: 19px;
+  font-weight: 600;
 }
 
 .card p {
@@ -228,59 +333,69 @@ body {
 .card-go {
   display: inline-block;
   margin-top: 14px;
-  color: var(--accent);
-  font-size: 14px;
+  color: var(--accent-d);
+  font-size: 13px;
   font-weight: 600;
 }
 
-/* ---------- 愿景板块 ---------- */
+.card:hover .card-go {
+  color: var(--accent);
+}
+
+/* ---------- 板块标题 ---------- */
 .block-title {
-  font-size: 24px;
-  font-weight: 800;
+  font-family: var(--head);
+  font-size: 22px;
+  font-weight: 600;
   text-align: center;
-  color: var(--nav-bg);
+  color: var(--text);
 }
 
 .block-sub {
   text-align: center;
   color: var(--muted);
-  margin: 8px 0 24px;
+  margin: 8px 0 22px;
+  font-size: 14px;
 }
 
+/* ---------- 愿景板块 ---------- */
 .vision {
   max-width: 960px;
   margin: 0 auto;
-  padding: 44px 24px 8px;
+  padding: 36px 24px 8px;
 }
 
 .vision-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 18px;
+  gap: 14px;
 }
 
 .vision-card {
-  background: linear-gradient(165deg, #ffffff 0%, #f0fdf4 100%);
-  border: 1px solid #d1fae5;
-  border-radius: 14px;
-  padding: 22px 22px 20px;
-  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 18px 18px 16px;
+  box-shadow: var(--shadow);
+  transition: transform .18s, box-shadow .18s, border-color .18s;
 }
 
 .vision-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 26px rgba(16, 185, 129, 0.12);
-  border-color: #6ee7b7;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, .12);
+  border-color: var(--accent-d);
 }
 
 .vision-tag {
-  display: inline-block;
-  font-size: 19px;
-  font-weight: 800;
-  color: #047857;
+  display: block;
+  font-family: var(--head);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--accent-d);
   padding-bottom: 8px;
-  margin-bottom: 10px;
-  border-bottom: 3px solid #34d399;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
 }
 
 .vision-card p {
@@ -292,33 +407,35 @@ body {
 .tech {
   max-width: 960px;
   margin: 0 auto;
-  padding: 40px 24px 8px;
+  padding: 34px 24px 8px;
 }
 
 .tech-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .tech-item {
   background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 16px 18px;
-  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  transition: transform .18s, box-shadow .18s, border-color .18s;
 }
 
 .tech-item:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
-  border-color: #06b6d4;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, .10);
+  border-color: var(--accent-d);
 }
 
 .tech-item h3 {
-  font-size: 15px;
-  font-weight: 700;
-  color: #0e7490;
+  font-family: var(--head);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .tech-item p {
@@ -331,24 +448,24 @@ body {
 .doc {
   display: flex;
   height: 100%;
-  --accent: #2563eb;
 }
 
 .toc {
   width: 264px;
   flex: none;
   overflow-y: auto;
-  background: #fbfcfe;
-  border-right: 1px solid var(--line);
-  padding: 18px 12px 40px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 16px 12px 40px;
 }
 
 .toc-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--nav-bg);
+  font-family: var(--head);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
   padding: 4px 12px 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border);
   margin-bottom: 10px;
 }
 
@@ -362,28 +479,33 @@ body {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  color: #374151;
+  padding: 7px 12px;
+  border-radius: var(--radius);
+  color: var(--muted);
   text-decoration: none;
   font-size: 13.5px;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
+  transition: background .12s, color .12s;
 }
 
 .toc-list a:hover {
-  background: #eef2f7;
+  background: var(--panel-3);
+  color: var(--text);
 }
 
 .toc-list a.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
+  font-weight: 600;
 }
 
+.toc-list a.active .toc-no { color: inherit; }
+
 .toc-no {
+  font-family: var(--mono);
   font-size: 11px;
-  font-weight: 700;
-  opacity: 0.65;
+  font-weight: 600;
+  opacity: .55;
   min-width: 16px;
 }
 
@@ -396,22 +518,23 @@ body {
 .doc-body {
   max-width: 860px;
   margin: 0 auto;
-  padding: 32px 44px 90px;
+  padding: 28px 44px 80px;
 }
 
 .doc-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 26px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--line);
+  margin-bottom: 22px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
 }
 
 .doc-head h1 {
-  font-size: 26px;
-  font-weight: 800;
-  color: var(--nav-bg);
+  font-family: var(--head);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .back-link {
@@ -419,18 +542,19 @@ body {
   text-decoration: none;
   font-size: 13px;
   padding: 6px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   white-space: nowrap;
+  transition: color .15s, border-color .15s;
 }
 
 .back-link:hover {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--accent-d);
+  border-color: var(--accent-d);
 }
 
 .doc-section {
-  margin-bottom: 40px;
+  margin-bottom: 36px;
   scroll-margin-top: 16px;
 }
 
@@ -438,20 +562,22 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 20px;
-  font-weight: 700;
+  font-family: var(--head);
+  font-size: 19px;
+  font-weight: 600;
   margin-bottom: 14px;
-  color: var(--nav-bg);
+  color: var(--text);
 }
 
 .sec-badge {
   width: 26px;
   height: 26px;
   flex: none;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--accent);
-  color: #fff;
-  font-size: 13px;
+  color: var(--on-accent);
+  font-family: var(--mono);
+  font-size: 12px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -460,11 +586,11 @@ body {
 
 .doc-end {
   text-align: center;
-  color: var(--muted);
+  color: var(--faint);
   font-size: 13px;
-  margin-top: 60px;
-  border-top: 1px dashed var(--line);
-  padding-top: 24px;
+  margin-top: 56px;
+  border-top: 1px dashed var(--border);
+  padding-top: 22px;
 }
 
 .to-top {
@@ -472,18 +598,20 @@ body {
   left: 100%;
   bottom: 24px;
   margin-right: 24px;
-  background: var(--nav-bg);
+  background: var(--rail);
   color: #fff;
   border: none;
-  border-radius: 20px;
+  border-radius: var(--radius);
   padding: 8px 16px;
   font-size: 13px;
   cursor: pointer;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
+  box-shadow: var(--shadow);
+  transition: background .15s;
 }
 
 .to-top:hover {
-  background: var(--accent);
+  background: var(--accent-h);
+  color: var(--on-accent);
 }
 
 /* ---------- Markdown 内容样式 ---------- */
@@ -491,15 +619,15 @@ body {
 .doc-md h2,
 .doc-md h3,
 .doc-md h4 {
-  color: var(--nav-bg);
+  color: var(--text);
   margin: 22px 0 10px;
   line-height: 1.4;
 }
 
-.doc-md h1 { font-size: 24px; }
-.doc-md h2 { font-size: 20px; }
-.doc-md h3 { font-size: 17px; }
-.doc-md h4 { font-size: 15px; }
+.doc-md h1 { font-family: var(--head); font-size: 22px; }
+.doc-md h2 { font-family: var(--head); font-size: 19px; }
+.doc-md h3 { font-family: var(--head); font-size: 16px; }
+.doc-md h4 { font-family: var(--head); font-size: 15px; }
 
 .doc-md p {
   margin: 10px 0;
@@ -516,23 +644,27 @@ body {
 }
 
 .doc-md strong {
-  color: var(--nav-bg);
+  color: var(--text);
+  font-weight: 600;
 }
 
 .doc-md code {
-  background: #eef1f5;
-  border-radius: 5px;
+  background: var(--panel-3);
+  border-radius: 3px;
   padding: 2px 6px;
-  font-family: 'SF Mono', Consolas, Menlo, monospace;
+  font-family: var(--mono);
   font-size: 13px;
-  color: #b45309;
+  color: var(--accent-d);
 }
 
+body.dark .doc-md code { color: var(--accent); }
+
 .doc-md pre.rp-code {
-  background: #0f172a;
-  color: #e2e8f0;
-  border-radius: 10px;
-  padding: 16px 18px;
+  background: var(--rail);
+  color: #E2E8F0;
+  border: 1px solid var(--rail-2);
+  border-radius: var(--radius);
+  padding: 14px 16px;
   overflow-x: auto;
   margin: 14px 0;
   line-height: 1.55;
@@ -546,12 +678,12 @@ body {
 }
 
 .doc-md blockquote {
-  border-left: 4px solid var(--accent);
-  background: #f8fafc;
+  border-left: 3px solid var(--accent);
+  background: var(--panel-2);
   padding: 10px 16px;
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
   margin: 14px 0;
-  color: #334155;
+  color: var(--muted);
 }
 
 .doc-md table {
@@ -559,39 +691,45 @@ body {
   border-collapse: collapse;
   margin: 14px 0;
   font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 
 .doc-md th,
 .doc-md td {
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   padding: 8px 12px;
   text-align: left;
 }
 
 .doc-md th {
-  background: #f1f5f9;
-  font-weight: 700;
-  color: var(--nav-bg);
+  background: var(--panel-3);
+  font-weight: 600;
+  color: var(--text);
+  font-family: var(--head);
+  font-size: 13.5px;
 }
 
 .doc-md tr:nth-child(even) td {
-  background: #fafbfc;
+  background: var(--panel-2);
 }
 
 .doc-md hr {
   border: none;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border);
   margin: 20px 0;
 }
 
-/* ---------- 页脚 ---------- */
+/* ---------- 页脚（深蓝黑） ---------- */
 .foot {
   flex: none;
   text-align: center;
-  color: #94a3b8;
+  color: var(--nav-mute);
   font-size: 12px;
   padding: 10px;
   background: var(--nav-bg);
+  border-top: 1px solid var(--nav-line);
 }
 
 /* ---------- 404 ---------- */
@@ -604,6 +742,29 @@ body {
   gap: 14px;
 }
 
+.notfound h2 {
+  font-family: var(--head);
+  color: var(--text);
+}
+
 .notfound a {
-  color: var(--accent);
+  color: var(--accent-d);
+}
+
+/* 滚动条：平台同款冷灰细滚动条 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #C3CBD6;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+body.dark ::-webkit-scrollbar-thumb {
+  background: #3A475C;
 }

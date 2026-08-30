@@ -1,0 +1,598 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5] [cursor=pointer]:
+      - generic [ref=e6]: 能碳
+      - generic [ref=e7]: 能碳一体机 · 文档中心
+    - navigation [ref=e8]:
+      - link "宣传手册" [ref=e9] [cursor=pointer]:
+        - /url: /promo
+      - link "使用手册" [ref=e10] [cursor=pointer]:
+        - /url: /manual
+      - link "技术文档" [ref=e11] [cursor=pointer]:
+        - /url: /tech
+    - button "日间" [active] [ref=e522] [cursor=pointer]
+    - link "首页" [ref=e16] [cursor=pointer]:
+      - /url: "#/"
+  - main [ref=e17]:
+    - generic [ref=e80]:
+      - complementary [ref=e81]:
+        - generic [ref=e82]: 宣传手册
+        - generic [ref=e83]:
+          - generic [ref=e84] [cursor=pointer]:
+            - generic [ref=e85]: "1"
+            - text: 平台简介与核心理念
+          - generic [ref=e86] [cursor=pointer]:
+            - generic [ref=e87]: "2"
+            - text: 能力全景（上）看得见 · 建得真 · 算得清
+          - generic [ref=e88] [cursor=pointer]:
+            - generic [ref=e89]: "3"
+            - text: 能力全景（中）推演得准 · 想得出 · 动得了
+          - generic [ref=e90] [cursor=pointer]:
+            - generic [ref=e91]: "4"
+            - text: 能力全景（下）守得住 · 会汇报
+          - generic [ref=e92] [cursor=pointer]:
+            - generic [ref=e93]: "5"
+            - text: 能碳一体机
+          - generic [ref=e94] [cursor=pointer]:
+            - generic [ref=e95]: "6"
+            - text: 多平台支持
+          - generic [ref=e96] [cursor=pointer]:
+            - generic [ref=e97]: "7"
+            - text: 控排企业的一天
+          - generic [ref=e98] [cursor=pointer]:
+            - generic [ref=e99]: "8"
+            - text: 持续进化的智能能力
+          - generic [ref=e100] [cursor=pointer]:
+            - generic [ref=e101]: "9"
+            - text: 设计愿景
+          - generic [ref=e102] [cursor=pointer]:
+            - generic [ref=e103]: "10"
+            - text: 为什么选择我们
+          - generic [ref=e104] [cursor=pointer]:
+            - generic [ref=e105]: "11"
+            - text: 结语
+      - generic [ref=e107]:
+        - heading "宣传手册" [level=1] [ref=e109]
+        - generic [ref=e110]:
+          - heading "1 平台简介与核心理念" [level=2] [ref=e111]:
+            - generic [ref=e112]: "1"
+            - text: 平台简介与核心理念
+          - generic [ref=e113]:
+            - heading "工业能碳智控平台 · 系统介绍（v2.0.0）" [level=1] [ref=e114]
+            - blockquote [ref=e115]:
+              - strong [ref=e116]: 给每座工厂派驻一位"工业级具身智能体"
+              - text: 它看得见现场、
+              - strong [ref=e117]: 懂能、懂碳、懂市场
+              - text: ——算得清能源账、碳账与成本账，想得出方案、动得了参数、写得好报告，24 小时在岗，为企业的节能降碳保驾护航。
+            - heading "一、核心理念：一位懂能、懂碳、懂市场的\"数字专家\"" [level=2] [ref=e118]
+            - heading "1. 工业级具身智能 —— 不只是\"会聊天\"的 AI" [level=3] [ref=e119]
+            - paragraph [ref=e120]:
+              - text: 人工智能正在发生深刻变革：AI 不再只是"会聊天、能对话"的软件，而是进化出了
+              - strong [ref=e121]: 感知、认知、决策、行动
+              - text: 的完整能力——它看得见、想得到、更做得出，这就是前沿的"具身智能"。
+            - paragraph [ref=e122]:
+              - strong [ref=e123]: 工业级具身智能，就是把这样的智能体派驻到您的工厂。
+              - text: 过去，节能减排靠老师傅的经验、靠外请专家诊断、靠反复试验摸索；现在，平台将工厂"全要素数字化"后，AI 智能体便有了一个可以持续感知和行动的"身体"，成为工厂里"24 小时在岗的数字专家"。
+            - paragraph [ref=e124]:
+              - text: 这位数字专家与众不同之处在于——它
+              - strong [ref=e125]: 不是只盯着碳
+              - text: ，而是同时长着三双眼睛：
+            - table [ref=e126]:
+              - rowgroup [ref=e127]:
+                - row [ref=e128]:
+                  - columnheader "洞察维度" [ref=e129]
+                  - columnheader "关注什么" [ref=e130]
+                  - columnheader "行业场景（以钢铁为例）" [ref=e131]
+              - rowgroup [ref=e132]:
+                - row [ref=e133]:
+                  - cell [ref=e134]:
+                    - strong [ref=e135]: 懂能
+                  - cell "能源消耗、能效水平" [ref=e136]
+                  - cell "每吨产品烧了多少电、多少煤气、多少燃料（吨钢、吨熟料……），能效哪里还有空间" [ref=e137]
+                - row [ref=e138]:
+                  - cell [ref=e139]:
+                    - strong [ref=e140]: 懂碳
+                  - cell "碳排放、碳强度" [ref=e141]
+                  - cell "每道工序排了多少碳，全厂一本明白账，控排履约有底气" [ref=e142]
+                - row [ref=e143]:
+                  - cell [ref=e144]:
+                    - strong [ref=e145]: 懂市场
+                  - cell "碳价、原料价、行业资讯" [ref=e146]
+                  - cell "碳配额什么价、焦煤什么价、政策有什么新动向，决策有依据" [ref=e147]
+            - heading "2. 云边协同 —— \"就近感知、云端思考\"的分工合作" [level=3] [ref=e148]
+            - paragraph [ref=e149]:
+              - text: 要让数字专家足够聪明、反应足够快，平台采用了一套聪明的分工方式——
+              - strong [ref=e150]: 云边协同
+              - text: ：
+            - list [ref=e151]:
+              - listitem [ref=e152]:
+                - strong [ref=e153]: 厂里放一个"耳朵"（能碳一体机）
+                - text: ：部署在工厂现场，就近收集能源、生产、计量各类数据，随采随算，网络波动也不影响数据采集；
+              - listitem [ref=e154]:
+                - strong [ref=e155]: 云端有一颗"大脑"（平台系统）
+                - text: ：汇聚全厂数据，负责深度的核算、推演、学习与思考，越用越聪明；
+              - listitem [ref=e156]:
+                - strong [ref=e157]: 两边默契配合
+                - text: ：现场数据源源不断传上云端，云端智慧随时下发指导，一台数字专家、两处协同工作。
+            - blockquote [ref=e158]:
+              - text: 简单说：
+              - strong [ref=e159]: 现场的事，就近办；深度的事，云端想——反应快，还不丢数据，两全其美。
+        - generic [ref=e160]:
+          - heading "2 能力全景（上）看得见 · 建得真 · 算得清" [level=2] [ref=e161]:
+            - generic [ref=e162]: "2"
+            - text: 能力全景（上）看得见 · 建得真 · 算得清
+          - generic [ref=e163]:
+            - heading "二、它能做什么：八大能力" [level=2] [ref=e164]
+            - heading "1. 看得见 —— 把整座工厂\"搬\"进电脑" [level=3] [ref=e165]
+            - list [ref=e166]:
+              - listitem [ref=e167]: 钢铁的烧结、焦化、高炉、转炉、连铸、轧钢，水泥的生料磨、回转窑、粉磨站，化工的反应、精制装置……20 多种工序设备按真实比例呈现在三维场景中，整条产线尽收眼底；
+              - listitem [ref=e168]: 想看哪道工序点哪里，物料怎么流动、能耗高低分布，用颜色就能看得清清楚楚；
+            - blockquote [ref=e169]:
+              - text: 不用进现场，也能随时掌握全厂的
+              - strong [ref=e170]: 能源消耗与碳排状况
+              - text: 。
+            - heading "2. 建得真 —— 工艺流程自己搭，设备信息自己配" [level=3] [ref=e171]
+            - paragraph [ref=e172]: 平台不仅预置了标准产线，更把"定义工厂"的能力交到企业自己手中：
+            - list [ref=e173]:
+              - listitem [ref=e174]:
+                - strong [ref=e175]: 工艺流程自己搭
+                - text: ：像搭积木一样，拖一拖、连一连，就能搭出企业真实的工艺流程——钢铁的原料、炼铁、炼钢到轧钢，水泥的生料、熟料到粉磨，流程怎么走，企业说了算；
+              - listitem [ref=e176]:
+                - strong [ref=e177]: 设备信息自己配
+                - text: ：每台设备的量程、运行范围、规模大小都可以按企业实际"量身定制"；
+              - listitem [ref=e178]:
+                - strong [ref=e179]: 改完马上生效
+                - text: ：流程搭好、设备配好，三维场景和仿真结果随即更新；
+              - listitem [ref=e180]:
+                - strong [ref=e181]: 上手无门槛
+                - text: ：内置行业模板一键载入，在模板基础上自由修改即可。
+            - blockquote [ref=e182]:
+              - text: 平台不替您决定工艺，而是把"定义工艺的能力"交给您——
+              - strong [ref=e183]: 一厂一策，千厂千面。
+            - heading "3. 算得清 —— 全厂一本\"能源账 + 碳账 + 成本账\"" [level=3] [ref=e184]
+            - list [ref=e185]:
+              - listitem [ref=e186]:
+                - strong [ref=e187]: 能源账
+                - text: ：从原料到成品，每道工序的电、气、煤、焦消耗自动汇总，全厂能耗一目了然，吨钢、吨熟料等单耗随手可查；
+              - listitem [ref=e188]:
+                - strong [ref=e189]: 碳账
+                - text: ：每道工序的碳排放自动核算，全厂碳排总量、单位产品碳强度（吨钢、吨熟料等）一键可得；
+              - listitem [ref=e190]:
+                - strong [ref=e191]: 成本账
+                - text: ：每次调整都同步估算成本变化——燃料、电力、物料省了多少，清清楚楚；
+              - listitem [ref=e192]:
+                - strong [ref=e193]: 账目可追溯
+                - text: ：每一笔能源、每一笔碳从哪来、到哪去，清清楚楚，经得起核查。
+            - blockquote [ref=e194]:
+              - text: 能、碳、钱三本账一起算——
+              - strong [ref=e195]: 能耗看得见、碳排算得明、成本省得着。
+        - generic [ref=e196]:
+          - heading "3 能力全景（中）推演得准 · 想得出 · 动得了" [level=2] [ref=e197]:
+            - generic [ref=e198]: "3"
+            - text: 能力全景（中）推演得准 · 想得出 · 动得了
+          - generic [ref=e199]:
+            - heading "4. 推演得准 —— 改参数之前，先\"预演\"一遍" [level=3] [ref=e200]
+            - list [ref=e201]:
+              - listitem [ref=e202]:
+                - strong [ref=e203]: 一键仿真
+                - text: ：输入工艺参数，平台立即算出对应的能耗、碳排与成本；
+              - listitem [ref=e204]:
+                - strong [ref=e205]: 零风险试错
+                - text: ：在仿真模式下随意调整、反复试算，改坏了也不影响真实数据，退出即还原；
+              - listitem [ref=e206]:
+                - strong [ref=e207]: 效果对比
+                - text: ：执行某项减排策略后，平台自动展示"改之前 vs 改之后"——能耗降多少、减排多少吨、降本多少元，一目了然。
+            - blockquote [ref=e208]: 每一项工艺调整，先看到结果再决定，不再"拍脑袋"。
+            - heading "5. 想得出 —— AI 当\"能碳参谋\"" [level=3] [ref=e209]
+            - list [ref=e210]:
+              - listitem [ref=e211]:
+                - strong [ref=e212]: 用大白话下指令
+                - text: ：像和人说话一样，输入
+                - strong [ref=e213]: "\"焦比降低 5%\""
+                - text: 、
+                - strong [ref=e214]: "\"提高喷煤量 10%\""
+                - text: （水泥行业则说
+                - strong [ref=e215]: "\"吨熟料煤耗降 3%\""
+                - text: ），AI 自动理解并转化为可执行的调整方案；
+              - listitem [ref=e216]:
+                - strong [ref=e217]: 一工序一模型，专门算法建模
+                - text: ：不是一套算法"包打天下"，而是
+                - strong [ref=e218]: 针对每一个工艺环节都建立了专门优化的 AI 算法模型
+                - text: ——高炉有高炉的焓平衡燃烧模型、烧结有烧结的工艺寻优、转炉有转炉的配比优化，水泥有水泥的窑炉热平衡模型、化工有化工的反应单元寻优……每个工序都有专属的"数字师傅"，用最贴合本工序机理的算法提供最专业的判断；
+              - listitem [ref=e219]:
+                - strong [ref=e220]: 会学习的优化引擎
+                - text: ：AI 持续学习工厂运行数据，自动寻找"既保产量、又降能耗、还省钱"的最优参数组合，越用越聪明；
+              - listitem [ref=e221]:
+                - strong [ref=e222]: 策略知识库
+                - text: ：内置成熟的节能降碳策略模板，企业自己的好做法也能保存成"自定义策略"，形成专属的能碳管理经验库。
+            - blockquote [ref=e223]: 企业降碳不再依赖个别专家，每个工序都有深耕本专业的"AI 数字师傅"。
+            - heading "6. 动得了 —— 从\"给建议\"到\"动手干\"" [level=3] [ref=e224]
+            - list [ref=e225]:
+              - listitem [ref=e226]:
+                - strong [ref=e227]: 智能自动控制
+                - text: ：优化模型找到更优参数后，在三级防护校验范围内自动下发到可调设备，形成"感知—寻优—执行"的智能闭环；
+              - listitem [ref=e228]:
+                - strong [ref=e229]: 一句话指挥仿真
+                - text: ：输入简单指令即可运行、停止仿真、切换视角，操控整个"数字工厂"；
+              - listitem [ref=e230]:
+                - strong [ref=e231]: 智能体仿真控制
+                - text: ：输入一句话，AI 自动完成"解析 → 确认 → 应用 → 对比"全流程，让"您说、它调、您验"成为现实。
+            - blockquote [ref=e232]: AI 不只给建议，还能动手干，节能减碳闭环真正跑起来。
+        - generic [ref=e233]:
+          - heading "4 能力全景（下）守得住 · 会汇报" [level=2] [ref=e234]:
+            - generic [ref=e235]: "4"
+            - text: 能力全景（下）守得住 · 会汇报
+          - generic [ref=e236]:
+            - heading "7. 守得住 —— AI 聪明，更要守规矩" [level=3] [ref=e237]
+            - paragraph [ref=e238]:
+              - text: 让 AI 自主行动，安全是第一位的。平台为智能体的每一个动作都装上了
+              - strong [ref=e239]: 三级防护
+              - text: ，确保它"有想法、更有分寸"：
+            - paragraph [ref=e240]:
+              - strong [ref=e241]: 第一级 · 参数边界防护
+            - list [ref=e242]:
+              - listitem [ref=e243]:
+                - text: 每一台设备、每一项可调参数都设有
+                - strong [ref=e244]: 安全运行区间
+                - text: （如温度、风量、配比的上下限）；
+              - listitem [ref=e245]:
+                - text: AI 的任何操作一旦触碰边界，立刻被拦截并提示，
+                - strong [ref=e246]: 绝不越雷池一步
+                - text: 。
+            - paragraph [ref=e247]:
+              - strong [ref=e248]: 第二级 · 耦合一致性防护
+            - list [ref=e249]:
+              - listitem [ref=e250]: 自动识别自相矛盾的操作组合（如"降温的同时却提高风温"），在源头上拦截不合理策略；
+              - listitem [ref=e251]: 多参数联动时自动校验相互影响，防止"按下葫芦浮起瓢"。
+            - paragraph [ref=e252]:
+              - strong [ref=e253]: 第三级 · 执行确认防护
+            - list [ref=e254]:
+              - listitem [ref=e255]:
+                - text: 关键操作必须
+                - strong [ref=e256]: 经工程师确认后方可执行
+                - text: ，全程操作留痕、可查可溯；
+              - listitem [ref=e257]: 每一步都"有人把关、有账可查"，即使出问题也能快速定位。
+            - paragraph [ref=e258]:
+              - strong [ref=e259]: 两种协作模式，主动权始终在工程师手中：
+            - table [ref=e260]:
+              - rowgroup [ref=e261]:
+                - row [ref=e262]:
+                  - columnheader "模式" [ref=e263]
+                  - columnheader "工作方式" [ref=e264]
+                  - columnheader "适合场景" [ref=e265]
+              - rowgroup [ref=e266]:
+                - row [ref=e267]:
+                  - cell "自动模式" [ref=e268]
+                  - cell "防护校验通过后，优化参数自动下发执行" [ref=e269]
+                  - cell "工况稳定、信任成熟时全自动运行" [ref=e270]
+                - row [ref=e271]:
+                  - cell "建议模式" [ref=e272]
+                  - cell "AI 只提供优化建议，工程师结合现场经验自主判断、手动调整" [ref=e273]
+                  - cell "工况复杂、需要专家判断时人工把关" [ref=e274]
+            - blockquote [ref=e275]:
+              - text: 机器给建议、人做决定——
+              - strong [ref=e276]: AI 再聪明，安全边界与最终决策权，始终牢牢掌握在工程师手中。
+            - heading "8. 会汇报 —— 行情资讯自动更新，成果一键成文" [level=3] [ref=e277]
+            - list [ref=e278]:
+              - listitem [ref=e279]:
+                - strong [ref=e280]: 每日自动获取碳市场数据
+                - text: ：碳市场配额价格、自愿减排量价格自动更新，走势图直观呈现，未来价格趋势智能预测；
+              - listitem [ref=e281]:
+                - strong [ref=e282]: 每日自动获取原料与能源市场资讯
+                - text: ：煤炭、焦炭、天然气、电力等原料能源价格与市场快讯自动抓取，价格波动、政策动向第一时间掌握；
+              - listitem [ref=e283]:
+                - strong [ref=e284]: 智能报告
+                - text: ：能耗盘点、碳排放盘点、减排效果、优化建议，自动生成条理清晰的分析报告，支持下载与分享。
+            - blockquote [ref=e285]:
+              - text: 能价、碳价、原料价自动更新，报告自动生成——
+              - strong [ref=e286]: 市场一有风吹草动，您第一时间掌握。
+        - generic [ref=e287]:
+          - heading "5 能碳一体机" [level=2] [ref=e288]:
+            - generic [ref=e289]: "5"
+            - text: 能碳一体机
+          - generic [ref=e290]:
+            - heading "三、能碳一体机 —— 数字专家的\"顺风耳\"" [level=2] [ref=e291]
+            - paragraph [ref=e292]:
+              - text: 平台的感知能力，来自我们自主研发的
+              - strong [ref=e293]: 能碳一体机
+              - text: 。它是一台部署在工厂现场的智能设备，也是连接"真实工厂"与"数字工厂"的桥梁。
+            - heading "两大接入方式，真正\"开箱即用\"" [level=3] [ref=e294]
+            - paragraph [ref=e295]:
+              - strong [ref=e296]: 1. 不打扰、不改造——轻轻接入企业现有系统
+            - list [ref=e297]:
+              - listitem [ref=e298]: 无需改造企业现有系统，不触碰生产网络，像"旁路"一样顺路采集能源与碳排数据；
+              - listitem [ref=e299]: 企业已有的计量系统、能源系统、数据中心，历史与实时数据均可平滑接入；
+              - listitem [ref=e300]: 部署"无感"，不干扰正常生产，实施周期短、上线快。
+            - paragraph [ref=e301]:
+              - strong [ref=e302]: 2. 直接连——现场设备随手接
+            - list [ref=e303]:
+              - listitem [ref=e304]: 电表、气表、水表、流量计、传感器等现场计量设备可直接接入；
+              - listitem [ref=e305]: 就地采集、就地处理，实时汇聚能源消耗与排放数据；
+              - listitem [ref=e306]: 即使网络不畅，数据也先稳稳保存在现场，随时补传，一条都不丢。
+            - heading "一体机带来的四大好处" [level=3] [ref=e307]
+            - table [ref=e308]:
+              - rowgroup [ref=e309]:
+                - row [ref=e310]:
+                  - columnheader "好处" [ref=e311]
+                  - columnheader "说明" [ref=e312]
+              - rowgroup [ref=e313]:
+                - row [ref=e314]:
+                  - cell [ref=e315]:
+                    - strong [ref=e316]: 接入快
+                  - cell "不改造企业系统，实施几乎零风险" [ref=e317]
+                - row [ref=e318]:
+                  - cell [ref=e319]:
+                    - strong [ref=e320]: 数据全
+                  - cell "系统数据 + 现场设备双通道汇聚，能碳数据更细、更完整" [ref=e321]
+                - row [ref=e322]:
+                  - cell [ref=e323]:
+                    - strong [ref=e324]: 反应快
+                  - cell "现场就近采集处理，网络波动也不怕，数据实时可靠" [ref=e325]
+                - row [ref=e326]:
+                  - cell [ref=e327]:
+                    - strong [ref=e328]: 成本省
+                  - cell "软硬一体、开箱即用，总投入更低" [ref=e329]
+            - heading "软硬一体 · 依托自研云边协同系统" [level=3] [ref=e330]
+            - paragraph [ref=e331]:
+              - text: 能碳一体机采用
+              - strong [ref=e332]: 软硬一体
+              - text: 设计，依托平台
+              - strong [ref=e333]: 自主研发的云边协同系统
+              - text: ，把"设备接入、模型下发、数据上云"做成一件开箱即用的事：
+            - list [ref=e334]:
+              - listitem [ref=e335]:
+                - strong [ref=e336]: 自研云边协同系统
+                - text: ：云端 K3s + KubeEdge 作为唯一控制平面，一体机内置 EdgeCore 边缘节点，经 CloudHub 安全长连接与云端实时同步——控制下发与数据回传双通道毫秒级响应，断线自动重连、数据补传不丢失；
+              - listitem [ref=e337]:
+                - strong [ref=e338]: 软硬一体、开箱即用
+                - text: ：工业级硬件与采集、边缘计算软件深度预装预调，出厂即"可上云"，无需现场拼装与专业调试；
+              - listitem [ref=e339]:
+                - strong [ref=e340]: 快速设备模型建立与下发
+                - text: ：基于 KubeEdge 设备模型（DeviceModel / Device），支持五种主流协议的可视化建模，YAML 一键生成、秒级下发到一体机——新增设备即建即用；
+              - listitem [ref=e341]:
+                - strong [ref=e342]: 远程下发 AI 模型
+                - text: ：AI 优化模型与采集程序支持云端远程一键下发、版本管理与回滚，模型更新全程自动化，无需现场、无需登录盒子；
+              - listitem [ref=e343]:
+                - strong [ref=e344]: 傻瓜式部署盒子
+                - text: ：部署包自动生成（内置 edgecore 配置模板与 token / caHash），现场一条命令完成接入，约 10 分钟上线，无需专业运维；
+              - listitem [ref=e345]:
+                - strong [ref=e346]: 完善的管理平台
+                - text: ：设备管理、关联映射、实时数据、消息流追踪、健康诊断一站式云端管控——一体机上云即可远程运营。
+            - blockquote [ref=e347]:
+              - text: 一台软硬一体的能碳一体机 + 一套自研云边协同系统：
+              - strong [ref=e348]: 设备模型秒级建立、AI 模型远程下发、盒子傻瓜式部署、平台一站式管理——把"上云"做成一件简单的事。
+            - blockquote [ref=e349]:
+              - text: 有了能碳一体机，数字专家才有了真正的"感官"——
+              - strong [ref=e350]: 用最轻的方式，获得最全的数据，让每一笔能源、每一笔碳都"有源可查"。
+        - generic [ref=e351]:
+          - heading "6 多平台支持" [level=2] [ref=e352]:
+            - generic [ref=e353]: "6"
+            - text: 多平台支持
+          - generic [ref=e354]:
+            - heading "四、随时随地可用 —— 办公、出差、会议室，想看就看" [level=2] [ref=e355]
+            - paragraph [ref=e356]:
+              - text: 这套系统
+              - strong [ref=e357]: 一套能力、多种载体
+              - text: ，按企业需要自由选择：
+            - table [ref=e358]:
+              - rowgroup [ref=e359]:
+                - row [ref=e360]:
+                  - columnheader "使用方式" [ref=e361]
+                  - columnheader "特点" [ref=e362]
+                  - columnheader "适合场景" [ref=e363]
+              - rowgroup [ref=e364]:
+                - row [ref=e365]:
+                  - cell "浏览器访问" [ref=e366]
+                  - cell "免安装，打开即用" [ref=e367]
+                  - cell "办公室、会议室演示、多部门使用" [ref=e368]
+                - row [ref=e369]:
+                  - cell "桌面应用（电脑版）" [ref=e370]
+                  - cell "双击运行，原生体验" [ref=e371]
+                  - cell "日常办公、离线演示" [ref=e372]
+                - row [ref=e373]:
+                  - cell "集团集中部署" [ref=e374]
+                  - cell "一处部署、全员共享" [ref=e375]
+                  - cell "集团/厂级统一管理，全厂一套数据口径" [ref=e376]
+                - row [ref=e377]:
+                  - cell "轻量工具" [ref=e378]
+                  - cell "极简轻巧" [ref=e379]
+                  - cell "技术人员快速调用" [ref=e380]
+            - blockquote [ref=e381]: 出差、开会、办公室，随时打开都能看；集团集中部署，全厂数据一个口径。
+        - generic [ref=e382]:
+          - heading "7 控排企业的一天" [level=2] [ref=e383]:
+            - generic [ref=e384]: "7"
+            - text: 控排企业的一天
+          - generic [ref=e385]:
+            - heading "五、走进真实场景：控排企业的一天" [level=2] [ref=e386]
+            - paragraph [ref=e387]:
+              - text: 以率先落地的
+              - strong [ref=e388]: 钢铁行业
+              - text: 为例，看看这套系统如何改变企业的工作方式——同样的方法，完全适用于水泥、化工、有色等行业：
+            - paragraph [ref=e389]:
+              - strong [ref=e390]: 过去
+              - text: ：减排目标下达 → 技术科翻报表、凭经验提方案 → 生产试验数月 → 结果难量化、汇报靠估计。
+            - paragraph [ref=e391]:
+              - strong [ref=e392]: 现在
+              - text: ：
+            - list [ref=e393]:
+              - listitem [ref=e394]:
+                - strong [ref=e395]: 部署
+                - text: ：厂里装上一台能碳一体机，对接已有系统、接上关键计量设备，
+                - strong [ref=e396]: 一个周末即可完成
+                - text: ，生产零改动；
+              - listitem [ref=e397]:
+                - strong [ref=e398]: 建模
+                - text: ：工程师按企业真实产线，搭出"烧结 → 高炉 → 转炉 → 连铸 → 轧钢"工艺流程，配好各设备参数，三维场景随即生成；
+              - listitem [ref=e399]:
+                - strong [ref=e400]: 早上
+                - text: ：打开平台，全厂状态尽收眼底，昨日各工序能耗与碳排自动汇总，碳市场、原料市场行情与快讯已自动更新，一屏掌握全局；
+              - listitem [ref=e401]:
+                - strong [ref=e402]: 上午
+                - text: ：接到"单位产品碳强度再降 3%"的目标（如钢铁的吨钢碳强度），工程师在平台输入
+                - strong [ref=e403]: "\"焦比降低 5%，喷煤提高 8%\""
+                - text: ，AI 立即解析并仿真，10 秒后给出预测——能耗降多少、减排多少、成本省多少，同时呈现；
+              - listitem [ref=e404]:
+                - strong [ref=e405]: 下午
+                - text: ：对比多个方案后选定最优策略保存入库；开启 AI 优化，系统持续寻找"更节能、更低碳、更低成本"的参数组合；
+              - listitem [ref=e406]:
+                - strong [ref=e407]: 周末
+                - text: ：AI 训练出更优参数，经工程师确认后在安全边界内自动下发，同时生成一份《本周能效与碳排分析报告》，一键分享给管理层；
+              - listitem [ref=e408]:
+                - strong [ref=e409]: 季度
+                - text: ：全厂能源账、碳账、成本账清晰可查，控排履约数据完备，汇报材料一键导出。
+            - paragraph [ref=e410]:
+              - strong [ref=e411]: 结果
+              - text: ：节能减碳从"以月为单位试错"变成"分钟级推演"，决策从"凭经验"变成"靠数据 + AI"。
+            - blockquote [ref=e412]: 无论钢铁、水泥、化工还是有色，这套"感知 → 建模 → 仿真 → 寻优 → 执行 → 汇报"的闭环方法一以贯之——换个行业，只是换一套工序模型。
+        - generic [ref=e413]:
+          - heading "8 持续进化的智能能力" [level=2] [ref=e414]:
+            - generic [ref=e415]: "8"
+            - text: 持续进化的智能能力
+          - generic [ref=e416]:
+            - heading "六、持续进化的智能能力" [level=2] [ref=e417]
+            - paragraph [ref=e418]: 平台的智能能力覆盖完整，且随着使用不断进化：
+            - heading "1. 全自动的\"智能操作员\"" [level=3] [ref=e419]
+            - paragraph [ref=e420]:
+              - text: 说一句话（如"把焦比降低 10%"），AI 自动解析、确认后自动应用，并实时展示前后对比。更进一步的
+              - strong [ref=e421]: 全自动仿真控制
+              - text: ，AI 根据目标自主规划调整路径、自动执行多轮寻优——真正"全自动操作"。
+            - heading "2. 会沉淀、会进化的\"策略大脑\"" [level=3] [ref=e422]
+            - paragraph [ref=e423]: AI 从企业历史运行数据中自动总结"什么工况、用什么策略最节能、最省碳"，形成企业专属的策略知识库；并已实现"能耗 + 碳排 + 成本"的多目标综合优化，帮企业算总账、算长账。
+            - heading "3. 一套平台、服务全行业" [level=3] [ref=e424]
+            - paragraph [ref=e425]:
+              - text: 平台面向
+              - strong [ref=e426]: 全国碳市场四大重点控排行业
+              - text: ——钢铁、水泥、化工、有色，并持续拓展更多高耗能行业。其中
+              - strong [ref=e427]: 钢铁行业率先全面落地
+              - text: （20 多种工序设备建模就绪），
+              - strong [ref=e428]: 水泥、化工、有色行业同步就绪
+              - text: ，同构复用、快速上线。每个行业、每个工序都有
+              - strong [ref=e429]: 专门建模的专属算法
+              - text: ，AI 模型库覆盖全行业、持续深耕。
+            - heading "4. 与真实生产紧密相连" [level=3] [ref=e430]
+            - paragraph [ref=e431]:
+              - text: 能碳一体机支持多种数据来源，数字工厂
+              - strong [ref=e432]: 由真实生产数据实时驱动
+              - text: ，仿真与生产无缝衔接，数字专家的"感知"越来越敏锐、越来越真实。
+        - generic [ref=e433]:
+          - heading "9 设计愿景" [level=2] [ref=e434]:
+            - generic [ref=e435]: "9"
+            - text: 设计愿景
+          - generic [ref=e436]:
+            - heading "七、设计愿景：低耗能 · 低碳 · 保护地球" [level=2] [ref=e437]
+            - heading "我们的愿景主张" [level=3] [ref=e438]
+            - list [ref=e439]:
+              - listitem [ref=e440]:
+                - strong [ref=e441]: 低耗能
+                - text: ：用 AI 的"精打细算"代替设备的"大拆大换"——同样的产量，烧得更少、耗得更低；
+              - listitem [ref=e442]:
+                - strong [ref=e443]: 低碳
+                - text: ：让每一次生产决策都算得清碳、降得下碳，帮助企业以可承受的代价走向深度减排；
+              - listitem [ref=e444]:
+                - strong [ref=e445]: 保护地球
+                - text: ：面向钢铁、水泥、化工、有色等全国碳市场重点控排行业及更多高耗能行业，让每一家控排企业都成为绿色转型的参与者，用智慧守护我们的地球家园。
+            - heading "节能减排与降本增效，从来不是二选一" [level=3] [ref=e446]
+            - paragraph [ref=e447]:
+              - text: 很长一段时间里，企业常常面临一个两难：
+              - strong [ref=e448]: 要减碳，就得投大钱、换大件
+              - text: ——新设备、新工艺、大修大改，动辄数亿的投资，让不少企业"想减却不敢减"。
+            - paragraph [ref=e449]:
+              - strong [ref=e450]: 这个平台要打破的，正是这个观念。
+            - heading "节能降碳，不只有\"大投资\"一条路" [level=3] [ref=e451]
+            - list [ref=e452]:
+              - listitem [ref=e453]:
+                - strong [ref=e454]: 高投入的工艺改进
+                - text: （更新装备、改造产线）当然是一条路径，但它周期长、资金压力大、风险高，并非所有企业都走得动；
+              - listitem [ref=e455]:
+                - text: 而
+                - strong [ref=e456]: 同样可观
+                - text: 的节能减碳空间，往往藏在日常运行的"细枝末节"里：参数调一调、配比改一改、调度优化一步——不动一台设备、不改一条产线，靠
+                - strong [ref=e457]: 聪明的算法调度
+                - text: ，就能把能耗和碳排放"挤"出来。
+            - heading "算法调度：花小钱、办大事的节能减碳路径" [level=3] [ref=e458]
+            - table [ref=e459]:
+              - rowgroup [ref=e460]:
+                - row [ref=e461]:
+                  - columnheader "方式" [ref=e462]
+                  - columnheader "投入" [ref=e463]
+                  - columnheader "特点" [ref=e464]
+              - rowgroup [ref=e465]:
+                - row [ref=e466]:
+                  - cell "工艺装备大改造" [ref=e467]
+                  - cell "高（数亿级）" [ref=e468]
+                  - cell "周期长、见效大、风险高" [ref=e469]
+                - row [ref=e470]:
+                  - cell "智能算法调度优化" [ref=e471]
+                  - cell "低（平台级投入）" [ref=e472]
+                  - cell "快见效、可持续、零产线改动" [ref=e473]
+            - paragraph [ref=e474]:
+              - text: 平台的 AI 优化引擎正是为此而生：持续学习运行数据，找到"既保产量、又降能耗、还省钱"的最优参数组合——
+              - strong [ref=e475]: 焦比怎么调、窑温怎么控、配比怎么改、各工序能耗怎么平衡
+              - text: ，一遍遍仿真寻优，把藏在日常运行中的节能减碳空间一点点挖掘出来。
+            - heading "一鱼两吃：减碳的同时，成本同步下降" [level=3] [ref=e476]
+            - list [ref=e477]:
+              - listitem [ref=e478]:
+                - text: 平台
+                - strong [ref=e479]: 每一次仿真，都同步算出能耗、碳排与成本变化
+                - text: ——节能降碳带来的燃料、电力、物料节省，清清楚楚地呈现在同一张图上；
+              - listitem [ref=e480]:
+                - text: 减少消耗本身就是在降低成本：
+                - strong [ref=e481]: 烧得少、排得少、花得少
+                - text: ，节能、降碳、增效在多数场景下同向而行；
+              - listitem [ref=e482]:
+                - text: 平台让企业看到的，不只是"减排了多少吨"，更是"省下了多少钱"——
+                - strong [ref=e483]: 用数据证明：节能减排，可以不与降低成本冲突，反而常常双赢。
+            - blockquote [ref=e484]:
+              - text: 设计愿景：让节能减碳从"拼投入"走向"拼智慧"，让每一家企业都能以可承受的代价，走出一条
+              - strong [ref=e485]: 既降耗、又降碳、还增效
+              - text: 的可持续发展之路。
+        - generic [ref=e486]:
+          - heading "10 为什么选择我们" [level=2] [ref=e487]:
+            - generic [ref=e488]: "10"
+            - text: 为什么选择我们
+          - generic [ref=e489]:
+            - heading "八、为什么选择我们" [level=2] [ref=e490]
+            - list [ref=e491]:
+              - listitem [ref=e492]:
+                - strong [ref=e493]: 看得见
+                - text: ：三维数字孪生，全厂状态一屏掌握；
+              - listitem [ref=e494]:
+                - strong [ref=e495]: 建得真
+                - text: ：工艺流程自己搭、设备信息自己配，一厂一策灵活建模；
+              - listitem [ref=e496]:
+                - strong [ref=e497]: 算得清
+                - text: ：能源账、碳账、成本账三本账同步核算，清清楚楚；
+              - listitem [ref=e498]:
+                - strong [ref=e499]: 推演准
+                - text: ：先仿真、后决策，节能降碳与降本效果提前预知；
+              - listitem [ref=e500]:
+                - strong [ref=e501]: 有智能
+                - text: ：AI 策略 + 优化引擎 + 自动控制，能碳管理从"人治"走向"智治"；
+              - listitem [ref=e502]:
+                - strong [ref=e503]: 模型专
+                - text: ：一工序一模型，每个工艺环节都有专门优化的 AI 算法建模，专业判断更可信；
+              - listitem [ref=e504]:
+                - strong [ref=e505]: 守得住
+                - text: ：三级安全防护 + 工程师自主决策，AI 聪明更守规矩；
+              - listitem [ref=e506]:
+                - strong [ref=e507]: 懂市场
+                - text: ：碳市场、原料市场、能源资讯每日自动获取，决策更有底；
+              - listitem [ref=e508]:
+                - strong [ref=e509]: 易落地
+                - text: ：能碳一体机轻轻接入 + 多平台随手可用，部署快、上手易、扩展灵活。
+        - generic [ref=e510]:
+          - heading "11 结语" [level=2] [ref=e511]:
+            - generic [ref=e512]: "11"
+            - text: 结语
+          - generic [ref=e513]:
+            - heading "九、结语" [level=2] [ref=e514]
+            - paragraph [ref=e515]:
+              - strong [ref=e516]: 工业能碳智控平台——懂能、懂碳、懂市场的工业级具身智能，为企业节能降碳而生。
+            - paragraph [ref=e517]:
+              - text: 从一台能碳一体机的"轻轻接入"，到自主流程建模的"一厂一策"，再到三维数字孪生的"全厂尽收眼底"与 AI 策略引擎的"深思熟虑"——它是一位 24 小时在岗的数字专家：看得见全厂、算得清能源账碳账成本账、推演得准效果、执行得了方案、写得好报告，更看得懂市场。而三级安全防护，则确保它始终"聪明又守规矩"——
+              - strong [ref=e518]: 机器给建议，人做决定，安全边界与最终决策权始终掌握在企业自己手中。
+              - text: 面向钢铁、水泥、化工、有色等全行业，让每一家控排企业，都拥有一双"智慧的眼睛"和一颗"AI 的大脑"。
+            - paragraph [ref=e519]:
+              - strong [ref=e520]: 让节能降碳，从今天开始变得简单、确定、看得见。
+        - generic [ref=e521]: —— 宣传手册 完 ——
+  - contentinfo [ref=e79]: 能碳一体机 · 文档中心 · v2.0.0

@@ -731,7 +731,14 @@ export default {
     // 浮动模式为独立弹窗：标题栏拖动移动、右下角手柄调整大小，点击「固定」回面板。
     toggleFloat() {
       this.floatMode = !this.floatMode
-      if (this.floatMode) this._initFloatRect()
+      if (this.floatMode) {
+        this._initFloatRect()
+        // 浮动模式：本析智擎已弹出为独立窗口，右侧属性栏不再承载内容，收起以免空白占位
+        this.store.rightOpen = false
+      } else {
+        // 固定模式：回到右侧属性面板，重新展开右侧栏
+        this.store.rightOpen = true
+      }
     },
     _initFloatRect() {
       const cur = this.floatRect
@@ -832,10 +839,14 @@ export default {
   background: var(--bg);
   overflow: hidden;
 }
-/* 浮动弹窗：fixed 相对视口，独立悬浮展示 */
+/* 浮动弹窗：fixed 相对视口，独立悬浮展示。
+   right-collapsed 时父级 .inspector 会继承 visibility:hidden / pointer-events:none，
+   需在此显式覆盖（visibility/pointer-events 为继承属性，子元素可覆盖），否则浮动窗随属性栏一起隐藏 */
 .agent-view.float {
   position: fixed;
   z-index: 400;
+  visibility: visible;
+  pointer-events: auto;
   width: auto;
   height: auto;
   border: 1px solid var(--line);

@@ -2,7 +2,7 @@ export const sections = [
   {
     id: 'arch',
     title: '系统技术架构',
-    body: `# 工业能碳智控平台 · 技术文档（v2.0.0）
+    body: `# 工业能碳智控平台 · 技术文档（v2.1.0）
 
 本平台是面向全国碳市场重点控排行业（钢铁、水泥、化工、有色及更多高耗能行业）的能碳数字孪生仿真系统，覆盖设备监控、碳素流仿真、碳排放核算与操作策略推荐四大能力。钢铁行业已率先全面落地，水泥、化工、有色等行业同步就绪，各行业工艺均支持自主流程建模与专属算法寻优。
 
@@ -48,8 +48,12 @@ backend/
   │  ├─ factors.py           # 排放因子表
   │  ├─ devices.py           # 监测设备库（活动数据来源）
   │  ├─ realtime.py          # WebSocket 遥测推送 + 历史 ring buffer
+  │  ├─ cloud_agent.py       # 云端数据代理（HTTP 42083 状态/CRD/时序库查询 + 缓存）
+  │  ├─ mqtt_source/         # 云端 MQTT 订阅线程（cloud/state、cloud/crds、cloud/logs、data/# 解析）
   │  ├─ nl_parser.py         # 自然语言 → 策略操作（启发式）
   │  ├─ llm_strategy.py      # LLM 策略解析/对话（可选，无 Key 自动回退）
+  │  ├─ llm_settings.py      # LLM 配置接口与密钥管理
+  │  ├─ kb_settings.py       # 知识库设置
   │  ├─ param_schema.py      # 工序参数分级元数据
   │  ├─ carbon_market.py     # 碳市场行情服务（CEA/CCER 拉取 + TTL 缓存 + 价格预测）
   │  ├─ market_news.py       # 市场快讯服务（中国煤炭交易网爬取 + TTL 缓存）
@@ -60,6 +64,9 @@ backend/
   │  ├─ optimizers.py        # AI 优化模型引擎（GA/PSO/RL 在线训练 + 版本管理）
   │  ├─ specs.py             # 设备规格档位
   │  ├─ store.py             # 策略持久化
+  │  ├─ github_deploy.py     # 盒子一键接入（GitHub 托管 · 配置驱动）
+  │  ├─ api/                 # REST 路由（overview / devices / box_router / help / tsdb 等）
+  │  ├─ services/            # 业务服务层（部署、报告、行情、优化等）
   │  └─ models.py            # 前后端数据契约（Pydantic）
   ├─ config/                 # 统一配置目录：requirements.txt / run.sh / .env（LLM 密钥，不入库）/ strategies.json
   └─ data/reports/           # 历史报告输出
