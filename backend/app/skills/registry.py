@@ -16,6 +16,7 @@ from typing import Dict, Optional
 
 from .base import SkillRegistry
 from .builtin import register_builtin_skills
+from .methodology import register_methodology_skills
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ def get_registry() -> SkillRegistry:
     if _registry is None:
         _registry = _PersistentSkillRegistry()
         register_builtin_skills(_registry)
+        register_methodology_skills(_registry)
         _apply_state_file(_registry)
     return _registry
 

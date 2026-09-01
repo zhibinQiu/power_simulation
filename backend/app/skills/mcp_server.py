@@ -33,9 +33,11 @@ def build_server(registry: SkillRegistry, name: str = "本析智擎") -> MCPServ
     """把注册表中的全部 skills 注册为 MCP 工具，返回 MCPServer。"""
     server = MCPServer(
         name=name,
-        description=("本析智擎 · 钢铁能碳智控平台能力服务：查询设备实时读数、"
-                     "运行工艺仿真、查询碳市场行情与预测、排放因子等。"),
-        version="1.0.0",
+        description=("本析智擎 · 能碳智控平台能力服务：设备实时读数/历史查询、"
+                     "工艺仿真、碳市场行情与预测、排放因子；以及碳计算方法学"
+                     "（碳排放量核算、市场周期判断、碳价预测、CEA 结转测算、"
+                     "履约合规评估、履约策略推荐、企业碳资产台账）等。"),
+        version="1.1.0",
     )
     for skill in registry.list(enabled_only=True):
         _register_skill(server, skill)

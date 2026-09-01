@@ -1,8 +1,8 @@
 <template>
   <div class="om-mask" @click.self="$emit('close')">
-    <div class="om-modal" role="dialog" aria-modal="true" :aria-label="t('本体管理')">
+    <div class="om-modal" role="dialog" aria-modal="true" :aria-label="t('本体定义')">
       <div class="om-head">
-        <span class="om-title">🧬 {{ t('本体管理') }}</span>
+        <span class="om-title">🧬 {{ t('本体定义') }}</span>
         <span class="om-sub">{{ t('领域语义层：智能体先补全问题，再从概念/关系/规则推理，判断能否直接回答或需要技能') }}</span>
         <button class="x-btn lg" @click="$emit('close')" :aria-label="t('关闭')">×</button>
       </div>
@@ -347,6 +347,13 @@ onMounted(loadAll)
 .om-field label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 5px; color: var(--text); }
 .om-input { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel-2); color: var(--text); font-size: 13px; }
 .om-input:focus { outline: none; border-color: var(--accent); }
+/* 下拉选择框：全局 select 固定 height:22px 且 box-sizing:border-box，与 om-input 的 7px 垂直 padding 叠加后内容区仅剩约 6px，13px 文本被压扁裁切；改为高度自适应并保留右侧箭头空间 */
+select.om-input {
+  height: auto;
+  line-height: 1.4;
+  padding: 7px 26px 7px 10px;
+  background-position: calc(100% - 14px) center, calc(100% - 10px) center;
+}
 .om-ta { resize: vertical; font-family: inherit; line-height: 1.5; }
 .om-check { display: flex; align-items: center; gap: 8px; font-weight: 400 !important; cursor: pointer; }
 .om-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; }

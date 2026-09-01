@@ -123,7 +123,12 @@ _SEED_AGENTS: List[Dict[str, Any]] = [
                            "get_emission_factors"],
         "available_skills": ["run_simulation", "get_carbon_market_quote",
                              "get_emission_factors", "get_carbon_forecast",
-                             "query_realtime_devices"],
+                             "query_realtime_devices",
+                             "compute_carbon_accounting", "evaluate_carbon_compliance",
+                             "judge_carbon_market_cycle",
+                             "forecast_carbon_price_to_year_end",
+                             "compute_cea_carry_forward", "recommend_carbon_strategy",
+                             "query_carbon_enterprise_ledger", "list_carbon_enterprises"],
         "builtin": True,
     },
     {
@@ -136,7 +141,30 @@ _SEED_AGENTS: List[Dict[str, Any]] = [
         ),
         "default_skills": ["get_carbon_market_quote", "get_carbon_forecast"],
         "available_skills": ["get_carbon_market_quote", "get_carbon_forecast",
-                             "get_emission_factors"],
+                             "get_emission_factors",
+                             "judge_carbon_market_cycle",
+                             "forecast_carbon_price_to_year_end"],
+        "builtin": True,
+    },
+    {
+        "id": "compliance_advisor", "name": "履约合规顾问", "emoji": "🧾",
+        "description": "专注碳排放核算、履约缺口、碳配额结转与合规策略",
+        "system_prompt": (
+            _APP_CONTEXT +
+            "你的专长是碳履约合规：碳排放量核算（Scope1/2）、履约缺口测算、"
+            "CCER 抵扣、CEA 结转、三档履约策略与合规建议。"
+            "回答优先调用方法学技能基于真实台账与公式计算，给出关键数字与计算过程；"
+            "需要企业数据时先调用 list_carbon_enterprises / query_carbon_enterprise_ledger 取数。"
+        ),
+        "default_skills": ["compute_carbon_accounting", "evaluate_carbon_compliance",
+                           "recommend_carbon_strategy", "get_carbon_market_quote"],
+        "available_skills": [
+            "compute_carbon_accounting", "evaluate_carbon_compliance",
+            "compute_cea_carry_forward", "recommend_carbon_strategy",
+            "query_carbon_enterprise_ledger", "list_carbon_enterprises",
+            "judge_carbon_market_cycle", "forecast_carbon_price_to_year_end",
+            "get_carbon_market_quote", "get_emission_factors", "get_carbon_forecast",
+        ],
         "builtin": True,
     },
 ]

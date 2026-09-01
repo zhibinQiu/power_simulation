@@ -14,7 +14,10 @@ CONFIG_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "config", "kb_cfg.json"
 )
 ENV_MAP = {"root_path": "KB_ROOT"}
-DEFAULT_KB_PATH = "storage/kb"
+# 默认知识库根目录：backend/knowledge（绝对路径，不依赖进程 CWD；
+# 与知识库服务文档及历史数据位置一致，避免相对路径导致数据分散）
+_BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_KB_PATH = os.path.join(_BACKEND_DIR, "knowledge")
 
 _store = JsonCfgStore(CONFIG_PATH, ENV_MAP)
 

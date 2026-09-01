@@ -1371,10 +1371,12 @@ input[type="range"]::-moz-range-thumb { border-radius: 50% !important; }
 /* =========================================================
    系统主题色（设置 → 显示 → 系统主题色）：
    通过 App 根节点 data-accent 属性切换，覆盖品牌主色变量。
+   body[data-accent] 由 theme/index.js 同步维护，确保 teleport 到 body 的弹窗
+   （ConfirmDialog / ContextMenu / TftAnalysisDialog 等）也能继承主题色。
    默认品牌黄（amber）不在此列；默认主题色为科技蓝（blue）。深色主题用 .sim-dark 叠加规则。
    ========================================================= */
 /* —— 科技蓝 —— */
-.app[data-accent="blue"] {
+.app[data-accent="blue"], body[data-accent="blue"] {
   --accent: #2F6FED; --accent-d: #1E4FAD; --accent-h: #275FD2;
   --accent2: #6E86B8; --accent-l: rgba(47,111,237,.14); --sel: #DCE6FA; --on-accent: #FFFFFF;
 }
@@ -1383,7 +1385,7 @@ input[type="range"]::-moz-range-thumb { border-radius: 50% !important; }
   --accent2: #9FB6DC; --accent-l: rgba(91,141,239,.18); --sel: #1E2C4A; --on-accent: #0B1220;
 }
 /* —— 生态绿 —— */
-.app[data-accent="green"] {
+.app[data-accent="green"], body[data-accent="green"] {
   --accent: #2E9E6B; --accent-d: #1E7A52; --accent-h: #278A5C;
   --accent2: #6FA98C; --accent-l: rgba(46,158,107,.14); --sel: #D9EEE2; --on-accent: #FFFFFF;
 }
@@ -1392,7 +1394,7 @@ input[type="range"]::-moz-range-thumb { border-radius: 50% !important; }
   --accent2: #9CCFB8; --accent-l: rgba(67,201,139,.18); --sel: #143426; --on-accent: #062014;
 }
 /* —— 中国红 —— */
-.app[data-accent="red"] {
+.app[data-accent="red"], body[data-accent="red"] {
   --accent: #D64545; --accent-d: #A83232; --accent-h: #BD3A3A;
   --accent2: #C08080; --accent-l: rgba(214,69,69,.14); --sel: #F6DEDE; --on-accent: #FFFFFF;
 }

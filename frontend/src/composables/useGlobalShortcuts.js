@@ -2,10 +2,10 @@
 import { onMounted, onBeforeUnmount } from 'vue'
 import { closeAuditDialog, auditState } from '../stores/audit'
 
-export function useGlobalShortcuts({ store, onRun, focusSel, onMenuEsc, onTftAnalysis }) {
+export function useGlobalShortcuts({ store, onSimToggle, focusSel, onMenuEsc, onTftAnalysis }) {
   function onKeyGlobal(e) {
     const mod = e.ctrlKey || e.metaKey
-    if (mod && e.key.toLowerCase() === 'enter') { e.preventDefault(); onRun(); return }
+    if (mod && e.key.toLowerCase() === 'enter') { e.preventDefault(); onSimToggle(); return }
     // Alt+T：高炉数值仿真分析（仅仿真模式可用，逻辑在回调内判断）
     if (e.altKey && !mod && e.key.toLowerCase() === 't') {
       if (onTftAnalysis) { e.preventDefault(); onTftAnalysis(); return }

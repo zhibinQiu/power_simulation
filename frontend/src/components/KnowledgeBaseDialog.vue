@@ -1,9 +1,9 @@
 <template>
   <div class="kb-mask" @click.self="close">
-    <div class="kb-modal" role="dialog" aria-modal="true" :aria-label="t('知识库管理')">
+    <div class="kb-modal" role="dialog" aria-modal="true" :aria-label="t('行业知识库')">
       <!-- 顶部：标题 + 统计 + 搜索 + 关闭 -->
       <div class="kb-head">
-        <div class="kb-title">{{ t('知识库管理') }}</div>
+        <div class="kb-title">{{ t('行业知识库') }}</div>
         <div class="kb-stats">
           <span class="kb-stat">{{ t('文件夹') }} <b>{{ stats.folders }}</b></span>
           <span class="kb-stat">{{ t('文档') }} <b>{{ stats.docs }}</b></span>
@@ -130,7 +130,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, h, nextTick, onMounted, ref } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
 import { t } from '../i18n'
@@ -471,34 +471,55 @@ function md2html(md) {
 }
 
 // ---------- 文件夹树节点（递归组件） ----------
+// 注意：必须用 render 函数而非字符串 template —— 项目 Vue 为 runtime-only 构建
+// （vue.runtime.esm-bundler.js，无模板编译器），字符串 template 会编译失败导致节点渲染为空。
 const FolderNode = {
   name: 'FolderNode',
   props: { node: Object, depth: Number, expanded: Object, current: String },
   emits: ['select', 'toggle', 'new-folder', 'rename-folder', 'remove-folder'],
-  template: `
-    <div class="kb-node" :style="{ paddingLeft: (depth * 14) + 'px' }"
-         :class="{ active: current === node.path }" @click="$emit('select', node.path)">
-      <span class="kb-twist" @click.stop="$emit('toggle', node.path)">
-        {{ node.children && node.children.length ? (expanded.has(node.path) ? '▾' : '▸') : '·' }}
-      </span>
-      <span class="kb-folder-ico">▤</span>
-      <span class="kb-node-name">{{ node.name }}</span>
-      <span class="kb-node-count">{{ node.docs.length || '' }}</span>
-      <span class="kb-node-ops">
-        <button class="kb-mini" @click.stop="$emit('new-folder', node.path)" title="新建子文件夹">＋</button>
-        <button class="kb-mini" @click.stop="$emit('rename-folder', node)" title="重命名">✎</button>
-        <button class="kb-mini danger" @click.stop="$emit('remove-folder', node)" title="删除">✕</button>
-      </span>
-    </div>
-    <div v-if="expanded.has(node.path) && node.children && node.children.length" class="kb-branch">
-      <div v-for="c in node.children" :key="c.path" class="kb-branch">
-        <FolderNode :node="c" :depth="depth + 1" :expanded="expanded" :current="current"
-                    @select="$emit('select', $event)" @toggle="$emit('toggle', $event)"
-                    @new-folder="$emit('new-folder', $event)" @rename-folder="$emit('rename-folder', $event)"
-                    @remove-folder="$emit('remove-folder', $event)" />
-      </div>
-    </div>
-  `,
+  render() {
+    const { node, depth, expanded, current } = this
+    const hasChildren = !!(node.children && node.children.length)
+    const open = !!expanded.has(node.path)
+    const emit = (event, arg) => this.$emit(event, arg)
+    return h('div', [
+      h('div', {
+        class: ['kb-node', { active: current === node.path }],
+        style: { paddingLeft: depth * 14 + 'px' },
+        onClick: () => emit('select', node.path),
+      }, [
+        h('span', {
+          class: 'kb-twist',
+          onClick: (e) => { e.stopPropagation(); emit('toggle', node.path) },
+        }, hasChildren ? (open ? '▾' : '▸') : '·'),
+        h('span', { class: 'kb-folder-ico' }, '▤'),
+        h('span', { class: 'kb-node-name' }, node.name),
+        h('span', { class: 'kb-node-count' }, node.docs.length || ''),
+        h('span', { class: 'kb-node-ops' }, [
+          h('button', { class: 'kb-mini', title: '新建子文件夹', onClick: (e) => { e.stopPropagation(); emit('new-folder', node.path) } }, '＋'),
+          h('button', { class: 'kb-mini', title: '重命名', onClick: (e) => { e.stopPropagation(); emit('rename-folder', node) } }, '✎'),
+          h('button', { class: 'kb-mini danger', title: '删除', onClick: (e) => { e.stopPropagation(); emit('remove-folder', node) } }, '✕'),
+        ]),
+      ]),
+      open && hasChildren
+        ? h('div', { class: 'kb-branch' },
+            (node.children || []).map((c) => h('div', { key: c.path, class: 'kb-branch' }, [
+              h(FolderNode, {
+                node: c,
+                depth: depth + 1,
+                expanded,
+                current,
+                onSelect: (p) => emit('select', p),
+                onToggle: (p) => emit('toggle', p),
+                onNewFolder: (p) => emit('new-folder', p),
+                onRenameFolder: (n) => emit('rename-folder', n),
+                onRemoveFolder: (n) => emit('remove-folder', n),
+              }),
+            ]))
+          )
+        : null,
+    ])
+  },
 }
 function close() { emit('close') }
 

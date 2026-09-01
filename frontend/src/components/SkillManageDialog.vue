@@ -1,8 +1,8 @@
 <template>
   <div class="sm-mask" @click.self="$emit('close')">
-    <div class="sm-modal" role="dialog" aria-modal="true" :aria-label="t('技能管理')">
+    <div class="sm-modal" role="dialog" aria-modal="true" :aria-label="t('智能体技能')">
       <div class="sm-head">
-        <span class="sm-title">⚙️ {{ t('技能管理') }}</span>
+        <span class="sm-title">⚙️ {{ t('智能体技能') }}</span>
         <span class="sm-sub">{{ t('Skills 是智能体的工具集（内置 + MCP 接入），可启停控制可用范围') }}</span>
         <button class="x-btn lg" @click="$emit('close')" :aria-label="t('关闭')">×</button>
       </div>

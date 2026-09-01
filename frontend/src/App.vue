@@ -328,7 +328,7 @@ const menus = computed(() => [
     { label: t('设置…'), act: () => { showSettings.value = true } },
   ] },
   { id: 'sim', label: t('仿真'), items: [
-    { label: t('运行仿真'), accel: 'Ctrl+Enter', act: onRun },
+    { label: t('运行仿真'), accel: 'Ctrl+Enter', act: onSimToggle },
     { sep: true },
     { label: t('重置仿真参数'), act: onResetParams },
     { label: t('应用当前情景'), act: () => { store.refresh(); pushCmd(t('已应用当前仿真情景并重新计算。'),'out') } },
@@ -380,11 +380,11 @@ const menus = computed(() => [
   { id: 'ai', label: t('AI'), items: [
     { label: t('数据分析与策略'), toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
     { sep: true },
-    { label: t('知识库管理'), act: () => { showKnowledgeManage.value = true } },
+    { label: t('行业知识库'), act: () => { showKnowledgeManage.value = true } },
     { sep: true },
     { label: t('智能体管理'), act: () => { showAgentManage.value = true } },
-    { label: t('技能管理'), act: () => { showSkillManage.value = true } },
-    { label: t('本体管理'), act: () => { showOntologyManage.value = true } },
+    { label: t('智能体技能'), act: () => { showSkillManage.value = true } },
+    { label: t('本体定义'), act: () => { showOntologyManage.value = true } },
   ] },
   { id: 'help', label: t('帮助'), items: [
     { label: t('宣传手册'), accel: 'F1', act: () => openDocsSite('promo') },
@@ -397,7 +397,7 @@ const menus = computed(() => [
 ])
 
 useGlobalShortcuts({
-  store, onRun, focusSel,
+  store, onSimToggle, focusSel,
   onMenuEsc: () => topBarRef.value && topBarRef.value.closeMenus(),
   onTftAnalysis: () => {
     if (store.simMode) showTftAnalysis.value = true

@@ -111,10 +111,10 @@ export default {
 
   // ===== 菜单：AI =====
   'AI': 'AI',
-  '知识库管理': 'Knowledge Base',
+  '行业知识库': 'Industry KB',
   '智能体管理': 'Agents',
-  '技能管理': 'Skills',
-  '本体管理': 'Ontology',
+  '智能体技能': 'Agent Skills',
+  '本体定义': 'Ontology Definition',
   '对话中不可切换智能体': 'Agent is locked during a conversation',
   '对话中': 'in chat',
   '新建文件夹': 'New Folder',

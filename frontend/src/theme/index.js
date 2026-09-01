@@ -15,10 +15,18 @@ const saved = localStorage.getItem(KEY)
 /** 当前主题色 id（响应式，绑定到 App 根节点的 data-accent），默认科技蓝 */
 export const accent = ref(ACCENTS.some((a) => a.id === saved) ? saved : 'blue')
 
+// 同步主题色到 body：ConfirmDialog 等弹窗 teleport 到 body，不在 .app 作用域内，
+// 只有 body[data-accent] 上的 CSS 变量覆盖才能被它们继承（见 main.css 主题色规则）。
+function syncBodyAccent(id) {
+  if (typeof document !== 'undefined') document.body.dataset.accent = id
+}
+syncBodyAccent(accent.value)
+
 export function setAccent(id) {
   if (!ACCENTS.some((a) => a.id === id)) return
   accent.value = id
   localStorage.setItem(KEY, id)
+  syncBodyAccent(id)
 }
 
 const MODE_KEY = 'carbon-sim.theme-mode'
