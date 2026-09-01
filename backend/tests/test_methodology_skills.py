@@ -9,19 +9,28 @@
 - evaluate_carbon_compliance  履约缺口与 CCER 覆盖
 - recommend_carbon_strategy  缺参/企业不存在友好错误 + 完整策略链路（临时存储）
 - query_carbon_enterprise_ledger / list_carbon_enterprises 台账查询
+- 每个方法学技能返回「计算过程说明」calculation_note（summary/steps/assumptions）
+- 体系自动扩展：追加一个 Skill 即注册，缺字段给出清晰报错
 
 运行：
   cd backend && python -m pytest tests/test_methodology_skills.py -v
 """
 import json
 import sys
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from app.skills.base import Skill  # noqa: E402
 from app.skills.registry import get_registry  # noqa: E402
+from app.skills.methodology import (  # noqa: E402
+    _METHODOLOGY_SKILLS,
+    methodology_manifest,
+    register_methodology_skills,
+)
 
 METHODOLOGY_NAMES = [
     "compute_carbon_accounting",
@@ -341,3 +350,142 @@ def test_agents_include_compliance_advisor():
     market = {a["id"]: a for a in agents.values() if a["id"] == "market_analyst"}
     allow_market = market["market_analyst"]["available_skills"] or []
     assert "judge_carbon_market_cycle" in allow_market
+
+
+# ---------------------------------------------------------------------------
+# 计算过程说明（calculation_note）
+# ---------------------------------------------------------------------------
+def _gen_history(n: int = 60) -> list:
+    """生成 n 个交易日的历史行情（工作日序列）。"""
+    d = date(2025, 1, 2)
+    rows, p = [], 75.0
+    while len(rows) < n:
+        if d.weekday() < 5:
+            p += (len(rows) % 5 - 2) * 0.3
+            rows.append({"t": d.isoformat(), "close": round(max(40.0, p), 2)})
+        d += timedelta(days=1)
+    return rows
+
+
+def test_all_methodology_skills_have_calc_note(tmp_cc, monkeypatch):
+    """每个方法学技能成功执行后都返回 calculation_note（summary/steps/assumptions）。"""
+    import app.services.carbon_compliance.market_sync as market_sync
+
+    monkeypatch.setattr(market_sync, "fetch_cneeex_daily_quotes_sync", lambda: [])
+    cases = [
+        ("compute_carbon_accounting", {"scope1_combustion": 10.0, "free_cea_quota": 8.0}),
+        ("judge_carbon_market_cycle",
+         {"cea_monthly_prices": [60.0, 62.0, 58.0, 70.0, 75.0, 80.0], "current_cea_price": 75.0}),
+        ("forecast_carbon_price_to_year_end",
+         {"history": _gen_history(60), "method": "rule"}),
+        ("compute_cea_carry_forward",
+         {"base_qty": 10.0, "net_sell": 2.0, "year_end_holding": 12.0}),
+        ("evaluate_carbon_compliance",
+         {"scope1_combustion": 20.0, "free_cea_quota": 15.0,
+          "ccer_holdings": [{"qty": 1.0, "eligible_qty": 1.0, "expire_at": "2030-12-31",
+                             "linked_green_cert": False}]}),
+        ("list_carbon_enterprises", {}),
+    ]
+    for name, args in cases:
+        out = _exec(name, args)
+        assert out["ok"] is True, f"{name} 执行失败: {out.get('error')}"
+        note = out.get("calculation_note")
+        assert note is not None, f"{name} 缺少 calculation_note"
+        assert note.get("summary"), f"{name} note 缺 summary"
+        assert note.get("steps"), f"{name} note 缺 steps"
+        assert note.get("assumptions"), f"{name} note 缺 assumptions"
+
+    # 台账类技能：建企业后验证
+    eid = _make_enterprise(tmp_cc)
+    for name, args in [
+        ("query_carbon_enterprise_ledger", {"enterprise_id": eid}),
+        ("recommend_carbon_strategy", {"enterprise_id": eid, "compliance_year": 2025}),
+    ]:
+        out = _exec(name, args)
+        assert out["ok"] is True, f"{name} 执行失败: {out.get('error')}"
+        assert out["calculation_note"]["steps"], f"{name} note 缺 steps"
+
+
+def test_accounting_calc_note_steps_math():
+    """核算技能的计算过程说明带可追溯的中间数值。"""
+    out = _exec("compute_carbon_accounting", {
+        "scope1_combustion": 10.0, "scope1_process": 2.0, "free_cea_quota": 8.0,
+        "own_ccer_eligible": 0.5,
+    })
+    note = out["calculation_note"]
+    joined = " | ".join(note["steps"])
+    assert "12.00 万吨" in joined      # Scope1 合计中间值
+    assert "8.00" in joined            # 免费配额
+    assert "4.00" in joined            # 履约缺口
+    assert "0.50" in joined            # 自有 CCER 可用
+    assert "3.50" in joined            # 扣 CCER 后缺口
+
+
+# ---------------------------------------------------------------------------
+# 体系自动扩展
+# ---------------------------------------------------------------------------
+def test_auto_expand_new_skill():
+    """新增方法学：只追加必填字段的 Skill，注册器自动补全 tags/meta。"""
+    from app.skills.base import SkillRegistry
+
+    reg = SkillRegistry()
+    _METHODOLOGY_SKILLS.append(Skill(
+        name="new_methodology_demo",
+        description="演示新增方法学技能自动扩展",
+        input_schema={"type": "object", "properties": {}},
+        handler=lambda args: {"ok": True},
+    ))
+    try:
+        register_methodology_skills(reg)
+        s = reg.get("new_methodology_demo")
+        assert s is not None
+        assert s.tags == ["carbon", "methodology"]       # 自动补全分类标签
+        assert s.meta["category"] == "methodology"       # 自动标注分类
+        assert "methodology_module" in s.meta            # 自动注入源模块元数据
+        assert s.enabled                                 # 默认启用
+    finally:
+        _METHODOLOGY_SKILLS.pop()
+
+
+def test_auto_expand_missing_fields_rejected():
+    """缺 handler 的新方法学技能在注册时被清晰拦截。"""
+    from app.skills.base import SkillRegistry
+
+    _METHODOLOGY_SKILLS.append(Skill(
+        name="broken_skill", description="缺 handler 演示",
+        input_schema={"type": "object", "properties": {}},
+        handler=None,  # type: ignore[arg-type]
+    ))
+    try:
+        with pytest.raises(ValueError, match="handler"):
+            register_methodology_skills(SkillRegistry())
+    finally:
+        _METHODOLOGY_SKILLS.pop()
+
+
+def test_auto_expand_missing_description_rejected():
+    """缺 description 的新方法学技能在注册时被清晰拦截。"""
+    from app.skills.base import SkillRegistry
+
+    _METHODOLOGY_SKILLS.append(Skill(
+        name="broken_skill_desc", description="",
+        input_schema={"type": "object", "properties": {}},
+        handler=lambda args: {"ok": True},
+    ))
+    try:
+        with pytest.raises(ValueError, match="description"):
+            register_methodology_skills(SkillRegistry())
+    finally:
+        _METHODOLOGY_SKILLS.pop()
+
+
+def test_methodology_manifest():
+    """manifest 清单包含全部 8 个方法学技能及溯源模块。"""
+    manifest = methodology_manifest()
+    names = {m["name"] for m in manifest}
+    assert names == set(METHODOLOGY_NAMES)
+    by_name = {m["name"]: m for m in manifest}
+    assert by_name["compute_carbon_accounting"]["module"] == "accounting.py"
+    assert by_name["recommend_carbon_strategy"]["module"] == "strategy_engine.py"
+    for m in manifest:
+        assert m["category"] == "methodology"

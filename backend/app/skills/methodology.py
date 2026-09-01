@@ -29,6 +29,16 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # 数值工具
 # ---------------------------------------------------------------------------
+def _calc_note(summary: str, steps: List[str], assumptions: List[str]) -> Dict[str, Any]:
+    """构造「计算过程说明」：供 LLM 向用户解释方法学的计算依据。
+
+    - summary     一句话概括本方法学
+    - steps       计算步骤（含公式与中间结果，逐步可追溯）
+    - assumptions 关键假设与默认值（数据口径、固定参数等）
+    """
+    return {"summary": summary, "steps": steps, "assumptions": assumptions}
+
+
 def _num(v: Any, default: float = 0.0) -> float:
     if v is None or v == "":
         return default
@@ -89,20 +99,45 @@ def _compute_carbon_accounting(args: Dict[str, Any]) -> Dict[str, Any]:
         compute_accounting,
     )
 
+    scope1_c = _num(args.get("scope1_combustion"))
+    scope1_p = _num(args.get("scope1_process"))
+    quota = _num(args.get("free_cea_quota"))
+    own_ccer = _num(args.get("own_ccer_eligible"))
+    factor = _num(args.get("grid_emission_factor"), 0.5703) or 0.5703
+    ratio = _num(args.get("ccer_max_ratio"), 0.05) or 0.05
+    verified_override = _opt_num(args.get("verified_override"))
+
     inp = AccountingInput(
-        scope1_combustion=_num(args.get("scope1_combustion")),
-        scope1_process=_num(args.get("scope1_process")),
+        scope1_combustion=scope1_c,
+        scope1_process=scope1_p,
         scope2_power=_num(args.get("scope2_power")),
         purchased_mwh=_num(args.get("purchased_mwh")),
         market_green_mwh=_num(args.get("market_green_mwh")),
         self_gen_mwh=_num(args.get("self_gen_mwh")),
-        free_cea_quota=_num(args.get("free_cea_quota")),
-        own_ccer_eligible=_num(args.get("own_ccer_eligible")),
-        grid_emission_factor=_num(args.get("grid_emission_factor"), 0.5703) or 0.5703,
-        ccer_max_ratio=_num(args.get("ccer_max_ratio"), 0.05) or 0.05,
-        verified_override=_opt_num(args.get("verified_override")),
+        free_cea_quota=quota,
+        own_ccer_eligible=own_ccer,
+        grid_emission_factor=factor,
+        ccer_max_ratio=ratio,
+        verified_override=verified_override,
     )
-    return {"ok": True, "method": "accounting", "result": compute_accounting(inp).to_dict()}
+    r = compute_accounting(inp).to_dict()
+    note = _calc_note(
+        summary="按履约核查口径汇总 Scope1/2 排放，并与免费配额、CCER 抵扣比对得出履约缺口。",
+        steps=[
+            f"Scope1 合计 = 燃料燃烧 {scope1_c:.2f} + 工艺过程 {scope1_p:.2f} = {r['scope1_total']:.2f} 万吨",
+            f"履约核查总量 = Scope1 合计{'(官方核查覆盖 ' + str(verified_override) + ' 万吨)' if verified_override else ''} = {r['verified_emission']:.2f} 万吨",
+            f"履约缺口 = 核查总量 {r['verified_emission']:.2f} − 免费配额 {quota:.2f} = {r['compliance_gap']:.2f} 万吨",
+            f"CCER 抵扣上限 = 核查总量 × {ratio:.0%} = {r['ccer_cap']:.2f} 万吨",
+            f"自有 CCER 可用 = min(自有可抵扣 {own_ccer:.2f}, 上限 {r['ccer_cap']:.2f}, 缺口 {r['compliance_gap']:.2f}) = {r['own_ccer_usable']:.2f} 万吨",
+            f"扣自有 CCER 后缺口 = {r['compliance_gap']:.2f} − {r['own_ccer_usable']:.2f} = {r['residual_gap_after_own_ccer']:.2f} 万吨",
+        ],
+        assumptions=[
+            f"履约核查口径仅计 Scope1（燃料燃烧 + 工艺过程），Scope2 外购电不纳入核查",
+            f"电网排放因子 {factor:.4f} 吨CO2/MWh（仅用于 Scope2 参考核算）",
+            f"CCER 抵扣上限比例 {ratio:.0%}",
+        ],
+    )
+    return {"ok": True, "method": "accounting", "result": r, "calculation_note": note}
 
 
 # ---------------------------------------------------------------------------
@@ -129,18 +164,34 @@ def _judge_carbon_market_cycle(args: Dict[str, Any]) -> Dict[str, Any]:
         if current_cea is None and prices:
             current_cea = prices[-1]
 
+    low_p = _num(args.get("low_percentile"), 0.30) or 0.30
+    mid_p = _num(args.get("mid_percentile"), 0.70) or 0.70
     result = judge_market_cycle(
         prices,
         current_cea,
         current_ccer,
-        low_percentile=_num(args.get("low_percentile"), 0.30) or 0.30,
-        mid_percentile=_num(args.get("mid_percentile"), 0.70) or 0.70,
+        low_percentile=low_p,
+        mid_percentile=mid_p,
     )
     out = result.to_dict()
-    out["data_note"] = (
-        "价格序列来自市场月度台账（公开日均，非实时挂单）" if not raw else "价格序列来自入参"
+    data_src = "市场月度台账（公开日均，非实时挂单）" if not raw else "入参价格序列"
+    out["data_note"] = f"价格序列来自{data_src}"
+    note = _calc_note(
+        summary="对 CEA 历史价格序列做分位带与时间窗口研判，组合规则输出买卖建议。",
+        steps=[
+            f"价格样本 {len(prices)} 个；当前 CEA {out['current_price']:.2f} 元/吨" if out.get("current_price") is not None else f"价格样本 {len(prices)} 个",
+            f"分位阈值 low={low_p:.0%} / mid={mid_p:.0%} → 价格带 {out['price_band']}",
+            f"履约时间窗口 {out['time_window']}（按月份划分 early/mid/late）",
+            f"CEA−CCER 价差 {out['cea_ccer_spread']:.2f} 元/吨 → CCER 供给 {out['ccer_supply_tag']}" if out.get("cea_ccer_spread") is not None else f"CCER 供给 {out['ccer_supply_tag']}",
+            f"规则组合 → 建议动作 {out['action_tag']}",
+        ],
+        assumptions=[
+            f"价格来源：{data_src}",
+            "价差/供需为按静态规则打标签，非实时盘口",
+            "动作建议只作研判参考，落地交易需结合企业台账与预算",
+        ],
     )
-    return {"ok": True, "method": "market_cycle", "result": out}
+    return {"ok": True, "method": "market_cycle", "result": out, "calculation_note": note}
 
 
 # ---------------------------------------------------------------------------
@@ -180,13 +231,30 @@ def _forecast_carbon_price_to_year_end(args: Dict[str, Any]) -> Dict[str, Any]:
     if not fc.get("ok"):
         return {"ok": False, "method": "price_forecast",
                 "error": fc.get("error") or "预测失败", "points": [], "summary": None}
+    summary = fc.get("summary") or {}
+    steps = [f"历史样本 {len(hist)} 个交易日，锚定价 {fc.get('anchor_price')} 元/吨"]
+    if summary.get("year_end_price") is not None:
+        steps.append(f"以 {method} 模型外推至年底 → 预测价 {summary.get('year_end_price')} 元/吨")
+        steps.append(f"预测区间 [{summary.get('year_end_low')}, {summary.get('year_end_high')}] 元/吨，共 {summary.get('trading_days')} 个交易日")
+        if summary.get("peak_price") is not None:
+            steps.append(f"峰值 {summary.get('peak_price')}（{summary.get('peak_date')}）/ 谷值 {summary.get('trough_price')}（{summary.get('trough_date')}）")
+    note = _calc_note(
+        summary=f"基于交易所官方历史日线，用 {method} 算法把{instrument.upper()}价格外推预测至年底。",
+        steps=steps,
+        assumptions=[
+            f"预测模型 {method}，默认假设历史趋势延续",
+            "未纳入政策调整、配额供需突变等外生冲击",
+            "结果为模型参考值，非投资/交易承诺",
+        ],
+    )
     return {
         "ok": True,
         "method": "price_forecast",
         "instrument": instrument,
         "anchor": {"date": fc.get("anchor_date"), "price": fc.get("anchor_price")},
-        "summary": fc.get("summary"),
+        "summary": summary,
         "points": (fc.get("points") or [])[:30],  # 防上下文爆炸，只给前 30 个交易日
+        "calculation_note": note,
     }
 
 
@@ -197,15 +265,38 @@ def _compute_cea_carry_forward(args: Dict[str, Any]) -> Dict[str, Any]:
     """CEA 结转额度测算（最大可结转/超额/需扩卖量）。"""
     from app.services.carbon_compliance.carry_forward import compute_carry_forward
 
+    base = _num(args.get("base_qty"))
+    net_sell = _num(args.get("net_sell"))
+    holding = _num(args.get("year_end_holding"))
+    mult = _num(args.get("net_sell_multiplier"), 1.5) or 1.5
     r = compute_carry_forward(
-        base_qty=_num(args.get("base_qty")),
-        net_sell=_num(args.get("net_sell")),
-        year_end_holding=_num(args.get("year_end_holding")),
-        net_sell_multiplier=_num(args.get("net_sell_multiplier"), 1.5) or 1.5,
+        base_qty=base,
+        net_sell=net_sell,
+        year_end_holding=holding,
+        net_sell_multiplier=mult,
         deadline_md=str(args.get("deadline_md") or "06-10"),
         deadline_year=_int_arg(args.get("deadline_year"), 0) or None,
     )
-    return {"ok": True, "method": "carry_forward", "result": r.to_dict()}
+    rd = r.to_dict()
+    steps = [
+        f"公式上限 = 基础 {base:.2f} + 净卖出 {net_sell:.2f} × 倍数 {mult:.2f} = {rd['formula_cap']:.2f} 万吨",
+        f"最大可结转 = min(公式上限 {rd['formula_cap']:.2f}, 年末持仓 {holding:.2f}) = {rd['max_carry']:.2f} 万吨",
+        f"超额 = max(年末持仓 {holding:.2f} − 最大可结转 {rd['max_carry']:.2f}, 0) = {rd['excess']:.2f} 万吨",
+    ]
+    if rd["excess"] > 1e-9:
+        steps.append(
+            f"需扩卖 = 超额 {rd['excess']:.2f} / (1 + 倍数 {mult:.2f}) = {rd['sell_to_expand_cap']:.2f} 万吨"
+        )
+    note = _calc_note(
+        summary="按配额结转规则测算年末最大可结转量，以及持仓超额时的扩卖需求。",
+        steps=steps,
+        assumptions=[
+            f"净卖出计入结转上限的倍数为 {mult:.2f}（每卖 1 万吨可多结转 {mult:.2f} 万吨）",
+            f"结转截止日 {rd['deadline']}",
+            "本测算基于规则公式，实际以主管部门最新结转细则为准",
+        ],
+    )
+    return {"ok": True, "method": "carry_forward", "result": rd, "calculation_note": note}
 
 
 # ---------------------------------------------------------------------------
@@ -248,16 +339,21 @@ def _evaluate_carbon_compliance(args: Dict[str, Any]) -> Dict[str, Any]:
             ]
 
     own_ccer = eligible_ccer_qty(holdings)
+    scope1_c = _num(args.get("scope1_combustion"))
+    scope1_p = _num(args.get("scope1_process"))
+    quota = _num(args.get("free_cea_quota"))
+    ratio = _num(args.get("ccer_max_ratio"), 0.05) or 0.05
+    verified_override = _opt_num(args.get("verified_override"))
     inp = AccountingInput(
-        scope1_combustion=_num(args.get("scope1_combustion")),
-        scope1_process=_num(args.get("scope1_process")),
+        scope1_combustion=scope1_c,
+        scope1_process=scope1_p,
         scope2_power=_num(args.get("scope2_power")),
         purchased_mwh=_num(args.get("purchased_mwh")),
-        free_cea_quota=_num(args.get("free_cea_quota")),
+        free_cea_quota=quota,
         own_ccer_eligible=own_ccer,
         grid_emission_factor=_num(args.get("grid_emission_factor"), 0.5703) or 0.5703,
-        ccer_max_ratio=_num(args.get("ccer_max_ratio"), 0.05) or 0.05,
-        verified_override=_opt_num(args.get("verified_override")),
+        ccer_max_ratio=ratio,
+        verified_override=verified_override,
     )
     acc = compute_accounting(inp)
     result = acc.to_dict()
@@ -268,7 +364,23 @@ def _evaluate_carbon_compliance(args: Dict[str, Any]) -> Dict[str, Any]:
         result["conclusion"] = "配额盈余，可评估结转留存或择机出售"
     else:
         result["conclusion"] = "配额收支平衡"
-    return {"ok": True, "method": "compliance", "result": result}
+    note = _calc_note(
+        summary="先核算核查排放与履约缺口，再判定 CCER 可抵扣量并测算扣减后缺口。",
+        steps=[
+            f"CCER 可抵扣判定：共 {len(holdings)} 条持仓，剔除过期/未关联绿证 → 可抵扣 {own_ccer:.2f} 万吨",
+            f"核查总量 = Scope1 合计（{scope1_c:.2f} + {scope1_p:.2f} 万吨）= {result['verified_emission']:.2f} 万吨",
+            f"履约缺口 = {result['verified_emission']:.2f} − 免费配额 {quota:.2f} = {gap:.2f} 万吨",
+            f"CCER 抵扣上限 = {result['verified_emission']:.2f} × {ratio:.0%} = {result['ccer_cap']:.2f} 万吨",
+            f"扣自有 CCER 后缺口 = {gap:.2f} − {result['own_ccer_usable']:.2f} = {result['residual_gap_after_own_ccer']:.2f} 万吨",
+            f"结论：{result['conclusion']}",
+        ],
+        assumptions=[
+            "CCER 判定口径：已过期（expire_at 早于核查年度）或未关联绿电绿证的持仓不计入可抵扣",
+            f"CCER 抵扣上限比例 {ratio:.0%}",
+            f"数据来源：{'企业台账自动读取' if enterprise_id else '入参（未传 enterprise_id）'}",
+        ],
+    )
+    return {"ok": True, "method": "compliance", "result": result, "calculation_note": note}
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +416,21 @@ def _recommend_carbon_strategy(args: Dict[str, Any]) -> Dict[str, Any]:
     tags = result.get("market_tags")
     if isinstance(tags, dict) and tags.get("rationale"):
         tags["rationale"] = (tags["rationale"][:200] + "…") if len(tags["rationale"]) > 200 else tags["rationale"]
-    return {"ok": True, "method": "strategy", "result": result}
+    gap = float((result.get("accounting_snapshot") or {}).get("compliance_gap") or 0)
+    actions_total = sum(len(p.get("actions") or []) for p in (result.get("plans") or []))
+    note = _calc_note(
+        summary="读取企业台账 → 核算快照与市场研判 → 规则引擎生成三档履约方案并过滤风险画像。",
+        steps=[
+            f"核算快照：核查排放 {result.get('accounting_snapshot', {}).get('verified_emission', 0)} 万吨，履约缺口 {gap:.2f} 万吨",
+            f"市场研判：{tags.get('time_window', '-')} / {tags.get('action_tag', '-')}",
+            f"生成 {len(result.get('plans') or [])} 档方案（min_cost/optimized/full_compliance），共 {actions_total} 个动作",
+        ],
+        assumptions=[
+            "推荐价为日均/预测锚定，非实时盘口",
+            "三档方案按风险画像与预算约束过滤，仅作决策参考",
+        ],
+    )
+    return {"ok": True, "method": "strategy", "result": result, "calculation_note": note}
 
 
 # ---------------------------------------------------------------------------
@@ -319,21 +445,40 @@ def _query_carbon_enterprise_ledger(args: Dict[str, Any]) -> Dict[str, Any]:
     if err:
         return err
     uid = ccs.DEFAULT_USER_ID
+    ent = ccs.enterprise_to_dict(ccs.get_enterprise(None, uid, enterprise_id))
+    emissions = [dict(r) for r in ccs.list_emission_years(None, enterprise_id)]
+    forecasts = [dict(r) for r in ccs.list_forecasts(None, enterprise_id)]
+    cea_holdings = [dict(r) for r in ccs.list_cea_holdings(None, enterprise_id)]
+    cea_trades = [dict(r) for r in ccs.list_cea_trades(None, enterprise_id)]
+    ccer_holdings = [dict(r) for r in ccs.list_ccer_holdings(None, enterprise_id)]
+    green_power = [dict(r) for r in ccs.list_green_power(None, enterprise_id)]
+    green_certs = [dict(r) for r in ccs.list_green_certs(None, enterprise_id)]
+    alerts = [dict(r) for r in ccs.list_alerts(None, uid, enterprise_id=enterprise_id, limit=20)]
+    note = _calc_note(
+        summary=f"从企业台账汇总 {ent.get('name', enterprise_id)} 的碳资产全貌。",
+        steps=[
+            f"企业档案 1 条：行业 {ent.get('industry', '-')} / 风险画像 {ent.get('risk_profile', '-')}",
+            f"历史排放 {len(emissions)} 条 / 排放预测 {len(forecasts)} 条",
+            f"CEA 持仓 {len(cea_holdings)} 条 / CEA 交易 {len(cea_trades)} 条 / CCER 持仓 {len(ccer_holdings)} 条",
+            f"绿电 {len(green_power)} 条 / 绿证 {len(green_certs)} 条 / 履约预警 {len(alerts)} 条",
+        ],
+        assumptions=[
+            "数据来源为企业碳资产台账（人工录入 + 平台同步），非交易所直接持仓",
+        ],
+    )
     return {
         "ok": True,
         "method": "ledger",
-        "enterprise": ccs.enterprise_to_dict(ccs.get_enterprise(None, uid, enterprise_id)),
-        "emissions": [dict(r) for r in ccs.list_emission_years(None, enterprise_id)],
-        "forecasts": [dict(r) for r in ccs.list_forecasts(None, enterprise_id)],
-        "cea_holdings": [dict(r) for r in ccs.list_cea_holdings(None, enterprise_id)],
-        "cea_trades": [dict(r) for r in ccs.list_cea_trades(None, enterprise_id)],
-        "ccer_holdings": [dict(r) for r in ccs.list_ccer_holdings(None, enterprise_id)],
-        "green_power": [dict(r) for r in ccs.list_green_power(None, enterprise_id)],
-        "green_certs": [dict(r) for r in ccs.list_green_certs(None, enterprise_id)],
-        "alerts": [
-            dict(r)
-            for r in ccs.list_alerts(None, uid, enterprise_id=enterprise_id, limit=20)
-        ],
+        "enterprise": ent,
+        "emissions": emissions,
+        "forecasts": forecasts,
+        "cea_holdings": cea_holdings,
+        "cea_trades": cea_trades,
+        "ccer_holdings": ccer_holdings,
+        "green_power": green_power,
+        "green_certs": green_certs,
+        "alerts": alerts,
+        "calculation_note": note,
     }
 
 
@@ -345,11 +490,17 @@ def _list_carbon_enterprises(args: Dict[str, Any]) -> Dict[str, Any]:
     from app.services import carbon_compliance_service as ccs
 
     rows = ccs.list_enterprises(None, ccs.DEFAULT_USER_ID)
+    note = _calc_note(
+        summary="从企业台账读取全部控排企业档案。",
+        steps=[f"台账共 {len(rows)} 家控排企业"],
+        assumptions=["数据来源为企业碳资产台账（人工录入）"],
+    )
     return {
         "ok": True,
         "method": "enterprises",
         "count": len(rows),
         "enterprises": [ccs.enterprise_to_dict(e) for e in rows],
+        "calculation_note": note,
     }
 
 
@@ -537,7 +688,62 @@ _METHODOLOGY_SKILLS: List[Skill] = [
 ]
 
 
+# 方法学技能名 → 源方法学模块（用于溯源元数据；未命中时留空不影响注册）
+_METHODOLOGY_MODULES = {
+    "compute_carbon_accounting": "accounting.py",
+    "judge_carbon_market_cycle": "market_cycle.py",
+    "forecast_carbon_price_to_year_end": "price_forecast.py",
+    "compute_cea_carry_forward": "carry_forward.py",
+    "evaluate_carbon_compliance": "compliance.py",
+    "recommend_carbon_strategy": "strategy_engine.py",
+    "query_carbon_enterprise_ledger": "carbon_compliance_service.py",
+    "list_carbon_enterprises": "carbon_compliance_service.py",
+}
+
+
+def _validate_skill(s: Skill) -> None:
+    """校验方法学 Skill 定义完整性；缺字段即失败并提示，防止新增技能时漏配。"""
+    missing = [f for f in ("name", "description", "input_schema") if not getattr(s, f)]
+    if not callable(getattr(s, "handler", None)):
+        missing.append("handler")
+    if missing:
+        raise ValueError(
+            f"方法学技能定义不完整（缺少: {', '.join(missing)}）：{s.name or '<未命名>'}"
+        )
+
+
 def register_methodology_skills(registry) -> None:
-    """把全部方法学 skills 注册到给定 SkillRegistry。"""
+    """把全部方法学 skills 注册到给定 SkillRegistry。
+
+    体系自动扩展：新增方法学时只需在 _METHODOLOGY_SKILLS 列表追加一个 Skill
+    （name/description/input_schema/handler 必填），其余自动完成：
+    - 自动补全分类标签（tags 缺省为 ["carbon", "methodology"]）
+    - 自动标注元数据 category=methodology、methodology_module=源模块
+    - 注册前做必填字段校验，缺失时报错并指出缺哪个字段
+    - 注册后输出一行摘要日志
+    """
     for s in _METHODOLOGY_SKILLS:
+        _validate_skill(s)
+        s.meta.setdefault("category", "methodology")
+        s.meta.setdefault("methodology_module", _METHODOLOGY_MODULES.get(s.name, ""))
+        if not s.tags:
+            s.tags = ["carbon", "methodology"]
         registry.register(s)
+        logger.info(
+            "方法学技能注册: %s (module=%s, tags=%s)",
+            s.name, s.meta["methodology_module"], s.tags,
+        )
+
+
+def methodology_manifest() -> List[Dict[str, str]]:
+    """返回全部方法学技能清单（name → 源模块/简介），供调试与文档使用。"""
+    return [
+        {
+            "name": s.name,
+            "module": s.meta.get("methodology_module") or "",
+            "category": s.meta.get("category", "methodology"),
+            "description": (s.description or "").splitlines()[0][:80],
+            "tags": ",".join(s.tags),
+        }
+        for s in _METHODOLOGY_SKILLS
+    ]
