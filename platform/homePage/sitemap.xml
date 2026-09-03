@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 海颐·能优算 · 工业能碳智控平台门户站点地图
+     当前为单页门户，收录首页；站点新增独立页面时在此追加 <url> 条目。
+     部署域名/端口变化时请同步修改各 <loc> 与 index.html canonical/og:url。 -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>http://36.151.146.71:40200/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>

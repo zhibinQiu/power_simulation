@@ -165,7 +165,7 @@
                     <span class="cbx-topo-mod-name" :title="'CloudCore'">{{ t('云边连接服务') }}</span>
                     <span class="cbx-topo-mod-badge" :class="{ ok: overview.cloudcore && overview.cloudcore.phase === 'Running' }">{{ overview.cloudcore ? phaseZh(overview.cloudcore.phase) : '—' }}</span>
                   </div>
-                  <div class="cbx-topo-mod-sub">CloudHub :10002 · KubeEdge CRD<br/>{{ cloudCfg.host || '172.19.134.45' }}</div>
+                  <div class="cbx-topo-mod-sub">CloudHub :10002 · KubeEdge CRD<br/>{{ cloudCfg.host || '36.151.146.71' }}</div>
                   <div class="cbx-topo-mod-ops">
                     <button class="cbx-op cbx-xs" :disabled="!!restartingKey" @click="restartCloudcore()" :title="t('重启云端 kubeedge 命名空间下的 cloudcore 工作负载')">{{ restartingKey === 'deployment:cloudcore' ? t('重启中…') : '↻ ' + t('重启') }}</button>
                   </div>
@@ -414,7 +414,7 @@
       <span class="cbx-st-item">{{ t('模型') }} {{ devices.models?.length || 0 }} · {{ t('设备') }} {{ devices.devices?.length || 0 }}</span>
       <span class="cbx-st-item">{{ t('消息') }} {{ messages.length }} {{ t('条') }}</span>
       <span class="cbx-st-grow"></span>
-      <span class="cbx-st-item">{{ cloudCfg.host || '172.19.134.45' }}</span>
+      <span class="cbx-st-item">{{ cloudCfg.host || '36.151.146.71' }}</span>
       <span class="cbx-st-item">3s {{ t('自动刷新') }}</span>
     </footer>
 
@@ -719,7 +719,7 @@
             <div class="cbx-form">
               <div class="cbx-form-row">
                 <label>{{ t('盒子主机名') }}</label><input v-model="onboardForm.hostname" class="cbx-input" placeholder="edge-box"/>
-                <label>{{ t('云端 CloudCore IP') }}</label><input v-model="onboardForm.cloudIP" class="cbx-input" placeholder="172.19.134.45"/>
+                <label>{{ t('云端 CloudCore IP') }}</label><input v-model="onboardForm.cloudIP" class="cbx-input" placeholder="36.151.146.71"/>
                 <label>{{ t('盒子 IP（可选，远程一键时作为直达地址）') }}</label><input v-model="onboardForm.boxIP" class="cbx-input" placeholder="172.20.186.56"/>
                 <button class="cbx-op primary" :disabled="!onboardForm.cloudIP || onboardBusy" @click="doOnboard">{{ onboardBusy ? t('生成中…') : t('生成一键脚本') }}</button>
               </div>
@@ -1765,7 +1765,7 @@ async function delCloud(kind, name, namespace) {
 async function copyPreview() { try { await navigator.clipboard.writeText(preview.value); store.showToast(t('YAML 已复制'), 'success') } catch (e) {} }
 
 // ---- Tab4 盒子一键接入（自解压脚本：box-deploy 包 + edgecore.yaml + rootCA + token）----
-const onboardForm = reactive({ hostname: 'edge-box', cloudIP: '172.19.134.45', boxIP: '' })
+const onboardForm = reactive({ hostname: 'edge-box', cloudIP: '36.151.146.71', boxIP: '' })
 const onboardResult = ref(null)
 const onboardOpen = ref(false)
 const onboardBusy = ref(false)

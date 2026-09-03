@@ -31,7 +31,8 @@
       "available_skills": [
         "query_realtime_devices",
         "query_device_history",
-        "run_simulation"
+        "run_simulation",
+        "summarize_plant_emissions"
       ],
       "builtin": true,
       "created_at": 0.0,
@@ -72,6 +73,8 @@
         "get_emission_factors",
         "get_carbon_forecast",
         "query_realtime_devices",
+        "summarize_plant_emissions",
+        "query_knowledge",
         "compute_carbon_accounting",
         "evaluate_carbon_compliance",
         "judge_carbon_market_cycle",
@@ -129,7 +132,10 @@
         "forecast_carbon_price_to_year_end",
         "get_carbon_market_quote",
         "get_emission_factors",
-        "get_carbon_forecast"
+        "get_carbon_forecast",
+        "query_realtime_devices",
+        "summarize_plant_emissions",
+        "query_knowledge"
       ],
       "builtin": true,
       "created_at": 0.0,

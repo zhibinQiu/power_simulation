@@ -1,17 +1,17 @@
 {
   "docs": {
-    "96e57442b41e": {
-      "id": "96e57442b41e",
-      "title": "说明",
-      "folder": "测试目录",
-      "ext": ".txt",
-      "size": 3710,
-      "chars": 3242,
-      "original": "说明.txt",
+    "6781718c1907": {
+      "id": "6781718c1907",
+      "title": "炼钢节能减排-喷吹煤",
+      "folder": "高炉优化",
+      "ext": ".pdf",
+      "size": 28632248,
+      "chars": 0,
+      "original": "炼钢节能减排-喷吹煤.pdf",
       "parse": true,
-      "raw": "raw/96e57442b41e.txt",
-      "created_at": "2026-08-30T12:01:36",
-      "updated_at": "2026-08-30T12:01:36"
+      "raw": "raw/6781718c1907.pdf",
+      "created_at": "2026-09-03T14:01:46",
+      "updated_at": "2026-09-03T14:01:46"
     }
   }
 }

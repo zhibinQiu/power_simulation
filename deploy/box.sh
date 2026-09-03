@@ -10,10 +10,10 @@
 #   1) 配置文件驱动（推荐）：把 box-config.json 放到 /opt/weight-bridge/ 后一条命令
 #        curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/box.sh | bash
 #      box-config.json 字段（其余字段一律忽略）：
-#        { "boxId": "my-box-01", "cloudIP": "172.19.134.45", "token": "xxx.yyy.zzz",
+#        { "boxId": "my-box-01", "cloudIP": "36.151.146.71", "token": "xxx.yyy.zzz",
 #          "repo": "owner/repo", "branch": "master", "rootCA": "<base64 可选>" }
 #   2) 命令行参数（无配置文件）：
-#        curl -fsSL <同上> | bash -s -- -i 172.19.134.45 -n my-box-01 -t <token>
+#        curl -fsSL <同上> | bash -s -- -i 36.151.146.71 -n my-box-01 -t <token>
 #   3) 仅指定主机名（兼容旧用法，其余用脚本内置默认）：
 #        curl -fsSL <同上> | bash -s my-box-01
 #
@@ -52,7 +52,7 @@ usage() {
       自动读取 /opt/weight-bridge/box-config.json（boxId/cloudIP/token 必填）
   curl -fsSL <同上> | bash -s -- -c /path/box-config.json
       指定配置文件
-  curl -fsSL <同上> | bash -s -- -i 172.19.134.45 -n my-box-01 -t <token>
+  curl -fsSL <同上> | bash -s -- -i 36.151.146.71 -n my-box-01 -t <token>
       命令行指定（无配置文件）
 
 选项：

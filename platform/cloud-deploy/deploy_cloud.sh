@@ -13,7 +13,7 @@
 #      /api/history 查询; 库名 nengtan, 超表 readings, 保留 TSDB_KEEP 天)
 #
 # 一键用法 (傻瓜式, 推荐):
-#   bash deploy_cloud.sh --bootstrap --ip 172.19.134.45
+#   bash deploy_cloud.sh --bootstrap --ip 36.151.146.71
 #     自动检测/安装 k3s → 控制面 → 数据面 → 时序库 → agent → 末尾打印「平台配置一键导入」
 #     (把打印的 JSON 复制到平台「云端 Broker 配置 → 一键导入」即可)
 #   分步用法:
@@ -29,7 +29,7 @@
 #   --auto-k3s         仅当 k3s/kubectl 缺失时自动安装 (与分步模式搭配)
 #   --ip <IP>          云端对外 IP (等价 CLOUD_IP 环境变量)
 # 环境变量:
-#   CLOUD_IP         云端对外 IP (默认 172.19.134.45, 边缘盒子要能路由到)
+#   CLOUD_IP         云端对外 IP (默认 36.151.146.71, 边缘盒子要能路由到)
 #   KUBEEDGE_VERSION KubeEdge 版本 (默认 v1.20.0, 兼容 k3s ≤ 1.30)
 #   DATA_DIR         数据面部署路径 (默认 /root/qzb/jianpai/data-terminal)
 #   DATAPATH_SRC     参考工程源码目录 (可选, 优先复制覆盖本包自带数据面实现)
@@ -54,7 +54,7 @@ DATAPATH_DIR="$SELF_DIR/datapath"
 SYSTEMD_SRC="$DATAPATH_DIR/systemd"
 AGENT_DIR="$SELF_DIR/agent"
 
-CLOUD_IP="${CLOUD_IP:-172.19.134.45}"
+CLOUD_IP="${CLOUD_IP:-36.151.146.71}"
 KUBEEDGE_VERSION="${KUBEEDGE_VERSION:-v1.20.0}"
 DATA_DIR="${DATA_DIR:-/root/qzb/jianpai/data-terminal}"
 DATAPATH_SRC="${DATAPATH_SRC:-}"

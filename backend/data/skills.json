@@ -1,6 +1,7 @@
 {
   "skills": {
     "run_simulation": true,
-    "get_carbon_forecast": true
+    "get_carbon_forecast": true,
+    "query_realtime_devices": true
   }
 }

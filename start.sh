@@ -10,6 +10,7 @@
 #    ./start.sh --no-docs     不启动独立文档网站
 #    ./start.sh --no-portal   不启动门户网站
 #    ./start.sh --no-portal-sync  不自动同步门户到线上官网 (https://www.nengyousuan.com)
+#    ./start.sh --server      一键同步代码到新服务器 36.151.146.71 并重建重启（等价 bash sync.sh，参数透传）
 #    ./start.sh --help        查看帮助
 #
 #  说明:
@@ -17,6 +18,8 @@
 #    - 前端首次运行自动 npm install
 #    - 日志写入 .logs/ 目录，Ctrl+C 停止全部服务
 #    - 默认启动门户时会把 platform/homePage/ 同步到线上官网 43.161.194.75（免密 SSH），失败不阻断本地服务
+#    - 后端默认连接「新服务器」云端 MQTT Broker（backend/config/box_config.json 指向 36.151.146.71:41883），
+#      本地开发即可看到盒子实时数据；生产部署/更新请用 deploy/server.sh 与 ./sync.sh（详见 README）
 # ============================================================
 set -euo pipefail
 
@@ -35,6 +38,12 @@ PORTAL_SYNC=1     # 启动门户时同步 platform/homePage 到线上官网 43.1
 PORTAL_SERVER="root@43.161.194.75"
 PORTAL_REMOTE_DIR="/var/www/nengyousuan"
 
+# --server：一键同步代码到新服务器（36.151.146.71）并重建重启 = bash sync.sh，剩余参数透传
+if [ "${1:-}" = "--server" ] || [ "${1:-}" = "--sync" ]; then
+  shift
+  exec bash "$ROOT/sync.sh" "$@"
+fi
+
 for arg in "$@"; do
   case "$arg" in
     --prod)     MODE="prod" ;;
@@ -44,7 +53,7 @@ for arg in "$@"; do
     --no-portal) RUN_PORTAL=0 ;;
     --no-portal-sync) PORTAL_SYNC=0 ;;
     -h|--help)
-      sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
+      awk 'NR >= 2 && /^#/ { sub(/^# ?/, ""); print } NR >= 2 && !/^#/ { exit }' "$0"
       exit 0
       ;;
     *)

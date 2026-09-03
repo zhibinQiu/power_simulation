@@ -936,7 +936,7 @@ def _mqtt_client():
             cli.on_message = _on_cmd_message
             # connect_async + loop_start：paho 后台线程自动重连（1s~120s 指数退避），
             # 云端 Broker 重启/网络抖动无需人工干预即可恢复
-            cli.connect_async(MQTT_BROKER.get("host", "172.19.134.45"), int(MQTT_BROKER.get("port", 41883)), 30)
+            cli.connect_async(MQTT_BROKER.get("host", "36.151.146.71"), int(MQTT_BROKER.get("port", 41883)), 30)
             cli.loop_start()
             _mqtt_cli = cli
         except Exception as e:
@@ -1442,6 +1442,70 @@ def services_reporter(stop_event):
 # ---------------------------------------------------------------------------
 # 设备采集线程
 # ---------------------------------------------------------------------------
+# 死值监测（stuck watch）：数值读数连续 count 拍纹丝不动 -> 注入 <prop>_stuck=1
+# 告警属性并打醒目日志，恢复变化自动解除（注入 0）。防"假在线"掩盖变送器/传感器故障
+# （例：变送器损坏恒定输出 0.01，无论称重多少寄存器纹丝不动）。设备配置示例：
+#   "stuckWatch": {
+#       "count": 30,             # 连续不变 N 拍触发（N x interval = 告警时长）
+#       "deadband": 0.0,         # |Δ| <= deadband 视为不变；可按物理分辨率放宽
+#       "properties": ["weight"] # 缺省 = 监测全部数值属性
+#   }
+# 仅在设备存在 stuckWatch 配置时启用，不影响其他设备；str/bool 状态属性不监测
+# （ICCID/reg/在线状态等本就恒定）。告警属性随原通道上送：DMI twins + MQTT data/#，
+# 云端 Device.status.twins / data/# 可直接看到，平台侧无需任何改动。
+# ---------------------------------------------------------------------------
+class StuckWatcher:
+    """死值监测器（每设备一个实例，由 collector 驱动）。"""
+
+    def __init__(self, device, interval=1.0):
+        cfg = device.get("stuckWatch") or {}
+        self.enabled = bool(device.get("stuckWatch")) and cfg.get("enabled", True) is not False
+        self.count = max(2, int(cfg.get("count", 60) or 60))
+        self.deadband = float(cfg.get("deadband", 0.0) or 0.0)
+        watch = cfg.get("properties")
+        self.props = [str(p) for p in watch] if watch else None  # None = 全部数值属性
+        self.interval = max(0.1, float(interval or 1.0))
+        self._last = {}   # prop -> 上一次有效值
+        self._same = {}   # prop -> 连续不变拍数
+        self._alarm = {}  # prop -> 当前告警态
+
+    def _watched(self, prop, v):
+        if v is None or isinstance(v, (str, bool)):
+            return False
+        if self.props is not None and prop not in self.props:
+            return False
+        return True
+
+    def update(self, values):
+        """比较本拍读数，就地合并告警属性到 values；返回告警状态翻转 [(prop, on), ...]。
+
+        告警中每拍保持注入 <prop>_stuck=1（twins 持续刷新可见），解除时注入 0 清警；
+        正常期不注入该属性，避免污染 twins。
+        """
+        flips = []
+        for prop in list(values):
+            v = values[prop]
+            if not self._watched(prop, v):
+                continue
+            last = self._last.get(prop)
+            if last is None or abs(float(v) - float(last)) > self.deadband:
+                self._last[prop] = v
+                self._same[prop] = 0
+                on = False
+            else:
+                self._same[prop] = self._same.get(prop, 0) + 1
+                on = self._same[prop] >= self.count
+            prev = self._alarm.get(prop, False)
+            self._alarm[prop] = on
+            if on:
+                values[prop + "_stuck"] = 1
+            elif prev:
+                values[prop + "_stuck"] = 0
+            if on != prev:
+                flips.append((prop, on))
+        return flips
+
+
 _stub_global = None
 _stub_lock = threading.Lock()
 
@@ -1465,6 +1529,11 @@ def collector(device, stop_event):
     points = device.get("points", [])
     print("[info] [%s] 采集线程启动: protocol=%s interval=%.1fs points=%d" % (
         name, proto, interval, len(points)))
+    watcher = StuckWatcher(device, interval)
+    if watcher.enabled:
+        print("[info] [%s] 死值监测启用: 连续 %d 拍(~%.0fs)读数不变触发告警，监测=%s deadband=%s" % (
+            name, watcher.count, watcher.count * watcher.interval,
+            ",".join(watcher.props) if watcher.props else "全部数值属性", watcher.deadband))
     while not stop_event.is_set():
         reader = None
         try:
@@ -1474,6 +1543,13 @@ def collector(device, stop_event):
             while not stop_event.is_set():
                 try:
                     values = reader.read_all()
+                    if watcher.enabled:
+                        for prop, on in watcher.update(values):
+                            if on:
+                                print("[alarm] [%s] %s 已连续 ~%.0fs 读数无变化，疑似死值/变送器故障，请检查传感器与变送器！" % (
+                                    name, prop, watcher.count * watcher.interval))
+                            else:
+                                print("[info] [%s] %s 读数恢复变化，死值告警解除" % (name, prop))
                     stub = get_stub()
                     # stub 为 None（DMI 未就绪）时仍尝试上报：MQTT 实时直报通道独立可用，
                     # DMI 断连期间平台仍能经 data/# 拿到实时数据

@@ -40,12 +40,12 @@ _LAUNCHER = r"""#!/usr/bin/env bash
 #      或显式指定配置路径：
 #        curl -fsSL $REPO_BASE/onboard/onboard_box.sh | bash -s -- -c /path/box-config.json
 #   2) 命令行参数（无配置文件）：
-#        curl -fsSL $REPO_BASE/onboard/onboard_box.sh | bash -s -- -i 172.19.134.45 -n my-box-01
+#        curl -fsSL $REPO_BASE/onboard/onboard_box.sh | bash -s -- -i 36.151.146.71 -n my-box-01
 #   3) 仅指定主机名（其余用脚本内置默认 + 仓库 token）：
 #        curl -fsSL $REPO_BASE/onboard/onboard_box.sh | bash -s my-box-01
 #
 # box-config.json 字段（平台「盒子接入 → GitHub 托管」可一键导出）：
-#   { "boxId": "my-box-01", "cloudIP": "172.19.134.45", "token": "xxx.yyy.zzz",
+#   { "boxId": "my-box-01", "cloudIP": "36.151.146.71", "token": "xxx.yyy.zzz",
 #     "repo": "owner/repo", "branch": "master" }
 #   - boxId/cloudIP 必填（缺省回落命令行参数 / 脚本内置值 / 当前主机名）；
 #   - token 可选：缺省脚本自动从仓库拉取；
@@ -71,7 +71,7 @@ usage() {
       用当前主机名 + 内置云端 IP；若 /opt/weight-bridge/box-config.json 存在则自动读取
   curl -fsSL $REPO_BASE/onboard/onboard_box.sh | bash -s -- -c /path/box-config.json
       配置文件驱动（推荐：现场只有一份 box-config.json，无需任何源码）
-  curl -fsSL $REPO_BASE/onboard/onboard_box.sh | bash -s -- -i 172.19.134.45 -n my-box-01
+  curl -fsSL $REPO_BASE/onboard/onboard_box.sh | bash -s -- -i 36.151.146.71 -n my-box-01
       命令行指定云端 IP / 主机名（无配置文件）
   curl -fsSL $REPO_BASE/onboard/onboard_box.sh | bash -s my-box-01
       仅指定主机名（兼容旧用法）

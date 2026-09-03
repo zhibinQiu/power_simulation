@@ -200,7 +200,7 @@ export const sections = [
 5. **盒子接入**：输入盒子主机名 / 云端 CloudCore IP / 盒子 IP，生成 edgecore.yaml（模板渲染）+ 共享 Token + CA 指纹 + 完整部署命令（① keadm join → ② 配置下发 → ③ 云端创建设备 → ④ box-deploy 采集包部署 → ⑤ 触发路由验证）。
 
 关键规则：
-- **总体架构**：控制平面全在云端 K3s（轻量 K8s，172.19.134.45）+ KubeEdge CloudCore；盒子边缘只安装 EdgeCore（不部署 k3s-server、无本地控制平面），经 CloudHub（云端 10002 端口）长连接云端，边缘运行 Pod / mosquitto / mapper（DMI 采集，云边协同断点续传）；
+- **总体架构**：控制平面全在云端 K3s（轻量 K8s，36.151.146.71）+ KubeEdge CloudCore；盒子边缘只安装 EdgeCore（不部署 k3s-server、无本地控制平面），经 CloudHub（云端 10002 端口）长连接云端，边缘运行 Pod / mosquitto / mapper（DMI 采集，云边协同断点续传）；
 - **一键重启**：拓扑图中 CloudCore / cloud-agent / MQTT Broker 模块均有「↻ 重启」按钮，边端盒子有「↻ Mapper」按钮——CloudCore 为 kubectl 滚动重启；cloud-agent / MQTT Broker 为云端 systemctl 重启（重启 cloud-agent 自身延迟 2 秒自动拉起）；box-mapper 由云端 agent 经 SSH 到边缘盒子执行 systemctl restart（需在 agent 的 \`/opt/cloud-agent/config.json\` 配置 \`edge\` 节点：host / user / password 或 key，密码方式需安装 sshpass）。重启 Broker 会短暂断开云边 MQTT 长连接，数秒后自动重连；
 - 设备/模型在设备管理创建（后端持久化 \`backend/config/box_devices.json\`），可从设备库导入模板（皮带秤/电表/流量计等）；盒子接入模板预览为 \`backend/config/edgecore.template.yaml\`；
 - 管理台只做「配置」与「读取展示」，传感器读数经 DMI 链路获取（断连期间由边缘 SQLite 缓存 + 恢复后补传，数据不丢）。

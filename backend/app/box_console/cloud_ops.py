@@ -72,7 +72,7 @@ def cloud_config() -> Dict[str, Any]:
     c = data.get("cloud") or {}
     broker_host = mqtt_source.get_config().get("broker", {}).get("host", "") if mqtt_source else ""
     return {
-        "host": (c.get("host") or "").strip() or broker_host or "172.19.134.45",
+        "host": (c.get("host") or "").strip() or broker_host or "36.151.146.71",
         "agent_port": int(c.get("agent_port", 42083)),
         "agent_token": c.get("agent_token", ""),
         "namespace": c.get("namespace", "default"),

@@ -12,7 +12,7 @@
 | 云端 OS | openEuler / CentOS / Ubuntu（systemd，root） |
 | 容器运行时 | **k3s v1.30.x**（kubectl 可用，KUBECONFIG=`/etc/rancher/k3s/k3s.yaml`） |
 | KubeEdge | cloudcore **v1.20.0**（手动 manifest 部署，无需 keadm） |
-| 云端 IP | 默认 `172.19.134.45`（`CLOUD_IP` 可改） |
+| 云端 IP | 默认 `36.151.146.71`（`CLOUD_IP` 可改） |
 | 数据面端口 | MQTT **41883**（TCP）/ **41083**（WS）/ 仪表盘 **41500** |
 
 > **端口规范（全局约定）**：本项目**服务端口一律使用 40000+**（如 41883/41083/41500），
@@ -49,8 +49,8 @@ cloud-deploy/
 
 ```bash
 # ⭐ 一键部署（傻瓜式，推荐）：自动装 k3s → 控制面 → 数据面 → agent → 打印平台配置
-#    本机默认 IP 172.19.134.45，若不同请用 --ip 指定
-sudo bash deploy_cloud.sh --bootstrap --ip 172.19.134.45
+#    本机默认 IP 36.151.146.71，若不同请用 --ip 指定
+sudo bash deploy_cloud.sh --bootstrap --ip 36.151.146.71
 ```
 
 部署结束会打印一段 JSON（含 agent_token/broker 地址），把 JSON 复制到平台
@@ -59,7 +59,7 @@ sudo bash deploy_cloud.sh --bootstrap --ip 172.19.134.45
 分步模式（前置：k3s 已装）：
 
 ```bash
-export CLOUD_IP=172.19.134.45
+export CLOUD_IP=36.151.146.71
 sudo ./deploy_cloud.sh                       # 控制面 + 数据面 + agent
 sudo ./deploy_cloud.sh --control-only        # 仅 KubeEdge 控制面（cloudcore/CRD/防火墙）
 sudo ./deploy_cloud.sh --datapath-only       # 仅数据面（broker/dashboard/collector + systemd）

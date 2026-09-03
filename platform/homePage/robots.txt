@@ -1,0 +1,93 @@
+# 海颐·能优算 · 工业能碳智控平台门户 —— 爬虫访问策略
+# 部署域名/端口变化时，请同步修改下方 Sitemap 行与 index.html 中 canonical/og:url。
+# 站点为纯静态单页（无登录、无私有内容），故对浏览器爬虫与 AI 爬虫一律放行。
+
+# ---- 通用浏览器搜索引擎爬虫 ----
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+User-agent: Sogou web spider
+Allow: /
+
+User-agent: 360Spider
+Allow: /
+
+User-agent: YisouSpider
+Allow: /
+
+# ---- 兼容任意的常规/未知爬虫（兜底：覆盖未显式列出的所有浏览器/AI 爬虫） ----
+User-agent: *
+Allow: /
+# 资源文件中的品牌素材同样可索引，无需屏蔽
+
+# ================= AI / 生成式引擎爬虫（GEO 检索增强）=================
+# ---- 国内主流大模型（重点）----
+# 字节跳动 · 豆包（豆包 App / 豆包网页助手引用网站来源时使用 DoubaoBot）
+User-agent: DoubaoBot
+Allow: /
+
+# 字节跳动 · 豆包/搜索与模型训练数据（Bytespider）
+User-agent: Bytespider
+Allow: /
+
+# 阿里巴巴 · 通义千问 / 通义（T-AlphaBot）
+User-agent: T-AlphaBot
+Allow: /
+
+# DeepSeek（DeepSeekBot）
+User-agent: DeepSeekBot
+Allow: /
+
+# 百度 · 文心一言 / AI 搜索聚合：内容引用走百度搜索（Baiduspider，已在通用段放行）；
+# 若百度后续公布独立的 AI 抓取 UA，在此追加即可
+User-agent: Baiduspider-render
+Allow: /
+
+# 说明：腾讯元宝、360 纳米 AI、讯飞星火、快手可灵等尚未公布固定 AI 抓取 UA，
+# 均会命中上方 User-agent: * 兜底放行，无需担心被拦截。
+
+# ---- 海外主流 AI / 生成式引擎爬虫 ----
+# OpenAI
+User-agent: GPTBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+# Anthropic (Claude)
+User-agent: ClaudeBot
+Allow: /
+User-agent: Claude-Web
+Allow: /
+User-agent: anthropic-ai
+Allow: /
+# Google AI (AI Overview / SGE)
+User-agent: Google-Extended
+Allow: /
+# Perplexity
+User-agent: PerplexityBot
+Allow: /
+User-agent: Perplexity-User
+Allow: /
+# Meta AI
+User-agent: meta-externalagent
+Allow: /
+# Apple AI / Siri
+User-agent: Applebot
+Allow: /
+User-agent: Applebot-Extended
+Allow: /
+# Common Crawl (CCBot，多为 AI 训练数据源)
+User-agent: CCBot
+Allow: /
+User-agent: Amazonbot
+Allow: /
+
+# ---- 站点地图与 AI 站点索引 ----
+Sitemap: http://36.151.146.71:40200/sitemap.xml

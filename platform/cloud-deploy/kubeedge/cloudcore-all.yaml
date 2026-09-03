@@ -7,7 +7,7 @@
 #   → Service(ClusterIP)
 #
 # 使用前必须用 deploy_cloud.sh 渲染 {{CLOUD_IP}} 为云端对外 IP，例如:
-#   sed "s/{{CLOUD_IP}}/172.19.134.45/g" cloudcore-all.yaml | kubectl apply -f -
+#   sed "s/{{CLOUD_IP}}/36.151.146.71/g" cloudcore-all.yaml | kubectl apply -f -
 #
 # 关键设计:
 #   - Deployment hostNetwork:true / dnsPolicy:ClusterFirstWithHostNet

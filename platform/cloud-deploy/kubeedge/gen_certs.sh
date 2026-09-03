@@ -11,7 +11,7 @@
 #   - 证书预置宿主机 /etc/kubeedge，由 cloudcore-all.yaml 以 hostPath 挂载
 #
 # 用法:
-#   ./gen_certs.sh [CLOUD_IP]          # 生成 CA + server 证书 (默认 IP 172.19.134.45)
+#   ./gen_certs.sh [CLOUD_IP]          # 生成 CA + server 证书 (默认 IP 36.151.146.71)
 #   ./gen_certs.sh --with-stream [IP]  # 额外生成 cloudStream 证书 (启用 10003)
 #   ./gen_certs.sh --force [IP]        # 已存在证书时强制重新生成 (需重启 cloudcore)
 #
@@ -20,7 +20,7 @@
 set -euo pipefail
 
 CERT_DIR="/etc/kubeedge"
-CLOUD_IP="${1:-172.19.134.45}"
+CLOUD_IP="${1:-36.151.146.71}"
 WITH_STREAM=0
 FORCE=0
 

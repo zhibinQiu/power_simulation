@@ -30,6 +30,9 @@ services:
       - "40014:8010"               # 主机 40014 -> 容器 8010
     environment:
       - PYTHONUNBUFFERED=1
+      # Broker 连接地址：box_config.json 默认指向新云端公网 IP（本地开发直连用）；
+      # 容器内通过 docker 网关回环宿主（172.18.0.1）更快更稳，故此处覆盖。
+      - BROKER_HOST=172.18.0.1
       # 大模型策略拆解（OpenAI 兼容接口）。未配置时自动回退到规则解析。
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.deepseek.com/v1}
       - LLM_API_KEY=${LLM_API_KEY:-}

@@ -22,9 +22,9 @@ router = APIRouter()
 _CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "config")
 _DEVICES_PATH = os.path.join(_CONFIG_DIR, "box_devices.json")
 _BROKER_CFG_PATH = os.path.join(_CONFIG_DIR, "box_config.json")
-_DEFAULT_CLOUD_HOST = "172.19.134.45"
-# 文档站经 frp 隧道暴露的公网入口（45 服务器 → 36.151.146.71:40183），
-# 可经环境变量 DOCS_PUBLIC_HOST 覆盖（如切换公网 frps 地址时）。
+_DEFAULT_CLOUD_HOST = "36.151.146.71"
+# 文档站公网入口（36.151.146.71:40184，与平台同机直出；原 frp 隧道方案已下线），
+# 可经环境变量 DOCS_PUBLIC_HOST 覆盖（如切换公网地址时）。
 _DEFAULT_PUBLIC_HOST = os.getenv("DOCS_PUBLIC_HOST", "").strip() or "36.151.146.71"
 
 
@@ -37,8 +37,8 @@ _HOST_TTL = 60.0
 def cloud_host() -> str:
     """返回文档站对外访问地址（TTL 缓存）。
 
-    文档站经 frp 隧道暴露公网，跳转链接固定使用公网地址（DOCS_PUBLIC_HOST
-    优先，默认 36.151.146.71），不再使用云端内网 IP。
+    文档站公网入口与平台同机（36.151.146.71:40184），跳转链接固定使用公网地址
+    （DOCS_PUBLIC_HOST 优先，默认 36.151.146.71），不再使用云端内网 IP。
     """
     global _cloud_host_cache, _cloud_host_ts
     now = time.monotonic()

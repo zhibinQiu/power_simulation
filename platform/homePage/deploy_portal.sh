@@ -14,14 +14,14 @@
 #   ./deploy_portal.sh uninstall                        # 卸载服务（保留站点文件）
 #
 # 选项：
-#   -s, --server <user@host>  目标服务器（默认 root@172.19.134.45，可改）
+#   -s, --server <user@host>  目标服务器（默认 root@36.151.146.71，可改）
 #   -p, --port <port>         对外端口（默认 40200，遵循 40000+ 端口规范）
 #   -h, --help                帮助
 # ============================================================================
 set -euo pipefail
 cd "$(dirname "$0")"
 
-SERVER="${SERVER:-root@172.19.134.45}"
+SERVER="${SERVER:-root@36.151.146.71}"
 PORT="${PORT:-40200}"
 APP_DIR="/opt/nengtan-portal"
 SERVICE="nengtan-portal.service"

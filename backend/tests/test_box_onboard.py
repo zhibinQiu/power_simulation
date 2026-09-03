@@ -20,7 +20,7 @@ from app import box_console  # noqa: E402
 from app import github_deploy  # noqa: E402
 
 TOKEN = "a1b2c3.header.payload.sig"
-CLOUD_IP = "172.19.134.45"
+CLOUD_IP = "36.151.146.71"
 HOSTNAME = "edge-box"
 
 

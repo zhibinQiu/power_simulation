@@ -771,7 +771,7 @@ def _noise(v, pct=0.04):
 
 ## 一、总体架构
 
-- 云端 \`172.19.134.45\` 运行 **K3s + KubeEdge CloudCore**，是**唯一控制平面**；
+- 云端 \`36.151.146.71\` 运行 **K3s + KubeEdge CloudCore**，是**唯一控制平面**；
 - 盒子边缘设备只部署 **EdgeCore**（不部署 k3s-server，边缘不存在本地 K8s 控制平面），边缘通过 **CloudHub（10002 端口）** 长连接云端，运行 Pod（edged 拉起）、mosquitto（本地 MQTT）、box-mapper（仪表采集，DMI 上报 twins + MQTT 实时发布 data/#）；
 - 数据链路：边缘 box-mapper 仪表采集（Modbus/OPC-UA 等）→ ①DMI→edgecore→CloudHub→CloudCore→K3s Device.status.twins；②MQTT 实时发布→云端 MQTT Broker（TCP 41883）\`data/#\`；本平台订阅识别云端设备、与设备实例关联后同步读数。
 
@@ -866,7 +866,7 @@ spec:
 1. 全新盒子先 \`keadm join\`（下载 edgecore 二进制、本地生成边缘证书 \`/etc/kubeedge/certs/server.{crt,key}\`、注册 systemd）：
 
 \`\`\`bash
-keadm join --cloudcore-ipport=172.19.134.45:10000 --token=<token> --kubeedge-version=v1.20.0 --with-edge-core
+keadm join --cloudcore-ipport=36.151.146.71:10000 --token=<token> --kubeedge-version=v1.20.0 --with-edge-core
 \`\`\`
 
 2. 覆盖 \`/etc/kubeedge/config/edgecore.yaml\`（管理台模板替换 \`{{HOSTNAME}}/{{TOKEN}}/{{CLOUDIP}}\`，关键项：edgeHub.httpServer=10002、websocket=10004、deviceTwin.dmiSockPath=/etc/kubeedge/dmi.sock、edged 运行时 containerd、顶层 database 用 sqlite3）；
@@ -890,7 +890,7 @@ keadm join --cloudcore-ipport=172.19.134.45:10000 --token=<token> --kubeedge-ver
 | --- | --- |
 | 边缘节点 NotReady | NTP 时间不同步；edgehub 连不上 10002/10004（nc 测试）；证书过期（看概览「证书与 Token 有效期」） |
 | 应用设备报 unknown field | 用了旧 v1alpha2 字段，确认 protocolName + configData 结构 |
-| 云端识别设备为空 | \`box_config.json\` 的 ignored_devices 是否误过滤 + 云端 41883 是否可达（nc 172.19.134.45 41883） |
+| 云端识别设备为空 | \`box_config.json\` 的 ignored_devices 是否误过滤 + 云端 41883 是否可达（nc 36.151.146.71 41883） |
 | cloudcore 非 Running | kubectl get pod -n kubeedge 查看状态，关注概览页 CloudCore 卡片 |
 | 盒子到云端网络 | nc 依次测试 22 / 10002 / 10004 / 41883，定位防火墙或服务未监听 |
 
@@ -934,7 +934,7 @@ ss -tlnp | grep -E ':(1000[0-4])[^0-9]'
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
 | boxId | 是 | 盒子主机名（与云端 K8s 节点名一致，如 my-box-01） |
-| cloudIP | 是 | 云端 CloudCore / MQTT Broker 地址（如 172.19.134.45） |
+| cloudIP | 是 | 云端 CloudCore / MQTT Broker 地址（如 36.151.146.71） |
 | token | 否 | 共享接入 token；留空时脚本自动从仓库 \`onboard/token\` 拉取 |
 | repo | 否 | 镜像仓库 owner/repo（如改用 gitee 镜像时填写，覆盖脚本内置仓库地址） |
 | branch | 否 | 镜像仓库分支（默认 master） |
@@ -951,7 +951,7 @@ curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/onboard/onb
 curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/onboard/onboard_box.sh | bash -s -- -c /path/box-config.json
 
 # 方式 C：无配置文件，命令行直接给参数
-curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/onboard/onboard_box.sh | bash -s -- -i 172.19.134.45 -n my-box-01
+curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/onboard/onboard_box.sh | bash -s -- -i 36.151.146.71 -n my-box-01
 
 # 方式 D：仅指定主机名（其余用脚本内置默认 + 仓库 token）
 curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/onboard/onboard_box.sh | bash -s my-box-01
@@ -995,7 +995,7 @@ curl -fsSL <同上> | bash -s -- -r gitee.com/user/mirror -b main -d /opt/carbon
 # 盒子 root；先放好 /opt/weight-bridge/box-config.json（boxId/cloudIP/token 必填）
 curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/box.sh | bash
 # 或命令行直接给参数（无配置文件）：
-curl -fsSL <同上> | bash -s -- -i 172.19.134.45 -n my-box-01 -t <token>
+curl -fsSL <同上> | bash -s -- -i 36.151.146.71 -n my-box-01 -t <token>
 \`\`\`
 
 与 \`onboard_box.sh\` 的区别：\`deploy/box.sh\` 直接拉**公开源码仓库** tarball（内含 box-deploy 部署包与 edgecore 模板），**无需平台「同步到 GitHub」**；唯一仍需现场提供的是**共享 token**（公开仓库不存放动态凭证，平台「导出 box-config.json」可自动填入）。box-config.json 额外支持 \`rootCA\`（base64，可选；keadm join 会自动从云端拉取）。

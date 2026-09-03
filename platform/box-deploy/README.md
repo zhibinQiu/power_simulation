@@ -119,7 +119,7 @@ bash onboard_box.sh
   "protocol": "nengtan-iot",            // 统一协议注册名, 勿改
   "cache": { "db": "/opt/weight-bridge/twin_cache.db", "max": 200000, "flushBatch": 100 },
   "mqtt": { "enabled": true, "boxId": "box-nt001",
-            "broker": { "host": "172.19.134.45", "port": 41883, "username": "", "password": "" },
+            "broker": { "host": "36.151.146.71", "port": 41883, "username": "", "password": "" },
             "cmdTopic": "cmd/{box}/#", "cmdAckTopic": "state/{box}/deploy",
             "servicesTopic": "state/{box}/services" },
   "apps": { "dir": "/opt/box-apps" },        // 云端下发应用/模型的安装根目录 (默认即此)

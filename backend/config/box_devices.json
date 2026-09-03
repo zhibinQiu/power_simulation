@@ -19,7 +19,7 @@
         }
       ],
       "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: DeviceModel\nmetadata:\n  name: \"weighing-indicator-model\"\n  namespace: \"default\"\nspec:\n  properties:\n  - name: \"weight\"\n    description: \"实时重量（32位有符号，低字在前）\"\n    type: INT\n    accessMode: ReadOnly\n    unit: \"kg\"\n",
-      "created_at": 1787800615
+      "created_at": 1788249061
     }
   ],
   "devices": [
@@ -78,14 +78,24 @@
         }
       ],
       "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"chengzhong\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\nspec:\n  deviceModelRef:\n    name: \"weighing-indicator-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"weight\"\n    collectCycle: 1000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        com:\n          commType: serial\n          serialPort: \"/dev/ttyUSB-weigh\"\n          baudRate: 9600\n          dataBits: 8\n          parity: \"none\"\n          stopBits: 1\n        slaveID: 1\n        visitors:\n        - propertyName: \"weight\"\n          register: HoldingRegister\n          offset: 0\n          limit: 2\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: true\n",
-      "created_at": 1787800615,
+      "created_at": 1788249061,
       "status": "reporting"
     }
   ],
   "cloud": {
-    "host": "172.19.134.45",
+    "host": "172.18.0.1",
     "agent_port": 42083,
     "agent_token": "3c55b2662ec1341b56456524a778acc4358cb36b75d377a6",
     "namespace": "default"
+  },
+  "edge": {
+    "host": "172.20.186.56",
+    "port": 22,
+    "user": "root",
+    "password": "nengtan@2026",
+    "key": ""
+  },
+  "box_aliases": {
+    "nt001": "能碳一体机（实验机）"
   }
 }
