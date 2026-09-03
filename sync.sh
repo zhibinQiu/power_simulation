@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 # ============================================================================
-# 同步脚本 v2：本地源码 → 新服务器（Docker 部署）→ 服务器自动重建 + 健康检查
+# 同步脚本 v3：本地源码 → 新服务器（Docker 源码卷挂载 + uvicorn --reload）
 #
 # 背景：云端主服务器已从 172.19.134.45（备用）迁移到 36.151.146.71（新），
-#       新服务器以 Docker Compose 镜像模式运行（后端依赖/前端产物在镜像内），
-#       因此「同步代码 + 让改动生效」= rsync 代码 + docker compose up -d --build
-#       （镜像层缓存命中，通常 1 分钟内），无需再手动 install/重启 systemd。
+#       新服务器以「源码卷挂载」模式运行（backend/ 与 frontend/dist 卷挂载进容器，
+#       容器内 uvicorn --reload），因此日常改代码的生效路径最快：
+#         - 后端 .py 改动  → rsync 后容器内 --reload 秒级自动生效，无需重建/重启
+#         - 前端改动       → 本地 npx vite build 后 rsync frontend/dist（静态文件即刻生效）
+#       仅当 Dockerfile / docker-compose.yml / requirements.txt 等「构建输入」
+#       变更时才需要 docker compose up -d --build（脚本自动检测，依赖层缓存通常 1 分钟内）。
 #
 # 用法：
-#   bash sync.sh                            rsync→71 + 71 重建 + git 提交推送
+#   bash sync.sh                            rsync→71 + 自动部署 + git 提交推送
 #   bash sync.sh "fix: xxx"                 指定 git 提交信息
 #   bash sync.sh --no-git                   只同步代码到服务器（不提交 GitHub）
-#   bash sync.sh --skip-build               只 rsync 代码，不在服务器重建（下次手动 up）
+#   bash sync.sh --skip-build               只 rsync 代码，不在服务器构建/拉起（下次手动 up）
 #   bash sync.sh --server 45                同步到备用服务器 172.19.134.45
 #   bash sync.sh --no-portal                跳过线上官网同步
 #
@@ -22,12 +25,13 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 # ---- 云端目标：主=新服务器 71，备=45 ----
-CLOUD_MAIN="root@36.151.146.71"        # 新服务器（Docker Compose 部署，目录即仓库根）
+CLOUD_MAIN="root@36.151.146.71"        # 新服务器（Docker Compose 源码卷挂载部署，目录即仓库根）
 CLOUD_BACKUP="root@172.19.134.45"      # 备用服务器（旧部署结构，保留 rsync 兼容）
 SERVER="$CLOUD_MAIN"
 SERVER_DIR="/root/qzb/jianpai"
 GIT_REMOTE="github"
 GIT_BRANCH="master"
+IMAGE_NAME="ghcr.io/zhibinqiu/power_simulation:latest"
 
 # 线上官网（https://www.nengyousuan.com，43.161.194.75 + Nginx 静态托管）
 PORTAL_SERVER="root@43.161.194.75"
@@ -78,39 +82,67 @@ fi
 if ! command -v rsync >/dev/null 2>&1; then echo "❌ 缺少 rsync" >&2; exit 1; fi
 echo "==> 同步目标：$SERVER:$SERVER_DIR （$( [ "$SERVER" = "$CLOUD_MAIN" ] && echo 新服务器/主 || echo 备用 )）"
 
-# ---- [1/4] rsync 源码（运行时数据/构建产物/本机环境一律不上传） ----
+# ---- [0/5] 本地构建前端/文档站产物（dist 已入库，随 rsync 同步；改动即生效） ----
+echo "==> [0/5] 本地构建前端产物（frontend/ docs-site/，缺失/失败不阻断同步）..."
+(cd frontend && npx vite build >/dev/null 2>&1) && echo "    frontend/dist 已构建" \
+  || echo "    ⚠ frontend 构建跳过/失败（检查 node_modules 与 vite）"
+(cd docs-site && npx vite build >/dev/null 2>&1) && echo "    docs-site/dist 已构建" \
+  || echo "    ⚠ docs-site 构建跳过/失败"
+
+# ---- [1/5] rsync 源码（运行时数据/本机环境不上传；frontend/dist 需同步以挂载生效） ----
 EXCLUDES="--exclude=.git --exclude=.venv --exclude=venv --exclude=node_modules --exclude=__pycache__
   --exclude=*.pyc --exclude=.DS_Store --exclude=.env --exclude=*.log
-  --exclude=frontend/dist --exclude=docs-site/node_modules --exclude=.playwright-cli
+  --exclude=docs-site/node_modules --exclude=.playwright-cli
   --exclude=outputs --exclude=generated-images --exclude=chrome_*
   --exclude=backend/data --exclude=backend/knowledge --exclude=.pre-sync-*"
-echo "==> [1/4] rsync 源码 + 配置到服务器（排除运行时数据/构建产物）..."
+echo "==> [1/5] rsync 源码 + 配置 + 前端产物到服务器（排除运行时数据/本机环境）..."
 rsync_run $EXCLUDES ./ "$SERVER:$SERVER_DIR/"
 
-# ---- [2/4] 服务器上重建镜像并重启（改动即生效） ----
+# ---- 是否需要重建镜像：仅「构建输入」变更 / 服务器无镜像 时才 build ----
+BUILD_SENSITIVE="Dockerfile Dockerfile.docs docker-compose.yml .dockerignore backend/config/requirements.txt"
+need_build() {
+  local lh rh f
+  ssh_run "$SERVER" "docker image inspect '$IMAGE_NAME' >/dev/null 2>&1" 2>/dev/null \
+    || { echo "    ↪ 服务器无运行镜像 → 首次构建"; return 0; }
+  for f in $BUILD_SENSITIVE; do
+    rh=$(ssh_run "$SERVER" "cd '$SERVER_DIR' && md5sum '$f' 2>/dev/null | cut -d' ' -f1" 2>/dev/null || true)
+    [ -n "$rh" ] || { echo "    ↪ 服务器缺少 $f → 需构建"; return 0; }
+    if command -v md5sum >/dev/null 2>&1; then lh=$(md5sum "$f" 2>/dev/null | cut -d' ' -f1); else lh=$(md5 -q "$f" 2>/dev/null || true); fi
+    [ -n "$lh" ] && [ "$lh" != "$rh" ] && { echo "    ↪ $f 已变更 → 需重建镜像"; return 0; }
+  done
+  return 1
+}
+
+# ---- [2/5] 服务器部署：构建输入无变更则跳过重建，代码改动由容器内 reload 生效 ----
 if [ "$RUN_BUILD" = "1" ]; then
-  echo "==> [2/4] 服务器重建容器（层缓存命中，通常 1 分钟内）..."
-  ssh_run "$SERVER" "cd $SERVER_DIR && docker compose up -d --build" \
-    || { echo "⚠ 服务器重建失败（查看上方日志）；代码已同步，可稍后手动：cd $SERVER_DIR && docker compose up -d --build" >&2; }
-  echo "    容器重建完成，健康检查："
+  if need_build; then
+    echo "==> [2/5] 重建运行环境镜像并拉起（层缓存命中，通常 1 分钟内）..."
+    ssh_run "$SERVER" "cd $SERVER_DIR && docker compose up -d --build" \
+      || { echo "⚠ 服务器重建失败（查看上方日志）；代码已同步，可稍后手动：cd $SERVER_DIR && docker compose up -d --build" >&2; }
+  else
+    echo "==> [2/5] 构建输入无变更 → 不重建镜像；容器内 uvicorn --reload 已自动加载新代码"
+    ssh_run "$SERVER" "cd $SERVER_DIR && docker compose up -d" \
+      || { echo "⚠ 服务器拉起失败（查看上方日志）" >&2; }
+  fi
+  echo "    健康检查："
   ssh_run "$SERVER" 'for i in $(seq 1 12); do curl -fsS -m 3 -o /dev/null http://127.0.0.1:40014/api/health && break; sleep 5; done; curl -m 5 -s http://127.0.0.1:40014/api/health' \
     || echo "    ⚠ 健康检查未通过，请查看：docker compose logs" || true
 else
-  echo "==> [2/4] 跳过服务器重建（--skip-build）。代码已同步，服务器上执行 docker compose up -d --build 生效。"
+  echo "==> [2/5] 跳过服务器构建（--skip-build）。代码已同步，服务器上执行 docker compose up -d --build 生效。"
 fi
 
-# ---- [3/4] 线上官网同步（platform/homePage → https://www.nengyousuan.com） ----
+# ---- [3/5] 线上官网同步（platform/homePage → https://www.nengyousuan.com） ----
 if [ "$RUN_PORTAL" = "1" ]; then
-  echo "==> [3/4] 同步门户官网 platform/homePage/ → $PORTAL_SERVER:$PORTAL_REMOTE_DIR ..."
+  echo "==> [3/5] 同步门户官网 platform/homePage/ → $PORTAL_SERVER:$PORTAL_REMOTE_DIR ..."
   rsync_run --delete --exclude='.DS_Store' --exclude='.serve.pid' --exclude='.serve.log' \
     --exclude='*.log' ./platform/homePage/ "$PORTAL_SERVER:$PORTAL_REMOTE_DIR/" \
     && echo "    官网已更新: https://www.nengyousuan.com" \
     || echo "    ⚠ 官网同步失败（不影响平台；检查免密/网络）" >&2
 fi
 
-# ---- [4/4] git 提交并推送（可选） ----
+# ---- [4/5] git 提交并推送（可选） ----
 if [ "$RUN_GIT" = "1" ]; then
-  echo "==> [4/4] git 提交并推送 GitHub"
+  echo "==> [4/5] git 提交并推送 GitHub"
   git add -A
   if git diff --cached --quiet; then
     echo "    无本地改动，跳过提交"
@@ -125,7 +157,7 @@ if [ "$RUN_GIT" = "1" ]; then
     echo "    ⚠ 本次未能推送（GitHub 网络问题），改动已在本地提交，稍后执行 ./push.sh"
   fi
 else
-  echo "==> [4/4] 已跳过 git（--no-git）"
+  echo "==> [4/5] 已跳过 git（--no-git）"
 fi
 
 echo "==> 全部完成。服务器访问：http://36.151.146.71:40014  （日志：docker logs -f steel-carbon-twin）"

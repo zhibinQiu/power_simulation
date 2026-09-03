@@ -1,5 +1,6 @@
-# 构建上下文忽略：镜像内不需要的开发/本地文件
-# （frontend/dist 由多阶段构建产出，不 COPY 宿主旧产物）
+# 构建上下文忽略
+# 源码卷挂载模式：镜像只构建 Python 运行环境，业务代码/前端不进 context，
+# 仅需 backend/config/requirements.txt；dist 由卷挂载 / rsync 提供。
 .venv/
 venv/
 __pycache__/
@@ -8,8 +9,7 @@ __pycache__/
 .git/
 .gitignore
 node_modules/
-frontend/node_modules/
-frontend/dist/
+frontend/
 docs-site/node_modules/
 tests/
 backend/tests/
@@ -25,5 +25,7 @@ docker-compose.yml
 *.yaml
 generated-images/
 outputs/
-.ds_store
 .DS_Store
+# 保留依赖清单（供 COPY backend/config/requirements.txt）
+backend/*
+!backend/config

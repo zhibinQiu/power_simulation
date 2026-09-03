@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # ============================================================================
-# 能碳智控平台 · 全新服务器一键部署（Docker 镜像版 · 免 pip/npm/node）
+# 能碳智控平台 · 全新服务器一键部署（源码卷挂载 + reload · 免 pip/npm/node）
 #
-# 服务器只需安装 Docker，镜像内已含后端依赖 + 前端构建产物：
-#   - 有镜像源（ghcr 已发布）→ docker compose pull，秒级拉起，零编译
-#   - 无镜像源/离线网络   → docker compose build（利用层缓存，只编译一次）
+# 服务器只需安装 Docker；镜像只固化 Python 运行环境（依赖），业务代码
+# backend/ 与前端产物 frontend/dist、docs-site/dist 均已入库并随仓库克隆：
+#   - docker compose up -d --build 首次构建运行环境镜像（仅 Python 依赖层）
+#   - 容器以卷挂载 backend/ + frontend/dist 运行，容器内 uvicorn --reload
+#   - 日常更新 = git pull / rsync 代码（后端 reload 秒级生效，前端产物已入库）
 # 不再像旧版那样在服务器装 python3-venv/npm/node_modules/vite，大幅省资源。
 #
 # 用法（服务器 root，Ubuntu/Debian/CentOS）：
@@ -16,7 +18,7 @@
 #   -r, --repo <owner/repo>  源码仓库（默认内置；公开仓库拉取无需 token）
 #   -b, --branch <branch>    分支（默认 master）
 #   -d, --dir <path>         安装目录（默认 /opt/carbon-platform）
-#   -p, --pull               优先 docker compose pull（ghcr 镜像），默认本地 build
+#   -p, --port <port>        对外端口（默认 40014，遵循 40000+ 端口规范）
 #   -h, --help               显示本帮助
 # ============================================================================
 set -euo pipefail
@@ -30,11 +32,10 @@ REPO="$DEFAULT_REPO"
 BRANCH="$DEFAULT_BRANCH"
 INSTALL_DIR="$DEFAULT_DIR"
 PORT="$DEFAULT_PORT"
-USE_PULL=0
 
 usage() {
   cat <<'USAGE'
-能碳智控平台 · 全新服务器一键部署（Docker 镜像版）
+能碳智控平台 · 全新服务器一键部署（源码卷挂载 + uvicorn --reload）
 
 用法（root）：
   curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/server.sh | bash
@@ -45,7 +46,6 @@ usage() {
   -b, --branch <branch>    分支（默认 master）
   -d, --dir <path>         安装目录（默认 /opt/carbon-platform）
   -p, --port <port>        对外端口（默认 40014，遵循 40000+ 端口规范）
-      --pull               优先拉取 ghcr.io 镜像（默认本地 docker build）
   -h, --help               显示本帮助
 USAGE
   exit 0
@@ -57,7 +57,6 @@ while [ $# -gt 0 ]; do
     -b|--branch) BRANCH="${2:-}";      shift 2 ;;
     -d|--dir)    INSTALL_DIR="${2:-}"; shift 2 ;;
     -p|--port)   PORT="${2:-}";        shift 2 ;;
-    --pull)      USE_PULL=1;           shift ;;
     -h|--help)   usage ;;
     *) echo "[error] 未知参数：$1（-h 查看帮助）" >&2; exit 1 ;;
   esac
@@ -102,16 +101,10 @@ fi
 [ -f "$INSTALL_DIR/.env" ] || cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
 log "已生成 $INSTALL_DIR/.env（如需大模型问答，编辑填 LLM_API_KEY）"
 
-# ---------- 4. 启动（镜像拉取 或 本地构建） ----------
+# ---------- 4. 启动（首次构建运行环境镜像） ----------
 cd "$INSTALL_DIR"
-if [ "$USE_PULL" -eq 1 ]; then
-  log "拉取 ghcr.io 镜像（docker compose pull）..."
-  docker compose pull || { log "镜像拉取失败（可能未发布），回退本地构建..."; USE_PULL=0; }
-fi
-if [ "$USE_PULL" -eq 0 ]; then
-  log "构建镜像（首次约 3~5 分钟，含前端编译 + Python 依赖；之后有层缓存秒级）..."
-  docker compose build || err "镜像构建失败，请查看上方日志"
-fi
+log "构建运行环境镜像（首次约 1~3 分钟，仅 Python 依赖；代码由仓库目录卷挂载）..."
+docker compose build || err "镜像构建失败，请查看上方日志"
 docker compose up -d || err "容器启动失败，请查看上方日志"
 
 # ---------- 5. 自检与提示 ----------

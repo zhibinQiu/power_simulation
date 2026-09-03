@@ -1,31 +1,31 @@
-# 能碳智控平台 · 生产部署（自包含镜像，非开发式源码挂载）
+# 能碳智控平台 · 源码卷挂载 + uvicorn --reload（开发-生产同构，日常更新免重建）
 #
-# 用法（服务器，无需 python/node/npm）：
-#   git clone --depth 1 <repo> /opt/carbon-platform
-#   cd /opt/carbon-platform
-#   cp .env.example .env           # 按需填 LLM_API_KEY
-#   docker compose up -d --build
+# 运行方式（服务器，仅需 Docker；无需 python/node/npm/venv）：
+#   cd <部署目录>
+#   docker compose up -d --build          # 首次 / 依赖变更：构建运行环境镜像
+#   日常更新代码（rsync backend/ 与 frontend/dist 到部署目录即可）：
+#     - 后端改动：容器内 uvicorn --reload 自动生效（秒级，无需重建/重启）
+#     - 前端改动：本地 npx vite build 后同步 frontend/dist（静态文件即刻生效）
+#   仅当 backend/config/requirements.txt / Dockerfile / docker-compose.yml
+#   变更时才需重新 docker compose up -d --build（依赖层缓存命中，通常 1 分钟内）。
 #
+# 数据安全：backend 整目录卷挂载（含 data/config/knowledge），运行期写盘内容
+#           即宿主机目录，重建容器/升级镜像不覆盖。
 # 访问：http://<服务器IP>:40014    （平台，前端由后端静态托管）
 #        http://<服务器IP>:40184    （文档站）
-#
-# 数据安全：backend/data、backend/config、backend/knowledge 以目录挂载，
-#           运行期写盘内容持久化在服务器源码目录内，镜像更新不覆盖。
-# 更新：git pull && docker compose up -d --build（见 deploy/update.sh）
 
 services:
   steel-twin:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ghcr.io/zhibinqiu/power_simulation:latest   # 已有镜像时 docker compose pull 免构建
+    image: ghcr.io/zhibinqiu/power_simulation:latest   # 本地 build 覆盖同 tag，不依赖公网拉取
     container_name: steel-carbon-twin
     working_dir: /app
     volumes:
-      # 运行期可变数据/配置以目录挂载持久化（不整体挂载源码，代码在镜像内）
-      - ./backend/data:/app/backend/data
-      - ./backend/config:/app/backend/config
-      - ./backend/knowledge:/app/backend/knowledge
+      # 源码卷挂载（reload 生效）+ 前端构建产物挂载（后端静态托管）
+      - ./backend:/app/backend
+      - ./frontend/dist:/app/frontend/dist
     ports:
       - "40014:8010"               # 主机 40014 -> 容器 8010
     environment:

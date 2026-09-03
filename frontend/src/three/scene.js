@@ -2604,10 +2604,22 @@ export class TwinScene {
     const label = this._makeLabel(unit.name, res ? res.co2_total : null, res ? res.energy_total : null, role, co2Css)
     // 工艺/工辅标签样式统一、大小一致：同一两行卡片布局、同一悬浮位置，main 仅标记主工艺层级
     const isMain = unit.route !== 'aux' && unit.route !== 'util'
-    // 工序标签始终位于工艺模型正上方：中心锚点 = 模型顶(topY) + 卡片半高 + 悬停间隙，
-    // 卡片随整体缩放变化后仍贴顶悬浮，不会压住/埋进模型（LABEL_Y_LIFT = 卡半高 + 2.2 间隙）
+    // 工序标签始终位于工艺模型正上方：中心锚点 = 模型顶 + 卡片半高 + 悬停间隙，
+    // 卡片随整体缩放变化后仍贴顶悬浮，不会压住/埋进模型（LABEL_Y_LIFT = 卡半高 + 2.2 间隙）。
+    // 注意：部分工辅造型（热风炉/辅助锅炉等）userData.topY 与实际几何顶不一致
+    // （拱顶、烟囱、出风塔、冷却塔等出挑件高出标记值），因此以「本体包围盒真实最高点」为准，
+    // 保证任何工辅/工艺标签都悬停在模型实际最高点之上、不被顶部部件压住。
+    let labelAnchorTop = body.userData.topY || 0
+    {
+      group.updateMatrixWorld(true)
+      const _bb = new THREE.Box3().setFromObject(body)
+      if (Number.isFinite(_bb.max.y)) {
+        const _topLocal = (_bb.max.y - group.position.y) / group.scale.y
+        if (Number.isFinite(_topLocal)) labelAnchorTop = Math.max(labelAnchorTop, _topLocal)
+      }
+    }
     const LABEL_Y_LIFT = LABEL_SCALE * (UNIT_LABEL_H / LABEL_W) / 2 + 2.2
-    label.position.set(0, (body.userData.topY || 0) + LABEL_Y_LIFT, 0)
+    label.position.set(0, labelAnchorTop + LABEL_Y_LIFT, 0)
     label.userData.unitId = unit.id
     label.userData.kind = 'unit'   // 可由 3D 标签直接点击聚焦（替代点击工艺本体）
     label.userData.labelObj.main = isMain
@@ -2714,9 +2726,19 @@ export class TwinScene {
     const co2 = reses.reduce((s, r) => s + (r ? r.co2_total || 0 : 0), 0)
     const en = reses.reduce((s, r) => s + (r ? r.energy_total || 0 : 0), 0)
     const label = this._makeGroupLabel(gname, n, reses.some((r) => r) ? co2 : null, reses.some((r) => r) ? en : null)
-    // 组标签同样悬浮在组模型顶上方：贴顶小间隙（卡半高 + 2.4）
+    // 组标签同样悬浮在组模型顶上方：贴顶小间隙（卡半高 + 2.4）。
+    // 与单元标签一致，以代表成员模型「本体实际包围盒最高点」为锚，避免工辅高塔/拱顶等出挑件压住标签。
+    let groupAnchorTop = built.topY
+    {
+      group.updateMatrixWorld(true)
+      const _bb = new THREE.Box3().setFromObject(built.body)
+      if (Number.isFinite(_bb.max.y)) {
+        const _t = (_bb.max.y - (built.group.position ? built.group.position.y : 0)) / (built.group.scale ? built.group.scale.y : 1)
+        if (Number.isFinite(_t)) groupAnchorTop = Math.max(groupAnchorTop, _t)
+      }
+    }
     const GROUP_LABEL_LIFT = LABEL_SCALE * (GROUP_LABEL_H / LABEL_W) / 2 + 2.4
-    label.position.set(0, built.topY + GROUP_LABEL_LIFT, 0)
+    label.position.set(0, groupAnchorTop + GROUP_LABEL_LIFT, 0)
     label.userData.kind = 'unit'
     label.userData.groupId = gid
     // _makeGroupLabel 已自行完成绘制；标注为组标签，便于实时刷新时走 _drawGroupLabel
