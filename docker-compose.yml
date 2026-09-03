@@ -1,47 +1,48 @@
-# 钢铁碳监测数字孪生平台
-# 用法（在映射目录 /root/qzb/jianpai 下）：
-#   docker compose build
-#   docker compose up -d
-# 访问：http://<服务器IP>:40014
-# 文档站（宣传手册/使用手册/技术文档）：http://<服务器IP>:40183
+# 能碳智控平台 · 生产部署（自包含镜像，非开发式源码挂载）
 #
-# 源码映射：整个项目挂到容器 /app，修改 backend/ 下任意 .py 文件，
-# 容器内的 uvicorn --reload 会自动重启生效。
-# 注意：前端改动需先在本机/映射目录执行 `npm run build`（frontend/dist 由后端静态托管），
-#       文档站改动需先执行 `cd docs-site && npm run build`（docs-site/dist 由下方服务静态托管）。
+# 用法（服务器，无需 python/node/npm）：
+#   git clone --depth 1 <repo> /opt/carbon-platform
+#   cd /opt/carbon-platform
+#   cp .env.example .env           # 按需填 LLM_API_KEY
+#   docker compose up -d --build
+#
+# 访问：http://<服务器IP>:40014    （平台，前端由后端静态托管）
+#        http://<服务器IP>:40184    （文档站）
+#
+# 数据安全：backend/data、backend/config、backend/knowledge 以目录挂载，
+#           运行期写盘内容持久化在服务器源码目录内，镜像更新不覆盖。
+# 更新：git pull && docker compose up -d --build（见 deploy/update.sh）
 
 services:
   steel-twin:
     build:
       context: .
       dockerfile: Dockerfile
+    image: ghcr.io/zhibinqiu/power_simulation:latest   # 已有镜像时 docker compose pull 免构建
     container_name: steel-carbon-twin
     working_dir: /app
     volumes:
-      - .:/app                      # 源码映射进容器，改动即生效
+      # 运行期可变数据/配置以目录挂载持久化（不整体挂载源码，代码在镜像内）
+      - ./backend/data:/app/backend/data
+      - ./backend/config:/app/backend/config
+      - ./backend/knowledge:/app/backend/knowledge
     ports:
-      - "40014:8010"               # 主机端口 40014 -> 容器 8010
+      - "40014:8010"               # 主机 40014 -> 容器 8010
     environment:
       - PYTHONUNBUFFERED=1
-      # 大模型策略拆解（OpenAI 兼容接口）。无 LLM_API_KEY 时自动回退到规则解析。
-      - LLM_BASE_URL=https://api.deepseek.com/v1
-      - LLM_API_KEY=sk-f431be74819a4b7f82fd04f06977a039
-      - LLM_MODEL=deepseek-v4-pro
+      # 大模型策略拆解（OpenAI 兼容接口）。未配置时自动回退到规则解析。
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.deepseek.com/v1}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-}
     restart: unless-stopped
 
-  # 独立文档网站：宣传手册 / 使用手册 / 技术文档
-  # 平台帮助菜单（帮助 -> 宣传手册/使用手册/技术文档）点击跳转到本服务（端口 40183）。
+  # 独立文档网站（宣传手册/使用手册/技术文档），dist 已入库，零构建
   docs-site:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.docs
+    image: ghcr.io/zhibinqiu/power_simulation-docs:latest
     container_name: nengtan-docs-site
-    working_dir: /app/docs-site
-    volumes:
-      - .:/app
-    command: ["python3", "-m", "http.server", "40183", "--bind", "0.0.0.0", "--directory", "/app/docs-site/dist"]
     ports:
-      - "40183:40183"
-    depends_on:
-      - steel-twin
+      - "40184:40183"
     restart: unless-stopped

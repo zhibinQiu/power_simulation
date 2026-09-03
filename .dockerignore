@@ -1,8 +1,29 @@
-# 不进入 docker 构建上下文（仅 COPY 了 requirements.txt，这里主要是避免无谓传输）
-backend/.venv
-frontend/node_modules
-__pycache__
+# 构建上下文忽略：镜像内不需要的开发/本地文件
+# （frontend/dist 由多阶段构建产出，不 COPY 宿主旧产物）
+.venv/
+venv/
+__pycache__/
 *.pyc
-.git
-.DS_Store
 *.log
+.git/
+.gitignore
+node_modules/
+frontend/node_modules/
+frontend/dist/
+docs-site/node_modules/
+tests/
+backend/tests/
+platform/
+deploy/
+.github/
+.dockerignore
+Dockerfile
+Dockerfile.docs
+docker-compose.yml
+*.md
+*.yml
+*.yaml
+generated-images/
+outputs/
+.ds_store
+.DS_Store

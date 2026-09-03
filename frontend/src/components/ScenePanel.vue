@@ -25,7 +25,7 @@
           <div v-for="d in devsOf(u.id)" :key="d.id" class="tchild leaf dev-leaf click"
                :class="{ active: store.deviceDetailId === d.id, 'drag-src': dragId === d.id }"
                :draggable="!store.editMode"
-               :title="(d.measures ? d.label + '（' + d.measures + '）' : d.label) + t(' · 拖拽至「数据分析与策略」作为数据源')"
+               :title="(d.measures ? d.label + '（' + d.measures + '）' : d.label) + t(' · 拖拽至「数据分析」作为数据源')"
                @click="store.openDeviceDetail(d.id)"
                @dragstart="onDevDrag($event, d)"
                @dragend="onDevDragEnd">

@@ -96,7 +96,8 @@ _SEED_AGENTS: List[Dict[str, Any]] = [
             "回答时给出关键数值与简单解读，必要时用对比说明趋势。"
         ),
         "default_skills": ["query_realtime_devices", "query_device_history", "run_simulation"],
-        "available_skills": ["query_realtime_devices", "query_device_history", "run_simulation"],
+        "available_skills": ["query_realtime_devices", "query_device_history", "run_simulation",
+                             "summarize_plant_emissions"],
         "builtin": True,
     },
     {
@@ -124,6 +125,8 @@ _SEED_AGENTS: List[Dict[str, Any]] = [
         "available_skills": ["run_simulation", "get_carbon_market_quote",
                              "get_emission_factors", "get_carbon_forecast",
                              "query_realtime_devices",
+                             "summarize_plant_emissions",
+                             "query_knowledge",
                              "compute_carbon_accounting", "evaluate_carbon_compliance",
                              "judge_carbon_market_cycle",
                              "forecast_carbon_price_to_year_end",
@@ -164,6 +167,8 @@ _SEED_AGENTS: List[Dict[str, Any]] = [
             "query_carbon_enterprise_ledger", "list_carbon_enterprises",
             "judge_carbon_market_cycle", "forecast_carbon_price_to_year_end",
             "get_carbon_market_quote", "get_emission_factors", "get_carbon_forecast",
+            "query_realtime_devices", "summarize_plant_emissions",
+            "query_knowledge",
         ],
         "builtin": True,
     },

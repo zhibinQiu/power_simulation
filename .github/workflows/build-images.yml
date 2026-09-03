@@ -1,0 +1,81 @@
+# ============================================================
+# 平台镜像自动构建发布（GitHub Container Registry）
+#
+# 触发方式：
+#   1) 推送 tag（v1.2.3）：构建并推送 ghcr.io/zhibinqiu/power_simulation:latest + :1.2.3
+#   2) 推送 master：构建并推送 ... :latest
+#   3) 手动 workflow_dispatch
+#
+# 产物：
+#   ghcr.io/zhibinqiu/power_simulation:latest      平台后端（含前端 dist）
+#   ghcr.io/zhibinqiu/power_simulation-docs:latest 文档站
+#
+# 服务器部署（免源码编译）：
+#   cd /opt/carbon-platform && docker compose pull && docker compose up -d
+#
+# 前提：仓库为 public（ghcr 公开包可匿名拉取），仓库 Settings→Actions→
+#       General 勾选 Read and write permissions。
+# ============================================================
+name: 平台镜像发布
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: ghcr.io/${{ github.repository }}
+
+jobs:
+  build-push:
+    name: 构建并推送平台 + 文档站镜像
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 提取版本号
+        id: ver
+        run: |
+          VER="latest"
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VER="${GITHUB_REF_NAME#v}"
+          fi
+          echo "tag=$VER" >> "$GITHUB_OUTPUT"
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 构建并推送平台镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_BASE }}:latest
+            ${{ env.IMAGE_BASE }}:${{ steps.ver.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 构建并推送文档站镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.docs
+          push: true
+          tags: |
+            ${{ env.IMAGE_BASE }}-docs:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -9,41 +9,15 @@ CloudCore 日志由 agent 每 3s 经 MQTT cloud/logs 推送。全程无 SSH、�
 from __future__ import annotations
 
 import time
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from .. import cloud_agent
 from .. import mqtt_source
-from ._shared import _TWIN_HISTORY, _TWIN_HISTORY_MAX, _load_devices
+from ._shared import (_TWIN_HISTORY, _TWIN_HISTORY_MAX, _load_devices,
+                      DATA_FRESH_SECONDS, data_fresh, last_data_ts,
+                      parse_crd_ts as _parse_crd_ts)
 from .cloud_ops import _K8S_NAME_RE
 from .devices import _device_fingerprint, _match_cloud_device
-
-
-def _parse_crd_ts(ts: Any) -> Optional[float]:
-    """解析云端 CRD twins 的 timestamp 为 epoch 秒，失败返回 None。
-
-    实测云端 Device.status.twins 的 timestamp 是「毫秒 epoch 字符串」（如 "1787643075724"），
-    同时兼容 ISO 字符串（2026-08-25T07:14:43Z / +08:00）与秒级 epoch。
-    """
-    if not ts:
-        return None
-    s = str(ts).strip()
-    # 数字：毫秒(13 位)/秒(10 位) epoch
-    if s.isdigit():
-        try:
-            n = int(s)
-            return n / 1000.0 if len(s) >= 12 else float(n)
-        except Exception:  # noqa: BLE001
-            return None
-    for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ"):
-        try:
-            return datetime.strptime(s, fmt).timestamp()
-        except Exception:  # noqa: BLE001
-            continue
-    try:
-        return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
-    except Exception:  # noqa: BLE001
-        return None
 
 
 def _cloud_twins_map() -> Dict[str, Dict[str, Any]]:
@@ -175,12 +149,14 @@ def realtime_devices() -> Dict[str, Any]:
                 if len(dedup) > _TWIN_HISTORY_MAX:
                     del dedup[: len(dedup) - _TWIN_HISTORY_MAX]
                 _TWIN_HISTORY[key] = dedup
+        last = last_data_ts((ctw or {}).get("twins", []), cd)
         out.append({
             "name": name, "model": d.get("model"), "node": d.get("node"),
             "box_ip": d.get("box_ip"),
-            "state": "reporting" if (ctw or cd) else "pending",
-            "lastOnlineTime": (_parse_crd_ts((ctw or {}).get("lastOnlineTime", ""))
-                               or (cd.get("last_seen") if cd else None)),
+            # 在线 = 有实时数据推送（最后数据时间在窗口内）；读不到数据即离线
+            "state": "reporting" if (last and (now - last) <= DATA_FRESH_SECONDS) else "offline",
+            # 最后在线时间 = 最后数据上报时间（CRD twins 或 MQTT，双通道最新），非注册时间
+            "lastOnlineTime": last,
             "twins": twins,
             "history": {t["propertyName"]: _TWIN_HISTORY.get(f"{name}::{t['propertyName']}", [])
                         for t in twins},
@@ -197,8 +173,29 @@ def cloud_crds(force: bool = False) -> Dict[str, Any]:
 
     对应云端管理台 GET /api/devices：返回模型列表（属性清单）+ 设备列表（twins 摘要）。
     云端不可达/未部署 CRD 时返回 ok=False + 具体错误（不返回仿真数据）。
+
+    附加字段（供界面「在线/离线」判定，勿用原始 state——那是注册态）：
+    - data_online：是否有实时数据推送（CRD twins 上报时间戳 / 平台 MQTT data/#，
+      窗口 DATA_FRESH_SECONDS 内）；读不到数据即 False（离线）。
+    - last_online：最后数据时间 = 最后在线时间（epoch 秒）。
+    注意 crds() 非 force 返回共享缓存对象，此处一律拷贝后再附加字段，不污染缓存。
     """
-    return cloud_agent.crds(force=force)
+    data = cloud_agent.crds(force=force)
+    if not isinstance(data, dict):
+        return data
+    with mqtt_source._LOCK:  # noqa: SLF001
+        cloud = {k: dict(v) for k, v in mqtt_source.CLOUD_DEVICES.items()}
+    devs = []
+    for d in data.get("devices", []):
+        d2 = dict(d)
+        cd = cloud.get((d2.get("name") or "").strip())
+        fresh, last = data_fresh(d2.get("twins", []), cd)
+        d2["data_online"] = fresh
+        d2["last_online"] = last
+        devs.append(d2)
+    out = dict(data)
+    out["devices"] = devs
+    return out
 
 
 def ingest_device_value(p: Dict[str, Any]) -> Dict[str, Any]:

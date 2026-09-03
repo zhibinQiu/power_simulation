@@ -17,15 +17,15 @@ function addSkid(group, w = 18, d = 13) {
   group.add(pad)
 }
 
-// 电机（带散热筋的蓝色圆柱）
+// 电机（带散热筋的工业涂装电机）
 function addMotor(group, x, y, z, len = 5) {
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, len, 20), mat(0x1f6f8b, { metalness: 0.5 }))
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, len, 20), mat(0x4a5d72, { metalness: 0.5, roughness: 0.4 }))
   m.rotation.z = Math.PI / 2
   m.position.set(x, y, z)
   group.add(m)
   // 散热筋
   for (let i = -1; i <= 1; i++) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.45, 0.12, 6, 20), mat(0x0d3a48))
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.45, 0.12, 6, 20), mat(0x3a4a5c))
     ring.rotation.y = Math.PI / 2
     ring.position.set(x + i * (len / 3), y, z)
     group.add(ring)
@@ -53,10 +53,10 @@ function buildRotatingMachine(type, bodyMat, anim) {
   g.add(outlet)
   // 叶轮（透明旋转件，透视蜗壳内）
   const blades = new THREE.Group()
-  const hub = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 1.6, 16), mat(0x0d3a48, { metalness: 0.7 }))
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 1.6, 16), mat(0x46566a, { metalness: 0.6 }))
   hub.rotation.z = Math.PI / 2
   blades.add(hub)
-  const bMat = mat(0x4fd0e0, { metalness: 0.6, emissive: 0x0a3a44, emissiveIntensity: 0.4, transparent: true, opacity: 0.78 })
+  const bMat = mat(0x8b98a6, { metalness: 0.55, roughness: 0.3, transparent: true, opacity: 0.6 })
   for (let i = 0; i < 9; i++) {
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.8, 5.2, 1.6), bMat)
     const a = (i / 9) * Math.PI * 2
@@ -88,7 +88,7 @@ function buildStove(type, bodyMat, anim) {
   // 炉体（高瘦圆柱，红白间隔涂装）
   const shell = new THREE.Mesh(
     new THREE.CylinderGeometry(5, 5.4, 18, 28),
-    new THREE.MeshStandardMaterial({ map: tankShellTex(), roughness: 0.5, metalness: 0.4, color: 0xeaeef2 }),
+    new THREE.MeshStandardMaterial({ map: tankShellTex(), roughness: 0.5, metalness: 0.4, color: 0xd3dae0 }),
   )
   shell.position.set(0, cy, 0)
   g.add(shell)
@@ -97,7 +97,7 @@ function buildStove(type, bodyMat, anim) {
   dome.position.set(0, cy + 9, 0)
   g.add(dome)
   // 热风围管（环绕下部的环形管）
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(6.2, 1.1, 10, 28), mat(0xc0563a, { metalness: 0.6 }))
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(6.2, 1.1, 10, 28), mat(0xa0492e, { metalness: 0.6, roughness: 0.45 }))
   ring.rotation.x = Math.PI / 2
   ring.position.set(0, cy - 6, 0)
   g.add(ring)
@@ -110,7 +110,7 @@ function buildStove(type, bodyMat, anim) {
   for (let i = 0; i < 3; i++) {
     const fl = new THREE.Mesh(
       new THREE.ConeGeometry(1.2, 3.4, 12),
-      new THREE.MeshStandardMaterial({ color: 0xff6a1e, emissive: 0xff5a1e, emissiveIntensity: 2, transparent: true, opacity: 0.9 }),
+      new THREE.MeshStandardMaterial({ color: 0xc05a26, emissive: 0x8a3412, emissiveIntensity: 0.7, transparent: true, opacity: 0.85 }),
     )
     fl.position.set((i - 1) * 2, cy + 4 + i * 0.3, 1.5)
     g.add(fl)
@@ -171,7 +171,7 @@ function buildConveyor(type, bodyMat, anim) {
     g.add(pipe)
     const rotors = []
     for (let i = 0; i < 6; i++) {
-      const v = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.6, 0.8), mat(0x4fd0e0, { transparent: true, opacity: 0.8, emissive: 0x0a3a44, emissiveIntensity: 0.4 }))
+      const v = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.6, 0.8), mat(0x8b98a6, { metalness: 0.55, roughness: 0.3, transparent: true, opacity: 0.65 }))
       const a = (i / 6) * Math.PI * 2
       v.position.set(-3 + Math.cos(a) * 1.4, cy + Math.sin(a) * 1.4, 0)
       v.rotation.z = a
@@ -194,7 +194,7 @@ function buildConveyor(type, bodyMat, anim) {
       const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 12, 12), mat(0x101418, { metalness: 0.7 }))
       rod.position.y = cy + 5
       e.add(rod)
-      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 10), new THREE.MeshStandardMaterial({ color: 0x66ccff, emissive: 0x3399ff, emissiveIntensity: 2 }))
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 10), new THREE.MeshStandardMaterial({ color: 0xcc5522, emissive: 0x8a3410, emissiveIntensity: 0.8 }))
       tip.position.y = cy - 1
       e.add(tip)
       e.position.x = i * 3
@@ -205,7 +205,7 @@ function buildConveyor(type, bodyMat, anim) {
     g.userData._elecRegs = elec
   } else {
     // injector 喷吹系统 / feeder 给料机：料罐 + 喷吹管 + 脉动料流
-    const tank = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.8, 9, 20), new THREE.MeshStandardMaterial({ map: tankShellTex(), color: 0xeaeef2, roughness: 0.5, metalness: 0.4 }))
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.8, 9, 20), new THREE.MeshStandardMaterial({ map: tankShellTex(), color: 0xd3dae0, roughness: 0.5, metalness: 0.4 }))
     tank.position.set(-3, cy + 3, 0)
     g.add(tank)
     const cone = new THREE.Mesh(new THREE.ConeGeometry(3.5, 3, 20), bodyMat)
@@ -263,7 +263,7 @@ function buildPowerStation(type, bodyMat, anim) {
   house.position.set(5.5, cy + 3.25, 0)
   g.add(house)
   for (let i = -1; i <= 1; i++) {
-    const win = boxMesh(1.8, 1.6, 0.3, new THREE.MeshStandardMaterial({ color: 0x1a2f42, emissive: 0x66ccff, emissiveIntensity: 0.6 }))
+    const win = boxMesh(1.8, 1.6, 0.3, new THREE.MeshStandardMaterial({ color: 0x24384a, roughness: 0.3, metalness: 0.3 }))
     win.position.set(5.5 + i * 2.6, cy + 4.6, 3.2)
     g.add(win)
   }
@@ -301,7 +301,7 @@ function buildPowerStation(type, bodyMat, anim) {
   for (let i = -1; i <= 1; i++) {
     const from = new THREE.Vector3(-4.5, cy + 12.5, -4)
     const to = new THREE.Vector3(1.5 + i * 2.2, cy + 9, 0.5)
-    const p = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), new THREE.MeshStandardMaterial({ color: 0x99ddff, emissive: 0x3399ff, emissiveIntensity: 2.2 }))
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffd98c, emissive: 0xcc9933, emissiveIntensity: 1.0 }))
     p.position.copy(from)
     p._from = from
     p._to = to
@@ -325,7 +325,7 @@ function buildTowerPlant(type, bodyMat, anim) {
     const h = 16 + (i === 0 ? 4 : 0)
     const t = new THREE.Mesh(
       new THREE.CylinderGeometry(2.6, 2.8, h, 20),
-      new THREE.MeshStandardMaterial({ color: 0xcdd6de, roughness: 0.4, metalness: 0.55 }),
+      new THREE.MeshStandardMaterial({ color: 0xbfc9d2, roughness: 0.4, metalness: 0.55 }),
     )
     t.position.set(i * 6.5, cy + h / 2 - cy + 0, 0)
     t.position.y = 0.8 + h / 2
@@ -333,7 +333,7 @@ function buildTowerPlant(type, bodyMat, anim) {
     towers.push(t)
   }
   // 冷箱（主换热，蓝色发光体）
-  const coldBox = boxMesh(8, 10, 6, new THREE.MeshStandardMaterial({ color: 0x1f6f8b, metalness: 0.5, emissive: 0x0a3a44, emissiveIntensity: 0.3 }))
+  const coldBox = boxMesh(8, 10, 6, new THREE.MeshStandardMaterial({ color: 0x9aabb8, metalness: 0.55, roughness: 0.35 }))
   coldBox.position.set(0, 6, -5)
   g.add(coldBox)
   // 连接管道

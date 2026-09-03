@@ -181,12 +181,15 @@ class BoxEdgeConfigRequest(BaseModel):
     - host：现场可达地址（现场内网 IP / 跳板机 / frp 地址）；运行期盒子无 IP，为空时拒绝重启 Mapper
     - port：SSH 端口（默认 22）
     - user / password / key：SSH 凭据（云端 agent 登录盒子用）
+    - box / name：盒子显示名称别名（box=云端节点名，name=显示别名，留空恢复原名）
     """
     host: str = ""
     port: int = 22
     user: str = ""
     password: str = ""
     key: str = ""
+    box: str = ""
+    name: str = ""
 
 
 class BoxAppCmdRequest(BaseModel):

@@ -195,7 +195,8 @@ export const useSimStore = defineStore('sim', {
     bottomOpen: false,        // 底栏（命令行）是否展开（默认隐藏，可由状态栏/命令入口展开）
     newsTickerOn: (() => { try { return localStorage.getItem('sim.newsTickerOn') !== '0' } catch (e) { return true } })(),  // 底栏快讯是否显示（默认开，localStorage 持久化）
     fullscreenOn: false,      // 全屏模式：隐藏左/右/底栏，仅保留 3D 场景
-    dataViewOn: false,        // 数据视图：中间 3D 场景替换为传感器历史数据表格（顶栏「视图 → 数据视图」切换）
+    dataViewOn: false,        // 数据视图：中间 3D 场景替换为传感器历史数据表格（顶栏「AI → 数据分析」切换）
+    aiGroupOn: false,         // AI 群控视图：与数据分析同布局但无 tab，仅保留「参数优化」内容（顶栏「AI → AI群控」切换）
     carbonMarketOn: false,    // 碳资产管理视图：中间 3D 场景替换为碳资产行情与管理面板（顶栏「视图 → 碳资产管理」切换）
     carbonCalcOn: false,      // 碳排核算视图：中间 3D 场景替换为多标准碳核算结果对比（工具 → 低碳 → 全景碳核查切换）
     energyFlowOn: false,      // 能流分析视图：中间 3D 场景替换为能流桑基图（工具 → 能源 → 能流分析切换）
@@ -270,9 +271,9 @@ export const useSimStore = defineStore('sim', {
     notifications: [],
   }),
   getters: {
-    // 视图模式：非数字孪生的独立视图（工况数据分析 / CEA 行情 / 碳排核算 / 能流分析 / 能碳一体机）激活时，
+    // 视图模式：非数字孪生的独立视图（工况数据分析 / AI 群控 / CEA 行情 / 碳排核算 / 能流分析 / 能碳一体机）激活时，
     // 界面进入沉浸模式——隐藏左/右/下侧面板（底部状态栏保留），顶栏工具栏按当前视图渲染
-    viewModeOn: (s) => s.dataViewOn || s.carbonMarketOn || s.carbonCalcOn || s.energyFlowOn || s.boxManageOn,
+    viewModeOn: (s) => s.dataViewOn || s.aiGroupOn || s.carbonMarketOn || s.carbonCalcOn || s.energyFlowOn || s.boxManageOn,
     // 未读系统通知数（底栏铃铛徽标）
     unreadNotifs: (s) => s.notifications.filter((n) => !n.read).length,
     // 「本析智擎」：右侧检视器当前是否为智能体对话界面
@@ -864,10 +865,13 @@ export const useSimStore = defineStore('sim', {
       await this.refreshOptimizers()
     },
     // 保存控制与自训练设置：{ auto_control?: bool, schedule?: { interval?, window? } }
+    // 注意：该入口同时被模型/聚类算法/决策变量/优化目标/拟合变量等所有设置复用，
+    // 后端返回体恒带 auto_control 当前值（与本次 patch 无关），故「开启/关闭自动化控制」
+    // 的提示只允许在本次确实切换 auto_control 时弹出，避免其它设置每次保存都误报造成反复弹窗。
     async setOptimizerSettings(id, patch) {
       try {
         const r = await api.setOptimizerSettings(id, patch)
-        if (r && typeof r.auto_control === 'boolean') {
+        if (r && patch && Object.prototype.hasOwnProperty.call(patch, 'auto_control') && typeof r.auto_control === 'boolean') {
           this.toast = r.auto_control
             ? t('已开启「{model}」自动化控制：模型变优后自动下发参数到可调设备', { model: (AI_MODEL_MAP[id] || {}).name || '优化模型' })
             : t('已关闭「{model}」自动化控制：改为系统提醒手动调优', { model: (AI_MODEL_MAP[id] || {}).name || '优化模型' })
@@ -1180,11 +1184,11 @@ export const useSimStore = defineStore('sim', {
       this.newsTickerOn = !this.newsTickerOn
       try { localStorage.setItem('sim.newsTickerOn', this.newsTickerOn ? '1' : '0') } catch (e) {}
     },
-    // 数据视图：中间 3D 场景 ↔ 工况数据分析面板（顶栏「数据 → 工况数据分析」切换）
+    // 工况数据分析视图：中间 3D 场景 ↔ 数据分析面板（AI → 数据分析切换）
     toggleDataView() {
       this.dataViewOn = !this.dataViewOn
       if (this.dataViewOn) {
-        this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false; this.overviewOn = false
+        this.aiGroupOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false; this.overviewOn = false
         // 记录进入前布局状态（退出时恢复）
         if (!this._savedPanels) this._savedPanels = { leftOpen: this.leftOpen, rightOpen: this.rightOpen, bottomOpen: this.bottomOpen }
         // 工况数据分析的数据源需从左侧「场景」资源树拖入 → 打开时自动展开左侧并定位到场景面板
@@ -1196,34 +1200,50 @@ export const useSimStore = defineStore('sim', {
         this._restorePanels()
       }
     },
+    // AI 群控视图：与数据分析同布局（左侧数据源 + 中间内容区），无 tab 切换，仅展示参数优化（AI → AI群控切换）
+    toggleAiGroup() {
+      this.aiGroupOn = !this.aiGroupOn
+      if (this.aiGroupOn) {
+        this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false; this.overviewOn = false
+        // 记录进入前布局状态（退出时恢复）
+        if (!this._savedPanels) this._savedPanels = { leftOpen: this.leftOpen, rightOpen: this.rightOpen, bottomOpen: this.bottomOpen }
+        // 参数优化的受控对象（数据源）同样需从左侧「场景」资源树拖入 → 自动展开左侧并定位到场景面板
+        this.leftOpen = true
+        this.rightOpen = false
+        this.bottomOpen = false
+        this.activityView = 'scene'
+      } else {
+        this._restorePanels()
+      }
+    },
     // 碳资产管理视图：中间 3D 场景 ↔ 碳资产管理面板（顶栏「视图 → 碳资产管理」切换）
     toggleCarbonMarket() {
       this.carbonMarketOn = !this.carbonMarketOn
-      if (this.carbonMarketOn) { this.dataViewOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false; this.overviewOn = false; this._collapsePanels() }
+      if (this.carbonMarketOn) { this.dataViewOn = false; this.aiGroupOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false; this.overviewOn = false; this._collapsePanels() }
       else { this._restorePanels() }
     },
     // 碳排核算视图：中间 3D 场景 ↔ 多标准碳核算结果对比（工具 → 低碳 → 全景碳核查切换）
     toggleCarbonCalc() {
       this.carbonCalcOn = !this.carbonCalcOn
-      if (this.carbonCalcOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.energyFlowOn = false; this.boxManageOn = false; this.overviewOn = false; this._collapsePanels() }
+      if (this.carbonCalcOn) { this.dataViewOn = false; this.aiGroupOn = false; this.carbonMarketOn = false; this.energyFlowOn = false; this.boxManageOn = false; this.overviewOn = false; this._collapsePanels() }
       else { this._restorePanels() }
     },
     // 能流分析视图：中间 3D 场景 ↔ 能流桑基图（工具 → 能源 → 能流分析切换）
     toggleEnergyFlow() {
       this.energyFlowOn = !this.energyFlowOn
-      if (this.energyFlowOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.boxManageOn = false; this.overviewOn = false; this._collapsePanels() }
+      if (this.energyFlowOn) { this.dataViewOn = false; this.aiGroupOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.boxManageOn = false; this.overviewOn = false; this._collapsePanels() }
       else { this._restorePanels() }
     },
     // 能碳一体机管理视图：中间 3D 场景 ↔ 云端设备识别 + 设备关联管理（视图 → 能碳一体机管理切换）
     toggleBoxManage() {
       this.boxManageOn = !this.boxManageOn
-      if (this.boxManageOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.overviewOn = false; this._collapsePanels() }
+      if (this.boxManageOn) { this.dataViewOn = false; this.aiGroupOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.overviewOn = false; this._collapsePanels() }
       else { this._restorePanels() }
     },
     // HMI人机交互屏：与 3D 场景互斥切换（开 HMI 关 3D，关 HMI 还原 3D）
     toggleOverview() {
       this.overviewOn = !this.overviewOn
-      if (this.overviewOn) { this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false }
+      if (this.overviewOn) { this.dataViewOn = false; this.aiGroupOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false }
     },
     toggleFullscreen() {
       this.fullscreenOn = !this.fullscreenOn

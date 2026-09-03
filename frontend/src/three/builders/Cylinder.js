@@ -9,7 +9,6 @@ import { PAL, mat, boxMesh, steelTex, tankShellTex } from './utils.js'
 export default function _buildCylinder(bodyMat) {
     const g = new THREE.Group()
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x2c6e9e
 
 
     // === 1. 钢包（ladle — 耐火材料内衬） ===
@@ -63,7 +62,7 @@ export default function _buildCylinder(bodyMat) {
         // 电弧
         const arc = new THREE.Mesh(new THREE.SphereGeometry(0.22, 6, 4),
             new THREE.MeshStandardMaterial({
-                color: 0xffffcc, emissive: 0xffaa00, emissiveIntensity: 2.0,
+                color: 0xffdda0, emissive: 0xff8800, emissiveIntensity: 1.0,
                 roughness: 0.05, metalness: 0.05, transparent: true, opacity: 0.7, depthWrite: false
             }))
         arc.position.set(ex, 5.5, ez)
@@ -137,11 +136,11 @@ export default function _buildCylinder(bodyMat) {
 
     // === 7. 霓虹 ===
     const lfRing1 = new THREE.Mesh(new THREE.TorusGeometry(3.7, 0.12, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
+        mat(0x42566b, { roughness: 0.55, metalness: 0.35 }))
     lfRing1.rotation.x = Math.PI / 2; lfRing1.position.set(0, 4.0, 0); g.add(lfRing1)
 
     const lfRing2 = new THREE.Mesh(new THREE.TorusGeometry(3.7, 0.12, 8, 24),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
+        mat(0x42566b, { roughness: 0.55, metalness: 0.35 }))
     lfRing2.rotation.x = Math.PI / 2; lfRing2.position.set(0, 6.8, 0); g.add(lfRing2)
 
     // === 8. 动画钩子 ===

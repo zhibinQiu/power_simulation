@@ -13,8 +13,13 @@
     <!-- SceneViewer 首次进入数字孪生视图时懒加载（three.js ~500KB 不进首屏关键路径），
          加载后保持挂载，不销毁 WebGL 上下文，切换速度与原先一致 -->
     <main class="stage">
-      <SceneViewer v-if="sceneMounted" v-show="!store.editMode && !store.dataViewOn && !store.carbonMarketOn && !store.carbonCalcOn && !store.energyFlowOn && !store.boxManageOn && !store.overviewOn" />
-      <DataView v-if="store.dataViewOn && !store.editMode" ref="dataViewRef" />
+      <SceneViewer v-if="sceneMounted" v-show="!store.editMode && !store.dataViewOn && !store.aiGroupOn && !store.carbonMarketOn && !store.carbonCalcOn && !store.energyFlowOn && !store.boxManageOn && !store.overviewOn" />
+      <!-- 数据分析（AI → 数据分析）与 AI 群控（AI → AI群控）共用 DataView：
+           双视图互斥，用 key 保证切换时组件重建（各自独立内部视图状态） -->
+      <DataView v-if="(store.dataViewOn || store.aiGroupOn) && !store.editMode"
+                :key="store.dataViewOn ? 'analysis' : 'group'"
+                :variant="store.dataViewOn ? 'analysis' : 'group'"
+                ref="dataViewRef" />
       <CarbonAssistantView v-if="store.carbonMarketOn && !store.editMode" ref="marketViewRef" />
       <CarbonCalcView v-if="store.carbonCalcOn && !store.editMode" />
       <EnergyFlowView v-if="store.energyFlowOn && !store.editMode" />
@@ -239,6 +244,7 @@ function onAbout() { store.openAbout() }
 function closeView() {
   if (store.editMode) store.exitEdit()
   else if (store.dataViewOn) store.toggleDataView()
+  else if (store.aiGroupOn) store.toggleAiGroup()
   else if (store.carbonMarketOn) store.toggleCarbonMarket()
   else if (store.carbonCalcOn) store.toggleCarbonCalc()
   else if (store.energyFlowOn) store.toggleEnergyFlow()
@@ -263,6 +269,16 @@ function openAiModel(id) {
   store.selectStrategy(cur === id ? cur : id)
   const m = id === 'ai::seq' ? t('时序预测') : id === 'ai::clu' ? t('聚类分析') : id === 'ai::fit' ? t('数据拟合') : t('AI 模型')
   store.toast = t('已打开「') + m + t('」属性面板')
+}
+// AI 群控视图（AI → AI群控）：与数据分析同布局、无 tab，仅参数优化。
+// 打开时自动选中参数优化集中面板（GA/PSO/RL，面板顶部可切换；已选中其中一种时保持不跳变），右侧即展示训练控制
+function openAiGroup() {
+  if (store.aiGroupOn) { store.toggleAiGroup(); return }
+  store.toggleAiGroup()
+  const cur = store.selectedStrategyId
+  const curOpt = /^ai::(ga|pso|rl)$/.test(String(cur || ''))
+  store.selectStrategy(curOpt ? cur : 'ai::ga')
+  pushCmd(t('AI群控：请从左侧「场景」资源树拖入受控设备，在右侧参数优化面板设置目标并开始训练，此处实时展示收敛进度与最优参数。'), 'out')
 }
 // 碳资产管理视图：刷新行情（CarbonAssistantView 暴露的 loadAll）
 async function marketRefresh() { await waitViewRef(marketViewRef); if (marketViewRef.value?.loadAll) marketViewRef.value.loadAll() }
@@ -378,7 +394,8 @@ const menus = computed(() => [
     ] },
   ] },
   { id: 'ai', label: t('AI'), items: [
-    { label: t('数据分析与策略'), toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
+    { label: t('数据分析'), toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
+    { label: t('AI群控'), toggle: () => store.aiGroupOn, act: () => openAiGroup() },
     { sep: true },
     { label: t('行业知识库'), act: () => { showKnowledgeManage.value = true } },
     { sep: true },

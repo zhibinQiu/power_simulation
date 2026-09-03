@@ -1015,8 +1015,10 @@ function resetModel() { store.resetOptimizer(strategy.value.id) }
 function saveHyper() { store.setOptimizerHyper(strategy.value.id, { ...hpDraft.value }) }
 function applyModel() { store.applyOptimizer(strategy.value.id) }
 // ---- 控制与训练设置 ----
-function toggleAutoControl() {
-  store.setOptimizerSettings(strategy.value.id, { auto_control: !st.value.auto_control })
+// 自动化控制开关：直接以事件目标值为准（st.auto_control 需等轮询刷新才更新，
+// 用 !st.auto_control 取反在快速连点时可能按过时状态重复/反向提交，导致提示反复弹出）
+function toggleAutoControl(e) {
+  store.setOptimizerSettings(strategy.value.id, { auto_control: !!e.target.checked })
 }
 function saveSchedule() {
   store.setOptimizerSettings(strategy.value.id, {

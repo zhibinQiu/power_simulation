@@ -10,7 +10,6 @@ import { PAL, mat, boxMesh, steelTex, tankShellTex, wallPanelTex } from './utils
 export default function _buildFurnace(bodyMat) {
     const g = new THREE.Group()
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x2c6e9e
 
 
     // === 1. 炉体 ===
@@ -65,9 +64,9 @@ export default function _buildFurnace(bodyMat) {
         // 电弧火焰（电极尖端 — 高温等离子弧）
         const arc = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 6),
             new THREE.MeshStandardMaterial({
-                color: 0xffffcc, emissive: 0xffffff, emissiveIntensity: 3.0,
+                color: 0xffe6b0, emissive: 0xffcc88, emissiveIntensity: 1.3,
                 roughness: 0.05, metalness: 0.05, transparent: true,
-                opacity: 0.8, depthWrite: false
+                opacity: 0.75, depthWrite: false
             }))
         arc.position.set(0, 5.0, 0)
         arc.name = 'arcFlare'
@@ -86,8 +85,8 @@ export default function _buildFurnace(bodyMat) {
     // === 3. 炉内熔池（液态钢水） ===
     const meltPool = new THREE.Mesh(
         new THREE.CylinderGeometry(3.5, 4.2, 2.5, 24),
-        mat(0xbf6a30, {
-            roughness: 0.15, metalness: 0.05, emissive: 0x8a4018, emissiveIntensity: 0.5,
+        mat(0xb35a28, {
+            roughness: 0.2, metalness: 0.08, emissive: 0x773010, emissiveIntensity: 0.32,
             transparent: true, opacity: 0.8, depthWrite: false
         })
     )
@@ -141,11 +140,11 @@ export default function _buildFurnace(bodyMat) {
 
     // === 7. 霓虹装饰 ===
     const eafRing = new THREE.Mesh(new THREE.TorusGeometry(5.7, 0.15, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
+        mat(0x42566b, { roughness: 0.55, metalness: 0.35 }))
     eafRing.rotation.x = Math.PI / 2; eafRing.position.set(0, 4.5, 0); g.add(eafRing)
 
     const eafRing2 = new THREE.Mesh(new THREE.TorusGeometry(4.8, 0.12, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
+        mat(0x42566b, { roughness: 0.55, metalness: 0.35 }))
     eafRing2.rotation.x = Math.PI / 2; eafRing2.position.set(0, 8.0, 0); g.add(eafRing2)
 
     // === 7.5 检修平台（2层） ===

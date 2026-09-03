@@ -200,7 +200,7 @@ export default {
       statusText: '',  // 当前思考/调用状态（thinking/reason/status/verify 提示）
       streamAbort: null, // 当前流式请求的中断控制器（「新对话」时中断进行中的回复）
       messages: [], // { role, content, html, thoughts: [], thoughtsOpen }
-      suggests: [t('帮我查询设备当前实时运行状态'), t('分析最近一周的能耗趋势'), t('当前碳排放量是多少？'), t('碳市场最新行情如何？')],
+      suggests: [t('当前的设备都运转正常吗'), t('今年以来工厂一共排放了多少碳，消耗了多少能源'), t('给出各个工艺碳排放的实时占比'), t('高炉节能减碳的措施有哪些')],
       // 多智能体：智能体列表 / skills 列表 / 当前选择
       agents: [],
       skills: [],

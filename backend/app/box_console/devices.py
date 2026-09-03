@@ -9,9 +9,10 @@ import json
 import time
 from typing import Any, Dict, List, Optional
 
+from .. import cloud_agent
 from .. import mqtt_source
 from ..domain.box import DeviceYamlFactory
-from ._shared import _load_devices, _save_devices
+from ._shared import _load_devices, _save_devices, data_fresh, last_data_ts
 from .cloud_ops import _auto_sync_cloud, _cloud_delete_crds, apply_devices_to_cloud
 
 
@@ -71,9 +72,30 @@ def list_devices() -> Dict[str, Any]:
         cd = matched.get(d.get("name"))
         if cd:
             fp2cd.setdefault(_device_fingerprint(d), cd)
+    # 云端 CRD twins（双通道之一）：name/cloudDevice → twins 列表（读平台缓存，零网络）
+    twins_map: Dict[str, List[Dict[str, Any]]] = {}
+    try:
+        crds = cloud_agent.crds()
+        if crds.get("ok"):
+            for d in crds.get("devices", []):
+                twins_map[d.get("name")] = d.get("twins", [])
+    except Exception:  # noqa: BLE001
+        twins_map = {}
+
+    def _twins_of(d: Dict[str, Any]) -> List[Dict[str, Any]]:
+        return (twins_map.get((d.get("cloudDevice") or "").strip())
+                or twins_map.get(d.get("name")) or [])
+
+    fp2ctw: Dict[str, List[Dict[str, Any]]] = {}
+    for d in raw:
+        t = _twins_of(d)
+        if t:
+            fp2ctw.setdefault(_device_fingerprint(d), t)
     devices = []
     for d in raw:
-        cd = matched.get(d.get("name")) or fp2cd.get(_device_fingerprint(d))
+        fp = _device_fingerprint(d)
+        cd = matched.get(d.get("name")) or fp2cd.get(fp)
+        twins = _twins_of(d) or fp2ctw.get(fp, [])
         d2 = dict(d)
         # mqtt_matched = 该设备已被 MQTT 识别（盒子正上报真实读数）——用于实时读数展示，
         # 注意：不等于「已下发云端 CRD」！下发状态请以 /box/devices/cloud 的云端 CRD 为准。
@@ -81,6 +103,11 @@ def list_devices() -> Dict[str, Any]:
         d2["cloud_matched"] = bool(cd)   # 兼容旧字段（语义同 mqtt_matched）
         d2["last_seen"] = cd.get("last_seen") if cd else None
         d2["primary"] = cd.get("primary") if cd else None
+        # 在线 = 有实时数据推送（CRD twins 或 MQTT 双通道，窗口 DATA_FRESH_SECONDS 内）；
+        # data_ts = 最后数据时间 = 最后在线时间（epoch 秒）。读不到数据即离线。
+        fresh, last = data_fresh(twins, cd)
+        d2["data_online"] = fresh
+        d2["data_ts"] = last
         devices.append(d2)
     return {"models": data.get("models", []), "devices": devices, "cloud_devices": cloud}
 

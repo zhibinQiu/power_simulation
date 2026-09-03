@@ -11,7 +11,6 @@ export default function _buildReheatFurnace(bodyMat) {
     const g = new THREE.Group()
     const L = 22; const D = 10; const H = 10
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x2c6e9e
 
 
     // === 1. 炉体（长条形步进式加热炉：装料端→预热→加热→均热→出料端） ===
@@ -38,7 +37,7 @@ export default function _buildReheatFurnace(bodyMat) {
         for (const sz of [-0.8, 0.8]) {
             const slab = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.4, 1.2),
                 new THREE.MeshStandardMaterial({
-                    roughness: 0.2, metalness: 0.1, emissive: 0xbf5a2e, emissiveIntensity: 0.3 + i * 0.1
+                    roughness: 0.2, metalness: 0.1, emissive: 0xbf5a2e, emissiveIntensity: 0.18 + i * 0.06
                 }))
             slab.position.set(slabX, 3.35, sz); g.add(slab)
             slab.name = i < 2 ? 'coldSlab' : i >= 4 ? 'soakingSlab' : 'heatingSlab'
@@ -58,13 +57,13 @@ export default function _buildReheatFurnace(bodyMat) {
         const bx = -L * 0.35 + i * (L * 0.7 / (slabCount - 1))
         for (const s of [-1, 1]) {
             const burner = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 0.6, 8),
-                mat(0x996644, { roughness: 0.3, metalness: 0.5, emissive: 0x331100, emissiveIntensity: 0.6 }))
+                mat(0x996644, { roughness: 0.3, metalness: 0.5, emissive: 0x331100, emissiveIntensity: 0.35 }))
             burner.position.set(bx, 4.5, s * D * 0.2)
             burnerGroup.add(burner)
             // 火焰锥
             const flame = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.8, 8),
                 new THREE.MeshStandardMaterial({
-                    color: 0xff8844, emissive: 0xcc3a00, emissiveIntensity: 0.8,
+                    color: 0xdd6a2a, emissive: 0xa83a10, emissiveIntensity: 0.45,
                     roughness: 0.3, metalness: 0.05, transparent: true, opacity: 0.55, depthWrite: false
                 }))
             flame.rotation.x = Math.PI
@@ -86,7 +85,7 @@ export default function _buildReheatFurnace(bodyMat) {
         // 炉门内可见火焰
         const doorFlare = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.0, D * 0.4),
             new THREE.MeshStandardMaterial({
-                color: 0xff8844, emissive: 0xcc3a00, emissiveIntensity: 0.8,
+                color: 0xdd6a2a, emissive: 0xa83a10, emissiveIntensity: 0.45,
                 transparent: true, opacity: 0.55, depthWrite: false
             }))
         doorFlare.position.set(doorX, 2.5, 0); g.add(doorFlare)
@@ -108,7 +107,7 @@ export default function _buildReheatFurnace(bodyMat) {
 
     // === 7. 霓虹 ===
     const reheatRing = new THREE.Mesh(new THREE.TorusGeometry(L * 0.42, 0.12, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
+        mat(0x42566b, { roughness: 0.55, metalness: 0.35 }))
     reheatRing.rotation.x = Math.PI / 2; reheatRing.position.set(0, 2.0, 0); g.add(reheatRing)
 
     // === 8. 动画钩子 ===

@@ -27,7 +27,7 @@ from typing import Any, Dict, Optional, Set
 _CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config")
 _DEVICES_PATH = os.path.join(_CONFIG_DIR, "box_devices.json")
 _BROKER_CFG_PATH = os.path.join(_CONFIG_DIR, "box_config.json")
-_DEFAULT_HOST = "172.19.134.45"
+_DEFAULT_HOST = "172.18.0.1"  # docker 网关: 平台容器与云端同机部署时经宿主回环访问 broker/agent
 _DEFAULT_PORT = 42083
 
 _LOCK = threading.Lock()

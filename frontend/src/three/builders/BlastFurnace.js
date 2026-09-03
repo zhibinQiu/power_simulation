@@ -11,7 +11,6 @@ export default function _buildBlastFurnace(bodyMat) {
     const g = new THREE.Group()
     const steel = mat(PAL.steel, { metalness: 0.5, roughness: 0.35 })
     const brickMat = mat(0x8a7060, { metalness: 0.05, roughness: 0.6 })
-    const neonColor = 0x2c6e9e
     // 无厂房框架，仅保留高炉本体与附属设备
 
     // 高炉主体按Y轴缩放到合适高度
@@ -93,7 +92,7 @@ export default function _buildBlastFurnace(bodyMat) {
     const cohesiveZone = new THREE.Mesh(
         new THREE.CylinderGeometry(5.0, 5.5, 10, 24),
         mat(0x8a4020, {
-            roughness: 0.35, metalness: 0.1, emissive: 0xcc3a00, emissiveIntensity: 0.25,
+            roughness: 0.35, metalness: 0.1, emissive: 0x99280a, emissiveIntensity: 0.14,
             transparent: true, opacity: 0.8, depthWrite: false
         })
     )
@@ -105,7 +104,7 @@ export default function _buildBlastFurnace(bodyMat) {
     const drippingZone = new THREE.Mesh(
         new THREE.CylinderGeometry(7.0, 7.5, 10, 24),
         mat(0x4a3530, {
-            roughness: 0.3, metalness: 0.15, emissive: 0x8a4018, emissiveIntensity: 0.4,
+            roughness: 0.3, metalness: 0.15, emissive: 0x7a2c10, emissiveIntensity: 0.22,
             transparent: true, opacity: 0.7, depthWrite: false
         })
     )
@@ -116,8 +115,8 @@ export default function _buildBlastFurnace(bodyMat) {
     // 3D. 炉缸铁水 + 炉渣分层（hearth — 铁水在下，炉渣在上）
     const ironPool = new THREE.Mesh(
         new THREE.CylinderGeometry(7.5, 7.5, 4.5, 24),
-        mat(0xff3300, {
-            roughness: 0.1, metalness: 0.9, emissive: 0xff2200, emissiveIntensity: 0.9,
+        mat(0xc44e22, {
+            roughness: 0.3, metalness: 0.7, emissive: 0x8f2e10, emissiveIntensity: 0.4,
             transparent: true, opacity: 0.85, depthWrite: false
         })
     )
@@ -215,7 +214,7 @@ export default function _buildBlastFurnace(bodyMat) {
         const flare = new THREE.Mesh(
             new THREE.SphereGeometry(0.35, 8, 6),
             new THREE.MeshStandardMaterial({
-                color: 0xc67a3c, emissive: 0xcc4a10, emissiveIntensity: 0.8,
+                color: 0xc26530, emissive: 0xb54214, emissiveIntensity: 0.4,
                 roughness: 0.25, metalness: 0.05, transparent: true, opacity: 0.75, depthWrite: false
             })
         )
@@ -249,7 +248,7 @@ export default function _buildBlastFurnace(bodyMat) {
     // 出铁口（低标高）— 铁水流道
     const tapHoleIron = new THREE.Mesh(
         new THREE.CylinderGeometry(0.6, 0.8, 0.8, 12),
-        mat(0x553322, { metalness: 0.4, roughness: 0.4, emissive: 0xff3300, emissiveIntensity: 0.6 })
+        mat(0x553322, { metalness: 0.4, roughness: 0.4, emissive: 0xcc4420, emissiveIntensity: 0.35 })
     )
     tapHoleIron.rotation.z = Math.PI / 2
     tapHoleIron.position.set(8.8, 1.8, 3); mainGroup.add(tapHoleIron)
@@ -257,15 +256,15 @@ export default function _buildBlastFurnace(bodyMat) {
     // 出铁沟流道
     const ironRunner = new THREE.Mesh(
         new THREE.BoxGeometry(0.6, 0.4, 4),
-        mat(0x442211, { metalness: 0.3, roughness: 0.5, emissive: 0xff2200, emissiveIntensity: 0.5 })
+        mat(0x442211, { metalness: 0.3, roughness: 0.5, emissive: 0xbb3315, emissiveIntensity: 0.3 })
     )
     ironRunner.position.set(10.5, 1.2, 3); mainGroup.add(ironRunner)
 
     // 铁水流动体（出铁口外 — 液态铁水）
     const ironStream = new THREE.Mesh(
         new THREE.BoxGeometry(1.5, 0.3, 2.5),
-        mat(0xff3300, {
-            roughness: 0.05, metalness: 0.9, emissive: 0xff2200, emissiveIntensity: 1.4,
+        mat(0xcc4018, {
+            roughness: 0.25, metalness: 0.7, emissive: 0x993210, emissiveIntensity: 0.6,
             transparent: true, opacity: 0.9, depthWrite: false
         })
     )
@@ -324,12 +323,12 @@ export default function _buildBlastFurnace(bodyMat) {
     // ========== 九、霓虹装饰 ==========
     // 炉缸霓虹环
     const bfRing1 = new THREE.Mesh(new THREE.TorusGeometry(9.2, 0.15, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
+        mat(0x42566b, { roughness: 0.55, metalness: 0.35 }))
     bfRing1.rotation.x = Math.PI / 2; bfRing1.position.set(0, 10, 0); mainGroup.add(bfRing1)
 
     // 炉身中部霓虹环
     const bfRing2 = new THREE.Mesh(new THREE.TorusGeometry(5.8, 0.12, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
+        mat(0x42566b, { roughness: 0.55, metalness: 0.35 }))
     bfRing2.rotation.x = Math.PI / 2; bfRing2.position.set(0, 35, 0); mainGroup.add(bfRing2)
 
     // ========== 十、动画钩子数据 ==========

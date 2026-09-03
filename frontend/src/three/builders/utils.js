@@ -1,7 +1,7 @@
 // 工艺模型共享工具模块：颜色、材质、纹理、标签绘制
 import * as THREE from 'three'
 
-/** 赛博朋克工业科技蓝调色板 */
+/** 工业涂装调色板（设备主体用低饱和钢灰蓝；neon 系仅供 dark 主题环境光） */
 export const PAL = {
   terrain: 0x0b1020,
   platform: 0x1a2035,
@@ -10,7 +10,7 @@ export const PAL = {
   grass: 0x0d1830,
   wall: 0x1e2d4a,
   roof: 0x253550,
-  steel: 0x3a5080,
+  steel: 0x4d5d72,
   glass: 0x1a8aa8,
   accent: 0x00b4d8,
   accent2: 0xd040f0,
@@ -22,9 +22,9 @@ export const PAL = {
   stackBand: 0x00b4d8,
 }
 
-/** 标准材质工厂 */
+/** 标准材质工厂（默认亚光工业涂装，避免塑料高光感；需要金属光泽的零件显式覆盖） */
 export function mat(color, o = {}) {
-  return new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.48, metalness: 0.42 }, o))
+  return new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.62, metalness: 0.3 }, o))
 }
 
 /** 快速创建 BoxGeometry Mesh */
@@ -76,10 +76,10 @@ let _tankShellTexCache = null
 export function tankShellTex() {
   if (_tankShellTexCache) return _tankShellTexCache
   const t = _makeCanvasTex(1024, 512, (ctx, w, h) => {
-    ctx.fillStyle = '#c9cfd4'; ctx.fillRect(0, 0, w, h)
+    ctx.fillStyle = '#bcc5cd'; ctx.fillRect(0, 0, w, h)
     for (let y = 0; y < h; y += 40) {
-      ctx.fillStyle = 'rgba(60,70,80,0.40)'; ctx.fillRect(0, y, w, 3)
-      ctx.fillStyle = 'rgba(255,255,255,0.20)'; ctx.fillRect(0, y + 3, w, 1)
+      ctx.fillStyle = 'rgba(55,65,75,0.45)'; ctx.fillRect(0, y, w, 3)
+      ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(0, y + 3, w, 1)
     }
     const gv = ctx.createLinearGradient(0, 0, w, 0)
     gv.addColorStop(0, 'rgba(0,0,0,0.30)'); gv.addColorStop(0.4, 'rgba(0,0,0,0)')
@@ -104,7 +104,7 @@ export function stackPanelTex() {
   const t = _makeCanvasTex(512, 1024, (ctx, w, h) => {
     const segH = 64
     for (let y = 0; y < h; y += segH) {
-      ctx.fillStyle = (y / segH) % 2 === 0 ? '#d8d2c4' : '#a6423a'
+      ctx.fillStyle = (y / segH) % 2 === 0 ? '#c7cdd3' : '#7a4a40'
       ctx.fillRect(0, y, w, segH)
     }
     const gv = ctx.createLinearGradient(0, 0, w, 0)

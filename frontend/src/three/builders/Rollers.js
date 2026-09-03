@@ -10,7 +10,6 @@ export default function buildRollers(bodyMat) {
     const g = new THREE.Group()
     const L = 30; const D = 6; const H = 12
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x2c6e9e
 
 
     // === 1. 轧机机架（粗轧R1→R2→精轧F1-F6） ===
@@ -85,7 +84,7 @@ export default function buildRollers(bodyMat) {
         const nx = coolingX - coolingLen / 2 + i * (coolingLen / 7)
         const waterJet = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.2, 6),
             new THREE.MeshBasicMaterial({
-                color: 0x88ccff, transparent: true, opacity: 0.35, depthWrite: false
+                color: 0xcfdce6, transparent: true, opacity: 0.35, depthWrite: false
             }))
         waterJet.position.set(nx, 2.5, 0); g.add(waterJet)
     }
@@ -108,7 +107,7 @@ export default function buildRollers(bodyMat) {
 
     // === 7. 轧线霓虹 ===
     const rollLine = new THREE.Mesh(new THREE.BoxGeometry(L * 0.85, 0.04, 0.12),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
+        mat(0x42566b, { roughness: 0.55, metalness: 0.35 }))
     rollLine.position.set(0, 1.0, 0); g.add(rollLine)
 
     // === 7.5 辊道传送台 ===

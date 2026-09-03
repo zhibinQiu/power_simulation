@@ -40,23 +40,50 @@
             v-model="layout.state.open[sid]"
             @drop="layout.move($event.from, $event.to, $event.position)"
           >
-            <div class="chips">
-              <div class="chip2 e"><span>{{ t('综合能耗') }}</span><b>{{ fmt(plantEnergy.total) }}</b><i>GJ/h</i></div>
-              <div class="chip2 e"><span>{{ t('单位能耗') }}</span><b>{{ fmt(plantEnergy.intensity) }}</b><i>kgce/t</i></div>
-              <div class="chip2 e"><span>{{ t('电耗') }}</span><b>{{ fmt(plantElec) }}</b><i>MWh/h</i></div>
-              <div class="chip2 c"><span>{{ t('总排放') }}</span><b :style="{color:co2Color}">{{ fmt(totals.co2_total) }}</b><i>tCO₂/h</i></div>
-              <div class="chip2 c"><span>{{ t('吨钢强度') }}</span><b>{{ fmt(totals.intensity) }}</b><i>kg/t</i></div>
-              <div class="chip2"><span>{{ t('钢产量') }}</span><b>{{ fmt(totals.steel_output) }}</b><i>t/h</i></div>
-              <div class="chip2 c"><span>{{ t('碳利用率') }}</span><b>{{ (totals.carbon_utilization*100).toFixed(1) }}</b><i>%</i></div>
-            </div>
-            <div class="scope">
-              <div class="scope-bar">
-                <i class="scope-direct" :style="{ width: directPct + '%' }"></i>
-                <i class="scope-indirect" :style="{ width: indirectPct + '%' }"></i>
+            <!-- 全厂总览分两类：实时（小时粒度）与年度核算（按 8000h/年折算） -->
+            <div class="plant-group">
+              <div class="plant-sec">{{ t('实时全厂总览') }}</div>
+              <div class="chips">
+                <div class="chip2 e"><span>{{ t('综合能耗') }}</span><b>{{ fmt(plantEnergy.total) }}</b><i>GJ/h</i></div>
+                <div class="chip2 e"><span>{{ t('单位能耗') }}</span><b>{{ fmt(plantEnergy.intensity) }}</b><i>kgce/t</i></div>
+                <div class="chip2 e"><span>{{ t('电耗') }}</span><b>{{ fmt(plantElec) }}</b><i>MWh/h</i></div>
+                <div class="chip2 c"><span>{{ t('总排放') }}</span><b :style="{color:co2Color}">{{ fmt(totals.co2_total) }}</b><i>tCO₂/h</i></div>
+                <div class="chip2 c"><span>{{ t('吨钢强度') }}</span><b>{{ fmt(totals.intensity) }}</b><i>kg/t</i></div>
+                <div class="chip2"><span>{{ t('钢产量') }}</span><b>{{ fmt(totals.steel_output) }}</b><i>t/h</i></div>
+                <div class="chip2 c"><span>{{ t('碳利用率') }}</span><b>{{ (totals.carbon_utilization*100).toFixed(1) }}</b><i>%</i></div>
               </div>
-              <div class="scope-legend">
-                <span>{{ t('直接') }} {{ fmt(totals.co2_direct) }} ({{ directPct }}%)</span>
-                <span>{{ t('间接') }} {{ fmt(totals.co2_indirect) }} ({{ indirectPct }}%)</span>
+              <div class="scope">
+                <div class="scope-bar">
+                  <i class="scope-direct" :style="{ width: directPct + '%' }"></i>
+                  <i class="scope-indirect" :style="{ width: indirectPct + '%' }"></i>
+                </div>
+                <div class="scope-legend">
+                  <span>{{ t('直接') }} {{ fmt(totals.co2_direct) }} ({{ directPct }}%)</span>
+                  <span>{{ t('间接') }} {{ fmt(totals.co2_indirect) }} ({{ indirectPct }}%)</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="plant-group">
+              <div class="plant-sec">{{ t('年度核算全厂总览') }}</div>
+              <div class="chips">
+                <div class="chip2 e"><span>{{ t('年度综合能耗') }}</span><b>{{ fmt(annual.energy) }}</b><i>万GJ</i></div>
+                <div class="chip2 e"><span>{{ t('单位能耗') }}</span><b>{{ fmt(plantEnergy.intensity) }}</b><i>kgce/t</i></div>
+                <div class="chip2 e"><span>{{ t('年度电耗') }}</span><b>{{ fmt(annual.elec) }}</b><i>亿kWh</i></div>
+                <div class="chip2 c"><span>{{ t('年度总排放') }}</span><b :style="{color:co2Color}">{{ fmt(annual.co2) }}</b><i>万tCO₂</i></div>
+                <div class="chip2 c"><span>{{ t('吨钢强度') }}</span><b>{{ fmt(totals.intensity) }}</b><i>kg/t</i></div>
+                <div class="chip2"><span>{{ t('年度钢产量') }}</span><b>{{ fmt(annual.steel) }}</b><i>万t</i></div>
+                <div class="chip2 c"><span>{{ t('碳利用率') }}</span><b>{{ (totals.carbon_utilization*100).toFixed(1) }}</b><i>%</i></div>
+              </div>
+              <div class="scope">
+                <div class="scope-bar">
+                  <i class="scope-direct" :style="{ width: directPct + '%' }"></i>
+                  <i class="scope-indirect" :style="{ width: indirectPct + '%' }"></i>
+                </div>
+                <div class="scope-legend">
+                  <span>{{ t('直接') }} {{ fmt(annual.direct) }} ({{ directPct }}%)</span>
+                  <span>{{ t('间接') }} {{ fmt(annual.indirect) }} ({{ indirectPct }}%)</span>
+                </div>
               </div>
             </div>
           </CollapseSection>
@@ -218,6 +245,26 @@ const plantElec = computed(() => {
   for (const u of units) sum += energyOf(u).elec
   return sum
 })
+// 年运行小时（钢铁长流程：日历 8760h 扣除检修停机约 760h），口径与 HMI 大屏「年度碳排放」一致
+const ANNUAL_HOURS = 8000
+// 年度核算全厂总览：按 ANNUAL_HOURS 折算为年度量（万GJ / 亿kWh / 万tCO₂ / 万t）
+const annual = computed(() => {
+  const t = totals.value
+  const energy = plantEnergy.value.total || 0
+  const elec = plantElec.value || 0
+  const co2 = t.co2_total || 0
+  const direct = t.co2_direct || 0
+  const indirect = t.co2_indirect || 0
+  const steel = t.steel_output || 0
+  return {
+    energy: (energy * ANNUAL_HOURS) / 10000,    // 万GJ
+    elec: (elec * ANNUAL_HOURS) / 100000,        // 亿kWh（1亿kWh = 10^5 MWh）
+    co2: (co2 * ANNUAL_HOURS) / 10000,           // 万tCO₂
+    direct: (direct * ANNUAL_HOURS) / 10000,     // 万tCO₂
+    indirect: (indirect * ANNUAL_HOURS) / 10000, // 万tCO₂
+    steel: (steel * ANNUAL_HOURS) / 10000,       // 万t
+  }
+})
 // 策略节能减碳效果（基线 vs 策略）：节能与减碳并重
 const stratCmp = computed(() => {
   const b = store.baseline && store.baseline.totals
@@ -273,6 +320,15 @@ function fmt(n) { return (n == null ? '—' : Number(n).toLocaleString('zh-CN', 
 /* 总览指标卡：统一中性底色（与全局面板一致），不再按能耗/碳排区分彩色底，避免视觉杂乱；
  * 语义色仅保留在数值上（co2Color 强度警示），卡片本身一色到底 */
 .te-row { align-items: flex-start; padding-top: 9px; padding-bottom: 9px; }
+/* 全厂总览：实时 / 年度核算两类分区标题（标题 + 延展细线） */
+.plant-group + .plant-group { margin-top: 10px; padding-top: 2px; }
+.plant-sec {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 10px; color: var(--muted); letter-spacing: .05em;
+  margin: 0 0 5px;
+}
+.plant-sec::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.plant-group + .plant-group .plant-sec { margin-top: 8px; }
 .te-bar { display: block; height: 4px; border-radius: 2px; background: var(--panel-2); overflow: hidden; margin-top: 5px; }
 .te-bar > i { display: block; height: 100%; border-radius: 2px; }
 .te-pct { flex: 0 0 44px; text-align: right; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }

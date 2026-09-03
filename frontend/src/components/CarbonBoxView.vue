@@ -22,7 +22,7 @@
                 <div class="cbx-tree-row" @click="expanded['box-' + b.name] = !expanded['box-' + b.name]">
                   <span class="cbx-tree-arrow">{{ expanded['box-' + b.name] ? '▾' : '▸' }}</span>
                   <span class="cbx-dot" :class="{ on: readyOk(b.ready) }"></span>
-                  <span class="cbx-tree-label">{{ b.name }}</span>
+                  <span class="cbx-tree-label" :title="b.name">{{ boxName(b) }}</span>
                   <span class="cbx-tree-tag" :class="{ ok: readyOk(b.ready), err: b.ready === false }">{{ readyZh(b.ready) }}</span>
                 </div>
                 <div v-show="expanded['box-' + b.name]" class="cbx-tree-children">
@@ -68,6 +68,52 @@
         <div class="cbx-editor">
           <!-- ===== 概览页 ===== -->
           <section class="cbx-page">
+        <!-- 0 运行状态总览：面向非技术人员的“一眼式”健康摘要；下方所有专业区块功能均保留 -->
+        <section class="cbx-hero">
+          <div class="cbx-hero-main">
+            <div class="cbx-hero-verdict" :class="'tone-' + hero.tone">
+              <span class="cbx-hero-ic">{{ hero.icon }}</span>
+              <div class="cbx-hero-tt">
+                <b>{{ hero.title }}</b>
+                <p>{{ hero.desc }}</p>
+              </div>
+            </div>
+            <button class="cbx-op cbx-xs cbx-guide-btn" @click="toggleGuide"
+                    :title="t('面向非技术人员的快速使用说明')">{{ guideOpen ? t('收起指引') : t('使用指引') }}</button>
+            <div class="cbx-hero-stats">
+              <div class="cbx-hero-stat" :class="'tone-' + heroCloud.cls" :title="t('云端服务器连接与数据推送状态')">
+                <b>{{ heroCloud.txt }}</b><span>{{ t('云端服务') }}</span>
+              </div>
+              <div class="cbx-hero-stat click" :class="'tone-' + heroBox.cls" @click="scrollToSec('box')" :title="t('在线盒子数 / 总数（点击查看盒子列表）')">
+                <b>{{ heroBox.txt }}</b><span>{{ t('盒子在线') }}</span>
+              </div>
+              <div class="cbx-hero-stat click" :class="'tone-' + heroDev.cls" @click="scrollToSec('dev')" :title="t('正在上报数据的设备 / 全部设备（点击查看设备列表）')">
+                <b>{{ heroDev.txt }}</b><span>{{ t('设备上传中') }}</span>
+              </div>
+              <div class="cbx-hero-stat" :class="'tone-' + heroMsg.cls" :title="t('近 3 秒收到的设备消息条数')">
+                <b>{{ heroMsg.n }}</b><span>{{ t('实时消息') }}</span>
+              </div>
+            </div>
+          </div>
+          <!-- 使用指引：首次进入自动展开，点“知道了”后记住不再打扰 -->
+          <div v-if="guideOpen" class="cbx-guide">
+            <div class="cbx-guide-title">
+              <b>{{ t('快速使用指引') }}</b>
+              <span class="cbx-guide-sub">{{ t('面向非技术人员的快速使用说明') }}</span>
+              <span class="cbx-sec-spacer"></span>
+              <button class="cbx-op cbx-xs" @click="closeGuide" :title="t('不再显示')">✕</button>
+            </div>
+            <ol class="cbx-guide-steps">
+              <li>{{ t('本页管理部署在车间现场的「边缘采集盒子」：盒子负责把现场电表 / 传感器等设备的数据采集后上传到云端，再展示到这里。') }}</li>
+              <li>{{ t('日常只需看顶部「运行状态」：全部为绿色说明一切正常，无需任何操作。') }}</li>
+              <li>{{ t('查看某台设备的最新读数：点击左侧「设备导航」或下方「采集设备」卡片中的设备名，即可打开实时曲线。') }}</li>
+              <li>{{ t('添加一台新设备：点击「＋ 设备」按提示填写即可；接入新盒子：点击「盒子接入」。') }}</li>
+              <li>{{ t('下方「证书与密钥到期 / 实时日志 / 发测试消息」等区块仅供专业维护人员排查问题，日常可忽略。') }}</li>
+            </ol>
+            <button class="cbx-op cbx-xs" style="margin-top:8px" @click="closeGuide">{{ t('知道了，不再显示') }}</button>
+          </div>
+        </section>
+
         <!-- 云端状态全局提示（集中展示，避免下方各区块重复出现“云端不可达”tag） -->
         <div class="cbx-banner" :class="overview.cloud_source === 'degraded' ? 'warn' : 'err'"
              v-if="overview.cloud_source && overview.cloud_source !== 'live'">
@@ -79,7 +125,8 @@
         <!-- ① 通信拓扑图：平台 → 云端 → 边端 → 设备端（连线标注实际协议） -->
         <section class="cbx-sec">
           <div class="cbx-sec-head">
-            <b>{{ t('通信拓扑图') }}</b>
+            <b>{{ t('系统连接图') }}</b>
+            <span class="cbx-sec-sub">{{ t('数据流向：现场设备 → 现场盒子 → 云端服务器 → 平台') }}</span>
             <span class="cbx-sec-hint">{{ t('拖动模块可自定义布局，连线自动跟随') }}</span>
             <span class="cbx-sec-spacer"></span>
             <button class="cbx-op cbx-xs" @click="autoLayoutTopo()" :title="t('恢复四列自动布局，清除所有模块的手动拖拽位置')">{{ t('自动布局') }}</button>
@@ -105,7 +152,7 @@
                 <div class="cbx-topo-lane-title">{{ t('云端') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openBoxConfig" :title="t('配置云端 Broker 地址/账号与 agent Token/端口，保存后自动热更新重连')">{{ t('云端配置') }}</button></div>
                 <div :ref="setNodeRef('n_agent')" class="cbx-topo-mod agent" :class="{ down: !agentStatusOk }">
                   <div class="cbx-topo-mod-head">
-                    <span class="cbx-topo-mod-name">cloud-agent</span>
+                    <span class="cbx-topo-mod-name" :title="'cloud-agent'">{{ t('云端数据服务') }}</span>
                     <span class="cbx-topo-mod-badge" :class="{ ok: agentStatusOk }">{{ agentStatusOk ? t('在线') : t('离线') }}</span>
                   </div>
                   <div class="cbx-topo-mod-sub">HTTP :42083 · Bearer<br/>{{ agentStatusOk ? t('已连通') : t('未连通（需配置 Token）') }}</div>
@@ -115,7 +162,7 @@
                 </div>
                 <div :ref="setNodeRef('n_cloudcore')" class="cbx-topo-mod cloudcore" :class="{ down: overview.cloud_source !== 'live' || (overview.cloudcore && overview.cloudcore.phase !== 'Running') }">
                   <div class="cbx-topo-mod-head">
-                    <span class="cbx-topo-mod-name">CloudCore</span>
+                    <span class="cbx-topo-mod-name" :title="'CloudCore'">{{ t('云边连接服务') }}</span>
                     <span class="cbx-topo-mod-badge" :class="{ ok: overview.cloudcore && overview.cloudcore.phase === 'Running' }">{{ overview.cloudcore ? phaseZh(overview.cloudcore.phase) : '—' }}</span>
                   </div>
                   <div class="cbx-topo-mod-sub">CloudHub :10002 · KubeEdge CRD<br/>{{ cloudCfg.host || '172.19.134.45' }}</div>
@@ -125,7 +172,7 @@
                 </div>
                 <div :ref="setNodeRef('n_broker')" class="cbx-topo-mod broker">
                   <div class="cbx-topo-mod-head">
-                    <span class="cbx-topo-mod-name">MQTT Broker</span>
+                    <span class="cbx-topo-mod-name" :title="'MQTT Broker'">{{ t('消息中心') }}</span>
                     <span class="cbx-topo-mod-badge ok">{{ t('运行中') }}</span>
                   </div>
                   <div class="cbx-topo-mod-sub">TCP :41883 · WS :41083<br/>{{ t('订阅') }} {{ fmtNum(stats.subscriptions) }} · {{ t('运行') }} {{ fmtUptime(stats.uptime) }}</div>
@@ -139,10 +186,10 @@
                 <div class="cbx-topo-lane-title">{{ t('边端') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openOnboard" :title="t('新盒子接入：生成 edgecore.yaml 配置')">{{ t('盒子接入') }}</button></div>
                 <div v-for="b in topoBoxes" :key="b.name" :ref="setBoxNodeRef(b.name)" class="cbx-topo-mod box" :class="{ down: b.ready === false }">
                   <div class="cbx-topo-mod-head">
-                    <span class="cbx-topo-mod-name">{{ b.name }}</span>
+                    <span class="cbx-topo-mod-name" :title="b.name">{{ boxName(b) }}</span>
                     <span class="cbx-topo-mod-badge" :class="{ ok: readyOk(b.ready), err: b.ready === false }">{{ readyZh(b.ready) }}</span>
                   </div>
-                  <div class="cbx-topo-mod-sub">EdgeCore<template v-if="b.version && b.version !== '—'"> · v{{ b.version }}</template><template v-if="b.roles && b.roles !== '—'"> · {{ roleZh(b.roles) }}</template><br/>edgecore MQTT :1883 · {{ b.source === 'mqtt' ? t('MQTT 识别') : 'K8s Agent' }} · {{ devCountOf(b.name) }} {{ t('台待下发') }}</div>
+                  <div class="cbx-topo-mod-sub">{{ t('边缘接入') }} · EdgeCore<template v-if="b.version && b.version !== '—'"> · v{{ b.version }}</template><template v-if="b.roles && b.roles !== '—'"> · {{ roleZh(b.roles) }}</template><br/>edgecore MQTT :1883 · {{ b.source === 'mqtt' ? t('MQTT 识别') : 'K8s Agent' }} · {{ devCountOf(b.name) }} {{ t('台待下发') }}</div>
                   <!-- 盒子当前运行的服务/模型（云端部署，盒子周期上报 state/{box}/services） -->
                   <div class="cbx-topo-svcs">
                     <template v-if="b.services && b.services.length">
@@ -155,9 +202,9 @@
                     <div v-else class="cbx-topo-svc-empty">{{ t('暂无云端部署应用') }}</div>
                   </div>
                   <div class="cbx-topo-mod-ops">
-                    <button class="cbx-op cbx-xs" @click="openBoxEdgeCfg(b)" :title="t('配置盒子现场可达 IP / SSH 凭据（重启 Mapper 前必须配置且探测可达）')">{{ t('盒子IP') }}</button>
+                    <button class="cbx-op cbx-xs" @click="openBoxEdgeCfg(b)" :title="t('配置盒子显示名称 / 现场可达 IP / SSH 凭据（重启 Mapper 前必须配置且探测可达）')">{{ t('配置') }}</button>
                     <button class="cbx-op cbx-xs" @click="openAppDeploy(b)" :title="t('云端部署模型/服务到盒子（经云端 Broker 命令主题下发，盒子订阅执行）')">⬇ {{ t('部署') }}</button>
-                    <button class="cbx-op cbx-xs" :disabled="!!restartingKey || !edgeIpOk(b)" @click="restartMapper(b)" :title="edgeIpOk(b) ? t('重启该盒子上的 box-mapper systemd 服务（云端 agent 经 SSH 到边缘盒子执行 systemctl restart box-mapper）') : t('未配置盒子 IP 或探测不通，无法重启 Mapper（先点「盒子IP」配置现场可达地址）')">{{ restartingKey === 'edge:box-mapper' ? t('重启中…') : '↻ ' + t('重启 Mapper') }}</button>
+                    <button class="cbx-op cbx-xs" :disabled="!!restartingKey || !edgeIpOk(b)" @click="restartMapper(b)" :title="edgeIpOk(b) ? t('重启该盒子上的 box-mapper systemd 服务（云端 agent 经 SSH 到边缘盒子执行 systemctl restart box-mapper）') : t('未配置盒子 IP 或探测不通，无法重启 Mapper（先点「配置」填写现场可达地址）')">{{ restartingKey === 'edge:box-mapper' ? t('重启中…') : '↻ ' + t('重启 Mapper') }}</button>
                   </div>
                 </div>
                 <div v-if="!topoBoxes.length" class="cbx-topo-empty">{{ t('未识别到盒子节点（云端未连接）。') }}</div>
@@ -236,12 +283,12 @@
           </div>
           <div class="cbx-reslist">
             <!-- 盒子列表 -->
-            <div class="cbx-rescol">
+            <div id="cbx-res-box" class="cbx-rescol">
               <div class="cbx-rescol-head">{{ t('盒子列表') }}<span class="cbx-rescol-n">{{ topoBoxes.length }}</span></div>
               <div class="cbx-rescol-body">
                 <div v-for="b in topoBoxes" :key="b.name" class="cbx-resrow" @click="openDevRealtime({ name: b.name })" :title="t('盒子节点') + '：' + b.name">
                   <span class="cbx-dot" :class="{ on: readyOk(b.ready) }"></span>
-                  <span class="cbx-res-name">{{ b.name }}</span>
+                  <span class="cbx-res-name" :title="b.name">{{ boxName(b) }}</span>
                   <span class="cbx-res-tag" :class="{ ok: readyOk(b.ready), err: b.ready === false }">{{ readyZh(b.ready) }}</span>
                   <span class="cbx-res-sub">EdgeCore<template v-if="b.version && b.version !== '—'"> v{{ b.version }}</template> · {{ devCountOf(b.name) }} {{ t('台待下发') }}</span>
                 </div>
@@ -262,7 +309,7 @@
               </div>
             </div>
             <!-- 设备列表 -->
-            <div class="cbx-rescol">
+            <div id="cbx-res-dev" class="cbx-rescol">
               <div class="cbx-rescol-head">◈ {{ t('设备列表') }}<span class="cbx-rescol-n">{{ mergedDevices.length }}</span></div>
               <div class="cbx-rescol-body">
                 <div v-for="d in mergedDevices" :key="d.name" class="cbx-resrow" @click="onDevClick(d)" :title="(d._cloud ? t('云端设备（点击查看实时）') : t('待下发设备（点击编辑配置）')) + '：' + d.name + (modelOf(d) ? '（' + t('模型') + ' ' + modelOf(d) + '）' : '')">
@@ -274,7 +321,7 @@
                     <button class="cbx-op cbx-tiny" @click.stop="openEditDev(d)" :title="t('编辑该设备配置')">✎ {{ t('配置') }}</button>
                     <template v-if="d._cloud">
                       <button class="cbx-op cbx-tiny" @click.stop="openCloudHistory(d)" :title="t('云端时序库（TDengine）历史读数曲线')">{{ t('历史') }}</button>
-                      <button class="cbx-op cbx-tiny" @click.stop="openIngest(d)" :title="t('手动上报 twins（回写设备状态）')">⬆ {{ t('上报') }}</button>
+                      <button class="cbx-op cbx-tiny" @click.stop="openIngest(d)" :title="t('向云端模拟上报一次读数（回写设备状态）')">⬆ {{ t('上报') }}</button>
                       <button class="cbx-op cbx-tiny danger" @click.stop="delCloud('device', d.name, d.namespace || 'default')" :title="t('删除云端 Device CRD')">🗑 {{ t('删除') }}</button>
                     </template>
                   </span>
@@ -287,8 +334,9 @@
         <!-- ③ 证书与 Token 有效期（独立区块：云端 agent 实时采集云端 CA/服务证书与共享 token） -->
         <section class="cbx-sec" v-if="(overview.certs || []).length || overview.token">
           <div class="cbx-sec-head">
-            <b>{{ t('证书与 Token 有效期') }}</b>
-            <span class="cbx-sec-hint">{{ t('云端 agent 实时采集 · 剩余不足 30 天红色告警') }}</span>
+            <b>{{ t('证书与密钥到期提醒') }}</b>
+            <span class="cbx-sec-sub">{{ t('仅专业维护人员查看') }}</span>
+            <span class="cbx-sec-hint">{{ t('剩余不足 30 天标红提醒') }}</span>
           </div>
           <div class="cbx-certlist">
             <div v-for="c in overview.certs || []" :key="c.cn" class="cbx-certrow">
@@ -346,7 +394,7 @@
 
         <!-- ④ 发测试消息（向云端 Broker 发布） -->
         <section class="cbx-sec">
-          <div class="cbx-sec-head"><b>{{ t('发测试消息') }}</b></div>
+          <div class="cbx-sec-head"><b>{{ t('发测试消息') }}</b><span class="cbx-sec-sub">{{ t('仅供专业维护：向云端发送模拟数据，验证链路是否通畅') }}</span></div>
           <div class="cbx-form">
             <div class="cbx-form-row">
               <label>{{ t('主题') }}</label><input v-model="pubForm.topic" class="cbx-input" style="width:260px" placeholder="data/box-001/device-1"/>
@@ -374,7 +422,7 @@
         <div v-if="ingestOpen" class="cbx-mask" @click.self="ingestOpen = false">
           <div class="cbx-dialog">
             <div class="cbx-dialog-head">
-              <b>{{ t('手动上报 twins：') }}<code>{{ ingestForm.device }}</code></b>
+              <b>{{ t('手动上报读数：') }}<code>{{ ingestForm.device }}</code></b>
               <button class="x-btn lg" @click="ingestOpen = false" :aria-label="t('关闭')">✕</button>
             </div>
             <div class="cbx-form">
@@ -588,8 +636,8 @@
           <div class="cbx-dialog cbx-dialog-xl">
             <div class="cbx-dialog-head">
               <b>{{ t('实时数据：') }}<code>{{ devRtName }}</code></b>
-              <span v-if="devRt" class="cbx-tag" :class="{ ok: devRt.state === 'reporting' }">{{ devRt.state === 'reporting' ? t('上报中') : t('等待上报') }}</span>
-              <span v-if="devRt" class="cbx-sec-hint">{{ t('节点') }} {{ devRt.node }} · {{ t('模型') }} {{ devRt.model }} · {{ t('每 3s 自动刷新') }}</span>
+              <span v-if="devRt" class="cbx-tag" :class="{ ok: devRt.state === 'reporting' }">{{ devRt.state === 'reporting' ? t('上报中') : t('离线') }}</span>
+              <span v-if="devRt" class="cbx-sec-hint">{{ t('节点') }} {{ devRt.node }} · {{ t('模型') }} {{ devRt.model }} · {{ t('每 3s 自动刷新') }}<template v-if="devRt.lastOnlineTime"> · {{ t('最后在线') }} {{ fmtAgo(devRt.lastOnlineTime) }}</template></span>
               <button class="x-btn lg" @click="closeDevRealtime" :aria-label="t('关闭')">✕</button>
             </div>
             <div v-if="devRt && devRt.twins && devRt.twins.length" class="cbx-rt">
@@ -672,7 +720,7 @@
               <div class="cbx-form-row">
                 <label>{{ t('盒子主机名') }}</label><input v-model="onboardForm.hostname" class="cbx-input" placeholder="edge-box"/>
                 <label>{{ t('云端 CloudCore IP') }}</label><input v-model="onboardForm.cloudIP" class="cbx-input" placeholder="172.19.134.45"/>
-                <label>{{ t('盒子 IP（可选，远程一键时作为直达地址）') }}</label><input v-model="onboardForm.boxIP" class="cbx-input" placeholder="192.168.1.20"/>
+                <label>{{ t('盒子 IP（可选，远程一键时作为直达地址）') }}</label><input v-model="onboardForm.boxIP" class="cbx-input" placeholder="172.20.186.56"/>
                 <button class="cbx-op primary" :disabled="!onboardForm.cloudIP || onboardBusy" @click="doOnboard">{{ onboardBusy ? t('生成中…') : t('生成一键脚本') }}</button>
               </div>
               <p class="cbx-note">{{ t('一键脚本内置 box-deploy 采集部署包（mapper + mosquitto + 云边协同断点续传，约 18 MB），盒子执行一条') }} <code>bash onboard_box.sh</code> {{ t('即完成：① EdgeCore 接入（keadm join）→ ② rootCA / edgecore.yaml 下发 → ③ 部署包解包 → ④ config.json 自动定制（boxId / broker）→ ⑤ 一键部署 → ⑥ 链路自检。幂等，可重复执行。') }}</p>
@@ -1033,14 +1081,18 @@
       </div>
     </div>
 
-    <!-- ==================== 盒子 IP 配置弹窗（重启 Mapper 前置条件） ==================== -->
+    <!-- ==================== 盒子配置弹窗（显示名称 + IP/SSH 凭据，重启 Mapper 前置条件） ==================== -->
     <div v-if="edgeCfgOpen" class="cbx-mask" @click.self="edgeCfgOpen = false">
       <div class="cbx-dialog">
         <div class="cbx-dialog-head">
-          <b>{{ t('盒子连接配置（') }}<code>{{ edgeCfgBox || '' }}</code>{{ t('）') }}</b>
+          <b>{{ t('盒子连接配置（') }}<code>{{ boxAliases[edgeCfgBox] || edgeCfgBox || '' }}</code>{{ t('）') }}</b>
           <button class="x-btn lg" @click="edgeCfgOpen = false" :aria-label="t('关闭')">✕</button>
         </div>
         <div class="cbx-form">
+          <div class="cbx-form-row">
+            <label>{{ t('名称') }}</label><input v-model="edgeCfg.name" class="cbx-input" style="flex:1" :placeholder="t('盒子显示名称（留空=使用云端节点名）')"/>
+            <label>{{ t('节点名') }}</label><code class="cbx-input" style="flex:0 0 auto;width:auto;padding:4px 8px;font-size:10.5px;color:var(--muted)">{{ edgeCfgBox }}</code>
+          </div>
           <div class="cbx-form-row">
             <label>{{ t('盒子 IP') }}</label><input v-model="edgeCfg.host" class="cbx-input" style="flex:1" :placeholder="t('现场可达地址（内网 IP / 跳板机 / frp）')"/>
             <label>{{ t('端口') }}</label><input v-model.number="edgeCfg.port" type="number" class="cbx-input" style="width:90px" placeholder="22"/>
@@ -1119,7 +1171,7 @@ const store = useSimStore()
 
 // ---- 单页布局（设备配置已并入通信拓扑图，无 tab）----
 const expanded = reactive({ boxes: true, models: true, devs: true, unmounted: false })
-const sideTitle = t('资源')
+const sideTitle = t('设备导航')
 const sideCount = computed(() => `${topoBoxes.value?.length || 0} ${t('盒')} · ${mergedModels.value.length} ${t('模型')} · ${mergedDevices.value.length} ${t('设备')}`)
 
 // 合并界面：原「数据概览」+「设备管理」二合一（云端设备关联 / 边缘节点 / twins 实时值 / CloudHub 端口已移除）
@@ -1316,8 +1368,10 @@ const cloudUnbound = computed(() => {
 })
 const cloudUnboundGroups = computed(() => {
   const list = cloudUnbound.value
-  const on = list.filter((c) => c.state === 'online')
-  const off = list.filter((c) => c.state !== 'online')
+  // 在线 = 有实时数据推送（后端 data_online），注册在线(CRD state)不计；离线项 state 归一便于文案展示
+  const norm = (c) => ({ ...c, state: c.data_online ? 'online' : 'offline' })
+  const on = list.filter((c) => c.data_online).map(norm)
+  const off = list.filter((c) => !c.data_online).map(norm)
   const groups = []
   if (on.length) groups.push({ label: t('在线'), items: on })
   if (off.length) groups.push({ label: t('离线'), items: off })
@@ -1447,14 +1501,14 @@ function restartBroker() {
 }
 function restartMapper(b) {
   if (!edgeIpOk(b)) {
-    store.showToast(t('未配置盒子 IP 或探测不通，无法重启 Mapper。请先点击「盒子IP」填写现场可达地址（内网 IP / 跳板机 / frp）并保存。'), 'warn')
+    store.showToast(t('未配置盒子 IP 或探测不通，无法重启 Mapper。请先点击「配置」填写现场可达地址（内网 IP / 跳板机 / frp）并保存。'), 'warn')
     return
   }
   return restartCloud(
     { kind: 'edge', name: 'box-mapper' },
-    'box-mapper（' + b.name + '）',
-    t('确认重启边端盒子「') + b.name + t('」的 box-mapper 服务？') + '\n' +
-    t('云端 agent 将经 SSH 到边缘盒子执行 systemctl restart box-mapper（需已在盒子卡片「盒子IP」配置现场可达地址且探测通过）。') + '\n' +
+    'box-mapper（' + boxName(b) + '）',
+    t('确认重启边端盒子「') + boxName(b) + t('」的 box-mapper 服务？') + '\n' +
+    t('云端 agent 将经 SSH 到边缘盒子执行 systemctl restart box-mapper（需已在盒子卡片「配置」中填写现场可达地址且探测通过）。') + '\n' +
     t('注意：盒子处于现场内网/无直达 IP 时云端 SSH 无法直达，该操作会失败，需现场运维重启。')
   )
 }
@@ -1465,17 +1519,25 @@ const edgeCfgBox = ref('')
 const edgeCfgSaving = ref(false)
 const edgeCfgChecking = ref(false)
 const edgeCfgCheckResult = ref(null)
-const edgeCfg = reactive({ host: '', port: 22, user: 'root', password: '', key: '' })
+const edgeCfg = reactive({ host: '', port: 22, user: 'root', password: '', key: '', name: '' })
+// 盒子显示名称别名（原名=云端 K8s 节点名不可改；后端 box_aliases 映射 节点名->显示名）
+const boxAliases = ref({})
+function boxName(b) {
+  return (b && (boxAliases.value[b.name] || b.name)) || ''
+}
 async function loadEdgeCfgSilent() {
-  // 页面加载时静默拉取已保存的盒子 IP 配置，用于「重启 Mapper」按钮的可用性判断
+  // 页面加载时静默拉取已保存的盒子 IP 配置与名称别名，用于「重启 Mapper」按钮的可用性判断
   try {
     const r = await api.boxEdgeConfig()
-    if (r && r.edge) {
-      edgeCfg.host = r.edge.host || ''
-      edgeCfg.port = r.edge.port || 22
-      edgeCfg.user = r.edge.user || 'root'
-      edgeCfg.password = r.edge.password || ''
-      edgeCfg.key = r.edge.key || ''
+    if (r) {
+      if (r.edge) {
+        edgeCfg.host = r.edge.host || ''
+        edgeCfg.port = r.edge.port || 22
+        edgeCfg.user = r.edge.user || 'root'
+        edgeCfg.password = r.edge.password || ''
+        edgeCfg.key = r.edge.key || ''
+      }
+      if (r.aliases) boxAliases.value = r.aliases
       if (edgeCfg.host) checkEdgeCfg(true)
     }
   } catch (e) {}
@@ -1485,14 +1547,18 @@ async function openBoxEdgeCfg(b) {
   edgeCfgCheckResult.value = null
   try {
     const r = await api.boxEdgeConfig()
-    if (r && r.edge) {
-      edgeCfg.host = r.edge.host || ''
-      edgeCfg.port = r.edge.port || 22
-      edgeCfg.user = r.edge.user || 'root'
-      edgeCfg.password = r.edge.password || ''
-      edgeCfg.key = r.edge.key || ''
+    if (r) {
+      if (r.edge) {
+        edgeCfg.host = r.edge.host || ''
+        edgeCfg.port = r.edge.port || 22
+        edgeCfg.user = r.edge.user || 'root'
+        edgeCfg.password = r.edge.password || ''
+        edgeCfg.key = r.edge.key || ''
+      }
+      if (r.aliases) boxAliases.value = r.aliases
     }
   } catch (e) {}
+  edgeCfg.name = boxAliases.value[b.name] || ''
   edgeCfgOpen.value = true
   if (edgeCfg.host) checkEdgeCfg(true)
 }
@@ -1500,6 +1566,8 @@ async function saveEdgeCfg() {
   edgeCfgSaving.value = true
   try {
     const r = await api.boxEdgeConfigSave({
+      box: edgeCfgBox.value,
+      name: (edgeCfg.name || '').trim(),
       host: (edgeCfg.host || '').trim(),
       port: Number(edgeCfg.port) || 22,
       user: (edgeCfg.user || '').trim(),
@@ -1507,6 +1575,7 @@ async function saveEdgeCfg() {
       key: (edgeCfg.key || '').trim(),
     })
     if (r && r.ok !== false) {
+      if (r.aliases) boxAliases.value = r.aliases
       edgeCfgCheckResult.value = (r.check && r.check.reachable != null) ? { reachable: !!r.check.reachable } : null
       store.showToast(edgeCfgCheckResult.value && edgeCfgCheckResult.value.reachable
         ? t('盒子 IP 已保存且探测可达')
@@ -1927,21 +1996,30 @@ const mergedModels = computed(() => {
   })
   return [...map.values()]
 })
+// 设备在线判定（全局统一）：有实时数据推送才算在线。
+// 云端设备：后端 cloud_crds 按 twins/MQTT 数据新鲜度计算 data_online → online/offline；
+// 本地待下发设备：若平台 MQTT 正在上报其读数（/box/devices 的 data_online）也算在线，否则保持「待下发」。
+function onlineState(d) {
+  if (d._cloud) return d.data_online ? 'online' : 'offline'
+  return d.data_online ? 'online' : null
+}
 const mergedDevices = computed(() => {
   const map = new Map()
-  ;(cloudCrd.value.devices || []).forEach((d) => map.set(d.name, { ...d, _cloud: true }))
+  ;(cloudCrd.value.devices || []).forEach((d) => map.set(d.name, { ...d, _cloud: true, state: d.data_online ? 'online' : 'offline' }))
   ;(devices.value.devices || []).forEach((d) => {
     const c = map.get(d.name)
-    map.set(d.name, { ...d, _cloud: !!c, state: c ? c.state : null })
+    const merged = { ...d, _cloud: !!c }
+    merged.state = c ? c.state : onlineState(merged)
+    map.set(d.name, merged)
   })
   return [...map.values()]
 })
 // 盒子下设备合并（云端真实 + 本地待下发，同名合并，云端优先带状态）
 function boxDevices(b) {
   const map = new Map()
-  ;(b.cloudDevices || []).forEach((d) => map.set(d.name, { ...d, _cloud: true, state: d.state }))
+  ;(b.cloudDevices || []).forEach((d) => map.set(d.name, { ...d, _cloud: true }))
   ;(b.devices || []).forEach((d) => {
-    if (!map.has(d.name)) map.set(d.name, { ...d, _cloud: false, state: null })
+    if (!map.has(d.name)) map.set(d.name, { ...d, _cloud: false, state: d.data_online ? 'online' : null })
   })
   return [...map.values()]
 }
@@ -2035,6 +2113,8 @@ const topoBoxes = computed(() => {
   const devs = devices.value.devices || []
   const cloudDevs = (cloudCrd.value.devices || []).map((d) => ({
     ...d,
+    // 在线 = 有实时数据推送（后端 cloud_crds 已算 data_online，窗口 120s）；注册态(CRD state)不再冒充在线
+    state: d.data_online ? 'online' : 'offline',
     primary: (d.twins && d.twins.length && d.twins[0].reported) || '',
   }))
   return nodes.map((n) => ({
@@ -2748,6 +2828,66 @@ const rtTipStyle = computed(() => {
   return { left: (info.x / 900) * 100 + '%', top: (info.y / 280) * 100 + '%' }
 })
 
+// ---- 通俗化「运行状态总览 + 使用指引」：面向非技术人员的健康摘要（不改变任何功能与下方区块） ----
+// 使用指引：首次进入自动展开，点“知道了”后用 localStorage 记住，不再打扰
+const guideSeen = ref(false)
+try { guideSeen.value = localStorage.getItem('cbx-guide-seen') === '1' } catch (e) {}
+const guideOpen = ref(!guideSeen.value)
+function toggleGuide() { guideOpen.value = !guideOpen.value }
+function closeGuide() {
+  guideOpen.value = false
+  guideSeen.value = true
+  try { localStorage.setItem('cbx-guide-seen', '1') } catch (e) {}
+}
+// 指标卡点击 → 平滑滚动到对应列表
+function scrollToSec(which) {
+  const el = document.getElementById(which === 'box' ? 'cbx-res-box' : 'cbx-res-dev')
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// 云端连接（live/stale/degraded/unreachable → 通俗文案）
+const heroCloud = computed(() => {
+  const s = overview.value.cloud_source
+  if (s === 'live') return { txt: t('云端在线'), cls: 'ok' }
+  if (s === 'stale') return { txt: t('数据过期'), cls: 'warn' }
+  if (s === 'degraded') return { txt: t('部分异常'), cls: 'warn' }
+  if (s === 'unreachable') return { txt: t('连接中断'), cls: 'err' }
+  return { txt: t('检测中'), cls: 'mute' }
+})
+// 盒子在线统计
+const heroBox = computed(() => {
+  const list = topoBoxes.value
+  const ok = list.filter((b) => b.ready === true).length
+  const bad = list.filter((b) => b.ready === false).length
+  return { n: list.length, ok, bad, txt: list.length ? ok + ' / ' + list.length : '—', cls: !list.length ? 'mute' : (bad ? 'warn' : 'ok') }
+})
+// 设备上传统计（online = 有实时数据推送）
+const heroDev = computed(() => {
+  const list = mergedDevices.value
+  const on = list.filter((d) => d.state === 'online').length
+  const off = list.filter((d) => d.state === 'offline').length
+  return { n: list.length, on, off, txt: list.length ? on + ' / ' + list.length : '—', cls: !list.length ? 'mute' : (on ? 'ok' : (off ? 'warn' : 'mute')) }
+})
+// 实时消息（近端缓存条数）
+const heroMsg = computed(() => ({ n: messages.value.length, cls: messages.value.length ? 'ok' : 'mute' }))
+// 总体结论（优先级：云中断 > 云端降级/过期 > 盒子未就绪 > 设备离线 > 空系统 > 正常）
+const hero = computed(() => {
+  const cs = overview.value.cloud_source
+  const loaded = !!(cs || (overview.value.nodes || []).length || overview.value.broker)
+  const b = heroBox.value, d = heroDev.value
+  if (!loaded) return { tone: 'mute', icon: '·', title: t('正在获取运行状态…'), desc: t('正在加载云端与设备状态，请稍候…') }
+  if (cs === 'unreachable') return { tone: 'err', icon: '✕', title: t('无法连接云端服务器'), desc: t('本页显示的云端状态与设备数据可能不是最新。请先确认云端服务器是否开机、网络是否正常，必要时联系系统维护人员。') }
+  if (cs === 'degraded') return { tone: 'warn', icon: '⚠', title: t('云端部分服务异常'), desc: t('云端个别服务未完全就绪，部分数据可能不完整或为缓存，一般会随系统运行自动恢复；如持续异常请联系维护人员。') }
+  if (cs === 'stale') return { tone: 'warn', icon: '⚠', title: t('云端数据推送中断'), desc: t('设备状态已较长时间未更新，可能是云端服务或网络异常，请稍候；持续异常请联系系统维护人员。') }
+  if (b.n && b.bad) return { tone: 'warn', icon: '⚠', title: t('有盒子未就绪'), desc: t('有 {n} 台盒子未就绪（共 {m} 台）。可点击上方「盒子在线」卡片查看「盒子列表」。', { n: b.bad, m: b.n }) }
+  if (d.n && d.on === 0 && d.off > 0) return { tone: 'warn', icon: '⚠', title: t('有设备离线未上报'), desc: t('有 {n} 台设备离线未上报（共 {m} 台）。可点击上方「设备上传中」卡片查看「设备列表」。', { n: d.off, m: d.n }) }
+  if (!b.n && !d.n) return { tone: 'mute', icon: '·', title: t('尚未接入设备'), desc: t('本页将展示现场盒子和设备的运行状态。请点击「＋ 设备」添加第一台采集设备，或点击「盒子接入」部署边缘盒子。') }
+  const parts = [t('云端在线')]
+  if (b.n) parts.push(t('{x} 台盒子就绪', { x: b.ok + '/' + b.n }))
+  if (d.n) parts.push(t('{x} 台设备正在上报数据', { x: d.on + '/' + d.n }))
+  return { tone: 'ok', icon: '✓', title: t('一切正常，无需操作'), desc: parts.join(' · ') + t('（约每 3 秒自动刷新）') }
+})
+
 // 关闭视图
 const close = () => store.toggleBoxManage()
 
@@ -3004,6 +3144,42 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 /* 总览页云端状态全局提示条（云端不可达/部分异常时展示一次，避免各区块重复提示） */
 .cbx-banner { margin-bottom: 10px; }
 .cbx-op-disabled { opacity: .55; cursor: default; }
+/* ---- 通俗化：运行状态总览 + 使用指引（面向非技术人员，不影响任何功能） ---- */
+.cbx-hero { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.cbx-hero-main { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+.cbx-hero-verdict { display: flex; align-items: center; gap: 10px; flex: 1 1 280px; min-width: 240px; }
+.cbx-hero-ic {
+  flex: none; width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 800; line-height: 1;
+  background: color-mix(in srgb, var(--green) 13%, transparent); color: var(--green);
+}
+.cbx-hero-verdict.tone-warn .cbx-hero-ic { background: color-mix(in srgb, var(--yellow) 13%, transparent); color: var(--yellow); }
+.cbx-hero-verdict.tone-err .cbx-hero-ic { background: color-mix(in srgb, var(--red) 13%, transparent); color: var(--red); }
+.cbx-hero-verdict.tone-mute .cbx-hero-ic { background: color-mix(in srgb, var(--faint) 10%, transparent); color: var(--faint); }
+.cbx-hero-tt { min-width: 0; }
+.cbx-hero-tt b { font-size: 14px; color: var(--text); letter-spacing: .2px; }
+.cbx-hero-tt p { margin: 3px 0 0; font-size: 11px; color: var(--muted); line-height: 1.6; }
+.cbx-guide-btn { flex: none; }
+.cbx-hero-stats { display: flex; gap: 8px; flex: none; }
+.cbx-hero-stat {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-width: 88px; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2);
+}
+.cbx-hero-stat.click { cursor: pointer; transition: border-color .12s, transform .12s; }
+.cbx-hero-stat.click:hover { border-color: var(--accent); transform: translateY(-1px); }
+.cbx-hero-stat b { font-size: 15px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.cbx-hero-stat span { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.cbx-hero-stat.tone-ok b { color: var(--green); }
+.cbx-hero-stat.tone-warn b { color: var(--yellow); }
+.cbx-hero-stat.tone-err b { color: var(--red); }
+.cbx-hero-stat.tone-mute b { color: var(--faint); }
+.cbx-guide { margin-top: 10px; padding: 10px 12px; background: var(--panel-2); border: 1px dashed var(--accent); border-radius: 8px; }
+.cbx-guide-title { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--accent-d); margin-bottom: 6px; }
+.cbx-guide-sub { font-size: 10.5px; font-weight: 400; color: var(--muted); }
+.cbx-guide-steps { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; }
+.cbx-guide-steps li { font-size: 11.5px; color: var(--text); line-height: 1.7; }
 .cbx-empty {
   font-size: 11px; color: var(--faint); background: var(--panel-2);
   border: 1px dashed var(--border); border-radius: 4px; padding: 16px; line-height: 1.7; text-align: center;

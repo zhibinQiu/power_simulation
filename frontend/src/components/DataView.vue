@@ -1,5 +1,8 @@
 <template>
-  <!-- ============ 数据分析与策略（视图 → 数据分析与策略；数据源从左侧「场景」资源树拖入，右侧策略面板联动） ============ -->
+  <!-- ============ 数据分析 / AI 群控 数据区 ============
+       variant='analysis'（数据分析，AI → 数据分析）：tabs = 原始数据/时序预测/聚类分析；
+       variant='group'（AI 群控，AI → AI群控）：与数据分析同布局（左侧数据源），无 tab，仅展示参数优化内容。
+       数据源从左侧「场景」资源树拖入，右侧策略面板联动 -->
   <div class="data-view" :class="{ drop: dragOver }"
        @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
     <!-- 左侧：数据源（从左侧「场景」资源树拖入，可多选） -->
@@ -15,7 +18,8 @@
         <template v-if="source === 'local'">
           <svg class="dv-drop-ico" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <p class="dv-drop-t1">{{ t('将左侧「场景」资源树中的') }}<br />{{ t('设备拖拽到此处作为数据源') }}</p>
-          <p class="dv-drop-t2">{{ t('拖入后可点击多选（同图对比 / 聚类分析）；') }}<br />{{ t('不需要时可直接拖回左侧场景移除') }}</p>
+          <!-- AI 群控形态仅参数优化，不涉及同图对比 / 聚类分析，引导文案省略 -->
+          <p v-if="!isGroup" class="dv-drop-t2">{{ t('拖入后可点击多选（同图对比 / 聚类分析）；') }}<br />{{ t('不需要时可直接拖回左侧场景移除') }}</p>
         </template>
         <template v-else>
           <p class="dv-drop-t1">{{ t('暂无云端时序设备') }}</p>
@@ -46,8 +50,8 @@
 
     <!-- 右侧：信息条 + 历史数据表格 -->
     <div class="dv-main">
-      <!-- 表格上方统计行：设备名、属性选择已移至左侧面板，这里仅保留时间段选择 -->
-      <div class="dv-stats">
+      <!-- 表格上方统计行：设备名、属性选择已移至左侧面板，这里仅保留时间段选择（AI 群控固定参数优化，不消费时间段，隐藏） -->
+      <div class="dv-stats" v-if="!isGroup">
         <!-- 时间段选择（快捷范围 + 自定义起止） -->
         <div class="dv-time" :title="t('选择时间段')">
           <button v-for="r in timeQuick" :key="r.v" class="dv-tq"
@@ -62,20 +66,16 @@
         </div>
       </div>
 
-      <!-- 视图切换 tab（统一工具栏） -->
-      <div class="dv-view-bar">
+      <!-- 视图切换 tab（统一工具栏）：数据分析可用；AI 群控形态无 tab 切换，固定展示下方参数优化内容 -->
+      <div class="dv-view-bar" v-if="!isGroup">
         <button class="dv-mode" :class="{ on: viewMode === 'chart' }" @click="goChart">{{ t('原始数据') }}</button>
         <button class="dv-mode" :class="{ on: viewMode === 'seq' }" @click="goSeq">{{ t('时序预测') }}</button>
         <button class="dv-mode" :class="{ on: viewMode === 'cluster' }" :disabled="selDevs.length < 2"
                 :title="t('多选 ≥2 台设备后可用')" @click="goCluster">{{ t('聚类分析') }}</button>
-        <button class="dv-mode" :class="{ on: viewMode === 'fit' }"
-                :title="t('联动右侧「数据拟合」策略，显示拟合方程与曲线')" @click="goFit">{{ t('数据拟合') }}</button>
-        <button class="dv-mode" :class="{ on: viewMode === 'opt' }"
-                :title="t('联动右侧「参数优化」策略，显示优化进度与最优参数')" @click="goOpt">{{ t('参数优化') }}</button>
       </div>
 
       <!-- 中间：原始数据视图（含折线图、同图对比、历史列表切换） -->
-      <div class="dv-chart-wrap" v-if="viewMode === 'chart'">
+      <div class="dv-chart-wrap" v-if="!isGroup && viewMode === 'chart'">
         <div class="dv-chart-toolbar">
           <span class="dv-chart-title">{{ t('原始数据') }} · {{ selDevs.length }} {{ t('台设备') }}</span>
           <div class="dv-chart-actions">
@@ -155,7 +155,7 @@
       </div>
 
       <!-- 中间：时序预测（单设备，联动右侧「时序预测」策略） -->
-      <div class="dv-chart-wrap" v-else-if="viewMode === 'seq'">
+      <div class="dv-chart-wrap" v-else-if="!isGroup && viewMode === 'seq'">
         <div class="dv-compare-bar">
           <span class="dv-compare-title">{{ t('时序预测') }} · {{ curDev.label || curDev.id || '-' }}</span>
           <span class="dv-sub">{{ t('预测未来') }} {{ seqForecastN }} {{ t('步趋势') }}</span>
@@ -178,7 +178,7 @@
       </div>
 
       <!-- 中间：聚类分析（多设备，联动右侧「聚类分析」策略） -->
-      <div class="dv-chart-wrap" v-else-if="viewMode === 'cluster'">
+      <div class="dv-chart-wrap" v-else-if="!isGroup && viewMode === 'cluster'">
         <div class="dv-compare-bar">
           <span class="dv-compare-title">{{ t('聚类分析') }} · {{ selDevs.length }} {{ t('台设备') }}</span>
           <span class="dv-sub">{{ t('簇数') }} {{ clusterK ? clusterK + ' ' + t('组') : t('自动') }}（{{ t('配置见右侧属性面板') }}）</span>
@@ -225,52 +225,11 @@
         <div v-else class="dv-chart-empty">{{ t('请多选 ≥2 台设备（进入本视图后自动执行聚类分析）') }}</div>
       </div>
 
-      <!-- 中间：数据拟合（联动右侧「数据拟合」策略 ai::fit，显示拟合方程与曲线） -->
-      <div class="dv-chart-wrap" v-else-if="viewMode === 'fit'">
-        <div class="dv-compare-bar">
-          <span class="dv-compare-title">{{ t('数据拟合') }} · {{ t('策略联动') }}</span>
-          <span v-if="fitSt" class="dv-link-tag">ai::fit{{ fitRes ? ' · ' + fitRes.method_label : ' · ' + t('未训练') }}</span>
-        </div>
-        <div v-if="!fitSt" class="dv-chart-empty">
-          {{ t('未选择「数据拟合」策略：请在右侧属性面板点击「数据拟合」，训练后此处显示拟合方程与曲线') }}
-        </div>
-        <div v-else-if="!fitRes" class="dv-chart-empty">
-          {{ t('拟合模型尚未训练：请在右侧属性面板点击「开始训练」') }}
-        </div>
-        <div v-else class="dv-fit-body">
-          <div class="dv-cluster-meta">
-            <span>{{ t('方法') }} <b>{{ fitRes.method_label }}</b></span>
-            <span>{{ t('样本') }} <b>{{ fitRes.n }}</b> {{ t('点') }}</span>
-            <span>{{ t('拟合优度') }} R² <b class="dv-sil" :class="silCls(fitRes.r2)">{{ fitRes.r2 }}</b></span>
-            <span class="dv-cluster-note">{{ fitTargetLabel }}</span>
-          </div>
-          <div class="dv-fit-eq">{{ t('拟合方程') }} <code>{{ fitRes.equation }}</code></div>
-          <svg v-if="fitSvg" class="dv-chart-svg" :viewBox="fitSvg.viewBox">
-            <g class="dv-axis">
-              <line :x1="fitSvg.PL" :y1="fitSvg.Y0" :x2="fitSvg.W - fitSvg.PR" :y2="fitSvg.Y0" />
-              <line :x1="fitSvg.PL" :y1="fitSvg.Y0" :x2="fitSvg.PL" :y2="fitSvg.PT" />
-              <g v-for="t in fitSvg.yTicks" :key="t.y">
-                <line class="dv-grid" :x1="fitSvg.PL" :y1="t.y" :x2="fitSvg.W - fitSvg.PR" :y2="t.y" />
-                <text class="dv-tick" :x="fitSvg.PL - 6" :y="t.y + 3" text-anchor="end">{{ t.label }}</text>
-              </g>
-              <g v-for="t in fitSvg.xTicks" :key="t.x">
-                <text class="dv-tick" :x="t.x" :y="fitSvg.H - 10" text-anchor="middle">{{ t.label }}</text>
-              </g>
-            </g>
-            <path v-if="fitSvg.realPath" class="dv-fit-real" :d="fitSvg.realPath" fill="none" />
-            <path v-if="fitSvg.extPath" class="dv-fit-ext" :d="fitSvg.extPath" fill="none" />
-            <circle v-for="p in fitSvg.actual" :key="p.x" class="dv-fit-dot" :cx="p.x" :cy="p.y" r="2.4" />
-            <text v-if="fitSvg.hasExt" class="dv-tick" :x="fitSvg.W - fitSvg.PR - 4" :y="fitSvg.PT + 2" text-anchor="end">
-              {{ t('虚线为外推预测段') }}
-            </text>
-          </svg>
-        </div>
-      </div>
-
-      <!-- 中间：参数优化（联动右侧「参数优化」策略 ai::ga/pso/rl，显示优化进度与最优参数） -->
+      <!-- 中间：参数优化（联动右侧「参数优化」策略 ai::ga/pso/rl，显示优化进度与最优参数）。
+           数据分析形态：该 tab 已移除（本分支仅兜底）；AI 群控形态：无 tab，本分支即唯一内容，恒展示 -->
       <div class="dv-chart-wrap" v-else>
         <div class="dv-compare-bar">
-          <span class="dv-compare-title">{{ t('参数优化') }} · {{ t('策略联动') }}</span>
+          <span class="dv-compare-title">{{ isGroup ? t('AI群控') + ' · ' + t('参数优化') : t('参数优化') }} · {{ t('策略联动') }}</span>
           <span v-if="optSt" class="dv-link-tag">{{ optIdLabel }} · {{ optSt.running ? t('优化中') : t('就绪') }}</span>
         </div>
         <div v-if="!optSt" class="dv-chart-empty">
@@ -336,8 +295,16 @@ import TrendChart from './TrendChart.vue'
 import MultiTrendChart from './MultiTrendChart.vue'
 
 const store = useSimStore()
+
+// 形态：'analysis' 数据分析（AI → 数据分析：tabs = 原始数据/时序预测/聚类分析）；
+//       'group' AI 群控（AI → AI群控：与数据分析同布局，但无 tab 切换，仅固定展示参数优化内容）
+const props = defineProps({
+  variant: { type: String, default: 'analysis' },
+})
+const isGroup = computed(() => props.variant === 'group')
+
 const curId = ref(null)
-const viewMode = ref('chart')   // 'chart' 原始数据（含列表切换、同图对比） / 'seq' 时序预测 / 'cluster' 聚类分析 / 'fit' 数据拟合(策略联动) / 'opt' 参数优化(策略联动)
+const viewMode = ref('chart')   // 'chart' 原始数据（含列表切换、同图对比） / 'seq' 时序预测 / 'cluster' 聚类分析（'opt' 仅存在于 AI 群控形态，数据分析无该 tab）
 const chartOverlay = ref('chart') // 'chart' 图表 / 'list' 列表（仅在 viewMode === 'chart' 时生效）
 const source = ref('local')    // 'local' 场景设备 / 'cloud' 云端时序库（TDengine）
 
@@ -583,14 +550,9 @@ const compareSeries = computed(() => selDevs.value.map((d) => ({
   unit: d.unitName || d.unit || '',
   pts: histOf(d),
 })))
+// 打开右侧对应 AI 属性面板（与 App.vue openAiModel 行为一致：selectStrategy → 右侧 strategyDetail）；
+// 参数优化已不在数据分析 tab 内，AI 群控形态固定参数优化无需经此入口
 function openStrategyPanel(id) {
-  // 与 App.vue openAiModel 行为一致：打开右侧对应 AI 属性面板
-  if (id === 'ai::opt') {
-    const cur = store.selectedStrategyId
-    const curOpt = /^ai::(ga|pso|rl)$/.test(String(cur || ''))
-    store.selectStrategy(curOpt ? cur : 'ai::ga')
-    return
-  }
   store.selectStrategy(id)
 }
 function goChart() {
@@ -606,14 +568,6 @@ function goCluster() {
   viewMode.value = 'cluster'
   openStrategyPanel('ai::clu')
   if (!clusterRes.value && selDevs.value.length >= 2) runCluster()
-}
-function goFit() {
-  viewMode.value = 'fit'
-  openStrategyPanel('ai::fit')
-}
-function goOpt() {
-  viewMode.value = 'opt'
-  openStrategyPanel('ai::opt')
 }
 function toggleListOverlay() {
   chartOverlay.value = chartOverlay.value === 'list' ? 'chart' : 'list'
@@ -719,23 +673,11 @@ watch(selIds, () => {
   if (viewMode.value === 'cluster' && selDevs.value.length >= 2 && !clusterBusy.value) runCluster()
 }, { deep: true })
 
-// ==================== 策略联动：数据拟合（ai::fit） / 参数优化（ai::ga/pso/rl） ====================
+// ==================== 策略联动：参数优化（ai::ga/pso/rl） ====================
 // 右侧属性面板选中策略后，本数据区自动切换对应视图；数据来自 store.optimizers（每 3s 轮询刷新）
 const STRAT_OPT_RE = /^ai::(ga|pso|rl)$/
-const fitSt = computed(() => store.optimizers['ai::fit'] || null)
-const fitRes = computed(() => (fitSt.value && fitSt.value.fit) || null)
-const fitCurve = computed(() => (fitSt.value && Array.isArray(fitSt.value.curve) ? fitSt.value.curve : []))
-const fitTargetLabel = computed(() => {
-  const st = fitSt.value
-  if (!st) return ''
-  if (Array.isArray(st.targets)) {
-    const tg = st.targets.find((x) => x.id === st.target)
-    if (tg) return `${t('拟合对象')}：${tg.label}`
-  }
-  return st.target || ''
-})
 
-// 拟合曲线 SVG（实线 = 实测段，虚线 = 外推预测段；圆点 = 实际采样）
+// 坐标轴刻度格式化（参数优化收敛曲线共用）
 const fmtAxis = (v) => {
   if (v == null || !isFinite(v)) return ''
   const a = Math.abs(v)
@@ -745,43 +687,6 @@ const fmtAxis = (v) => {
   if (a >= 1) return v.toFixed(1)
   return v.toExponential(1)
 }
-const fitSvg = computed(() => {
-  const pts = fitCurve.value
-  if (!pts.length) return null
-  const W = 880, H = 260, PL = 52, PR = 18, PT = 26, PB = 34
-  const xs = pts.map((p) => p.x)
-  const vals = pts.filter((p) => p.y != null).map((p) => p.y)
-    .concat(pts.map((p) => p.yfit).filter((v) => v != null))
-  const x0 = Math.min(...xs), x1 = Math.max(...xs)
-  let y0 = Math.min(...vals), y1 = Math.max(...vals)
-  if (!(y1 > y0)) { y0 -= 1; y1 += 1 }
-  const dx = (x1 - x0) || 1, dy = (y1 - y0) || 1
-  const X = (x) => PL + ((x - x0) / dx) * (W - PL - PR)
-  const Y = (y) => H - PB - ((y - y0) / dy) * (H - PT - PB)
-  const firstExt = pts.findIndex((p) => p.y == null)  // 外推预测起点
-  const realPts = (firstExt < 0 ? pts : pts.slice(0, firstExt)).filter((p) => p.yfit != null)
-  const extPts = firstExt >= 0 ? pts.slice(firstExt).filter((p) => p.yfit != null) : []
-  const path = (arr) => arr.map((p, i) => `${i ? 'L' : 'M'}${X(p.x).toFixed(1)},${Y(p.yfit).toFixed(1)}`).join(' ')
-  const yTicks = []
-  for (let i = 0; i <= 4; i++) {
-    const v = y0 + (dy * i) / 4
-    yTicks.push({ y: Y(v).toFixed(1), label: fmtAxis(v) })
-  }
-  const xTicks = []
-  const xStepN = Math.min(6, pts.length)
-  for (let i = 0; i <= xStepN; i++) {
-    const xi = x0 + (dx * i) / xStepN
-    xTicks.push({ x: X(xi).toFixed(1), label: `${Math.round(xi)}` })
-  }
-  return {
-    W, H, PL, PR, PT, PB, viewBox: `0 0 ${W} ${H}`,
-    Y0: Y(y0).toFixed(1),
-    realPath: path(realPts), extPath: path(extPts),
-    actual: pts.filter((p) => p.y != null).map((p) => ({ x: X(p.x).toFixed(1), y: Y(p.y).toFixed(1) })),
-    yTicks, xTicks, hasExt: extPts.length >= 2,
-  }
-})
-
 // 参数优化视图
 const optSt = computed(() =>
   STRAT_OPT_RE.test(store.selectedStrategyId || '') ? (store.optimizers[store.selectedStrategyId] || null) : null)
@@ -824,22 +729,20 @@ const optSvg = computed(() => {
   }
 })
 
-// 右侧属性面板选中策略 → 数据区自动跟随（聚类 / 预测趋势 / 拟合 / 参数优化）
+// 右侧属性面板选中策略 → 数据区自动跟随（聚类 / 预测趋势）
+// 参数优化（ai::ga/pso/rl）与数据拟合（ai::fit）：数据分析已移除对应 tab → 不切换；AI 群控固定参数优化 → 同样无需切换
 function syncStrategyMode(id) {
+  if (isGroup.value) return
   if (id === 'ai::clu') {
     viewMode.value = 'cluster'
     if (selDevs.value.length >= 2) runCluster()
   } else if (id === 'ai::seq') {
     viewMode.value = 'seq'
     chartOverlay.value = 'chart'
-  } else if (id === 'ai::fit') {
-    viewMode.value = 'fit'
-  } else if (STRAT_OPT_RE.test(id || '')) {
-    viewMode.value = 'opt'
   }
 }
 watch(() => store.selectedStrategyId, (id) => {
-  if (!store.dataViewOn) return
+  if (!store.dataViewOn && !store.aiGroupOn) return
   syncStrategyMode(id)
 })
 
@@ -1054,7 +957,7 @@ const statusText = (v) => {
 const statusCls = (v) => (statusText(v) === '超限' ? 'warn' : 'ok')
 
 onMounted(() => {
-  // 已选中 AI 策略时，打开视图即联动到对应数据区（聚类 / 预测趋势 / 拟合 / 参数优化）
+  // 已选中 AI 策略时，打开视图即联动到对应数据区（聚类 / 预测趋势）
   syncStrategyMode(store.selectedStrategyId)
   // 拉取一次本地历史，保证拖入数据源后立即可查看
   refresh()
@@ -1149,7 +1052,7 @@ defineExpose({ close, refresh })
 /* ---- 折线图内列表切换 ---- */
 .dv-list-overlay { flex: 1 1 auto; min-height: 0; overflow: auto; }
 .dv-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-/* ---- 聚类 / 拟合 / 优化 顶部工具条（复用原同图对比样式） ---- */
+/* ---- 聚类 / 优化 顶部工具条（复用原同图对比样式） ---- */
 .dv-compare-bar { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; padding-bottom: 6px; }
 .dv-compare-title { font-size: 12px; color: var(--text); font-weight: 500; }
 .dv-compare-chart { flex: 1 1 auto; min-height: 0; }
@@ -1321,29 +1224,16 @@ defineExpose({ close, refresh })
   border-top: 1px dashed var(--line);
 }
 .dv-clear-all:hover { color: var(--red); }
-/* ---- 策略联动：数据拟合 / 参数优化 ---- */
+/* ---- 策略联动：参数优化 ---- */
 .dv-link-tag {
   flex: 0 0 auto; padding: 1px 8px; border-radius: 9px;
   font-size: 10px; color: var(--accent-d); background: var(--accent-l);
 }
-.dv-fit-body, .dv-opt-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow: auto; }
-.dv-fit-eq {
-  flex: 0 0 auto; padding: 6px 10px;
-  font-size: 12px; color: var(--text);
-  background: var(--panel-3); border: 1px solid var(--border); border-radius: 5px;
-}
-.dv-fit-eq code {
-  font-family: var(--mono); color: var(--accent-d);
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px;
-  padding: 1px 6px; margin-left: 4px; font-size: 12px;
-}
+.dv-opt-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow: auto; }
 .dv-chart-svg { flex: 1 1 auto; width: 100%; min-height: 120px; }
 .dv-axis line { stroke: var(--line); stroke-width: 1; }
 .dv-grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 3; opacity: .6; }
 .dv-tick { fill: var(--faint); font-size: 10px; font-family: var(--mono); }
-.dv-fit-real { stroke: var(--accent); stroke-width: 1.8; }
-.dv-fit-ext { stroke: var(--red); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: .85; }
-.dv-fit-dot { fill: var(--accent); opacity: .85; }
 .dv-opt-sub { flex: 0 0 auto; font-size: 11px; color: var(--muted); }
 .dv-opt-line { stroke: var(--accent); stroke-width: 1.6; }
 .dv-opt-dot { fill: var(--accent); }

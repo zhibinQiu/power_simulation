@@ -9,7 +9,6 @@ import { PAL, mat, boxMesh, steelTex, tankShellTex } from './utils.js'
 export default function _buildPretreat(bodyMat) {
     const g = new THREE.Group()
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x2c6e9e
 
 
     // === 1. 鱼雷罐车 ===
@@ -109,7 +108,7 @@ export default function _buildPretreat(bodyMat) {
 
     // === 7. 霓虹 ===
     const pretRing = new THREE.Mesh(new THREE.TorusGeometry(2.5, 0.1, 8, 24),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
+        mat(0x42566b, { roughness: 0.55, metalness: 0.35 }))
     pretRing.rotation.y = Math.PI / 2; pretRing.position.set(0, 5.5, 0); g.add(pretRing)
 
     // === 8. 动画钩子 ===

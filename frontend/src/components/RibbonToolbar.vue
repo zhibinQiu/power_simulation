@@ -76,9 +76,9 @@
             </button>
           </div>
         </template>
-        <!-- ============ 工况数据分析 ============ -->
+        <!-- ============ 数据分析 ============ -->
         <template v-else-if="view === 'data'">
-          <span class="ribbon-title">{{ t('数据分析与策略') }}</span>
+          <span class="ribbon-title">{{ t('数据分析') }}</span>
           <span class="rdiv"></span>
           <div class="rbtns">
             <button class="rbtn" @click="actions.dataRefresh()" :title="t('重新拉取工况数据')">
@@ -86,6 +86,17 @@
             </button>
           </div>
           <!-- AI 分析入口已下沉到 DataView 内部视图 tab，顶部工具栏不再重复展示 -->
+        </template>
+        <!-- ============ AI 群控：与数据分析同布局，仅参数优化（无 tab，训练控制/进度在右侧面板与中间内容区） ============ -->
+        <template v-else-if="view === 'group'">
+          <span class="ribbon-title">{{ t('AI群控') }}</span>
+          <span class="rdiv"></span>
+          <div class="rbtns">
+            <button class="rbtn" @click="actions.dataRefresh()" :title="t('重新拉取工况数据')">
+              <Icon name="refresh"/><span>{{ t('刷新数据') }}</span>
+            </button>
+          </div>
+          <!-- 参数优化（遗传算法 / 粒子群 / 强化学习）训练控制统一在右侧属性面板，中间内容区实时展示收敛进度与最优参数 -->
         </template>
         <!-- ============ CEA & CCER 行情 ============ -->
         <template v-else-if="view === 'market'">
@@ -150,6 +161,7 @@ const store = useSimStore()
 const view = computed(() => {
   if (store.editMode) return 'edit'
   if (store.dataViewOn) return 'data'
+  if (store.aiGroupOn) return 'group'
   if (store.carbonMarketOn) return 'market'
   if (store.carbonCalcOn) return 'calc'
   if (store.energyFlowOn) return 'energy'

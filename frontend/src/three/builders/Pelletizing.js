@@ -10,7 +10,6 @@ export default function _buildPelletizing(bodyMat) {
     const g = new THREE.Group()
     const L = 28; const D = 16; const H = 12
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x2c6e9e
 
     // === 1. 造球盘（granulating disc ±45°倾斜旋转） ===
     const pelletDiscs = []
@@ -75,7 +74,7 @@ export default function _buildPelletizing(bodyMat) {
     // 窑内火焰可见（高温带）
     const kilnGlow = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.0, kilnLen * 0.4, 16),
         new THREE.MeshStandardMaterial({
-            color: 0xff6633, emissive: 0xff3300, emissiveIntensity: 1.2,
+            color: 0xcc5528, emissive: 0xaa3a10, emissiveIntensity: 0.6,
             roughness: 0.1, metalness: 0.05, transparent: true, opacity: 0.5, depthWrite: false
         }))
     kilnGlow.rotation.z = Math.PI / 2
@@ -85,7 +84,7 @@ export default function _buildPelletizing(bodyMat) {
     // 窑头燃烧器
     const burner = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.5, 8),
         new THREE.MeshStandardMaterial({
-            color: 0xff8833, emissive: 0xff3300, emissiveIntensity: 1.5,
+            color: 0xc76a2a, emissive: 0xaa3a10, emissiveIntensity: 0.85,
             roughness: 0.1, metalness: 0.05, depthWrite: false
         }))
     burner.rotation.z = Math.PI / 2
@@ -112,7 +111,7 @@ export default function _buildPelletizing(bodyMat) {
 
     // === 5. 霓虹 ===
     const pelRing = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.12, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
+        mat(0x42566b, { roughness: 0.55, metalness: 0.35 }))
     pelRing.rotation.x = Math.PI / 2; pelRing.position.set(L * 0.38, 1.5, 0); g.add(pelRing)
 
     // === 6. 动画钩子 ===

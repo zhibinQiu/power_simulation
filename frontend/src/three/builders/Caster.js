@@ -11,7 +11,6 @@ export default function _buildCaster(bodyMat) {
     const g = new THREE.Group()
     const L = 30; const W = 8; const D = 10; const H = 14
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x2c6e9e
 
 
     // === 1. 钢水罐（ladle turret — 回转台） ===
@@ -108,7 +107,7 @@ export default function _buildCaster(bodyMat) {
     for (const sp of sprayPositions) {
         const drop = new THREE.Mesh(new THREE.SphereGeometry(0.08 + Math.random() * 0.04, 4, 4),
             new THREE.MeshBasicMaterial({
-                color: 0xaaddff, transparent: true, opacity: 0.4, depthWrite: false
+                color: 0xd0dce4, transparent: true, opacity: 0.4, depthWrite: false
             }))
         drop.position.set(sp.x, sp.y, sp.z)
         drop.userData.baseX = sp.x
@@ -146,7 +145,7 @@ export default function _buildCaster(bodyMat) {
     // === 8. 铸坯穿行条（strand moving through — 水平段下方） ===
     const strand = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.6, 1.6),
         new THREE.MeshStandardMaterial({
-            roughness: 0.25, metalness: 0.1, emissive: 0xcc3a00, emissiveIntensity: 0.8,
+            roughness: 0.25, metalness: 0.1, emissive: 0xcc3a00, emissiveIntensity: 0.45,
             transparent: true, opacity: 0.8, depthWrite: false
         }))
     strand.position.set(2.0, 0.6, 0); g.add(strand)
@@ -173,10 +172,10 @@ export default function _buildCaster(bodyMat) {
 
     // === 10. 霓虹 ===
     const casterLine = new THREE.Mesh(new THREE.BoxGeometry(L * 0.9, 0.05, 0.15),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
+        mat(0x42566b, { roughness: 0.55, metalness: 0.35 }))
     casterLine.position.set(0, 0.3, 0); g.add(casterLine)
     const casterRing = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.1, 8, 16),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
+        mat(0x42566b, { roughness: 0.55, metalness: 0.35 }))
     casterRing.rotation.x = Math.PI / 2; casterRing.position.set(0, 3.5, 0); g.add(casterRing)
 
     // === 11. 动画钩子 ===

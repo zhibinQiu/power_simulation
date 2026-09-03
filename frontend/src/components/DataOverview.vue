@@ -245,7 +245,7 @@
                 <span class="nd-name" :title="d.name">{{ d.name }}</span>
                 <span class="nd-model" data-fit>{{ d.model || '—' }}</span>
                 <span class="nd-st">{{ t(devState(d).label) }}</span>
-                <span class="nd-time" v-if="d.last_seen">{{ relTime(d.last_seen) }}{{ t('前') }}</span>
+                <span class="nd-time" v-if="d.data_ts || d.last_seen">{{ relTime(d.data_ts || d.last_seen) }}{{ t('前') }}</span>
               </div>
               <div v-if="!boxDevices.length" class="ov-empty sm">{{ t('暂无设备，请在「能碳一体机」中配置') }}</div>
             </div>
@@ -415,12 +415,11 @@ function nodeState(n) {
   return { key: 'stopped', label: '状态未知' }
 }
 function devState(d) {
-  if (d.mqtt_matched === true) {
-    const ls = d.last_seen || 0
-    const fresh = now.value / 1000 - ls < 120
-    return fresh ? { key: 'run', label: '在线' } : { key: 'stopped', label: '离线' }
-  }
-  return { key: 'stopped', label: '未上报' }
+  // 在线 = 有实时数据推送（后端统一判定：CRD twins 或 MQTT data/# 双通道，120s 窗口，见 data_online）；
+  // 曾上报过但停滞 → 离线；从未上报 → 未上报
+  if (d.data_online === true) return { key: 'run', label: '在线' }
+  const ls = d.data_ts || d.last_seen || 0
+  return ls ? { key: 'stopped', label: '离线' } : { key: 'stopped', label: '未上报' }
 }
 
 // ---------- 报警汇总（一级界面只显示数量，明细在二级） ----------
@@ -447,7 +446,7 @@ const alarms = computed(() => {
   }
   for (const d of boxDevices.value) {
     const s = devState(d).key
-    if (s === 'stopped') push('mid', `${t('传感器')} · ${d.name}`, d.mqtt_matched ? '长时间离线' : '未上报数据', now.value / 1000)
+    if (s === 'stopped') push('mid', `${t('传感器')} · ${d.name}`, (d.data_ts || d.last_seen) ? '长时间离线' : '未上报数据', now.value / 1000)
   }
   list.sort((a, b) => (b.ts || 0) - (a.ts || 0))
   return list

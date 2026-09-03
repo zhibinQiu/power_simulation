@@ -7,6 +7,21 @@
         {{ t('暂无仿真结果，请先运行一次仿真后查看碳排核算。') }}
       </div>
       <template v-else>
+        <!-- 测算口径：实时（小时粒度）/ 年度（默认全年，可下拉选择每月，按计划运行小时折算） -->
+        <div class="cc-period">
+          <div class="cc-period-seg">
+            <button type="button" class="cc-pbtn" :class="{ active: period === 'realtime' }" @click="period = 'realtime'">{{ t('实时测算') }}</button>
+            <button type="button" class="cc-pbtn" :class="{ active: period === 'annual' }" @click="period = 'annual'">{{ t('年度测算') }}</button>
+          </div>
+          <label v-if="period === 'annual'" class="cc-month">
+            <span>{{ t('核算期间') }}</span>
+            <select v-model="month" class="cc-month-sel">
+              <option :value="0">{{ t('全年') }}</option>
+              <option v-for="m in 12" :key="m" :value="m">{{ m }}月</option>
+            </select>
+          </label>
+        </div>
+
         <div class="cc-cards">
           <div
             v-for="s in standards"
@@ -29,10 +44,10 @@
               <span v-for="(tag, i) in s.tags" :key="i" class="cc-tag" :class="tag.type">{{ t(tag.label) }}</span>
             </div>
             <div class="cc-card-value">
-              <span class="cc-v-num">{{ fmt(cardValue(s.id), 1) }}</span>
-              <span class="cc-v-unit">tCO₂/h</span>
+              <span class="cc-v-num">{{ fmt(qty(cardValue(s.id)), 1) }}</span>
+              <span class="cc-v-unit">{{ unitText }}</span>
             </div>
-            <div class="cc-card-hint">{{ t('当前核算 CO₂排放（t/h）— 长流程') }}</div>
+            <div class="cc-card-hint">{{ t('当前核算 CO₂排放') }}（{{ unitText }}）— 长流程</div>
           </div>
         </div>
 
@@ -50,7 +65,7 @@
           <div class="cc-scope-row">
             <div v-for="(tag, i) in current.tags" :key="i" class="cc-scope-box" :class="tag.type">
               <div class="cc-scope-label">{{ t(tag.label) }}</div>
-              <div class="cc-scope-val">{{ scopeTotal(tag.key) }}</div>
+              <div class="cc-scope-val">{{ scopeTotal(tag.key) }} <span class="cc-unit">{{ unitText }}</span></div>
             </div>
           </div>
 
@@ -58,7 +73,7 @@
             <table class="cc-table">
               <thead>
                 <tr>
-                  <th v-for="c in columns" :key="c.key" :class="`text-${c.align || 'right'}`">{{ t(c.label) }}</th>
+                  <th v-for="c in columns" :key="c.key" :class="`text-${c.align || 'right'}`">{{ c.label }}<template v-if="c.key !== 'name' && c.key !== 'intensity' && c.key !== 'control'"> ({{ unitText }})</template></th>
                 </tr>
               </thead>
               <tbody>
@@ -67,7 +82,7 @@
                     <template v-if="c.key === 'name'">{{ row.name }}</template>
                     <template v-else-if="c.key === 'intensity'">{{ fmt(row[c.key]) }} <span class="cc-unit">kgCO₂/t</span></template>
                     <template v-else-if="c.key === 'control'">{{ t(row.control) }}</template>
-                    <template v-else>{{ fmt(row[c.key]) }}</template>
+                    <template v-else>{{ fmt(qty(row[c.key])) }}</template>
                   </td>
                 </tr>
                 <tr class="total">
@@ -75,7 +90,7 @@
                     <template v-if="c.key === 'name'">{{ t('合计') }}</template>
                     <template v-else-if="c.key === 'intensity'">{{ fmt(totalRow[c.key]) }} <span class="cc-unit">kgCO₂/t</span></template>
                     <template v-else-if="c.key === 'control'"></template>
-                    <template v-else>{{ fmt(totalRow[c.key]) }}</template>
+                    <template v-else>{{ fmt(qty(totalRow[c.key])) }}</template>
                   </td>
                 </tr>
               </tbody>
@@ -99,6 +114,26 @@ import { t } from '../i18n'
 const store = useSimStore()
 const result = computed(() => store.resultForView)
 const selected = ref('iso')
+
+// ===== 测算口径：实时（小时粒度）/ 年度（默认全年，可下拉选择每月）=====
+const period = ref('realtime')
+const month = ref(0) // 0 = 全年
+const ANNUAL_HOURS = 8000
+// 各月计划运行小时：全年合计 = 8000h（2/6/7/12 月为检修减负荷月）
+const MONTH_HOURS = [700, 650, 700, 680, 700, 620, 620, 700, 680, 700, 680, 570]
+// 折算因子：实时 = 1；年度全年 = 8000；月度 = 该月计划运行小时
+const factor = computed(() => {
+  if (period.value === 'realtime') return 1
+  if (month.value === 0) return ANNUAL_HOURS
+  return MONTH_HOURS[month.value - 1]
+})
+const unitText = computed(() => (period.value === 'realtime' ? 'tCO₂/h' : '万tCO₂'))
+// 数值按口径折算：实时保持 t/h；年度/月度换算为 万tCO₂（×factor÷10000）
+function qty(n) {
+  if (n == null || Number.isNaN(n)) return 0
+  const v = n * factor.value
+  return period.value === 'realtime' ? v : v / 10000
+}
 
 const standards = [
   {
@@ -216,28 +251,31 @@ const totalRow = computed(() => {
 const columnSet = {
   iso: [
     { key: 'name', label: '工序设备', align: 'left' },
-    { key: 'scope1', label: 'Scope 1 直接排放 (t/h)', align: 'right' },
-    { key: 'scope2', label: 'Scope 2 间接排放 (t/h)', align: 'right' },
-    { key: 'total', label: '合计排放 (t/h)', align: 'right' },
-    { key: 'intensity', label: '吨钢排放 (kg CO₂/t)', align: 'right' },
+    { key: 'scope1', label: 'Scope 1 直接排放', align: 'right' },
+    { key: 'scope2', label: 'Scope 2 间接排放', align: 'right' },
+    { key: 'total', label: '合计排放', align: 'right' },
+    { key: 'intensity', label: '吨钢排放', align: 'right' },
   ],
   gbt: [
     { key: 'name', label: '工序设备', align: 'left' },
-    { key: 'fuel', label: 'Scope 1 燃料燃烧 (t/h)', align: 'right' },
-    { key: 'process', label: 'Scope 1 工艺过程 (t/h)', align: 'right' },
-    { key: 'elec', label: 'Scope 2 净购入电力热力 (t/h)', align: 'right' },
-    { key: 'total', label: '合计排放 (t/h)', align: 'right' },
-    { key: 'intensity', label: '吨钢排放 (kg CO₂/t)', align: 'right' },
+    { key: 'fuel', label: 'Scope 1 燃料燃烧', align: 'right' },
+    { key: 'process', label: 'Scope 1 工艺过程', align: 'right' },
+    { key: 'elec', label: 'Scope 2 净购入电力热力', align: 'right' },
+    { key: 'total', label: '合计排放', align: 'right' },
+    { key: 'intensity', label: '吨钢排放', align: 'right' },
   ],
   market: [
     { key: 'name', label: '工序设备', align: 'left' },
-    { key: 'controlled', label: '管控工序直接排放 (t/h)', align: 'right' },
-    { key: 'exempt', label: '非管控工序直接排放 (t/h)', align: 'right' },
-    { key: 'total', label: '合计排放 (t/h)', align: 'right' },
-    { key: 'intensity', label: '吨钢排放 (kg CO₂/t)', align: 'right' },
+    { key: 'controlled', label: '管控工序直接排放', align: 'right' },
+    { key: 'exempt', label: '非管控工序直接排放', align: 'right' },
+    { key: 'total', label: '合计排放', align: 'right' },
+    { key: 'intensity', label: '吨钢排放', align: 'right' },
   ],
 }
-const columns = computed(() => columnSet[selected.value] || columnSet.iso)
+const columns = computed(() => {
+  const cols = columnSet[selected.value] || columnSet.iso
+  return cols.map((c) => ({ ...c, label: t(c.label) }))
+})
 
 function cardValue(id) {
   if (!result.value) return 0
@@ -246,7 +284,7 @@ function cardValue(id) {
 }
 
 function scopeTotal(key) {
-  return fmt(totalRow.value[key] || 0)
+  return fmt(qty(totalRow.value[key] || 0))
 }
 
 function fmt(n, digits = 2) {
@@ -268,6 +306,23 @@ const close = () => store.toggleCarbonCalc()
 }
 .cc-body { flex: 1 1 auto; padding: 14px; overflow: auto; }
 .cc-empty { text-align: center; color: var(--muted); font-size: 12px; padding: 60px 20px; }
+
+/* ===== 测算口径切换：实时 / 年度（月度下拉） ===== */
+.cc-period { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.cc-period-seg { display: flex; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.cc-pbtn {
+  padding: 6px 16px; font-size: 12px; border: none; background: transparent;
+  color: var(--muted); cursor: pointer; transition: background .12s, color .12s;
+}
+.cc-pbtn + .cc-pbtn { border-left: 1px solid var(--border); }
+.cc-pbtn:hover { background: var(--panel-3); color: var(--text); }
+.cc-pbtn.active { background: var(--accent-d); color: #fff; }
+.cc-month { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.cc-month-sel {
+  background: var(--panel); color: var(--text); border: 1px solid var(--border);
+  border-radius: 4px; padding: 4px 6px; font-size: 12px; outline: none; cursor: pointer;
+}
+.cc-month-sel:focus { border-color: var(--accent-d); }
 
 /* ===== 核算标准切换卡 ===== */
 .cc-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }

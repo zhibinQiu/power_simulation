@@ -1,0 +1,6 @@
+# 文档站静态镜像：docs-site/dist 已入库，无需 node 构建，直接以 python http.server 托管
+FROM python:3.11-slim
+WORKDIR /site
+COPY docs-site/dist/ /site/dist/
+EXPOSE 40183
+CMD ["python3", "-m", "http.server", "40183", "--bind", "0.0.0.0", "--directory", "/site/dist"]

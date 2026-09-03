@@ -146,16 +146,19 @@ function boxMesh(w, h, d, material) {
   return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material)
 }
 
-// ---------------- 工序小铭牌（模型旁只显示工序名，数据改由点击弹窗展示） ----------------
+// ---------------- 工序竖式铭牌（窄高名片，模型旁显示名称 + 实时能耗/碳排） ----------------
 // 画布按「逻辑尺寸 × LABEL_SS」超采样绘制，再由 sRGB 纹理下采样呈现，保证文字锐利。
-const LABEL_W = 165             // 逻辑宽（绘制坐标系）
-const LABEL_H = 46              // 逻辑高（单行小铭牌）
-const UNIT_LABEL_H = 64         // 工艺标签逻辑高（两行：工序名 + 实时能耗/碳排）
+const LABEL_W = 88              // 逻辑宽（绘制坐标系）——窄竖卡：横向瘦、纵向紧凑排 3 行
+const LABEL_H = 52              // 连接/管道标签逻辑高（两行：物料名 + 速度）
+const UNIT_LABEL_H = 86         // 工艺/工辅标签逻辑高（三行：名称 + 能耗 + 碳排）
+const GROUP_LABEL_H = 92        // 小组聚合标签逻辑高（四行：名称 + ×N 徽章 + 能耗 + 碳排）
 const LABEL_SS = 4              // 超采样倍率（清晰度关键：4x 保证远处放大 5.2x 后文字仍锐利）
 const LABEL_PARENT_REF = 4.6    // 工艺标签世界尺寸基准：工艺模型父级缩放代表值，所有标签以此为统一大小
 const LABEL_AUX_GAIN = 0.72     // 工辅/小组标签相对工艺标签的小一号系数（0.85→0.72 再小一号）
-const LABEL_SCALE = 6.5         // 世界坐标下的铭牌宽度：工序标签与管道/轨道连接标签统一尺寸
+const LABEL_SCALE = 2.8         // 世界坐标下的铭牌宽度：工序标签与管道/轨道连接标签统一尺寸（紧凑铭牌：整体收敛避免过高遮挡）
 const LABEL_ASPECT = LABEL_H / LABEL_W
+const LABEL_PAD = 13            // 竖卡左右内边距（文字绘制区宽度 = LABEL_W - LABEL_PAD*2）
+const LABEL_BODY_W = LABEL_W - LABEL_PAD * 2   // 可用正文宽度
 const LABEL_FOCUS_GAIN = 1.2    // 聚焦时的放大倍率
 const LABEL_FONT = '"PingFang SC","Microsoft YaHei",-apple-system,sans-serif'
 const LABEL_NUM_FONT = '"SF Mono","Roboto Mono",Consolas,"Courier New","PingFang SC",sans-serif'
@@ -165,61 +168,77 @@ function _fmtMetric(v) {
   return Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 1 })
 }
 
-// 标签底板：light=true 时绘制 VS Code 浅色扁平卡片（白底/浅灰边框/聚焦蓝描边）；
-// 否则绘制深色毛玻璃铭牌（半透明面板、亚光边框、聚焦时蓝色辉光）。
-// 简约风：无名称左侧竖线、无选中态上方横线，仅以边框/描边区分选中。
-// h 为可选卡片高度（工艺标签为两行 UNIT_LABEL_H，其余保持单行 LABEL_H）
+// 标签底板：磨砂玻璃（Glassmorphism）——
+// 半透明渐变基板 + 顶部高光带 + 玻璃质感细描边，背景场景可透出且不干扰文字阅读。
+// 浅色环境 = 白玻璃（深字），深色环境 = 深蓝灰玻璃（白字），聚焦时高亮描边并更实。
+// h 为可选卡片高度（工艺标签为 UNIT_LABEL_H，小组 GROUP_LABEL_H，其余 LABEL_H）
 function _drawLabelCard(ctx, focused, role, slim, main, light, h = LABEL_H) {
   const W = LABEL_W, H = h
-  const r = 9
+  const r = Math.min(7, H * 0.22)          // 圆角（小卡保持轻圆角）
+  const x = 0.5, y = 0.5, w = W - 1, hh = H - 1
 
+  // 基板：柔和投影，让玻璃卡从背景中浮起
   ctx.save()
-
-  if (light) {
-    // ===== VS Code 浅色卡片 =====
-    // 柔和投影（浅色下用淡灰，不喧宾夺主）
-    ctx.shadowColor = focused ? 'rgba(0,94,148,0.30)' : 'rgba(0,0,0,0.12)'
-    ctx.shadowBlur = focused ? 10 : 5
-    ctx.shadowOffsetX = 0
-    ctx.shadowOffsetY = focused ? 0 : 1
-
-    // 白底（聚焦时淡蓝底）
-    ctx.beginPath()
-    _roundRect(ctx, 1, 1, W - 2, H - 2, r)
-    ctx.fillStyle = focused ? 'rgba(226,240,253,0.97)' : 'rgba(255,255,255,0.97)'
-    ctx.fill()
-
-    ctx.restore()
-
-    // 边框：聚焦 = 强调蓝 2px；普通 = 细浅灰（简约 VS Code 风，无装饰条）
-    ctx.beginPath()
-    _roundRect(ctx, 1, 1, W - 2, H - 2, r)
-    ctx.strokeStyle = focused ? 'rgba(0,94,148,0.9)' : 'rgba(214,219,225,1)'
-    ctx.lineWidth = focused ? 2 : 1
-    ctx.stroke()
-    return
-  }
-
-  // ===== 深色毛玻璃铭牌（赛博/默认模式） =====
-  // 柔和投影/辉光：聚焦时蓝色外发光，普通时暗色投影增加层次
-  ctx.shadowColor = focused ? 'rgba(0,168,255,0.55)' : 'rgba(0,0,0,0.35)'
-  ctx.shadowBlur = focused ? 14 : 8
+  ctx.shadowColor = focused
+    ? (light ? 'rgba(0,94,148,0.32)' : 'rgba(120,200,255,0.30)')
+    : (light ? 'rgba(96,128,160,0.18)' : 'rgba(0,0,0,0.32)')
+  ctx.shadowBlur = focused ? 7 : 3
   ctx.shadowOffsetX = 0
-  ctx.shadowOffsetY = focused ? 0 : 2
+  ctx.shadowOffsetY = 1
 
-  // 深色半透明面板底色（聚焦时亮度略高、更不透明）
+  // 磨砂基板：半透明渐变基板，透过淡淡一层背景仍有玻璃质感；
+  // 但 alpha 保持高值（≥0.6），保证上层文字始终高对比、不虚不透明。
+  const body = ctx.createLinearGradient(0, 0, 0, hh)
+  if (light) {
+    body.addColorStop(0, focused ? 'rgba(231,244,255,0.96)' : 'rgba(255,255,255,0.92)')
+    body.addColorStop(1, focused ? 'rgba(199,229,250,0.9)' : 'rgba(231,241,250,0.84)')
+  } else {
+    body.addColorStop(0, focused ? 'rgba(56,82,110,0.86)' : 'rgba(42,58,78,0.76)')
+    body.addColorStop(1, focused ? 'rgba(36,50,70,0.78)' : 'rgba(24,34,48,0.66)')
+  }
   ctx.beginPath()
-  _roundRect(ctx, 1, 1, W - 2, H - 2, r)
-  ctx.fillStyle = focused ? 'rgba(32,40,52,0.92)' : 'rgba(22,26,34,0.88)'
+  _roundRect(ctx, x, y, w, hh, r)
+  ctx.fillStyle = body
   ctx.fill()
-
   ctx.restore()
 
-  // 边框：聚焦 = 蓝色辉光边框；普通 = 微透明白边（简约风，无顶部横线/左侧竖线）
+  // 玻璃高光：上部渐隐亮带 + 底缘细反光（模拟磨砂玻璃漫反射，而非纯色平板）
+  ctx.save()
   ctx.beginPath()
-  _roundRect(ctx, 1, 1, W - 2, H - 2, r)
-  ctx.strokeStyle = focused ? 'rgba(0,168,255,0.85)' : 'rgba(255,255,255,0.14)'
-  ctx.lineWidth = focused ? 2 : 1
+  _roundRect(ctx, x, y, w, hh, r)
+  ctx.clip()
+  const gloss = ctx.createLinearGradient(0, y, 0, y + hh * 0.55)
+  if (light) {
+    gloss.addColorStop(0, 'rgba(255,255,255,0.62)')
+    gloss.addColorStop(0.55, 'rgba(255,255,255,0.08)')
+    gloss.addColorStop(1, 'rgba(255,255,255,0)')
+  } else {
+    gloss.addColorStop(0, 'rgba(255,255,255,0.13)')
+    gloss.addColorStop(0.55, 'rgba(255,255,255,0.025)')
+    gloss.addColorStop(1, 'rgba(255,255,255,0)')
+  }
+  ctx.fillStyle = gloss
+  ctx.fillRect(x, y, w, hh * 0.55)
+  const rim = ctx.createLinearGradient(0, y + hh * 0.78, 0, y + hh)
+  rim.addColorStop(0, 'rgba(255,255,255,0)')
+  rim.addColorStop(1, light ? 'rgba(255,255,255,0.34)' : 'rgba(255,255,255,0.10)')
+  ctx.fillStyle = rim
+  ctx.fillRect(x, y + hh * 0.78, w, hh * 0.22)
+  ctx.restore()
+
+  // 玻璃描边：普通 = 半透明细边；聚焦 = 企业蓝/冰蓝加粗高亮
+  ctx.beginPath()
+  _roundRect(ctx, x, y, w, hh, r)
+  ctx.strokeStyle = focused
+    ? (light ? 'rgba(0,94,148,0.92)' : 'rgba(150,212,255,0.95)')
+    : (light ? 'rgba(0,94,148,0.28)' : 'rgba(190,215,240,0.30)')
+  ctx.lineWidth = focused ? 1.6 : 1
+  ctx.stroke()
+  // 内侧细白色高光边（玻璃厚缘感）
+  ctx.beginPath()
+  _roundRect(ctx, x + 1, y + 1, w - 2, hh - 2, Math.max(0, r - 1))
+  ctx.strokeStyle = light ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.22)'
+  ctx.lineWidth = 0.75
   ctx.stroke()
 }
 
@@ -789,7 +808,7 @@ function _footTex() {
   return t
 }
 
-// 圆角矩形路径（供画布绘制复用：工序标签药丸等）
+// 矩形/圆角矩形路径（r=0 时即直角矩形 —— 工序铭牌等工业标签统一直角硬边）
 function _roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath()
   ctx.moveTo(x + r, y)
@@ -1413,7 +1432,7 @@ export class TwinScene {
     } else if (mode === 'industrial') {
       // ===== MATLAB 工业风：浅灰混凝土平台 + 细蓝描边 + 均匀明亮照明（与浅色系统 UI 协调） =====
       if (pm) {
-        pm.color.set(0xffffff); pm.roughness = 0.92; pm.metalness = 0.05
+        pm.color.set(0xf1f3f6); pm.roughness = 0.92; pm.metalness = 0.05
         pm.map = _industrialTex()
         pm.emissive.set(0xe9edf2); pm.emissiveIntensity = 0.0
         pm.needsUpdate = true
@@ -1424,7 +1443,7 @@ export class TwinScene {
       // 设备/组合底座：白底 + 浅灰工业地坪纹理（与厂区地面统一）
       if (this._pedestalMats) this._pedestalMats.forEach((m) => {
         if (!m) return
-        m.color.set(0xffffff); m.roughness = 0.92; m.metalness = 0.12
+        m.color.set(0xf3f5f8); m.roughness = 0.92; m.metalness = 0.12
         m.map = _industrialTex()
         m.emissive.set(0xe9edf2); m.emissiveIntensity = 0.0
         m.needsUpdate = true
@@ -2397,7 +2416,7 @@ export class TwinScene {
     const shape = meta.shape
     // 实心外壳，不透明；industrial 浅色模式下加深主体色以提高对比度
     const isLight = this.envMode === 'industrial'
-    bodyMat = mat(isLight ? 0x5a6e80 : 0x7a8ea0, { metalness: 0.15, roughness: 0.5, transparent: false, opacity: 1.0, depthWrite: true })
+    bodyMat = mat(isLight ? 0x55687a : 0x6d8095, { metalness: 0.12, roughness: 0.55, transparent: false, opacity: 1.0, depthWrite: true })
     bodyMats = [bodyMat]
     const builder = builderMap[unit.type]
     if (builder) {
@@ -2585,8 +2604,10 @@ export class TwinScene {
     const label = this._makeLabel(unit.name, res ? res.co2_total : null, res ? res.energy_total : null, role, co2Css)
     // 工艺/工辅标签样式统一、大小一致：同一两行卡片布局、同一悬浮位置，main 仅标记主工艺层级
     const isMain = unit.route !== 'aux' && unit.route !== 'util'
-    // 工序标签悬浮在设备顶部正上方（与管道/轨道连接标签的悬浮位置形式一致）
-    label.position.set(0, (body.userData.topY || 0) + 5.5, 0)
+    // 工序标签始终位于工艺模型正上方：中心锚点 = 模型顶(topY) + 卡片半高 + 悬停间隙，
+    // 卡片随整体缩放变化后仍贴顶悬浮，不会压住/埋进模型（LABEL_Y_LIFT = 卡半高 + 2.2 间隙）
+    const LABEL_Y_LIFT = LABEL_SCALE * (UNIT_LABEL_H / LABEL_W) / 2 + 2.2
+    label.position.set(0, (body.userData.topY || 0) + LABEL_Y_LIFT, 0)
     label.userData.unitId = unit.id
     label.userData.kind = 'unit'   // 可由 3D 标签直接点击聚焦（替代点击工艺本体）
     label.userData.labelObj.main = isMain
@@ -2693,7 +2714,9 @@ export class TwinScene {
     const co2 = reses.reduce((s, r) => s + (r ? r.co2_total || 0 : 0), 0)
     const en = reses.reduce((s, r) => s + (r ? r.energy_total || 0 : 0), 0)
     const label = this._makeGroupLabel(gname, n, reses.some((r) => r) ? co2 : null, reses.some((r) => r) ? en : null)
-    label.position.set(0, built.topY + 12, 0)
+    // 组标签同样悬浮在组模型顶上方：贴顶小间隙（卡半高 + 2.4）
+    const GROUP_LABEL_LIFT = LABEL_SCALE * (GROUP_LABEL_H / LABEL_W) / 2 + 2.4
+    label.position.set(0, built.topY + GROUP_LABEL_LIFT, 0)
     label.userData.kind = 'unit'
     label.userData.groupId = gid
     // _makeGroupLabel 已自行完成绘制；标注为组标签，便于实时刷新时走 _drawGroupLabel
@@ -2713,7 +2736,7 @@ export class TwinScene {
       memberUnits: members,
       countByType: null,
       label, labelObj: label.userData.labelObj, ring: built.ring,
-      topY: built.topY + 12, lift: built.lift, yStretch: built.yStretch,
+      topY: built.topY + GROUP_LABEL_LIFT, lift: built.lift, yStretch: built.yStretch,
       ioY: io,
       centerX: cx, centerZ: cz,
       share: 0, shareCss: '#e86850',
@@ -2725,7 +2748,7 @@ export class TwinScene {
   _makeGroupLabel(name, count, co2, energy) {
     const canvas = document.createElement('canvas')
     canvas.width = LABEL_W * LABEL_SS
-    canvas.height = UNIT_LABEL_H * LABEL_SS
+    canvas.height = GROUP_LABEL_H * LABEL_SS
     const ctx = canvas.getContext('2d')
     const tex = new THREE.CanvasTexture(canvas)
     tex.colorSpace = THREE.SRGBColorSpace
@@ -2733,7 +2756,7 @@ export class TwinScene {
     tex.magFilter = THREE.LinearFilter
     tex.generateMipmaps = false
     const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }))
-    spr.scale.set(LABEL_SCALE, LABEL_SCALE * (UNIT_LABEL_H / LABEL_W), 1)
+    spr.scale.set(LABEL_SCALE, LABEL_SCALE * (GROUP_LABEL_H / LABEL_W), 1)
     spr.renderOrder = 11
     const obj = { canvas, ctx, tex, sprite: spr, name, count, co2, energy, isGroup: true, _key: null }
     spr.userData.labelObj = obj
@@ -2751,66 +2774,60 @@ export class TwinScene {
     obj._key = key
     obj.co2 = co2; obj.energy = energy
     ctx.setTransform(LABEL_SS, 0, 0, LABEL_SS, 0, 0)
-    ctx.clearRect(0, 0, LABEL_W, UNIT_LABEL_H)
+    ctx.clearRect(0, 0, LABEL_W, GROUP_LABEL_H)
 
     const light = this.envMode === 'industrial'
-    // 背景卡片（与工艺标签同高同款：工业浅色 / 其余深色毛玻璃）
-    _roundRect(ctx, 1, 1, LABEL_W - 2, UNIT_LABEL_H - 2, 9)
-    if (light) {
-      ctx.fillStyle = 'rgba(255,255,255,0.97)'
-      ctx.fill()
-      ctx.lineWidth = 1
-      ctx.strokeStyle = 'rgba(214,219,225,1)'
-      ctx.stroke()
-    } else {
-      ctx.fillStyle = 'rgba(20,28,38,0.82)'
-      ctx.fill()
-      ctx.lineWidth = 1
-      ctx.strokeStyle = 'rgba(120,150,180,0.35)'
-      ctx.stroke()
-    }
+    // 背景卡片：磨砂玻璃面板（与工艺/连接标签统一玻璃质感）
+    _drawLabelCard(ctx, false, undefined, undefined, undefined, light, GROUP_LABEL_H)
 
-    // 第一行：组名 + 「×N」倍数徽章（蓝灰，系统强调色），右侧「点击 ▸」提示
+    // 第 1 行：组名（自适应字号，超长优先降号再截断）
     ctx.textBaseline = 'middle'
     ctx.textAlign = 'left'
-    let x = 14
-    ctx.font = `bold 16px ${LABEL_FONT}`
+    ctx.font = `bold 13.5px ${LABEL_FONT}`
     ctx.fillStyle = light ? '#1f2733' : 'rgba(255,255,255,0.95)'
-    const nameW = LABEL_W - 30 - 64   // 预留 ×N 徽章与「点击 ▸」空间
     let nm = name
-    if (ctx.measureText(nm).width > nameW) {
-      while (nm.length > 1 && ctx.measureText(nm + '…').width > nameW) nm = nm.slice(0, -1)
-      nm += '…'
+    if (ctx.measureText(nm).width > LABEL_BODY_W) {
+      const px = Math.max(11, Math.floor((13.5 * LABEL_BODY_W) / ctx.measureText(nm).width * 2) / 2)
+      ctx.font = `bold ${px}px ${LABEL_FONT}`
+      if (ctx.measureText(nm).width > LABEL_BODY_W) {
+        while (nm.length > 1 && ctx.measureText(nm + '…').width > LABEL_BODY_W) nm = nm.slice(0, -1)
+        nm += '…'
+      }
     }
-    ctx.fillText(nm, x, 21)
-    x += ctx.measureText(nm).width + 6
+    ctx.fillText(nm, LABEL_PAD, 16)
 
+    // 第 2 行：×N 倍数徽章（直角蓝边小牌，整行独立）+ 右侧「点击 ▸」提示
     const tagText = `×${count}`
-    ctx.font = `bold 14px ${LABEL_FONT}`
+    ctx.font = `bold 10.5px ${LABEL_FONT}`
     const tw = ctx.measureText(tagText).width
-    const padX = 6
-    _roundRect(ctx, x, 21 - 11, tw + padX * 2, 22, 7)
-    ctx.fillStyle = 'rgba(0,75,118,0.12)'
+    const padX = 5
+    const bx = LABEL_PAD
+    _roundRect(ctx, bx, 27, tw + padX * 2, 16, 0)
+    ctx.fillStyle = light ? 'rgba(0,75,118,0.14)' : 'rgba(110,207,255,0.14)'
     ctx.fill()
-    ctx.fillStyle = '#005E94'
-    ctx.fillText(tagText, x + padX, 21 + 1)
+    ctx.strokeStyle = light ? 'rgba(0,94,148,0.5)' : 'rgba(110,207,255,0.55)'
+    ctx.lineWidth = 1
+    ctx.stroke()
+    ctx.fillStyle = light ? '#005E94' : '#6ecfff'
+    ctx.fillText(tagText, bx + padX, 35 + 1)
 
     // 右侧「点击 ▸」提示（可交互暗示）
     ctx.textAlign = 'right'
-    ctx.font = `600 11px ${LABEL_FONT}`
+    ctx.font = `600 10.5px ${LABEL_FONT}`
     ctx.fillStyle = light ? '#005E94' : '#6ecfff'
-    ctx.fillText('点击 ▸', LABEL_W - 13, 21)
+    ctx.fillText('点击 ▸', LABEL_W - 12, 35)
 
-    // 第二行：汇总能耗 ⚡ 左对齐 / 碳排 ☁ 右对齐（与工艺标签一致）
+    // 第 3 行：汇总能耗 ⚡
     ctx.textAlign = 'left'
-    ctx.font = `600 14px ${LABEL_FONT}`
-    ctx.fillStyle = light ? '#5a6472' : 'rgba(170,190,210,0.95)'
+    ctx.font = `600 11.5px ${LABEL_FONT}`
+    ctx.fillStyle = light ? '#37434f' : 'rgba(230,239,249,1)'
     const enStr = energy != null ? fmtShort(energy) : '—'
-    ctx.fillText('⚡ ' + enStr, 14, 46)
-    ctx.textAlign = 'right'
+    ctx.fillText('⚡ ' + enStr, LABEL_PAD, 56)
+
+    // 第 4 行：汇总碳排 ☁
     const co2Str = co2 != null ? fmtShort(co2) : '—'
     ctx.fillStyle = light ? '#005E94' : '#6ecfff'
-    ctx.fillText('☁ ' + co2Str, LABEL_W - 15, 46)
+    ctx.fillText('☁ ' + co2Str, LABEL_PAD, 77)
 
     tex.needsUpdate = true
   }
@@ -2836,7 +2853,7 @@ export class TwinScene {
     tex.minFilter = THREE.LinearFilter      // 关闭 mipmap 链，远处文字不被过度模糊
     tex.magFilter = THREE.LinearFilter
     tex.generateMipmaps = false
-    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }))
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }))
     spr.scale.set(LABEL_SCALE, LABEL_SCALE * (UNIT_LABEL_H / LABEL_W), 1)
     spr.renderOrder = 12
     const obj = { canvas, ctx, tex, sprite: spr, name, role, co2Css, focused: false }
@@ -2874,63 +2891,74 @@ export class TwinScene {
     if (light) {
       _drawLabelCard(ctx, focused, undefined, undefined, undefined, true, UNIT_LABEL_H)
       ctx.textBaseline = 'middle'
-      // 工序名（深色，与管道标签物料名同款；过长自动截断）
+      // 第 1 行：工序名（深色；长名优先降字号，再截断）
       ctx.textAlign = 'left'
-      ctx.font = `bold 16px ${LABEL_FONT}`
+      ctx.font = `bold 13.5px ${LABEL_FONT}`
       ctx.fillStyle = focused ? '#004B76' : '#1C1C1C'
-      const maxNameW = LABEL_W - 30
       let text = obj.name
-      if (ctx.measureText(text).width > maxNameW) {
-        while (text.length > 1 && ctx.measureText(text + '…').width > maxNameW) text = text.slice(0, -1)
-        text += '…'
+      if (ctx.measureText(text).width > LABEL_BODY_W) {
+        const px = Math.max(11, Math.floor((13.5 * LABEL_BODY_W) / ctx.measureText(text).width * 2) / 2)
+        ctx.font = `bold ${px}px ${LABEL_FONT}`
+        if (ctx.measureText(text).width > LABEL_BODY_W) {
+          while (text.length > 1 && ctx.measureText(text + '…').width > LABEL_BODY_W) text = text.slice(0, -1)
+          text += '…'
+        }
       }
-      ctx.fillText(text, 15, 21)
-      // 第二行：实时能耗 ⚡ 左对齐 / 碳排 ☁ 右对齐（碳排按排放占比着色，长数字也不会重叠）
-      ctx.font = `600 14px ${LABEL_FONT}`
-      ctx.fillStyle = '#5a6472'
-      ctx.fillText('⚡ ' + fmtShort(e), 15, 46)
-      ctx.textAlign = 'right'
+      ctx.fillText(text, LABEL_PAD, 17)
+      // 名称下方细分隔线，将标题与数据区分开
+      ctx.strokeStyle = 'rgba(0,94,148,0.16)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(LABEL_PAD, 33)
+      ctx.lineTo(LABEL_W - LABEL_PAD, 33)
+      ctx.stroke()
+      // 第 2 行：实时能耗 ⚡
+      ctx.font = `600 11.5px ${LABEL_FONT}`
+      ctx.fillStyle = '#37434f'
+      ctx.fillText('⚡ ' + fmtShort(e), LABEL_PAD, 48)
+      // 第 3 行：实时碳排 ☁（碳排按排放占比着色）
       ctx.fillStyle = obj.co2Css || '#005E94'
-      ctx.fillText('☁ ' + fmtShort(c), LABEL_W - 15, 46)
+      ctx.fillText('☁ ' + fmtShort(c), LABEL_PAD, 69)
       ctx.shadowBlur = 0; ctx.shadowOffsetY = 0
       tex.needsUpdate = true
       return
     }
 
-    // ===== 深色毛玻璃铭牌（非 industrial 场景：虚空/沙漠/城市/海滩） =====
+    // ===== 深色半透明铭牌（非 industrial 场景：虚空/沙漠/城市/海滩） =====
     _drawLabelCard(ctx, focused, obj.role, true, obj.main, false, UNIT_LABEL_H)
 
     ctx.textBaseline = 'middle'
 
-    // 角色色点（霓虹色，与深色底板强对比）：工艺/工辅统一中性灰蓝，仅起点/终点/隔离保留语义色
-    const roleColor = obj.role === 'start' ? '#3ddc84'
-      : obj.role === 'end' ? '#00a8ff'
-      : obj.role === 'iso' ? '#ffcc3d'
-      : '#7a93a6'
-    ctx.fillStyle = roleColor
-    ctx.beginPath()
-    ctx.arc(17, 21, 3.4, 0, Math.PI * 2)
-    ctx.fill()
-
-    // 工序名（高亮文字，过长自动截断）
+    // 第 1 行：工序名（高亮文字；长名优先降字号，再截断）——所有工艺统一文字颜色，不做角色色区分
     ctx.textAlign = 'left'
-    ctx.font = `bold 16px ${LABEL_FONT}`
+    ctx.font = `bold 13.5px ${LABEL_FONT}`
     ctx.fillStyle = focused ? '#ffffff' : 'rgba(255,255,255,0.92)'
-    const maxNameW = LABEL_W - 30 - 10
     let text = obj.name
-    if (ctx.measureText(text).width > maxNameW) {
-      while (text.length > 1 && ctx.measureText(text + '…').width > maxNameW) text = text.slice(0, -1)
-      text += '…'
+    if (ctx.measureText(text).width > LABEL_BODY_W) {
+      const px = Math.max(11, Math.floor((13.5 * LABEL_BODY_W) / ctx.measureText(text).width * 2) / 2)
+      ctx.font = `bold ${px}px ${LABEL_FONT}`
+      if (ctx.measureText(text).width > LABEL_BODY_W) {
+        while (text.length > 1 && ctx.measureText(text + '…').width > LABEL_BODY_W) text = text.slice(0, -1)
+        text += '…'
+      }
     }
-    ctx.fillText(text, 30, 21)
+    ctx.fillText(text, LABEL_PAD, 17)
 
-    // 第二行：实时能耗 ⚡ 左对齐 / 碳排 ☁ 右对齐（碳排按排放占比着色，长数字也不会重叠）
-    ctx.font = `600 14px ${LABEL_FONT}`
-    ctx.fillStyle = 'rgba(170,190,210,0.95)'
-    ctx.fillText('⚡ ' + fmtShort(e), 30, 46)
-    ctx.textAlign = 'right'
-    ctx.fillStyle = obj.co2Css || 'rgba(170,190,210,0.95)'
-    ctx.fillText('☁ ' + fmtShort(c), LABEL_W - 15, 46)
+    // 名称下方细分隔线
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(LABEL_PAD, 33)
+    ctx.lineTo(LABEL_W - LABEL_PAD, 33)
+    ctx.stroke()
+
+    // 第 2 行：实时能耗 ⚡
+    ctx.font = `600 11.5px ${LABEL_FONT}`
+    ctx.fillStyle = 'rgba(230,239,249,1)'
+    ctx.fillText('⚡ ' + fmtShort(e), LABEL_PAD, 48)
+    // 第 3 行：实时碳排 ☁（碳排按排放占比着色）
+    ctx.fillStyle = obj.co2Css || 'rgba(230,239,249,1)'
+    ctx.fillText('☁ ' + fmtShort(c), LABEL_PAD, 69)
 
     ctx.shadowBlur = 0; ctx.shadowOffsetY = 0
     tex.needsUpdate = true
@@ -3070,7 +3098,7 @@ export class TwinScene {
     tex.minFilter = THREE.LinearFilter
     tex.magFilter = THREE.LinearFilter
     tex.generateMipmaps = false
-    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }))
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }))
     spr.scale.set(LABEL_SCALE, LABEL_SCALE * LABEL_ASPECT, 1)   // 与工序标签统一尺寸
     spr.renderOrder = 12
     this._drawFlowLabel(ctx, tex, name, hexColor, rate, carbon, speed)
@@ -3084,17 +3112,26 @@ export class TwinScene {
 
     ctx.textBaseline = 'middle'
 
-    // 物料名（与工序标签一致：浅色场景深色文字、深色场景白色文字）
+    // 第 1 行：物料名（与工序标签一致：浅色场景深色文字、深色场景白色文字；长名降字号截断）
     ctx.textAlign = 'left'
-    ctx.font = `bold 16px ${LABEL_FONT}`
+    ctx.font = `bold 13.5px ${LABEL_FONT}`
     ctx.fillStyle = light ? '#1C1C1C' : 'rgba(255,255,255,0.92)'
-    ctx.fillText(name, 15, LABEL_H / 2)
+    let nm = name
+    if (ctx.measureText(nm).width > LABEL_BODY_W) {
+      const px = Math.max(11, Math.floor((13.5 * LABEL_BODY_W) / ctx.measureText(nm).width * 2) / 2)
+      ctx.font = `bold ${px}px ${LABEL_FONT}`
+      if (ctx.measureText(nm).width > LABEL_BODY_W) {
+        while (nm.length > 1 && ctx.measureText(nm + '…').width > LABEL_BODY_W) nm = nm.slice(0, -1)
+        nm += '…'
+      }
+    }
+    ctx.fillText(nm, LABEL_PAD, 16)
 
-    // 运输速度（浅色场景 MATLAB 蓝小字；深色场景亮青，与工序标签「点击 ▸」同款）
+    // 第 2 行：运输速度（浅色场景 MATLAB 蓝小字；深色场景亮青，与工序标签「点击 ▸」同款）
     ctx.textAlign = 'right'
     ctx.font = `600 11px ${LABEL_FONT}`
     ctx.fillStyle = light ? (color || '#005E94') : '#6ecfff'
-    ctx.fillText(speed + ' m/s', LABEL_W - 15, LABEL_H / 2)
+    ctx.fillText(speed + ' m/s', LABEL_W - LABEL_PAD, 39)
 
     ctx.shadowBlur = 0; ctx.shadowOffsetY = 0
     tex.needsUpdate = true
@@ -4357,7 +4394,9 @@ export class TwinScene {
       // 归一化后消除继承父级缩放造成的尺寸差异，且三类标签呈现明确的层级大小关系。
       const ps = lo.sprite.parent ? lo.sprite.parent.getWorldScale(parentScale) : parentScale.set(1, 1, 1)
       const base = sf * LABEL_PARENT_REF * (lo.isGroup || lo.main !== true ? LABEL_AUX_GAIN : 1)
-      lo.sprite.scale.set(base / ps.x, (base * (UNIT_LABEL_H / LABEL_W)) / ps.y, 1)
+      // 高宽比按标签类型取：工艺/工辅卡 UNIT_LABEL_H，小组聚合卡 GROUP_LABEL_H
+      const lh = (lo.isGroup ? GROUP_LABEL_H : UNIT_LABEL_H) / LABEL_W
+      lo.sprite.scale.set(base / ps.x, (base * lh) / ps.y, 1)
     })
 
     // 工艺间连接线标签

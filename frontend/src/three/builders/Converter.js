@@ -11,7 +11,6 @@ import { PAL, mat, boxMesh, steelTex, tankShellTex, wallPanelTex } from './utils
 export default function _buildConverter(bodyMat) {
     const g = new THREE.Group()
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x2c6e9e
 
 
     // ========== 可倾动炉体（绕耳轴旋转） ==========
@@ -154,8 +153,8 @@ export default function _buildConverter(bodyMat) {
     // ========== 炉内钢水熔池（内部可见 — 液态钢水） ==========
     const meltPool = new THREE.Mesh(
         new THREE.CylinderGeometry(3.8, 4.2, 3.5, 24),
-        mat(0xbf6a30, {
-            roughness: 0.15, metalness: 0.05, emissive: 0x8a4018, emissiveIntensity: 0.6,
+        mat(0xb35a28, {
+            roughness: 0.2, metalness: 0.08, emissive: 0x773010, emissiveIntensity: 0.35,
             transparent: true, opacity: 0.8, depthWrite: false
         })
     )
@@ -166,7 +165,7 @@ export default function _buildConverter(bodyMat) {
     for (let i = 0; i < 3; i++) {
         const ripple = new THREE.Mesh(new THREE.TorusGeometry(1.8 + i * 1.0, 0.08, 6, 24),
             new THREE.MeshStandardMaterial({
-                color: 0xffdd88, emissive: 0xff6622, emissiveIntensity: 0.6,
+                color: 0xffcc88, emissive: 0xcc4410, emissiveIntensity: 0.35,
                 roughness: 0.1, metalness: 0.05, depthWrite: false
             }))
         ripple.rotation.x = Math.PI / 2
@@ -187,12 +186,12 @@ export default function _buildConverter(bodyMat) {
     // ========== 霓虹装饰 ==========
     // 炉体中部霓虹环
     const convRing1 = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.12, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
+        mat(0x42566b, { roughness: 0.55, metalness: 0.35 }))
     convRing1.rotation.x = Math.PI / 2; convRing1.position.set(0, 3.0 - TRUNNION_Y, 0); vessel.add(convRing1)
 
     // 炉口霓虹环
     const convRing2 = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.12, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
+        mat(0x42566b, { roughness: 0.55, metalness: 0.35 }))
     convRing2.rotation.x = Math.PI / 2; convRing2.position.set(0, 11.0 - TRUNNION_Y, 0); vessel.add(convRing2)
 
     // ========== 动画钩子数据 ==========
@@ -233,7 +232,7 @@ export default function _buildConverter(bodyMat) {
     // 喷吹脱碳火花（从氧枪尖端到钢水表面）
     for (let i = 0; i < 4; i++) {
         const spark = new THREE.Mesh(new THREE.SphereGeometry(0.1, 4, 4),
-            new THREE.MeshBasicMaterial({ color: 0xffffcc, transparent: true, opacity: 0.7, depthWrite: false }))
+            new THREE.MeshBasicMaterial({ color: 0xffe2b0, transparent: true, opacity: 0.5, depthWrite: false }))
         spark.position.set((Math.random() - 0.5) * 1.2, 7 + Math.random() * 3 - TRUNNION_Y, (Math.random() - 0.5) * 1.2)
         vessel.add(spark)
         convFlow.push({

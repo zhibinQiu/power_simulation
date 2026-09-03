@@ -15,6 +15,7 @@ def edge_config() -> Dict[str, Any]:
     """读取盒子连接配置：本地 box_devices.json 顶层 edge（优先）→ 云端 agent 已存配置。
 
     edge 结构：{"host": 现场可达地址, "port": 22, "user": "root", "password": "", "key": ""}。
+    aliases：{"节点名": "显示别名"}，前端拓扑图展示用（盒子真实名=云端 K8s 节点名不可改）。
     """
     data = _load_devices()
     local = data.get("edge") if isinstance(data.get("edge"), dict) else {}
@@ -22,16 +23,29 @@ def edge_config() -> Dict[str, Any]:
         remote = cloud_agent.get_edge_config()
         if remote.get("ok") and isinstance(remote.get("edge"), dict):
             local = {k: remote["edge"].get(k) for k in ("host", "port", "user", "password", "key")}
-    return {"ok": True, "edge": local or {}}
+    return {"ok": True, "edge": local or {}, "aliases": data.get("box_aliases") or {}}
 
 
 def update_edge_config(p: Dict[str, Any]) -> Dict[str, Any]:
     """保存盒子连接配置到本地 box_devices.json + 云端 agent，并立即探测连通性。
 
+    额外支持盒子显示名称别名：p["box"]=节点名、p["name"]=显示别名（留空=恢复原名），
+    仅保存在本地 box_aliases 映射，不改云端 K8s 节点名。
     平台侧保存后 agent 侧 config.json 同步更新，重启 Mapper 等 SSH 操作使用新地址。
     """
+    alias_box = str(p.get("box") or "").strip()
+    alias_name = str(p.get("name") or "").strip()
     with _LOCK:
         data = _load_devices()
+        # ① 盒子显示名称别名（原名=云端 K8s 节点名不可改，此处仅存显示别名，留空恢复原名）
+        aliases = dict(data.get("box_aliases") or {})
+        if alias_box:
+            if alias_name:
+                aliases[alias_box] = alias_name
+            else:
+                aliases.pop(alias_box, None)
+            data["box_aliases"] = aliases
+        # ② 连接配置（SSH 现场可达地址/凭据）
         edge = dict(data.get("edge") or {})
         for k in ("host", "port", "user", "password", "key"):
             if k in p and p[k] is not None:
@@ -42,17 +56,19 @@ def update_edge_config(p: Dict[str, Any]) -> Dict[str, Any]:
                         return {"ok": False, "error": "port 必须是整数：%r" % (p[k],)}
                 else:
                     edge[k] = str(p[k]).strip()
-        if not edge:
-            return {"ok": False, "error": "缺少配置字段（host/port/user/password/key）"}
-        data["edge"] = edge
+        if edge:
+            data["edge"] = edge
         _save_devices(data)
     # 同步到云端 agent（保存成功后立即探测）；agent 未部署/不可达时不阻断本地保存，
-    # 仅在返回中提示（重启 Mapper 等 SSH 操作仍需要 agent 在线且盒子可达）
-    result = cloud_agent.update_edge_config(edge)
-    if not result.get("ok"):
-        return {"ok": True, "edge": edge, "check": None,
-                "warning": "本地已保存；同步到云端 agent 失败（%s），盒子 IP 生效前需先部署/恢复 agent" % result.get("error", "")}
-    return {"ok": True, "edge": edge, "check": result.get("check")}
+    # 仅在返回中提示（重启 Mapper 等 SSH 操作仍需要 agent 在线且盒子可达）。
+    # 仅修改名称别名（未改连接字段）时无需同步 agent。
+    result = {"ok": True}
+    if edge:
+        result = cloud_agent.update_edge_config(edge)
+        if not result.get("ok"):
+            return {"ok": True, "edge": edge, "check": None,
+                    "warning": "本地已保存；同步到云端 agent 失败（%s），盒子 IP 生效前需先部署/恢复 agent" % result.get("error", "")}
+    return {"ok": True, "edge": edge, "aliases": aliases, "check": result.get("check")}
 
 
 def check_edge_reachable(host: str = "", port: int = 22) -> Dict[str, Any]:

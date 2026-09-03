@@ -10,7 +10,6 @@ export default function _buildIngotCasting(bodyMat) {
     const g = new THREE.Group()
     const L = 22; const D = 12; const H = 14
     const steel = mat(PAL.steel, { metalness: 0.55, roughness: 0.35 })
-    const neonColor = 0x2c6e9e
 
 
     // === 1. 钢包（ladle） ===
@@ -82,7 +81,7 @@ export default function _buildIngotCasting(bodyMat) {
 
     // === 6. 霓虹 ===
     const ingotRing = new THREE.Mesh(new THREE.TorusGeometry(2.5, 0.1, 8, 32),
-        new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 }))
+        mat(0x42566b, { roughness: 0.55, metalness: 0.35 }))
     ingotRing.rotation.x = Math.PI / 2; ingotRing.position.set(0, 3.5, 0); g.add(ingotRing)
 
     // === 7. 动画钩子 ===
