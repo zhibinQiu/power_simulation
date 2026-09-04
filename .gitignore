@@ -16,8 +16,13 @@ __pycache__/
 *.pyo
 backend/**/__pycache__/
 
-# ===== 前端 Vite 构建临时配置（vite.config.js.timestamp-*.mjs） =====
+# ===== 前端/文档站 Vite 构建临时配置（vite.config.js.timestamp-*.mjs） =====
 frontend/vite.config.js.timestamp-*.mjs
+platform/doc-deploy/docs-site/vite.config.js.timestamp-*.mjs
+
+# ===== 门户/文档站本地静态服务运行时残留（serve.sh） =====
+platform/portal-deploy/.serve.pid
+platform/portal-deploy/.serve.log
 
 # ===== 临时/调试脚本 =====
 frontend/_rtest5.mjs
@@ -61,5 +66,5 @@ backend/config/github_config.json
 # 全新 git 部署开箱即有前端/文档站产物（Dockerfile 均 COPY dist，无需 node 构建）
 !frontend/dist/
 !frontend/dist/**
-!docs-site/dist/
-!docs-site/dist/**
+!platform/doc-deploy/docs-site/dist/
+!platform/doc-deploy/docs-site/dist/**

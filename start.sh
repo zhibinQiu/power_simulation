@@ -9,21 +9,22 @@
 #    ./start.sh --frontend    仅启动前端 dev
 #    ./start.sh --no-docs     不启动独立文档网站
 #    ./start.sh --no-portal   不启动门户网站
-#    ./start.sh --portal-sync 显式开启同步门户到线上官网 (https://www.nengyousuan.com)；默认不同步
-#    ./start.sh --server      一键同步代码到新服务器 36.151.146.71 并部署（等价 bash platform/bs-deploy/sync.sh，参数透传）
 #    ./start.sh --help        查看帮助
 #
 #  说明:
+#    - 本脚本只负责本地启动，启动过程不包含任何推送/同步逻辑
+#    - 线上部署/更新请走 platform/ 统一入口：bash platform/deploy.sh（bs/portal/docs 等目标）
 #    - 后端首次运行自动创建 .venv 并安装依赖
-#    - 前端首次运行自动 npm install
+#    - 前端/文档站首次运行自动 npm install
 #    - 日志写入 .logs/ 目录，Ctrl+C 停止全部服务
-#    - 默认不把门户同步到线上官网 43.161.194.75；如需要请加 --portal-sync
 #    - 后端默认连接「新服务器」云端 MQTT Broker（backend/config/box_config.json 指向 36.151.146.71:41883），
-#      本地开发即可看到盒子实时数据；生产部署/更新请用 platform/bs-deploy/server.sh 与 platform/bs-deploy/sync.sh（详见 README）
+#      本地开发即可看到盒子实时数据
 # ============================================================
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
+DOCS_DIR="$ROOT/platform/doc-deploy/docs-site"   # 文档站源码（vite）
+PORTAL_DIR="$ROOT/platform/portal-deploy"        # 门户静态站点
 LOG_DIR="$ROOT/.logs"
 mkdir -p "$LOG_DIR"
 
@@ -32,13 +33,6 @@ RUN_BACKEND=1
 RUN_FRONTEND=1
 RUN_DOCS=1
 RUN_PORTAL=1
-PORTAL_SYNC=0     # 默认不同步门户到线上官网 43.161.194.75；--portal-sync 显式开启
-
-# --server：一键同步代码到新服务器（36.151.146.71）并部署 = bash platform/bs-deploy/sync.sh，剩余参数透传
-if [ "${1:-}" = "--server" ] || [ "${1:-}" = "--sync" ]; then
-  shift
-  exec bash "$ROOT/platform/bs-deploy/sync.sh" "$@"
-fi
 
 for arg in "$@"; do
   case "$arg" in
@@ -47,10 +41,9 @@ for arg in "$@"; do
     --frontend) RUN_BACKEND=0 ;;
     --no-docs)  RUN_DOCS=0 ;;
     --no-portal) RUN_PORTAL=0 ;;
-    --no-portal-sync) PORTAL_SYNC=0 ;;   # 兼容参数：保持不同步
-    --portal-sync)  PORTAL_SYNC=1 ;;
     -h|--help)
-      awk 'NR >= 2 && /^#/ { sub(/^# ?/, ""); print } NR >= 2 && !/^#/ { exit }' "$0"
+      # 注意：不能用两个独立的 pattern-action（sub 原地修改 $0 后第二个 !/^#/ 会对已删 # 的行误判 exit）
+      awk 'NR >= 2 { if (/^#/) { sub(/^# ?/, ""); print } else exit }' "$0"
       exit 0
       ;;
     *)
@@ -69,7 +62,8 @@ stop_old_services() {
   pkill -f "config/run\.sh" 2>/dev/null && { echo "   - 已停止旧后端启动器 (run.sh)"; stopped=1; } || true
   # 旧前端 / 文档站 dev 服务器（vite dev 与 preview 共用 .bin/vite 入口）
   pkill -f "frontend/node_modules/\.bin/vite" 2>/dev/null && { echo "   - 已停止旧前端 dev (vite)"; stopped=1; } || true
-  pkill -f "docs-site/node_modules/\.bin/vite" 2>/dev/null && { echo "   - 已停止旧文档站 dev (vite)"; stopped=1; } || true
+  pkill -f "doc-deploy/docs-site/node_modules/\.bin/vite" 2>/dev/null && { echo "   - 已停止旧文档站 dev (vite)"; stopped=1; } || true
+  pkill -f "docs-site/node_modules/\.bin/vite" 2>/dev/null && { echo "   - 已停止旧路径文档站 dev（历史目录）"; stopped=1; } || true
   # 旧门户静态服务器
   pkill -f "http\.server 40200" 2>/dev/null && { echo "   - 已停止旧门户 (http.server)"; stopped=1; } || true
   # 旧的一键启动脚本（排除当前进程，避免自杀）
@@ -91,8 +85,8 @@ if [ "$MODE" = "prod" ]; then
   echo "==> [构建] 前端产物 (npx vite build)..."
   (cd "$ROOT/frontend" && npx vite build)
   if [ "$RUN_DOCS" = "1" ]; then
-    echo "==> [构建] 文档网站产物 (docs-site: npx vite build)..."
-    (cd "$ROOT/docs-site" && npx vite build)
+    echo "==> [构建] 文档网站产物 (doc-deploy/docs-site: npx vite build)..."
+    (cd "$DOCS_DIR" && npx vite build)
   fi
   RUN_FRONTEND=0
 fi
@@ -151,18 +145,18 @@ if [ "$RUN_FRONTEND" = "1" ]; then
   wait_ready "http://127.0.0.1:5173" "前端" || true
 fi
 
-# ---- 启动独立文档网站（宣传手册/使用手册/技术文档） ----
+# ---- 启动独立文档网站（宣传手册/使用手册/技术文档，源码在 platform/doc-deploy/docs-site） ----
 if [ "$RUN_DOCS" = "1" ]; then
-  if [ ! -d "$ROOT/docs-site/node_modules" ]; then
+  if [ ! -d "$DOCS_DIR/node_modules" ]; then
     echo "   首次运行，安装文档站依赖 (npm install)..."
-    (cd "$ROOT/docs-site" && npm install)
+    (cd "$DOCS_DIR" && npm install)
   fi
   if [ "$MODE" = "prod" ]; then
     echo "==> [文档站] 启动静态托管 (127.0.0.1:40183)..."
-    (cd "$ROOT/docs-site" && npx vite preview --port 40183 --host 127.0.0.1) > "$LOG_DIR/docs-site.log" 2>&1 &
+    (cd "$DOCS_DIR" && npx vite preview --port 40183 --host 127.0.0.1) > "$LOG_DIR/docs-site.log" 2>&1 &
   else
     echo "==> [文档站] 启动 Vite dev (127.0.0.1:5174)..."
-    (cd "$ROOT/docs-site" && npm run dev) > "$LOG_DIR/docs-site.log" 2>&1 &
+    (cd "$DOCS_DIR" && npm run dev) > "$LOG_DIR/docs-site.log" 2>&1 &
   fi
   DOCS_PID=$!
   echo "   PID: $DOCS_PID    日志: $LOG_DIR/docs-site.log"
@@ -173,24 +167,13 @@ if [ "$RUN_DOCS" = "1" ]; then
   fi
 fi
 
-# ---- 启动门户网站（平台门户静态站点 platform/home-deploy） ----
+# ---- 启动门户网站（平台门户静态站点 platform/portal-deploy） ----
 if [ "$RUN_PORTAL" = "1" ]; then
   echo "==> [门户] 启动静态网站 (127.0.0.1:40200)..."
-  (cd "$ROOT/platform/home-deploy" && python3 -m http.server 40200 --bind 127.0.0.1) > "$LOG_DIR/portal.log" 2>&1 &
+  (cd "$PORTAL_DIR" && python3 -m http.server 40200 --bind 127.0.0.1) > "$LOG_DIR/portal.log" 2>&1 &
   PORTAL_PID=$!
   echo "   PID: $PORTAL_PID    日志: $LOG_DIR/portal.log"
   wait_ready "http://127.0.0.1:40200" "门户" || true
-fi
-
-# ---- 同步门户到线上官网（默认关闭，仅加 --portal-sync 时执行）----
-# 把最新 platform/home-deploy/ 推上线（走 home-deploy/sync-home.sh），
-# 失败仅警告、不阻断本地服务
-if [ "$PORTAL_SYNC" = "1" ]; then
-  if bash "$ROOT/platform/home-deploy/sync-home.sh"; then
-    echo "   ✔ 线上官网已更新: https://www.nengyousuan.com"
-  else
-    echo "   ⚠ 官网同步失败（不影响本地服务，请检查网络与免密 SSH 配置）" >&2
-  fi
 fi
 
 # ---- 输出访问地址 ----

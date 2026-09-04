@@ -49,13 +49,18 @@ services:
       - LLM_MODEL=${LLM_MODEL:-}
     restart: unless-stopped
 
-  # 独立文档网站（宣传手册/使用手册/技术文档），docs-site/dist 已入库，零构建
+  # 独立文档网站（宣传手册/使用手册/技术文档）
+  # 站点源码与文档位于 platform/doc-deploy/（docs-site = vite 站点，docs = 源文档）
+  # dist 卷挂载：platform/doc-deploy/sync-docs.sh 构建并 rsync 新 dist 后
+  # docker compose restart docs-site 即生效（免重建镜像）
   docs-site:
     build:
       context: ../..
       dockerfile: platform/bs-deploy/Dockerfile.docs
     image: ghcr.io/zhibinqiu/power_simulation-docs:latest
     container_name: nengtan-docs-site
+    volumes:
+      - ../../platform/doc-deploy/docs-site/dist:/site/dist
     ports:
       - "40184:40183"
     restart: unless-stopped

@@ -1,13 +1,13 @@
 """帮助中心路由：提供独立文档网站（docs-site）的访问地址。
 
 宣传手册 / 使用手册 / 技术文档已从平台前端脱离，作为独立站点由 docs-site
-项目承载（构建产物 dist 经静态服务托管，端口见环境变量 DOCS_SITE_PORT，
-默认 40183，遵循项目 40000+ 端口规范）。平台帮助菜单通过本接口获取跳转地址。
+项目承载。平台帮助菜单通过本接口获取跳转地址。
 
-文档站经云端 frp 隧道暴露到公网（remotePort 40183），对外访问地址固定使用
-【公网地址】（环境变量 DOCS_PUBLIC_HOST 可覆盖，默认 36.151.146.71），
-而非浏览器当前访问的 host / 云端内网 IP——公网用户经 36.151.146.71:40183
-访问，内网用户同样可达。前端兜底推导地址同理应使用该公网地址。
+对外访问地址固定使用【公网地址】（环境变量 DOCS_PUBLIC_HOST 可覆盖，默认
+36.151.146.71），而非浏览器当前访问的 host——公网用户经
+http://36.151.146.71:40184 访问（文档站容器与平台同机直出，compose 映射
+40184:40183；环境变量 DOCS_SITE_PORT 默认 40184，遵循项目 40000+ 端口规范），
+内网用户同样可达。前端兜底推导地址同理应使用该公网地址。
 """
 from __future__ import annotations
 
@@ -73,7 +73,7 @@ def _resolve_cloud_host() -> str:
 @router.get("/api/help/site")
 async def help_site():
     """返回独立文档网站的访问地址（宣传手册/使用手册/技术文档）。"""
-    docs_port = int(os.getenv("DOCS_SITE_PORT", "40183"))
+    docs_port = int(os.getenv("DOCS_SITE_PORT", "40184"))
     host = cloud_host()
     return {
         "url": f"http://{host}:{docs_port}",

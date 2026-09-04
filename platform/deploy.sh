@@ -4,9 +4,11 @@
 #
 # 各部署目标脚本统一收口（各司其职，目录即部署单元）：
 #   bs-deploy/     平台自身前后端（服务器 Docker 部署：bs = back-stage/platform）
+#   portal-deploy/ 平台门户静态站点（官网 nengyousuan.com 更新 / 服务器独立安装）
+#   doc-deploy/    文档站源码 + 源文档 + 更新部署（docs-site + docs）
 #   cloud-deploy/  云端 KubeEdge 控制面 / 数据面 / TDengine / cloud-agent
 #   box-deploy/    边缘盒子（一体机）部署包
-#   mac/windows-platform-deploy/   桌面客户端打包
+#   mac/windows-deploy/   桌面客户端打包
 #
 # 用法：bash platform/deploy.sh <目标> [脚本参数...]
 #
@@ -20,10 +22,11 @@
 #   box         盒子 GitHub 在线一键接入                 box-deploy/box.sh（盒子 root）
 #   deploy-box  盒子完整离线部署（依赖+mapper+mosquitto） box-deploy/deploy_box.sh（盒子 root）
 #   migrate-box 盒子换云迁移（免手工签发证书）            box-deploy/migrate-box.sh（盒子 root）
-#   mac         桌面客户端 macOS 打包                    mac-platform-deploy/build_mac.sh（本机）
-#   windows     桌面客户端 Windows 打包                  windows-platform-deploy/build_windows.bat（Win）
-#   home        门户官网内容更新（→ 线上 nengyousuan.com）  home-deploy/sync-home.sh（开发机）
-#   home-install 门户独立站点安装（systemd 常驻服务）        home-deploy/deploy_portal.sh（开发机）
+#   mac         桌面客户端 macOS 打包                    mac-deploy/build_mac.sh（本机）
+#   windows     桌面客户端 Windows 打包                  windows-deploy/build_windows.bat（Win）
+#   portal      门户官网内容更新（→ 线上 nengyousuan.com）  portal-deploy/sync-portal.sh（开发机）
+#   portal-install 门户独立站点安装（systemd 常驻服务）        portal-deploy/deploy.sh（开发机）
+#   docs        文档站 + 源文档更新（→ 71:40184 容器）      doc-deploy/sync-docs.sh（开发机）
 #   list        列出部署矩阵（默认无参数时显示）
 #
 # 示例：
@@ -83,22 +86,27 @@ case "$TARGET" in
     ;;
   mac)
     echo "==> macOS 桌面客户端打包"
-    exec bash "$DIR/mac-platform-deploy/build_mac.sh" "$@"
+    exec bash "$DIR/mac-deploy/build_mac.sh" "$@"
     ;;
   windows)
     echo "==> Windows 桌面客户端打包（需在 Windows 机器执行）："
-    echo "    cd platform/windows-platform-deploy && build_windows.bat $*"
+    echo "    cd platform/windows-deploy && build_windows.bat $*"
     exit 0
     ;;
-  home|portal)
+  portal)
     echo "==> 平台门户官网内容更新（本机执行 → 线上 https://www.nengyousuan.com）"
-    echo "    门户源码：platform/home-deploy/（脚本自身即更新器；免密 SSH 或 export QZB_SSH_PASS=密码）"
-    exec bash "$DIR/home-deploy/sync-home.sh" "$@"
+    echo "    门户源码：platform/portal-deploy/（脚本自身即更新器；免密 SSH 或 export QZB_SSH_PASS=密码）"
+    exec bash "$DIR/portal-deploy/sync-portal.sh" "$@"
     ;;
-  home-install|portal-install)
+  portal-install)
     echo "==> 门户独立站点安装（默认 71:/opt/nengtan-portal 端口 40200，systemd 常驻）"
-    echo "    用法：bash platform/deploy.sh home-install [-s root@<服务器>] [-p <端口>]"
-    exec bash "$DIR/home-deploy/deploy_portal.sh" "$@"
+    echo "    用法：bash platform/deploy.sh portal-install [-s root@<服务器>] [-p <端口>]"
+    exec bash "$DIR/portal-deploy/deploy.sh" "$@"
+    ;;
+  docs)
+    echo "==> 文档站 + 源文档更新部署（本机执行 → 71:40184 文档站容器）"
+    echo "    内容：platform/doc-deploy/（docs-site 站点 + docs 源文档）"
+    exec bash "$DIR/doc-deploy/sync-docs.sh" "$@"
     ;;
   list|-l|--list)
     usage

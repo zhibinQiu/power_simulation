@@ -217,11 +217,12 @@ function onExport() {
   pushCmd(t('已打开右侧报告面板：请配置标题、引擎与分析深度后点击「生成报告」。'), 'out')
 }
 // 打开独立文档网站（宣传手册 / 使用手册 / 技术文档已脱离平台，作为独立服务跳转）
-// 文档站经云端 frp 隧道暴露公网（36.151.146.71:40183），跳转链接固定使用公网地址。
+// 文档站与平台同机直出公网（http://36.151.146.71:40184），跳转链接固定使用公网地址；
+// 开发态（vite dev）指向本地文档站 dev server（5174）。
 function openDocsSite(page = '') {
   const target = page ? '/#/' + page : '/#/'
   const open = (host) => {
-    const port = import.meta.env.DEV ? 5174 : 40183
+    const port = import.meta.env.DEV ? 5174 : 40184
     window.open(`http://${host}:${port}${target}`, '_blank')
   }
   const ctrl = new AbortController()
@@ -233,7 +234,7 @@ function openDocsSite(page = '') {
       throw new Error('no host')
     })
     .catch(() => {
-      // 后端接口不可用时：直接回退公网文档站入口（frp 隧道）
+      // 后端接口不可用时：直接回退公网文档站入口（36.151.146.71:40184）
       open('36.151.146.71')
     })
     .finally(() => clearTimeout(timer))

@@ -1,6 +1,9 @@
-# 文档站静态镜像：docs-site/dist 已入库，无需 node 构建，直接以 python http.server 托管
+# 文档站静态镜像：dist 已入库 + 卷挂载，容器运行期直接读挂载目录
+#   - 首次/全新部署：COPY 一份 dist 进镜像（开箱即用，零构建）
+#   - 日常更新：platform/doc-deploy/sync-docs.sh 构建并 rsync 新 dist 后
+#     docker compose restart docs-site 即生效（compose 已卷挂载 dist，覆盖镜像内副本）
 FROM python:3.11-slim
 WORKDIR /site
-COPY docs-site/dist/ /site/dist/
+COPY platform/doc-deploy/docs-site/dist/ /site/dist/
 EXPOSE 40183
 CMD ["python3", "-m", "http.server", "40183", "--bind", "0.0.0.0", "--directory", "/site/dist"]

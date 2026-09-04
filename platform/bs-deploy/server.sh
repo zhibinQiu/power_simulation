@@ -3,7 +3,7 @@
 # 能碳智控平台 · 全新服务器一键部署（源码卷挂载 + reload · 免 pip/npm/node）
 #
 # 服务器只需安装 Docker；镜像只固化 Python 运行环境（依赖），业务代码
-# backend/ 与前端产物 frontend/dist、docs-site/dist 均已入库并随仓库克隆：
+# backend/ 与前端产物 frontend/dist、文档站 platform/doc-deploy/docs-site/dist 均已入库并随仓库克隆：
 #   - docker compose up -d --build 首次构建运行环境镜像（仅 Python 依赖层）
 #   - 容器以卷挂载 backend/ + frontend/dist 运行，容器内 uvicorn --reload
 #   - 日常更新 = git pull / rsync 代码（后端 reload 秒级生效，前端产物已入库）

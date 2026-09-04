@@ -85,23 +85,25 @@ echo "==> 仓库根：$ROOT"
 echo "==> 同步目标：$SERVER:$SERVER_DIR （ $( [ "$SERVER" = "$CLOUD_MAIN" ] && echo 新服务器/主 || echo 备用 )）"
 
 # ---- [0/5] 本地构建前端/文档站产物（dist 已入库，随 rsync 同步；改动即生效） ----
-echo "==> [0/5] 本地构建前端产物（frontend/ docs-site/，缺失/失败不阻断同步）..."
+echo "==> [0/5] 本地构建前端产物（frontend/ doc-deploy/docs-site/，缺失/失败不阻断同步）..."
 (cd frontend && npx vite build >/dev/null 2>&1) && echo "    frontend/dist 已构建" \
   || echo "    ⚠ frontend 构建跳过/失败（检查 node_modules 与 vite）"
-(cd docs-site && npx vite build >/dev/null 2>&1) && echo "    docs-site/dist 已构建" \
+(cd platform/doc-deploy/docs-site && npx vite build >/dev/null 2>&1) && echo "    docs-site/dist 已构建" \
   || echo "    ⚠ docs-site 构建跳过/失败"
 
 # ---- [1/5] rsync 源码（运行时数据/本机环境不上传；frontend/dist 需同步以挂载生效） ----
 EXCLUDES="--exclude=.git --exclude=.venv --exclude=venv --exclude=node_modules --exclude=__pycache__
   --exclude=*.pyc --exclude=.DS_Store --exclude=.env --exclude=*.log
-  --exclude=docs-site/node_modules --exclude=.playwright-cli
+  --exclude=platform/doc-deploy/docs-site/node_modules --exclude=.playwright-cli
   --exclude=outputs --exclude=generated-images --exclude=chrome_*
   --exclude=backend/data --exclude=backend/knowledge --exclude=.pre-sync-*"
 echo "==> [1/5] rsync 源码 + 配置 + 前端产物到服务器（排除运行时数据/本机环境）..."
 rsync_run $EXCLUDES ./ "$SERVER:$SERVER_DIR/"
 
-# 清理服务器上历史迁移遗留目录（deploy/ 已于 2026-09 迁入 platform/，homePage 更名 home-deploy）
-ssh_run "$SERVER" "rm -rf '$SERVER_DIR/deploy' '$SERVER_DIR/platform/homePage'" 2>/dev/null || true
+# 清理服务器上历史迁移遗留目录（deploy/ 已迁入 platform/；homePage → home-deploy → portal-deploy；
+# 根级 docs-site/ docs/ 已并入 platform/doc-deploy/；mac/windows-platform-deploy 更名 mac/windows-deploy。
+# rsync 无 --delete，旧目录不会自动消失，需在此登记清理。）
+ssh_run "$SERVER" "rm -rf '$SERVER_DIR/deploy' '$SERVER_DIR/platform/homePage' '$SERVER_DIR/platform/home-deploy' '$SERVER_DIR/docs-site' '$SERVER_DIR/docs' '$SERVER_DIR/platform/mac-platform-deploy' '$SERVER_DIR/platform/windows-platform-deploy'" 2>/dev/null || true
 
 # ---- 是否需要重建镜像：仅「构建输入」变更 / 服务器无镜像 时才 build ----
 # 比对路径统一用「仓库根相对路径」（本地与远程目录结构一致）
@@ -137,9 +139,9 @@ else
   echo "==> [2/5] 跳过服务器构建（--skip-build）。代码已同步，服务器上执行 docker compose up -d --build 生效。"
 fi
 
-# ---- [3/5] 门户官网内容更新（platform/home-deploy → https://www.nengyousuan.com） ----
+# ---- [3/5] 门户官网内容更新（platform/portal-deploy → https://www.nengyousuan.com） ----
 if [ "$RUN_PORTAL" = "1" ]; then
-  if bash "$ROOT/platform/home-deploy/sync-home.sh"; then
+  if bash "$ROOT/platform/portal-deploy/sync-portal.sh"; then
     echo "    官网已更新: https://www.nengyousuan.com"
   else
     echo "    ⚠ 官网同步失败（不影响平台；检查免密/网络）" >&2

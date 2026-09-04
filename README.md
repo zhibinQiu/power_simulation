@@ -35,6 +35,16 @@
 
 ## 快速开始
 
+### 一键启动（推荐）
+
+```bash
+./start.sh                 # 纯本地启动：后端(8010) + 前端 dev(5173) + 文档站(5174) + 门户(40200)
+./start.sh --prod          # 构建产物后由后端托管前端 + 文档站 preview(40183)
+./start.sh --help          # 全部参数
+```
+
+`start.sh` 只负责本地启动，不含任何推送逻辑；线上部署/更新走 `platform/deploy.sh`（见下文部署）。
+
 ### 后端
 
 ```bash
@@ -138,16 +148,69 @@ npx vite build         # 产物输出至 dist/，由后端 Catch-all 路由托�
 │   │       └── ...                      # 其余界面组件（含「使用手册 / 技术文档」）
 │   └── vite.config.js
 ├── cli-chat/                   # 命令行聊天辅助脚本
-├── docs/                       # 设计文档（架构梳理、流程编排方案）
-├── Dockerfile / docker-compose.yml
+├── platform/                   # 统一部署入口（目录即部署单元）
+│   ├── deploy.sh               # bash platform/deploy.sh <目标>（bs/portal/docs/cloud/box…）
+│   ├── bs-deploy/              # 平台前后端（71 服务器 Docker 源码卷挂载 + reload）
+│   ├── portal-deploy/          # 门户静态站点（官网更新 sync-portal.sh / 独立安装 deploy.sh）
+│   ├── doc-deploy/             # 文档站与文档（docs-site 站点源码 + docs 源文档 + sync-docs.sh）
+│   ├── cloud-deploy/           # 云端 KubeEdge 控制面/数据面/TDengine/agent
+│   ├── box-deploy/             # 边缘盒子（一体机）部署包
+│   └── mac/windows-deploy/   # 桌面客户端打包
 └── README.md
 ```
+
+## 部署
+
+线上环境由两类部署单元组成，统一收口在 `platform/deploy.sh`（`bash platform/deploy.sh list` 查看矩阵）：
+
+| 部署单元 | 内容（端口） | 一键脚本 | 执行位置 |
+| --- | --- | --- | --- |
+| **bs / 平台** | 后端 + 前端 + 文档站容器（40014 / 40184） | `bs-deploy/server.sh`（全新）/ `bs-deploy/update.sh`（更新）/ `bs-deploy/sync.sh`（开发机 rsync） | 目标机 root / 开发机 |
+| **cloud / 云端** | K3s + KubeEdge CloudCore 控制面（10001-10004）、MQTT 数据面（41883/41083/41500）、TDengine 时序库、cloud-agent（42083） | `cloud-deploy/deploy_cloud.sh --bootstrap --ip <IP>` | 云机 root |
+| **box / 盒子** | 边缘一体机采集（mapper + mosquitto + EdgeCore） | `box-deploy/box.sh`（在线）/ `deploy_box.sh`（离线） | 盒子 root |
+| docs / portal | 文档站 / 门户官网更新 | `doc-deploy/sync-docs.sh`、`portal-deploy/` | 开发机 |
+
+> 架构上云端与平台可同机（现网 36.151.146.71 即同机：平台容器以 `BROKER_HOST=172.18.0.1` 回环宿主直连本机 Broker），也可分两台服务器。
+
+### 全新服务器部署（云端 + 完整平台，单机全栈）
+
+以下以新机 IP `1.2.3.4` 为例，root 登录执行：
+
+```bash
+# ① 准备：外网 + ≥4C8G；放行端口 10001-10004 + 41883/41083/41500/42083 + 40014/40184
+# ② 拉代码（与现网同路径，便于 rsync/git 通道复用）
+git clone --depth 1 https://github.com/zhibinQiu/power_simulation /root/qzb/jianpai
+
+# ③ 云端一键部署：自动装 k3s(≤1.30) → CloudCore v1.20.0 → 数据面 → TDengine → cloud-agent
+cd /root/qzb/jianpai/platform/cloud-deploy
+bash deploy_cloud.sh --bootstrap --ip 1.2.3.4
+#    末尾打印「平台配置一键导入 JSON」（同时落 /opt/cloud-agent/platform.json），务必抄下 agent_token
+bash deploy_cloud.sh --check              # 链路自检（不修改任何东西）
+
+# ④ 平台（bs）起容器：构建仅 Python 依赖层（1~3 分钟）
+cd /root/qzb/jianpai/platform/bs-deploy
+docker compose up -d --build
+#    访问：平台 http://1.2.3.4:40014 · 文档站 http://1.2.3.4:40184
+
+# ⑤ 平台对接云端：总览 → 云端 Broker 配置 → 一键导入（粘贴 ③ 的 JSON）
+#    单机架构无需改 broker 配置（compose 环境变量 BROKER_HOST=172.18.0.1 优先级最高，自动回环宿主）
+
+# ⑥ 盒子接入（如需切机）：平台「盒子管理 → 接入新盒子」→ 盒子执行 onboard_box.sh / curl | bash
+```
+
+独立机器也可直接 `curl -fsSL https://raw.githubusercontent.com/zhibinQiu/power_simulation/master/platform/bs-deploy/server.sh | bash`（默认装 `/opt/carbon-platform`，参数见脚本 `-h`）。
+
+**分机部署**（云机 A + 平台机 B）：A 机执行 `deploy_cloud.sh --bootstrap --ip <A公网IP>`（边缘盒子须能路由到 A）；B 机 `server.sh` 部署后，将 `bs-deploy/docker-compose.yml` 的 `BROKER_HOST` 改为 A 的 IP，并在 A 放行 B 入站 41883/42083。
+
+**日常更新**：服务器侧 `platform/bs-deploy/update.sh`（备份 `backend/{data,config,knowledge}` → git pull → 恢复 → 重建，数据安全优先）；开发机侧改 `bs-deploy/sync.sh` 顶部 `CLOUD_MAIN` 指向新机后走 rsync 一体化。老机迁移历史数据：将 `backend/data`、`backend/knowledge`、`backend/config`（含 `box_devices.json`/`links.json`）拷入新机对应目录再起容器。
+
+**要点提醒**：cloudcore v1.20.0 兼容 k3s **≤1.30**；证书必须 EC P-256 且 server SAN 含新机 IP（`deploy_cloud.sh` 自动处理，勿手动 RSA）；脚本/文档中的 `36.151.146.71` 为默认值，新机一律以 `--ip` + 一键导入生成的配置为准。
 
 ## 文档索引
 
 - **使用手册**：应用内「帮助 → 使用手册」，按操作逻辑讲解界面分区、菜单、工具条、3D 场景、检视器、设备、策略、仿真、流程编排、命令行、碳市场、报告与快捷键；
 - **技术文档**：应用内「帮助 → 技术文档」，讲解系统架构、碳素流仿真引擎、碳排放核算、能耗计算、设备库、自然语言解析、LLM 智能体、TFT 算法、设备耦合、实时遥测、数据契约、仿真协议、碳市场行情与市场快讯服务；
-- **`docs/` 目录**：架构与业务逻辑梳理、可编辑流程编排方案（设计期文档）。
+- **`platform/doc-deploy/docs/` 目录**：架构与业务逻辑梳理、可编辑流程编排方案（设计期文档，随文档站同仓管理）。
 
 ## 常见问题
 
