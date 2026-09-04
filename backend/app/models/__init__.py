@@ -125,6 +125,10 @@ class SimTotals(BaseModel):
     energy_intensity: float = 0.0   # kgce/t 单位产品综合能耗
     elec: float = 0.0               # MWh/h 全厂外购电耗
     fuel_energy: float = 0.0        # GJ/h 全厂燃料能耗
+    # 外购原燃料/动力量汇总（成本核算 = 用量 × 单价）：
+    #   iron_ore/coke/coal/limestone/scrap/electrode/biomass 单位 t/h；electricity MWh/h；ngas m³/h
+    #   coke 为「焦炭需求 − 焦炉自产」后的外购差额
+    purchases: Dict[str, float] = Field(default_factory=dict)
 
 
 class SimResult(BaseModel):

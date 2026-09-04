@@ -46,6 +46,17 @@ def _electrode_formula(electrode: float, co2: float, cfg: Dict) -> str:
     return f"{electrode:.2f} t × {cfg['electrode_ef']} tCO₂/t = {co2:.0f} tCO₂/h"
 
 
+def _purchases(r: Dict, **kw: float) -> None:
+    """登记本工序外购原燃料消耗（固体按 t/h 计），供全厂成本核算（用量 × 单价）。
+
+    物料 id 与前端 flowLibrary.MATERIALS 对齐（iron_ore/coke/coal/limestone/scrap/
+    electrode/biomass…）；外购电力(MWh/h)与天然气(m³/h)由 simulate 统一自动汇总，无需在此登记。
+    """
+    buy = {k: round(float(v), 3) for k, v in kw.items() if v and float(v) > 1e-9}
+    if buy:
+        r["purchases"] = buy
+
+
 def calc_sinter(p, cfg=DEFAULT_FACTORS):
     ore = p.get("ore_rate", 0.0)
     fuel_t = p.get("fuel_rate", 0.0) * ore / 1000.0          # t/h 固体燃料
@@ -63,6 +74,7 @@ def calc_sinter(p, cfg=DEFAULT_FACTORS):
              formula=_elec_formula(elec, indirect, cfg)),
     ]
     r["notes"] = ["烧结碳排主要来自燃料燃烧(范围一)与电耗(范围二)"]
+    _purchases(r, coal=fuel_t, iron_ore=ore)   # 外购：铁矿石(处理矿量) + 固体燃料
     return r
 
 
@@ -83,6 +95,7 @@ def calc_pellet(p, cfg=DEFAULT_FACTORS):
              formula=_elec_formula(elec, indirect, cfg)),
     ]
     r["notes"] = ["球团工序碳排低于烧结，是更清洁的炉料准备方式"]
+    _purchases(r, coal=fuel_t, iron_ore=ore)   # 外购：铁矿石(处理矿量) + 固体燃料
     return r
 
 
@@ -111,6 +124,7 @@ def calc_coke(p, cfg=DEFAULT_FACTORS):
     ]
     r["notes"] = ["焦炉约 75% 的碳进入焦炭(后续入高炉)，作为中间产品碳离开本工序",
                   "焦炭产品碳已按物料连线流入高炉（焦炭碳节点 → 高炉），构成 煤→焦炉→高炉 碳素流闭环；高炉焦炭外源仅含自产不足部分"]
+    _purchases(r, coal=coal)                 # 外购：入炉炼焦煤（自产焦炭成本随煤计入）
     return r
 
 
@@ -305,6 +319,8 @@ def calc_bf(p, cfg=DEFAULT_FACTORS):
             f" → 推算焦比 {op_info['coke_rate_derived']} kg/t、煤比 {op_info['coal_inj_derived']} kg/t"
             f"（基准 {op_info['coke_rate_base']}/{op_info['coal_inj_base']} kg/t）")
     r["notes"] = notes
+    _purchases(r, coke=coke_t, coal=coal_t,           # 外购：焦炭(需求−焦炉自产差额于 simulate 补正)/喷吹煤
+               limestone=flux["limestone"] + flux["dolomite"])  # 外购：熔剂（石灰石+白云石）
     return r
 
 
@@ -337,6 +353,7 @@ def calc_h2bf(p, cfg=DEFAULT_FACTORS):
     r["notes"] = ["以 H₂ 替代焦炭作还原剂，直接碳排极低；碳排主要来自制氢电耗",
                   "氢冶金铁水几乎不渗碳，溶解碳远低于常规高炉",
                   "若制氢采用绿电，则该环节近零碳"]
+    _purchases(r, coal=coal_t)               # 外购：少量补偿煤
     return r
 
 
@@ -414,6 +431,7 @@ def calc_smelt(p, cfg=DEFAULT_FACTORS):
     ]
     r["notes"] = ["熔融还原以非炼焦煤粉为还原剂与燃料，省去焦炉，但直接碳排仍较高",
                   "可与 CCS/绿电耦合进一步降碳"]
+    _purchases(r, coal=coal_t, iron_ore=ore) # 外购：非炼焦煤粉 + 铁矿石
     return r
 
 
@@ -438,6 +456,7 @@ def calc_biochar(p, cfg=DEFAULT_FACTORS):
     r["notes"] = ["生物质碳来自大气 CO₂ 光合固碳，生命周期视为净零，可抵消等量化石碳排",
                   "属未来减排工艺（BECCS 思路）",
                   "生物质碳/能量已计入碳素流与能流桑基图（源：生物质碳/生物质），碳排放按 0 计"]
+    _purchases(r, biomass=biomass)           # 外购：生物质碳（破碎/输送/喷吹用电已按电力自动汇总）
     return r
 
 
@@ -474,6 +493,8 @@ def calc_bof(p, cfg=DEFAULT_FACTORS):
     r["notes"] = ["脱碳反应将金属料中的碳氧化为 CO₂，是转炉主要直接排放源",
                   "炉渣带走碳（渣含碳约 1.5%）随钢渣排出，不计入 CO₂ 排放，物料平衡须单独扣减",
                   "提高废钢比可降低单位碳排"]
+    _purchases(r, scrap=scrap,               # 外购：废钢（铁水为中间产品不购）
+               limestone=flux["limestone"] + flux["dolomite"])  # 外购：熔剂（石灰石+白云石）
     return r
 
 
@@ -511,6 +532,8 @@ def calc_eaf(p, cfg=DEFAULT_FACTORS):
     r["notes"] = ["以废钢/DRI 为原料，直接碳排很低，碳排主要来自电耗与电极消耗",
                   "使用绿电+高废钢比可实现近零碳电炉钢",
                   "钢水含碳高于金属料时，差额由电极溶解/喂碳补足（已计入 carbon_in，不额外排放）"]
+    _purchases(r, scrap=scrap,               # 外购：废钢（DRI 视中间产品，随物料连线已由前道计入）
+               electrode=electrode)          # 外购：石墨电极
     return r
 
 

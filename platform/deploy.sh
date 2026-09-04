@@ -1,44 +1,41 @@
 #!/usr/bin/env bash
 # ============================================================================
-# 能碳全平台 · 统一部署入口（platform/deploy.sh）
+# 能碳全平台 · 部署入口（platform/deploy.sh）
 #
-# 各部署目标脚本统一收口（各司其职，目录即部署单元）：
-#   bs-deploy/     平台自身前后端（服务器 Docker 部署：bs = back-stage/platform）
-#   portal-deploy/ 平台门户静态站点（官网 nengyousuan.com 更新 / 服务器独立安装）
-#   doc-deploy/    文档站源码 + 源文档 + 更新部署（docs-site + docs）
-#   cloud-deploy/  云端 KubeEdge 控制面 / 数据面 / TDengine / cloud-agent
-#   box-deploy/    边缘盒子（一体机）部署包
-#   mac/windows-deploy/   桌面客户端打包
+# 面向【全新部署 / 首次安装 / 接入 / 打包】类操作；日常更新请走
+# platform/update.sh（代码同步 / 内容发布）。两类脚本与各部署单元统一
+# 命名一致：deploy.sh = 第一次部署环境；update.sh = 后续更新代码。
+#
+# 目标服务器地址统一配置在 platform/servers.conf，本脚本不内嵌 IP；
+# 目标机执行类（server/cloud/box 等）在目标机器 root 下运行。
 #
 # 用法：bash platform/deploy.sh <目标> [脚本参数...]
 #
-#   目标       功能                                     脚本（在哪台机器执行）
-#   ----------  --------------------------------------   --------------------------
-#   bs|platform 平台前后端：本地同步 + 部署到 71          bs-deploy/sync.sh（开发机）
-#   server      平台全新服务器一键部署                    bs-deploy/server.sh（目标机 root）
-#   update      平台服务器更新（数据安全备份+重建）       bs-deploy/update.sh（目标机 root）
-#   push        提交并推送到 GitHub                      bs-deploy/push.sh（开发机）
-#   cloud       云端控制面/数据面/时序库/agent            cloud-deploy/deploy_cloud.sh（云机 root）
-#   box         盒子 GitHub 在线一键接入                 box-deploy/box.sh（盒子 root）
-#   deploy-box  盒子完整离线部署（依赖+mapper+mosquitto） box-deploy/deploy_box.sh（盒子 root）
-#   migrate-box 盒子换云迁移（免手工签发证书）            box-deploy/migrate-box.sh（盒子 root）
-#   mac         桌面客户端 macOS 打包                    mac-deploy/build_mac.sh（本机）
-#   windows     桌面客户端 Windows 打包                  windows-deploy/build_windows.bat（Win）
-#   portal      门户官网内容更新（→ 线上 nengyousuan.com）  portal-deploy/sync-portal.sh（开发机）
-#   portal-install 门户独立站点安装（systemd 常驻服务）        portal-deploy/deploy.sh（开发机）
-#   docs        文档站 + 源文档更新（→ 71:40184 容器）      doc-deploy/sync-docs.sh（开发机）
-#   list        列出部署矩阵（默认无参数时显示）
+#   目标          功能                                    脚本（在哪台机器执行）
+#   ------------  ---------------------------------------  --------------------------
+#   server        平台全新服务器一键部署                    bs-deploy/deploy.sh（目标机 root）
+#   cloud         云端控制面/数据面/时序库/agent            cloud-deploy/deploy_cloud.sh（云机 root）
+#   box           盒子 GitHub 在线一键接入                  box-deploy/box.sh（盒子 root）
+#   deploy-box    盒子完整离线部署（依赖+mapper+mosquitto） box-deploy/deploy_box.sh（盒子 root）
+#   migrate-box   盒子换云迁移                              box-deploy/migrate-box.sh（盒子 root）
+#   portal-install 门户独立站点安装（systemd 常驻）         portal-deploy/deploy.sh（开发机）
+#   docs-install  文档站首次拉起/重建                       doc-deploy/deploy.sh（开发机）
+#   nginx         官网域名反代网关配置下发                  nginx-deploy/deploy.sh（开发机）
+#   mac           macOS 桌面客户端打包                      mac-deploy/build_mac.sh（本机）
+#   windows       Windows 桌面客户端打包                    windows-deploy/build_windows.bat（Win）
+#   list          列出本入口支持的部署矩阵（默认无参数时显示）
 #
 # 示例：
-#   bash platform/deploy.sh bs --no-git                          # 同步 71 且不提交 git
-#   bash platform/deploy.sh bs "feat: xxx"                        # 同步 + 指定提交信息
+#   bash platform/deploy.sh server
 #   bash platform/deploy.sh box -i 36.151.146.71 -n my-box-01 -t <token>
 # ============================================================================
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONF="$DIR/servers.conf"                       # 服务器地址集中配置
+[ -f "$CONF" ] && . "$CONF" || true
 
 usage() {
-  sed -n '6,30p' "$0" | sed 's/^# \{0,1\}//'
+  awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
   exit 0
 }
 
@@ -47,26 +44,14 @@ TARGET="$1"
 shift
 
 case "$TARGET" in
-  bs|platform)
-    echo "==> 平台前后端同步部署（本机执行 → 71 服务器源码卷挂载 + reload）"
-    exec bash "$DIR/bs-deploy/sync.sh" "$@"
-    ;;
   server)
-    echo "==> 平台全新服务器一键部署"
-    echo "    请在目标服务器 root 下执行；curl 版：bash <(curl -fsSL https://raw.githubusercontent.com/zhibinQiu/power_simulation/master/platform/bs-deploy/server.sh) $*"
-    exec bash "$DIR/bs-deploy/server.sh" "$@"
-    ;;
-  update)
-    echo "==> 平台服务器更新（备份现场数据 → git pull → 重建 → 自检）"
-    echo "    请在已部署服务器 root 下执行"
-    exec bash "$DIR/bs-deploy/update.sh" "$@"
-    ;;
-  push)
-    exec bash "$DIR/bs-deploy/push.sh" "$@"
+    echo "==> 平台全新服务器一键部署（仅需 Docker）"
+    echo "    请在目标服务器 root 下执行；curl 版：bash <(curl -fsSL https://raw.githubusercontent.com/zhibinQiu/power_simulation/master/platform/bs-deploy/deploy.sh) $*"
+    exec bash "$DIR/bs-deploy/deploy.sh" "$@"
     ;;
   cloud)
-    echo "==> 云端部署（控制面/数据面/TDengine/agent）"
-    echo "    请在云端服务器（36.151.146.71）root 下执行"
+    echo "==> 云端部署（K3s 控制面 / 数据面 / TDengine / cloud-agent）"
+    echo "    请在云端服务器（${CLOUD_IP:-36.151.146.71}）root 下执行"
     exec bash "$DIR/cloud-deploy/deploy_cloud.sh" "$@"
     ;;
   box)
@@ -84,6 +69,20 @@ case "$TARGET" in
     echo "    请在盒子 root 下执行"
     exec bash "$DIR/box-deploy/migrate-box.sh" "$@"
     ;;
+  portal-install)
+    echo "==> 门户独立站点安装（默认 ${PORTAL_SSH:-root@36.151.146.71}:${PORTAL_PORT:-40200}，systemd 常驻）"
+    echo "    用法：bash platform/deploy.sh portal-install [-s root@<服务器>] [-p <端口>]"
+    exec bash "$DIR/portal-deploy/deploy.sh" "$@"
+    ;;
+  docs-install)
+    echo "==> 文档站首次拉起/重建（复用 doc-deploy/update.sh 幂等链路，容器缺失自动构建）"
+    exec bash "$DIR/doc-deploy/deploy.sh" "$@"
+    ;;
+  nginx)
+    echo "==> 官网域名反代网关配置下发（本机执行 → ${WEB_SSH:-root@43.161.194.75} nginx）"
+    echo "    源配置：platform/nginx-deploy/nengyousuan.conf（自动备份 + nginx -t 校验 + reload）"
+    exec bash "$DIR/nginx-deploy/deploy.sh" "$@"
+    ;;
   mac)
     echo "==> macOS 桌面客户端打包"
     exec bash "$DIR/mac-deploy/build_mac.sh" "$@"
@@ -93,26 +92,11 @@ case "$TARGET" in
     echo "    cd platform/windows-deploy && build_windows.bat $*"
     exit 0
     ;;
-  portal)
-    echo "==> 平台门户官网内容更新（本机执行 → 线上 https://www.nengyousuan.com）"
-    echo "    门户源码：platform/portal-deploy/（脚本自身即更新器；免密 SSH 或 export QZB_SSH_PASS=密码）"
-    exec bash "$DIR/portal-deploy/sync-portal.sh" "$@"
-    ;;
-  portal-install)
-    echo "==> 门户独立站点安装（默认 71:/opt/nengtan-portal 端口 40200，systemd 常驻）"
-    echo "    用法：bash platform/deploy.sh portal-install [-s root@<服务器>] [-p <端口>]"
-    exec bash "$DIR/portal-deploy/deploy.sh" "$@"
-    ;;
-  docs)
-    echo "==> 文档站 + 源文档更新部署（本机执行 → 71:40184 文档站容器）"
-    echo "    内容：platform/doc-deploy/（docs-site 站点 + docs 源文档）"
-    exec bash "$DIR/doc-deploy/sync-docs.sh" "$@"
-    ;;
-  list|-l|--list)
+  list|-l|--list|-h|--help|-help)
     usage
     ;;
   *)
-    echo "[error] 未知目标：$TARGET（bash platform/deploy.sh list 查看全部）" >&2
+    echo "[error] 未知目标：${TARGET}（bash platform/deploy.sh list 查看全部）" >&2
     exit 1
     ;;
 esac

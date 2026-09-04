@@ -216,6 +216,7 @@ def simulate(model: ProcessModel, factors: Dict = None) -> SimResult:
     totals["energy_total"] = 0.0
     totals["elec"] = 0.0
     totals["fuel_energy"] = 0.0
+    totals["purchases"] = {}
 
     raw = _raw_units(model, cfg)
     max_co2 = 1.0
@@ -233,10 +234,22 @@ def simulate(model: ProcessModel, factors: Dict = None) -> SimResult:
         totals["energy_total"] += res["energy_total"]
         totals["elec"] += res["elec"]
         totals["fuel_energy"] += res["fuel_energy"]
+        # 外购原燃料（calc 登记）+ 电力 + 天然气（台账 m³/h 即天然气，统一自动汇总）
+        for k, v in (res.get("purchases") or {}).items():
+            totals["purchases"][k] = totals["purchases"].get(k, 0.0) + v
+        totals["purchases"]["electricity"] = totals["purchases"].get("electricity", 0.0) + res["elec"]
+        for it in res.get("ledger", []):
+            if it.get("qty_unit") == "m³/h":
+                totals["purchases"]["ngas"] = totals["purchases"].get("ngas", 0.0) + float(it.get("qty", 0.0) or 0.0)
         # 钢产量：仅统计"金属/成品"类工序（铁水、钢水、DRI、成品材），
         # 排除原料类工序（烧结/球团/焦炭/生物质），避免其产品量被误认为钢产量
         if u.type in _OUTPUT_METAL_TYPES and res["steel_output"] > totals["steel_output"]:
             totals["steel_output"] = res["steel_output"]
+
+    # 焦炭外购差额：全厂焦炭需求 − 焦炉自产（自产供不足部分才外购，避免入炉煤与焦炭双计）
+    coke_self = sum((res.get("steel_output", 0.0) or 0.0) for u, res, _p in raw if u.type == "coke_oven")
+    totals["purchases"]["coke"] = max(totals["purchases"].get("coke", 0.0) - coke_self, 0.0)
+    totals["purchases"] = {k: round(v, 3) for k, v in totals["purchases"].items() if v and v > 1e-6}
 
     # 热力图归一化 + 组装 UnitResult
     for u, res, params in raw:
@@ -284,6 +297,7 @@ def simulate(model: ProcessModel, factors: Dict = None) -> SimResult:
         energy_intensity=round(energy_intensity, 1),
         elec=round(totals["elec"], 1),
         fuel_energy=round(totals["fuel_energy"], 1),
+        purchases=dict(totals["purchases"]),
     )
     flows = list(getattr(model, "flows", None) or [])
     sankey = build_sankey(raw, flows)

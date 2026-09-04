@@ -278,6 +278,13 @@ body.compact .nav-item > a{padding:.38em .82em;font-size:1.5rem}
 .dl-drop a{display:flex;justify-content:space-between;align-items:center;gap:.8em;padding:.7em .9em;font-family:var(--f-head);font-size:1.45rem;font-weight:600;color:var(--ink);transition:.12s}
 .dl-drop a small{font-family:var(--f-body);font-weight:400;font-size:1.2rem;color:#8a8a8a}
 .dl-drop a:hover{background:var(--gray)}
+/* 网页版线路选择下拉 */
+.web-drop{min-width:31rem}
+.web-drop a{display:block;justify-content:flex-start;align-items:stretch;gap:0;padding:.9em 1.1em}
+.web-drop a .ln-name{display:block;font-family:var(--f-head);font-size:1.45rem;font-weight:700;color:var(--ink);line-height:1.2}
+.web-drop a .rec{display:inline-block;margin-left:.5em;font-family:var(--f-body);font-style:normal;font-size:1.05rem;font-weight:400;color:#fff;background:var(--accent);border-radius:.3em;padding:.15em .55em;vertical-align:1px}
+.web-drop a .ln-url{display:block;font-family:var(--f-body);font-size:1.2rem;color:#8a8a8a;margin-top:.3rem;word-break:break-all}
+.web-drop a:hover .ln-name{color:var(--accent)}
 /* 选项卡 */
 .hero-tabs{position:sticky;top:var(--hhc);z-index:90;background:#fff;border-bottom:0.1rem solid var(--line);margin-top:-6.4rem}
 .hero-tabs .wrap{width:min(calc(100% - 3.2rem),var(--w-wide));display:flex;gap:0}
@@ -541,7 +548,19 @@ footer ul a:hover{color:var(--accent)}
     <h1 data-page-node-id="UEn8Sb1A1nA7DqfXZBWuZA">工业能碳智控平台 <span class="hero-ver" data-page-node-id="VQSmQVLnVDVJvFIPIzG3eT">v2.0.0</span></h1>
     <p data-page-node-id="CMvt7ytVDYeV5HqM0QwzEZ">我们为您的能碳难题而来，平台软硬件资源全面开放，费用按效果负责。</p>
     <div class="hero-cta" data-page-node-id="XnrzZ484x8ux3xg6TR9DI8">
-      <a class="btn" href="http://36.151.146.71:40014/" target="_blank" rel="noopener" data-page-node-id="A2XMZ4xDK8Smpn5uudcukj">网页版 <span class="arr" data-page-node-id="hgy2DR6GVtRmHzDeHNiMdH">▸</span></a>
+      <div class="dl-wrap" id="webWrap" data-page-node-id="A2XMZ4xDK8Smpn5uudcukj">
+        <a class="btn" href="javascript:void(0)" id="webBtn" data-page-node-id="hgy2DR6GVtRmHzDeHNiMdH">网页版 <span class="caret">▾</span></a>
+        <div class="dl-drop web-drop">
+          <a href="https://www.nengyousuan.com/sim/" target="_blank" rel="noopener" title="主站：域名访问（推荐）">
+            <span class="ln-name">线路一 · 主站 <em class="rec">推荐</em></span>
+            <span class="ln-url">https://www.nengyousuan.com/sim/</span>
+          </a>
+          <a href="http://36.151.146.71:40014/sim/" target="_blank" rel="noopener" title="备选体验站：IP 直连">
+            <span class="ln-name">线路二 · 备选体验站</span>
+            <span class="ln-url">http://36.151.146.71:40014/sim/</span>
+          </a>
+        </div>
+      </div>
       <div class="dl-wrap" id="dlWrap" data-page-node-id="4rehqY43oDx6DBdpU262p8">
         <a class="btn-outline" href="javascript:void(0)" id="dlBtn" data-page-node-id="ca9y5EMChL1RymfWztvKO9">客户端下载 <span class="caret" data-page-node-id="IbvRkcJM5u1DK49MjGOvC3">▾</span></a>
         <div class="dl-drop" data-page-node-id="81a6VPlDvTtJd5IgZ9inB4">
@@ -931,6 +950,16 @@ document.getElementById('dlBtn').addEventListener('click', function(e){
 });
 document.addEventListener('click', function(e){
   if(dlWrap && !dlWrap.contains(e.target)) dlWrap.classList.remove('open');
+});
+
+/* 网页版线路下拉：点击切换，点击外部关闭 */
+var webWrap = document.getElementById('webWrap');
+document.getElementById('webBtn').addEventListener('click', function(e){
+  e.preventDefault();
+  webWrap.classList.toggle('open');
+});
+document.addEventListener('click', function(e){
+  if(webWrap && !webWrap.contains(e.target)) webWrap.classList.remove('open');
 });
 
 /* 搜索展开框 */

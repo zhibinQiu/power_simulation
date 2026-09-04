@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 # ============================================================================
-# 能碳智控平台 · 全新服务器一键部署（源码卷挂载 + reload · 免 pip/npm/node）
+# 能碳智控平台 · 全新服务器一键部署（源码卷挂载 + reload · 仅需 Docker）
 #
 # 服务器只需安装 Docker；镜像只固化 Python 运行环境（依赖），业务代码
-# backend/ 与前端产物 frontend/dist、文档站 platform/doc-deploy/docs-site/dist 均已入库并随仓库克隆：
+# backend/ 与前端产物 frontend/dist、文档站 platform/doc-deploy/docs-site/dist 均入库并随仓库克隆：
 #   - docker compose up -d --build 首次构建运行环境镜像（仅 Python 依赖层）
 #   - 容器以卷挂载 backend/ + frontend/dist 运行，容器内 uvicorn --reload
-#   - 日常更新 = git pull / rsync 代码（后端 reload 秒级生效，前端产物已入库）
-# 不再像旧版那样在服务器装 python3-venv/npm/node_modules/vite，大幅省资源。
+#   - 日常更新走 update.sh（开发机 rsync / 服务器 git pull），后端 reload 秒级生效
 #
 # 用法（服务器 root，Ubuntu/Debian/CentOS）：
-#   curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/platform/bs-deploy/server.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/platform/bs-deploy/deploy.sh | bash
 #   自定义仓库 / 分支 / 目录 / 端口：
 #   curl -fsSL <同上> | bash -s -- -r gitee.com/user/mirror -b main -d /opt/carbon-platform
 #
@@ -38,7 +37,7 @@ usage() {
 能碳智控平台 · 全新服务器一键部署（源码卷挂载 + uvicorn --reload）
 
 用法（root）：
-  curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/platform/bs-deploy/server.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/platform/bs-deploy/deploy.sh | bash
   curl -fsSL <同上> | bash -s -- -d /opt/carbon-platform -p 40014
 
 选项：
@@ -63,7 +62,7 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$REPO" ] && [ -n "$BRANCH" ] || { echo "[error] 仓库地址不能为空" >&2; exit 1; }
 
-log() { echo -e "\033[32m[deploy:server]\033[0m $*"; }
+log() { echo -e "\033[32m[deploy]\033[0m $*"; }
 err() { echo -e "\033[31m[error]\033[0m $*" >&2; exit 1; }
 
 # ---------- 0. root 与 docker ----------
@@ -80,10 +79,10 @@ fi
 command -v docker compose >/dev/null 2>&1 || command -v docker-compose >/dev/null 2>&1 \
   || err "缺少 docker compose 插件（Docker ≥ 20.10 自带，重装 docker 即可）"
 
-# ---------- 1. 拉取源码（仅取部署编排 + 数据/配置模板） ----------
+# ---------- 1. 拉取源码 ----------
 if [ -d "$INSTALL_DIR/.git" ]; then
   log "目录已是 git 仓库：$INSTALL_DIR"
-  log "已部署实例请使用「更新脚本」：platform/bs-deploy/update.sh（备份现场数据后安全更新）"
+  log "已部署实例请使用更新脚本：platform/bs-deploy/update.sh"
   exit 0
 fi
 mkdir -p "$(dirname "$INSTALL_DIR")"
@@ -116,7 +115,7 @@ if docker ps --format '{{.Names}}' | grep -qx "$NAME"; then
   log "  访问地址：http://${IP:-<服务器IP>}:$PORT"
   log "  文档站  ：http://${IP:-<服务器IP>}:40184"
   log "  日志查看：docker logs -f $NAME"
-  log "  更新     ：platform/bs-deploy/update.sh（git pull + docker compose up -d --build）"
+  log "  更新     ：platform/bs-deploy/update.sh（开发机 rsync / 服务器 git 拉取）"
   log "  备注：平台如需连接云端 MQTT / cloud-agent，在「总览 → 配置」填写云端地址即可"
 else
   err "平台容器启动失败，请查看：docker compose logs"

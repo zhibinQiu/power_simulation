@@ -13,6 +13,7 @@
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
+    <!-- 相对引用：配合 base=/docs/（dev 经 /docs/ 路径访问，vite 按相对当前页解析） -->
+    <script type="module" src="./src/main.js"></script>
   </body>
 </html>

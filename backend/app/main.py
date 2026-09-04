@@ -19,9 +19,10 @@ from __future__ import annotations
 import os
 import sys
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import mqtt_source
@@ -94,6 +95,45 @@ def _frontend_dist_dir() -> str:
 FRONTEND_DIST = _frontend_dist_dir()
 
 
+# ------------------------- 文档站反向代理（宣传手册/使用手册/技术文档） -------------------------
+# 文档站（docs-site，独立 vite 站点）并入平台【同源】访问：浏览器只访问平台端口
+# （如 40014），平台后端把 /docs/* 原样转发（保留前缀）到独立文档站服务，
+# 页面与静态资源一律经平台出口，不再要求文档站端口（40184）对外开放（云安全组免配）。
+# 目标地址用环境变量 DOCS_PROXY_TARGET 覆盖：
+#   - 71 生产（steel-twin 容器）：http://docs-site:40183（compose 同网络服务名，见
+#     platform/bs-deploy/docker-compose.yml）
+#   - 本地开发（默认）：http://127.0.0.1:5174（docs-site vite dev server）
+_DOCS_PROXY_TARGET = os.getenv("DOCS_PROXY_TARGET", "http://127.0.0.1:5174").rstrip("/")
+_docs_client: httpx.AsyncClient | None = None
+
+
+def _docs_client_get() -> httpx.AsyncClient:
+    """惰性创建转发客户端（上游仅 GET/HEAD 静态服务，复用连接）。"""
+    global _docs_client
+    if _docs_client is None:
+        _docs_client = httpx.AsyncClient(base_url=_DOCS_PROXY_TARGET, timeout=15.0, follow_redirects=False)
+    return _docs_client
+
+
+# 必须声明在下方 SPA catch-all（/{full_path:path}）之前，否则 /docs/* 会被吞进前端回退
+@app.api_route("/docs", methods=["GET", "HEAD"])
+@app.api_route("/docs/{doc_path:path}", methods=["GET", "HEAD"])
+async def docs_site_proxy(doc_path: str = ""):
+    """把 /docs/{doc_path} 请求转发到独立文档站，作为平台同源入口。
+
+    上游（docs-site dev server / 容器）以 /docs/ 为 base，路径必须带尾斜杠，
+    故 /docs 与 /docs/ 统一转发为 /docs/（首页），子路径为 /docs/{sub}。
+    """
+    upstream_path = "/docs/" if not doc_path else "/docs/" + doc_path.lstrip("/")
+    try:
+        upstream = await _docs_client_get().get(upstream_path)
+    except httpx.HTTPError:
+        return Response(content='{"detail": "docs site unreachable"}', status_code=502, media_type="application/json")
+    headers = {k: v for k, v in upstream.headers.items()
+               if k.lower() not in ("content-length", "transfer-encoding", "connection", "keep-alive")}
+    return Response(content=upstream.content, status_code=upstream.status_code, headers=headers)
+
+
 # ------------------------- 实时遥测（WebSocket + 设备历史） -------------------------
 realtime.register_realtime(app)
 
@@ -103,6 +143,13 @@ realtime.register_realtime(app)
 _assets_dir = os.path.join(FRONTEND_DIST, "assets")
 if os.path.isdir(_assets_dir):
     app.mount("/assets", StaticFiles(directory=_assets_dir), name="assets")
+
+# base=/sim/ 双入口兼容：门户域名反代（www.nengyousuan.com/sim/，nginx 剥离 /sim 前缀后
+# 走上面的 /assets 或根路径）与 IP:40014 直连（浏览器资源引用为 /sim/*）均需可用。
+# 直连时后端须能按 /sim 前缀命中同一份 dist，故此处把 /sim 也挂载到 dist 根目录
+# （html=True：/sim/ 返回 index.html，/sim/assets/* 落盘命中）。注册在 SPA catch-all 之前。
+if os.path.isdir(FRONTEND_DIST):
+    app.mount("/sim", StaticFiles(directory=FRONTEND_DIST, html=True), name="sim-frontend")
 
 if os.path.isdir(FRONTEND_DIST):
     @app.get("/{full_path:path}")

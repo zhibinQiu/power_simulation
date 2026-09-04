@@ -216,28 +216,15 @@ function onExport() {
   })
   pushCmd(t('已打开右侧报告面板：请配置标题、引擎与分析深度后点击「生成报告」。'), 'out')
 }
-// 打开独立文档网站（宣传手册 / 使用手册 / 技术文档已脱离平台，作为独立服务跳转）
-// 文档站与平台同机直出公网（http://36.151.146.71:40184），跳转链接固定使用公网地址；
-// 开发态（vite dev）指向本地文档站 dev server（5174）。
+// 打开独立文档网站（宣传手册 / 使用手册 / 技术文档）：文档站已并入平台【同源】访问，
+// 统一入口为 /docs/#/<page>（页面路径 /docs/ + hash 路由）：
+//   - 开发态：vite dev 把 /docs 代理到本地 docs-site dev server（127.0.0.1:5174）
+//   - 生产态：平台后端把 /docs 反代到 docs-site 容器
+// 同源跳转无需额外端口（40184 不再对外开放），且 window.open 同步执行于用户手势栈内，
+// 不会被浏览器弹窗拦截。
 function openDocsSite(page = '') {
   const target = page ? '/#/' + page : '/#/'
-  const open = (host) => {
-    const port = import.meta.env.DEV ? 5174 : 40184
-    window.open(`http://${host}:${port}${target}`, '_blank')
-  }
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 4000)
-  fetch('/api/help/site', { signal: ctrl.signal })
-    .then((r) => (r.ok ? r.json() : null))
-    .then((data) => {
-      if (data && data.host) return open(data.host)
-      throw new Error('no host')
-    })
-    .catch(() => {
-      // 后端接口不可用时：直接回退公网文档站入口（36.151.146.71:40184）
-      open('36.151.146.71')
-    })
-    .finally(() => clearTimeout(timer))
+  window.open(`${location.origin}/docs${target}`, '_blank')
 }
 function onAbout() { store.openAbout() }
 

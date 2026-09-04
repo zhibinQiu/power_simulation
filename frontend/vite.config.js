@@ -14,7 +14,11 @@ const cleanDistOldAssets = () => ({
 })
 
 export default defineConfig({
-  base: '/',
+  // 门户 www.nengyousuan.com 以路径前缀 /sim/ 反代本平台（71 服务器未备案，域名不可直连，只能经已备案门户转发）。
+  // 注意：base 改为 /sim/ 后 http://36.151.146.71:40014 的 IP 直连将失效（资源变 /sim/assets/*），
+  //       对外入口收敛为 https://www.nengyousuan.com/sim/（门户 nginx 剥离 /sim 前缀后转发到 71:40014）。
+  //       如需恢复直连 / 子域名整站代理，改回 '/' 重新构建即可。
+  base: '/sim/',
   plugins: [vue(), cleanDistOldAssets()],
   server: {
     host: '127.0.0.1',
@@ -26,6 +30,9 @@ export default defineConfig({
       '/box': { target: 'http://127.0.0.1:8010', changeOrigin: true },
       // 报告新页面（/report/<id>）也由后端渲染，开发期代理到后端
       '/report': { target: 'http://127.0.0.1:8010', changeOrigin: true },
+      // 独立文档站（宣传手册/使用手册/技术文档）：同源 /docs/* 代理到本地 docs-site dev server
+      // （5174，base=/docs/，保留前缀原样转发；生产由后端反代，行为一致）
+      '/docs': { target: 'http://127.0.0.1:5174', changeOrigin: true },
     },
   },
   build: {

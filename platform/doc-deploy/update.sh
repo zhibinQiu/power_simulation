@@ -1,31 +1,34 @@
 #!/usr/bin/env bash
 # ============================================================================
-# 能碳平台 · 文档站/文档更新部署脚本（platform/doc-deploy/sync-docs.sh，开发机执行）
+# 能碳平台 · 文档站/文档更新脚本（platform/doc-deploy/update.sh，开发机执行）
 #
 # 职责：文档站（platform/doc-deploy/docs-site，宣传手册/使用手册/技术文档）
-#       与源文档（platform/doc-deploy/docs）同步发布到 71 服务器，并让运行中的
-#       docs-site 容器（http://36.151.146.71:40184）立即加载新内容：
+#       与源文档（platform/doc-deploy/docs）同步发布到平台机（目标见
+#       platform/servers.conf PLATFORM_SSH/PLATFORM_DIR/DOCS_PORT），并让运行中的
+#       docs-site 容器立即加载新内容：
 #         ① 本机构建 docs-site/dist（npx vite build）
-#         ② rsync platform/doc-deploy/ 与构建编排文件 → 71 仓库根
+#         ② rsync platform/doc-deploy/ 与构建编排文件 → 平台机仓库根
 #         ③ 编排/镜像输入有变更 → docker compose up -d --build docs-site
 #            （仅首次或 compose/Dockerfile.docs 变更时）
 #            无变更 → docker compose restart docs-site（dist 卷挂载即生效）
 #         ④ 健康自检
 #
 # 用法（仓库根任一路径执行均可，脚本自动定位仓库根）：
-#   bash platform/deploy.sh docs                        # 更新部署（推荐统一入口）
-#   bash platform/doc-deploy/sync-docs.sh               # 直接调用
+#   bash platform/update.sh docs                        # 文档站更新（推荐统一入口）
+#   bash platform/doc-deploy/update.sh                  # 直接调用
 #
 # 服务器免密说明：默认 BatchMode=yes 走 SSH 密钥；未配置密钥时可用
-#   export QZB_SSH_PASS='<密码>' bash platform/doc-deploy/sync-docs.sh
+#   export QZB_SSH_PASS='<密码>' bash platform/doc-deploy/update.sh
 # ============================================================================
 set -euo pipefail
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SELF_DIR/../.." && pwd)"
 cd "$ROOT"
+CONF="$ROOT/platform/servers.conf"      # 服务器地址集中配置（platform/servers.conf）
+[ -f "$CONF" ] && . "$CONF" || true
 
-SERVER="${DOC_SERVER:-root@36.151.146.71}"   # 文档站随平台同机
-SERVER_DIR="/root/qzb/jianpai"                # 服务器仓库根
+SERVER="${DOC_SERVER:-${PLATFORM_SSH:-root@36.151.146.71}}"   # 文档站随平台同机（servers.conf PLATFORM_SSH）
+SERVER_DIR="${PLATFORM_DIR:-/root/qzb/jianpai}"                # 服务器仓库根（servers.conf PLATFORM_DIR）
 BS_DIR="platform/bs-deploy"                   # 服务器构建编排目录（相对仓库根）
 DOC_SITE="platform/doc-deploy/docs-site"
 DOC_DIR="platform/doc-deploy"
@@ -53,7 +56,7 @@ command -v rsync >/dev/null 2>&1 || { echo "❌ 缺少 rsync" >&2; exit 1; }
 [ -f "$DOC_SITE/package.json" ] || { echo "❌ 未找到文档站源码（应在 platform/doc-deploy/docs-site/）" >&2; exit 1; }
 
 echo "==> 文档站更新部署：$DOC_DIR → $SERVER:$SERVER_DIR"
-echo "    服务器访问：http://36.151.146.71:40184"
+echo "    服务器访问：http://${SERVER#*@}:${DOCS_PORT:-40184}"
 
 # ---- [1/4] 本地构建文档站产物 ----
 echo "==> [1/4] 构建文档站产物（$DOC_SITE: npx vite build）..."
@@ -98,7 +101,7 @@ fi
 # ---- [4/4] 健康自检 ----
 echo "==> [4/4] 健康自检..."
 if ssh_run "$SERVER" 'for i in $(seq 1 10); do curl -fsS -m 3 -o /dev/null http://127.0.0.1:40184/ && break; sleep 2; done; curl -m 5 -s -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:40184/'; then
-  echo "✔ 文档站已更新：http://36.151.146.71:40184"
+  echo "✔ 文档站已更新：http://${SERVER#*@}:${DOCS_PORT:-40184}"
 else
   echo "⚠ 自检未通过，请查看：docker logs nengtan-docs-site" >&2
   exit 1

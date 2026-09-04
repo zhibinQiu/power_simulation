@@ -6,21 +6,24 @@
 // 能源类：电网电 0.5703 tCO₂/MWh（2022 年全国电力平均 CO₂ 排放因子）；副产品煤气按发热量折算。
 export const MATERIALS = [
   // 原料
-  { id: 'iron_ore', name: '铁矿石', cat: '原料', unit: 't', color: '#8a9a5b', carbon: 0.02 },
-  { id: 'coke', name: '焦炭', cat: '原料', unit: 't', color: '#5a5a5a', carbon: 3.0 },
-  { id: 'coal', name: '煤', cat: '原料', unit: 't', color: '#6a6a6a', carbon: 2.4 },
-  { id: 'limestone', name: '石灰石', cat: '原料', unit: 't', color: '#c9c2a8', carbon: 0.44 },
-  { id: 'scrap', name: '废钢', cat: '原料', unit: 't', color: '#6f9e74', carbon: 0.1 },
+  // price：外购参考单价（元/单位，行业参考价），供「全厂总览 → 成本 = 外购用量 × 单价」核算；
+  //        可在物料属性中按采购合同调整（随方案持久化）。
+  { id: 'iron_ore', name: '铁矿石', cat: '原料', unit: 't', color: '#8a9a5b', carbon: 0.02, price: 900 },
+  { id: 'coke', name: '焦炭', cat: '原料', unit: 't', color: '#5a5a5a', carbon: 3.0, price: 2100 },
+  { id: 'coal', name: '煤', cat: '原料', unit: 't', color: '#6a6a6a', carbon: 2.4, price: 1200 },
+  { id: 'limestone', name: '石灰石', cat: '原料', unit: 't', color: '#c9c2a8', carbon: 0.44, price: 200 },
+  { id: 'scrap', name: '废钢', cat: '原料', unit: 't', color: '#6f9e74', carbon: 0.1, price: 2600 },
+  { id: 'electrode', name: '石墨电极', cat: '原料', unit: 't', color: '#7a6a8a', carbon: 0.5, price: 40000 },
   { id: 'dri', name: '直接还原铁/热压块铁', cat: '原料', unit: 't', color: '#7d9b6a', carbon: 0.2 },
   { id: 'pig_iron', name: '生铁', cat: '原料', unit: 't', color: '#5f7d52', carbon: 1.6 },
   { id: 'ferroalloy', name: '合金', cat: '原料', unit: 't', color: '#8a7bb0', carbon: 1.5 },
   { id: 'oxygen', name: '氧气', cat: '能源', unit: 'Nm³', color: '#5b83a8', carbon: 0 },
   { id: 'water', name: '水', cat: '原料', unit: 't', color: '#4f97a0', carbon: 0 },
-  { id: 'ngas', name: '天然气', cat: '能源', unit: 'Nm³', color: '#a0a0a0', carbon: 0.00216 },
+  { id: 'ngas', name: '天然气', cat: '能源', unit: 'Nm³', color: '#a0a0a0', carbon: 0.00216, price: 3.2 },
   // 电力类（外购电 / 绿电 / 自发电）；process 模板的 electricity 端口即指向「外购电」
-  { id: 'electricity', name: '外购电', cat: '能源', unit: 'MWh', color: '#e0b24a', carbon: 0.57 },
+  { id: 'electricity', name: '外购电', cat: '能源', unit: 'MWh', color: '#e0b24a', carbon: 0.57, price: 550 },
   { id: 'green_power', name: '绿电', cat: '能源', unit: 'MWh', color: '#3fae7a', carbon: 0.02 },
-  { id: 'biomass', name: '生物质碳', cat: '能源', unit: 't', color: '#7fae5a', carbon: 0.0 },
+  { id: 'biomass', name: '生物质碳', cat: '能源', unit: 't', color: '#7fae5a', carbon: 0.0, price: 400 },
   // 中间产物
   { id: 'sinter', name: '烧结矿', cat: '中间产物', unit: 't', color: '#9a8b5b', carbon: 0.2 },
   { id: 'pellet', name: '球团', cat: '中间产物', unit: 't', color: '#b0a060', carbon: 0.1 },

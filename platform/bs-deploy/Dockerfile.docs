@@ -1,9 +1,12 @@
 # 文档站静态镜像：dist 已入库 + 卷挂载，容器运行期直接读挂载目录
 #   - 首次/全新部署：COPY 一份 dist 进镜像（开箱即用，零构建）
-#   - 日常更新：platform/doc-deploy/sync-docs.sh 构建并 rsync 新 dist 后
+#   - 日常更新：platform/doc-deploy/update.sh 构建并 rsync 新 dist 后
 #     docker compose restart docs-site 即生效（compose 已卷挂载 dist，覆盖镜像内副本）
+#   - 访问：经平台同源 /docs 入口（平台后端反代 → http://docs-site:40183/docs/*），
+#     serve_docs.py 剥 /docs 前缀落盘；根路径直访同样兼容（见 serve_docs.py）
 FROM python:3.11-slim
 WORKDIR /site
 COPY platform/doc-deploy/docs-site/dist/ /site/dist/
+COPY platform/bs-deploy/serve_docs.py /site/serve_docs.py
 EXPOSE 40183
-CMD ["python3", "-m", "http.server", "40183", "--bind", "0.0.0.0", "--directory", "/site/dist"]
+CMD ["python3", "/site/serve_docs.py", "--port", "40183", "--directory", "/site/dist"]

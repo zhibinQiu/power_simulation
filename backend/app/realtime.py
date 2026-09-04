@@ -164,11 +164,27 @@ async def ws_feed(ws: WebSocket):
                 pass
             sim = cached_simulate(model)
             device_readings = _record_devices(sim)
+            # 实时全厂核算：直接/间接排放、能耗与碳利用率必须取自本 tick 的实时仿真结果，
+            # 否则前端「全厂总览」的实时/年度核算会混用静态基线（基线直接排放 + 实时总量）
+            # 造成直接+间接 ≠ 总量、年度量级对不上的假象。故把 totals 全量随遥测帧下发。
+            tt = sim.totals
             payload = {
                 "type": "telemetry",
-                "total_co2": sim.totals.co2_total,
-                "intensity": sim.totals.intensity,
-                "steel_output": sim.totals.steel_output,
+                "total_co2": tt.co2_total,
+                "intensity": tt.intensity,
+                "steel_output": tt.steel_output,
+                "totals": {
+                    "co2_direct": tt.co2_direct,
+                    "co2_indirect": tt.co2_indirect,
+                    "carbon_utilization": tt.carbon_utilization,
+                    "energy_total": tt.energy_total,            # GJ/h
+                    "energy_intensity": tt.energy_intensity,    # kgce/t
+                    "elec": tt.elec,                            # MWh/h
+                    "fuel_energy": tt.fuel_energy,              # GJ/h
+                    "steel_output": tt.steel_output,            # t/h
+                    "intensity": tt.intensity,                  # kgCO₂/t
+                    "purchases": tt.purchases,                  # 外购量 {t/h|MWh/h|m³/h}（成本=用量×单价）
+                },
                 "units": [
                     {"id": u.id, "name": u.name, "co2_total": u.co2_total,
                      "energy_total": u.energy_total,   # 3D 标签「先能后碳」需实时能耗

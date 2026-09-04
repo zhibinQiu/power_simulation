@@ -981,41 +981,41 @@ curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/onboard/onb
 ### 全新服务器 · 一键部署平台
 
 \`\`\`bash
-# 服务器 root（Ubuntu / Debian / CentOS），自动：拉源码 → 装依赖 → 构建前端 → systemd 启动
-curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/server.sh | bash
-# 自定义仓库 / 分支 / 目录 / 端口（默认 40013，遵循 40000+ 端口规范）：
-curl -fsSL <同上> | bash -s -- -r gitee.com/user/mirror -b main -d /opt/carbon-platform -p 40013
+# 服务器 root（Ubuntu / Debian / CentOS），仅需 Docker：自动装 Docker → 拉源码 → 构建运行环境镜像并启动
+curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/platform/bs-deploy/deploy.sh | bash
+# 自定义仓库 / 分支 / 目录 / 端口（默认 40014，遵循 40000+ 端口规范）：
+curl -fsSL <同上> | bash -s -- -r gitee.com/user/mirror -b main -d /opt/carbon-platform -p 40014
 \`\`\`
 
-平台监听 40013（可用 \`-p\` 修改），前端由后端托管、单端口对外；如需云端能力（K3s + CloudCore + cloud-agent），另用 \`platform/cloud-deploy/deploy_cloud.sh\` 部署。
+平台监听 40014（可用 \`-p\` 修改），前端由后端托管、单端口对外；如需云端能力（K3s + CloudCore + cloud-agent），另用 \`platform/cloud-deploy/deploy_cloud.sh\` 部署。
 
 ### 全新盒子 · 一键接入（免平台预同步）
 
 \`\`\`bash
 # 盒子 root；先放好 /opt/weight-bridge/box-config.json（boxId/cloudIP/token 必填）
-curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/box.sh | bash
+curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/platform/box-deploy/box.sh | bash
 # 或命令行直接给参数（无配置文件）：
 curl -fsSL <同上> | bash -s -- -i 36.151.146.71 -n my-box-01 -t <token>
 \`\`\`
 
-与 \`onboard_box.sh\` 的区别：\`deploy/box.sh\` 直接拉**公开源码仓库** tarball（内含 box-deploy 部署包与 edgecore 模板），**无需平台「同步到 GitHub」**；唯一仍需现场提供的是**共享 token**（公开仓库不存放动态凭证，平台「导出 box-config.json」可自动填入）。box-config.json 额外支持 \`rootCA\`（base64，可选；keadm join 会自动从云端拉取）。
+与 \`onboard_box.sh\` 的区别：\`platform/box-deploy/box.sh\` 直接拉**公开源码仓库** tarball（内含 box-deploy 部署包与 edgecore 模板），**无需平台「同步到 GitHub」**；唯一仍需现场提供的是**共享 token**（公开仓库不存放动态凭证，平台「导出 box-config.json」可自动填入）。box-config.json 额外支持 \`rootCA\`（base64，可选；keadm join 会自动从云端拉取）。
 
 | 脚本 | 前置条件 | 适用场景 |
 | --- | --- | --- |
 | \`onboard_box.sh\`（仓库 \`onboard/\` 目录） | 平台已「同步到 GitHub」 | 有平台、现场只有一份配置文件 |
-| \`deploy/box.sh\`（源码仓库） | 公开仓库 + token | 全新盒子 / 无平台预同步 |
+| \`platform/box-deploy/box.sh\`（源码仓库） | 公开仓库 + token | 全新盒子 / 无平台预同步 |
 
 ### 更新（服务器 · 数据安全优先）
 
 \`\`\`bash
-# 已部署实例升级，先备份现场数据 → 更新 → 恢复 → 重建前端 → 重启
-curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/update.sh | bash -s -- -d /opt/carbon-platform
+# 已部署实例更新（服务器 root）：先备份现场数据 → git 拉取 → 恢复 → 重建容器
+curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/platform/bs-deploy/update.sh | bash -s -- server -d /opt/carbon-platform
 \`\`\`
 
-- 必须用 \`update.sh\` 而不是重跑 \`server.sh\`：源码仓库**跟踪**了 \`backend/config/\` 下的 \`box_config.json\` / \`box_devices.json\`（设备 CRD）/ \`links.json\`（设备关联）/ \`mqtt.yaml\`（云端 MQTT）与 \`backend/data/\`（碳合规、历史报告），直接 \`git reset --hard\` 会把这些**现场数据覆盖丢失**；update.sh 更新前自动备份到 \`<安装目录>/.update-backup-<时间戳>\`、更新后自动恢复，全程不丢数据。
+- 更新必须走 \`update.sh\`（不要直接 \`git reset --hard\` 拉源码）：源码仓库**跟踪**了 \`backend/config/\` 下的 \`box_config.json\` / \`box_devices.json\`（设备 CRD）/ \`links.json\`（设备关联）/ \`mqtt.yaml\`（云端 MQTT）与 \`backend/data/\`（碳合规、历史报告），直接 \`git reset --hard\` 会把这些**现场数据覆盖丢失**；update.sh 更新前自动备份到 \`<安装目录>/.update-backup-<时间戳>\`、更新后自动恢复，全程不丢数据。
 - \`platform_config.json\` / \`strategies.json\` / \`.env\` / \`github_config.json\` 已被 gitignore，常规更新不受影响（备份逻辑同样覆盖，双保险）。
-- \`server.sh\` 检测到已部署实例时会导向 \`update.sh\`，不会自行覆盖。
-- 盒子侧更新：重新执行 \`deploy/box.sh\` 即可（幂等——edgecore 运行中跳过 join、\`/opt/weight-bridge/config.json\` 现场配置保留，仅更新 box-deploy 程序）。
+- \`deploy.sh\` 检测到已部署实例时会导向 \`update.sh\`，不会自行覆盖。
+- 盒子侧更新：重新执行 \`platform/box-deploy/box.sh\` 即可（幂等——edgecore 运行中跳过 join、\`/opt/weight-bridge/config.json\` 现场配置保留，仅更新 box-deploy 程序）。
 
 ### 云端时序数据库（TDengine · 设备历史落时序库）
 

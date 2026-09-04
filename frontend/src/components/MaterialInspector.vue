@@ -9,6 +9,20 @@
       </div>
       </CollapseSection>
 
+      <CollapseSection v-if="purchasable" :title="t('外购单价（全厂成本核算）')" tone="amber" :show-more="false">
+      <div class="card">
+        <div class="kv2">
+          <span>{{ t('外购单价') }}</span>
+          <span class="kv-edit">
+            <input type="number" class="num" min="0" step="0.1" :value="price" @change="onPrice($event.target.value)" />
+            <span class="num-unit">元/{{ mat.unit }}</span>
+          </span>
+        </div>
+        <div class="pr-hint">{{ t('全厂总览「成本 = 外购用量 × 单价」：本物料当前为行业参考价，可按采购合同调整；保存后实时联动全厂成本与当日/当月/当年累计。') }}</div>
+        <button v-if="isPriceOverride" class="reset" @click="resetPrice">{{ t('恢复库默认价') }}</button>
+      </div>
+      </CollapseSection>
+
       <CollapseSection :title="t('隐含碳因子')" tone="amber" :show-more="false">
       <div class="card">
         <div class="param-row">
@@ -161,6 +175,21 @@ import { t } from '../i18n'
 const store = useSimStore()
 const mat = computed(() => store.selectedMaterial)
 const isOverride = computed(() => !!(store.materialOverrides && store.materialOverrides[mat.value.id]))
+// ---- 外购单价：后端 purchases 只含下列可外购计量物料，成本 = 用量 × 单价（元/单位）----
+const PURCHASABLE_IDS = ['iron_ore', 'coke', 'coal', 'limestone', 'scrap', 'electrode', 'ngas', 'electricity', 'biomass']
+const purchasable = computed(() => !!mat.value && PURCHASABLE_IDS.includes(mat.value.id))
+const price = computed(() => {
+  const ov = store.materialOverrides && store.materialOverrides[mat.value.id]
+  if (ov && ov.price != null) return ov.price
+  return mat.value.price != null ? mat.value.price : 0
+})
+const isPriceOverride = computed(() => {
+  if (!purchasable.value) return false
+  const ov = store.materialOverrides && store.materialOverrides[mat.value.id]
+  return !!(ov && ov.price != null)
+})
+function onPrice(v) { store.setMaterialAttr(mat.value.id, 'price', Number(v)) }
+function resetPrice() { store.setMaterialAttr(mat.value.id, 'price', mat.value.price) }
 const carbon = computed(() => {
   const id = mat.value.id
   const ov = store.materialOverrides[id]

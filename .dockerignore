@@ -13,8 +13,16 @@ frontend/
 docs-site/node_modules/
 tests/
 backend/tests/
-platform/
 deploy/
+# platform/ 整体不入构建 context，但 docs-site 镜像需独立 COPY 的最小文件集需放行
+# （serve_docs.py + docs-site/dist 源码快照，见 Dockerfile.docs）
+platform/*
+!platform/bs-deploy/
+!platform/bs-deploy/serve_docs.py
+!platform/doc-deploy/
+!platform/doc-deploy/docs-site/
+!platform/doc-deploy/docs-site/dist/
+!platform/doc-deploy/docs-site/dist/**
 .github/
 .dockerignore
 Dockerfile

@@ -1061,7 +1061,7 @@ export const useSimStore = defineStore('sim', {
       // 仿真模式：记录物料属性变更（备注仅提示已更新，避免超长文案）
       if (this.simMode) {
         const ml = ((MATERIAL_MAP[id] || {}).label) || id
-        const keyLabel = ({ density: t('堆密度'), transport_ef: t('运输排放因子'), moisture: t('含水率'), note: t('备注') })[key] || key
+        const keyLabel = ({ density: t('堆密度'), transport_ef: t('运输排放因子'), moisture: t('含水率'), note: t('备注'), price: t('采购单价') })[key] || key
         if (key === 'note') {
           this._simLog('factor', t('{name} · 备注', { name: ml }), t('已更新'), `ma_${id}_${key}`)
         } else {
@@ -1071,7 +1071,8 @@ export const useSimStore = defineStore('sim', {
         }
       }
       this.materialOverrides = { ...this.materialOverrides, [id]: { ...(this.materialOverrides[id] || {}), [key]: val } }
-      if (this.simMode && key !== 'note') this.refresh()
+      // price 仅前端成本核算使用（成本=外购用量×单价），无需后端重算
+      if (this.simMode && key !== 'note' && key !== 'price') this.refresh()
     },
     // 配置物料详细化学成分（如烧结矿 TFe/FeO/CaO、焦炭固定碳/灰分等，质量分数 %），
     // 覆盖值存于 materialOverrides[id].composition，随方案持久化；仅 sinter/pellet/coke 支持。

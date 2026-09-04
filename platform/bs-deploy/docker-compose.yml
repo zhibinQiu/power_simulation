@@ -21,8 +21,9 @@ name: jianpai
 #     与仓库根 .dockerignore 均基于该 context；dockerfile 相对 context 指回本目录。
 #   * 相对卷挂载（../../*）同样解析到仓库根，运行期写盘内容即宿主机源码目录，
 #     重建容器/升级镜像不覆盖。
-# 访问：http://<服务器IP>:40014    （平台，前端由后端静态托管）
-#        http://<服务器IP>:40184    （文档站）
+# 访问：http://<服务器IP>:40014            （平台，前端由后端静态托管）
+#        http://<服务器IP>:40014/docs/     （文档站：宣传手册/使用手册/技术文档，经平台同源反代，
+#                                           页面资源带 /docs/ 前缀；40184 已非必开端口）
 
 services:
   steel-twin:
@@ -43,6 +44,9 @@ services:
       # Broker 连接地址：box_config.json 默认指向新云端公网 IP（本地开发直连用）；
       # 容器内通过 docker 网关回环宿主（172.18.0.1）更快更稳，故此处覆盖。
       - BROKER_HOST=172.18.0.1
+      # 文档站反代目标：平台后端把 /docs/* 保留前缀转发到本 compose 网络的 docs-site
+      # 服务（40183），对外统一走平台 40014，文档站 40184 不再要求开放（云安全组免配）。
+      - DOCS_PROXY_TARGET=http://docs-site:40183
       # 大模型策略拆解（OpenAI 兼容接口）。未配置时自动回退到规则解析。
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.deepseek.com/v1}
       - LLM_API_KEY=${LLM_API_KEY:-}
@@ -51,8 +55,11 @@ services:
 
   # 独立文档网站（宣传手册/使用手册/技术文档）
   # 站点源码与文档位于 platform/doc-deploy/（docs-site = vite 站点，docs = 源文档）
-  # dist 卷挂载：platform/doc-deploy/sync-docs.sh 构建并 rsync 新 dist 后
+  # dist 卷挂载：platform/doc-deploy/update.sh 构建并 rsync 新 dist 后
   # docker compose restart docs-site 即生效（免重建镜像）
+  # 入口：平台同源 /docs/*（steel-twin 后端反代 → http://docs-site:40183/docs/*，
+  # serve_docs.py 剥 /docs 前缀落盘）。40184 端口映射保留仅供本机调试/内网，
+  # 公网访问统一走平台 40014，无需为 40184 配置安全组放行。
   docs-site:
     build:
       context: ../..

@@ -13,7 +13,7 @@
 #
 #  说明:
 #    - 本脚本只负责本地启动，启动过程不包含任何推送/同步逻辑
-#    - 线上部署/更新请走 platform/ 统一入口：bash platform/deploy.sh（bs/portal/docs 等目标）
+#    - 线上部署/更新请走 platform/ 统一入口：全新部署 bash platform/deploy.sh、日常更新 bash platform/update.sh（目标见各自 list）
 #    - 后端首次运行自动创建 .venv 并安装依赖
 #    - 前端/文档站首次运行自动 npm install
 #    - 日志写入 .logs/ 目录，Ctrl+C 停止全部服务

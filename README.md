@@ -15,7 +15,7 @@
 - **碳市场实时行情**：内置「碳市场」视图，实时展示 CEA（全国碳市场配额）日K线蜡烛图与 CCER（自愿减排量）成交均价折线图，叠加线性回归走势预测与置信带，15 秒自动刷新；
 - **市场快讯**：底部状态栏滚动播报中国煤炭交易网「市场快讯」（60 秒缓存，前端 5 分钟刷新），鼠标悬停暂停滚动以便细读；
 - **实时遥测**：WebSocket 推送设备读数（默认「Mqtt 实时」数据源：后端订阅云端 MQTT Broker 获取真实读数，不生成模拟数据；亦支持自定义 WebSocket / HTTP 轮询），约 10 分钟环形缓冲 + 历史趋势；读数同步采用**关联制**：云端识别设备（能碳一体机盒子下）须在「视图 → 能碳一体机管理」中与仿真设备实例手动关联后才同步；
-- **能碳一体机管理**（视图 → 能碳一体机管理）：集成参考项目 yunduan1 全部能力，六页签——总览（云端 Broker $SYS 实时统计 + 边缘节点 + CloudCore/证书演示）、设备管理（KubeEdge DeviceModel/Device 五协议 CRUD + YAML 生成，`config/box_devices.json`）、设备关联（云端设备 ↔ 仿真设备实例，`config/links.json`）、盒子一键接入（三种方式：① GitHub 托管——平台同步接入资产到用户仓库，盒子现场 `curl … | bash` 一条命令接入；② 自解压 `onboard_box.sh`——内嵌 box-deploy 采集包 + edgecore.yaml + rootCA + token，下载后现场执行；③ 云端 agent 远程一键接入推送执行；另仓库 `platform/` 统一部署入口（`bash platform/deploy.sh`，脚本见 `platform/bs-deploy/`、`platform/box-deploy/`）支持全新服务器（`platform/bs-deploy/server.sh`）与全新盒子（`platform/box-deploy/box.sh`）直接从公开源码仓库一键部署，免平台预同步；`config/edgecore.template.yaml`）、实时数据（Device.twins 真实读数 + 趋势 + 消息流 + 发测试消息）、接入指引（盒子采集 mapper / 部署包 / 诊断工具）；总体架构：云端（36.151.146.71）K3s 轻量 K8s + KubeEdge CloudCore 作为唯一控制平面；盒子边缘仅安装 EdgeCore（不部署 k3s-server，无本地控制平面），经 CloudHub 10002 端口长连接云端，边缘运行 Pod / mosquitto / box-mapper；
+- **能碳一体机管理**（视图 → 能碳一体机管理）：集成参考项目 yunduan1 全部能力，六页签——总览（云端 Broker $SYS 实时统计 + 边缘节点 + CloudCore/证书演示）、设备管理（KubeEdge DeviceModel/Device 五协议 CRUD + YAML 生成，`config/box_devices.json`）、设备关联（云端设备 ↔ 仿真设备实例，`config/links.json`）、盒子一键接入（三种方式：① GitHub 托管——平台同步接入资产到用户仓库，盒子现场 `curl … | bash` 一条命令接入；② 自解压 `onboard_box.sh`——内嵌 box-deploy 采集包 + edgecore.yaml + rootCA + token，下载后现场执行；③ 云端 agent 远程一键接入推送执行；另仓库 `platform/` 部署入口（全新部署 `bash platform/deploy.sh`、日常更新 `bash platform/update.sh`，脚本见 `platform/bs-deploy/`、`platform/box-deploy/`）支持全新服务器（`platform/bs-deploy/deploy.sh`）与全新盒子（`platform/box-deploy/box.sh`）直接从公开源码仓库一键部署，免平台预同步；`config/edgecore.template.yaml`）、实时数据（Device.twins 真实读数 + 趋势 + 消息流 + 发测试消息）、接入指引（盒子采集 mapper / 部署包 / 诊断工具）；总体架构：云端（36.151.146.71）K3s 轻量 K8s + KubeEdge CloudCore 作为唯一控制平面；盒子边缘仅安装 EdgeCore（不部署 k3s-server，无本地控制平面），经 CloudHub 10002 端口长连接云端，边缘运行 Pod / mosquitto / box-mapper；
 - **命令行交互中枢**：聊天 / 代码 / 规划三模式 + 孪生控制命令（run / sim / stop / view / edit …）；
 - **AI 分析报告**：AI 生成或本地模板双引擎，报告标题、分析深度（精简/标准/深入）、附录表格可选，输出 Markdown + 分享页 HTML；
 - **工艺属性内化配置**：参数运行空间（min/max/step）、设备量程、设备规格档位均在编排模式节点属性面板中直接调整，随方案持久化（节点自定义范围 > 设备规格 ranges > 默认范围），无独立全局配置入口；
@@ -43,7 +43,7 @@
 ./start.sh --help          # 全部参数
 ```
 
-`start.sh` 只负责本地启动，不含任何推送逻辑；线上部署/更新走 `platform/deploy.sh`（见下文部署）。
+`start.sh` 只负责本地启动，不含任何推送逻辑；线上部署/更新走 `platform/` 两个入口（全新部署 `platform/deploy.sh`、日常更新 `platform/update.sh`，见下文部署）。
 
 ### 后端
 
@@ -149,10 +149,12 @@ npx vite build         # 产物输出至 dist/，由后端 Catch-all 路由托�
 │   └── vite.config.js
 ├── cli-chat/                   # 命令行聊天辅助脚本
 ├── platform/                   # 统一部署入口（目录即部署单元）
-│   ├── deploy.sh               # bash platform/deploy.sh <目标>（bs/portal/docs/cloud/box…）
-│   ├── bs-deploy/              # 平台前后端（71 服务器 Docker 源码卷挂载 + reload）
-│   ├── portal-deploy/          # 门户静态站点（官网更新 sync-portal.sh / 独立安装 deploy.sh）
-│   ├── doc-deploy/             # 文档站与文档（docs-site 站点源码 + docs 源文档 + sync-docs.sh）
+│   ├── deploy.sh               # 全新部署入口：bash platform/deploy.sh <目标>（server/cloud/box/portal-install/docs-install/nginx/mac/windows…）
+│   ├── update.sh               # 日常更新入口：bash platform/update.sh <目标>（bs/update/push/portal/docs…）
+│   ├── servers.conf            # 服务器地址集中配置（平台/云端/官网/门户，脚本统一引用）
+│   ├── bs-deploy/              # 平台前后端（deploy.sh 首次部署 / update.sh 后续更新；71 Docker 源码卷挂载 + reload）
+│   ├── portal-deploy/          # 门户静态站点（官网内容更新 update.sh / 独立安装 deploy.sh）
+│   ├── doc-deploy/             # 文档站与文档（deploy.sh 首次拉起 / update.sh 内容更新；docs-site 源码 + docs 源文档）
 │   ├── cloud-deploy/           # 云端 KubeEdge 控制面/数据面/TDengine/agent
 │   ├── box-deploy/             # 边缘盒子（一体机）部署包
 │   └── mac/windows-deploy/   # 桌面客户端打包
@@ -161,14 +163,16 @@ npx vite build         # 产物输出至 dist/，由后端 Catch-all 路由托�
 
 ## 部署
 
-线上环境由两类部署单元组成，统一收口在 `platform/deploy.sh`（`bash platform/deploy.sh list` 查看矩阵）：
+线上环境由两类部署单元组成，按操作类型分别收口在两个入口（服务器地址统一在 `platform/servers.conf`）：
+- **全新部署 / 首次安装 / 接入 / 打包**：`bash platform/deploy.sh list` 查看矩阵
+- **日常更新 / 代码同步 / 内容发布**：`bash platform/update.sh list` 查看矩阵
 
 | 部署单元 | 内容（端口） | 一键脚本 | 执行位置 |
 | --- | --- | --- | --- |
-| **bs / 平台** | 后端 + 前端 + 文档站容器（40014 / 40184） | `bs-deploy/server.sh`（全新）/ `bs-deploy/update.sh`（更新）/ `bs-deploy/sync.sh`（开发机 rsync） | 目标机 root / 开发机 |
+| **bs / 平台** | 后端 + 前端 + 文档站容器（40014 / 40184） | `bs-deploy/deploy.sh`（全新）/ `bs-deploy/update.sh`（更新：开发机同步，或服务器 `update.sh server` git 拉取） | 目标机 root / 开发机 |
 | **cloud / 云端** | K3s + KubeEdge CloudCore 控制面（10001-10004）、MQTT 数据面（41883/41083/41500）、TDengine 时序库、cloud-agent（42083） | `cloud-deploy/deploy_cloud.sh --bootstrap --ip <IP>` | 云机 root |
 | **box / 盒子** | 边缘一体机采集（mapper + mosquitto + EdgeCore） | `box-deploy/box.sh`（在线）/ `deploy_box.sh`（离线） | 盒子 root |
-| docs / portal | 文档站 / 门户官网更新 | `doc-deploy/sync-docs.sh`、`portal-deploy/` | 开发机 |
+| docs / portal | 文档站 / 门户官网更新 | `doc-deploy/update.sh`、`portal-deploy/update.sh` | 开发机 |
 
 > 架构上云端与平台可同机（现网 36.151.146.71 即同机：平台容器以 `BROKER_HOST=172.18.0.1` 回环宿主直连本机 Broker），也可分两台服务器。
 
@@ -198,11 +202,11 @@ docker compose up -d --build
 # ⑥ 盒子接入（如需切机）：平台「盒子管理 → 接入新盒子」→ 盒子执行 onboard_box.sh / curl | bash
 ```
 
-独立机器也可直接 `curl -fsSL https://raw.githubusercontent.com/zhibinQiu/power_simulation/master/platform/bs-deploy/server.sh | bash`（默认装 `/opt/carbon-platform`，参数见脚本 `-h`）。
+独立机器也可直接 `curl -fsSL https://raw.githubusercontent.com/zhibinQiu/power_simulation/master/platform/bs-deploy/deploy.sh | bash`（默认装 `/opt/carbon-platform`，参数见脚本 `-h`）。
 
-**分机部署**（云机 A + 平台机 B）：A 机执行 `deploy_cloud.sh --bootstrap --ip <A公网IP>`（边缘盒子须能路由到 A）；B 机 `server.sh` 部署后，将 `bs-deploy/docker-compose.yml` 的 `BROKER_HOST` 改为 A 的 IP，并在 A 放行 B 入站 41883/42083。
+**分机部署**（云机 A + 平台机 B）：A 机执行 `deploy_cloud.sh --bootstrap --ip <A公网IP>`（边缘盒子须能路由到 A）；B 机 `deploy.sh` 部署后，将 `bs-deploy/docker-compose.yml` 的 `BROKER_HOST` 改为 A 的 IP，并在 A 放行 B 入站 41883/42083。
 
-**日常更新**：服务器侧 `platform/bs-deploy/update.sh`（备份 `backend/{data,config,knowledge}` → git pull → 恢复 → 重建，数据安全优先）；开发机侧改 `bs-deploy/sync.sh` 顶部 `CLOUD_MAIN` 指向新机后走 rsync 一体化。老机迁移历史数据：将 `backend/data`、`backend/knowledge`、`backend/config`（含 `box_devices.json`/`links.json`）拷入新机对应目录再起容器。
+**日常更新**：开发机侧 `bash platform/bs-deploy/update.sh`（本地构建 + rsync + 容器 reload 一体化，默认目标 71；`--server <主机>` 换目标机）；服务器侧 `update.sh server -d <目录>`（备份 `backend/{data,config,knowledge}` → git pull → 恢复 → 重建，数据安全优先，curl 版 `bash <(curl -fsSL …/platform/bs-deploy/update.sh) server`）。老机迁移历史数据：将 `backend/data`、`backend/knowledge`、`backend/config`（含 `box_devices.json`/`links.json`）拷入新机对应目录再起容器。
 
 **要点提醒**：cloudcore v1.20.0 兼容 k3s **≤1.30**；证书必须 EC P-256 且 server SAN 含新机 IP（`deploy_cloud.sh` 自动处理，勿手动 RSA）；脚本/文档中的 `36.151.146.71` 为默认值，新机一律以 `--ip` + 一键导入生成的配置为准。
 

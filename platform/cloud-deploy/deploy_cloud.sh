@@ -49,12 +49,14 @@ set -euo pipefail
 
 # ----------------------------- 常量 --------------------------------------
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONF="$(cd "$SELF_DIR/.." && pwd)/servers.conf"   # 服务器地址集中配置（platform/servers.conf，存在才加载）
+[ -f "$CONF" ] && . "$CONF" || true
 KUBEEDGE_DIR="$SELF_DIR/kubeedge"
 DATAPATH_DIR="$SELF_DIR/datapath"
 SYSTEMD_SRC="$DATAPATH_DIR/systemd"
 AGENT_DIR="$SELF_DIR/agent"
 
-CLOUD_IP="${CLOUD_IP:-36.151.146.71}"
+CLOUD_IP="${CLOUD_IP:-36.151.146.71}"   # 默认云端对外 IP（servers.conf CLOUD_IP）
 KUBEEDGE_VERSION="${KUBEEDGE_VERSION:-v1.20.0}"
 DATA_DIR="${DATA_DIR:-/root/qzb/jianpai/data-terminal}"
 DATAPATH_SRC="${DATAPATH_SRC:-}"

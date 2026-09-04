@@ -2,11 +2,10 @@
 # ============================================================================
 # 平台门户网站 · 独立部署脚本（nengtan-portal）
 #
-# 与「盒子云端 cloud-deploy」完全无关：这是面向公众的平台门户静态站点
-# （platform/portal-deploy，2026-09 由 homePage → home-deploy 更名而来），
-# 独立安装到服务器 /opt/nengtan-portal/，注册 systemd 常驻服务
-# nengtan-portal.service（开机自启 + 崩溃自动重启）。
-# 注：官网（https://www.nengyousuan.com）日常内容更新用同目录 sync-portal.sh。
+# 面向公众的平台门户静态站点（platform/portal-deploy），独立安装到服务器
+# /opt/nengtan-portal/，注册 systemd 常驻服务 nengtan-portal.service
+# （开机自启 + 崩溃自动重启）。
+# 注：官网（https://www.nengyousuan.com）日常内容更新用同目录 update.sh。
 #
 # 用法（本机开发机执行，需能免密 SSH 到服务器）：
 #   ./deploy.sh                                        # 部署到默认服务器
@@ -21,15 +20,18 @@
 #   -h, --help                帮助
 # ============================================================================
 set -euo pipefail
-cd "$(dirname "$0")"
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SELF_DIR"
+CONF="$(cd "$SELF_DIR/.." && pwd)/servers.conf"   # 服务器地址集中配置（platform/servers.conf）
+[ -f "$CONF" ] && . "$CONF" || true
 
-SERVER="${SERVER:-root@36.151.146.71}"
-PORT="${PORT:-40200}"
+SERVER="${SERVER:-${PORTAL_SSH:-root@36.151.146.71}}"   # 门户独立站点服务器（servers.conf PORTAL_SSH）
+PORT="${PORT:-${PORTAL_PORT:-40200}}"                    # 门户端口（servers.conf PORTAL_PORT）
 APP_DIR="/opt/nengtan-portal"
 SERVICE="nengtan-portal.service"
 
 usage() {
-  sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
+  awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$SELF_DIR/$(basename "${BASH_SOURCE[0]}")"
   exit 0
 }
 
@@ -64,7 +66,7 @@ case "${CMD:-deploy}" in
       --exclude='.png-backup' --exclude='*.log' \
       ./ "$SERVER:$APP_DIR/"
 
-    # ---------- ② 写入 systemd 单元（独立服务，与盒子云端无关） ----------
+    # ---------- ② 写入 systemd 单元 ----------
     log "② 注册 systemd 常驻服务 ${SERVICE}（端口 ${PORT}）"
     "${SSH[@]}" "cat > /etc/systemd/system/$SERVICE" <<EOF
 [Unit]

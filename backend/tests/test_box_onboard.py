@@ -270,13 +270,13 @@ def _check_bash_syntax(script: str):
 
 
 def test_deploy_server_sh():
-    script = _read_deploy_script(BS_DEPLOY_DIR, "server.sh")
+    script = _read_deploy_script(BS_DEPLOY_DIR, "deploy.sh")
     assert script.startswith("#!/usr/bin/env bash")
     # 全新服务器一键部署：拉源码（backend 源码 + dist 均已入库）→ 构建运行环境镜像 → 卷挂载启动
     for kw in ("-r|--repo)", "-b|--branch)", "-d|--dir)", "-p|--port)",
                "git clone --depth 1", "docker compose build", "docker compose up -d",
                "DEFAULT_PORT=40014", "platform/bs-deploy", "源码卷挂载"):
-        assert kw in script, f"server.sh 缺少：{kw}"
+        assert kw in script, f"deploy.sh 缺少：{kw}"
     assert "update.sh" in script  # 已部署实例提示走更新脚本
     _check_bash_syntax(script)
 
@@ -301,16 +301,19 @@ def test_deploy_box_sh():
 def test_deploy_update_sh():
     script = _read_deploy_script(BS_DEPLOY_DIR, "update.sh")
     assert script.startswith("#!/usr/bin/env bash")
-    # 更新脚本：备份现场数据 → git 更新 → 恢复 → 重建（reload 模式）→ 自检
+    # 服务器模式（server 子命令：备份现场 → git pull → 恢复 → 重建）
     for kw in ("-d|--dir)", "-b|--branch)",
                'git reset --hard "origin/$BRANCH"',
                "backend/data backend/config backend/knowledge",
-               "platform/bs-deploy/.env", "platform/bs-deploy/server.sh",
+               "platform/bs-deploy/.env", "platform/bs-deploy/deploy.sh",
                "docker compose build", "docker compose up -d"):
-        assert kw in script, f"update.sh 缺少：{kw}"
+        assert kw in script, f"update.sh(服务器模式) 缺少：{kw}"
     # 明确防止覆盖现场数据（备份/恢复 + git 管理）
     assert "reset --hard" in script and "备份" in script and "恢复" in script
     assert "update-backup-" in script
+    # 开发机模式（本地构建 + rsync + reload 一体化）
+    for kw in ("rsync", "vite build", "--skip-build", "CLOUD_MAIN", "push.sh"):
+        assert kw in script, f"update.sh(开发机模式) 缺少：{kw}"
     _check_bash_syntax(script)
 
 

@@ -1,21 +1,17 @@
 #!/usr/bin/env bash
 # ============================================================================
-# 能碳平台门户 · 官网内容更新脚本（platform/portal-deploy/sync-portal.sh，开发机执行）
+# 能碳平台门户 · 官网内容更新脚本（platform/portal-deploy/update.sh，开发机执行）
 #
 # 职责：把门户站点源码（本目录）同步发布到线上官网
 #       https://www.nengyousuan.com（root@43.161.194.75:/var/www/nengyousuan，
-#       Nginx 静态托管）。门户日常改版/内容更新走本脚本。
-#
-# 与同目录 deploy.sh 的区别：
-#   sync-portal.sh  官网内容更新（现役 https://www.nengyousuan.com）
-#   deploy.sh       门户在全新服务器上的独立安装（/opt/nengtan-portal/，
-#                   systemd 常驻 + 高端口对外），属部署而非日常更新
+#       Nginx 静态托管）。门户日常改版/内容更新走本脚本；
+#       门户在全新服务器上的独立安装（systemd 常驻）用同目录 deploy.sh。
 #
 # 用法（仓库根任一路径执行均可，脚本自动定位门户目录）：
-#   bash platform/deploy.sh portal                     # 官网更新（推荐统一入口）
-#   bash platform/portal-deploy/sync-portal.sh         # 直接调用
-#   bash platform/portal-deploy/sync-portal.sh -s root@192.168.1.50 -d /var/www/site
-#   QZB_SSH_PASS='<密码>' bash platform/portal-deploy/sync-portal.sh   # 无免密时用密码
+#   bash platform/update.sh portal                     # 官网更新（推荐统一入口）
+#   bash platform/portal-deploy/update.sh              # 直接调用
+#   bash platform/portal-deploy/update.sh -s root@192.168.1.50 -d /var/www/site
+#   QZB_SSH_PASS='<密码>' bash platform/portal-deploy/update.sh        # 无免密时用密码
 #
 # 选项：
 #   -s, --server <user@host>  目标服务器（默认 root@43.161.194.75）
@@ -27,11 +23,13 @@
 # ============================================================================
 set -euo pipefail
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVER="${HOME_SERVER:-root@43.161.194.75}"
-REMOTE_DIR="${HOME_DIR:-/var/www/nengyousuan}"
+CONF="$(cd "$SELF_DIR/.." && pwd)/servers.conf"   # 服务器地址集中配置（platform/servers.conf）
+[ -f "$CONF" ] && . "$CONF" || true
+SERVER="${HOME_SERVER:-${WEB_SSH:-root@43.161.194.75}}"      # 官网服务器（servers.conf WEB_SSH）
+REMOTE_DIR="${HOME_DIR:-${WEB_DIR:-/var/www/nengyousuan}}"   # 官网静态目录（servers.conf WEB_DIR）
 
 usage() {
-  sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'
+  awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
   exit 0
 }
 
@@ -68,7 +66,7 @@ rsync_run() { # 与 ssh_run 配套的 rsync 传输
 }
 
 echo "==> 门户官网内容更新: $SELF_DIR/ → $SERVER:$REMOTE_DIR"
-# 排除脚本/本地服务文件；--delete 同时清掉历史误传的 .sh 等
+# 排除脚本/本地服务文件；--delete 同步清理远端多余文件
 rsync_run --delete \
   --exclude='*.sh' --exclude='.DS_Store' --exclude='.serve.pid' \
   --exclude='.serve.log' --exclude='.png-backup' --exclude='*.log' \
