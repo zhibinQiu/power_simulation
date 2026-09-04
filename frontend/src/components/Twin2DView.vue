@@ -130,7 +130,7 @@ import { ref, computed, reactive, onMounted, onBeforeUnmount, watch, nextTick } 
 import { t } from '../i18n'
 import { useSimStore } from '../stores/sim'
 import { MATERIAL_MAP, PROCESS_MAP } from '../data/flowLibrary'
-import { T2D_ICONS, T2D_GEOM, T2D_INOUT } from './twin2dIcons'
+import { T2D_ICONS, T2D_GEOM, T2D_INOUT } from '../data/twin2dIcons'
 
 const store = useSimStore()
 const wrap = ref(null)

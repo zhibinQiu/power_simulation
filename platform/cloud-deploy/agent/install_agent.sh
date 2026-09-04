@@ -64,7 +64,7 @@ fi
 
 echo "==> 1/4 检查依赖（kubectl / openssl / ss / mosquitto_pub）"
 for bin in kubectl openssl ss mosquitto_pub; do
-  command -v "$bin" >/dev/null 2>&1 || { echo "错误：缺少命令 $bin（cloud-agent 依赖系统命令，避免装 pip 包）" >&2; exit 1; }
+  command -v "$bin" >/dev/null 2>&1 || { echo "错误：缺少命令 ${bin}（cloud-agent 依赖系统命令，避免装 pip 包）" >&2; exit 1; }
 done
 
 echo "==> 2/4 写入配置 $INSTALL_DIR/config.json"
@@ -127,19 +127,19 @@ systemctl --no-pager --lines=20 status $SERVICE_NAME || true
 
 echo ""
 echo "✅ cloud-agent 安装完成"
-echo "   - HTTP API : http://0.0.0.0:$HTTP_PORT（Bearer token 认证）"
+echo "   - HTTP API : http://0.0.0.0:${HTTP_PORT}（Bearer token 认证）"
 echo "   - MQTT 推送 : cloud/state(30s) cloud/crds(5s) cloud/logs(3s) → $BROKER_HOST:$BROKER_PORT"
 echo "   - 日志查看 : journalctl -u $SERVICE_NAME -f"
 echo ""
 echo "   ⚠ 若云端口未放行，请执行："
 echo "     sudo firewall-cmd --permanent --add-port=$HTTP_PORT/tcp && sudo firewall-cmd --reload"
-echo "     （或云安全组放行 TCP $HTTP_PORT）"
+echo "     （或云安全组放行 TCP ${HTTP_PORT}）"
 echo ""
 echo "   ⚠ 平台侧需在「能碳一体机管理 → 总览 → 配置」填写："
 echo "     云端地址 / agent端口=$HTTP_PORT / agent_token=$TOKEN"
 echo ""
 if [ -n "$EDGE_HOST" ]; then
-  echo "   ✅ 边缘盒子已配置（$EDGE_USER@$EDGE_HOST:$EDGE_PORT），可在平台一键重启 box-mapper 等边缘服务"
+  echo "   ✅ 边缘盒子已配置（${EDGE_USER}@${EDGE_HOST}:${EDGE_PORT}），可在平台一键重启 box-mapper 等边缘服务"
 else
   echo "   ⚠ 未配置边缘盒子（--edge-host），平台「重启 Mapper」将提示配置；"
   echo "     需支持时编辑 $INSTALL_DIR/config.json 的 edge 字段（密码方式需 yum install -y sshpass）"

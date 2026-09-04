@@ -57,7 +57,7 @@ while [ $# -gt 0 ]; do
     -d|--dir)    INSTALL_DIR="${2:-}"; shift 2 ;;
     -p|--port)   PORT="${2:-}";        shift 2 ;;
     -h|--help)   usage ;;
-    *) echo "[error] 未知参数：$1（-h 查看帮助）" >&2; exit 1 ;;
+    *) echo "[error] 未知参数：${1}（-h 查看帮助）" >&2; exit 1 ;;
   esac
 done
 [ -n "$REPO" ] && [ -n "$BRANCH" ] || { echo "[error] 仓库地址不能为空" >&2; exit 1; }
@@ -66,7 +66,7 @@ log() { echo -e "\033[32m[deploy]\033[0m $*"; }
 err() { echo -e "\033[31m[error]\033[0m $*" >&2; exit 1; }
 
 # ---------- 0. root 与 docker ----------
-[ "$(id -u)" -eq 0 ] || err "请以 root 运行（或 sudo bash $0）"
+[ "$(id -u)" -eq 0 ] || err "请以 root 运行（或 sudo bash ${0}）"
 command -v git >/dev/null 2>&1 || err "缺少 git：apt/yum install -y git"
 if ! command -v docker >/dev/null 2>&1; then
   log "安装 Docker（官方脚本）..."
@@ -86,7 +86,7 @@ if [ -d "$INSTALL_DIR/.git" ]; then
   exit 0
 fi
 mkdir -p "$(dirname "$INSTALL_DIR")"
-log "克隆源码：https://github.com/$REPO（分支 $BRANCH）→ $INSTALL_DIR"
+log "克隆源码：https://github.com/${REPO}（分支 ${BRANCH}）→ $INSTALL_DIR"
 git clone --depth 1 -b "$BRANCH" "https://github.com/$REPO.git" "$INSTALL_DIR"
 [ -f "$INSTALL_DIR/platform/bs-deploy/docker-compose.yml" ] || err "源码结构异常：缺少 platform/bs-deploy/docker-compose.yml"
 
@@ -115,7 +115,7 @@ if docker ps --format '{{.Names}}' | grep -qx "$NAME"; then
   log "  访问地址：http://${IP:-<服务器IP>}:$PORT"
   log "  文档站  ：http://${IP:-<服务器IP>}:40184"
   log "  日志查看：docker logs -f $NAME"
-  log "  更新     ：platform/bs-deploy/update.sh（开发机 rsync / 服务器 git 拉取）"
+  log "  更新     ：开发机推送代码即热生效：bash platform/update.sh bs（服务器不自拉 git）"
   log "  备注：平台如需连接云端 MQTT / cloud-agent，在「总览 → 配置」填写云端地址即可"
 else
   err "平台容器启动失败，请查看：docker compose logs"

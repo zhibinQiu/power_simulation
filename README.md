@@ -150,7 +150,7 @@ npx vite build         # 产物输出至 dist/，由后端 Catch-all 路由托�
 ├── cli-chat/                   # 命令行聊天辅助脚本
 ├── platform/                   # 统一部署入口（目录即部署单元）
 │   ├── deploy.sh               # 全新部署入口：bash platform/deploy.sh <目标>（server/cloud/box/portal-install/docs-install/nginx/mac/windows…）
-│   ├── update.sh               # 日常更新入口：bash platform/update.sh <目标>（bs/update/push/portal/docs…）
+│   ├── update.sh               # 日常更新入口：bash platform/update.sh <目标>（update|bs/push/portal/docs…）
 │   ├── servers.conf            # 服务器地址集中配置（平台/云端/官网/门户，脚本统一引用）
 │   ├── bs-deploy/              # 平台前后端（deploy.sh 首次部署 / update.sh 后续更新；71 Docker 源码卷挂载 + reload）
 │   ├── portal-deploy/          # 门户静态站点（官网内容更新 update.sh / 独立安装 deploy.sh）
@@ -169,7 +169,7 @@ npx vite build         # 产物输出至 dist/，由后端 Catch-all 路由托�
 
 | 部署单元 | 内容（端口） | 一键脚本 | 执行位置 |
 | --- | --- | --- | --- |
-| **bs / 平台** | 后端 + 前端 + 文档站容器（40014 / 40184） | `bs-deploy/deploy.sh`（全新）/ `bs-deploy/update.sh`（更新：开发机同步，或服务器 `update.sh server` git 拉取） | 目标机 root / 开发机 |
+| **bs / 平台** | 后端 + 前端 + 文档站容器（40014 / 40184） | `bs-deploy/deploy.sh`（全新部署，服务器 git clone）/ `bs-deploy/update.sh`（日常更新：开发机构建 + rsync 推送） | 目标机 root / 开发机 |
 | **cloud / 云端** | K3s + KubeEdge CloudCore 控制面（10001-10004）、MQTT 数据面（41883/41083/41500）、TDengine 时序库、cloud-agent（42083） | `cloud-deploy/deploy_cloud.sh --bootstrap --ip <IP>` | 云机 root |
 | **box / 盒子** | 边缘一体机采集（mapper + mosquitto + EdgeCore） | `box-deploy/box.sh`（在线）/ `deploy_box.sh`（离线） | 盒子 root |
 | docs / portal | 文档站 / 门户官网更新 | `doc-deploy/update.sh`、`portal-deploy/update.sh` | 开发机 |
@@ -206,7 +206,7 @@ docker compose up -d --build
 
 **分机部署**（云机 A + 平台机 B）：A 机执行 `deploy_cloud.sh --bootstrap --ip <A公网IP>`（边缘盒子须能路由到 A）；B 机 `deploy.sh` 部署后，将 `bs-deploy/docker-compose.yml` 的 `BROKER_HOST` 改为 A 的 IP，并在 A 放行 B 入站 41883/42083。
 
-**日常更新**：开发机侧 `bash platform/bs-deploy/update.sh`（本地构建 + rsync + 容器 reload 一体化，默认目标 71；`--server <主机>` 换目标机）；服务器侧 `update.sh server -d <目录>`（备份 `backend/{data,config,knowledge}` → git pull → 恢复 → 重建，数据安全优先，curl 版 `bash <(curl -fsSL …/platform/bs-deploy/update.sh) server`）。老机迁移历史数据：将 `backend/data`、`backend/knowledge`、`backend/config`（含 `box_devices.json`/`links.json`）拷入新机对应目录再起容器。
+**日常更新**：开发机执行 `bash platform/update.sh bs`（= `bs-deploy/update.sh`：本地构建 + rsync 推送 + 容器 reload 一体化，默认目标 71；`--server <主机>` 换目标机）。代码更新一律由开发机向服务器推送，服务器不自拉 git（全新部署 / 重装才在服务器侧用 `deploy.sh` git clone）。老机迁移历史数据：将 `backend/data`、`backend/knowledge`、`backend/config`（含 `box_devices.json`/`links.json`）拷入新机对应目录再起容器。
 
 **要点提醒**：cloudcore v1.20.0 兼容 k3s **≤1.30**；证书必须 EC P-256 且 server SAN 含新机 IP（`deploy_cloud.sh` 自动处理，勿手动 RSA）；脚本/文档中的 `36.151.146.71` 为默认值，新机一律以 `--ip` + 一键导入生成的配置为准。
 

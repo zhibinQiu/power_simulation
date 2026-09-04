@@ -38,7 +38,7 @@ while [ $# -gt 0 ]; do
     -s|--server) SERVER="${2:-}"; shift 2 ;;
     -d|--dir)    REMOTE_DIR="${2:-}"; shift 2 ;;
     -h|--help)   usage ;;
-    *) echo "[error] 未知参数：$1（-h 查看帮助）" >&2; exit 1 ;;
+    *) echo "[error] 未知参数：${1}（-h 查看帮助）" >&2; exit 1 ;;
   esac
 done
 [ -n "$SERVER" ] || { echo "[error] 目标服务器不能为空" >&2; exit 1; }

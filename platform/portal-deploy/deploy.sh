@@ -41,7 +41,7 @@ while [ $# -gt 0 ]; do
     -p|--port)   PORT="${2:-}";   shift 2 ;;
     -h|--help)   usage ;;
     status|uninstall) CMD="$1"; shift ;;
-    *) echo "[error] 未知参数：$1（-h 查看帮助）" >&2; exit 1 ;;
+    *) echo "[error] 未知参数：${1}（-h 查看帮助）" >&2; exit 1 ;;
   esac
 done
 [ -n "$SERVER" ] || { echo "[error] 服务器不能为空" >&2; exit 1; }
@@ -53,7 +53,7 @@ err() { echo -e "\033[31m[error]\033[0m $*" >&2; exit 1; }
 # ---------- 前置校验 ----------
 [ -f index.html ] || err "未找到 index.html，请在 platform/portal-deploy/ 下运行本脚本"
 command -v rsync >/dev/null 2>&1 || err "缺少 rsync"
-"${SSH[@]}" true 2>/dev/null || err "无法 SSH 到 $SERVER（请先配置免密登录）"
+"${SSH[@]}" true 2>/dev/null || err "无法 SSH 到 ${SERVER}（请先配置免密登录）"
 
 case "${CMD:-deploy}" in
 

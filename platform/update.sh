@@ -13,16 +13,15 @@
 #
 #   目标          功能                                    脚本（在哪台机器执行）
 #   ------------  ---------------------------------------  --------------------------
-#   bs            平台更新：本地构建 + rsync 部署到平台机   bs-deploy/update.sh（开发机）
-#   update        平台服务器更新（备份+git拉取+重建）       bs-deploy/update.sh server（目标机 root）
-#   push          提交并推送到 GitHub                      bs-deploy/push.sh（开发机）
+#   update|bs     平台更新：本地构建 + 推送代码到平台机     bs-deploy/update.sh（开发机）
+#   push          提交并推送到 GitHub                      push.sh（仓库根）
 #   portal        门户官网内容更新                          portal-deploy/update.sh（开发机）
 #   docs          文档站 + 源文档更新                       doc-deploy/update.sh（开发机）
 #   list          列出本入口支持的更新矩阵（默认无参数时显示）
 #
 # 示例：
-#   bash platform/update.sh bs                              # 本地构建 + 同步到平台机
-#   bash platform/update.sh bs --server root@<主机>          # 同步到指定服务器
+#   bash platform/update.sh bs                              # 平台代码推送：本地构建 + rsync（update 等价）
+#   bash platform/update.sh bs --server root@<主机>          # 推送到指定服务器
 # ============================================================================
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -39,17 +38,12 @@ TARGET="$1"
 shift
 
 case "$TARGET" in
-  bs|platform)
-    echo "==> 平台更新：本地构建 + rsync 部署到平台机（开发机执行，见 bs-deploy/update.sh）"
-    exec bash "$DIR/bs-deploy/update.sh" "$@"
-    ;;
-  update)
-    echo "==> 平台服务器更新（备份现场数据 → git 拉取 → 恢复 → 重建）"
-    echo "    请在已部署服务器 root 下执行；脚本自判定 server 模式：bash <(curl -fsSL https://raw.githubusercontent.com/zhibinQiu/power_simulation/master/platform/bs-deploy/update.sh) $*"
+  update|bs|platform)
+    echo "==> 平台更新：本地构建 + 推送代码到平台机（开发机执行 → ${PLATFORM_SSH:-root@36.151.146.71} 容器 reload 生效）"
     exec bash "$DIR/bs-deploy/update.sh" "$@"
     ;;
   push)
-    exec bash "$DIR/bs-deploy/push.sh" "$@"
+    exec bash "$DIR/../push.sh" "$@"
     ;;
   portal)
     echo "==> 平台门户官网内容更新（本机执行 → https://www.nengyousuan.com）"

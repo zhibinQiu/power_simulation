@@ -81,7 +81,7 @@ mkdir -p "$BK"
 for p in /etc/kubeedge/ca /etc/kubeedge/certs /etc/kubeedge/config "$BOX_DIR/config.json"; do
   [ -e "$p" ] && cp -a "$p" "$BK/"
 done
-log "现场已备份 → $BK（回滚：恢复该目录后重启 edgecore/box-mapper）"
+log "现场已备份 → ${BK}（回滚：恢复该目录后重启 edgecore/box-mapper）"
 
 # ---------- ① 新 rootCA ----------
 if [ -n "$CA_B64" ]; then

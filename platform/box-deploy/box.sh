@@ -131,7 +131,7 @@ esac
 TARBALL_URL="https://codeload.github.com/$REPO/tar.gz/refs/heads/$BRANCH"
 SRC_ROOT="/tmp/carbon-src"
 rm -rf "$SRC_ROOT" && mkdir -p "$SRC_ROOT"
-log "拉取公开源码仓库：$REPO（分支 $BRANCH，含 box-deploy 部署包约 13MB，请稍候）..."
+log "拉取公开源码仓库：${REPO}（分支 ${BRANCH}，含 box-deploy 部署包约 13MB，请稍候）..."
 fetch "$TARBALL_URL" > /tmp/carbon-src.tar.gz
 tar -xzf /tmp/carbon-src.tar.gz -C "$SRC_ROOT"
 rm -f /tmp/carbon-src.tar.gz
@@ -176,7 +176,7 @@ systemctl daemon-reload 2>/dev/null || true
 if systemctl list-unit-files edgecore.service >/dev/null 2>&1; then
   systemctl restart edgecore.service 2>/dev/null || warn "edgecore 重启失败（可手动 systemctl restart edgecore.service）"
 fi
-log "edgecore.yaml 已下发（hostname=$BOX_ID，cloud=$CLOUD_IP）"
+log "edgecore.yaml 已下发（hostname=${BOX_ID}，cloud=${CLOUD_IP}）"
 
 # ---------- ④ 部署 box-deploy 采集部署包（源码拷贝，无需平台打包） ----------
 mkdir -p "$DEST_DIR"
@@ -197,7 +197,7 @@ broker["host"] = cloud_ip
 json.dump(c, open(path, "w"), ensure_ascii=False, indent=2)
 PY
   systemctl restart box-mapper 2>/dev/null || warn "box-mapper 重启失败（可手动 systemctl restart box-mapper）"
-  log "config.json 已写入 mqtt.boxId=$BOX_ID，broker.host=$CLOUD_IP"
+  log "config.json 已写入 mqtt.boxId=${BOX_ID}，broker.host=${CLOUD_IP}"
 fi
 
 # ---------- ⑥ 自检 ----------

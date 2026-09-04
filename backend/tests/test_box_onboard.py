@@ -301,20 +301,22 @@ def test_deploy_box_sh():
 def test_deploy_update_sh():
     script = _read_deploy_script(BS_DEPLOY_DIR, "update.sh")
     assert script.startswith("#!/usr/bin/env bash")
-    # 服务器模式（server 子命令：备份现场 → git pull → 恢复 → 重建）
-    for kw in ("-d|--dir)", "-b|--branch)",
-               'git reset --hard "origin/$BRANCH"',
-               "backend/data backend/config backend/knowledge",
-               "platform/bs-deploy/.env", "platform/bs-deploy/deploy.sh",
-               "docker compose build", "docker compose up -d"):
-        assert kw in script, f"update.sh(服务器模式) 缺少：{kw}"
-    # 明确防止覆盖现场数据（备份/恢复 + git 管理）
-    assert "reset --hard" in script and "备份" in script and "恢复" in script
-    assert "update-backup-" in script
-    # 开发机模式（本地构建 + rsync + reload 一体化）
-    for kw in ("rsync", "vite build", "--skip-build", "CLOUD_MAIN", "push.sh"):
+    # 开发机模式（本地构建 + rsync + reload 一体化；服务器不自拉 git）
+    for kw in ("rsync", "vite build", "--skip-build", "CLOUD_MAIN",
+               "docker compose up -d", "服务器不自拉 git"):
         assert kw in script, f"update.sh(开发机模式) 缺少：{kw}"
+    # push 子命令：改完代码一键推送到 GitHub（调用仓库根 push.sh）
+    assert '"push"' in script and 'exec bash "$ROOT/push.sh"' in script
+    assert "代码入库推送" in script
     _check_bash_syntax(script)
+    # 仓库根 push.sh：纯 git 推送脚本（协作者通用），已从 bs-deploy/ 迁至仓库根
+    root_push = os.path.join(REPO_ROOT, "push.sh")
+    assert os.path.isfile(root_push), f"仓库根 push.sh 缺失：{root_push}"
+    push_script = open(root_push, encoding="utf-8").read()
+    assert push_script.startswith("#!/usr/bin/env bash")
+    assert 'cd "$(dirname "$0")"' in push_script      # 位于仓库根（git 根）
+    assert 'GIT_REMOTE="github"' in push_script and "git push" in push_script
+    _check_bash_syntax(push_script)
 
 
 # ------------------------- 云端时序数据库（TDengine 历史查询） -------------------------
