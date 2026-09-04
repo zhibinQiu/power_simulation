@@ -5,7 +5,7 @@
 ## 平台资源
 
 - [工业能碳智控平台官网首页](http://36.151.146.71:40200/)：平台愿景、面向对象、一站式方案（数字孪生引擎 / 能碳仿真寻优 / 本析智擎 / 能碳一体机 / 能碳合规引擎）、核心能力与常见问题
-- [网页版在线体验](http://36.151.146.71:40005/)：工业能碳智控平台网页版入口
+- [网页版在线体验](http://36.151.146.71:40014/)：工业能碳智控平台网页版入口
 - [Windows 客户端下载](https://github.com/zhibinQiu/power_simulation/releases/download/v2.0.3/SteelCarbonTwin-windows-x64-setup.exe)：SteelCarbonTwin Windows x64 安装包（EXE）
 - [macOS 客户端下载](http://36.151.146.71:40280/SteelCarbonTwin-macos-arm64.dmg)：SteelCarbonTwin macOS arm64 安装包（DMG）
 

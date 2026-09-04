@@ -82,7 +82,7 @@ A：三级防护（参数边界 / 耦合一致性 / 执行确认）+「自动/�
 ## 联系与获取
 
 - 电话 / 微信：15963564658
-- 网页版在线体验：http://36.151.146.71:40005/
+- 网页版在线体验：http://36.151.146.71:40014/
 - Windows 客户端下载：https://github.com/zhibinQiu/power_simulation/releases/download/v2.0.3/SteelCarbonTwin-windows-x64-setup.exe
 - macOS 客户端下载：http://36.151.146.71:40280/SteelCarbonTwin-macos-arm64.dmg
 - 服务方式：预约产品演示、订阅最新动态（添加微信即可）
