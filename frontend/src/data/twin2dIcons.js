@@ -261,24 +261,28 @@ export const T2D_ICONS = {
 }
 
 // —— 设备图幅几何表：每个设备在 2D 图中的「占位盒」（宽×高，px）。
-// 2D 图不再用统一卡片包设备，设备以平面图直接落地，故每台设备按自身形态占据不同尺寸的图幅：
-// 高炉高耸、烧结/轧机宽扁、风机小巧。布局与连线路由都按此动态尺寸排布。
+// 2D 图不再用统一卡片包设备，设备以平面图直接落地。
+// 主工艺尺寸统一（2026-09-04 用户要求「大小一致」）：图符渲染为等比 contain
+// （矢量 min(avW/22, avH/23.5)、PNG preserveAspectRatio=meet），统一盒尺寸不会拉伸
+// 设备图形，只统一视觉大小；端口位置由 T2D_INOUT 图标坐标(0-22)决定，不受盒尺寸影响。
+// 注：盒高在端口数多时仍自动扩展（boxH: max(h, 96+(cnt-1)*24) + KPI_H），
+// 高炉（9 个入口）实际盒高 ~314 略高，属端口空间需求。
 // h 为「基础高」，端口数多时自动向上扩展；主工艺底部有悬浮 KPI 再额外 +26。
 export const T2D_GEOM = {
-  // —— 主工艺（炼铁/炼钢/轧钢）——
-  sinter_plant:      { w: 395, h: 200 },  // 烧结台车：宽扁长条（主工艺 ×1.2）
-  pelletizing:       { w: 335, h: 205 },  // 球团圆盘
-  coke_oven:         { w: 350, h: 215 },  // 焦炉：多室体
-  blast_furnace:     { w: 210, h: 300 },  // 高炉：高耸炉体
-  hot_metal_pretreat:{ w: 290, h: 185 },  // 铁水包
-  bof:               { w: 330, h: 245 },  // 转炉：梨形高炉体
-  ladle_furnace:     { w: 290, h: 215 },
-  rh_vacuum:         { w: 275, h: 210 },
-  caster:            { w: 335, h: 220 },  // 连铸：弧形辊列
-  rolling_mill:      { w: 360, h: 200 },  // 轧机：水平宽
-  reheating_furnace: { w: 200, h: 155 },
-  eaf:               { w: 180, h: 195 },
-  dri_midrex:        { w: 165, h: 200 },
+  // —— 主工艺（炼铁/炼钢/轧钢）—— 统一 330×230
+  sinter_plant:      { w: 330, h: 230 },  // 烧结台车（原 395×200 宽扁）
+  pelletizing:       { w: 330, h: 230 },  // 球团圆盘
+  coke_oven:         { w: 330, h: 230 },  // 焦炉：多室体
+  blast_furnace:     { w: 330, h: 230 },  // 高炉（原 210×300 高耸；端口多自动加高）
+  hot_metal_pretreat:{ w: 330, h: 230 },  // 铁水包
+  bof:               { w: 330, h: 230 },  // 转炉
+  ladle_furnace:     { w: 330, h: 230 },
+  rh_vacuum:         { w: 330, h: 230 },
+  caster:            { w: 330, h: 230 },  // 连铸：弧形辊列
+  rolling_mill:      { w: 330, h: 230 },  // 轧机
+  reheating_furnace: { w: 330, h: 230 },  // （短流程）
+  eaf:               { w: 330, h: 230 },  // （短流程）
+  dri_midrex:        { w: 330, h: 230 },  // （短流程）
   // —— 公用 / 节能减碳 ——
   gas_power:         { w: 180, h: 155 },
   waste_heat:        { w: 180, h: 165 },
@@ -308,19 +312,24 @@ export const T2D_GEOM = {
 //   - cx/cy 直接落在图符画出的特征点上（料钟、风口带、出铁口、氧枪头…），图符放大后位置随之等比缩放；
 //   - side 决定连线的「外接方向」：T=向上 / R=向右 / B=向下 / L=向左，stub 沿此方向外伸后再折线连接。
 // 数组下标与 PROCESS_TEMPLATES[type].inputs / outputs 的物料顺序严格一一对应。
+// 2D 端口出/入口径规则(用户约束):
+//   - 入口(in)只能落在设备的「左 / 上 / 下」三边(L/T/B)
+//   - 出口(out)只能落在设备的「右」边(R)
+//   - 同边多口沿该边(cx 或 cy)均匀错开
+// 数组下标与 PROCESS_TEMPLATES[type].inputs / outputs 的物料顺序严格一一对应。
 export const T2D_INOUT = {
   // —— 主工艺 ——
   sinter_plant: {
     in: [
       { cx: 2,  cy: 11,   side: 'L' },  // 0: iron_ore  烧结料层左端入料
-      { cx: 2,  cy: 10,   side: 'L' },  // 1: coke
+      { cx: 6,  cy: 22,   side: 'B' },  // 1: coke      焦炉回供焦粉：底部进（回流弧自下方走廊上插，与 draft 的 cx=11 错开）
       { cx: 2,  cy: 9,    side: 'L' },  // 2: limestone
       { cx: 11, cy: 22,   side: 'B' },  // 3: draft     抽风罩
     ],
     out: [
       { cx: 21, cy: 15,   side: 'R' },  // 0: sinter    烧结台车右端出料
-      { cx: 8,  cy: 8,    side: 'T' },  // 1: bfg       抽风罩排气
-      { cx: 16, cy: 8,    side: 'T' },  // 2: co2
+      { cx: 21, cy: 8,    side: 'R' },  // 1: bfg       抽风罩排气（右出）
+      { cx: 21, cy: 11,   side: 'R' },  // 2: co2       右出
     ],
   },
   pelletizing: {
@@ -330,8 +339,8 @@ export const T2D_INOUT = {
       { cx: 12, cy: 18,   side: 'B' },  // 2: draft
     ],
     out: [
-      { cx: 18, cy: 14,   side: 'R' },  // 0: pellet
-      { cx: 16, cy: 6,    side: 'T' },  // 1: co2
+      { cx: 21, cy: 14,   side: 'R' },  // 0: pellet
+      { cx: 21, cy: 18,   side: 'R' },  // 1: co2
     ],
   },
   coke_oven: {
@@ -341,62 +350,62 @@ export const T2D_INOUT = {
     ],
     out: [
       { cx: 21, cy: 13,   side: 'R' },  // 0: coke      推焦侧出焦
-      { cx: 6,  cy: 4,    side: 'T' },  // 1: cog       上升管
-      { cx: 18, cy: 4,    side: 'T' },  // 2: co2
+      { cx: 21, cy: 9,    side: 'R' },  // 1: cog       上升管（右出）
+      { cx: 21, cy: 5,    side: 'R' },  // 2: co2       右出
     ],
   },
   blast_furnace: {
     in: [
-      { cx: 4,  cy: 0.5,  side: 'T' },  // 0: sinter     炉顶料钟装料
-      { cx: 8,  cy: 0.5,  side: 'T' },  // 1: pellet
-      { cx: 12, cy: 0.5,  side: 'T' },  // 2: coke
-      { cx: 16, cy: 0.5,  side: 'T' },  // 3: limestone
+      { cx: 1,  cy: 3,    side: 'L' },  // 0: sinter     来自主带左侧（烧结机同行相邻）→ 左壁入
+      { cx: 1,  cy: 6,    side: 'L' },  // 1: pellet     同上（球团）
+      { cx: 1,  cy: 13,   side: 'L' },  // 2: coke       与焦炉 out coke cy13 对齐 → 笔直横线
+      { cx: 1,  cy: 9,    side: 'L' },  // 3: limestone
       { cx: 5,  cy: 19,   side: 'L' },  // 4: self_power
       { cx: 8,  cy: 15,   side: 'L' },  // 5: blast_air  风口带冷风
-      { cx: 11, cy: 15,   side: 'L' },  // 6: hot_blast  风口带热风
-      { cx: 14, cy: 15,   side: 'L' },  // 7: pulverized_coal  风口带喷煤
+      { cx: 1,  cy: 17,   side: 'L' },  // 6: hot_blast  风口带热风（贴左缘、垂直错开热风与喷煤口）
+      { cx: 5,  cy: 20,   side: 'L' },  // 7: pulverized_coal  风口带喷煤（与 hot_blast 错开 37px，水平并排两条线不再共 x 槽）
       { cx: 5,  cy: 21,   side: 'L' },  // 8: electricity
     ],
     out: [
-      { cx: 18, cy: 21,   side: 'R' },  // 0: hot_metal  出铁口（铁水）
-      { cx: 16, cy: 17,   side: 'R' },  // 1: bf_slag    渣口
-      { cx: 7,  cy: 2,    side: 'T' },  // 2: bfg        炉顶煤气
-      { cx: 17, cy: 2,    side: 'T' },  // 3: co2
+      { cx: 21, cy: 21,   side: 'R' },  // 0: hot_metal  出铁口（铁水）
+      { cx: 21, cy: 18,   side: 'R' },  // 1: bf_slag    渣口
+      { cx: 21, cy: 6,    side: 'R' },  // 2: bfg        炉顶煤气（右出）
+      { cx: 21, cy: 3,    side: 'R' },  // 3: co2        右出
     ],
   },
   hot_metal_pretreat: {
     in: [
-      { cx: 10, cy: 8,    side: 'T' },  // 0: hot_metal  铁水包顶部倒入
-      { cx: 14, cy: 8,    side: 'T' },  // 1: oxygen     喷枪
+      { cx: 1,  cy: 10,   side: 'L' },  // 0: hot_metal  高炉在左侧同行 → 左壁入
+      { cx: 14, cy: 21,   side: 'B' },  // 1: oxygen     供氧系统在下方 → 底面进（喷枪）
     ],
     out: [
-      { cx: 18, cy: 10,   side: 'R' },  // 0: pre_hm     右侧倒出
-      { cx: 7,  cy: 8,    side: 'T' },  // 1: co2
+      { cx: 21, cy: 10,   side: 'R' },  // 0: pre_hm     右侧倒出
+      { cx: 21, cy: 14,   side: 'R' },  // 1: co2        右出
     ],
   },
   bof: {
     in: [
-      { cx: 8,  cy: 2.5,  side: 'T' },  // 0: pre_hm     炉口倒入
+      { cx: 1,  cy: 10,   side: 'L' },  // 0: pre_hm     铁水预处理在左侧同行、cy 与其 out 对齐 → 笔直横线
       { cx: 15, cy: 2.5,  side: 'T' },  // 1: scrap      炉口废钢
       { cx: 11, cy: 2.5,  side: 'T' },  // 2: limestone
-      { cx: 12, cy: 1,    side: 'T' },  // 3: oxygen     氧枪顶
+      { cx: 14, cy: 21,   side: 'B' },  // 3: oxygen     供氧系统在下方 → 底面进
     ],
     out: [
-      { cx: 18, cy: 18,   side: 'R' },  // 0: crude_steel 耳轴侧出钢
-      { cx: 16, cy: 2.5,  side: 'T' },  // 1: steel_slag  炉口出渣
-      { cx: 5,  cy: 1.5,  side: 'T' },  // 2: ldg        罩顶 LD 煤气
-      { cx: 9,  cy: 1.5,  side: 'T' },  // 3: conv_dust
-      { cx: 19, cy: 1.5,  side: 'T' },  // 4: co2
+      { cx: 21, cy: 18,   side: 'R' },  // 0: crude_steel 耳轴侧出钢
+      { cx: 21, cy: 15,   side: 'R' },  // 1: steel_slag  右出
+      { cx: 21, cy: 6,    side: 'R' },  // 2: ldg        罩顶 LD 煤气（右出）
+      { cx: 21, cy: 9,    side: 'R' },  // 3: conv_dust  右出
+      { cx: 21, cy: 3,    side: 'R' },  // 4: co2        右出
     ],
   },
   ladle_furnace: {
     in: [
-      { cx: 9,  cy: 9,    side: 'T' },  // 0: crude_steel 钢包顶倒入
+      { cx: 1,  cy: 10,   side: 'L' },  // 0: crude_steel 转炉在左侧同行 → 左壁入
       { cx: 15, cy: 9,    side: 'T' },  // 1: electricity 三电极
     ],
     out: [
-      { cx: 18, cy: 11,   side: 'R' },  // 0: refined_steel
-      { cx: 12, cy: 9,    side: 'T' },  // 1: co2
+      { cx: 21, cy: 11,   side: 'R' },  // 0: refined_steel
+      { cx: 21, cy: 15,   side: 'R' },  // 1: co2        右出
     ],
   },
   rh_vacuum: {
@@ -405,17 +414,17 @@ export const T2D_INOUT = {
       { cx: 12, cy: 3,    side: 'T' },  // 1: electricity  真空泵
     ],
     out: [
-      { cx: 16, cy: 10,   side: 'R' },  // 0: refined_steel 上升管出钢
+      { cx: 21, cy: 10,   side: 'R' },  // 0: refined_steel 上升管出钢
     ],
   },
   caster: {
     in: [
-      { cx: 12, cy: 1,    side: 'T' },  // 0: refined_steel 中间包
+      { cx: 1,  cy: 10,   side: 'L' },  // 0: refined_steel RH 在左侧同行、cy 与其 out 对齐 → 笔直横线
       { cx: 17, cy: 1,    side: 'T' },  // 1: electricity
     ],
     out: [
-      { cx: 11, cy: 22,   side: 'B' },  // 0: billet      铸坯弧形辊列下出
-      { cx: 4,  cy: 10,   side: 'L' },  // 1: scale       喷淋侧氧化铁皮
+      { cx: 21, cy: 12,   side: 'R' },  // 0: billet      铸坯（右出）
+      { cx: 21, cy: 18,   side: 'R' },  // 1: scale       右出
     ],
   },
   rolling_mill: {
@@ -426,7 +435,7 @@ export const T2D_INOUT = {
     ],
     out: [
       { cx: 21, cy: 12,   side: 'R' },  // 0: steel_product
-      { cx: 16, cy: 22,   side: 'B' },  // 1: scale
+      { cx: 21, cy: 18,   side: 'R' },  // 1: scale       右出
     ],
   },
   eaf: {
@@ -442,9 +451,9 @@ export const T2D_INOUT = {
     ],
     out: [
       { cx: 21, cy: 13.5, side: 'R' },  // 0: crude_steel  出钢槽
-      { cx: 18, cy: 16,   side: 'R' },  // 1: steel_slag
-      { cx: 6,  cy: 4,    side: 'T' },  // 2: ldg
-      { cx: 9,  cy: 4,    side: 'T' },  // 3: co2
+      { cx: 21, cy: 16,   side: 'R' },  // 1: steel_slag
+      { cx: 21, cy: 6,    side: 'R' },  // 2: ldg          右出
+      { cx: 21, cy: 3,    side: 'R' },  // 3: co2          右出
     ],
   },
   dri_midrex: {
@@ -456,9 +465,9 @@ export const T2D_INOUT = {
       { cx: 16, cy: 2,    side: 'T' },  // 4: drive_power
     ],
     out: [
-      { cx: 17, cy: 19,   side: 'R' },  // 0: dri
-      { cx: 7,  cy: 2,    side: 'T' },  // 1: co2
-      { cx: 11, cy: 2,    side: 'T' },  // 2: top_gas
+      { cx: 21, cy: 19,   side: 'R' },  // 0: dri
+      { cx: 21, cy: 6,    side: 'R' },  // 1: co2          右出
+      { cx: 21, cy: 3,    side: 'R' },  // 2: top_gas      右出
     ],
   },
   // —— 公用/减碳 ——
@@ -470,14 +479,14 @@ export const T2D_INOUT = {
     ],
     out: [
       { cx: 21, cy: 12,   side: 'R' },  // 0: self_power
-      { cx: 17, cy: 8,    side: 'T' },  // 1: steam
+      { cx: 21, cy: 15,   side: 'R' },  // 1: steam         右出
     ],
   },
   waste_heat: {
     in:  [{ cx: 10, cy: 5,    side: 'T' }],  // 0: waste_heat
     out: [
-      { cx: 17, cy: 12,   side: 'R' },  // 0: self_power
-      { cx: 19, cy: 4,    side: 'R' },  // 1: steam  烟囱侧
+      { cx: 21, cy: 12,   side: 'R' },  // 0: self_power
+      { cx: 21, cy: 15,   side: 'R' },  // 1: steam  烟囱侧
     ],
   },
   ccs: {
@@ -487,19 +496,19 @@ export const T2D_INOUT = {
   // —— 工辅 ——
   hot_blast_stove: {
     in:  [{ cx: 12, cy: 20,   side: 'B' }],  // 0: blast_air 蓄热室底部冷风阀
-    out: [{ cx: 18, cy: 10,   side: 'R' }],  // 0: hot_blast 蓄热室侧热风出口
+    out: [{ cx: 21, cy: 10,   side: 'R' }],  // 0: hot_blast 蓄热室侧热风出口
   },
   blower: {
-    in:  [{ cx: 11, cy: 3,    side: 'T' }],  // 0: oxygen 富氧
-    out: [{ cx: 11, cy: 3,    side: 'T' }],  // 0: blast_air 蜗壳出口朝上（送下方 stove）
+    in:  [{ cx: 11, cy: 19,   side: 'B' }],  // 0: oxygen 富氧（底部进，供氧系统就在其正下方）
+    out: [{ cx: 21, cy: 18,   side: 'R' }],  // 0: blast_air 蜗壳出口（右出，送下方 stove）
   },
   id_fan: {
     in:  [],
-    out: [{ cx: 12, cy: 3,    side: 'T' }],  // 0: draft
+    out: [{ cx: 21, cy: 10,   side: 'R' }],  // 0: draft         右出
   },
   injector: {
     in:  [],
-    out: [{ cx: 12, cy: 4,    side: 'T' }],  // 0: pulverized_coal 喷枪头顶
+    out: [{ cx: 21, cy: 8,    side: 'R' }],  // 0: pulverized_coal 喷枪头（右出）
   },
   combustion_blower: {
     in:  [],
@@ -511,7 +520,7 @@ export const T2D_INOUT = {
   },
   electrode_reg: {
     in:  [{ cx: 10, cy: 2,    side: 'T' }],  // 0: electricity
-    out: [{ cx: 14, cy: 2,    side: 'T' }],  // 0: electrode_power
+    out: [{ cx: 21, cy: 10,   side: 'R' }],  // 0: electrode_power 右出
   },
   belt_conv: {
     in:  [{ cx: 12, cy: 6,    side: 'T' }],  // 0: feeder_flow
@@ -535,7 +544,7 @@ export const T2D_INOUT = {
   },
   oxy_supply: {
     in:  [{ cx: 4,  cy: 12,   side: 'L' }],  // 0: electricity
-    out: [{ cx: 12, cy: 2,    side: 'T' }],  // 0: oxygen
+    out: [{ cx: 21, cy: 10,   side: 'R' }],  // 0: oxygen         右出
   },
   power_supply: {
     in:  [{ cx: 12, cy: 2,    side: 'T' }],  // 0: electricity
