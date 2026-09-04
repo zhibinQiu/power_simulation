@@ -1,34 +1,35 @@
 #!/usr/bin/env bash
 # ============================================================================
-# 同步脚本 v3：本地源码 → 新服务器（Docker 源码卷挂载 + uvicorn --reload）
+# 能碳平台 · 同步脚本（platform/bs-deploy/sync.sh，在开发机执行）
 #
-# 背景：云端主服务器已从 172.19.134.45（备用）迁移到 36.151.146.71（新），
-#       新服务器以「源码卷挂载」模式运行（backend/ 与 frontend/dist 卷挂载进容器，
-#       容器内 uvicorn --reload），因此日常改代码的生效路径最快：
-#         - 后端 .py 改动  → rsync 后容器内 --reload 秒级自动生效，无需重建/重启
-#         - 前端改动       → 本地 npx vite build 后 rsync frontend/dist（静态文件即刻生效）
-#       仅当 Dockerfile / docker-compose.yml / requirements.txt 等「构建输入」
-#       变更时才需要 docker compose up -d --build（脚本自动检测，依赖层缓存通常 1 分钟内）。
+# 本地源码 → 新服务器（Docker 源码卷挂载 + uvicorn --reload）：
+#   - 后端 .py 改动  → rsync 后容器内 --reload 秒级自动生效，无需重建/重启
+#   - 前端改动       → 本地 npx vite build 后 rsync frontend/dist（静态文件即刻生效）
+#   - 仅 Dockerfile / docker-compose.yml / requirements 等「构建输入」变更时
+#     才需 docker compose up -d --build（脚本自动检测，依赖层缓存通常 1 分钟内）
 #
-# 用法：
-#   bash sync.sh                            rsync→71 + 自动部署 + git 提交推送
-#   bash sync.sh "fix: xxx"                 指定 git 提交信息
-#   bash sync.sh --no-git                   只同步代码到服务器（不提交 GitHub）
-#   bash sync.sh --skip-build               只 rsync 代码，不在服务器构建/拉起（下次手动 up）
-#   bash sync.sh --server 45                同步到备用服务器 172.19.134.45
-#   bash sync.sh --no-portal                跳过线上官网同步
+# 用法（仓库根任一路径执行本脚本均可，脚本自动定位仓库根）：
+#   bash platform/bs-deploy/sync.sh                 rsync→71 + 自动部署 + git 提交推送
+#   bash platform/bs-deploy/sync.sh "fix: xxx"      指定 git 提交信息
+#   bash platform/bs-deploy/sync.sh --no-git        只同步代码到服务器（不提交 GitHub）
+#   bash platform/bs-deploy/sync.sh --skip-build    只 rsync 代码，不在服务器构建/拉起
+#   bash platform/bs-deploy/sync.sh --server 45     同步到备用服务器 172.19.134.45
+#   bash platform/bs-deploy/sync.sh --no-portal     跳过线上官网同步
 #
 # 服务器免密说明：默认 BatchMode=yes 走 SSH 密钥；未配置密钥时可用
-#   export QZB_SSH_PASS='<密码>' bash sync.sh   （依赖 sshpass）
+#   export QZB_SSH_PASS='<密码>' bash platform/bs-deploy/sync.sh   （依赖 sshpass）
 # ============================================================================
 set -euo pipefail
-cd "$(dirname "$0")"
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SELF_DIR/../.." && pwd)"          # 仓库根（rsync 源 / git / 前端构建均在此）
+cd "$ROOT"
 
 # ---- 云端目标：主=新服务器 71，备=45 ----
 CLOUD_MAIN="root@36.151.146.71"        # 新服务器（Docker Compose 源码卷挂载部署，目录即仓库根）
 CLOUD_BACKUP="root@172.19.134.45"      # 备用服务器（旧部署结构，保留 rsync 兼容）
 SERVER="$CLOUD_MAIN"
-SERVER_DIR="/root/qzb/jianpai"
+SERVER_DIR="/root/qzb/jianpai"          # 服务器仓库根
+BS_DIR="$SERVER_DIR/platform/bs-deploy" # 服务器部署编排目录（compose 相对 ../.. 指向仓库根）
 GIT_REMOTE="github"
 GIT_BRANCH="master"
 IMAGE_NAME="ghcr.io/zhibinqiu/power_simulation:latest"
@@ -80,7 +81,8 @@ if [ "$RUN_GIT" = "1" ] && ! git remote | grep -qx "$GIT_REMOTE"; then
 fi
 
 if ! command -v rsync >/dev/null 2>&1; then echo "❌ 缺少 rsync" >&2; exit 1; fi
-echo "==> 同步目标：$SERVER:$SERVER_DIR （$( [ "$SERVER" = "$CLOUD_MAIN" ] && echo 新服务器/主 || echo 备用 )）"
+echo "==> 仓库根：$ROOT"
+echo "==> 同步目标：$SERVER:$SERVER_DIR （ $( [ "$SERVER" = "$CLOUD_MAIN" ] && echo 新服务器/主 || echo 备用 )）"
 
 # ---- [0/5] 本地构建前端/文档站产物（dist 已入库，随 rsync 同步；改动即生效） ----
 echo "==> [0/5] 本地构建前端产物（frontend/ docs-site/，缺失/失败不阻断同步）..."
@@ -99,7 +101,8 @@ echo "==> [1/5] rsync 源码 + 配置 + 前端产物到服务器（排除运行�
 rsync_run $EXCLUDES ./ "$SERVER:$SERVER_DIR/"
 
 # ---- 是否需要重建镜像：仅「构建输入」变更 / 服务器无镜像 时才 build ----
-BUILD_SENSITIVE="Dockerfile Dockerfile.docs docker-compose.yml .dockerignore backend/config/requirements.txt"
+# 比对路径统一用「仓库根相对路径」（本地与远程目录结构一致）
+BUILD_SENSITIVE=".dockerignore platform/bs-deploy/Dockerfile platform/bs-deploy/Dockerfile.docs platform/bs-deploy/docker-compose.yml platform/bs-deploy/.env.example backend/config/requirements.txt"
 need_build() {
   local lh rh f
   ssh_run "$SERVER" "docker image inspect '$IMAGE_NAME' >/dev/null 2>&1" 2>/dev/null \
@@ -117,11 +120,11 @@ need_build() {
 if [ "$RUN_BUILD" = "1" ]; then
   if need_build; then
     echo "==> [2/5] 重建运行环境镜像并拉起（层缓存命中，通常 1 分钟内）..."
-    ssh_run "$SERVER" "cd $SERVER_DIR && docker compose up -d --build" \
-      || { echo "⚠ 服务器重建失败（查看上方日志）；代码已同步，可稍后手动：cd $SERVER_DIR && docker compose up -d --build" >&2; }
+    ssh_run "$SERVER" "cd $BS_DIR && docker compose up -d --build" \
+      || { echo "⚠ 服务器重建失败（查看上方日志）；代码已同步，可稍后手动：cd $BS_DIR && docker compose up -d --build" >&2; }
   else
     echo "==> [2/5] 构建输入无变更 → 不重建镜像；容器内 uvicorn --reload 已自动加载新代码"
-    ssh_run "$SERVER" "cd $SERVER_DIR && docker compose up -d" \
+    ssh_run "$SERVER" "cd $BS_DIR && docker compose up -d" \
       || { echo "⚠ 服务器拉起失败（查看上方日志）" >&2; }
   fi
   echo "    健康检查："
@@ -149,12 +152,12 @@ if [ "$RUN_GIT" = "1" ]; then
   else
     git commit -q -m "${MSG:-sync: 更新代码}" && echo "    已提交: ${MSG:-sync: 更新代码}"
   fi
-  echo "    推送到 GitHub（网络不通时自动跳过，稍后可用 ./push.sh）..."
+  echo "    推送到 GitHub（网络不通时自动跳过，稍后可用 push.sh）..."
   if command -v timeout >/dev/null 2>&1; then GIT_T="timeout 90"; else GIT_T=""; fi
   if $GIT_T git pull --rebase "$GIT_REMOTE" "$GIT_BRANCH" 2>/dev/null && $GIT_T git push "$GIT_REMOTE" "$GIT_BRANCH" 2>/dev/null; then
     echo "    推送完成"
   else
-    echo "    ⚠ 本次未能推送（GitHub 网络问题），改动已在本地提交，稍后执行 ./push.sh"
+    echo "    ⚠ 本次未能推送（GitHub 网络问题），改动已在本地提交，稍后执行 bash platform/bs-deploy/push.sh"
   fi
 else
   echo "==> [4/5] 已跳过 git（--no-git）"

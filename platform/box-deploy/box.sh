@@ -8,7 +8,7 @@
 #
 # 用法（盒子 root，Debian/Ubuntu arm64）：
 #   1) 配置文件驱动（推荐）：把 box-config.json 放到 /opt/weight-bridge/ 后一条命令
-#        curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/box.sh | bash
+#        curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/platform/box-deploy/box.sh | bash
 #      box-config.json 字段（其余字段一律忽略）：
 #        { "boxId": "my-box-01", "cloudIP": "36.151.146.71", "token": "xxx.yyy.zzz",
 #          "repo": "owner/repo", "branch": "master", "rootCA": "<base64 可选>" }
@@ -48,7 +48,7 @@ usage() {
 能碳一体机 · 全新盒子一键接入（GitHub 源码拉取版）
 
 用法（盒子 root）：
-  curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/box.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/platform/box-deploy/box.sh | bash
       自动读取 /opt/weight-bridge/box-config.json（boxId/cloudIP/token 必填）
   curl -fsSL <同上> | bash -s -- -c /path/box-config.json
       指定配置文件

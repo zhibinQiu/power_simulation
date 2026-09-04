@@ -245,13 +245,15 @@ def test_github_push_missing_config(monkeypatch):
     assert not res["ok"] and "token" in res["error"]
 
 
-# ------------------------- GitHub 源码一键部署（deploy/server.sh · deploy/box.sh） -------------------------
+# ---------- GitHub 源码一键部署（platform/bs-deploy · platform/box-deploy） ----------
 
-DEPLOY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "deploy")
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+BS_DEPLOY_DIR = os.path.join(REPO_ROOT, "platform", "bs-deploy")    # 平台自身前后端部署
+BOX_DEPLOY_DIR = os.path.join(REPO_ROOT, "platform", "box-deploy")  # 边缘盒子部署
 
 
-def _read_deploy_script(name: str) -> str:
-    path = os.path.join(DEPLOY_DIR, name)
+def _read_deploy_script(dir_: str, name: str) -> str:
+    path = os.path.join(dir_, name)
     assert os.path.isfile(path), f"部署脚本缺失：{path}"
     return open(path, encoding="utf-8").read()
 
@@ -268,19 +270,19 @@ def _check_bash_syntax(script: str):
 
 
 def test_deploy_server_sh():
-    script = _read_deploy_script("server.sh")
+    script = _read_deploy_script(BS_DEPLOY_DIR, "server.sh")
     assert script.startswith("#!/usr/bin/env bash")
-    # 全新服务器一键部署：拉源码 → 装依赖 → 构建前端 → systemd 启动
+    # 全新服务器一键部署：拉源码（backend 源码 + dist 均已入库）→ 构建运行环境镜像 → 卷挂载启动
     for kw in ("-r|--repo)", "-b|--branch)", "-d|--dir)", "-p|--port)",
-               "git clone --depth 1", "pip install -r config/requirements.txt",
-               "npx vite build", "carbon-platform.service", "uvicorn app.main:app"):
+               "git clone --depth 1", "docker compose build", "docker compose up -d",
+               "DEFAULT_PORT=40014", "platform/bs-deploy", "源码卷挂载"):
         assert kw in script, f"server.sh 缺少：{kw}"
-    assert "DEFAULT_PORT=40013" in script  # 遵循 40000+ 端口规范
+    assert "update.sh" in script  # 已部署实例提示走更新脚本
     _check_bash_syntax(script)
 
 
 def test_deploy_box_sh():
-    script = _read_deploy_script("box.sh")
+    script = _read_deploy_script(BOX_DEPLOY_DIR, "box.sh")
     assert script.startswith("#!/usr/bin/env bash")
     # 参数与配置驱动
     for kw in ("-c|--config)", "-i|--ip)", "-n|--name)", "-t|--token)",
@@ -297,17 +299,16 @@ def test_deploy_box_sh():
 
 
 def test_deploy_update_sh():
-    script = _read_deploy_script("update.sh")
+    script = _read_deploy_script(BS_DEPLOY_DIR, "update.sh")
     assert script.startswith("#!/usr/bin/env bash")
-    # 更新脚本：备份现场数据 → 更新 → 恢复 → 重建 → 重启
+    # 更新脚本：备份现场数据 → git 更新 → 恢复 → 重建（reload 模式）→ 自检
     for kw in ("-d|--dir)", "-b|--branch)",
-               "git reset --hard \"origin/$BRANCH\"",
-               "box_config.json box_devices.json links.json mqtt.yaml",
-               "platform_config.json strategies.json .env github_config.json",
-               "cp -a \"$BACKUP_DIR/config/.\" backend/config/",
-               "npx vite build", "systemctl restart carbon-platform.service"):
+               'git reset --hard "origin/$BRANCH"',
+               "backend/data backend/config backend/knowledge",
+               "platform/bs-deploy/.env", "platform/bs-deploy/server.sh",
+               "docker compose build", "docker compose up -d"):
         assert kw in script, f"update.sh 缺少：{kw}"
-    # 明确防止覆盖现场数据
+    # 明确防止覆盖现场数据（备份/恢复 + git 管理）
     assert "reset --hard" in script and "备份" in script and "恢复" in script
     assert "update-backup-" in script
     _check_bash_syntax(script)

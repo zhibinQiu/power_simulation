@@ -8,10 +8,10 @@
 #   → ⑤ 滚动重启容器 → ⑥ 自检
 #
 # 全程无需 python/node/npm/venv；旧 systemd/venv 部署的服务器请改用本脚本，
-# 或先执行 deploy/server.sh 完成 Docker 迁移。
+# 或先执行 platform/bs-deploy/server.sh 完成 Docker 迁移。
 #
 # 用法（root）：
-#   curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/update.sh | bash -s -- -d /opt/carbon-platform
+#   curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/platform/bs-deploy/update.sh | bash -s -- -d /opt/carbon-platform
 # 选项：
 #   -d, --dir <path>   安装目录（默认 /opt/carbon-platform）
 #   -b, --branch <str> 分支（默认 master）
@@ -29,7 +29,7 @@ usage() {
 能碳智控平台 · 服务器更新脚本（Docker 版）
 
 用法（root）：
-  curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/update.sh | bash -s -- -d /opt/carbon-platform
+  curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/platform/bs-deploy/update.sh | bash -s -- -d /opt/carbon-platform
 
 选项：
   -d, --dir <path>   安装目录（默认 /opt/carbon-platform）
@@ -51,10 +51,10 @@ log() { echo -e "\033[32m[update]\033[0m $*"; }
 err() { echo -e "\033[31m[error]\033[0m $*" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || err "请以 root 运行（或 sudo bash $0）"
-[ -d "$INSTALL_DIR/.git" ] || err "目录不是 git 仓库：$INSTALL_DIR（请先执行 deploy/server.sh 部署）"
+[ -d "$INSTALL_DIR/.git" ] || err "目录不是 git 仓库：$INSTALL_DIR（请先执行 platform/bs-deploy/server.sh 部署）"
 cd "$INSTALL_DIR"
 command -v git >/dev/null 2>&1 || err "缺少 git"
-command -v docker >/dev/null 2>&1 || err "缺少 docker（请先执行 deploy/server.sh 完成部署）"
+command -v docker >/dev/null 2>&1 || err "缺少 docker（请先执行 platform/bs-deploy/server.sh 完成部署）"
 
 BACKUP_DIR="$INSTALL_DIR/.update-backup-$(date +%Y%m%d%H%M%S)"
 mkdir -p "$BACKUP_DIR"
@@ -75,10 +75,11 @@ log "③ 恢复现场配置与数据..."
 for d in backend/data backend/config backend/knowledge; do
   [ -d "$BACKUP_DIR/$(basename "$d")" ] && cp -a "$BACKUP_DIR/$(basename "$d")/." "$d/" 2>/dev/null || true
 done
-[ -f "$INSTALL_DIR/.env" ] || cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
+[ -f "$INSTALL_DIR/platform/bs-deploy/.env" ] || cp "$INSTALL_DIR/platform/bs-deploy/.env.example" "$INSTALL_DIR/platform/bs-deploy/.env"
 
 # ---------- ④ 重建镜像并滚动重启 ----------
-log "④ 重建镜像 + 重启容器（pip/npm 依赖命中层缓存，通常 1 分钟内）..."
+cd "$INSTALL_DIR/platform/bs-deploy"   # 部署编排目录；compose 相对路径 ../.. 指向仓库根
+log "④ 重建镜像 + 重启容器（依赖层缓存命中，通常 1 分钟内）..."
 docker compose build || err "镜像构建失败，请查看上方日志"
 docker compose up -d || err "容器启动失败，请查看上方日志"
 

@@ -10,7 +10,7 @@
 # 不再像旧版那样在服务器装 python3-venv/npm/node_modules/vite，大幅省资源。
 #
 # 用法（服务器 root，Ubuntu/Debian/CentOS）：
-#   curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/server.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/platform/bs-deploy/server.sh | bash
 #   自定义仓库 / 分支 / 目录 / 端口：
 #   curl -fsSL <同上> | bash -s -- -r gitee.com/user/mirror -b main -d /opt/carbon-platform
 #
@@ -38,7 +38,7 @@ usage() {
 能碳智控平台 · 全新服务器一键部署（源码卷挂载 + uvicorn --reload）
 
 用法（root）：
-  curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/deploy/server.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/platform/bs-deploy/server.sh | bash
   curl -fsSL <同上> | bash -s -- -d /opt/carbon-platform -p 40014
 
 选项：
@@ -83,26 +83,26 @@ command -v docker compose >/dev/null 2>&1 || command -v docker-compose >/dev/nul
 # ---------- 1. 拉取源码（仅取部署编排 + 数据/配置模板） ----------
 if [ -d "$INSTALL_DIR/.git" ]; then
   log "目录已是 git 仓库：$INSTALL_DIR"
-  log "已部署实例请使用「更新脚本」：deploy/update.sh（备份现场数据后安全更新）"
+  log "已部署实例请使用「更新脚本」：platform/bs-deploy/update.sh（备份现场数据后安全更新）"
   exit 0
 fi
 mkdir -p "$(dirname "$INSTALL_DIR")"
 log "克隆源码：https://github.com/$REPO（分支 $BRANCH）→ $INSTALL_DIR"
 git clone --depth 1 -b "$BRANCH" "https://github.com/$REPO.git" "$INSTALL_DIR"
-[ -f "$INSTALL_DIR/docker-compose.yml" ] || err "源码结构异常：缺少 docker-compose.yml"
+[ -f "$INSTALL_DIR/platform/bs-deploy/docker-compose.yml" ] || err "源码结构异常：缺少 platform/bs-deploy/docker-compose.yml"
 
 # ---------- 2. 端口占位替换（可选） ----------
 if [ "$PORT" != "40014" ]; then
-  sed -i "s/\"$DEFAULT_PORT:8010\"/\"$PORT:8010\"/" "$INSTALL_DIR/docker-compose.yml"
+  sed -i "s/\"$DEFAULT_PORT:8010\"/\"$PORT:8010\"/" "$INSTALL_DIR/platform/bs-deploy/docker-compose.yml"
   log "对外端口改为 $PORT"
 fi
 
 # ---------- 3. .env 模板 ----------
-[ -f "$INSTALL_DIR/.env" ] || cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
-log "已生成 $INSTALL_DIR/.env（如需大模型问答，编辑填 LLM_API_KEY）"
+[ -f "$INSTALL_DIR/platform/bs-deploy/.env" ] || cp "$INSTALL_DIR/platform/bs-deploy/.env.example" "$INSTALL_DIR/platform/bs-deploy/.env"
+log "已生成 $INSTALL_DIR/platform/bs-deploy/.env（如需大模型问答，编辑填 LLM_API_KEY）"
 
 # ---------- 4. 启动（首次构建运行环境镜像） ----------
-cd "$INSTALL_DIR"
+cd "$INSTALL_DIR/platform/bs-deploy"   # 部署编排目录；compose 相对路径 ../.. 指向仓库根
 log "构建运行环境镜像（首次约 1~3 分钟，仅 Python 依赖；代码由仓库目录卷挂载）..."
 docker compose build || err "镜像构建失败，请查看上方日志"
 docker compose up -d || err "容器启动失败，请查看上方日志"
@@ -116,7 +116,7 @@ if docker ps --format '{{.Names}}' | grep -qx "$NAME"; then
   log "  访问地址：http://${IP:-<服务器IP>}:$PORT"
   log "  文档站  ：http://${IP:-<服务器IP>}:40184"
   log "  日志查看：docker logs -f $NAME"
-  log "  更新     ：deploy/update.sh（git pull + docker compose up -d --build）"
+  log "  更新     ：platform/bs-deploy/update.sh（git pull + docker compose up -d --build）"
   log "  备注：平台如需连接云端 MQTT / cloud-agent，在「总览 → 配置」填写云端地址即可"
 else
   err "平台容器启动失败，请查看：docker compose logs"

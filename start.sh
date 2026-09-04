@@ -19,7 +19,7 @@
 #    - 日志写入 .logs/ 目录，Ctrl+C 停止全部服务
 #    - 默认启动门户时会把 platform/homePage/ 同步到线上官网 43.161.194.75（免密 SSH），失败不阻断本地服务
 #    - 后端默认连接「新服务器」云端 MQTT Broker（backend/config/box_config.json 指向 36.151.146.71:41883），
-#      本地开发即可看到盒子实时数据；生产部署/更新请用 deploy/server.sh 与 ./sync.sh（详见 README）
+#      本地开发即可看到盒子实时数据；生产部署/更新请用 platform/bs-deploy/server.sh 与 platform/bs-deploy/sync.sh（详见 README）
 # ============================================================
 set -euo pipefail
 

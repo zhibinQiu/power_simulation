@@ -2,13 +2,13 @@
 # 协作者推送脚本。
 #
 # 用法：
-#   ./push.sh                          仅推送（要求工作树已提交）
-#   ./push.sh "fix: xxx"               提交 + 推送
-#   ./push.sh "fix: xxx" --tag v1.0.0  提交 + 打 tag + 推送（触发 GitHub Actions 打包发布 Release）
+#   bash platform/bs-deploy/push.sh                          仅推送（要求工作树已提交）
+#   bash platform/bs-deploy/push.sh "fix: xxx"               提交 + 推送
+#   bash platform/bs-deploy/push.sh "fix: xxx" --tag v1.0.0  提交 + 打 tag + 推送（触发 GitHub Actions 打包发布 Release）
 #
 # 流程：拉取远端最新并 rebase -> 推送到 GitHub 当前分支 -> （可选）推 tag 触发打包。
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../.."   # 定位到仓库根
 
 # 推送目标：GitHub 远端（命名约定为 github）
 GIT_REMOTE="github"
@@ -25,7 +25,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --tag)
       if [ $# -lt 2 ]; then
-        echo "❌ --tag 需要一个版本号，如：./push.sh \"msg\" --tag v1.0.0"
+        echo "❌ --tag 需要一个版本号，如：bash platform/bs-deploy/push.sh \"msg\" --tag v1.0.0"
         exit 1
       fi
       TAG="$2"
@@ -60,7 +60,7 @@ if [ -n "$MSG" ]; then
 else
   # 无提交信息：要求工作树已提交，避免把半成品推上去
   if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "⚠️ 工作树有未提交改动。请先 'git commit'，或用 './push.sh \"提交信息\"' 一键提交并推送。"
+    echo "⚠️ 工作树有未提交改动。请先 'git commit'，或用 'bash platform/bs-deploy/push.sh \"提交信息\"' 一键提交并推送。"
     git status --short
     exit 1
   fi
@@ -88,5 +88,5 @@ if [ -n "$TAG" ]; then
   echo "✅ 已推送 tag $TAG。约 10-15 分钟后可在仓库 Release 页面下载安装包。"
 else
   echo "✅ 推送完成。若是功能分支，请到 GitHub 发起 Pull Request 合并到 master。"
-  echo "   （需要打包发布时加 --tag，如：./push.sh \"msg\" --tag v1.0.0）"
+  echo "   （需要打包发布时加 --tag，如：bash platform/bs-deploy/push.sh \"msg\" --tag v1.0.0）"
 fi

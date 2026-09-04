@@ -8,9 +8,10 @@
 # 因此日常更新代码后容器无需重建；仅当 requirements.txt / Dockerfile /
 # docker-compose.yml 变更时才需 docker compose up -d --build。
 #
-# 构建：
-#   docker build -t steel-carbon-twin:latest .
-# 运行：见 docker-compose.yml
+# 构建（build context 恒为仓库根；.dockerignore 也在仓库根）：
+#   cd <仓库根>/platform/bs-deploy && docker compose up -d --build
+#   （或：cd <仓库根> && docker build -f platform/bs-deploy/Dockerfile -t steel-carbon-twin:latest .）
+# 运行：见同目录 docker-compose.yml
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \

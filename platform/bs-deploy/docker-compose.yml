@@ -1,31 +1,36 @@
-# 能碳智控平台 · 源码卷挂载 + uvicorn --reload（开发-生产同构，日常更新免重建）
+# 能碳智控平台 · 部署编排（platform/bs-deploy/ 内；build context = 仓库根 ../..）
+#
+# 源码卷挂载 + uvicorn --reload（开发-生产同构，日常更新免重建）
 #
 # 运行方式（服务器，仅需 Docker；无需 python/node/npm/venv）：
-#   cd <部署目录>
+#   cd <仓库根>/platform/bs-deploy
 #   docker compose up -d --build          # 首次 / 依赖变更：构建运行环境镜像
-#   日常更新代码（rsync backend/ 与 frontend/dist 到部署目录即可）：
+#   日常更新代码（git pull / rsync backend/ 与 frontend/dist 到仓库根即可）：
 #     - 后端改动：容器内 uvicorn --reload 自动生效（秒级，无需重建/重启）
 #     - 前端改动：本地 npx vite build 后同步 frontend/dist（静态文件即刻生效）
-#   仅当 backend/config/requirements.txt / Dockerfile / docker-compose.yml
-#   变更时才需重新 docker compose up -d --build（依赖层缓存命中，通常 1 分钟内）。
+#   仅当 platform/bs-deploy/requirements 上游或 Dockerfile / compose 变更时
+#   才需重新 docker compose up -d --build（依赖层缓存命中，通常 1 分钟内）。
 #
-# 数据安全：backend 整目录卷挂载（含 data/config/knowledge），运行期写盘内容
-#           即宿主机目录，重建容器/升级镜像不覆盖。
+# 说明：
+#   * build.context = 仓库根（../..）：Dockerfile 内 COPY backend/config/requirements.txt
+#     与仓库根 .dockerignore 均基于该 context；dockerfile 相对 context 指回本目录。
+#   * 相对卷挂载（../../*）同样解析到仓库根，运行期写盘内容即宿主机源码目录，
+#     重建容器/升级镜像不覆盖。
 # 访问：http://<服务器IP>:40014    （平台，前端由后端静态托管）
 #        http://<服务器IP>:40184    （文档站）
 
 services:
   steel-twin:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: platform/bs-deploy/Dockerfile
     image: ghcr.io/zhibinqiu/power_simulation:latest   # 本地 build 覆盖同 tag，不依赖公网拉取
     container_name: steel-carbon-twin
     working_dir: /app
     volumes:
       # 源码卷挂载（reload 生效）+ 前端构建产物挂载（后端静态托管）
-      - ./backend:/app/backend
-      - ./frontend/dist:/app/frontend/dist
+      - ../../backend:/app/backend
+      - ../../frontend/dist:/app/frontend/dist
     ports:
       - "40014:8010"               # 主机 40014 -> 容器 8010
     environment:
@@ -39,11 +44,11 @@ services:
       - LLM_MODEL=${LLM_MODEL:-}
     restart: unless-stopped
 
-  # 独立文档网站（宣传手册/使用手册/技术文档），dist 已入库，零构建
+  # 独立文档网站（宣传手册/使用手册/技术文档），docs-site/dist 已入库，零构建
   docs-site:
     build:
-      context: .
-      dockerfile: Dockerfile.docs
+      context: ../..
+      dockerfile: platform/bs-deploy/Dockerfile.docs
     image: ghcr.io/zhibinqiu/power_simulation-docs:latest
     container_name: nengtan-docs-site
     ports:

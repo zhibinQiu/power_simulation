@@ -1,17 +1,20 @@
 # ============================================================
-# 平台镜像自动构建发布（GitHub Container Registry）
+# 镜像自动构建发布（GitHub Container Registry）
+#
+# 部署模式：源码卷挂载 + uvicorn --reload（71 主服务器直接从仓库 build）。
+# 本流水线保留为「镜像发布通道」：产物供不便 git clone 的服务器拉取运行环境
+# 镜像后，再以卷挂载 backend/ 与 frontend/dist 运行（编排见
+# platform/bs-deploy/docker-compose.yml）。
 #
 # 触发方式：
-#   1) 推送 tag（v1.2.3）：构建并推送 ghcr.io/zhibinqiu/power_simulation:latest + :1.2.3
-#   2) 推送 master：构建并推送 ... :latest
+#   1) 推送 tag（v1.2.3）：构建并推送 ...:latest + :1.2.3
+#   2) 推送 master：构建并推送 ...:latest
 #   3) 手动 workflow_dispatch
 #
 # 产物：
-#   ghcr.io/zhibinqiu/power_simulation:latest      平台后端（含前端 dist）
-#   ghcr.io/zhibinqiu/power_simulation-docs:latest 文档站
-#
-# 服务器部署（免源码编译）：
-#   cd /opt/carbon-platform && docker compose pull && docker compose up -d
+#   ghcr.io/zhibinqiu/power_simulation:latest      平台运行环境镜像（仅 Python 依赖，
+#                                                   不含业务代码；代码走源码卷挂载）
+#   ghcr.io/zhibinqiu/power_simulation-docs:latest 文档站（docs-site/dist 已入库，自包含）
 #
 # 前提：仓库为 public（ghcr 公开包可匿名拉取），仓库 Settings→Actions→
 #       General 勾选 Read and write permissions。
@@ -57,11 +60,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 构建并推送平台镜像
+      - name: 构建并推送平台运行环境镜像
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile
+          file: platform/bs-deploy/Dockerfile
           push: true
           tags: |
             ${{ env.IMAGE_BASE }}:latest
@@ -73,7 +76,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.docs
+          file: platform/bs-deploy/Dockerfile.docs
           push: true
           tags: |
             ${{ env.IMAGE_BASE }}-docs:latest

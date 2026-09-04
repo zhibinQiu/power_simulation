@@ -18,7 +18,7 @@
 #   -t, --token <token>  新云端共享 token（keadm token create / tokensecret 获取）
 #       --ca-base64 <b64> 新云端 rootCA.crt 的 base64（也可先手工放到
 #                         /etc/kubeedge/ca/rootCA.crt 后不传本参数）
-#   -c, --config <file>  配置文件（含 cloudIP/token/rootCA 字段，见 deploy/box.sh）
+#   -c, --config <file>  配置文件（含 cloudIP/token/rootCA 字段，见 platform/box-deploy/box.sh）
 #   -h, --help           帮助
 # 回滚：备份在 /opt/backup_pre_migrate_<时间戳>/，恢复后 systemctl restart edgecore box-mapper
 # ============================================================================

@@ -6,7 +6,7 @@
 #
 # 用法：
 #   git tag v1.0.0 && git push github v1.0.0
-#   或在仓库根目录执行：./push.sh "fix: xxx" --tag v1.0.0
+#   或在仓库根目录执行：bash platform/bs-deploy/push.sh "fix: xxx" --tag v1.0.0
 #
 # 说明：
 #   - 复用 platform/windows-platform-deploy/build_windows.bat（内含前端构建 + PyInstaller）。
