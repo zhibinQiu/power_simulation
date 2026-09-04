@@ -2726,8 +2726,9 @@ export class TwinScene {
     const co2 = reses.reduce((s, r) => s + (r ? r.co2_total || 0 : 0), 0)
     const en = reses.reduce((s, r) => s + (r ? r.energy_total || 0 : 0), 0)
     const label = this._makeGroupLabel(gname, n, reses.some((r) => r) ? co2 : null, reses.some((r) => r) ? en : null)
-    // 组标签同样悬浮在组模型顶上方：贴顶小间隙（卡半高 + 2.4）。
-    // 与单元标签一致，以代表成员模型「本体实际包围盒最高点」为锚，避免工辅高塔/拱顶等出挑件压住标签。
+    // 组标签同样悬浮在组模型顶上方：明确留出大间隙（卡半高 + 6.0 局部间隙 ≈ 世界 20+）。
+    // 远视距下标签会按 _updateLabelScales 动态放大（MAX_FACTOR），卡片会向下扩展，
+    // 因此间隙必须足够大，保证任何视距下卡底缘都明显高于模型实际最高点、不压住/盖住模型。
     let groupAnchorTop = built.topY
     {
       group.updateMatrixWorld(true)
@@ -2737,13 +2738,15 @@ export class TwinScene {
         if (Number.isFinite(_t)) groupAnchorTop = Math.max(groupAnchorTop, _t)
       }
     }
-    const GROUP_LABEL_LIFT = LABEL_SCALE * (GROUP_LABEL_H / LABEL_W) / 2 + 2.4
+    const GROUP_LABEL_LIFT = LABEL_SCALE * (GROUP_LABEL_H / LABEL_W) / 2 + 6.0
     label.position.set(0, groupAnchorTop + GROUP_LABEL_LIFT, 0)
     label.userData.kind = 'unit'
     label.userData.groupId = gid
     // _makeGroupLabel 已自行完成绘制；标注为组标签，便于实时刷新时走 _drawGroupLabel
     label.userData.labelObj.isGroup = true
-    group.add(label)
+    // 关键：组标签必须挂在 built.group（带 scale 与 y 基准的成员容器）内，而非外层无缩放 group。
+    // 否则局部锚点 height 少了 ×scale 因子，标签会沉到模型半腰（scale 越大越明显）。
+    built.group.add(label)
 
     // 5) 管道连接用统一 IO 高度（世界坐标，与代表成员一致，汇聚到组中心）
     const io = this._ioHeights(rep.type, built.lift)
@@ -3841,9 +3844,11 @@ export class TwinScene {
     const fit = (half, fov) => (half / Math.tan(fov / 2)) * 1.14
     let dist = Math.max(fit(hx, hfov), fit(hy, vfov)) * 2.8 + 85
     dist = Math.min(Math.max(dist, 90), 260)
-    // 聚焦到组标签位置（组顶上方），与工序聚焦行为一致
-    const labelWorld = new THREE.Vector3(0, (g.topY || 0) + 4, 0)
-    g.group.localToWorld(labelWorld)
+    // 聚焦到组标签位置（组顶上方），与工序聚焦行为一致。
+    // 组标签挂在带 scale 的成员容器内，须取其真实世界坐标，否则聚焦点会低于模型顶。
+    const labelWorld = new THREE.Vector3()
+    if (g.label) g.label.getWorldPosition(labelWorld)
+    else { labelWorld.set(0, (g.topY || 0) + 4, 0); g.group.localToWorld(labelWorld) }
     this.focusOn(labelWorld, dist)
     this._setFocus(gid)
   }

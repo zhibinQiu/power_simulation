@@ -1,5 +1,10 @@
 # 能碳智控平台 · 部署编排（platform/bs-deploy/ 内；build context = 仓库根 ../..）
 #
+# name: 固定项目名（与部署目录名解耦）。compose 默认以编排文件所在目录为项目名，
+#       而本编排位于 platform/bs-deploy/（子目录），故显式固定为 jianpai，
+#       以便与部署目录名变化/多副本场景下容器归属一致。
+name: jianpai
+#
 # 源码卷挂载 + uvicorn --reload（开发-生产同构，日常更新免重建）
 #
 # 运行方式（服务器，仅需 Docker；无需 python/node/npm/venv）：
