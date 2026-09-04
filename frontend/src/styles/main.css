@@ -1,6 +1,6 @@
 :root {
   /* ===== 高绩效 HMI（ISA-101）· 门户「冷白」品牌基因 =====
-     配色与字体参考 platform/homePage 门户（冷白 #F4F6F9 / 深蓝黑 #0F172A / 科技蓝 #2563EB），
+     配色与字体参考 platform/home-deploy 门户（冷白 #F4F6F9 / 深蓝黑 #0F172A / 科技蓝 #2563EB），
      遵循 Siemens / Rockwell / PTC 工业设计系统原则（统一设计语言 + 动效与声音反馈）：
      1. 冷白底避免暖白/米黄，靠背景明度分层而非边框线；边框细、线最少
      2. 品牌黄仅用于「行动」语义（主按钮/选中/进度条/关键数值，黄底墨字）；
@@ -58,7 +58,7 @@
   --purple: #6B5BD2;        /* 紫色标识（AI 标记等非语义点缀） */
   --shadow: 0 1px 2px rgba(0,0,0,.10);   /* 包豪斯：单层弱阴影，克制的层次感 */
   --radius: 3px;            /* 全局统一圆角（几何直角感，仅控件级） */
-  /* 门户字体：标题 Montserrat · 正文 Source Sans Pro（与 platform/homePage 一致）；数值/命令用系统等宽 */
+  /* 门户字体：标题 Montserrat · 正文 Source Sans Pro（与 platform/home-deploy 一致）；数值/命令用系统等宽 */
   --mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, "Cascadia Code", "JetBrains Mono", "Courier New", monospace;
   --ui: "Source Sans Pro", "Helvetica Neue", Helvetica, Arial, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   --head: "Montserrat", "Source Sans Pro", "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;

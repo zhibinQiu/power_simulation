@@ -22,6 +22,8 @@
 #   migrate-box 盒子换云迁移（免手工签发证书）            box-deploy/migrate-box.sh（盒子 root）
 #   mac         桌面客户端 macOS 打包                    mac-platform-deploy/build_mac.sh（本机）
 #   windows     桌面客户端 Windows 打包                  windows-platform-deploy/build_windows.bat（Win）
+#   home        门户官网内容更新（→ 线上 nengyousuan.com）  home-deploy/sync-home.sh（开发机）
+#   home-install 门户独立站点安装（systemd 常驻服务）        home-deploy/deploy_portal.sh（开发机）
 #   list        列出部署矩阵（默认无参数时显示）
 #
 # 示例：
@@ -33,7 +35,7 @@ set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
-  sed -n '6,28p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '6,30p' "$0" | sed 's/^# \{0,1\}//'
   exit 0
 }
 
@@ -87,6 +89,16 @@ case "$TARGET" in
     echo "==> Windows 桌面客户端打包（需在 Windows 机器执行）："
     echo "    cd platform/windows-platform-deploy && build_windows.bat $*"
     exit 0
+    ;;
+  home|portal)
+    echo "==> 平台门户官网内容更新（本机执行 → 线上 https://www.nengyousuan.com）"
+    echo "    门户源码：platform/home-deploy/（脚本自身即更新器；免密 SSH 或 export QZB_SSH_PASS=密码）"
+    exec bash "$DIR/home-deploy/sync-home.sh" "$@"
+    ;;
+  home-install|portal-install)
+    echo "==> 门户独立站点安装（默认 71:/opt/nengtan-portal 端口 40200，systemd 常驻）"
+    echo "    用法：bash platform/deploy.sh home-install [-s root@<服务器>] [-p <端口>]"
+    exec bash "$DIR/home-deploy/deploy_portal.sh" "$@"
     ;;
   list|-l|--list)
     usage

@@ -100,6 +100,9 @@ EXCLUDES="--exclude=.git --exclude=.venv --exclude=venv --exclude=node_modules -
 echo "==> [1/5] rsync 源码 + 配置 + 前端产物到服务器（排除运行时数据/本机环境）..."
 rsync_run $EXCLUDES ./ "$SERVER:$SERVER_DIR/"
 
+# 清理服务器上历史迁移遗留目录（deploy/ 已于 2026-09 迁入 platform/，homePage 更名 home-deploy）
+ssh_run "$SERVER" "rm -rf '$SERVER_DIR/deploy' '$SERVER_DIR/platform/homePage'" 2>/dev/null || true
+
 # ---- 是否需要重建镜像：仅「构建输入」变更 / 服务器无镜像 时才 build ----
 # 比对路径统一用「仓库根相对路径」（本地与远程目录结构一致）
 BUILD_SENSITIVE=".dockerignore platform/bs-deploy/Dockerfile platform/bs-deploy/Dockerfile.docs platform/bs-deploy/docker-compose.yml platform/bs-deploy/.env.example backend/config/requirements.txt"
@@ -134,13 +137,13 @@ else
   echo "==> [2/5] 跳过服务器构建（--skip-build）。代码已同步，服务器上执行 docker compose up -d --build 生效。"
 fi
 
-# ---- [3/5] 线上官网同步（platform/homePage → https://www.nengyousuan.com） ----
+# ---- [3/5] 门户官网内容更新（platform/home-deploy → https://www.nengyousuan.com） ----
 if [ "$RUN_PORTAL" = "1" ]; then
-  echo "==> [3/5] 同步门户官网 platform/homePage/ → $PORTAL_SERVER:$PORTAL_REMOTE_DIR ..."
-  rsync_run --delete --exclude='.DS_Store' --exclude='.serve.pid' --exclude='.serve.log' \
-    --exclude='*.log' ./platform/homePage/ "$PORTAL_SERVER:$PORTAL_REMOTE_DIR/" \
-    && echo "    官网已更新: https://www.nengyousuan.com" \
-    || echo "    ⚠ 官网同步失败（不影响平台；检查免密/网络）" >&2
+  if bash "$ROOT/platform/home-deploy/sync-home.sh"; then
+    echo "    官网已更新: https://www.nengyousuan.com"
+  else
+    echo "    ⚠ 官网同步失败（不影响平台；检查免密/网络）" >&2
+  fi
 fi
 
 # ---- [4/5] git 提交并推送（可选） ----

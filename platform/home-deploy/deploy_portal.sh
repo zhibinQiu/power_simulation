@@ -3,8 +3,10 @@
 # 平台门户网站 · 独立部署脚本（nengtan-portal）
 #
 # 与「盒子云端 cloud-deploy」完全无关：这是面向公众的平台门户静态站点
-# （platform/homePage），独立安装到服务器 /opt/nengtan-portal/，
-# 注册 systemd 常驻服务 nengtan-portal.service（开机自启 + 崩溃自动重启）。
+# （platform/home-deploy，2026-09 由 homePage 更名），独立安装到服务器
+# /opt/nengtan-portal/，注册 systemd 常驻服务 nengtan-portal.service
+# （开机自启 + 崩溃自动重启）。
+# 注：官网（https://www.nengyousuan.com）日常内容更新用同目录 sync-home.sh。
 #
 # 用法（本机开发机执行，需能免密 SSH 到服务器）：
 #   ./deploy_portal.sh                                  # 部署到默认服务器
@@ -47,7 +49,7 @@ log() { echo -e "\033[32m[portal]\033[0m $*"; }
 err() { echo -e "\033[31m[error]\033[0m $*" >&2; exit 1; }
 
 # ---------- 前置校验 ----------
-[ -f index.html ] || err "未找到 index.html，请在 platform/homePage/ 下运行本脚本"
+[ -f index.html ] || err "未找到 index.html，请在 platform/home-deploy/ 下运行本脚本"
 command -v rsync >/dev/null 2>&1 || err "缺少 rsync"
 "${SSH[@]}" true 2>/dev/null || err "无法 SSH 到 $SERVER（请先配置免密登录）"
 
@@ -58,7 +60,7 @@ case "${CMD:-deploy}" in
     log "① 推送站点 → $SERVER:$APP_DIR"
     rsync -az --delete \
       -e "ssh -o StrictHostKeyChecking=no" \
-      --exclude='.DS_Store' --exclude='.serve.pid' --exclude='.serve.log' \
+      --exclude='*.sh' --exclude='.DS_Store' --exclude='.serve.pid' --exclude='.serve.log' \
       --exclude='.png-backup' --exclude='*.log' \
       ./ "$SERVER:$APP_DIR/"
 

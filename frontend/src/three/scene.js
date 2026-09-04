@@ -2182,8 +2182,10 @@ export class TwinScene {
 
     // 4) 主节点沿 X 轴排布（原料在左、成品在右），Z=0 居中；相邻主干间距 =
     //    净距 + 前一主工艺分支水平铺开宽 + 后一主工艺分支水平铺开宽，保证分支不被相邻主干遮挡。
+    //    参数取紧凑值：BSTEP=分支列步距、HW=主干半槽、MARGIN=主干净距——使大工艺间距更近、
+    //    整条主线收拢，观感紧凑（仍保证分支列与相邻主干不重叠）。
     const nMain = order.length
-    const BSTEP = 160, HW = 80, MARGIN = 40
+    const BSTEP = 110, HW = 62, MARGIN = 16
     const mainX = new Map()
     let cursor = HW
     order.forEach((id, i) => {
@@ -2220,7 +2222,7 @@ export class TwinScene {
     //    一级子树分配到前/后两侧，子树内部按「树深度 d」分层：第 d 层节点 z = 主工艺 z + 方向×(d+1)×ZSTEP，
     //    根节点紧贴主干正前/正后，同层兄弟沿 X 水平并排（sideH），子节点相对父节点向该侧递进一层。
     const ZSTEP = 150            // 垂直（Z，前后）分层步距：树的每一层深度
-    const COLSTEP3 = 150         // 同层兄弟/子树沿 X 水平铺开步距
+    const COLSTEP3 = 110         // 同层兄弟/子树沿 X 水平铺开步距（与主干间距 BSTEP 对齐，整体紧凑）
     for (const m of mainNodes) {
       const px = mainX.get(m.id)
       const sides = sidesOf.get(m.id)

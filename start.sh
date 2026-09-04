@@ -9,15 +9,15 @@
 #    ./start.sh --frontend    仅启动前端 dev
 #    ./start.sh --no-docs     不启动独立文档网站
 #    ./start.sh --no-portal   不启动门户网站
-#    ./start.sh --no-portal-sync  不自动同步门户到线上官网 (https://www.nengyousuan.com)
-#    ./start.sh --server      一键同步代码到新服务器 36.151.146.71 并重建重启（等价 bash sync.sh，参数透传）
+#    ./start.sh --portal-sync 显式开启同步门户到线上官网 (https://www.nengyousuan.com)；默认不同步
+#    ./start.sh --server      一键同步代码到新服务器 36.151.146.71 并部署（等价 bash platform/bs-deploy/sync.sh，参数透传）
 #    ./start.sh --help        查看帮助
 #
 #  说明:
 #    - 后端首次运行自动创建 .venv 并安装依赖
 #    - 前端首次运行自动 npm install
 #    - 日志写入 .logs/ 目录，Ctrl+C 停止全部服务
-#    - 默认启动门户时会把 platform/homePage/ 同步到线上官网 43.161.194.75（免密 SSH），失败不阻断本地服务
+#    - 默认不把门户同步到线上官网 43.161.194.75；如需要请加 --portal-sync
 #    - 后端默认连接「新服务器」云端 MQTT Broker（backend/config/box_config.json 指向 36.151.146.71:41883），
 #      本地开发即可看到盒子实时数据；生产部署/更新请用 platform/bs-deploy/server.sh 与 platform/bs-deploy/sync.sh（详见 README）
 # ============================================================
@@ -32,16 +32,12 @@ RUN_BACKEND=1
 RUN_FRONTEND=1
 RUN_DOCS=1
 RUN_PORTAL=1
-PORTAL_SYNC=1     # 启动门户时同步 platform/homePage 到线上官网 43.161.194.75
+PORTAL_SYNC=0     # 默认不同步门户到线上官网 43.161.194.75；--portal-sync 显式开启
 
-# 线上官网（https://www.nengyousuan.com）部署目标
-PORTAL_SERVER="root@43.161.194.75"
-PORTAL_REMOTE_DIR="/var/www/nengyousuan"
-
-# --server：一键同步代码到新服务器（36.151.146.71）并重建重启 = bash sync.sh，剩余参数透传
+# --server：一键同步代码到新服务器（36.151.146.71）并部署 = bash platform/bs-deploy/sync.sh，剩余参数透传
 if [ "${1:-}" = "--server" ] || [ "${1:-}" = "--sync" ]; then
   shift
-  exec bash "$ROOT/sync.sh" "$@"
+  exec bash "$ROOT/platform/bs-deploy/sync.sh" "$@"
 fi
 
 for arg in "$@"; do
@@ -51,7 +47,8 @@ for arg in "$@"; do
     --frontend) RUN_BACKEND=0 ;;
     --no-docs)  RUN_DOCS=0 ;;
     --no-portal) RUN_PORTAL=0 ;;
-    --no-portal-sync) PORTAL_SYNC=0 ;;
+    --no-portal-sync) PORTAL_SYNC=0 ;;   # 兼容参数：保持不同步
+    --portal-sync)  PORTAL_SYNC=1 ;;
     -h|--help)
       awk 'NR >= 2 && /^#/ { sub(/^# ?/, ""); print } NR >= 2 && !/^#/ { exit }' "$0"
       exit 0
@@ -176,23 +173,20 @@ if [ "$RUN_DOCS" = "1" ]; then
   fi
 fi
 
-# ---- 启动门户网站（平台门户静态站点 platform/homePage） ----
+# ---- 启动门户网站（平台门户静态站点 platform/home-deploy） ----
 if [ "$RUN_PORTAL" = "1" ]; then
   echo "==> [门户] 启动静态网站 (127.0.0.1:40200)..."
-  (cd "$ROOT/platform/homePage" && python3 -m http.server 40200 --bind 127.0.0.1) > "$LOG_DIR/portal.log" 2>&1 &
+  (cd "$ROOT/platform/home-deploy" && python3 -m http.server 40200 --bind 127.0.0.1) > "$LOG_DIR/portal.log" 2>&1 &
   PORTAL_PID=$!
   echo "   PID: $PORTAL_PID    日志: $LOG_DIR/portal.log"
   wait_ready "http://127.0.0.1:40200" "门户" || true
 fi
 
-# ---- 同步门户到线上官网（https://www.nengyousuan.com，43.161.194.75 + Nginx）----
-# 每次启动都把最新 platform/homePage/ 推上线，失败仅警告、不阻断本地服务
+# ---- 同步门户到线上官网（默认关闭，仅加 --portal-sync 时执行）----
+# 把最新 platform/home-deploy/ 推上线（走 home-deploy/sync-home.sh），
+# 失败仅警告、不阻断本地服务
 if [ "$PORTAL_SYNC" = "1" ]; then
-  echo "==> [门户] 同步 platform/homePage/ → 线上官网 $PORTAL_SERVER:$PORTAL_REMOTE_DIR ..."
-  if rsync -az --delete \
-      -e "ssh -i $HOME/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o BatchMode=yes" \
-      --exclude='.DS_Store' --exclude='.serve.pid' --exclude='.serve.log' --exclude='*.log' \
-      "$ROOT/platform/homePage/" "$PORTAL_SERVER:$PORTAL_REMOTE_DIR/"; then
+  if bash "$ROOT/platform/home-deploy/sync-home.sh"; then
     echo "   ✔ 线上官网已更新: https://www.nengyousuan.com"
   else
     echo "   ⚠ 官网同步失败（不影响本地服务，请检查网络与免密 SSH 配置）" >&2
