@@ -1,6 +1,41 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { execSync } from 'node:child_process'
+import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+// 构建期扫描 public/2D-image/devices，把「实际存在的设备图名」固化成虚拟模块清单。
+// 原方案是运行时对每张候选图发 HEAD 探测：首帧只能先画矢量图元、探测回来再换图，
+// 有肉眼可见的「矢量 → 图片」跳变，且 dev server 重启/图片后放进去时会整屏回退矢量。
+// 改为构建期清单后：打开 2D 工艺图即直接上图，零探测请求、零跳变。
+// 新增/删除图片后：生产重新 build 即可；dev 下由 watcher 自动失效清单并刷新页面。
+const DEV_IMG_ABS = fileURLToPath(new URL('./public/2D-image/devices', import.meta.url))
+const VID_DEV_IMG = 'virtual:device-images'
+const deviceImages = () => {
+  const read = () => {
+    try { return fs.readdirSync(DEV_IMG_ABS).filter((f) => /\.png$/i.test(f)).sort() } catch { return [] }
+  }
+  let names = read()
+  const vid = '\0' + VID_DEV_IMG
+  return {
+    name: 'device-images',
+    resolveId(id) { return id === VID_DEV_IMG ? vid : null },
+    load(id) { return id === vid ? `export const names = ${JSON.stringify(names)}` : null },
+    configureServer(server) {
+      server.watcher.add(DEV_IMG_ABS)
+      const onChange = (f) => {
+        if (!String(f).includes('2D-image')) return
+        const next = read()
+        if (next.join('|') === names.join('|')) return
+        names = next
+        const mod = server.moduleGraph.getModuleById(vid)
+        if (mod) server.moduleGraph.invalidateModule(mod)
+        server.ws.send({ type: 'full-reload' })
+      }
+      server.watcher.on('add', onChange).on('unlink', onChange)
+    },
+  }
+}
 
 // 构建前清理 dist 中上一次的旧产物（仅保留 public 复制内容与 index.html），
 // 避免产物无限累积导致 dist 膨胀（此前累积达 305MB/740 文件）。
@@ -19,7 +54,7 @@ export default defineConfig({
   //       对外入口收敛为 https://www.nengyousuan.com/sim/（门户 nginx 剥离 /sim 前缀后转发到 71:40014）。
   //       如需恢复直连 / 子域名整站代理，改回 '/' 重新构建即可。
   base: '/sim/',
-  plugins: [vue(), cleanDistOldAssets()],
+  plugins: [vue(), cleanDistOldAssets(), deviceImages()],
   server: {
     host: '127.0.0.1',
     port: 5173,

@@ -7,7 +7,7 @@
       </div>
 
       <div class="ab-logo">
-        <img src="/favicon.png" :alt="t('工业能碳智控平台')" />
+        <img :src="favicon" :alt="t('工业能碳智控平台')" />
       </div>
 
       <div class="ab-name">{{ t('工业能碳智控平台') }}</div>
@@ -60,6 +60,8 @@ import { useSimStore } from '../stores/sim'
 import { t } from '../i18n'
 
 const store = useSimStore()
+// public 下资源必须拼接 Vite base（vite.config.js base: '/sim/'），写死 '/favicon.png' 在带前缀部署下会 404
+const favicon = ((import.meta.env.BASE_URL || '/').replace(/\/+$/, '')) + '/favicon.png'
 // 用户只输入 16 位十六进制（前缀 NENG- 固定显示，粘贴时自动剥离），避免前缀逐字符输入的歧义
 const hexCode = ref('')
 const busy = ref(false)

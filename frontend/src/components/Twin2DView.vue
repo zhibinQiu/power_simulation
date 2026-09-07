@@ -126,11 +126,13 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { t } from '../i18n'
 import { useSimStore } from '../stores/sim'
 import { MATERIAL_MAP, PROCESS_MAP } from '../data/flowLibrary'
 import { T2D_ICONS, T2D_GEOM, T2D_INOUT } from '../data/twin2dIcons'
+// 设备图清单（构建期由 vite 插件 device-images 扫描 public/2D-image/devices 生成）
+import { names as DEV_IMG_NAMES } from 'virtual:device-images'
 
 const store = useSimStore()
 const wrap = ref(null)
@@ -423,7 +425,6 @@ function relayout() {
   groups.value = auxGroups
   conns.value = rewriteConnTopology(ns, cs)
   nextTick(fitAll)
-  probeImgs()   // 设备 PNG 探测：命中后用图替矢量，结果缓存免重试
 }
 
 // 网格线（在内容坐标系内生成）
@@ -589,54 +590,25 @@ function isAux(n) { return !isMain(n) }
 function isMain(n) { const t = PROCESS_MAP[n.type]; return !!t && t.route === 'steel' }
 function iconOf(t) { return T2D_ICONS[t] || T2D_ICONS.default }
 
-// —— 设备 PNG 图替（可选）：public/2D-image/devices/{设备名}.png 或 {type}.png 存在时，
-//    用真实设备图片替代矢量图元（按设备名中文优先、type 兜底）。发现机制：进入视图后对
-//    当前节点逐个 HEAD 探测，命中即换图；结果缓存，避免每次重排重复请求。找不到仍画矢量。
-const IMG_DIR = '/2D-image/devices/'
-const headCache = new Map()          // url -> 可访问（只缓存「命中」，会话级）
-const failAt = new Map()             // url -> 上次探测失败时间戳（失败不永久缓存，可重试）
-const FAIL_TTL = 5000                // 失败后多久允许重新探测（ms），避免瞬时故障被永久固化
-const urlOk = reactive(new Map())    // url -> 探测结果（驱动模板 v-if）
-function devImgCands(n) {
-  const out = []
-  const nm = (n.name || '').trim()
-  if (nm) out.push(IMG_DIR + encodeURIComponent(nm) + '.png')
-  // 实例名去掉末尾序号（热风炉1 → 热风炉）：多台同类型实例共享「类型图」如 热风炉.png
-  const base = nm.replace(/\s*\d+$/, '')
-  if (base && base !== nm) out.push(IMG_DIR + encodeURIComponent(base) + '.png')
-  // 类型中文名兜底：节点被重命名（如「热风炉1」→「1号炉」）时仍能命中 热风炉.png
-  const tl = PROCESS_MAP[n.type] && PROCESS_MAP[n.type].label
-  if (tl) out.push(IMG_DIR + encodeURIComponent(tl) + '.png')
-  if (n.type) out.push(IMG_DIR + n.type + '.png')
-  return out
-}
-async function probeImgs() {
-  const list = new Set()
-  for (const n of nodes.value) for (const u of devImgCands(n)) list.add(u)
-  for (const u of list) {
-    if (headCache.has(u)) { urlOk.set(u, headCache.get(u)); continue }
-    // 失败项在 TTL 内跳过（避免每次重排都发请求），超期则再探一次：
-    // 覆盖「dev server 重启 / 网络抖动 / 首次探测时图片还没放好」导致的批量失败，无需刷新页面即可自愈。
-    if (failAt.has(u) && Date.now() - failAt.get(u) < FAIL_TTL) continue
-    let ok = false
-    try {
-      const res = await fetch(u, { method: 'HEAD' })
-      // 不能只看 res.ok：dev server 对不存在的路径会 SPA-fallback 返回 200 text/html
-      const ct = (res.headers.get('content-type') || '').toLowerCase()
-      ok = res.ok && ct.startsWith('image/')
-    } catch { ok = false }
-    if (ok) { headCache.set(u, true); failAt.delete(u); urlOk.set(u, true) }
-    else { failAt.set(u, Date.now()); urlOk.delete(u) }
-  }
-}
+// —— 设备 PNG 图替：public/2D-image/devices/{设备名}.png 或 {type}.png 存在时，
+//    用真实设备图片替代矢量图元（按设备名中文优先、type 兜底），不存在仍画矢量。
+// 图片清单由 vite 插件 device-images 在构建期扫描目录生成（virtual:device-images），
+// 打开视图即可直接上图 —— 不再运行时 HEAD 探测（旧方案首帧先画矢量、探测回来再换图，有跳变）。
+// 必须拼接 Vite 的 base（vite.config.js base: '/sim/'，门户以 /sim/ 前缀反代）；
+// 写死 '/2D-image/...' 在带前缀的部署下会 404（或被 SPA fallback 返回 HTML），导致全图回退矢量。
+const BASE = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '')
+const IMG_DIR = BASE + '/2D-image/devices/'
+const IMG_SET = new Set(DEV_IMG_NAMES)   // 构建期固化的「已存在图片名」集合，同步可用
 function devImgOf(n) {
   const nm = (n.name || '').trim()
-  if (nm) { const u = IMG_DIR + encodeURIComponent(nm) + '.png'; if (urlOk.get(u)) return u }
+  if (nm && IMG_SET.has(nm + '.png')) return IMG_DIR + encodeURIComponent(nm) + '.png'
+  // 实例名去掉末尾序号（热风炉1 → 热风炉）：多台同类型实例共享「类型图」如 热风炉.png
   const base = nm.replace(/\s*\d+$/, '')
-  if (base && base !== nm) { const u = IMG_DIR + encodeURIComponent(base) + '.png'; if (urlOk.get(u)) return u }
+  if (base && base !== nm && IMG_SET.has(base + '.png')) return IMG_DIR + encodeURIComponent(base) + '.png'
+  // 类型中文名兜底：节点被重命名（如「热风炉1」→「1号炉」）时仍能命中 热风炉.png
   const tl = PROCESS_MAP[n.type] && PROCESS_MAP[n.type].label
-  if (tl) { const u = IMG_DIR + encodeURIComponent(tl) + '.png'; if (urlOk.get(u)) return u }
-  if (n.type) { const u = IMG_DIR + n.type + '.png'; if (urlOk.get(u)) return u }
+  if (tl && IMG_SET.has(tl + '.png')) return IMG_DIR + encodeURIComponent(tl) + '.png'
+  if (n.type && IMG_SET.has(n.type + '.png')) return IMG_DIR + n.type + '.png'
   return null
 }
 // 设备 PNG 显示盒：铺满节点「名称下方 → KPI/底部上方」的可用图带（等比 contain 居中）；
