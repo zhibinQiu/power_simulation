@@ -122,76 +122,344 @@
           <template v-else>{{ t('⚠ 云端不可达：以下云端数据不可用。请检查云端服务（cloud-agent / CloudHub 10002 / MQTT 41883）。') }}</template>
           <template v-if="overview.demo_note">{{ overview.demo_note }}</template>
         </div>
-        <!-- ① 通信拓扑图：平台 → 云端 → 边端 → 设备端（连线标注实际协议） -->
+        <!-- ① 数据源接入（合并自原「工具 >> 数据源…」弹窗）：能碳一体机 + 外部数据源（含模拟数据）
+             统一为数据源接入视图——一体机数据经云端 Broker 订阅通道进入；外部数据（含独立模拟源）
+             注册到数据中间件后由中间件转换为标准 MQTT 发布到云端 Broker；两者同 Broker 按 box
+             前缀区分，共用同一条摄取管道（平台与中间件自身都不产生模拟数据） -->
+        <section id="cbx-sec-sources" class="cbx-sec cbx-sec-sources">
+          <div class="cbx-sec-head">
+            <b>🔌 {{ t('数据源接入') }}</b>
+            <span class="cbx-sec-sub">{{ t('能碳一体机（云端 Broker 订阅）与外部数据源（注册到数据中间件，含独立模拟源服务）统一在此接入；平台按 box 前缀自动区分一体机与外部源') }}</span>
+            <span class="cbx-sec-spacer"></span>
+            <span class="ds-mwbadge" :class="mwOnline ? 'ok' : (mwChecked ? 'err' : 'unk')"
+                  :title="middleware && middleware.error ? middleware.error : t('数据中间件：外部数据采集与发布服务')">
+              {{ mwOnline ? '● ' + t('中间件在线') : (mwChecked ? '● ' + t('中间件离线') : t('中间件检测中…')) }}
+            </span>
+            <button class="cbx-op cbx-xs" @click="mwPanelOpen = !mwPanelOpen"
+                    :title="t('中间件服务连接地址 / Token / 数据输出形态')">{{ t('中间件配置') }}</button>
+            <button class="cbx-op cbx-xs" :disabled="mwSyncing" @click="syncMw"
+                    :title="t('本地已登记但中间件缺失的数据源补注册（中间件重建后恢复）')">{{ mwSyncing ? t('对账中…') : '⇄ ' + t('对账同步') }}</button>
+            <button class="cbx-op primary cbx-xs" @click="openAddForm()">＋ {{ t('注册外部数据源') }}</button>
+          </div>
+
+          <!-- 中间件连接配置（抽屉式） -->
+          <div v-if="mwPanelOpen" class="ds-mwpanel">
+            <div class="cbx-form-row">
+              <label>{{ t('服务地址') }}</label>
+              <input v-model="mwForm.base_url" class="cbx-input" style="flex:1"
+                     :placeholder="t('http://127.0.0.1:PORT，外部数据采集与发布服务')" />
+              <label>{{ t('Token') }}</label>
+              <input v-model="mwForm.token" class="cbx-input" style="width:150px"
+                     :placeholder="t('认证 Token（可空）')" />
+            </div>
+            <div class="cbx-form-row">
+              <label class="ds-switch" :title="mwForm.subscribe ? t('平台单独订阅中间件数据端口（local 形态）') : t('不勾选 = external 形态：转换数据直发云端 Broker，平台经云端端点订阅')">
+                <input type="checkbox" v-model="mwForm.subscribe" />
+                <i></i><span>{{ mwForm.subscribe ? t('订阅中间件端口') : t('直发云端 Broker') }}</span>
+              </label>
+              <label>{{ t('端口') }}</label>
+              <input v-model.number="mwForm.broker_port" type="number" class="cbx-input" style="width:150px"
+                     :disabled="!mwForm.subscribe"
+                     :placeholder="mwForm.subscribe ? t('平台订阅中间件的 MQTT 端口（>40000）') : t('数据输出目标端口')" />
+              <span v-if="!mwForm.subscribe" class="cbx-sec-sub">{{ t('external 形态：数据直发云端 Broker(41883)，与一体机数据同 Broker 按前缀区分') }}</span>
+            </div>
+            <div class="cbx-form-row">
+              <button class="cbx-op" :disabled="mwTestBusy" @click="testMw(false)">{{ mwTestBusy ? t('测试中…') : t('测试连通') }}</button>
+              <button class="cbx-op primary" :disabled="mwSaving" @click="saveMw">{{ mwSaving ? t('保存中…') : t('保存并重连') }}</button>
+              <span v-if="mwNote" class="cbx-sec-sub" :class="{ warn: mwNoteErr }">{{ mwNote }}</span>
+            </div>
+          </div>
+
+          <!-- 卡片网格：能碳一体机（默认来源）+ 各外部数据源 -->
+          <div class="ds-grid">
+            <!-- 能碳一体机：云端 Broker 订阅通道（平台无独立运行线程，enabled 控制是否采纳盒子数据） -->
+            <div class="ds-card" :class="{ off: !boxSrc.enabled }">
+              <div class="ds-card-hd">
+                <b>{{ boxSrc.name }}</b>
+                <span class="ds-tag builtin">内置</span>
+                <span class="ds-tag">{{ t('云端订阅通道') }}</span>
+                <span class="cbx-sec-spacer"></span>
+                <label class="ds-switch" :title="boxSrc.enabled ? t('停用：盒子实时数据不再驱动仿真') : t('启用：盒子实时数据恢复驱动仿真')">
+                  <input type="checkbox" :checked="boxSrc.enabled" @change="toggleSource(boxSrc, $event)" />
+                  <i></i><span>{{ boxSrc.enabled ? t('启用') : t('停用') }}</span>
+                </label>
+              </div>
+              <div class="ds-desc">{{ boxSrc.desc }}</div>
+              <div class="ds-rows">
+                <div class="ds-row"><span>{{ t('连接状态') }}</span>
+                  <b :class="boxSt.connected ? 'ok' : 'err'">
+                    {{ boxSt.connected ? '● ' + t('已连接') : (boxSt.connected === false ? '● ' + t('未连接') : '—') }}
+                    <template v-if="boxSt.message_count != null"> · {{ t('累计消息') }} {{ boxSt.message_count }}</template>
+                  </b>
+                </div>
+                <div class="ds-row"><span>{{ t('订阅端点') }}</span>
+                  <!-- 注意：v-if 不可与 v-for 写在同一元素上（Vue3 中 v-if 先求值，此时 es 未定义会抛错导致整页白屏）；
+                       改为 template 承载 v-for、内层元素承载 v-if -->
+                  <span class="ds-endps"><template v-for="(es, ek) in boxSt.endpoints || {}" :key="ek"><i
+                    v-if="es && es.enabled !== false"
+                    :class="['ds-ep', ek, es.connected ? 'on' : 'off']"
+                    :title="(ek === 'cloud' ? t('云端 Broker（一体机）') : t('中间件 Broker（外部数据）')) + '：' + ((es.host ? es.host + ':' + es.port : es.label || '—'))">
+                    {{ ek === 'cloud' ? '☁ ' + t('云端') : '⇄ ' + t('中间件') }}
+                  </i></template></span>
+                </div>
+                <div class="ds-row"><span>{{ t('设备读数') }}</span>
+                  <b>{{ boxSt.cloud_devices ?? 0 }} {{ t('台设备') }} · {{ boxSt.readings ?? 0 }} {{ t('条读数') }} · {{ boxSt.links ?? 0 }} {{ t('个关联') }}</b>
+                </div>
+                <div class="ds-row" v-if="boxLastMsg"><span>{{ t('最近消息') }}</span><b class="dim">{{ boxLastMsg }}</b></div>
+                <div class="ds-row" v-if="boxSt.broker_host"><span>{{ t('Broker') }}</span><b class="dim mono">{{ boxSt.broker_host }}:{{ boxSt.broker_port }}</b></div>
+              </div>
+              <div class="ds-ops">
+                <button class="cbx-op cbx-xs" @click="openBoxConfig"
+                        :title="t('配置云端 Broker 地址/账号，保存后自动热更新重连')">⚙ {{ t('云端配置') }}</button>
+                <button class="cbx-op cbx-xs" @click="scrollToSec('box')"
+                        :title="t('跳转到盒子列表')">{{ t('盒子列表') }}</button>
+              </div>
+            </div>
+
+            <!-- 外部数据源（含独立模拟源）：注册到中间件，转换后经平台订阅通道按前缀识别 -->
+            <div v-for="s in extSources" :key="s.id" class="ds-card"
+                 :class="{ off: !s.enabled, mwdown: mwChecked && !mwOnline && !s.status.running }">
+              <div class="ds-card-hd">
+                <b>{{ s.name }}</b>
+                <span class="ds-tag">{{ s.config.adapter_label }}</span>
+                <span class="ds-tag mono">{{ s.config.box }}</span>
+                <span class="cbx-sec-spacer"></span>
+                <label class="ds-switch" :title="s.enabled ? t('停用：中间件停止采集该数据源') : t('启用：中间件开始采集该数据源')">
+                  <input type="checkbox" :checked="s.enabled" @change="toggleSource(s, $event)" />
+                  <i></i><span>{{ s.enabled ? t('启用') : t('停用') }}</span>
+                </label>
+              </div>
+              <div class="ds-desc">{{ s.config.desc || (s.status && s.status.kind === 'external' ? t('外部数据源：数据先接入能碳一体机，由一体机上行到云端 ext/#，再经云端数据中间件转换为 data/ext-* 被平台识别') : '') }}</div>
+              <div class="ds-rows">
+                <div class="ds-row"><span>{{ t('运行状态') }}</span>
+                  <b :class="s.status.running ? 'ok' : 'err'">
+                    {{ s.status.running ? '● ' + t('采集运行中') : (s.status.mw_online === false ? '● ' + t('中间件未运行') : (s.status.mw_online ? '● ' + t('采集已停止') : '● ' + t('状态未知'))) }}
+                    <template v-if="s.status.received != null"> · {{ t('已收') }} {{ s.status.received }} {{ t('条') }}</template>
+                  </b>
+                </div>
+                <div class="ds-row"><span>{{ t('平台取数') }}</span>
+                  <b :class="s.status.active ? 'ok' : 'dim'">
+                    {{ s.status.active ? '● ' + t('数据实时到达') : (s.status.received ? t('最近数据已停 ' + agoText(s.status.last_at)) : t('尚未收到数据')) }}
+                  </b>
+                </div>
+                <div class="ds-row" v-if="s.status.cloud_devices != null"><span>{{ t('设备读数') }}</span>
+                  <b>{{ s.status.cloud_devices }} {{ t('台设备') }}<template v-if="s.status.last_topic"> · <span class="mono dim">{{ s.status.last_topic }}</span></template></b>
+                </div>
+                <div class="ds-row" v-if="s.status && s.status.note"><span>{{ t('提示') }}</span><b class="note">{{ s.status.note }}</b></div>
+              </div>
+              <div class="ds-ops">
+                <button class="cbx-op cbx-xs" @click="openEditForm(s)">✎ {{ t('编辑') }}</button>
+                <button class="cbx-op cbx-xs" :disabled="s.testing" @click="testSource(s)">{{ s.testing ? t('测试中…') : '⛁ ' + t('测试') }}</button>
+                <span class="cbx-sec-spacer"></span>
+                <button class="cbx-op cbx-xs danger" @click="removeSource(s)">🗑 {{ t('删除') }}</button>
+              </div>
+            </div>
+
+            <!-- 空态：无外部数据源时给出引导（含模拟数据注册入口） -->
+            <div v-if="!extSources.length" class="ds-card ds-empty" @click="openAddForm('mqtt')">
+              <div class="ds-empty-ic">⇄</div>
+              <b>{{ t('尚无外部数据源') }}</b>
+              <p>{{ t('外部 MQTT / 数据中台 / 模拟数据源（独立服务 sim-source）等先接入能碳一体机，由一体机上行到云端 ext/#，再经云端数据中间件转换为 data/ext-* 进入平台订阅通道。点击此处注册第一条（外部 MQTT 类型）。') }}</p>
+              <button class="cbx-op cbx-xs">＋ {{ t('注册外部数据源') }}</button>
+            </div>
+          </div>
+
+          <!-- 注册 / 编辑表单 -->
+          <div v-if="formOpen" class="ds-form">
+            <div class="cbx-form-row">
+              <b class="ds-form-title">{{ extForm.id ? t('编辑外部数据源') + '：' + extForm.id : t('注册外部数据源') }}</b>
+              <span class="cbx-sec-spacer"></span>
+              <span class="ds-form-hint">{{ t('注册到数据中间件（type=') }}{{ extForm.adapter }}）；{{ t('模拟数据源（独立服务 sim-source）用「外部 MQTT」类型：Broker 127.0.0.1:41885，主题 steel/# 或 idc/#') }}</span>
+            </div>
+            <div class="cbx-form-row">
+              <label>{{ t('名称') }}</label>
+              <input v-model="extForm.name" class="cbx-input" style="flex:1" :placeholder="t('如 一号炉烟气在线 / 模拟产线')" />
+              <label>{{ t('接入类型') }}</label>
+              <select v-model="extForm.adapter" class="cbx-input" style="width:170px" @change="onAdapterChange">
+                <option v-for="at in adapterTypes" :key="at.type" :value="at.type">{{ at.label }}</option>
+              </select>
+            </div>
+            <div class="cbx-form-row">
+              <label>{{ t('发布前缀') }}</label>
+              <input v-model="extForm.box" class="cbx-input mono" style="flex:1" :placeholder="t('小写字母/数字/连字符，如 ext-weigh（平台按此前缀识别归属、启停过滤）')" />
+            </div>
+            <div class="cbx-form-row" v-if="extForm.fields.length">
+              <label>{{ t('接入参数') }}</label>
+              <div class="ds-fields">
+                <template v-for="f in extForm.fields" :key="f.name">
+                  <div class="ds-fld" v-if="f.type === 'bool'">
+                    <label class="ds-switch" :title="f.label">
+                      <input type="checkbox" v-model="f.v" /><i></i><span>{{ f.label }}</span>
+                    </label>
+                  </div>
+                  <div class="ds-fld" v-else>
+                    <label :title="f.desc">{{ f.label }}<template v-if="f.required"> *</template></label>
+                    <input v-if="!isJsonLike(f.type)" :type="f.type === 'password' ? 'password' : 'text'"
+                           v-model="f.v" class="cbx-input" :placeholder="f.placeholder || ''" />
+                    <textarea v-else v-model="f.v" rows="2" class="cbx-input mono"
+                              :placeholder='f.placeholder || ((f.type === "array" || f.type === "list") ? "[\"topic1\", \"topic2\"]" : "[{…}]")'></textarea>
+                    <span v-if="f.desc && f.desc !== f.label" class="ds-fld-desc">{{ f.desc }}</span>
+                  </div>
+                </template>
+              </div>
+            </div>
+            <div class="cbx-form-row">
+              <label>{{ t('说明') }}</label>
+              <input v-model="extForm.desc" class="cbx-input" style="flex:1" :placeholder="t('数据源用途说明（可选）')" />
+            </div>
+            <div v-if="extFormErr" class="ds-form-err">{{ extFormErr }}</div>
+            <div class="cbx-form-row">
+              <span class="cbx-sec-spacer"></span>
+              <button class="cbx-op" @click="testForm()">{{ t('测试连接') }}</button>
+              <button class="cbx-op primary" :disabled="formSaving" @click="saveForm()">
+                {{ formSaving ? t('保存中…') : (extForm.id ? t('保存并同步中间件') : t('注册并保存')) }}
+              </button>
+              <button class="cbx-op" @click="closeForm()">{{ t('取消') }}</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ② 通信拓扑图：以「设备」为单位（平台服务器 / 云端服务器 / 能碳一体机 / 现场设备 / 外部数据系统），
+             服务运行在设备内部，连线只表示设备之间的通道 -->
         <section class="cbx-sec">
           <div class="cbx-sec-head">
             <b>{{ t('系统连接图') }}</b>
-            <span class="cbx-sec-sub">{{ t('数据流向：现场设备 → 现场盒子 → 云端服务器 → 平台') }}</span>
-            <span class="cbx-sec-hint">{{ t('拖动模块可自定义布局，连线自动跟随') }}</span>
+            <span class="cbx-sec-sub">{{ t('按设备划分：每张卡片是一台设备（服务器 / 一体机 / 传感器 / 外部系统），卡内列出该设备上运行的服务；连线表示设备之间的数据通道') }}</span>
+            <span class="cbx-sec-hint">{{ t('拖动设备卡片可自定义布局，连线自动跟随') }}</span>
             <span class="cbx-sec-spacer"></span>
-            <button class="cbx-op cbx-xs" @click="autoLayoutTopo()" :title="t('恢复四列自动布局，清除所有模块的手动拖拽位置')">{{ t('自动布局') }}</button>
+            <button class="cbx-op cbx-xs" @click="autoLayoutTopo()" :title="t('恢复自动布局，清除所有模块的手动拖拽位置')">{{ t('自动布局') }}</button>
+          </div>
+          <!-- 链路说明：能碳一体机是现场唯一接入点（下接传感器/仪表、后接外部数据系统），
+               一体机把收到的数据统一上报云端服务器；外部数据在云端经中间件（云端服务器内部服务）转换后交给平台 -->
+          <div class="cbx-topo-legend">
+            <span class="leg"><i class="lg g"></i>{{ t('传感器链路：现场设备（传感器/仪表） —RS485/Modbus→ 能碳一体机 —MQTT data/#→ 云端服务器 → 平台服务器') }}</span>
+            <span class="leg"><i class="lg b"></i>{{ t('外部数据链路：外部数据系统（PLC/数据中台/模拟源）—以太网/OPC→ 能碳一体机 —MQTT ext/#→ 云端服务器（再由云端中间件转 data/ext-*）→ 平台服务器；云边管理通道 CloudHub :10002 双向') }}</span>
+            <span class="leg"><i class="lg r"></i>{{ t('平台下行：平台服务器 → 云端服务器（cloud-agent HTTP :42083，kubectl 下发 / 重启等写操作）') }}</span>
           </div>
           <div ref="topoCanvasRef" class="cbx-topo cbx-topo-canvas">
             <div class="cbx-topo-lanes">
-              <!-- 平台列 -->
-              <div class="cbx-topo-lane">
-                <div class="cbx-topo-lane-title">{{ t('平台') }}</div>
-                <div :ref="setNodeRef('n_platform')" class="cbx-topo-mod platform">
-                  <div class="cbx-topo-mod-head">
-                    <span class="cbx-topo-mod-name">{{ t('工业能碳智控平台') }}</span>
+              <!-- 设备①：平台服务器（运行工业能碳智控平台，卡内为平台自身服务） -->
+              <div class="cbx-topo-lane host-lane">
+                <div class="cbx-topo-lane-title">{{ t('平台服务器') }}</div>
+                <div :ref="setNodeRef('d_platform')" class="cbx-topo-mod device platform">
+                  <div class="cbx-topo-dev-hd">
+                    <span class="cbx-topo-dev-ic">🖥</span>
+                    <div class="cbx-topo-dev-meta">
+                      <b class="cbx-topo-dev-title" :title="t('工业能碳智控平台')">{{ t('工业能碳智控平台') }}</b>
+                      <span class="cbx-topo-dev-addr mono">{{ platformHost }}</span>
+                    </div>
                     <span class="cbx-topo-mod-badge ok">{{ t('运行中') }}</span>
                   </div>
-                  <div class="cbx-topo-mod-sub">{{ t('Web 前端 ⇄ FastAPI :8010') }}<br/>{{ t('平台服务') }}</div>
+                  <div class="cbx-topo-svcs">
+                    <div class="cbx-topo-svc" :title="t('平台 Web 控制台（本页）')">
+                      <span class="cbx-topo-svc-dot on"></span>
+                      <span class="cbx-topo-svc-name">{{ t('Web 前端') }}</span>
+                      <span class="cbx-topo-svc-type">{{ t('控制台') }}</span>
+                    </div>
+                    <div class="cbx-topo-svc" :title="t('平台后端服务：设备/盒子管理、数据接入与对外 API')">
+                      <span class="cbx-topo-svc-dot on"></span>
+                      <span class="cbx-topo-svc-name">{{ t('平台后端') }}</span>
+                      <span class="cbx-topo-svc-type">FastAPI</span>
+                    </div>
+                    <div class="cbx-topo-svc" :title="t('数据接入：订阅云端 Broker 的 data/#（一体机上报 + 中间件转换后的外部数据）')">
+                      <span class="cbx-topo-svc-dot on"></span>
+                      <span class="cbx-topo-svc-name">{{ t('数据接入') }}</span>
+                      <span class="cbx-topo-svc-type">MQTT</span>
+                    </div>
+                  </div>
                   <div class="cbx-topo-mod-ops">
                     <button class="cbx-op cbx-xs" @click="refreshAll()" :title="t('刷新全部数据')">⟳ {{ t('刷新') }}</button>
                   </div>
                 </div>
               </div>
-              <!-- 云端列 -->
-              <div class="cbx-topo-lane">
-                <div class="cbx-topo-lane-title">{{ t('云端') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openBoxConfig" :title="t('配置云端 Broker 地址/账号与 agent Token/端口，保存后自动热更新重连')">{{ t('云端配置') }}</button></div>
-                <div :ref="setNodeRef('n_agent')" class="cbx-topo-mod agent" :class="{ down: !agentStatusOk }">
-                  <div class="cbx-topo-mod-head">
-                    <span class="cbx-topo-mod-name" :title="'cloud-agent'">{{ t('云端数据服务') }}</span>
+              <!-- 设备②：云端服务器（一台设备，卡内为云端运行的各项服务） -->
+              <div class="cbx-topo-lane cloud-lane">
+                <div class="cbx-topo-lane-title">{{ t('云端服务器') }}</div>
+                <div :ref="setNodeRef('d_cloud')" class="cbx-topo-mod device cloud"
+                     :class="{ down: !agentStatusOk || (overview.cloudcore && overview.cloudcore.phase !== 'Running') }">
+                  <div class="cbx-topo-dev-hd">
+                    <span class="cbx-topo-dev-ic">☁</span>
+                    <div class="cbx-topo-dev-meta">
+                      <b class="cbx-topo-dev-title" :title="t('云端服务器：CloudCore / cloud-agent / MQTT Broker / 数据中间件均运行在本机')">{{ t('云端服务器') }}</b>
+                      <span class="cbx-topo-dev-addr mono">{{ cloudCfg.host || '—' }}</span>
+                    </div>
                     <span class="cbx-topo-mod-badge" :class="{ ok: agentStatusOk }">{{ agentStatusOk ? t('在线') : t('离线') }}</span>
                   </div>
-                  <div class="cbx-topo-mod-sub">HTTP :42083 · Bearer<br/>{{ agentStatusOk ? t('已连通') : t('未连通（需配置 Token）') }}</div>
+                  <!-- 设备内服务：均运行在本机，彼此之间为进程内/本机通信，不占用系统连接图连接线 -->
+                  <div class="cbx-topo-svcs">
+                    <div class="cbx-topo-svc" :title="t('云端 Broker :41883 —— 能碳一体机上报的唯一入口：传感器数据与外部数据系统数据都由一体机上报到本 Broker；外部数据先落在上行空间 ext/#，经云端数据中间件转换为 data/ext-* 后再由平台消费，按 box 前缀区分归属') + '\n' + t('订阅') + ' ' + fmtNum(stats.subscriptions) + ' · ' + t('运行') + ' ' + fmtUptime(stats.uptime)">
+                      <span class="cbx-topo-svc-dot on"></span>
+                      <span class="cbx-topo-svc-name">{{ t('云端消息中心') }}</span>
+                      <span class="cbx-topo-svc-type">MQTT :41883</span>
+                      <span class="cbx-topo-svc-ops">
+                        <button class="cbx-op cbx-tiny" :disabled="!!restartingKey" @click="restartBroker()" :title="t('重启云端 MQTT Broker（nengtan-cloud-broker systemd 服务，短暂断连后自动重连）')">{{ restartingKey === 'systemd:nengtan-cloud-broker' ? '…' : '↻' }}</button>
+                      </span>
+                    </div>
+                    <div class="cbx-topo-svc" :class="{ off: !(overview.cloudcore && overview.cloudcore.phase === 'Running') }"
+                         :title="'CloudCore · CloudHub :10002 · KubeEdge CRD'">
+                      <span class="cbx-topo-svc-dot" :class="{ on: overview.cloudcore && overview.cloudcore.phase === 'Running' }"></span>
+                      <span class="cbx-topo-svc-name">{{ t('云边连接服务') }}</span>
+                      <span class="cbx-topo-svc-type">{{ overview.cloudcore ? phaseZh(overview.cloudcore.phase) : '—' }}</span>
+                      <span class="cbx-topo-svc-ops">
+                        <button class="cbx-op cbx-tiny" :disabled="!!restartingKey" @click="restartCloudcore()" :title="t('重启云端 kubeedge 命名空间下的 cloudcore 工作负载')">{{ restartingKey === 'deployment:cloudcore' ? '…' : '↻' }}</button>
+                      </span>
+                    </div>
+                    <div class="cbx-topo-svc" :class="{ off: !agentStatusOk }" :title="'cloud-agent · HTTP :42083 · Bearer'">
+                      <span class="cbx-topo-svc-dot" :class="{ on: agentStatusOk }"></span>
+                      <span class="cbx-topo-svc-name">{{ t('云端数据服务') }}</span>
+                      <span class="cbx-topo-svc-type">HTTP :42083</span>
+                      <span class="cbx-topo-svc-ops">
+                        <button class="cbx-op cbx-tiny" :disabled="!!restartingKey" @click="restartAgent()" :title="t('重启云端 cloud-agent systemd 服务（2 秒后自动拉起）')">{{ restartingKey === 'systemd:cloud-agent' ? '…' : '↻' }}</button>
+                      </span>
+                    </div>
+                    <div class="cbx-topo-svc" :class="{ off: mwChecked && !mwOnline }"
+                         :title="t('云端数据中间件：订阅云端 Broker 的上行空间 ext/#，把外部数据转换为标准主题 data/ext-* 后回写 Broker，平台按前缀识别归属；平台与中间件自身都不产生模拟数据')">
+                      <span class="cbx-topo-svc-dot" :class="{ on: mwOnline }"></span>
+                      <span class="cbx-topo-svc-name">{{ t('数据中间件') }}</span>
+                      <span class="cbx-topo-svc-type">{{ mwOnline ? t('在线') : (mwChecked ? t('离线') : '—') }}</span>
+                      <span class="cbx-topo-svc-ops">
+                        <button class="cbx-op cbx-tiny" @click="mwPanelOpen = !mwPanelOpen" :title="t('中间件服务连接地址 / Token / 数据输出形态')">⚙</button>
+                      </span>
+                    </div>
+                  </div>
+                  <!-- 设备内部互联（本机通信，非系统级链路） -->
+                  <div class="cbx-topo-inner">{{ t('本机内部：CloudCore → Broker（cloud/# 状态推送）· 中间件 ⇄ Broker（ext/# ⇄ data/ext-*）· agent 本地 kubectl') }}</div>
                   <div class="cbx-topo-mod-ops">
-                    <button class="cbx-op cbx-xs" :disabled="!!restartingKey" @click="restartAgent()" :title="t('重启云端 cloud-agent systemd 服务（2 秒后自动拉起）')">{{ restartingKey === 'systemd:cloud-agent' ? t('重启中…') : '↻ ' + t('重启') }}</button>
-                  </div>
-                </div>
-                <div :ref="setNodeRef('n_cloudcore')" class="cbx-topo-mod cloudcore" :class="{ down: overview.cloud_source !== 'live' || (overview.cloudcore && overview.cloudcore.phase !== 'Running') }">
-                  <div class="cbx-topo-mod-head">
-                    <span class="cbx-topo-mod-name" :title="'CloudCore'">{{ t('云边连接服务') }}</span>
-                    <span class="cbx-topo-mod-badge" :class="{ ok: overview.cloudcore && overview.cloudcore.phase === 'Running' }">{{ overview.cloudcore ? phaseZh(overview.cloudcore.phase) : '—' }}</span>
-                  </div>
-                  <div class="cbx-topo-mod-sub">CloudHub :10002 · KubeEdge CRD<br/>{{ cloudCfg.host || '36.151.146.71' }}</div>
-                  <div class="cbx-topo-mod-ops">
-                    <button class="cbx-op cbx-xs" :disabled="!!restartingKey" @click="restartCloudcore()" :title="t('重启云端 kubeedge 命名空间下的 cloudcore 工作负载')">{{ restartingKey === 'deployment:cloudcore' ? t('重启中…') : '↻ ' + t('重启') }}</button>
-                  </div>
-                </div>
-                <div :ref="setNodeRef('n_broker')" class="cbx-topo-mod broker">
-                  <div class="cbx-topo-mod-head">
-                    <span class="cbx-topo-mod-name" :title="'MQTT Broker'">{{ t('消息中心') }}</span>
-                    <span class="cbx-topo-mod-badge ok">{{ t('运行中') }}</span>
-                  </div>
-                  <div class="cbx-topo-mod-sub">TCP :41883 · WS :41083<br/>{{ t('订阅') }} {{ fmtNum(stats.subscriptions) }} · {{ t('运行') }} {{ fmtUptime(stats.uptime) }}</div>
-                  <div class="cbx-topo-mod-ops">
-                    <button class="cbx-op cbx-xs" :disabled="!!restartingKey" @click="restartBroker()" :title="t('重启云端 MQTT Broker（nengtan-cloud-broker systemd 服务，短暂断连后自动重连）')">{{ restartingKey === 'systemd:nengtan-cloud-broker' ? t('重启中…') : '↻ ' + t('重启') }}</button>
+                    <button class="cbx-op cbx-xs" @click="openBoxConfig" :title="t('配置云端 Broker 地址/账号与 agent Token/端口，保存后自动热更新重连')">⚙ {{ t('云端配置') }}</button>
+                    <button class="cbx-op cbx-xs" @click="mwPanelOpen = !mwPanelOpen" :title="t('中间件服务连接地址 / Token / 数据输出形态')">{{ t('中间件配置') }}</button>
                   </div>
                 </div>
               </div>
-              <!-- 边端列（EdgeCore 盒子） -->
-              <div class="cbx-topo-lane edge">
-                <div class="cbx-topo-lane-title">{{ t('边端') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openOnboard" :title="t('新盒子接入：生成 edgecore.yaml 配置')">{{ t('盒子接入') }}</button></div>
-                <div v-for="b in topoBoxes" :key="b.name" :ref="setBoxNodeRef(b.name)" class="cbx-topo-mod box" :class="{ down: b.ready === false }">
-                  <div class="cbx-topo-mod-head">
-                    <span class="cbx-topo-mod-name" :title="b.name">{{ boxName(b) }}</span>
+              <!-- 设备③：能碳一体机（每台一台设备，卡内为边缘运行时/采集服务/云端部署应用） -->
+              <div class="cbx-topo-lane box-lane">
+                <div class="cbx-topo-lane-title">{{ t('能碳一体机') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openOnboard" :title="t('新盒子接入：生成 edgecore.yaml 配置。一体机同时承担两类接入：下接传感器/仪表、后接外部数据系统')">{{ t('盒子接入') }}</button></div>
+                <div v-for="b in topoBoxes" :key="b.name" :ref="setBoxNodeRef(b.name)" class="cbx-topo-mod device box" :class="{ down: b.ready === false }">
+                  <div class="cbx-topo-dev-hd">
+                    <span class="cbx-topo-dev-ic">⬢</span>
+                    <div class="cbx-topo-dev-meta">
+                      <b class="cbx-topo-dev-title" :title="b.name">{{ boxName(b) }}</b>
+                      <span class="cbx-topo-dev-addr mono">{{ b.name }}<template v-if="b.version && b.version !== '—'"> · v{{ b.version }}</template></span>
+                    </div>
                     <span class="cbx-topo-mod-badge" :class="{ ok: readyOk(b.ready), err: b.ready === false }">{{ readyZh(b.ready) }}</span>
                   </div>
-                  <div class="cbx-topo-mod-sub">{{ t('边缘接入') }} · EdgeCore<template v-if="b.version && b.version !== '—'"> · v{{ b.version }}</template><template v-if="b.roles && b.roles !== '—'"> · {{ roleZh(b.roles) }}</template><br/>edgecore MQTT :1883 · {{ b.source === 'mqtt' ? t('MQTT 识别') : 'K8s Agent' }} · {{ devCountOf(b.name) }} {{ t('台待下发') }}</div>
-                  <!-- 盒子当前运行的服务/模型（云端部署，盒子周期上报 state/{box}/services） -->
+                  <!-- 设备内服务 -->
                   <div class="cbx-topo-svcs">
+                    <div class="cbx-topo-svc" :class="{ off: b.ready === false }"
+                         :title="t('KubeEdge 边缘运行时：与云端 CloudHub 建立长连接，接收设备/应用下发并上报状态')">
+                      <span class="cbx-topo-svc-dot" :class="{ on: b.ready !== false }"></span>
+                      <span class="cbx-topo-svc-name">EdgeCore</span>
+                      <span class="cbx-topo-svc-type">{{ t('边缘运行时') }}</span>
+                    </div>
+                    <div class="cbx-topo-svc" :class="{ off: b.ready === false }"
+                         :title="t('设备采集服务：按协议采集传感器/仪表读数，经 DMI 与 MQTT 双通道上报（data/# 与 ext/#）')">
+                      <span class="cbx-topo-svc-dot" :class="{ on: b.ready !== false }"></span>
+                      <span class="cbx-topo-svc-name">box-mapper</span>
+                      <span class="cbx-topo-svc-type">{{ t('采集') }}</span>
+                      <span class="cbx-topo-svc-ops">
+                        <button class="cbx-op cbx-tiny" :disabled="!!restartingKey || !edgeIpOk(b)" @click="restartMapper(b)" :title="edgeIpOk(b) ? t('重启该盒子上的 box-mapper systemd 服务（云端 agent 经 SSH 到边缘盒子执行 systemctl restart box-mapper）') : t('未配置盒子 IP 或探测不通，无法重启 Mapper（先点「配置」填写现场可达地址）')">{{ restartingKey === 'edge:box-mapper' ? '…' : '↻' }}</button>
+                      </span>
+                    </div>
+                    <!-- 云端部署到本机的应用/模型（盒子周期上报 state/{box}/services） -->
                     <template v-if="b.services && b.services.length">
                       <div v-for="s in b.services" :key="s.name" class="cbx-topo-svc" :title="(s.command || '') + (s.url ? '\n' + s.url : '')">
                         <span class="cbx-topo-svc-dot" :class="{ on: s.running || s.status === 'running' }"></span>
@@ -201,23 +469,28 @@
                     </template>
                     <div v-else class="cbx-topo-svc-empty">{{ t('暂无云端部署应用') }}</div>
                   </div>
+                  <!-- 一体机是本链路的汇聚点：下接传感器/仪表、后接外部数据系统，统一上行云端 -->
+                  <div class="cbx-topo-inner">{{ t('本机汇聚：传感器/仪表 + 外部数据系统 → 统一 MQTT 上行云端（data/# · ext/#）') }}</div>
+                  <div class="cbx-topo-inner">{{ devCountOf(b.name) }} {{ t('台待下发') }} · {{ b.source === 'mqtt' ? t('MQTT 识别') : 'K8s Agent' }}<template v-if="b.roles && b.roles !== '—'"> · {{ roleZh(b.roles) }}</template></div>
                   <div class="cbx-topo-mod-ops">
                     <button class="cbx-op cbx-xs" @click="openBoxEdgeCfg(b)" :title="t('配置盒子显示名称 / 现场可达 IP / SSH 凭据（重启 Mapper 前必须配置且探测可达）')">{{ t('配置') }}</button>
                     <button class="cbx-op cbx-xs" @click="openAppDeploy(b)" :title="t('云端部署模型/服务到盒子（经云端 Broker 命令主题下发，盒子订阅执行）')">⬇ {{ t('部署') }}</button>
-                    <button class="cbx-op cbx-xs" :disabled="!!restartingKey || !edgeIpOk(b)" @click="restartMapper(b)" :title="edgeIpOk(b) ? t('重启该盒子上的 box-mapper systemd 服务（云端 agent 经 SSH 到边缘盒子执行 systemctl restart box-mapper）') : t('未配置盒子 IP 或探测不通，无法重启 Mapper（先点「配置」填写现场可达地址）')">{{ restartingKey === 'edge:box-mapper' ? t('重启中…') : '↻ ' + t('重启 Mapper') }}</button>
                   </div>
                 </div>
                 <div v-if="!topoBoxes.length" class="cbx-topo-empty">{{ t('未识别到盒子节点（云端未连接）。') }}</div>
               </div>
-              <!-- 设备端列（采集设备总览，不按盒子分组） -->
+              <!-- 设备④：现场设备（传感器/仪表，一体机下接，卡内为各台采集设备） -->
               <div class="cbx-topo-lane dev">
-                <div class="cbx-topo-lane-title">{{ t('设备端') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openModelCreate" :title="t('新建设备模型（DeviceModel）')">＋ {{ t('模型') }}</button><button class="cbx-op cbx-xs" @click="openCreate()" :title="t('设备接入：新建采集设备并默认关联到盒子')">＋ {{ t('设备') }}</button></div>
-                <div :ref="setNodeRef('n_devs')" class="cbx-topo-mod devgroup">
-                  <div class="cbx-topo-mod-head">
-                    <span class="cbx-topo-mod-name">{{ t('采集设备') }}</span>
+                <div class="cbx-topo-lane-title">{{ t('现场设备（传感器/仪表）') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openModelCreate" :title="t('新建设备模型（DeviceModel）')">＋ {{ t('模型') }}</button><button class="cbx-op cbx-xs" @click="openCreate()" :title="t('设备接入：新建采集设备并默认关联到盒子')">＋ {{ t('设备') }}</button></div>
+                <div :ref="setNodeRef('d_devs')" class="cbx-topo-mod device devgroup">
+                  <div class="cbx-topo-dev-hd">
+                    <span class="cbx-topo-dev-ic">🛠</span>
+                    <div class="cbx-topo-dev-meta">
+                      <b class="cbx-topo-dev-title">{{ t('采集设备') }}</b>
+                      <span class="cbx-topo-dev-addr">{{ t('边缘采集 MQTT :1883') }}<template v-if="allDevProtos.length"> · {{ allDevProtos.join(' · ') }}</template></span>
+                    </div>
                     <span class="cbx-topo-mod-badge ok">{{ topoAllCloudDevs.length + topoAllLocalDevs.length + topoUnmounted.length }} {{ t('台') }}</span>
                   </div>
-                  <div class="cbx-topo-mod-sub">{{ t('边缘采集 MQTT :1883') }}<template v-if="allDevProtos.length"> · {{ t('协议') }}：{{ allDevProtos.join(' · ') }}</template></div>
                   <div class="cbx-topo-devlist">
                     <div v-if="topoAllCloudDevs.length" class="cbx-topo-devgroup">
                       <div class="cbx-topo-devlabel">{{ t('云端真实') }}</div>
@@ -254,6 +527,29 @@
                       </div>
                     </div>
                     <div v-if="!topoAllCloudDevs.length && !topoAllLocalDevs.length && !topoUnmounted.length" class="cbx-topo-dev-empty">{{ t('暂无设备') }}</div>
+                  </div>
+                </div>
+              </div>
+              <!-- 设备⑤：外部数据系统（一体机后面一级：第三方系统 / 数据中台 / 模拟源，经网线接入一体机） -->
+              <div class="cbx-topo-lane extsrc-lane">
+                <div class="cbx-topo-lane-title">{{ t('外部数据系统') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openAddForm('mqtt')" :title="t('注册外部数据源：第三方系统/数据中台经网线接入能碳一体机，由一体机上行到云端')">＋ {{ t('外部源') }}</button></div>
+                <div :ref="setNodeRef('d_ext')" class="cbx-topo-mod device extsrc">
+                  <div class="cbx-topo-dev-hd">
+                    <span class="cbx-topo-dev-ic">🏭</span>
+                    <div class="cbx-topo-dev-meta">
+                      <b class="cbx-topo-dev-title" :title="t('外部数据系统：PLC / 仪表 / 数据中台 / 第三方业务系统，经网线或工业总线接入能碳一体机，是「一体机后面一级」的数据来源；演示环境由独立服务 sim-source 模拟')">{{ t('外部数据系统') }}</b>
+                      <span class="cbx-topo-dev-addr">{{ t('以太网 / 串口 / OPC') }} → {{ t('一体机') }} → ext/&lt;源&gt;/#</span>
+                    </div>
+                    <span class="cbx-topo-mod-badge" :class="{ ok: extSources.some(s => s.enabled && s.status && s.status.active) }">{{ extSources.length }} {{ t('源') }}</span>
+                  </div>
+                  <div class="cbx-topo-devlist">
+                    <div v-for="s in extSources" :key="s.id" class="cbx-topo-dev cloud" :class="{ on: s.status && s.status.active }" :title="s.name + '（' + s.config.box + '）' + t('：经一体机上行到云端，由数据中间件转换后进入平台')">
+                      <span class="cbx-topo-dev-dot"></span>
+                      <span class="cbx-topo-dev-name">{{ s.name }}</span>
+                      <span class="cbx-topo-dev-sub mono">{{ s.config.box }}</span>
+                      <span class="cbx-topo-dev-val">{{ s.status && s.status.received != null ? fmtNum(s.status.received) : '—' }}</span>
+                    </div>
+                    <div v-if="!extSources.length" class="cbx-topo-dev-empty">{{ t('尚无外部数据源') }}</div>
                   </div>
                 </div>
               </div>
@@ -392,9 +688,9 @@
           </div>
         </section>
 
-        <!-- ④ 发测试消息（向云端 Broker 发布） -->
+        <!-- ④ 发测试消息（向云端 Broker 发布，一体机链路自检；与独立模拟源服务 sim-source 无关） -->
         <section class="cbx-sec">
-          <div class="cbx-sec-head"><b>{{ t('发测试消息') }}</b><span class="cbx-sec-sub">{{ t('仅供专业维护：向云端发送模拟数据，验证链路是否通畅') }}</span></div>
+          <div class="cbx-sec-head"><b>{{ t('发测试消息') }}</b><span class="cbx-sec-sub">{{ t('仅供专业维护：向云端 Broker 发一条测试读数自检一体机链路（模拟数据由独立服务 sim-source 生成，见上方「数据源接入」）') }}</span></div>
           <div class="cbx-form">
             <div class="cbx-form-row">
               <label>{{ t('主题') }}</label><input v-model="pubForm.topic" class="cbx-input" style="width:260px" placeholder="data/box-001/device-1"/>
@@ -1176,24 +1472,317 @@ const sideCount = computed(() => `${topoBoxes.value?.length || 0} ${t('盒')} ·
 
 // 合并界面：原「数据概览」+「设备管理」二合一（云端设备关联 / 边缘节点 / twins 实时值 / CloudHub 端口已移除）
 
+// ================= 数据源接入（能碳一体机 + 外部数据源，含独立模拟源） =================
+// 统一概念：一体机 = 云端 Broker 订阅通道；外部数据源（含模拟数据，由独立服务 sim-source
+// 生成）= 注册到数据中间件后由中间件转换为标准 MQTT 发布，平台按 box 前缀识别归属。
+// 列表/启停/状态来自 GET /api/data-sources（含中间件服务在线状态），卡片内操作转发 REST。
+const sourcesResp = reactive({ sources: [], middleware: {} })
+const sourcesLoading = ref(false)
+const mwChecked = ref(false)          // 是否已探测过中间件（得到过确定结果）
+const mwSyncing = ref(false)
+const mwNote = ref('')
+const mwNoteErr = ref(false)
+const mwPanelOpen = ref(false)
+const mwSaving = ref(false)
+const mwTestBusy = ref(false)
+const mwForm = reactive({ base_url: '', token: '', broker_port: 0, subscribe: true })
+
+const middleware = computed(() => sourcesResp.middleware || {})
+const mwOnline = computed(() => !!middleware.value.online)
+const boxSrc = computed(() => (sourcesResp.sources || []).find(s => s.type === 'box')
+  || { id: 'box', name: t('能碳一体机'), type: 'box', enabled: true, status: {} })
+const boxSt = computed(() => boxSrc.value.status || {})
+const boxLastMsg = computed(() => { const m = boxSt.value.last_msg; return m ? (m.topic || '') : '' })
+const extSources = computed(() => (sourcesResp.sources || []).filter(s => s.type !== 'box'))
+
+async function loadSources() {
+  sourcesLoading.value = true
+  try {
+    const r = await api.dataSources()
+    sourcesResp.sources = (r && r.sources) || []
+    sourcesResp.middleware = (r && r.middleware) || {}
+    mwChecked.value = true
+  } catch (e) {
+    mwChecked.value = true
+    sourcesResp.middleware = { online: false, error: e.message || t('无法获取数据源状态') }
+  } finally { sourcesLoading.value = false }
+}
+// 最近一条消息时间（external 状态里为 epoch 秒）→ 「X 分钟前」
+function agoText(sec) {
+  if (!sec) return ''
+  const s = Math.max(0, Date.now() / 1000 - Number(sec))
+  if (s < 5) return t('刚刚')
+  if (s < 60) return t('{n} 秒前', { n: Math.round(s) })
+  if (s < 3600) return t('{n} 分钟前', { n: Math.round(s / 60) })
+  if (s < 86400) return t('{n} 小时前', { n: Math.round(s / 3600) })
+  return t('{n} 天前', { n: Math.round(s / 86400) })
+}
+
+// ---- 接入类型与参数 schema（优先中间件注册表；离线用本地内置模板） ----
+const adapterTypes = ref([
+  { type: 'mqtt', label: t('外部 MQTT') },
+])
+// 本地字段模板（中间件不可达时的兜底 schema；形状与中间件注册表 fields 一致）
+const localFieldTpls = {
+  mqtt: [
+    { name: 'broker.host', label: t('Broker 地址'), required: true, placeholder: '10.0.0.9' },
+    { name: 'broker.port', label: t('Broker 端口'), kind: 'num', default: '1883', placeholder: '1883' },
+    { name: 'broker.username', label: t('用户名（可空）') },
+    { name: 'broker.password', label: t('密码（可空）'), type: 'password' },
+    { name: 'topics', label: t('订阅主题'), type: 'array', required: true,
+      desc: t('JSON 数组。中间件订阅外部主题后，将每条消息转投给平台（前缀化发布）') },
+    { name: 'fieldMap', label: t('字段映射（可选）'), type: 'json',
+      desc: t('把外部消息字段映射为平台标准字段（v/device/value/t），如 {"value":"reading"}') },
+    { name: 'device', label: t('默认设备 id（可选）'),
+      placeholder: t('外部消息无 device 字段时使用') },
+  ],
+  sim: [
+    { name: 'interval', label: t('发布间隔（秒）'), kind: 'num', default: '2' },
+    { name: 'devices', label: t('模拟设备（可选 JSON）'), type: 'json',
+      desc: t('留空时平台将自动注入默认示例设备；格式 [{id,name,properties:[{name,base,amplitude,noise,period,unit}]}]') },
+  ],
+}
+async function loadAdapterTypes() {
+  try {
+    const r = await api.middlewareTypes()
+    if (r && Array.isArray(r.types) && r.types.length) {
+      adapterTypes.value = r.types.map(x => ({ type: x.type, label: x.label || x.type, fields: x.fields || [] }))
+    }
+  } catch (e) { /* 中间件不可达：沿用本地模板 */ }
+}
+// 需要 JSON/列表式编辑（textarea）的字段类型（中间件注册表：json/list/number/devices/text/password）
+const JSON_LIKE_TYPES = ['json', 'array', 'list', 'devices']
+function isJsonLike(t) { return JSON_LIKE_TYPES.includes(t) }
+function adapterFieldTpl(type) {
+  const info = adapterTypes.value.find(a => a.type === type)
+  const raw = (info && info.fields && info.fields.length) ? info.fields : (localFieldTpls[type] || [])
+  // 中间件注册表 schema 以 key 标识字段（平台内部用 name），统一归一化
+  return raw.map(f => ({ ...f, name: f.name || f.key || '' }))
+}
+// 取值兼容：既有扁平键（'broker.host'）也有嵌套 params（{broker:{host}}）
+function fieldRaw(values, name) {
+  if (!values) return undefined
+  if (name in values) return values[name]
+  const segs = String(name).split('.')
+  let o = values
+  for (let i = 0; i < segs.length; i++) {
+    if (o == null || typeof o !== 'object') return undefined
+    o = o[segs[i]]
+  }
+  return o
+}
+// 生成表单字段（values: 已保存 params → 打散到字段；保持跨类型切换留值）
+function makeFields(type, values) {
+  return adapterFieldTpl(type).map(f => {
+    const key = f.name
+    let v = ''
+    const rawVal = fieldRaw(values, key)
+    if (rawVal !== undefined) {
+      v = isJsonLike(f.type)
+        ? (rawVal == null ? '' : JSON.stringify(rawVal))
+        : String(rawVal)
+    } else if (f.default !== undefined) v = String(f.default)
+    return { ...f, type: f.type || 'text', v }
+  })
+}
+
+// ---- 注册 / 编辑表单 ----
+const formOpen = ref(false)
+const formSaving = ref(false)
+const extFormErr = ref('')
+const extForm = reactive({ id: '', name: '', adapter: 'mqtt', box: '', desc: '', fields: [] })
+function openAddForm(prefer) {
+  extForm.id = ''; extForm.name = ''; extForm.box = ''; extForm.desc = ''
+  extFormErr.value = ''
+  extForm.adapter = (prefer && adapterTypes.value.some(a => a.type === prefer)) ? prefer
+    : ((adapterTypes.value[0] && adapterTypes.value[0].type) || 'mqtt')
+  extForm.fields = makeFields(extForm.adapter)
+  formOpen.value = true
+}
+function openEditForm(s) {
+  extForm.id = s.id
+  extForm.name = s.name || ''
+  extForm.adapter = (s.config && s.config.adapter) || 'mqtt'
+  extForm.box = (s.config && s.config.box) || ''
+  extForm.desc = (s.config && s.config.desc) || ''
+  extFormErr.value = ''
+  extForm.fields = makeFields(extForm.adapter, (s.config && s.config.params) || {})
+  formOpen.value = true
+}
+function closeForm() { formOpen.value = false }
+function onAdapterChange() {
+  const kept = {}
+  for (const f of extForm.fields) kept[f.name] = f.v
+  extForm.fields = makeFields(extForm.adapter, kept)
+}
+function validateForm() {
+  extFormErr.value = ''
+  extForm.box = String(extForm.box || '').trim().toLowerCase()
+  if (!extForm.box) { extFormErr.value = t('请填写发布前缀（小写字母/数字/连字符，如 ext-weigh）'); return false }
+  if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(extForm.box)) { extFormErr.value = t('发布前缀仅允许小写字母/数字/连字符（如 ext-weigh）'); return false }
+  for (const f of extForm.fields) {
+    if (f.required && !String(f.v || '').trim()) { extFormErr.value = t('请填写接入参数：') + f.label; return false }
+  }
+  return true
+}
+// 字段 → 嵌套 params（支持 broker.host 形式的点号键）
+function buildParams() {
+  const params = {}
+  for (const f of extForm.fields) {
+    if (String(f.v ?? '') === '') continue
+    let val = f.v
+    if (isJsonLike(f.type)) {
+      // list/array 容忍非 JSON 输入（按逗号/分号/换行拆分）；json/devices 需严格 JSON
+      const txt = String(f.v || '').trim()
+      try {
+        val = JSON.parse(txt)
+      } catch (e) {
+        if (f.type === 'list' || f.type === 'array') {
+          val = txt.split(/[,;\n]/).map(s => s.trim()).filter(Boolean)
+        } else {
+          extFormErr.value = t('参数「{label}」不是合法 JSON', { label: f.label }); return null
+        }
+      }
+    } else if (f.kind === 'num' || f.type === 'number') { val = Number(f.v) }
+    const segs = String(f.name).split('.')
+    let o = params
+    for (let i = 0; i < segs.length - 1; i++) o = (o[segs[i]] = o[segs[i]] || {})
+    o[segs[segs.length - 1]] = val
+  }
+  return params
+}
+async function saveForm() {
+  if (!validateForm()) return
+  const params = buildParams()
+  if (params === null) return
+  const config = { box: extForm.box, adapter: extForm.adapter, params, desc: extForm.desc }
+  const name = (extForm.name || '').trim() || extForm.box
+  formSaving.value = true
+  try {
+    const r = extForm.id
+      ? await api.dataSourceSave(extForm.id, { name, config })
+      : await api.dataSourceAdd({ name, config })
+    if (!r.ok) { extFormErr.value = r.error || t('保存失败'); return }
+    store.showToast(r.note || t('已保存'), 'success')
+    await loadSources()
+    closeForm()
+  } catch (e) { extFormErr.value = e.message || String(e) }
+  finally { formSaving.value = false }
+}
+async function toggleSource(s, ev) {
+  const on = !!ev.target.checked
+  const prev = s.enabled
+  s.enabled = on
+  try {
+    const r = await api.dataSourceToggle(s.id, on)
+    if (!r.ok) { s.enabled = prev; store.showToast(r.error || t('操作失败'), 'error'); return }
+    store.showToast(r.note || (on ? t('已启用') : t('已停用')), 'success')
+    await loadSources()
+  } catch (e) { s.enabled = prev; store.showToast(t('操作失败') + '：' + (e.message || e), 'error') }
+}
+async function removeSource(s) {
+  if (!confirm(t('删除外部数据源「{name}」？中间件将同步注销采集。', { name: s.name }))) return
+  try {
+    const r = await api.dataSourceRemove(s.id)
+    if (!r.ok) { store.showToast(r.error || t('删除失败'), 'error'); return }
+    store.showToast(r.note || t('已删除'), 'success')
+    await loadSources()
+  } catch (e) { store.showToast(t('删除失败') + '：' + (e.message || e), 'error') }
+}
+// 测试（表单 → 探测；卡片 → 按已保存配置探测）
+async function testForm() {
+  if (!validateForm()) return
+  const params = buildParams()
+  if (params === null) return
+  const cfg = { box: extForm.box, adapter: extForm.adapter, params, target: extForm.target }
+  try {
+    const r = await api.dataSourceTest({ config: cfg })
+    store.showToast((r.ok ? t('连通性测试通过') : t('测试失败') + '：' + ((r.message || r.error || ''))) || t('无结果'), r.ok ? 'success' : 'error')
+  } catch (e) { store.showToast(t('测试失败') + '：' + (e.message || e), 'error') }
+}
+async function testSource(s) {
+  s.testing = true
+  const cfg = { box: s.config.box, adapter: s.config.adapter, params: s.config.params || {}, target: s.config.target || '' }
+  try {
+    const r = await api.dataSourceTest({ id: s.id, config: cfg })
+    store.showToast((r.ok ? t('连通性测试通过') : t('测试失败') + '：' + ((r.message || r.error || ''))) || t('无结果'), r.ok ? 'success' : 'error')
+  } catch (e) { store.showToast(t('测试失败') + '：' + (e.message || e), 'error') }
+  finally { s.testing = false }
+}
+
+// ---- 中间件服务：状态 / 配置 / 对账 ----
+async function loadMwCfg() {
+  try {
+    const r = await api.middlewareStatus()
+    const c = (r && r.config) || {}
+    mwForm.base_url = c.base_url || ''
+    mwForm.token = c.token || ''
+    mwForm.broker_port = (c.broker && c.broker.port) || 0
+    mwForm.subscribe = c.subscribe !== false
+    mwNote.value = ''; mwNoteErr.value = false
+  } catch (e) { /* 忽略：中间件状态由 loadSources 呈现 */ }
+}
+async function saveMw() {
+  mwSaving.value = true; mwNoteErr.value = false
+  try {
+    const r = await api.middlewareConfig({
+      enabled: true,
+      subscribe: !!mwForm.subscribe,
+      base_url: String(mwForm.base_url || '').trim(),
+      token: String(mwForm.token || '').trim(),
+      broker: { port: Number(mwForm.broker_port) || 0 },
+    })
+    mwNote.value = (r.ok ? (r.note || t('中间件配置已保存')) : (r.error || t('保存失败')))
+    mwNoteErr.value = !r.ok
+    if (r.ok) await loadSources()
+  } catch (e) { mwNote.value = t('保存失败：') + (e.message || e); mwNoteErr.value = true }
+  finally { mwSaving.value = false }
+}
+async function testMw() {
+  mwTestBusy.value = true; mwNoteErr.value = false
+  try {
+    const r = await api.middlewareTest({ base_url: mwForm.base_url, token: mwForm.token })
+    mwNote.value = (r.ok ? (r.note || t('中间件可达')) : (r.error || r.note || t('中间件不可达')))
+    mwNoteErr.value = !r.ok
+    if (r.ok) { await loadSources(); await loadMwCfg() }
+  } catch (e) { mwNote.value = t('测试失败：') + (e.message || e); mwNoteErr.value = true }
+  finally { mwTestBusy.value = false }
+}
+async function syncMw() {
+  mwSyncing.value = true; mwNoteErr.value = false
+  try {
+    const r = await api.middlewareSync()
+    if (r.ok) { mwNote.value = t('对账完成：补注册 {n} 条缺失数据源', { n: r.registered || 0 }); await loadSources() }
+    else mwNote.value = (r.error || (r.errors && r.errors[0]) || t('对账失败'))
+    mwNoteErr.value = !r.ok
+  } catch (e) { mwNote.value = t('对账失败：') + (e.message || e); mwNoteErr.value = true }
+  finally { mwSyncing.value = false }
+}
+
 // ---- 轮询定时器 ----
-// 快慢拆分：数据概览（链路状态/实时读数/消息流）3s，设备配置列表 10s；按当前页签拉取，避免无谓请求
+// 快慢拆分：数据概览（链路状态/实时读数/消息流）3s，设备配置列表 30s；数据源状态并入快轮询由
+// 后端聚合返回（一次 /api/data-sources 同时给出目录 + 中间件服务 + 各源运行状态），每 6s 拉一次。
 let fastTimer = null
 let slowTimer = null
+let sourcesTimer = null
 const startPolling = () => {
   stopPolling()
   fastTimer = setInterval(refreshFast, 3000)
   slowTimer = setInterval(refreshSlow, 30000)
+  sourcesTimer = setInterval(loadSources, 6000)
 }
 const stopPolling = () => {
   if (fastTimer) { clearInterval(fastTimer); fastTimer = null }
   if (slowTimer) { clearInterval(slowTimer); slowTimer = null }
+  if (sourcesTimer) { clearInterval(sourcesTimer); sourcesTimer = null }
 }
 onMounted(() => {
   restoreTopoPos()
   refreshAll(); loadCloudCfg(); loadAgentStatus(); startPolling(); connectCloudFeed()
   loadEdgeCfgSilent()
   setupTopoLinks()
+  // 数据源接入：目录 + 中间件服务状态 + 接入类型 schema（含中间件连接配置初始值）
+  loadSources(); loadAdapterTypes(); loadMwCfg()
 })
 onUnmounted(() => {
   stopPolling(); closeDevRealtime(); disconnectCloudFeed()
@@ -2131,6 +2720,8 @@ const topoPendingCount = computed(() => (devices.value.devices || []).filter((d)
 // 设备端总览：跨盒子展平（不按盒子分组展示）
 const topoAllCloudDevs = computed(() => topoBoxes.value.flatMap((b) => b.cloudDevices))
 const topoAllLocalDevs = computed(() => topoBoxes.value.flatMap((b) => b.devices))
+// 平台服务器地址：当前控制台访问地址（平台自身作为连接图中的一台设备）
+const platformHost = (typeof window !== 'undefined' && window.location && window.location.host) || ''
 // 所有设备实际采集协议集合（去重）
 const allDevProtos = computed(() => {
   const set = new Set()
@@ -2194,8 +2785,8 @@ function devProtosOf(nodeName) {
 
 // ---- 通信拓扑图连线：SVG 贝塞尔箭头线锚定到具体模块边缘，标签按实际协议/方法动态显示 ----
 const topoCanvasRef = ref(null)
-const nodeRefs = {}            // 固定模块（平台/agent/cloudcore/broker/设备端）
-const boxNodeRefs = ref({})    // 动态盒子模块（按盒子名）
+const nodeRefs = {}            // 固定设备卡（平台服务器 / 云端服务器 / 现场设备 / 外部数据系统）
+const boxNodeRefs = ref({})    // 动态设备卡：能碳一体机（按盒子节点名）
 const links = ref([])          // [{id,d,cls,mk,both,label,lw,lx,ly}]
 function setNodeRef(k) {
   return (el) => { if (el) { nodeRefs[k] = el; attachTopoDrag(el, k) } }
@@ -2207,7 +2798,7 @@ function setBoxNodeRef(name) {
 // 拖拽时模块转 absolute（原位放占位块保持列内布局不跳动），松手后位置写入 topoPos 并持久化；
 // 「自动布局」清除所有手动位置恢复四列 flex 布局。
 const topoPos = ref({})                       // { key: {left, top} }
-const TOPO_POS_KEY = 'cbx-topo-pos-v1'
+const TOPO_POS_KEY = 'cbx-topo-pos-v2'   // v2：布局单元由「模块」改为「设备卡」，旧位置作废
 let topoDrag = null                           // 当前拖拽状态
 
 function attachTopoDrag(el, key) {
@@ -2374,31 +2965,43 @@ function recalcLinks() {
     const r = el.getBoundingClientRect()
     return { l: r.left - cRect.left, t: r.top - cRect.top, r: r.right - cRect.left, b: r.bottom - cRect.top, w: r.width, h: r.height }
   }
+  // 连接图按「设备」建模：连线只表示设备↔设备的通道，设备内部服务之间不画线
+  // （设备内部通信已在卡片内以「本机内部：…」文字说明呈现）
   const defs = []
-  const A = R(nodeRefs.n_platform)
-  const AG = R(nodeRefs.n_agent)
-  const CC = R(nodeRefs.n_cloudcore)
-  const BK = R(nodeRefs.n_broker)
-  if (A && AG) defs.push({ f: A, t: AG, cls: 'red', mk: 'red', both: false, label: t('写 HTTP :42083 · Bearer') })
-  if (BK && A) defs.push({ f: BK, t: A, cls: 'green', mk: 'green', both: false, label: t('读 MQTT :41883 长连接') })
-  if (AG && CC) defs.push({ f: AG, t: CC, cls: 'blue', mk: 'blue', both: false, label: t('kubectl 本地 apply · delete · rollout'), vertical: true })
-  if (CC && BK) defs.push({ f: CC, t: BK, cls: 'blue', mk: 'blue', both: false, label: t('MQTT 推送 cloud/state · crds · logs'), vertical: true })
-  const DEVS = R(nodeRefs.n_devs)
+  const P = R(nodeRefs.d_platform)
+  const C = R(nodeRefs.d_cloud)
+  const DEVS = R(nodeRefs.d_devs)
+  const EXT = R(nodeRefs.d_ext)
+  // 平台服务器 ⇄ 云端服务器：上行读取（MQTT 订阅）与下行写操作（agent HTTP）
+  if (P && C) {
+    defs.push({ f: P, t: C, cls: 'red', mk: 'red', both: false,
+                label: t('写 · HTTP :42083'), fyOff: -0.24, tyOff: -0.36 })
+    defs.push({ f: C, t: P, cls: 'green', mk: 'green', both: false,
+                label: t('读 · MQTT :41883'), fyOff: 0.36, tyOff: 0.24 })
+  }
   const boxCount = topoBoxes.value.length
   topoBoxes.value.forEach((box, idx) => {
     const B = R(boxNodeRefs.value[box.name])
-    if (!CC || !B) return
-    defs.push({ f: CC, t: B, cls: 'blue', mk: 'blue', both: true, label: t('双向 WebSocket :10002'), fyOff: -0.42, tyOff: -0.42 })
-    if (BK) defs.push({ f: B, t: BK, cls: 'green', mk: 'green', both: false, label: t('上报 MQTT data/#'), fyOff: 0.42, tyOff: 0.42 })
-    defs.push({ f: CC, t: B, cls: 'blue', mk: 'blue', both: true, label: t('DMI DeviceTwin 同步'), fyOff: 0.42, tyOff: 0.42 })
+    if (!B) return
+    const spread = boxCount > 1 ? (idx - (boxCount - 1) / 2) * 0.3 : 0
+    // 能碳一体机 → 云端服务器：一体机把「传感器数据（data/#）」与「外部数据系统数据（ext/#）」
+    // 统一 MQTT 上行到云端（外部数据不是外部系统直发云端，必须先经一体机转发）；另一条为云边管理通道
+    if (C) {
+      defs.push({ f: B, t: C, cls: 'green', mk: 'green', both: false,
+                  label: t('MQTT 上行 :41883 · data/# · ext/#'), fyOff: -0.3 + spread, tyOff: -0.12 + spread })
+      defs.push({ f: B, t: C, cls: 'blue', mk: 'blue', both: true,
+                  label: t('云边管理 :10002'), fyOff: 0.3 + spread, tyOff: 0.36 + spread })
+    }
+    // 现场设备（传感器/仪表）→ 能碳一体机：边缘采集（RS485 / Modbus / 以太网）
     if (DEVS) {
-      // 盒子 → 设备端总览：标注该盒子的真实边缘采集协议（动态），多盒子时在模块左缘按序分散锚点
-      const protos = devProtosOf(box.name)
-      defs.push({
-        f: B, t: DEVS, cls: 'green', mk: 'green', both: false,
-        label: protos.length ? t('边缘采集 MQTT :1883') + ' · ' + protos.join(' · ') : t('边缘采集 MQTT :1883'),
-        tyOff: boxCount > 1 ? (idx - (boxCount - 1) / 2) * 0.3 : 0,
-      })
+      defs.push({ f: DEVS, t: B, cls: 'green', mk: 'green', both: false,
+                  label: t('采集 · RS485/Modbus'), fyOff: -0.2 + spread, tyOff: -0.3 + spread })
+    }
+    // 外部数据系统 → 能碳一体机：外部数据先接入一体机（网线/工业总线），再由一体机上行云端，
+    // 因此这一段只是本地接入，不含任何云端主题
+    if (EXT) {
+      defs.push({ f: EXT, t: B, cls: 'blue', mk: 'blue', both: false,
+                  label: t('外部数据接入 · 以太网/OPC'), fyOff: 0.2 + spread, tyOff: 0.3 + spread })
     }
   })
   links.value = defs.map((l, i) => {
@@ -2839,9 +3442,10 @@ function closeGuide() {
   guideSeen.value = true
   try { localStorage.setItem('cbx-guide-seen', '1') } catch (e) {}
 }
-// 指标卡点击 → 平滑滚动到对应列表
+// 指标卡点击 → 平滑滚动到对应列表（sources=数据源接入区块，box/dev=资源列表）
 function scrollToSec(which) {
-  const el = document.getElementById(which === 'box' ? 'cbx-res-box' : 'cbx-res-dev')
+  const el = document.getElementById(which === 'box' ? 'cbx-res-box'
+    : which === 'sources' ? 'cbx-sec-sources' : 'cbx-res-dev')
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
@@ -3384,10 +3988,13 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .cbx-dialog-head b { font-size: 13px; font-weight: 600; letter-spacing: .2px; }
 .cbx-dialog-head .cbx-op { margin-left: auto; }
 .cbx-dialog-head .x-btn.lg { margin-left: auto; }
-/* ---- 通信拓扑图（平台 → 云端 → 边端 → 设备端 四列 + SVG 连线锚定模块）---- */
+/* ---- 系统连接图（以设备为单位：每台设备一张卡，卡内为运行在本设备上的服务）---- */
 .cbx-topo { position: relative; }
 .cbx-topo-lanes { display: flex; align-items: flex-start; gap: 26px; flex-wrap: wrap; justify-content: space-between; }
 .cbx-topo-lane { display: flex; flex-direction: column; gap: 14px; flex: 0 1 158px; min-width: 0; }
+.cbx-topo-lane.host-lane { flex: 0 1 186px; }
+.cbx-topo-lane.cloud-lane { flex: 0 1 224px; }
+.cbx-topo-lane.box-lane { flex: 0 1 208px; }
 .cbx-topo-lane.dev { flex: 0 1 212px; }
 .cbx-topo-lane-title {
   display: flex; align-items: center; gap: 6px;
@@ -3406,6 +4013,12 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .cbx-topo-mod.dragging { cursor: grabbing; box-shadow: 0 10px 30px rgba(15,23,42,.32); }
 .cbx-topo-mod-ph { visibility: hidden; }
 .cbx-topo-canvas { min-height: 700px; }
+.cbx-topo-legend { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 6px 10px; margin-bottom: 10px; border: 1px dashed var(--line, #2b3652); border-radius: 8px; background: rgba(255,255,255,.015); }
+.cbx-topo-legend .leg { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #8a94a6; line-height: 1.7; }
+.cbx-topo-legend i.lg { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.cbx-topo-legend i.g { background: var(--green); }
+.cbx-topo-legend i.b { background: var(--accent); }
+.cbx-topo-legend i.r { background: var(--red); }
 .cbx-topo-mod::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); }
 .cbx-topo-mod.platform::before { background: var(--accent); }
 .cbx-topo-mod.agent::before { background: var(--yellow); }
@@ -3413,6 +4026,10 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .cbx-topo-mod.broker::before { background: var(--accent2); }
 .cbx-topo-mod.box::before { background: var(--green); }
 .cbx-topo-mod.devgroup::before { background: var(--orange, #f59e0b); }
+.cbx-topo-mod.mw::before { background: #7c5cff; }
+.cbx-topo-mod.extsrc::before { background: var(--accent); }
+/* 外部数据系统列（一体机后面一级），宽度与设备端列一致便于对齐 */
+.cbx-topo-lane.extsrc-lane { flex: 0 1 212px; }
 .cbx-topo-mod:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(15,23,42,.08), 0 12px 26px rgba(15,23,42,.13); }
 .cbx-topo-mod.down { opacity: .75; }
 .cbx-topo-mod-head { display: flex; align-items: center; gap: 6px; }
@@ -3433,6 +4050,31 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .cbx-topo-svc-name { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cbx-topo-svc-type { color: var(--faint); font-size: 8.5px; margin-left: auto; flex: none; }
 .cbx-topo-svc-empty { font-size: 9.5px; color: var(--faint); padding: 2px 0; }
+/* 设备卡（系统连接图的基本单元）：头部为设备标识，卡内列表为运行在该设备上的服务 */
+.cbx-topo-mod.device { padding: 8px 9px; }
+.cbx-topo-mod.cloud::before { background: var(--accent2); }
+.cbx-topo-dev-hd { display: flex; align-items: center; gap: 6px; }
+.cbx-topo-dev-ic {
+  flex: none; width: 20px; height: 20px; border-radius: 4px; font-size: 11px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.06); border: 1px solid var(--border);
+}
+.cbx-topo-dev-meta { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.cbx-topo-dev-title {
+  font-size: 11.5px; font-weight: 700; color: var(--text); letter-spacing: .2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cbx-topo-dev-addr { font-size: 9px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cbx-topo-mod.device .cbx-topo-svcs { max-height: 138px; gap: 3px; }
+.cbx-topo-mod.device .cbx-topo-devlist { margin-left: 0; padding-left: 6px; margin-top: 6px; }
+.cbx-topo-svc.off .cbx-topo-svc-name { color: var(--muted); }
+.cbx-topo-svc-ops { display: inline-flex; gap: 2px; flex: none; margin-left: 4px; }
+.cbx-topo-svc-ops .cbx-op.cbx-tiny { padding: 0 4px; font-size: 9px; min-height: 15px; line-height: 15px; }
+/* 设备内部通信说明（本机进程间通信，不占系统级连线） */
+.cbx-topo-inner {
+  margin-top: 6px; padding-top: 5px; border-top: 1px dashed var(--border);
+  font-size: 8.5px; color: var(--faint); line-height: 1.5;
+}
 .cbx-edge-check { font-size: 10px; font-weight: 700; align-self: center; padding: 2px 8px; border-radius: 4px; }
 .cbx-edge-check.ok { color: var(--green); }
 .cbx-edge-check.bad { color: var(--red); }
@@ -3534,4 +4176,68 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .cbx-body::-webkit-scrollbar-track, .cbx-msglog::-webkit-scrollbar-track, .cbx-yaml::-webkit-scrollbar-track,
 .cbx-code::-webkit-scrollbar-track, .cbx-onboard::-webkit-scrollbar-track, .cbx-rt::-webkit-scrollbar-track,
 .cbx-topo::-webkit-scrollbar-track, .cbx-dialog::-webkit-scrollbar-track { background: transparent; }
+
+/* ============ 数据源接入区块（能碳一体机 + 外部数据源） ============ */
+.cbx-sec-sources { display: flex; flex-direction: column; gap: 10px; }
+.ds-mwbadge { font-size: 12px; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+.ds-mwbadge.ok { color: var(--green); background: color-mix(in srgb, var(--green) 12%, transparent); }
+.ds-mwbadge.err { color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
+.ds-mwbadge.unk { color: var(--muted); background: color-mix(in srgb, var(--muted) 12%, transparent); }
+.ds-mwpanel { border: 1px dashed var(--border); border-radius: 8px; padding: 8px 10px; background: color-mix(in srgb, var(--bg2, var(--panel)) 60%, transparent); }
+.ds-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 10px; }
+.ds-card {
+  display: flex; flex-direction: column; gap: 8px;
+  border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+  background: var(--panel); box-shadow: 0 1px 2px rgb(0 0 0 / .06);
+}
+.ds-card.off { opacity: .72; }
+.ds-card.mwdown { border-color: color-mix(in srgb, var(--red) 45%, var(--border)); }
+.ds-card-hd { display: flex; align-items: center; gap: 6px; }
+.ds-card-hd b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-tag { font-size: 11px; padding: 1px 7px; border-radius: 9px; color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 13%, transparent); white-space: nowrap; }
+.ds-tag.builtin { color: var(--green); background: color-mix(in srgb, var(--green) 13%, transparent); }
+.ds-tag.mono, .ds-card .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.ds-desc { font-size: 12px; color: var(--muted); line-height: 1.5; min-height: 18px; }
+.ds-rows { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+.ds-row { display: flex; align-items: baseline; gap: 8px; }
+.ds-row > span:first-child { color: var(--muted); flex: 0 0 64px; }
+.ds-row b { font-weight: 500; }
+.ds-row b.ok, .ds-mwbadge.ok, .ds-row b.err { }
+.ds-row b.ok { color: var(--green); }
+.ds-row b.err { color: var(--red); }
+.ds-row b.dim, .ds-row .dim, .ds-desc { color: var(--muted); }
+.ds-row b.note { color: #b58900; font-weight: 400; }
+.ds-endps { display: inline-flex; gap: 6px; }
+.ds-ep { font-size: 11px; padding: 1px 7px; border-radius: 9px; border: 1px solid var(--border); }
+.ds-ep.on { color: var(--green); border-color: color-mix(in srgb, var(--green) 55%, var(--border)); }
+.ds-ep.off { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, var(--border)); }
+.ds-ops { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.cbx-op.danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, var(--border)); }
+.ds-card.ds-empty { align-items: center; text-align: center; cursor: pointer; padding: 22px 18px; border-style: dashed; }
+.ds-card.ds-empty:hover { border-color: var(--accent); }
+.ds-empty-ic { font-size: 30px; opacity: .5; }
+.ds-card.ds-empty p { font-size: 12px; color: var(--muted); margin: 4px 0 10px; }
+.ds-form {
+  border: 1px solid var(--accent); border-radius: 10px; padding: 10px 12px;
+  background: color-mix(in srgb, var(--accent) 4%, var(--panel));
+  display: flex; flex-direction: column; gap: 8px;
+}
+.ds-form-title { font-size: 13px; }
+.ds-form-hint { font-size: 11px; color: var(--muted); }
+.ds-fields { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px 14px; }
+.ds-fld { display: flex; flex-direction: column; gap: 3px; }
+.ds-fld label { font-size: 11px; color: var(--muted); }
+.ds-fld .cbx-input, .ds-fld textarea.cbx-input { width: 100%; font-size: 12px; }
+.ds-fld-desc { font-size: 11px; color: var(--muted); opacity: .85; }
+.ds-form-err { color: var(--red); font-size: 12px; }
+/* 开关（沿用页面风格的小型 toggle） */
+.ds-switch { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-size: 12px; user-select: none; }
+.ds-switch input { display: none; }
+.ds-switch i { width: 30px; height: 16px; border-radius: 9px; background: var(--border); position: relative; transition: background .15s; }
+.ds-switch i::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: left .15s; }
+.ds-switch input:checked + i { background: var(--green); }
+.ds-switch input:checked + i::after { left: 16px; }
+.ds-switch span { color: var(--muted); }
+.ds-switch input:checked + i + span { color: var(--green); }
 </style>

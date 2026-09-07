@@ -30,7 +30,7 @@
       >
         <p class="sec-desc">{{ t('展示工序综合能耗、电耗及燃料能耗等核心指标。') }}</p>
         <div class="chips">
-          <div class="chip2"><span>{{ t('综合能耗') }}</span><b>{{ f(energy.intensity) }}</b><i>kgce/t</i></div>
+          <div class="chip2"><span>{{ t('综合能耗') }}</span><b>{{ f(energy.intensity / 1000) }}</b><i>tce/t</i></div>
           <div class="chip2"><span>{{ t('电耗') }}</span><b>{{ f(energy.elec) }}</b><i>MWh/h</i></div>
           <div class="chip2"><span>{{ t('燃料能耗') }}</span><b>{{ f(energy.fuel) }}</b><i>GJ/h</i></div>
         </div>

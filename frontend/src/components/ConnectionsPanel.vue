@@ -1,6 +1,8 @@
 <template>
   <div class="cn-wrap">
-    <!-- 编辑表单（平台仅两条内置数据源：能碳一体机 MQTT + 模拟数据，无新建入口） -->
+    <p class="cn-hint">{{ t('订阅统一格式 MQTT，把外部遥测字段对齐到仿真场景设备（数据仅驱动仿真，不入数据库）。') }}</p>
+    <!-- 编辑表单：平台 MQTT 实时订阅连接（能碳一体机 / 经中间件接入的外部数据与模拟数据
+         统一由「数据源接入」目录管理，见能碳一体机管理 → 数据源接入区块） -->
     <div v-if="formOpen" class="cn-form">
       <div class="cn-form-title">
         {{ t('编辑数据源') }}
@@ -275,6 +277,7 @@ function onScroll() {
 
 <style scoped>
 .cn-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.cn-hint { margin: 0; padding: 8px 10px; font-size: 10.5px; color: var(--muted); line-height: 1.6; border-bottom: 1px solid var(--border); background: var(--panel); }
 
 /* ---- 编辑表单 ---- */
 .cn-form { flex: 0 0 auto; padding: 10px; border-bottom: 1px solid var(--border); background: var(--panel-2); max-height: 55%; overflow-y: auto; }

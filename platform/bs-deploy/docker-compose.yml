@@ -44,6 +44,9 @@ services:
       # Broker 连接地址：box_config.json 默认指向新云端公网 IP（本地开发直连用）；
       # 容器内通过 docker 网关回环宿主（172.18.0.1）更快更稳，故此处覆盖。
       - BROKER_HOST=172.18.0.1
+      # 数据中间件管理 API：容器经 docker 网关回环宿主（与 BROKER_HOST 同理）；
+      # 仓库 config/middleware.json 保持本地默认 http://127.0.0.1:42084 互不覆盖。
+      - CARBON_MIDDLEWARE_URL=http://172.18.0.1:42084
       # 文档站反代目标：平台后端把 /docs/* 保留前缀转发到本 compose 网络的 docs-site
       # 服务（40183），对外统一走平台 40014，文档站 40184 不再要求开放（云安全组免配）。
       - DOCS_PROXY_TARGET=http://docs-site:40183

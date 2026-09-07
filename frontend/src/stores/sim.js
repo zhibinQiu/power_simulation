@@ -1,9 +1,14 @@
 import { defineStore } from 'pinia'
+import { watch, nextTick } from 'vue'
 import { t } from '../i18n'
 import { api, openFeed } from '../api/client'
 import { buildScheme, makeProcessNode, makeDeviceNode, makeMaterialNode, PROCESS_MAP, MATERIAL_MAP, PROCESS_ADJUSTABLE, DEVICE_MAP, DEVICE_COUPLE_REGISTRY, deriveProcessOpParams, materialFamily, loadCalibrations, NODE_NW, NODE_HEADER, NODE_PORT_Y0, NODE_GAP, nodeHeight, PROCESS_TEMPLATES, applySetpointResponse, migrateLegacyDevices, treeLayoutNodes } from '../data/flowLibrary'
 import { computeScheme } from '../flow/compute'
 import { PARK } from '../data/park'
+// 通用附加设备库（传感器 / 可变设备，所有场景可用）：
+// 与「工艺类型 → 典型可调设备」不同，附加设备是用户在某工艺节点上按需添加的，
+// 存于工艺节点 node.attached[]，运行态由 store 合成 ext::节点id::attUid 设备。
+import { SENSOR_MAP, ADJUSTABLE_MAP, ATTACH_MAP, attachUnit, attachDef, attachMeasureLabel } from '../data/attachLibrary'
 // 工艺静态业务数据：集中维护于独立数据模块 src/data/processMeta.js
 // （业务数据与代码逻辑分离），本 store 只负责仿真状态与交互逻辑；
 // 下方 re-export 保持既有组件 `import { ... } from '../stores/sim'` 兼容。
@@ -24,10 +29,84 @@ export const AI_MODELS = [
 ]
 export const AI_MODEL_MAP = Object.fromEntries(AI_MODELS.map((m) => [m.id, m]))
 
+// ===== 功能视图（窗口 + tab）注册表 =====
+// 中间内容区的功能视图不再「独占全屏、互斥切换」：统一以窗口形式打开，
+// 顶部 tab 标签可同时挂载多个视图并自由切换（关闭某个 tab 不影响其它已打开视图）。
+// id 与 openViews / activeViewId 一一对应；title 经 t() 国际化后展示在 tab 上。
+export const VIEW_DEFS = [
+  { id: 'flowEdit', title: '流程编排' },
+  { id: 'dataView', title: '数据分析' },
+  { id: 'aiGroup', title: 'AI群控' },
+  { id: 'carbonMarket', title: '碳资产管理' },
+  { id: 'carbonCalc', title: '全景碳核查' },
+  { id: 'energyFlow', title: '能流分析' },
+  { id: 'boxManage', title: '能碳一体机管理' },
+]
+export const VIEW_IDS = VIEW_DEFS.map((v) => v.id)
+export const VIEW_TITLE = Object.fromEntries(VIEW_DEFS.map((v) => [v.id, v.title]))
+
 let _idc = 0
 const uid = (p) => `${p}_${Date.now().toString(36)}${(_idc++).toString(36)}`
 // 数值展示：保留 2 位小数并去掉末尾多余的 0
 const fmtNum = (v) => (v == null || isNaN(v) ? '—' : Number(v).toFixed(2).replace(/\.?0+$/, ''))
+
+// ===== 附加设备（传感器 / 可变设备）合成工具 =====
+// 附加设备挂在具体工艺节点 node.attached[] 上，id 均为 ext::节点id::attUid；
+// 运行态由 getter 从 scheme 节点 + 对应 unit（params/实时）合成设备条目。
+function _attachTpl(kind, type) {
+  const m = ATTACH_MAP[kind] || {}
+  return m[type] || null
+}
+// 附加设备当前读数：按「数值来源」解析
+//  src = fixed → att.def（模板默认）；param → 绑定工艺节点的某数值参数；sim → 以默认值为基准的缓变模拟
+function _attachReading(att, unit, now) {
+  if (!att) return null
+  const tpl = _attachTpl(att.kind, att.type)
+  const def = att.def != null ? att.def
+    : (tpl ? (tpl.kind === 'sensor' ? tpl.def : (tpl.setpoint && tpl.setpoint.def)) : 0)
+  if (!att.src || att.src === 'fixed') return def
+  if (att.src === 'param') {
+    if (!unit || !unit.params || !att.param) return null
+    const v = Number(unit.params[att.param])
+    return isNaN(v) ? null : v
+  }
+  if (att.src === 'sim') {
+    const base = def || 0
+    const phase = String(att.uid || att.type || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+    const w = ((now || Date.now()) / 1200) + phase
+    return Math.round(base * (1 + 0.08 * Math.sin(w)) * 1000) / 1000
+  }
+  return null
+}
+// 工艺节点 → 附加设备合成（结构对齐计量/可调设备，详情面板可打开）
+function _extDevice(node, unit, att, now) {
+  const tpl = _attachTpl(att.kind, att.type)
+  if (!tpl) return null
+  const extId = `ext::${node.id}::${att.uid}`
+  const isSensor = tpl.kind === 'sensor'
+  const mUnit = isSensor ? tpl.measure.unit : tpl.setpoint.unit
+  const reading = _attachReading(att, unit, now)
+  return {
+    id: extId,
+    type: att.type,
+    label: att.label || tpl.label,
+    unit: mUnit,
+    measures: [{ key: 'val', label: isSensor ? tpl.measure.label : tpl.setpoint.label, unit: mUnit }],
+    measured: reading,
+    reading,
+    metering: isSensor,
+    adjustable: !isSensor,
+    setpoint: !isSensor ? (att.def != null ? att.def : tpl.setpoint.def) : null,
+    ext: true,
+    attachKind: att.kind,
+    src: att.src || 'fixed',
+    param: att.param || null,
+    desc: `${tpl.label}（${isSensor ? '传感器' : '可变设备'}）：${tpl.desc || ''}${att.src === 'param' && att.param ? '　读数来源：绑定工艺参数「' + att.param + '」。' : ''}`,
+    unitId: node.id,
+    unitName: (unit && unit.name) || node.name || node.type,
+    unitType: (unit && unit.type) || node.type,
+  }
+}
 
 // 由工序合成其典型"可调设备"条目（按工艺类型 PROCESS_ADJUSTABLE 给出），
 // 与后端下发的"计量设备"区分；用于设备树、3D 标注与详情。id 稳定为 工序::类型。
@@ -160,13 +239,24 @@ export const useSimStore = defineStore('sim', {
     toastType: 'info',    // 类型化 Toast：success / info / warn / error（ToastLayer 渲染）
     confirmDialog: { open: false, title: '', message: '', okText: '', cancelText: '', danger: false }, // 确认弹窗（ConfirmDialog 渲染）
     _confirmResolver: null, // confirm() 挂起的 Promise resolve
-    scenario: 'steel',           // 当前仿真场景（四大控排）：steel 钢铁(默认) / cement 水泥 / chemical 化工 / nonferrous 有色
-    processRoute: 'short',       // 当前流程：short 短流程(默认) / long 长流程；数字孪生默认展示短流程
+    scenario: 'steel',           // 当前仿真场景行业（四大控排 + 其它）：steel 钢铁(默认) / cement 水泥 / chemical 化工 / nonferrous 有色 / other 其它(资源包场景)
+    processRoute: 'short',       // 当前流程：短流程(默认) / 长流程；数字孪生默认展示短流程。资源包场景下为包内模板 id（如 cool）
+    // —— 场景 / 资源包（.ec）状态 ——
+    sceneId: 'steel',            // 当前打开的场景资源包 id（steel = 平台内置钢包）
+    sceneMode: 'steel',          // 'steel' = 钢铁碳引擎场景（后端仿真全能力）；'other' = 通用资源包场景（编排 → 孪生展示，本地静态核算）
+    sceneIndex: [],              // 后端场景注册表（/api/scenes：含 meta 与 ready/package 状态）
+    sceneIndexTs: 0,             // 注册表刷新代数（供 UI 观察列表变化）
+    scenePack: null,             // 当前场景资源包（{ meta, resources }）
+    sceneTemplates: [],          // 包内预置模板（resources.templates：编排方案快照）
+    sceneCtx: null,              // 包内通用字典上下文（dictionary/factors/paramSchema…），供非钢场景资源树/属性渲染
+    sceneVersion: 0,             // 场景包装载代数：切换场景后自增，触发组件按新场景重建
+    sceneBusy: false,            // 场景资源包装载/切换中
     scenarios: [
       { id: 'steel', label: t('钢铁') },
       { id: 'cement', label: t('水泥') },
       { id: 'chemical', label: t('化工') },
       { id: 'nonferrous', label: t('有色') },
+      { id: 'other', label: t('其它') },
     ],
     envMode: 'industrial',      // 场景环境：void 虚空 / industrial 工业(默认) / desert 沙漠 / city 城市 / coast 海滩
     envModes: [
@@ -195,14 +285,20 @@ export const useSimStore = defineStore('sim', {
     bottomOpen: false,        // 底栏（命令行）是否展开（默认隐藏，可由状态栏/命令入口展开）
     newsTickerOn: (() => { try { return localStorage.getItem('sim.newsTickerOn') !== '0' } catch (e) { return true } })(),  // 底栏快讯是否显示（默认开，localStorage 持久化）
     fullscreenOn: false,      // 全屏模式：隐藏左/右/底栏，仅保留 3D 场景
-    dataViewOn: false,        // 数据视图：中间 3D 场景替换为传感器历史数据表格（顶栏「AI → 数据分析」切换）
-    aiGroupOn: false,         // AI 群控视图：与数据分析同布局但无 tab，仅保留「参数优化」内容（顶栏「AI → AI群控」切换）
-    carbonMarketOn: false,    // 碳资产管理视图：中间 3D 场景替换为碳资产行情与管理面板（顶栏「视图 → 碳资产管理」切换）
-    carbonCalcOn: false,      // 碳排核算视图：中间 3D 场景替换为多标准碳核算结果对比（工具 → 低碳 → 全景碳核查切换）
-    energyFlowOn: false,      // 能流分析视图：中间 3D 场景替换为能流桑基图（工具 → 能源 → 能流分析切换）
-    boxManageOn: false,       // 能碳一体机管理视图：中间 3D 场景替换为云端设备识别 + 设备关联管理（视图 → 能碳一体机管理切换）
-    boxCloudSource: 'unknown',// 能碳一体机管理：云端连接状态（live / degraded / unknown），由 CarbonBoxView 轮询后写回，供 App.vue 顶部 view-banner 实时显示
-    overviewOn: false,         // HMI人机交互屏：中间 3D 场景替换为全厂实时运行大屏（视图 → HMI人机交互屏切换）
+    // ---- 功能视图窗口（tab 化）：功能视图以窗口形式开在中间内容区，可同时打开多个并切换 ----
+    // openViews / activeViewId 为唯一真源：
+    //   openViews    —— 已打开视图 id 列表（tab 顺序），例：['boxManage', 'carbonMarket']
+    //   activeViewId —— 当前激活视图 id，null 表示显示三维仿真场景（数字孪生）
+    // 各视图的 xxxOn（dataViewOn / carbonMarketOn / ...）改为由 activeViewId 派生的 getter，兼容既有读取代码。
+    openViews: [],
+    activeViewId: null,
+    // HMI人机交互屏：与 3D 数字孪生「对等」的主视图形态（不是功能视图窗口，不开 tab），
+    // 二者共用中间内容区，由工具条「三维仿真 / HMI人机交互屏」按钮切换；切到 HMI 时回到主视图槽位。
+    overviewOn: false,
+    // AI 群控进入前右侧系统栏的开合备份：群控内容区自含左右两栏（训练前测试 | 训练相关设定），
+    // 进入时收起外部右栏腾宽度，离开群控（切视图/返回孪生/关 tab）时由 App watch activeViewId 恢复
+    grpRightBackup: null,
+    boxCloudSource: 'unknown',// 能碳一体机管理：云端连接状态（live / degraded / unknown），由 CarbonBoxView 轮询后写回
     inspectorView: 'auto',    // 右侧检视器显式视图：'auto'（按选中推导）| 'park' 园区构成 | 'materials' 原料库 | 'strategy' 减排策略 | 'report' 报告面板 | 'agent' 本析智擎对话
     reportPayload: null,      // 「导出报告」请求载荷（baseline/strategy/ops/...），供右侧报告面板消费
     selectedStrategyId: null, // 左侧策略库选中的策略
@@ -229,7 +325,7 @@ export const useSimStore = defineStore('sim', {
     // MQTT 实时数据源状态（来自 /api/realtime/source）
     mqttSource: null,
     // ---- 左侧活动栏（VS Code 式）与多数据源管理 ----
-    activityView: 'explorer',   // 活动面板：'explorer' 资源 | 'search' 搜索 | 'scene' 场景 | 'connections' 连接
+    activityView: 'explorer',   // 活动面板：'explorer' 资源 | 'search' 搜索 | 'scene' 场景（AI 群控为独立视图，不占用活动面板）
     dataSources: [],            // 多数据源列表，每个含 { id,type,url,interval,name,enabled,mapping }
     activeDataSourceId: 'sim',  // 当前活动数据源 id（状态栏/指令区使用的活动源）
     sourceStatus: {},           // 各数据源连接状态：sourceId -> 'init'|'open'|'closed'|'error'
@@ -262,6 +358,18 @@ export const useSimStore = defineStore('sim', {
     // 左侧资源管理器：浏览态选中（只看属性，不改动产线）
     selectedAssetType: null,    // 选中的工艺类型（PROCESS_TEMPLATES.type）-> 仅用于左侧目录高亮；面板始终为实例面板
     materialOverrides: {},      // 物料属性覆盖：matId -> { carbon, density, moisture, composition:{...}, blend:[{id,name,ratio,comp:{...}}] }（随方案持久化）
+    // 碳市场参数（localStorage 独立持久化，非随方案）：企业年度碳配额（全国碳市场分配，免费+有偿，tCO₂/年，默认 2000 万吨）与实时碳价（元/t，默认 100，可按行情维护）
+    carbonCfg: (() => {
+      try {
+        const v = JSON.parse(localStorage.getItem('sim.carbonCfg') || 'null')
+        if (v && Number.isFinite(Number(v.allowance)) && Number.isFinite(Number(v.price))) {
+          // 兼容旧 localStorage（碳价原存 元/tCO₂ 口径）：万元/tCO₂ 不可能 ≥1，≥1 视为旧元口径，÷1e4
+          const price = Number(v.price) >= 1 ? Number(v.price) / 1e4 : Number(v.price)
+          return { allowance: Number(v.allowance), price }
+        }
+      } catch (e) { /* 忽略损坏的存储值，回退默认 */ }
+      return { allowance: 20000000, price: 0.01 }
+    })(),
     // 撤销/重做栈（仅编辑态编排方案）
     historyPast: [],        // 历史快照（每次编辑前压入上一状态）
     historyFuture: [],      // 重做快照
@@ -271,13 +379,46 @@ export const useSimStore = defineStore('sim', {
     notifications: [],
   }),
   getters: {
-    // 视图模式：非数字孪生的独立视图（工况数据分析 / AI 群控 / CEA 行情 / 碳排核算 / 能流分析 / 能碳一体机）激活时，
-    // 界面进入沉浸模式——隐藏左/右/下侧面板（底部状态栏保留），顶栏工具栏按当前视图渲染
-    viewModeOn: (s) => s.dataViewOn || s.aiGroupOn || s.carbonMarketOn || s.carbonCalcOn || s.energyFlowOn || s.boxManageOn,
+    // 视图模式：非数字孪生的功能视图激活时（数据分析 / AI 群控 / 碳资产管理 / 碳排核算 / 能流分析 / 能碳一体机），
+    // 顶栏工具栏按当前视图渲染（HMI人机交互屏与数字孪生同为主视图，不计入功能视图）
+    viewModeOn: (s) => !!s.activeViewId,
+    // 各功能视图激活态：由 activeViewId 派生（历史布尔开关的兼容读取口，不再单独存 state）
+    // 流程编排：editMode 为「编排模式是否开启」，flowEditOn 为「编排画布 tab 是否在前台」；
+    // 切到三维仿真 / 其它 tab 时编排模式保持（草稿不丢），仅画布隐藏 → 用 flowEditing 判断「画布可见」
+    flowEditOn: (s) => s.activeViewId === 'flowEdit',
+    flowEditing: (s) => s.editMode && s.activeViewId === 'flowEdit',
+    dataViewOn: (s) => s.activeViewId === 'dataView',
+    aiGroupOn: (s) => s.activeViewId === 'aiGroup',
+    carbonMarketOn: (s) => s.activeViewId === 'carbonMarket',
+    carbonCalcOn: (s) => s.activeViewId === 'carbonCalc',
+    energyFlowOn: (s) => s.activeViewId === 'energyFlow',
+    boxManageOn: (s) => s.activeViewId === 'boxManage',
     // 未读系统通知数（底栏铃铛徽标）
     unreadNotifs: (s) => s.notifications.filter((n) => !n.read).length,
     // 「本析智擎」：右侧检视器当前是否为智能体对话界面
     agentOn: (s) => s.inspectorView === 'agent',
+    // 场景资源包元信息（当前打开场景的 meta；注册表未加载时回退到场景本地默认）
+    currentSceneMeta: (s) => s.sceneIndex.find((x) => x.id === s.sceneId) || null,
+    // 非钢铁场景（机房热控等通用资源包）：编排 → 孪生展示模式
+    customSceneOn: (s) => s.sceneMode !== 'steel',
+    // 当前场景的「工艺」轻量模板字典（场景包内 scheme 节点 type → 模板），供非钢资源树与拖拽建节点使用
+    sceneProcessDict: (s) => {
+      const dict = {}
+      for (const tpl of s.sceneTemplates) {
+        for (const n of (tpl.scheme && tpl.scheme.nodes) || []) {
+          if (n.kind !== 'process' || dict[n.type]) continue
+          dict[n.type] = {
+            type: n.type,
+            label: (n.name || n.type).replace(/(·.+)$/, ''),   // 「冷水机组·冷源」→「冷水机组」
+            name: n.name,
+            params: { ...(n.params || {}) },
+            ports: n.ports ? JSON.parse(JSON.stringify(n.ports)) : null,
+            route: tpl.id,
+          }
+        }
+      }
+      return dict
+    },
     selectedUnit: (s) => s.model.units.find((u) => u.id === s.selectedUnitId) || null,
     selectedResult: (s) => {
       if (!s.selectedUnitId || !s.baseline) return null
@@ -327,6 +468,19 @@ export const useSimStore = defineStore('sim', {
           unitName: (PROCESS_MAP[unitType] || {}).label || unitType,
           unitType,
         }
+      }
+      // 附加设备（传感器/可变设备）：id = ext::工艺节点id::附加uid，从工艺节点实时合成
+      if (devId.startsWith('ext::')) {
+        const parts = devId.split('::')
+        const nid = parts[1]
+        const auid = parts[2]
+        const node = ((s.scheme && s.scheme.nodes) || []).find((x) => x.id === nid)
+        const att = node && (node.attached || []).find((a) => a.uid === auid)
+        if (!att) return null
+        const u = ((s.baseline && s.baseline.units) || []).find((x) => x.id === nid)
+        const dev = _extDevice(node, u, att)
+        if (!dev) return null
+        return { device: dev, unitId: nid, unitName: (u && u.name) || node.name, unitType: (u && u.type) || node.type }
       }
       if (!s.baseline || !s.baseline.units) return null
       for (const u of s.baseline.units) {
@@ -452,10 +606,45 @@ export const useSimStore = defineStore('sim', {
           })
         }
       }
+      // 附加设备（传感器 / 可变设备）：挂在具体工艺节点 node.attached[] 上，
+      // 附加后该工艺在资源管理器 / 设备树 / 数据分析中即出现对应设备（数值来源可按需解析）
+      for (const n of (s.scheme && s.scheme.nodes) || []) {
+        for (const att of (n.attached || [])) {
+          const u = ((s.baseline && s.baseline.units) || []).find((x) => x.id === n.id)
+          const dev = _extDevice(n, u, att)
+          if (!dev) continue
+          out.push({
+            ...dev,
+            live: s.deviceLive[dev.id] != null ? s.deviceLive[dev.id] : dev.reading,
+            history: s.deviceHistory[dev.id] || [],
+          })
+        }
+      }
       return out
     },
     deviceHistoryOf: (s) => (id) => s.deviceHistory[id] || [],
     deviceLiveOf: (s) => (id) => (s.deviceLive[id] != null ? s.deviceLive[id] : null),
+    // 某工艺节点可绑定的「数值来源」候选：工艺自身数值参数 + 固定值 + 模拟（供附加设备绑定下拉）
+    attachSourceOptions: (s) => (nodeId) => {
+      const node = ((s.scheme && s.scheme.nodes) || []).find((n) => n.id === nodeId)
+      if (!node) return []
+      const opts = [
+        { value: 'sim', label: '模拟数据（缓变）' },
+        { value: 'fixed', label: '固定值（模板默认）' },
+      ]
+      const params = node.params || {}
+      const t = PROCESS_MAP[node.type]
+      const plist = (t && Array.isArray(t.params)) ? t.params : []
+      for (const key of Object.keys(params)) {
+        const v = params[key]
+        const isNum = typeof v === 'number' || (typeof v === 'string' && v !== '' && !isNaN(Number(v)))
+        if (!isNum) continue
+        const p = plist.find((x) => x.key === key)
+        const label = (p && p.label) ? p.label : key
+        opts.push({ value: 'param', param: key, label: `工艺参数：${label}（${key}）` })
+      }
+      return opts
+    },
     // ---- 编辑态：选中节点 / 小组 / 方案估算 ----
     selectedFlowNode: (s) => s.scheme.nodes.find((n) => n.id === s.selectedFlowId) || null,
     selectedGroup: (s) => (s.selectedGroupId ? s.scheme.groups.find((g) => g.id === s.selectedGroupId) || null : null),
@@ -549,7 +738,19 @@ export const useSimStore = defineStore('sim', {
           this.processRoute = saved.route || this.processRoute
           // 同步恢复物料属性覆盖（隐含碳因子/密度/含水率/详细化学成分），旧方案无该字段时保持默认
           if (saved.materialOverrides && typeof saved.materialOverrides === 'object') {
-            this.materialOverrides = saved.materialOverrides
+            // 迁移：v1 之前 price/salePrice 存的是「元/单位」，统一口径后 ÷1e4 转为「万元/单位」
+            if (saved._ovUnitV !== 1) {
+              const migrated = {}
+              for (const [id, ov] of Object.entries(saved.materialOverrides)) {
+                const m = { ...ov }
+                if (typeof m.price === 'number') m.price = m.price / 1e4
+                if (typeof m.salePrice === 'number') m.salePrice = m.salePrice / 1e4
+                migrated[id] = m
+              }
+              this.materialOverrides = migrated
+            } else {
+              this.materialOverrides = saved.materialOverrides
+            }
           }
           // 同步恢复设备设定值（视图态/编辑态统一存储，驱动实时读数与碳引擎折算）
           const sps = {}
@@ -578,6 +779,7 @@ export const useSimStore = defineStore('sim', {
         await this._runRefresh()  // 首屏立即重算（不走防抖），保证 KPI 就绪
         await this.loadStrategies()
         this.ready = true
+        this._bindAutosave()   // 编排编辑自动保存（任何场景通用）
         this.notify('success', t('系统就绪'), t('数字孪生已载入 {units} 个工序、{flows} 条物流，实时链路与优化模型已就绪。', { units: this.model.units.length, flows: this.model.flows.length }))
         this._startFeed()
         // AI 优化模型：同步训练上下文并轮询状态（后台定时训练由后端调度，前端展示「逐渐变优」）
@@ -627,8 +829,12 @@ export const useSimStore = defineStore('sim', {
         if (!srcUnit || !dstUnit) continue
         const srcVal = (srcUnit.params && srcUnit.params[drive.src] != null) ? Number(srcUnit.params[drive.src]) : null
         if (srcVal != null) {
-          // 驱动连线：工辅供给绝对量直接写入同量纲目标参数（如 热风温度℃ → 高炉热风温度℃）
-          dstUnit.params = { ...(dstUnit.params || {}), [drive.dst]: srcVal }
+          // 驱动连线：工辅供给绝对量直接写入同量纲目标参数（如 热风温度℃ → 高炉热风温度℃）。
+          // 例外：喷吹系统 inj_rate 为绝对量(t/h) → 高炉 coal_inj 为相对量(kg/t)，按铁水产量折算
+          const hm = dstUnit.params && dstUnit.params.hot_metal != null ? Number(dstUnit.params.hot_metal) : null
+          let driveVal = srcVal
+          if (drive.dst === 'coal_inj' && drive.src === 'inj_rate' && hm && hm > 0) driveVal = (srcVal * 1000) / hm
+          dstUnit.params = { ...(dstUnit.params || {}), [drive.dst]: driveVal }
         }
       }
       // 2) 设备设定值桥接（DEVICE_COUPLE_REGISTRY）：设备设定优先（实际装备工况即运行点）
@@ -663,6 +869,11 @@ export const useSimStore = defineStore('sim', {
     // 刷新防抖：滑块/设备设定拖动会高频触发，合并为「停顿后一次」后端重算（约 280ms），
     // 本地参数/设定值已即时更新保证跟手，避免每次输入都打全量仿真请求（卡顿与时延根因）。
     async _runRefresh() {
+      // 通用资源包场景（其它分组）：无后端碳引擎，走本地静态核算刷新
+      if (this.sceneMode !== 'steel') {
+        this._otherSceneRefresh()
+        return
+      }
       const seq = ++_refreshSeq
       // 仿真模式下：属性修改后连同当前生效策略一起重算，保证「仿真前后对比」after 实时反映 参数+策略
       const ops = this.simMode ? (this.simOps || []) : []
@@ -679,6 +890,13 @@ export const useSimStore = defineStore('sim', {
       this._pushModelToFeed()
     },
     refresh() {
+      // 通用资源包场景（其它分组）：本地静态核算，无网络请求（可频繁调用）
+      if (this.sceneMode !== 'steel') {
+        if (_refreshTimer) clearTimeout(_refreshTimer)
+        _refreshTimer = null
+        this._otherSceneRefresh()
+        return
+      }
       if (_refreshTimer) clearTimeout(_refreshTimer)
       _refreshTimer = setTimeout(() => { _refreshTimer = null; this._runRefresh() }, 280)
     },
@@ -1061,7 +1279,7 @@ export const useSimStore = defineStore('sim', {
       // 仿真模式：记录物料属性变更（备注仅提示已更新，避免超长文案）
       if (this.simMode) {
         const ml = ((MATERIAL_MAP[id] || {}).label) || id
-        const keyLabel = ({ density: t('堆密度'), transport_ef: t('运输排放因子'), moisture: t('含水率'), note: t('备注'), price: t('采购单价') })[key] || key
+        const keyLabel = ({ density: t('堆密度'), transport_ef: t('运输排放因子'), moisture: t('含水率'), note: t('备注'), price: t('采购单价'), salePrice: t('销售单价') })[key] || key
         if (key === 'note') {
           this._simLog('factor', t('{name} · 备注', { name: ml }), t('已更新'), `ma_${id}_${key}`)
         } else {
@@ -1071,8 +1289,14 @@ export const useSimStore = defineStore('sim', {
         }
       }
       this.materialOverrides = { ...this.materialOverrides, [id]: { ...(this.materialOverrides[id] || {}), [key]: val } }
-      // price 仅前端成本核算使用（成本=外购用量×单价），无需后端重算
-      if (this.simMode && key !== 'note' && key !== 'price') this.refresh()
+      // price/salePrice 仅前端成本·收益核算使用（成本=外购用量×单价、收入=产品产量×售价），无需后端重算
+      if (this.simMode && key !== 'note' && key !== 'price' && key !== 'salePrice') this.refresh()
+    },
+    // 碳市场参数维护（allowance 企业年配额 tCO₂ / price 实时碳价 万元/tCO₂）：本地持久化，
+    // 用于全厂总览「碳配额结余」与「预估碳成本」计算，随改随联动。
+    setCarbonCfg(partial) {
+      this.carbonCfg = { ...this.carbonCfg, ...partial, v: 1 }
+      try { localStorage.setItem('sim.carbonCfg', JSON.stringify(this.carbonCfg)) } catch (e) { /* 忽略存储失败 */ }
     },
     // 配置物料详细化学成分（如烧结矿 TFe/FeO/CaO、焦炭固定碳/灰分等，质量分数 %），
     // 覆盖值存于 materialOverrides[id].composition，随方案持久化；仅 sinter/pellet/coke 支持。
@@ -1154,22 +1378,49 @@ export const useSimStore = defineStore('sim', {
         this.rightOpen = true
       }
     },
-    // 进入非数字孪生视图：记录进入前布局状态并收起左/右/下侧边栏（沉浸模式）；
-    // 用户可随时通过顶栏按钮 / 左侧活动栏重新展开
-    _collapsePanels() {
-      if (!this._savedPanels) {
-        this._savedPanels = { leftOpen: this.leftOpen, rightOpen: this.rightOpen, bottomOpen: this.bottomOpen }
-      }
-      this.leftOpen = false; this.rightOpen = false; this.bottomOpen = false
+    // ---- 功能视图窗口（tab）统一开合：openViews / activeViewId 为唯一真源 ----
+    // 打开视图：未打开则追加到 tab 列表并激活；已打开则仅激活（不重复开 tab）
+    openView(id) {
+      if (!VIEW_IDS.includes(id)) return
+      if (!this.openViews.includes(id)) this.openViews.push(id)
+      this._activateView(id)
     },
-    // 退出非数字孪生视图：恢复进入前的布局状态（“只是隐藏”，不丢失面板展开情况）
-    _restorePanels() {
-      if (this._savedPanels) {
-        this.leftOpen = this._savedPanels.leftOpen
-        this.rightOpen = this._savedPanels.rightOpen
-        this.bottomOpen = this._savedPanels.bottomOpen
-        this._savedPanels = null
+    // 关闭视图：关闭当前激活视图时自动切到相邻 tab（优先右侧，其次左侧）；全部关闭则回到三维仿真
+    closeViewById(id) {
+      // 「流程编排」tab 的关闭 = 完成编排：应用方案并退出编辑态（与工具条「完成编排」一致）
+      if (id === 'flowEdit' && this.editMode) { this.exitEdit(); return }
+      const i = this.openViews.indexOf(id)
+      if (i < 0) return
+      this.openViews.splice(i, 1)
+      if (this.activeViewId === id) {
+        this.activeViewId = this.openViews[i] || this.openViews[i - 1] || null
       }
+    },
+    // 激活视图：id 为空（null）表示切回三维仿真场景；未打开则先打开
+    activateView(id) {
+      if (!id) { this.activeViewId = null; return }
+      if (!this.openViews.includes(id)) { this.openView(id); return }
+      this._activateView(id)
+    },
+    // 切换视图：当前已激活则关闭（收起该窗口），否则打开并激活
+    toggleView(id) {
+      if (this.activeViewId === id) this.closeViewById(id)
+      else this.openView(id)
+    },
+    closeAllViews() {
+      // 编排中：先走 exitEdit 应用方案并关闭编排 tab，避免只清列表导致编辑态残留
+      if (this.editMode) this.exitEdit()
+      this.openViews = []; this.activeViewId = null
+    },
+    _activateView(id) {
+      // AI 群控：内容区改为「训练前测试 | 训练相关设定」左右两栏，训练属性面板已内嵌右栏 → 进入时备份并收起外部系统右栏
+      if (id === 'aiGroup') {
+        if (this.grpRightBackup == null) this.grpRightBackup = this.rightOpen
+        this.rightOpen = false
+      }
+      this.activeViewId = id
+      // 数据分析 / AI群控 的数据源需从左侧「场景」资源树拖入 → 打开时自动展开左侧并定位到场景面板
+      if (id === 'dataView' || id === 'aiGroup') { this.leftOpen = true; this.activityView = 'scene' }
     },
     // 工况数据分析：数据源增删（从左侧「场景」资源树拖入添加；拖回场景即移除）
     addDvSource(src) {
@@ -1185,67 +1436,33 @@ export const useSimStore = defineStore('sim', {
       this.newsTickerOn = !this.newsTickerOn
       try { localStorage.setItem('sim.newsTickerOn', this.newsTickerOn ? '1' : '0') } catch (e) {}
     },
-    // 工况数据分析视图：中间 3D 场景 ↔ 数据分析面板（AI → 数据分析切换）
-    toggleDataView() {
-      this.dataViewOn = !this.dataViewOn
-      if (this.dataViewOn) {
-        this.aiGroupOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false; this.overviewOn = false
-        // 记录进入前布局状态（退出时恢复）
-        if (!this._savedPanels) this._savedPanels = { leftOpen: this.leftOpen, rightOpen: this.rightOpen, bottomOpen: this.bottomOpen }
-        // 工况数据分析的数据源需从左侧「场景」资源树拖入 → 打开时自动展开左侧并定位到场景面板
-        this.leftOpen = true
-        this.rightOpen = false
-        this.bottomOpen = false
-        this.activityView = 'scene'
-      } else {
-        this._restorePanels()
-      }
-    },
-    // AI 群控视图：与数据分析同布局（左侧数据源 + 中间内容区），无 tab 切换，仅展示参数优化（AI → AI群控切换）
-    toggleAiGroup() {
-      this.aiGroupOn = !this.aiGroupOn
-      if (this.aiGroupOn) {
-        this.dataViewOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false; this.overviewOn = false
-        // 记录进入前布局状态（退出时恢复）
-        if (!this._savedPanels) this._savedPanels = { leftOpen: this.leftOpen, rightOpen: this.rightOpen, bottomOpen: this.bottomOpen }
-        // 参数优化的受控对象（数据源）同样需从左侧「场景」资源树拖入 → 自动展开左侧并定位到场景面板
-        this.leftOpen = true
-        this.rightOpen = false
-        this.bottomOpen = false
-        this.activityView = 'scene'
-      } else {
-        this._restorePanels()
-      }
-    },
-    // 碳资产管理视图：中间 3D 场景 ↔ 碳资产管理面板（顶栏「视图 → 碳资产管理」切换）
-    toggleCarbonMarket() {
-      this.carbonMarketOn = !this.carbonMarketOn
-      if (this.carbonMarketOn) { this.dataViewOn = false; this.aiGroupOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false; this.overviewOn = false; this._collapsePanels() }
-      else { this._restorePanels() }
-    },
-    // 碳排核算视图：中间 3D 场景 ↔ 多标准碳核算结果对比（工具 → 低碳 → 全景碳核查切换）
-    toggleCarbonCalc() {
-      this.carbonCalcOn = !this.carbonCalcOn
-      if (this.carbonCalcOn) { this.dataViewOn = false; this.aiGroupOn = false; this.carbonMarketOn = false; this.energyFlowOn = false; this.boxManageOn = false; this.overviewOn = false; this._collapsePanels() }
-      else { this._restorePanels() }
-    },
-    // 能流分析视图：中间 3D 场景 ↔ 能流桑基图（工具 → 能源 → 能流分析切换）
-    toggleEnergyFlow() {
-      this.energyFlowOn = !this.energyFlowOn
-      if (this.energyFlowOn) { this.dataViewOn = false; this.aiGroupOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.boxManageOn = false; this.overviewOn = false; this._collapsePanels() }
-      else { this._restorePanels() }
-    },
-    // 能碳一体机管理视图：中间 3D 场景 ↔ 云端设备识别 + 设备关联管理（视图 → 能碳一体机管理切换）
-    toggleBoxManage() {
-      this.boxManageOn = !this.boxManageOn
-      if (this.boxManageOn) { this.dataViewOn = false; this.aiGroupOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.overviewOn = false; this._collapsePanels() }
-      else { this._restorePanels() }
-    },
-    // HMI人机交互屏：与 3D 场景互斥切换（开 HMI 关 3D，关 HMI 还原 3D）
+    // 以下 7 个开关统一走「窗口 + tab」开合（toolbar / 菜单 / 活动栏调用入口保持不变）
+    toggleDataView() { this.toggleView('dataView') },
+    toggleAiGroup() { this.toggleView('aiGroup') },
+    toggleCarbonMarket() { this.toggleView('carbonMarket') },
+    toggleCarbonCalc() { this.toggleView('carbonCalc') },
+    toggleEnergyFlow() { this.toggleView('energyFlow') },
+    toggleBoxManage() { this.toggleView('boxManage') },
+    // HMI人机交互屏：与 3D 数字孪生对等的主视图形态（不进 tab 列表），
+    // 开启时回到主视图槽位（功能视图窗口保持打开，点其标签可再切回）
     toggleOverview() {
       this.overviewOn = !this.overviewOn
-      if (this.overviewOn) { this.dataViewOn = false; this.aiGroupOn = false; this.carbonMarketOn = false; this.carbonCalcOn = false; this.energyFlowOn = false; this.boxManageOn = false }
+      if (this.overviewOn) this.activeViewId = null
     },
+    // AI 群控视图入口（活动栏 / 顶栏 AI 菜单共用）：
+    // 参数优化训练面板已内嵌于群控视图右侧栏（训练相关设定，GA/PSO/RL 顶部可切换）；
+    // 打开时默认选中遗传算法（已选优化算法则保持不跳变），并保持外部右栏收起（_activateView 已处理）
+    openAiGroup() {
+      this.toggleAiGroup()
+      if (!this.aiGroupOn) return
+      const cur = this.selectedStrategyId
+      const curOpt = /^ai::(ga|pso|rl)$/.test(String(cur || ''))
+      this.selectStrategy(curOpt ? cur : 'ai::ga')
+      this.rightOpen = false
+      if (this.grpRightBackup == null) this.grpRightBackup = true
+    },
+    // 碳排核算视图 / 能流分析视图 / 能碳一体机管理视图 均复用上方 toggleXxx（tab 化开合）；
+    // HMI人机交互屏不走 tab（与 3D 数字孪生对等的主视图，见 toggleOverview）
     toggleFullscreen() {
       this.fullscreenOn = !this.fullscreenOn
       if (this.fullscreenOn) {
@@ -1456,11 +1673,218 @@ export const useSimStore = defineStore('sim', {
     },
     // 顶栏「重置视图」按钮 -> SceneViewer watch 该计数 -> scene.resetView()
     resetView() { this.viewResetNonce++ },
-    // 切换仿真场景（四大控排）；非钢铁场景当前不支持切换
-    setScenario(id) {
-      if (id === this.scenario) return
-      this.scenario = id
-      if (id !== 'steel') this.toast = t('当前仅支持「钢铁」控排场景')
+    // 切换场景行业（四大控排 + 其它）：实际打开场景资源包由 openScene 完成。
+    //  - steel → 平台内置钢铁包；other → 「其它」分组第一个就绪资源包（如示例机房热控）
+    //  - 水泥/化工/有色 → 未安装引导（对应行业 .ec 资源包安装后可在此打开）
+    async setScenario(id) {
+      if (id === this.scenario && id === 'steel' && this.sceneId === 'steel') return
+      if (id === 'steel') { await this.openScene('steel'); return }
+      if (id === 'other') {
+        const meta = this._readySceneOfGroup('其它')
+        if (meta) await this.openScene(meta.id)
+        else this.toast = t('「其它」分组暂无已安装的资源包：请先在场景设置中「导入资源包」安装 .ec 文件（系统内置示例：机房热控）')
+        return
+      }
+      const meta = this.sceneIndex.find((x) => x.id === id)
+      if (meta && meta.ready) { await this.openScene(meta.id); return }
+      const label = (meta && meta.label) || (this.scenarios.find((s) => s.id === id) || {}).label || id
+      this.toast = t('「{label}」行业资源包尚未安装：可通过「导入资源包」安装对应 .ec 定制包后打开（当前内置：钢铁、机房热控示例）', { label })
+    },
+    // 「其它」分组下第一个就绪场景（按注册表 order 升序）
+    _readySceneOfGroup(group) {
+      const list = this.sceneIndex.filter((x) => String(x.industryGroup || x.industry || '').indexOf(group) >= 0 && x.ready)
+      list.sort((a, b) => (a.order == null ? 99 : a.order) - (b.order == null ? 99 : b.order))
+      return list[0] || null
+    },
+    // 刷新场景注册表（后端 /api/scenes：内置包 + 已安装 .ec 资源包）
+    async refreshSceneIndex() {
+      try {
+        const list = await api.listScenes()
+        if (Array.isArray(list)) {
+          this.sceneIndex = list
+          this.sceneIndexTs++
+        }
+      } catch (e) { /* 后端暂不可用：静默，列表为空 */ }
+      return this.sceneIndex
+    },
+    // 打开场景资源包：卸载当前流程状态 → 装载包数据 → 重建编排方案/模型/资源视图。
+    // 返回是否成功；失败不改变当前场景。
+    async openScene(sceneId) {
+      if (!sceneId) return false
+      const sameMode = this.sceneMode === (sceneId === 'steel' ? 'steel' : 'other')
+      if (sceneId === this.sceneId && sameMode) return true
+      let meta = this.sceneIndex.find((x) => x.id === sceneId)
+      if (!meta) await this.refreshSceneIndex()
+      meta = this.sceneIndex.find((x) => x.id === sceneId) || meta
+      if (!meta) { this.toast = t('场景「{id}」不存在', { id: sceneId }); return false }
+      if (!meta.ready) {
+        this.toast = t('「{label}」资源包尚未就绪：请先通过「导入资源包」安装该场景的 .ec 文件', { label: meta.label || sceneId })
+        return false
+      }
+      if (this.sceneBusy) return false
+      // 先退出仿真/编排，避免在切换过程中触发旧场景的后端刷新
+      if (this.simMode) this.exitSim()
+      if (this.editMode) this.exitEdit()
+      this.sceneBusy = true
+      try {
+        const pkg = await api.getSceneResource(sceneId)
+        if (!pkg || !pkg.meta) throw new Error(t('资源包数据异常'))
+        this.scenePack = pkg
+        this.sceneId = sceneId
+        const isSteel = sceneId === 'steel' || ((pkg.meta.engines || []).includes('steel-carbon'))
+        this.sceneMode = isSteel ? 'steel' : 'other'
+        this.scenario = isSteel ? 'steel' : 'other'
+        const res = pkg.resources || {}
+        this.sceneCtx = res.dictionary || res.config || null
+        this.sceneTemplates = Array.isArray(res.templates) ? res.templates : []
+        if (res.factors) { this.factors = res.factors; this.factorsDefault = res.factors }
+        if (res.paramSchema) this.paramSchema = res.paramSchema
+        if (res.devices) this.deviceLibrary = res.devices
+        const routes = Array.isArray(pkg.meta.routes) && pkg.meta.routes.length ? pkg.meta.routes : null
+        const defaultRoute = pkg.meta.defaultRoute || (routes && routes[0]) || null
+        // 编排方案：优先恢复本场景本地存档，否则按包模板构建
+        const saved = this._loadScheme()
+        this.processRoute = isSteel ? ((saved && saved.route) || 'short') : (defaultRoute || 'cool')
+        this.scheme = (saved && saved.scheme) ? saved.scheme : this._buildSceneScheme(this.processRoute)
+        if (!this.scheme.groups) this.scheme.groups = []
+        // 子编排态不跨场景继承：否则新场景 3D 会沿用旧小组 id 走 groupScene 分支，渲染出空子场景
+        this.scheme.activeGroupId = null
+        // 清空跨场景会话状态（避免脏数据串场）
+        // 核算结果 / 实时帧 / 策略库 / 报告 / 撤销栈一并归零，防止刷新期间短暂展示旧场景数据
+        this.baseline = null
+        this.live = null
+        this.presets = []
+        this.reportPayload = null
+        this.flowBackId = null
+        this.historyPast = []
+        this.historyFuture = []
+        this.materialOverrides = {}
+        this.deviceSetpoints = {}
+        this.deviceExtraSetpoints = {}
+        this.deviceLive = {}
+        this.deviceHistory = {}
+        this.deviceMeta = null
+        this.strategy = null
+        this.delta = null
+        this.parsed = null
+        this.parsedText = ''
+        this.simOps = []
+        this.simCurrent = null
+        this.strategies = []
+        this.selectedUnitId = null
+        this.selectedGroupId = null
+        this.selectedFlowId = null
+        this.deviceDetailId = null
+        this.selectedMaterialId = null
+        this.selectedStrategyId = null
+        this.selectedAssetType = null
+        this.inspectorView = 'auto'
+        // 编译模型并按场景模式刷新（其它场景走本地静态核算，不请求钢铁碳引擎）
+        this.compileSchemeToModel()
+        if (!isSteel) {
+          this._otherSceneRefresh()
+          this._pushModelToFeed()   // 新场景模型同步给实时数据源，避免继续按旧 model 下发遥测
+        } else {
+          await this._loadSteelSession()
+        }
+        this._saveScheme()
+        // sceneVersion：左右面板（资源树 / 检视器）以它为 :key 重建，清空本地折叠态/档位等残留
+        this.sceneVersion++
+        try { localStorage.setItem('sim.sceneId', sceneId) } catch (e) { /* localStorage 不可用时忽略 */ }
+        // 3D 重建延后一帧：等面板按新 key 挂载、容器尺寸稳定后再 buildModel，
+        // 避免 canvas 0x0 导致相机投影矩阵 NaN（与 exitEdit 的处理口径一致）
+        await nextTick()
+        this.sceneRev++
+        const label = meta.label || pkg.meta.label || sceneId
+        this.toast = t('已打开场景「{label}」', { label })
+        this.pushCmd(t('已打开场景「{label}」：资源列表、编排方案与孪生模型已切换。', { label }), 'cmd')
+        return true
+      } catch (e) {
+        this.toast = t('打开场景失败：') + e.message
+        this.notify('error', t('打开场景失败'), e.message)
+        return false
+      } finally {
+        this.sceneBusy = false
+      }
+    },
+    // 启动恢复：自动打开上次退出前打开的场景（localStorage sim.sceneId，随 openScene 写入）。
+    // 场景已卸载 / 资源包未就绪时保持默认场景并给出提示，不阻断启动流程。
+    async restoreLastScene() {
+      let last = null
+      try { last = localStorage.getItem('sim.sceneId') } catch (e) { return false }
+      if (!last || last === this.sceneId) return false
+      if (!this.sceneIndex.length) await this.refreshSceneIndex()
+      const meta = this.sceneIndex.find((x) => x.id === last)
+      if (!meta) {
+        this.pushCmd(t('上次打开的场景「{id}」已不存在，已按默认场景启动。', { id: last }), 'sys')
+        return false
+      }
+      if (!meta.ready) {
+        this.pushCmd(t('上次打开的场景「{label}」资源包未就绪，已按默认场景启动：请在「设置 → 场景」导入该场景的 .ec 资源包。', { label: meta.label || last }), 'sys')
+        return false
+      }
+      const ok = await this.openScene(last)
+      if (ok) this.pushCmd(t('已自动恢复上次打开的场景「{label}」。', { label: meta.label || last }), 'sys')
+      return ok
+    },
+    // 钢铁场景会话：装载策略库 + 走后端碳引擎仿真
+    async _loadSteelSession() {
+      this.loadStrategies().catch(() => {})
+      await this._runRefresh()
+    },
+    // 按流程路线/包模板构建编排方案（steel 走 flowLibrary buildScheme；其它场景走包内模板快照）
+    _buildSceneScheme(route) {
+      if (this.sceneMode === 'steel' || this.sceneId === 'steel') {
+        return buildScheme(route === 'long' ? 'long' : 'short')
+      }
+      const tpl = this.sceneTemplates.find((x) => x.id === route || x.route === route) || this.sceneTemplates[0]
+      if (!tpl || !tpl.scheme) return { nodes: [], connections: [], devices: [], groups: [], activeGroupId: null }
+      const s = JSON.parse(JSON.stringify(tpl.scheme))
+      if (!s.groups) s.groups = []
+      if (s.activeGroupId == null) s.activeGroupId = null
+      return s
+    },
+    // 非钢场景本地静态刷新：耗能设备功率（MW）× 电网排放因子 → 范围二折碳（kgCO₂/h）。
+    // 不请求后端碳引擎（steel-carbon 仅识别标准工艺类型），供孪生/KPI/属性面板展示。
+    _otherSceneRefresh() {
+      this.compileSchemeToModel()
+      const gridKg = this._gridFactorKg()
+      const date = new Date().toISOString()
+      const totals0 = {}
+      const prevT = (this.baseline && this.baseline.totals) || {}
+      for (const k of Object.keys(prevT)) totals0[k] = 0
+      const units = (this.model.units || []).map((u) => {
+        const powerMW = Number((u.params && u.params.power != null) ? u.params.power : 0) || 0   // 包模板功率以 MW 计
+        const powerKW = powerMW * 1000
+        const carbonKg = powerKW * gridKg       // kgCO₂/h（范围二）
+        return {
+          ...u,
+          devices: [],
+          carbon: carbonKg,
+          energy: powerKW,      // kWh/h
+          prod: 1,
+          unitCarbon: carbonKg,
+        }
+      })
+      const carbonTotal = units.reduce((a, u) => a + (u.carbon || 0), 0)
+      const energyTotal = units.reduce((a, u) => a + (u.energy || 0), 0)
+      this.baseline = {
+        units,
+        flows: this.model.flows,
+        totals: { ...totals0, carbon: carbonTotal, energy: energyTotal },
+        date,
+        meta: {},
+      }
+      this.strategy = null
+      this.delta = null
+    },
+    // 电网排放因子（kgCO₂/kWh）：兼容钢包 factors.electricity.grid 与通用资源包 factors.grid_ef / factors.grid（tCO₂/MWh，数值上与 kgCO₂/kWh 同量）
+    _gridFactorKg() {
+      const f = this.factors || {}
+      if (f.electricity && Number(f.electricity.grid)) return Number(f.electricity.grid)
+      if (Number(f.grid_ef)) return Number(f.grid_ef)
+      if (Number(f.grid)) return Number(f.grid)
+      return 0.5703
     },
     // 切换核心孪生外围环绕环境（森林/城市/沙漠/海岸），触发中间 3D 场景重建
     setEnvMode(id) {
@@ -1584,17 +2008,18 @@ export const useSimStore = defineStore('sim', {
         } catch (e) {}
       }
       if (!this.dataSources.length) {
-        // 默认内置两条数据源：能碳一体机 Mqtt 实时（启用）+ 模拟数据（停用，按需开启，便于无真实设备时演示）
+        // 默认连接：平台 MQTT 实时订阅（能碳一体机/中间件发布链路）。数据源接入与启停的统一管理
+        // 在「能碳一体机管理 → 数据源接入」区块（数据源目录 config/data_sources.json，含中间件接入的
+        // 外部数据与模拟数据）；此处仅为「仿真驱动连接」的工作副本。
         this.dataSources = [
           { id: 'sim', type: 'sim', url: '', interval: 1000, name: '能碳一体机', enabled: true, mapping: {} },
-          { id: 'local', type: 'local', url: '', interval: 1000, name: '模拟数据', enabled: false, mapping: {} },
         ]
       }
-      // v3 精简：平台仅保留两条内置数据源（能碳一体机 Mqtt 实时 + 模拟数据）。
-      // 移除 ws/http 等自定义类型与多余实例（若有），固定 id=type，规范化名称，保证两条始终存在。
+      // v3 精简：保留既有的能碳一体机数据源（与外部 MQTT 订阅 + 字段绑定同通道）。
+      // 移除 ws/http 等自定义类型与多余实例（若有），固定 id=type，规范化名称。
       const v3Canonical = []
       for (const s of this.dataSources || []) {
-        if (!s || (s.type !== 'sim' && s.type !== 'local')) continue
+        if (!s || s.type !== 'sim') continue
         const c = v3Canonical.find((x) => x.type === s.type)
         if (c) {
           c.mapping = { ...(s.mapping || {}), ...(c.mapping || {}) }
@@ -1607,12 +2032,8 @@ export const useSimStore = defineStore('sim', {
       if (!v3Canonical.some((s) => s.type === 'sim')) {
         v3Canonical.unshift({ id: 'sim', type: 'sim', url: '', interval: 1000, name: '能碳一体机', enabled: true, mapping: {} })
       }
-      if (!v3Canonical.some((s) => s.type === 'local')) {
-        v3Canonical.push({ id: 'local', type: 'local', url: '', interval: 1000, name: '模拟数据', enabled: false, mapping: {} })
-      }
       for (const s of v3Canonical) {
         if (s.type === 'sim' && (!s.name || s.name === 'Mqtt 实时数据' || s.name.indexOf('Mqtt') === 0)) s.name = '能碳一体机'
-        if (s.type === 'local' && (!s.name || s.name === '本地模拟数据' || s.name.indexOf('本地模拟') === 0)) s.name = '模拟数据'
       }
       this.dataSources = v3Canonical
       this._saveDataSource()
@@ -1744,7 +2165,7 @@ export const useSimStore = defineStore('sim', {
       // 若方案为空（首次进入），以当前路线构建默认方案。
       if (!this.scheme || !this.scheme.nodes || this.scheme.nodes.length === 0) {
         const route = this.processRoute || 'short'
-        this.scheme = buildScheme(route)
+        this.scheme = this._buildSceneScheme(route)
       }
       // 保证小组容器字段存在（存量方案/旧 localStorage 可能缺失）
       if (!this.scheme.groups) this.scheme.groups = []
@@ -1759,23 +2180,28 @@ export const useSimStore = defineStore('sim', {
       _histKey = null
       // 触发 3D 计量设备标签重新布局（进入/退出编辑流程均重排，确保位置与计数正确）
       this.sceneRev++
+      // 编排以 tab 窗口形式打开：进入编排即开一个「流程编排」标签并激活，
+      // 可自由切到三维仿真 / 其它视图标签查看，再切回继续编排（草稿不丢），关闭标签即完成编排
+      this.openView('flowEdit')
     },
     exitEdit() {
       this.compileSchemeToModel()
       this.autoLayout()
       this.refresh()
       this.scheme.activeGroupId = null   // 退出编排后 3D 孪生回到顶层场景
+      // 先置非编辑态再关 tab：closeViewById('flowEdit') 依赖此标志区分「完成编排」与「普通关闭」
       this.editMode = false
+      this.closeViewById('flowEdit')
       this.toast = t('已应用编排方案，刷新孪生视图')
       this._saveScheme()   // 持久化编排结果，刷新后保持最后一次编排状态
-      // sceneRev 的触发由 SceneViewer 的 editMode watch 统一管理，
+      // sceneRev 的触发由 SceneViewer 的 flowEditing watch 统一管理，
       // 确保 DOM 可见 + resize 完成后再 rebuildScene，避免 canvas 0x0 导致相机投影矩阵 NaN
     },
 
     loadTemplate(route) {
       this._histCapture('tmpl_' + uid('h'))
       this.processRoute = route
-      this.scheme = buildScheme(route)
+      this.scheme = this._buildSceneScheme(route)
       // 保证模板方案的 group 容器字段齐全（buildScheme 返回的 groups/activeGroupId）
       if (!this.scheme.groups) this.scheme.groups = []
       if (this.scheme.activeGroupId == null) this.scheme.activeGroupId = null
@@ -1787,15 +2213,54 @@ export const useSimStore = defineStore('sim', {
       if (this.editMode) this.flowZoomFit()
       this.toast = route === 'short' ? t('已载入短流程炼钢模板') : t('已载入长流程炼钢模板')
     },
+    // 编排自动保存：任何场景（钢铁 / 资源包）下的编辑（增删节点、连线、参数、设备设定、物料覆盖）
+    // 均防抖 400ms 写入本地存档，下次打开（刷新页面或切换场景后切回）自动恢复最后一次编排结果。
+    _bindAutosave() {
+      if (this._autosaveBound) return
+      this._autosaveBound = true
+      let timer = null
+      watch(
+        () => [this.scheme, this.processRoute, this.materialOverrides, this.deviceSetpoints, this.deviceExtraSetpoints],
+        () => {
+          clearTimeout(timer)
+          timer = setTimeout(() => this._saveScheme(), 400)
+        },
+        { deep: true },
+      )
+    },
+    // 「文件 → 另存为场景…」：把当前场景（默认含当前编排方案快照）打包为可分发的 .ec 资源包下载。
+    // 导出包为非内置分发包，重新导入后即回到当前编排态。
+    async exportSceneAsPackage({ label, industry, version, vendor, product, withScheme = true } = {}) {
+      const payload = {
+        scene_id: this.sceneId,
+        meta: { label: label || undefined, industry: industry || undefined },
+        package: { version: version || undefined, vendor: vendor || undefined, product: product || undefined },
+        templates: withScheme
+          ? [{ id: 'current', route: this.processRoute, name: label || t('当前编排方案'), scheme: JSON.parse(JSON.stringify(this.scheme)) }]
+          : undefined,
+      }
+      const { blob, filename } = await api.exportSceneBlob(payload)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename || `${this.sceneId}.ec`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 4000)
+      return filename
+    },
     // 持久化当前编排方案：完成编排（exitEdit）、载入模板、清空画布、调节设备设定值时写入，
     // 使刷新后保持最后一次编排结果，而不是回退到默认流程。
     _saveScheme() {
       if (this.simMode) return   // 仿真模式：一切编辑不持久化
       try {
         localStorage.setItem('sim.scheme', JSON.stringify({
+          sceneId: this.sceneId || 'steel',   // 编排方案所属场景包：切场景不串档
           route: this.processRoute,
           scheme: this.scheme,
           materialOverrides: this.materialOverrides,
+          _ovUnitV: 1,   // 价格口径标记：v1 起 price/salePrice 统一为「万元/单位」（旧版存的是元/单位）
         }))
       } catch (e) { /* localStorage 不可用时静默忽略 */ }
     },
@@ -1805,6 +2270,9 @@ export const useSimStore = defineStore('sim', {
         if (!raw) return null
         const d = JSON.parse(raw)
         if (!d || !d.scheme || !Array.isArray(d.scheme.nodes) || d.scheme.nodes.length === 0) return null
+        // 编排方案随场景包隔离：只恢复与当前打开场景匹配的存档（旧版无 sceneId 视为钢包存档）
+        const sid = this.sceneId || 'steel'
+        if (d.sceneId && d.sceneId !== sid) return null
         return d
       } catch (e) { return null }
     },
@@ -1860,6 +2328,53 @@ export const useSimStore = defineStore('sim', {
       this._saveScheme()   // 持久化清空结果（空方案刷新后按流程路线重建默认，避免回退到旧方案）
     },
     // 从左栏拖入创建节点（kind: process|device|material）
+    // ===== 附加设备（传感器 / 可变设备）：绑定 / 解除 / 数值来源 =====
+    // 在某工艺节点上添加一个附加设备（kind: sensor / adjustable，type 取附加库模板 type），
+    // 实例存入工艺节点 node.attached[]（随方案持久化）；运行态 id 合成为 ext::节点id::attUid，
+    // 在资源管理器 / 设备树 / 数据分析中即出现相应设备。
+    addAttachToNode(nodeId, kind, type) {
+      const node = this.scheme.nodes.find((n) => n.id === nodeId)
+      if (!node) return null
+      const tpl = _attachTpl(kind, type)
+      if (!tpl) return null
+      const att = {
+        uid: uid('a'),
+        kind,
+        type,
+        label: tpl.label,
+        src: 'sim',        // 默认数值来源：模拟（可在属性面板切换为工艺参数 / 固定值）
+        param: null,       // src=param 时绑定的工艺数值参数 key
+        def: tpl.kind === 'sensor' ? tpl.def : (tpl.setpoint ? tpl.setpoint.def : null),
+      }
+      if (!node.attached) node.attached = []
+      node.attached.push(att)
+      this._histCapture('att_' + nodeId + uid('h'))
+      this._saveScheme()
+      return att
+    },
+    removeAttachFromNode(nodeId, uidToRemove) {
+      const node = this.scheme.nodes.find((n) => n.id === nodeId)
+      if (!node || !Array.isArray(node.attached)) return
+      const i = node.attached.findIndex((a) => a.uid === uidToRemove)
+      if (i < 0) return
+      node.attached.splice(i, 1)
+      this._histCapture('det_' + nodeId + uid('h'))
+      this._saveScheme()
+      const extId = `ext::${nodeId}::${uidToRemove}`
+      if (this.deviceDetailId === extId) this.deviceDetailId = null
+    },
+    // 设置附加设备的数值来源：{ src: 'fixed' | 'sim' | 'param', param?: 工艺参数 key }
+    setAttachSource(nodeId, uidToSet, patch) {
+      const node = this.scheme.nodes.find((n) => n.id === nodeId)
+      const att = node && Array.isArray(node.attached) ? node.attached.find((a) => a.uid === uidToSet) : null
+      if (!att) return
+      if (patch && patch.src) att.src = patch.src
+      if (patch && 'param' in patch) att.param = patch.param
+      if (patch && 'def' in patch) att.def = patch.def
+      this._histCapture('src_' + nodeId + uid('h'))
+      this._saveScheme()
+    },
+
     addFlowNode(kind, type, x, y) {
       if (this._simEditBlocked()) return null
       this._clearBrowse()               // 拖入后右侧切到节点属性，而非资源浏览属性
@@ -1869,8 +2384,16 @@ export const useSimStore = defineStore('sim', {
       if (kind === 'process') {
         // 同类型节点：仅 1 台直接使用类型名，从第 2 台起按序号命名（热风炉、热风炉2…），与 buildScheme 多实例命名一致
         const t = PROCESS_MAP[type]
-        const count = this.scheme.nodes.filter((n) => n.kind === 'process' && n.type === type).length + 1
-        node = makeProcessNode(type, x, y, count > 1 && t ? `${t.label}${count}` : undefined)
+        if (t || this.sceneMode === 'steel') {
+          const count = this.scheme.nodes.filter((n) => n.kind === 'process' && n.type === type).length + 1
+          node = makeProcessNode(type, x, y, count > 1 && t ? `${t.label}${count}` : undefined)
+        } else {
+          // 通用资源包场景（其它分组）：以包内模板节点的参数/端口创建该工艺节点
+          const count = this.scheme.nodes.filter((n) => n.kind === 'process' && n.type === type).length + 1
+          const d = this.sceneProcessDict[type]
+          if (d && count > 1 && d.label) node = this._makeSceneProcessNode(type, x, y, `${d.label}${count}`)
+          else node = this._makeSceneProcessNode(type, x, y)
+        }
       } else if (kind === 'device') node = makeDeviceNode(type, x, y)
       else if (kind === 'material') node = makeMaterialNode(type, x, y)
       if (!node) return
@@ -1884,6 +2407,30 @@ export const useSimStore = defineStore('sim', {
       this.selectedFlowId = node.id
       if (kind === 'device') this.scheme.devices.push(node)
       return node.id
+    },
+    // 通用资源包场景下按包内模板创建工艺节点（无钢字典语义：参数/端口取自包模板快照）
+    _makeSceneProcessNode(type, x, y, name) {
+      const d = this.sceneProcessDict[type]
+      if (!d) return null
+      const inMs = (d.ports && Array.isArray(d.ports.in)) ? d.ports.in : []
+      const outMs = (d.ports && Array.isArray(d.ports.out)) ? d.ports.out : []
+      return {
+        id: uid('n'),
+        kind: 'process',
+        type,
+        name: name || d.name || d.label || type,
+        x, y,
+        count: 1,
+        spec: '',
+        params: { ...(d.params || {}) },
+        recipe: inMs.map((p) => ({ material: p.material || p.id, ratio: 1 })),
+        ports: {
+          in: inMs.map((p) => ({ id: uid('in'), material: p.material || p.id })),
+          out: outMs.map((p) => ({ id: uid('out'), material: p.material || p.id })),
+        },
+        deviceBindings: [],
+        attached: [],
+      }
     },
     moveFlowNode(id, x, y) {
       this._histCapture('move_' + id)   // 同节点拖动在合并窗口内合成一步
@@ -2412,6 +2959,8 @@ export const useSimStore = defineStore('sim', {
     // 注意：后端碳引擎仅识别标准工艺类型，故"公用/节能"节点(煤气发电/余热/CCUS)不纳入 3D 仿真，
     // 其减碳作用在编辑态前端估算中已计入。
     compileSchemeToModel() {
+      // 通用资源包场景（其它分组）：包内 scheme 直译为单位模型（无钢字典语义）
+      if (this.sceneMode !== 'steel') return this._compileOtherScheme()
       const procs = this.scheme.nodes.filter((n) => n.kind === 'process' && PROCESS_MAP[n.type] && PROCESS_MAP[n.type].route !== 'util')
       const procIds = new Set(procs.map((n) => n.id))
       const units = procs.map((n) => ({
@@ -2466,8 +3015,12 @@ export const useSimStore = defineStore('sim', {
         if (!srcUnit || !dstUnit) continue
         const srcVal = (srcUnit.params && srcUnit.params[drive.src] != null) ? Number(srcUnit.params[drive.src]) : null
         if (srcVal != null) {
-          // 驱动连线：工辅供给绝对量直接写入同量纲目标参数（如 鼓风量 kNm³/h → 高炉风量 kNm³/h）
-          dstUnit.params = { ...(dstUnit.params || {}), [drive.dst]: srcVal }
+          // 驱动连线：工辅供给绝对量直接写入同量纲目标参数（如 鼓风量 kNm³/h → 高炉风量 kNm³/h）。
+          // 例外：喷吹系统 inj_rate 为绝对量(t/h) → 高炉 coal_inj 为相对量(kg/t)，按铁水产量折算
+          const hm = dstUnit.params && dstUnit.params.hot_metal != null ? Number(dstUnit.params.hot_metal) : null
+          let driveVal = srcVal
+          if (drive.dst === 'coal_inj' && drive.src === 'inj_rate' && hm && hm > 0) driveVal = (srcVal * 1000) / hm
+          dstUnit.params = { ...(dstUnit.params || {}), [drive.dst]: driveVal }
         }
       }
       // 标记工辅 Unit，供后端/前端识别（不影响其它工艺）
@@ -2479,6 +3032,37 @@ export const useSimStore = defineStore('sim', {
         units,
         flows,
         // 小组元信息（id/name），供 3D 数字孪生以聚合模型方式呈现小组
+        groups: (this.scheme.groups || []).map((g) => ({ id: g.id, name: g.name || '设备小组' })),
+      }
+    },
+
+    // 通用资源包场景（其它分组）编译：包内 scheme 直译为 3D 单位模型。
+    // 所有工艺节点按模板坐标排布、连线全保留（包模板连线可信，手工连线画布已校验端口）；
+    // 不依赖钢流程字典（PROCESS_MAP）与后端碳引擎；附加传感器/可变设备随 unit 携带。
+    _compileOtherScheme() {
+      const nodes = (this.scheme && this.scheme.nodes) || []
+      const conns = (this.scheme && this.scheme.connections) || []
+      const procSet = new Set(nodes.filter((n) => n.kind === 'process').map((n) => n.id))
+      const units = nodes.filter((n) => n.kind === 'process').map((n) => ({
+        id: n.id,
+        type: n.type,
+        name: n.name || n.type,
+        params: { ...(n.params || {}) },
+        techs: Array.isArray(n.techs) ? n.techs : [],
+        spec: n.spec || '',
+        groupId: n.groupId || null,
+        enabled: n.enabled !== false,
+        rot: n.rot || 0,
+        attached: Array.isArray(n.attached) ? n.attached.map((x) => ({ ...x })) : [],
+        x: Math.round(((n.x != null ? n.x : 0) - 400) / 40),
+        z: Math.round(((n.y != null ? n.y : 0) - 300) / 40),
+      }))
+      const flows = conns
+        .filter((c) => procSet.has(c.from) && procSet.has(c.to))
+        .map((c) => ({ id: c.id, from_unit: c.from, to_unit: c.to, material: c.material, rate: c.rate || 1000 }))
+      this.model = {
+        units,
+        flows,
         groups: (this.scheme.groups || []).map((g) => ({ id: g.id, name: g.name || '设备小组' })),
       }
     },

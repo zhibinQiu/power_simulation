@@ -4,7 +4,7 @@
     <Twin2DView v-if="view2D" class="scene-host"/>
 
     <!-- 左上角工具组（图标按钮）：2D/3D 切换 / 亮度 / 刷新视角 / 自动环视 -->
-    <div v-if="!store.editMode" class="twin-left-tools" :style="{ top: store.scheme.activeGroupId ? '58px' : '12px' }">
+    <div v-if="!store.flowEditing" class="twin-left-tools" :style="{ top: store.scheme.activeGroupId ? '58px' : '12px' }">
       <button type="button" class="twin-tool-btn" :class="{ on: view2D }" @click="toggleView2D()" :title="view2D ? t('切换到 3D 数字孪生视图') : t('切换到 2D 工艺流程图（ISA-101 人机界面）')">
         <Icon :name="view2D ? 'scene3d' : 'front'"/>
       </button>
@@ -30,7 +30,7 @@
     </div>
 
     <!-- 3D 小组子场景：左上角返回顶层浮层（非编辑态下点击小组标签进入） -->
-    <div v-if="!store.editMode && store.scheme.activeGroupId" class="group-scene-bar">
+    <div v-if="!store.flowEditing && store.scheme.activeGroupId" class="group-scene-bar">
       <button type="button" class="gs-back" @click="store.exitGroup()">{{ t('← 返回顶层') }}</button>
       <span class="gs-title">▦ {{ groupSceneName }}</span>
     </div>
@@ -73,14 +73,19 @@ let scene = null
 let ro = null
 let introDone = false
 
+// 3D 渲染循环是否需要暂停：2D 工艺流程图 / 编排画布在前台 / 主视图被 HMI 大屏或功能视图窗口覆盖 / 页面隐藏
+function paused() {
+  return view2D.value || store.flowEditing || store.overviewOn || !!store.activeViewId || document.hidden
+}
+
 // 2D/3D 视图切换：2D 视图是全新画布（独立工艺流程图），切换时暂停/恢复 3D 渲染循环
 function toggleView2D() {
   view2D.value = !view2D.value
   if (!scene) return
-  scene.setPaused(view2D.value || store.editMode || document.hidden)
+  scene.setPaused(paused())
   if (!view2D.value) {
     // 从 2D 返回 3D：canvas 刚恢复可见，等布局完成后重建场景避免 0 尺寸 NaN
-    nextTick(() => { if (scene) { scene.resize(); scene.setPaused(store.editMode || document.hidden) } })
+    nextTick(() => { if (scene) { scene.resize(); scene.setPaused(paused()) } })
   }
 }
 
@@ -88,7 +93,7 @@ function rebuildScene() {
   if (!scene || !store.ready || !store.model || !store.model.units || !store.model.units.length) return
   try {
     // 非编辑态下若处于某小组子场景（activeGroupId），3D 场景以该小组子场景模式重建
-    const gid = (!store.editMode && store.scheme.activeGroupId) ? store.scheme.activeGroupId : null
+    const gid = (!store.flowEditing && store.scheme.activeGroupId) ? store.scheme.activeGroupId : null
     scene.buildModel(store.model, store.resultForView, gid ? { groupScene: gid } : undefined)
     scene.setAutoRotate(store.autoRotate)
   } catch (e) {
@@ -103,8 +108,6 @@ function initScene() {
     scene = new TwinScene(host.value, { envMode: store.envMode })
     ok.value = true
     lastErr.value = ''
-    // dev 模式暴露场景实例，便于自动化验证/截图（生产构建不包含）
-    if (import.meta.env.DEV) window.__twinScene = scene
     // 点击模型旁的小铭牌 → 选中该工序实例，右侧统一显示实例属性面板
     scene.onSelectUnit = (id) => { store.pickUnit(id) }
     scene.onMiss = () => {}   // 点击场景空白：无浮窗需关闭
@@ -148,11 +151,20 @@ function onResize() {
 
 watch(() => store.ready, () => { if (store.ready) rebuildScene() })
 // 编辑态下 canvas 隐藏，避免在 0x0 尺寸下重建导致相机投影矩阵 NaN；退出编辑态由 editMode watch 统一重建
-watch(() => store.sceneRev, () => { if (!store.editMode) rebuildScene() })
+watch(() => store.sceneRev, () => { if (!store.flowEditing) rebuildScene() })
+// 切换场景：sceneId / sceneVersion 变化后，等左右面板按新 key 重建、容器尺寸稳定再重建 3D，
+// 避免沿用旧场景模型或 canvas 0x0 导致相机投影矩阵 NaN（与 openScene 的 nextTick 配合）
+watch(() => [store.sceneId, store.sceneVersion], async () => {
+  if (!scene || store.flowEditing) return
+  await nextTick()
+  if (!scene) return
+  scene.resize()
+  rebuildScene()
+})
 
 // 3D 小组子场景：进入/退出时同步视角（进入适配小组布局，返回播放全景动画）
 watch(() => store.scheme.activeGroupId, (gid) => {
-  if (!scene || store.editMode) return
+  if (!scene || store.flowEditing) return
   if (gid) scene.focusScene()
   else scene.resetView()
 })
@@ -175,12 +187,20 @@ watch(() => store.simCurrent, (r) => {
 })
 
 // 页面隐藏时暂停渲染循环，减少后台 CPU/GPU 占用；恢复可见或离开编排态时继续
-function onVis() { if (scene) scene.setPaused(view2D.value || store.editMode || document.hidden) }
+function onVis() { if (scene) scene.setPaused(paused()) }
 document.addEventListener('visibilitychange', onVis)
 
-watch(() => store.editMode, async (v) => {
+// 主视图被 HMI 大屏 / 功能视图窗口覆盖时暂停渲染（后台不空转 GPU），回到 3D 主视图时恢复；
+// 恢复后需 resize —— canvas 在 display:none 期间 clientWidth 为 0，恢复可见后要同步渲染器尺寸
+watch(() => [store.overviewOn, store.activeViewId], async () => {
   if (!scene) return
-  scene.setPaused(view2D.value || v || document.hidden)
+  scene.setPaused(paused())
+  if (!paused()) { await nextTick(); if (scene) scene.resize() }
+})
+
+watch(() => store.flowEditing, async (v) => {
+  if (!scene) return
+  scene.setPaused(paused())
   if (!v) {
     // 从编排态退出：canvas 刚从 display:none 变为可见，需要等 DOM 布局完成、
     // resize 恢复渲染器尺寸后，再重建 3D 场景。

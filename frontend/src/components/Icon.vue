@@ -75,6 +75,11 @@ const I = {
   send: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
   spark: '<path d="M12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26Z" fill="currentColor" stroke="none"/>',
   chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  // 「AI」字标（非描边字形：填充 currentColor，屏蔽继承的 stroke，避免加粗糊化）
+  // textLength + lengthAdjust 锁定宽度，保证不同系统/字体下占位一致、与其它图标视觉齐平
+  // 字重 600（其它线性图标 20px 下笔画约 1.25px，600 字重笔画宽度与之相当，不用 700 以免发闷）；
+  // textLength 15 与 scene3d/open/search 等图标的视觉宽度对齐，基线 17 使字标视觉中心落在 12
+  ai: '<text x="12" y="17.4" text-anchor="middle" textLength="17" lengthAdjust="spacingAndGlyphs" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="16" font-weight="600" fill="currentColor" stroke="none">AI</text>',
 }
 
 const icon = computed(() => I[props.name] || '')

@@ -148,6 +148,15 @@ def _energy_of(res: Dict) -> Dict[str, float]:
         cc = CC_FUEL.get(k)
         if cc:
             fuel_gj += float(v) / cc
+    # 焦化工序净能源口径：入炉煤能量 − 焦炭带出能量。
+    # 焦炭是焦炉自产的中间产品（非外购能源），其能量已计入上游入炉煤；
+    # 若焦炉仍按入炉煤全额计能、高炉再按焦炭全额计能，同一吨焦的能量会被重复计入，
+    # 使吨钢综合能耗虚高近一倍（演示值 1.05 tce/t vs 行业 ~0.55 tce/t）。
+    # 此处仅在能耗核算中扣减自产焦炭带出的能量（carbon_by_fuel/碳流图不受影响）。
+    carried = res.get("_coke_carried_tC", 0.0) or 0.0
+    cc_coke = CC_FUEL.get("coke")
+    if carried > 0 and cc_coke:
+        fuel_gj = max(fuel_gj - carried / cc_coke, 0.0)
     total = fuel_gj + elec * GJ_PER_MWH
     steel = res.get("steel_output", 0.0) or 0.0
     intensity = (total * KGCE_PER_GJ) / steel if steel > 0 else 0.0

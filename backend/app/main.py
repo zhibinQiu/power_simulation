@@ -25,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from . import data_sources
 from . import mqtt_source
 from . import presets
 from . import realtime
@@ -33,10 +34,13 @@ from .api.carbon_assets_router import (router as carbon_assets_router,
                                        share_router as report_share_router)
 from .api.ai_admin_router import router as ai_admin_router
 from .api.chat_session_router import router as chat_session_router
+from .api.data_sources_router import router as data_sources_router
+from .api.middleware_router import router as middleware_router
 from .api.help_router import router as help_router
 from .api.knowledge_router import router as knowledge_router
 from .api.license_router import router as license_router
 from .api.simulation_router import router as simulation_router
+from .api.scene_router import router as scene_router
 from .api.settings_router import router as settings_router
 
 
@@ -52,7 +56,18 @@ async def _lifespan(app):
     # 启动实时数据源（MQTT 订阅，参照参考项目 yunduan1 数据链路）：
     # 后台线程连接云端 MQTT Broker 订阅主题（Broker 配置前端化：能碳一体机管理 -> 总览 -> 配置 Broker，
     # 保存后热更新重连并持久化到 box_config.json），设备读数一律来自该真实数据源。
+    # 启动实时数据源：**订阅两类数据入口**（见 mqtt_source.client）
+    #   cloud      ：云端 Broker（41883），能碳一体机盒子/云端 agent 推送；中间件
+    #                external 形态下外部数据源与模拟数据也直发本 Broker（按前缀区分）；
+    #   middleware ：中间件独立数据端口（仅 local 形态，external 形态随 subscribe=false 停用）。
     mqtt_source.start()
+    # 统一数据源接入（box 能碳一体机 / external 经中间件接入的外部数据，见 app/data_sources/）：
+    # 登记默认源、与中间件对账补注册。平台与中间件自身都不产生模拟数据。
+    try:
+        data_sources.start()
+    except Exception as _e:  # pragma: no cover
+        realtime.manager.notify("warn", "数据源接入启动异常",
+                                f"统一数据源接入启动失败：{_e}")
     # 启动时为默认流程按 MQTT 真实读数预填设备历史（未上报的设备保持为空，不生成模拟数据）
     try:
         realtime.seed_history(presets.default_model())
@@ -60,6 +75,12 @@ async def _lifespan(app):
         # 预填失败不打印到命令行，改为前端弹窗通知（前端连接后可见）
         realtime.manager.notify("warn", "设备历史预填未完成", f"启动时按 MQTT 实时读数预填设备历史失败：{_e}")
     yield
+    # 应用退出：数据源接入随平台退出收尾（外部源采集在中间件进程内，平台无需停止；
+    # daemon 线程随进程结束亦可，显式停止更干净）
+    try:
+        data_sources.stop()
+    except Exception:  # pragma: no cover
+        pass
 
 app = FastAPI(title="工业能碳智控平台", version="2.0.0", lifespan=_lifespan)
 
@@ -75,10 +96,13 @@ app.include_router(ai_admin_router)            # AI 管理（智能体/技能/�
 app.include_router(chat_session_router)        # 聊天会话（历史对话/继续对话）
 app.include_router(box_router)                 # 能碳一体机管理
 app.include_router(carbon_assets_router)       # 碳资产管理（含 /api/carbon-assistant/*）
+app.include_router(data_sources_router)       # 统一数据源接入（一体机 + 经中间件接入的外部数据/模拟数据）
+app.include_router(middleware_router)         # 数据中间件服务（连接配置/状态/对账/接入类型）
 app.include_router(help_router)                # 帮助中心（独立文档网站地址）
 app.include_router(knowledge_router)           # 知识库（LLM-WIKI 式多级文件夹 + 文档解析，无需权限）
 app.include_router(license_router)             # 平台激活（激活码校验 / 激活状态）
 app.include_router(settings_router)            # 系统设置（LLM 配置等）
+app.include_router(scene_router)               # 场景资源包（.ec 打开/卸载/导出，/api/scenes 注册表）
 app.include_router(report_share_router)        # 报告分享页 /report/{rid}
 
 

@@ -14,12 +14,26 @@
         <div class="kv2">
           <span>{{ t('外购单价') }}</span>
           <span class="kv-edit">
-            <input type="number" class="num" min="0" step="0.1" :value="price" @change="onPrice($event.target.value)" />
-            <span class="num-unit">元/{{ mat.unit }}</span>
+            <input type="number" class="num" min="0" step="0.0001" :value="price" @change="onPrice($event.target.value)" />
+            <span class="num-unit">万元/{{ mat.unit }}</span>
           </span>
         </div>
-        <div class="pr-hint">{{ t('全厂总览「成本 = 外购用量 × 单价」：本物料当前为行业参考价，可按采购合同调整；保存后实时联动全厂成本与当日/当月/当年累计。') }}</div>
+        <div class="pr-hint">{{ t('全厂总览「成本 = 外购用量 × 单价（万元/单位）」：本物料当前为行业参考价，可按采购合同调整；保存后实时联动全厂成本与当日/当月/当年累计。') }}</div>
         <button v-if="isPriceOverride" class="reset" @click="resetPrice">{{ t('恢复库默认价') }}</button>
+      </div>
+      </CollapseSection>
+
+      <CollapseSection v-if="saleable" :title="t('销售单价（产品收益核算）')" tone="amber" :show-more="false">
+      <div class="card">
+        <div class="kv2">
+          <span>{{ t('销售单价') }}</span>
+          <span class="kv-edit">
+            <input type="number" class="num" min="0" step="0.0001" :value="salePrice" @change="onSalePrice($event.target.value)" />
+            <span class="num-unit">万元/{{ mat.unit }}</span>
+          </span>
+        </div>
+        <div class="pr-hint">{{ t('本物料为行业参考价，可按市场行情调整；收益 = 产品产量 × 销售单价 − 外购成本（外购成本见「全厂总览 → 成本」），售价保存后为后续收益核算提供依据。') }}</div>
+        <button v-if="isSalePriceOverride" class="reset" @click="resetSalePrice">{{ t('恢复库默认价') }}</button>
       </div>
       </CollapseSection>
 
@@ -168,14 +182,14 @@
 <script setup>
 import { computed } from 'vue'
 import { useSimStore } from '../stores/sim'
-import { PROCESS_MAP } from '../data/flowLibrary'
+import { PROCESS_MAP, PRODUCT_IDS } from '../data/flowLibrary'
 import CollapseSection from './CollapseSection.vue'
 import { t } from '../i18n'
 
 const store = useSimStore()
 const mat = computed(() => store.selectedMaterial)
 const isOverride = computed(() => !!(store.materialOverrides && store.materialOverrides[mat.value.id]))
-// ---- 外购单价：后端 purchases 只含下列可外购计量物料，成本 = 用量 × 单价（元/单位）----
+// ---- 外购单价：后端 purchases 只含下列可外购计量物料，成本 = 用量 × 单价（万元/单位）----
 const PURCHASABLE_IDS = ['iron_ore', 'coke', 'coal', 'limestone', 'scrap', 'electrode', 'ngas', 'electricity', 'biomass']
 const purchasable = computed(() => !!mat.value && PURCHASABLE_IDS.includes(mat.value.id))
 const price = computed(() => {
@@ -190,6 +204,24 @@ const isPriceOverride = computed(() => {
 })
 function onPrice(v) { store.setMaterialAttr(mat.value.id, 'price', Number(v)) }
 function resetPrice() { store.setMaterialAttr(mat.value.id, 'price', mat.value.price) }
+// ---- 产品销售单价：终端产品（PRODUCT_IDS：钢材/连铸坯/精炼钢水）可配置售价，供收益核算
+//      「收入 = 产品产量 × 销售单价 − 外购成本」，默认行业参考价，随方案持久化 ----
+const saleable = computed(() => !!mat.value && PRODUCT_IDS.includes(mat.value.id))
+const salePrice = computed(() => {
+  if (!mat.value) return 0
+  const ov = store.materialOverrides && store.materialOverrides[mat.value.id]
+  if (ov && ov.salePrice != null) return ov.salePrice
+  return mat.value.salePrice != null ? mat.value.salePrice : 0
+})
+const isSalePriceOverride = computed(() => {
+  if (!mat.value) return false
+  const ov = store.materialOverrides && store.materialOverrides[mat.value.id]
+  return !!(ov && ov.salePrice != null)
+})
+function onSalePrice(v) { store.setMaterialAttr(mat.value.id, 'salePrice', Number(v)) }
+function resetSalePrice() {
+  store.setMaterialAttr(mat.value.id, 'salePrice', mat.value.salePrice != null ? mat.value.salePrice : 0)
+}
 const carbon = computed(() => {
   const id = mat.value.id
   const ov = store.materialOverrides[id]

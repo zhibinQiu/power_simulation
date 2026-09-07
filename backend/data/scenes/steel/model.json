@@ -1,0 +1,113 @@
+{
+  "units": [
+    {
+      "id": "s1",
+      "type": "sinter_plant",
+      "name": "烧结机",
+      "x": -34.0,
+      "z": 0.0,
+      "rot": 0.0,
+      "enabled": true,
+      "params": {},
+      "techs": [],
+      "spec": ""
+    },
+    {
+      "id": "bf1",
+      "type": "blast_furnace",
+      "name": "高炉",
+      "x": -20.0,
+      "z": 0.0,
+      "rot": 0.0,
+      "enabled": true,
+      "params": {},
+      "techs": [],
+      "spec": ""
+    },
+    {
+      "id": "bof1",
+      "type": "bof",
+      "name": "转炉",
+      "x": -4.0,
+      "z": 0.0,
+      "rot": 0.0,
+      "enabled": true,
+      "params": {},
+      "techs": [],
+      "spec": ""
+    },
+    {
+      "id": "lf1",
+      "type": "ladle_furnace",
+      "name": "精炼炉",
+      "x": 10.0,
+      "z": 0.0,
+      "rot": 0.0,
+      "enabled": true,
+      "params": {},
+      "techs": [],
+      "spec": ""
+    },
+    {
+      "id": "cc1",
+      "type": "caster",
+      "name": "连铸机",
+      "x": 22.0,
+      "z": 0.0,
+      "rot": 0.0,
+      "enabled": true,
+      "params": {},
+      "techs": [],
+      "spec": ""
+    },
+    {
+      "id": "rm1",
+      "type": "rolling_mill",
+      "name": "热轧机",
+      "x": 34.0,
+      "z": 0.0,
+      "rot": 0.0,
+      "enabled": true,
+      "params": {},
+      "techs": [],
+      "spec": ""
+    }
+  ],
+  "flows": [
+    {
+      "id": "f0",
+      "from_unit": "s1",
+      "to_unit": "bf1",
+      "material": "sinter",
+      "rate": 385.0
+    },
+    {
+      "id": "f1",
+      "from_unit": "bf1",
+      "to_unit": "bof1",
+      "material": "hot_metal",
+      "rate": 350.0
+    },
+    {
+      "id": "f2",
+      "from_unit": "bof1",
+      "to_unit": "lf1",
+      "material": "steel",
+      "rate": 350.0
+    },
+    {
+      "id": "f3",
+      "from_unit": "lf1",
+      "to_unit": "cc1",
+      "material": "steel",
+      "rate": 350.0
+    },
+    {
+      "id": "f4",
+      "from_unit": "cc1",
+      "to_unit": "rm1",
+      "material": "steel",
+      "rate": 350.0
+    }
+  ]
+}

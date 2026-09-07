@@ -5,8 +5,22 @@
 用法：python3 _md2pdf.py <md文件...>
 """
 import os
+import re
 import sys
+import unicodedata
+
 import markdown
+
+
+def _slugify(value: str, separator: str = "-") -> str:
+    """GitHub 风格 slug：保留中文/字母/数字，去除标点，空格转 '-'。
+
+    python-markdown 默认 slugify 会把中文全部丢弃（ASCII only），导致
+    md 里手写的 #1-总体设计 这类锚点全部失效；这里保留 CJK 使锚点对上。
+    """
+    value = unicodedata.normalize("NFKC", value)
+    value = re.sub(r"[^\w\s-]", "", value.lower()).strip()
+    return re.sub(r"[-\s]+", separator, value)
 
 CSS = """
 @page {
@@ -55,10 +69,10 @@ a { color: #0d6efd; text-decoration: none; }
 def convert(md_path: str, html_path: str) -> None:
     with open(md_path, encoding="utf-8") as f:
         text = f.read()
-    body = markdown.markdown(
-        text,
+    body = markdown.Markdown(
         extensions=["tables", "fenced_code", "sane_lists", "toc", "nl2br"],
-    )
+        extension_configs={"toc": {"slugify": _slugify}},
+    ).convert(text)
     title = os.path.splitext(os.path.basename(md_path))[0]
     html = (
         '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'

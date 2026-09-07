@@ -11,6 +11,12 @@ from . import _shared
 from ._shared import CLOUD_DEVICES, LINKS_FILE, _LOCK
 
 
+def _rebuild_rev() -> None:
+    """原地重建 _LINKS_REV（避免整体赋值导致门面早期绑定引用分裂）。"""
+    _shared._LINKS_REV.clear()
+    _shared._LINKS_REV.update({l: c for c, l in _shared._LINKS.items()})
+
+
 def _load_links() -> None:
     links: Dict[str, str] = {}
     factors: Dict[str, float] = {}
@@ -30,9 +36,14 @@ def _load_links() -> None:
                 factors[c] = 1.0
     except Exception:
         pass
-    _shared._LINKS = links
-    _shared._LINKS_REV = {l: c for c, l in links.items()}
-    _shared._LINKS_FACTOR = factors
+    # 原地更新而非整体赋值：mqtt_source 门面 __init__ 在 links 模块加载前就已
+    # `from ._shared import _LINKS` 绑定引用，整体替换会造成门面与 _shared 指向
+    # 不同 dict（平台侧读不到关联）；clear+update 保证所有先期引用保持一致。
+    _shared._LINKS.clear()
+    _shared._LINKS.update(links)
+    _shared._LINKS_FACTOR.clear()
+    _shared._LINKS_FACTOR.update(factors)
+    _rebuild_rev()
 
 
 def _save_links() -> None:
@@ -64,7 +75,7 @@ def set_link(cloud_id: str, local_id: str, factor: float = 1.0) -> None:
                 _shared._LINKS_FACTOR.pop(c, None)
         _shared._LINKS[cloud_id] = local_id
         _shared._LINKS_FACTOR[cloud_id] = factor
-        _shared._LINKS_REV = {l: c for c, l in _shared._LINKS.items()}
+        _rebuild_rev()
         _save_links()
 
 
@@ -74,7 +85,7 @@ def remove_link(cloud_id: str) -> None:
     with _LOCK:
         _shared._LINKS.pop(cloud_id, None)
         _shared._LINKS_FACTOR.pop(cloud_id, None)
-        _shared._LINKS_REV = {l: c for c, l in _shared._LINKS.items()}
+        _rebuild_rev()
         _save_links()
 
 

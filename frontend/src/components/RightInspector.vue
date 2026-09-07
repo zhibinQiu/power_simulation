@@ -14,7 +14,9 @@
       <!-- 报告面板（工具条「数据 → 报告 → 导出报告」，含历史报告管理） -->
       <ReportPanel v-else-if="mode === 'report'" />
 
-      <!-- 场景/列表/左侧工艺目录点击实例：统一只用一个工序实例属性面板（能耗/碳排放/碳平衡/实时监测/可调节/核算台账/关联设备） -->
+      <!-- 场景/列表/左侧工艺目录点击实例：统一只用一个工序实例属性面板（能耗/碳排放/碳平衡/实时监测/可调节/核算台账/关联设备）；
+           行业资源包（其它场景）按包内字典渲染通用工序属性 -->
+      <OtherUnitPanel v-else-if="mode === 'unit' && store.customSceneOn" />
       <UnitCarbonDetail v-else-if="mode === 'unit'" />
 
       <!-- 原料属性 -->
@@ -41,9 +43,14 @@
             @drop="layout.move($event.from, $event.to, $event.position)"
           >
             <!-- 全厂总览：实时 / 日度 / 月度 / 年度 四档时段核算。
-                 realtime=小时速率；日/月/年=当日/当月/当年 0 点起截止当前的累计量（墙钟口径，跨周期自动归零）。
-                 每档含 综合能耗/电耗/总排放/钢产量/单位能耗/吨钢强度/成本/碳利用率；
-                 成本 = 外购用量 × 单价（点击成本卡展开构成明细）；同比/环比待接入历史台账后启用。 -->
+                 realtime=小时速率；日/月/年=当日/当月/当年 0 点起截止当前的累计量（速率随工况实时变化，累计按时间段积分，
+                 非「当前速率 × 已过小时」；30s 结算 + 速率变化即结清上一段，跨周期自动归零）。
+                 卡片分三组（产品 → 能源 → 碳排）；「产品」组仅在编排输出涉及物料库产品时显示：
+                   产品：产量 / 产品收益（= 产量 × 主产品销售单价，物料属性「销售单价」可调）
+                   能源：综合能耗（点开 = 燃料能耗 + 电力折标 · 同比/环比）/ 电耗 / 单位能耗 / 能源成本（= 外购用量 × 单价）
+                   碳排：总排放（= 直接排放范围一 · 全国碳市场口径；点开 = 计算方式 · 同比/环比 · 碳素利用）/ 吨钢排放 / 预估碳成本 = (配额 n − 到年底外推排放 m) × 实时碳价 p；
+                 外购电间接排放（范围二）在发电侧计入并承担配额，不并入钢铁企业总排——展开内仅以参考行注明，不参与核算与排行。
+                 同比/环比仅在日度/月度档出现，暂无历史台账时显示「—」。 -->
             <div class="plant">
               <div class="plant-tabs" role="tablist">
                 <button v-for="p in plantPeriods" :key="p.id" type="button" role="tab"
@@ -52,53 +59,124 @@
                         :title="t(p.hint)" @click="plantPeriod = p.id">{{ t(p.label) }}</button>
               </div>
               <div class="plant-note">{{ periodDesc }}</div>
+              <!-- 分组：产品 / 能源 / 碳排（产品→能源→碳排）。
+                   「产品」组仅在「当前编排中工艺的输出涉及物料库产品」时展示：
+                   资源包场景（如机房温控）无产品产出时自动隐藏该组与产品收益卡。 -->
+              <template v-if="hasProduct">
+                <div class="sec"><i class="dot d-prod"></i>{{ t('产品') }}</div>
+                <div class="chips">
+                  <div class="chip2"><span>{{ t('产量') }}</span><b>{{ fmt(period.steel) }}</b><i>{{ period.u.steel }}</i></div>
+                  <div class="chip2 tog" :class="{ open: revOpen }" role="button" :title="t('点击展开产品收益计算：产量 × 销售单价（物料属性可调）')" @click="revOpen = !revOpen">
+                    <span>{{ t('产品收益') }} <em class="caret">{{ revOpen ? '▾' : '▸' }}</em></span>
+                    <b>{{ fmt(period.rev) }}</b><i>{{ period.u.rev }}</i>
+                  </div>
+                </div>
+              </template>
+              <div class="sec"><i class="dot d-ene"></i>{{ t('能源') }}</div>
               <div class="chips">
-                <div class="chip2"><span>{{ t('综合能耗') }}</span><b>{{ fmt(period.energy) }}</b><i>{{ period.u.energy }}</i></div>
+                <div class="chip2 tog" :class="{ open: energyOpen }" role="button" :title="t('点击展开综合能耗计算方式与同比/环比')" @click="energyOpen = !energyOpen">
+                  <span>{{ t('综合能耗') }} <em class="caret">{{ energyOpen ? '▾' : '▸' }}</em></span>
+                  <b>{{ fmt(period.energy) }}</b><i>{{ period.u.energy }}</i>
+                </div>
                 <div class="chip2"><span>{{ t('电耗') }}</span><b>{{ fmt(period.elec) }}</b><i>{{ period.u.elec }}</i></div>
-                <div class="chip2"><span>{{ t('总排放') }}</span><b :style="{color:co2Color}">{{ fmt(period.co2) }}</b><i>{{ period.u.co2 }}</i></div>
-                <div class="chip2"><span>{{ t('钢产量') }}</span><b>{{ fmt(period.steel) }}</b><i>{{ period.u.steel }}</i></div>
-                <div class="chip2"><span>{{ t('单位能耗') }}</span><b>{{ fmt(plantEnergy.intensity) }}</b><i>kgce/t</i></div>
-                <div class="chip2"><span>{{ t('吨钢强度') }}</span><b :style="{color:co2Color}">{{ fmt(totals.intensity) }}</b><i>kgCO₂/t</i></div>
-                <div class="chip2 tog" :class="{ open: costOpen }" role="button" :title="t('点击展开成本构成（外购用量 × 单价）')" @click="costOpen = !costOpen">
-                  <span>{{ t('成本') }} <em class="caret">{{ costOpen ? '▾' : '▸' }}</em></span>
+                <div class="chip2"><span>{{ t('单位能耗') }}</span><b>{{ fmt(plantEnergy.intensity / 1000) }}</b><i>tce/t</i></div>
+                <div class="chip2 tog" :class="{ open: costOpen }" role="button" :title="t('点击展开能源成本构成（外购用量 × 单价）')" @click="costOpen = !costOpen">
+                  <span>{{ t('能源成本') }} <em class="caret">{{ costOpen ? '▾' : '▸' }}</em></span>
                   <b>{{ fmt(period.cost) }}</b><i>{{ period.u.cost }}</i>
                 </div>
-                <div class="chip2"><span>{{ t('碳利用率') }}</span><b>{{ (totals.carbon_utilization*100).toFixed(1) }}</b><i>%</i></div>
               </div>
+              <div class="sec"><i class="dot d-co2"></i>{{ t('碳排') }}</div>
+              <div class="chips">
+                <div class="chip2 tog" :class="{ open: emiOpen }" role="button" :title="t('点击展开总排放（直接排放范围一 · 全国碳市场口径）计算方式、同比/环比与碳配额结余')" @click="emiOpen = !emiOpen">
+                  <span>{{ t('总排放') }} <em class="caret">{{ emiOpen ? '▾' : '▸' }}</em></span>
+                  <b :style="{color:co2Color}">{{ fmt(period.direct) }}</b><i>{{ period.u.co2 }}</i>
+                </div>
+                <div class="chip2"><span>{{ t('吨钢排放') }}</span><b :style="{color:co2Color}">{{ fmt(totals.intensity / 1000) }}</b><i>tCO₂/t</i></div>
+                <div class="chip2 tog" :class="{ open: carbOpen }" role="button" :title="t('点击查看预估碳成本计算：(年配额 n − 到年底排放 m) × 实时碳价 p')" @click="carbOpen = !carbOpen">
+                  <span>{{ t('预估碳成本') }} <em class="caret">{{ carbOpen ? '▾' : '▸' }}</em></span>
+                  <b :class="carbEst.cls">{{ carbEst.text }}</b><i>万元/年</i>
+                </div>
+              </div>
+              <!-- 产品收益展开：产量 × 主产品销售单价（速率口径 · 卡面随所选周期累计） -->
+              <div v-if="revOpen && hasProduct" class="cost-detail rev-detail">
+                <div class="cd-head">{{ t('产品收益 = 产量 × 主产品销售单价（卡面收益随所选周期累计）') }}</div>
+                <div class="cd-row">
+                  <span class="cd-name" style="background:#3f9d6b">{{ t('主产品') }}</span>
+                  <span class="cd-qty">
+                    <select class="q-in rev-sel" v-model="revMainId" :title="t('自动匹配产线终端产品，或手动指定')">
+                      <option value="auto">{{ t('自动匹配（按产线终端工序）') }}</option>
+                      <option v-for="p in PRODUCTS" :key="p.id" :value="p.id">{{ p.name }} · {{ fmt(revPriceOf(p.id)) }} 万元/{{ p.unit }}</option>
+                    </select>
+                  </span>
+                  <span class="cd-amt"></span>
+                </div>
+                <div class="meth-line"><span class="ml">{{ t('① 产量（当前速率）') }}</span><i class="mval">{{ fmt(revQtyRate) }} t/h</i></div>
+                <div class="meth-line"><span class="ml">{{ t('② 主产品销售单价') }}</span><i class="mval">{{ fmt(revSalePrice) }} 万元/t</i></div>
+                <div class="meth-line"><span class="ml">{{ t('③ 收益（速率口径）= 产量 × 单价') }}</span><i class="mval">{{ fmt(revRateVal) }} 万元/h</i></div>
+                <div class="cd-note">{{ t('当前主产品：{p}。自动匹配按产线终端工序（轧制 → 钢材 · 连铸 → 连铸坯 · 仅精炼/炼钢 → 精炼钢水），可手动切换；单价格为行业参考价，在「物料属性 → 销售单价」按市场行情调整后实时联动（单位：万元/t）。收益仅计终端主产品，内部中间品与副产品不重复计入。', { p: revMainMat.name }) }}</div>
+              </div>
+              <!-- 综合能耗展开：计算方式 + 同比 / 环比（日度/月度档） -->
+              <div v-if="energyOpen" class="cost-detail energy-detail">
+                <div class="cd-head">{{ t('综合能耗 = 燃料能耗 + 电力折标（速率口径 · 卡面随所选周期累计）') }}</div>
+                <div class="meth-line"><span class="ml">{{ t('① 燃料能耗：各工序燃料燃烧低位发热量合计（含副产煤气自用）') }}</span><i class="mval">{{ fmt(eneFuelRate) }} GJ/h</i></div>
+                <div class="meth-line"><span class="ml">{{ t('② 电力折标：外购电 × 3.6 GJ/MWh') }}</span><i class="mval">{{ fmt(eneElecRate) }} MWh/h × 3.6 = {{ fmt(eneElecGJ) }} GJ/h</i></div>
+                <div class="meth-line"><span class="ml">{{ t('③ 综合能耗 = ① + ②') }}</span><i class="mval">{{ fmt(eneTotalRate) }} GJ/h</i></div>
+                <div class="meth-line"><span class="ml">{{ t('④ 单位能耗（吨产品）= 综合能耗 × 0.03412 tce/GJ ÷ 产量') }}</span><i class="mval">{{ fmt(plantEnergy.intensity / 1000) }} tce/t</i></div>
+                <template v-if="isCmpPeriod">
+                  <div class="cmp-row">
+                    <div class="chip2"><span>{{ t('同比') }}</span><b :class="dirCls(cmp.yoy)">{{ signedPct(cmp.yoy) }}</b><i>{{ t('较上年同期') }}</i></div>
+                    <div class="chip2"><span>{{ t('环比') }}</span><b :class="dirCls(cmp.mom)">{{ signedPct(cmp.mom) }}</b><i>{{ t('较上一核算期') }}</i></div>
+                  </div>
+                  <div class="meth-line sub"><span class="ml">{{ t('同比 =（本期 − 上年同期）÷ 上年同期 · 环比 =（本期 − 上一核算期）÷ 上一核算期') }}</span></div>
+                  <div class="cd-note">{{ t('同比/环比暂无历史台账数据，显示「—」；接入日/月报历史后自动启用，当前不做折算填充。') }}</div>
+                </template>
+              </div>
+              <!-- 总排放展开：总排放 = 直接排放（范围一）· 全国碳市场口径；外购电（范围二）在发电侧计入、不计入本厂总排；+ 同比 / 环比 + 碳配额结余 -->
+              <div v-if="emiOpen" class="cost-detail emi-detail">
+                <div class="cd-head">{{ t('总排放（全国碳市场口径）= 直接排放（范围一）· 排放因子法') }}</div>
+                <div class="meth-line"><span class="ml">{{ t('① 直接排放（范围一）= 燃料燃烧 + 工业过程（各工序求和）') }}</span><i class="mval" :style="{ color: co2Color }">{{ fmt(emiDirectRate) }} tCO₂/h</i></div>
+                <div class="meth-line sub"><span class="ml">{{ t('① 明细：燃料燃烧 Σ 消耗量 × 低位发热量 × 单位热值含碳量 × 碳氧化率 × 44/12；工业过程：碳酸盐分解（石灰石 0.4395 / 白云石 0.4761 tCO₂/t）、电极消耗 3.663 tCO₂/t。焦化/烧结等中间工序燃料碳按碳流平衡转入下游不重复计入；副产煤气回收、余热发电外供做扣减。默认因子为国家/行业参考值，可在「排放因子」设置中替换。') }}</span></div>
+                <div class="meth-line"><span class="ml">{{ t('② 外购电间接排放（范围二）= 外购电 × 电网平均排放因子 0.5703（发电侧排放 · 不计入企业总排放）') }}</span><i class="mval">{{ fmt(emiIndirectRate) }} tCO₂/h</i></div>
+                <div class="cd-note">{{ t('全国碳市场（CEA）对钢铁企业的管控范围仅覆盖直接排放（范围一）——外购电的排放已在发电侧由电力行业承担配额，钢铁企业不重复计算，故卡面「总排放」与本处计算均不含范围二；如需按温室气体清单对外披露全口径，可在 ① 基础上另加 ②。') }}</div>
+                <div class="meth-line"><span class="ml">{{ t('碳素利用：进入钢水/炉渣/捕集的碳 ÷ 输入碳') }}</span><i class="mval">{{ carbonUtilPct }}%</i></div>
+                <template v-if="isCmpPeriod">
+                  <div class="cmp-row">
+                    <div class="chip2"><span>{{ t('同比') }}</span><b :class="dirCls(cmp.yoy)">{{ signedPct(cmp.yoy) }}</b><i>{{ t('较上年同期') }}</i></div>
+                    <div class="chip2"><span>{{ t('环比') }}</span><b :class="dirCls(cmp.mom)">{{ signedPct(cmp.mom) }}</b><i>{{ t('较上一核算期') }}</i></div>
+                  </div>
+                  <div class="meth-line sub"><span class="ml">{{ t('同比 =（本期 − 上年同期）÷ 上年同期 · 环比 =（本期 − 上一核算期）÷ 上一核算期') }}</span></div>
+                  <div class="cd-note">{{ t('同比/环比暂无历史台账数据，显示「—」；接入日/月报历史后自动启用，当前不做折算填充。') }}</div>
+                </template>
+                <div class="quota-bar">
+                  <span class="qk">{{ t('碳配额结余') }}（{{ t('企业年配额 − 本年 CEA 直接排放') }}）</span>
+                  <b :class="quotaRemain.cls">{{ quotaRemain.text }}</b>
+                </div>
+                <div class="cd-note">{{ t('配额为企业当年经全国碳市场免费分配及有偿购得的配额量（CEA 仅覆盖直接排放范围一，不统计外购电范围二；默认值可在下方「预估碳成本」中维护）；结余为负表示超排，需购入配额履约。') }}</div>
+              </div>
+              <!-- 能源成本展开：外购用量 × 单价 -->
               <div v-if="costOpen" class="cost-detail">
-                <div class="cd-head">{{ t('成本构成 = 外购用量 × 单价（下表为小时速率 · 总卡金额随所选周期累计）') }}</div>
+                <div class="cd-head">{{ t('能源成本构成 = 外购用量 × 单价（下表为小时速率 · 总卡金额随所选周期累计）') }}</div>
                 <div v-for="it in costDetail" :key="it.id" class="cd-row">
                   <span class="cd-name" :style="{ background: it.color || 'var(--panel-3)' }">{{ it.name }}</span>
-                  <span class="cd-qty">{{ fmt(it.qty) }} {{ it.unit }}/h × {{ fmt(it.price) }} 元/{{ it.unit }}</span>
-                  <span class="cd-amt"><b>{{ fmt(it.amt / 1e4) }}</b><i>万元/h</i></span>
+                  <span class="cd-qty">{{ fmt(it.qty) }} {{ it.unit }}/h × {{ fmt(it.price) }} 万元/{{ it.unit }}</span>
+                  <span class="cd-amt"><b>{{ fmt(it.amt) }}</b><i>万元/h</i></span>
                 </div>
-                <div v-if="!costDetail.length" class="cd-row cd-empty">{{ t('当前流程无外购原燃料用量（自产/闭环），成本为 0。') }}</div>
+                <div v-if="!costDetail.length" class="cd-row cd-empty">{{ t('当前流程无外购原燃料用量（自产/闭环），能源成本为 0。') }}</div>
                 <div class="cd-note">{{ t('单价在「物料属性」中按采购合同调整后实时联动；内部中间品与副产品不重复计入。') }}</div>
               </div>
-              <div class="scope">
-                <div class="scope-bar">
-                  <i class="scope-direct" :style="{ width: directPct + '%' }"></i>
-                  <i class="scope-indirect" :style="{ width: indirectPct + '%' }"></i>
+              <!-- 预估碳成本展开：计算方式 (n − m) × 实时碳价（n/m 均按 CEA 范围一直接排放），配额/碳价可维护 -->
+              <div v-if="carbOpen" class="cost-detail carb-detail">
+                <div class="cd-head">{{ t('预估碳成本 = (企业年配额 n − 到年底排放 m) × 实时碳价 p（n/m 均为范围一直接排放 · CEA）') }}</div>
+                <div class="carb-edit">
+                  <label>{{ t('企业年配额 n') }}<input class="q-in" v-model="quotaDraft" type="number" min="0" step="100000" :title="t('单位：tCO₂/年')" @change="onQuotaEdit" /></label>
+                  <label>{{ t('实时碳价 p') }}<input class="q-in" v-model="priceDraft" type="number" min="0" step="0.0001" :title="t('单位：万元/tCO₂')" @change="onPriceEdit" /></label>
                 </div>
-                <div class="scope-legend">
-                  <span><i class="dot d"></i>{{ t('直接') }} {{ fmt(period.direct) }} {{ period.u.co2 }}<em> ({{ directPct }}%)</em></span>
-                  <span><i class="dot i"></i>{{ t('间接') }} {{ fmt(period.indirect) }} {{ period.u.co2 }}<em> ({{ indirectPct }}%)</em></span>
+                <div v-for="row in carbDetail" :key="row.k" class="cd-row">
+                  <span class="cd-name" :style="{ background: row.color || 'var(--panel-3)' }">{{ row.k }}</span>
+                  <span class="cd-qty">{{ row.v }}</span>
+                  <span class="cd-amt"><b :class="row.cls || 'flat'">{{ row.a }}</b><i>{{ row.u }}</i></span>
                 </div>
-              </div>
-              <div v-if="plantPeriod === 'day' || plantPeriod === 'month'" class="cmp-row">
-                <div class="chip2">
-                  <span>{{ t('综合能耗同比') }}</span>
-                  <b :class="dirCls(cmp.yoy)">{{ signedPct(cmp.yoy) }}</b>
-                  <i>{{ t('较上年同期') }}</i>
-                </div>
-                <div class="chip2">
-                  <span>{{ t('综合能耗环比') }}</span>
-                  <b :class="dirCls(cmp.mom)">{{ signedPct(cmp.mom) }}</b>
-                  <i>{{ t('较上一核算期') }}</i>
-                </div>
-              </div>
-              <div v-if="plantPeriod === 'day' || plantPeriod === 'month'" class="plant-foot">
-                {{ t('同比/环比暂无历史台账数据，显示「—」；接入日/月报历史后自动启用，当前不做折算填充。') }}
+                <div class="cd-note">{{ t('m 按当前范围一直接排放速率 × 全年 8760 小时外推（即全厂维持当前运行水平到年底的 CEA 排放总量，为预测值）；n − m < 0 为超排缺口，缺口量 × 碳价即预估购碳支出；盈余则为配额结余，按碳价折算潜在交易收益。范围二（外购电）排放不纳入 CEA——其碳成本已体现于购电价且由发电企业承担配额，不重复计量。') }}</div>
               </div>
             </div>
           </CollapseSection>
@@ -133,7 +211,7 @@
                 <span class="l-sub">{{ typeLabel(u.type) }}</span>
                 <span class="te-bar"><i :style="{ width: Math.min(100, u.share*100).toFixed(1)+'%', background: shareColor(u.share) }"></i></span>
               </div>
-              <span class="l-trail" :style="{color:co2Color}">{{ fmt(u.co2_total) }} <i class="u">tCO₂/h</i></span>
+              <span class="l-trail" :style="{color:co2Color}">{{ fmt(u.co2_direct) }} <i class="u">tCO₂/h</i></span>
               <span class="te-pct">{{ (u.share*100).toFixed(1) }}%</span>
             </div>
           </CollapseSection>
@@ -160,13 +238,14 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { computed, ref, reactive, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { energyOf } from '../utils/energy'
 import { useSimStore, UNIT_TYPES } from '../stores/sim'
-import { MATERIALS, MATERIAL_MAP } from '../data/flowLibrary'
+import { MATERIALS, MATERIAL_MAP, PRODUCTS } from '../data/flowLibrary'
 import { t } from '../i18n'
 const AgentChatView = defineAsyncComponent(() => import('../views/AgentChatView.vue'))
 import UnitCarbonDetail from './UnitCarbonDetail.vue'
+import OtherUnitPanel from './OtherUnitPanel.vue'
 import DeviceDetail from './DeviceDetail.vue'
 import FlowInspector from './FlowInspector.vue'
 import GroupDetail from './GroupDetail.vue'
@@ -238,11 +317,12 @@ const plantPeriods = [
   { id: 'year', label: '年度', hint: '年度：本年 1 月 1 日 0 点起累计（截至当前）' },
 ]
 // 各档展示单位：h 级单位(实时) / 原始单位(日内累计) / 万级(月) / 万~亿级(年)
+// rev 与 cost 同为金额口径：统一为万元（实时=万元/h · 日/月/年=万元）
 const P_UNIT = {
-  realtime: { energy: 'GJ/h', elec: 'MWh/h', co2: 'tCO₂/h', steel: 't/h', cost: '万元/h' },
-  day:      { energy: 'GJ', elec: 'MWh', co2: 'tCO₂', steel: 't', cost: '万元' },
-  month:    { energy: '万GJ', elec: '万kWh', co2: '万tCO₂', steel: '万t', cost: '万元' },
-  year:     { energy: '万GJ', elec: '亿kWh', co2: '万tCO₂', steel: '万t', cost: '亿元' },
+  realtime: { energy: 'GJ/h', elec: 'MWh/h', co2: 'tCO₂/h', steel: 't/h', cost: '万元/h', rev: '万元/h' },
+  day:      { energy: 'GJ', elec: 'MWh', co2: 'tCO₂', steel: 't', cost: '万元', rev: '万元' },
+  month:    { energy: 'GJ', elec: 'MWh', co2: 'tCO₂', steel: 't', cost: '万元', rev: '万元' },
+  year:     { energy: 'GJ', elec: 'MWh', co2: 'tCO₂', steel: 't', cost: '万元', rev: '万元' },
 }
 
 const plantPeriod = ref('realtime')
@@ -323,26 +403,223 @@ const costDetail = computed(() => {
   rows.sort((a, b) => b.amt - a.amt)
   return rows
 })
-// 外购成本小时速率（元/h）
+// 外购成本小时速率（万元/h；r.amt = 用量 × 单价（万元/单位））
 const costRateRaw = computed(() => costDetail.value.reduce((s, r) => s + r.amt, 0))
 // 成本构成明细展开开关
 const costOpen = ref(false)
 
-// ---------- 墙钟周期：当日 / 当月 / 当年 0 点起已过小时数（30s 刷新，离线/无遥测也随时间推进） ----------
-const clock = ref(0)
-let _clockTimer = null
-onMounted(() => { _clockTimer = setInterval(() => { clock.value++ }, 30000) })
-onBeforeUnmount(() => { if (_clockTimer) clearInterval(_clockTimer) })
-function elapsedHours(kind) {
-  void clock.value
-  const n = new Date()
-  const start = kind === 'day' ? new Date(n.getFullYear(), n.getMonth(), n.getDate())
-    : kind === 'month' ? new Date(n.getFullYear(), n.getMonth(), 1)
-    : new Date(n.getFullYear(), 0, 1)
-  return Math.max(0, (n - start) / 3.6e6)
+// ---------- 全国碳市场（CEA）：配额结余 + 预估碳成本（年度口径，跨档位展示） ----------
+// CEA 核算口径 = 仅直接排放（范围一：燃料燃烧 + 工业过程）；范围二（外购电）的碳排已在发电侧由电力行业承担配额，钢铁企业不重复纳入。
+const HOURS_YEAR = 8760
+const emiOpen = ref(false)      // 总排放卡展开：计算方式（范围一+二全口径展示）与碳配额结余（CEA = 范围一）
+const carbOpen = ref(false)     // 预估碳成本卡展开：计算明细（(n−m)×p，CEA 范围一）
+const quotaDraft = ref('')
+const priceDraft = ref('')
+// 企业年配额 n（tCO₂/年，默认 2000 万 t）与实时碳价 p（万元/tCO₂，默认 0.01）——store 持久化，卡片/明细实时联动
+const carbonQuota = computed(() => Number(store.carbonCfg.allowance) || 0)
+const carbonPrice = computed(() => Number(store.carbonCfg.price) || 0)
+watch(() => [store.carbonCfg.allowance, store.carbonCfg.price], ([a, p]) => {
+  quotaDraft.value = a != null ? String(a) : ''
+  priceDraft.value = p != null ? String(p) : ''
+}, { immediate: true })
+function onQuotaEdit() {
+  const v = Number(quotaDraft.value)
+  if (!Number.isFinite(v) || v < 0) { quotaDraft.value = String(carbonQuota.value); return }
+  store.setCarbonCfg({ allowance: Math.round(v) })
 }
+function onPriceEdit() {
+  const v = Number(priceDraft.value)
+  if (!Number.isFinite(v) || v < 0) { priceDraft.value = String(carbonPrice.value); return }
+  store.setCarbonCfg({ price: Math.round(v * 100) / 100 })
+}
+// CEA 控排速率 = 总排放速率 = 直接排放（范围一，tCO₂/h）——范围二（外购电）不计入企业排放
+const co2DirectRate = computed(() => totals.value.co2_direct || 0)
+// 到年底 CEA 排放 m：按当前直接排放速率 × 全年小时外推（预测值，非实际台账）
+const carbM = computed(() => co2DirectRate.value * HOURS_YEAR)
+// 本年 CEA 已累计排放（范围一）：优先取年度积分累计；积分未启动（首次渲染）时按当前速率 × 已过小时兜底
+const carbYtd = computed(() => {
+  const a = accum.year.v
+  if (a && a.direct) return a.direct
+  const dt = (Date.now() - periodStartAt('year')) / 3.6e6
+  return co2DirectRate.value * Math.max(0, dt)
+})
+// 碳配额结余 = 企业年配额 − 本年 CEA 累计排放（可为负：超排）
+const quotaRemain = computed(() => {
+  const r = carbonQuota.value - carbYtd.value   // tCO₂
+  const t2 = Math.abs(r)
+  return r >= 0
+    ? { text: `+${fmt(t2)} tCO₂`, cls: 'better' }
+    : { text: `−${fmt(t2)} tCO₂（${t('超排')}）`, cls: 'worse' }
+})
+// Δ = n − m（n/m 均为 CEA 范围一）：负=超排缺口（购碳支出），正=配额盈余（可交易收益）
+const carbDetail = computed(() => {
+  const n = carbonQuota.value
+  const m = carbM.value
+  const p = carbonPrice.value
+  const rate = co2DirectRate.value
+  const d = n - m
+  const rows = [
+    { k: t('CEA 直接排放速率（范围一）'), v: `${fmt(rate)} tCO₂/h`, a: '', u: '', color: '#3f6f9d' },
+    { k: t('到年底排放 m（按当前直接速率外推）'), v: `${fmt(m)} tCO₂`, a: '', u: '', color: '#b4692f' },
+    { k: t('企业年配额 n'), v: `${fmt(n)} tCO₂`, a: '', u: '', color: '#3f9d6b' },
+  ]
+  rows.push(d < 0
+    ? { k: t('超排缺口 (n−m)'), v: `${fmt(-d)} tCO₂`, a: '', u: '', color: '#c0574a' }
+    : { k: t('配额盈余 (n−m)'), v: `${fmt(d)} tCO₂`, a: '', u: '', color: '#c9a33e' })
+  rows.push({ k: t('实时碳价 p'), v: `${fmt(p)} 万元/tCO₂`, a: '', u: '', color: '#7a5fa8' })
+  const amt = (d * p) / 1e4   // 万元（负=支出）
+  rows.push({
+    k: t('预估碳成本 (n−m)×p'),
+    v: d < 0 ? t('超排需购碳履约') : d > 0 ? t('配额盈余可交易') : t('刚好持平'),
+    a: fmt(Math.abs(amt)),
+    u: d < 0 ? t('万元（支出）') : d > 0 ? t('万元（潜在收益）') : '万元',
+    cls: d < 0 ? 'worse' : d > 0 ? 'better' : 'flat',
+    color: '#2f6fb0',
+  })
+  return rows
+})
+// 卡片摘要：支出为正（红），配额盈余按负成本（绿）显示
+const carbEst = computed(() => {
+  const d = carbonQuota.value - carbM.value
+  const amt = (d * carbonPrice.value) / 1e4
+  if (!Number.isFinite(amt)) return { text: '—', cls: 'flat' }
+  if (d === 0) return { text: '0', cls: 'flat' }
+  return d < 0 ? { text: fmt(-amt), cls: 'worse' } : { text: '-' + fmt(amt), cls: 'better' }
+})
 
-// 当前档位核算：realtime=小时速率；day/month/year = 速率 × 周期已过小时数（当日/当月/当年累计）
+// 同比/环比仅于日度/月度档展示（其余档位无同口径基期）
+const isCmpPeriod = computed(() => plantPeriod.value === 'day' || plantPeriod.value === 'month')
+
+// ---------- 产品收益：产量 × 主产品销售单价（终端产品售价见「物料属性 → 销售单价」，行业参考价可调） ----------
+const revOpen = ref(false)                                  // 产品收益卡展开开关
+// 「产品」组可见性：仅当当前编排中存在「输出端口物料属于物料库产品（PRODUCTS）」的工艺节点时展示。
+// 资源包场景（机房温控等：产物为冷冻供水/冷风等非产品物料）自动隐藏该组与产品收益卡。
+const PRODUCT_ID_SET = new Set((PRODUCTS || []).map((p) => p && p.id))
+const hasProduct = computed(() => {
+  const nodes = (store.scheme && store.scheme.nodes) || []
+  for (const n of nodes) {
+    if (!n || (n.kind && n.kind !== 'process')) continue
+    const outs = (n.ports && n.ports.out) || []
+    for (const p of outs) {
+      const mid = typeof p === 'string' ? p : (p && p.material)
+      if (mid && PRODUCT_ID_SET.has(mid)) return true
+    }
+  }
+  return false
+})
+watch(hasProduct, (v) => { if (!v) revOpen.value = false })   // 无产品产出时收起收益明细
+const revMainId = ref(localStorage.getItem('sim.revMain') || 'auto')
+watch(revMainId, (v) => { try { localStorage.setItem('sim.revMain', v || 'auto') } catch (e) { /* 忽略 */ } })
+// 产线终端工序自动匹配主产品：冷轧/热轧 → 钢材 · 连铸/模铸 → 连铸坯 · 仅炼钢/精炼 → 精炼钢水
+function mainProductAuto() {
+  const r = store.resultForView
+  const types = new Set(((r && r.units) || []).map((u) => u.type))
+  if (types.has('cold_rolling') || types.has('rolling_mill')) return 'steel_product'
+  if (types.has('caster') || types.has('ingot_casting')) return 'billet'
+  return 'refined_steel'
+}
+const revMainIdEff = computed(() => (revMainId.value && revMainId.value !== 'auto' ? revMainId.value : mainProductAuto()))
+const revMainMat = computed(() => MATERIAL_MAP[revMainIdEff.value] || PRODUCTS[0])
+function revPriceOf(id) {
+  const ov = store.materialOverrides && store.materialOverrides[id]
+  if (ov && ov.salePrice != null) return Number(ov.salePrice)
+  const m = MATERIAL_MAP[id]
+  if (m && m.salePrice != null) return Number(m.salePrice)
+  return (m && m.price != null) ? Number(m.price) : 0
+}
+const revSalePrice = computed(() => revPriceOf(revMainIdEff.value))   // 万元/t
+const revQtyRate = computed(() => totals.value.steel_output || 0)     // t/h（当前速率）
+const revRateRaw = computed(() => revQtyRate.value * revSalePrice.value) // 万元/h（钢产量 t/h × 销售单价 万元/t）
+const revRateVal = computed(() => revRateRaw.value)                   // 万元/h（速率口径展示）
+// 收益随所选档位累计（金额口径统一为万元：实时=万元/h · 日/月/年=万元；累计量由收益速率连续积分得到，已为万元单位不再缩放）
+const periodRev = computed(() => {
+  const p = plantPeriod.value
+  if (p === 'realtime') return revRateRaw.value
+  const v = accum[p].v
+  if (!v || v.rev == null) return 0
+  return v.rev
+})
+
+// ---------- 综合能耗展开：燃料能耗 + 电力折标（速率口径 · 计算方式展示） ----------
+const energyOpen = ref(false)                               // 综合能耗卡展开开关
+const eneFuelRate = computed(() => totals.value.fuel_energy || 0)   // GJ/h 燃料（低位热值合计）
+const eneElecRate = computed(() => plantElec.value || 0)            // MWh/h 外购电
+const eneElecGJ = computed(() => eneElecRate.value * 3.6)           // 1 MWh = 3.6 GJ 电力折标
+const eneTotalRate = computed(() => plantEnergy.value.total || 0)   // GJ/h 综合能耗合计
+
+// ---------- 总排放展开构成（速率口径，总排放 = 范围一直接排放）与碳素利用 ----------
+const emiDirectRate = computed(() => totals.value.co2_direct || 0)
+const emiIndirectRate = computed(() => totals.value.co2_indirect || 0)   // 外购电（范围二，发电侧口径，仅参考展示）
+const carbonUtilPct = computed(() => ((totals.value.carbon_utilization || 0) * 100).toFixed(1))
+
+// ---------- 周期累计 = 速率对时间的连续积分 ----------
+// 速率随运行工况/遥测实时变化，「当前速率 × 已过小时」会把全程当成一个速率而失真，
+// 故按时间段积分：每 30s 或速率变化时，先把上一时间段的量按该段速率结清再切换当前速率；跨日/月/年自动归零重计。
+const PERIOD_KINDS = ['day', 'month', 'year']
+const ACC_KEYS = ['energy', 'elec', 'co2', 'direct', 'indirect', 'steel', 'cost', 'rev']
+function mkAcc() { return { v: null, t: 0, last: null } }
+const accum = reactive({ day: mkAcc(), month: mkAcc(), year: mkAcc() })
+function periodStartAt(kind) {
+  const n = new Date()
+  return kind === 'day' ? new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime()
+    : kind === 'month' ? new Date(n.getFullYear(), n.getMonth(), 1).getTime()
+    : new Date(n.getFullYear(), 0, 1).getTime()
+}
+function rateSnap() {
+  const t = totals.value
+  return {
+    energy: plantEnergy.value.total || 0,   // GJ/h
+    elec: plantElec.value || 0,             // MWh/h
+    co2: t.co2_total || 0,                  // tCO₂/h（范围一+二）
+    direct: t.co2_direct || 0,              // tCO₂/h（范围一，CEA）
+    indirect: t.co2_indirect || 0,          // tCO₂/h（范围二）
+    steel: t.steel_output || 0,             // t/h
+    cost: costRateRaw.value || 0,           // 万元/h
+    rev: revRateRaw.value || 0,             // 万元/h
+  }
+}
+// 把「截至 now」的流量积分入当日/当月/当年累计：新段以该段开始时的速率近似（30s 粒度 + 速率变化即结清）。
+// 首次开账/跨周期时，从周期起点按当前速率整段补记——因此页面前端数据未到（速率为 0）时不建账，
+// 等真实运行速率出现再一次性把「周期开始 → now」补入，避免整日/整月累计缺失。
+function settleAccum(now) {
+  const cur = rateSnap()
+  for (const kind of PERIOD_KINDS) {
+    const a = accum[kind]
+    const st = periodStartAt(kind)
+    const needOpen = !a.v || a.t < st || !a.last
+    if (needOpen) {
+      if (a.t < st && a.v) {                     // 跨周期：先把旧账清零，防残留
+        for (const k of ACC_KEYS) a.v[k] = 0
+        a.t = st
+      }
+      const tot = ACC_KEYS.reduce((s, k) => s + (cur[k] || 0), 0)
+      if (tot <= 0) { a.t = st; a.last = cur; continue }   // 尚无实际运行速率：不建账，起点钉在周期开始，待真实速率出现后整段补记
+      if (!a.v) { const v = {}; for (const k of ACC_KEYS) v[k] = 0; a.v = v }
+      const dt0 = (now - Math.max(st, a.t)) / 3.6e6
+      if (dt0 > 0) for (const k of ACC_KEYS) a.v[k] += (cur[k] || 0) * dt0
+      a.t = now
+      a.last = cur
+      continue
+    }
+    const dt = (now - a.t) / 3.6e6
+    if (dt > 0) {
+      for (const k of ACC_KEYS) a.v[k] += (a.last[k] || 0) * dt
+    }
+    a.t = now
+    a.last = cur
+  }
+}
+// 速率变化（调参/遥测更新）先结清上一段；时间流逝由 30s tick 结算推进
+watch(totals, () => settleAccum(Date.now()), { deep: true })
+let _accTimer = null
+onMounted(() => {
+  settleAccum(Date.now())
+  _accTimer = setInterval(() => settleAccum(Date.now()), 30000)
+})
+onBeforeUnmount(() => { if (_accTimer) clearInterval(_accTimer) })
+settleAccum(Date.now())  // setup 阶段先结算一次，首帧即有累计值
+
+// 当前档位核算：realtime = 实时速率；day/month/year = 当日/当月/当年 0 点起按实时速率连续积分的累计量
 const period = computed(() => {
   const p = plantPeriod.value
   const t = totals.value
@@ -352,39 +629,29 @@ const period = computed(() => {
   const direct = t.co2_direct || 0
   const indirect = t.co2_indirect || 0
   const steel = t.steel_output || 0
-  const costRate = costRateRaw.value            // 元/h
+  const costRate = costRateRaw.value            // 万元/h
+  // 日/月/年累计量取消万/亿级跳变，直接以 GJ / MWh / tCO₂ / t / 万元 原始单位展示（累计量由速率连续积分得到，单位已对应）
   if (p === 'realtime') {
-    return { energy, elec, co2, direct, indirect, steel, cost: costRate / 1e4, u: P_UNIT.realtime }
+    return { energy, elec, co2, direct, indirect, steel, cost: costRate, rev: periodRev.value, u: P_UNIT.realtime }
   }
-  const h = elapsedHours(p)
-  if (p === 'day') {
-    return {
-      energy: energy * h, elec: elec * h, co2: co2 * h, direct: direct * h, indirect: indirect * h,
-      steel: steel * h, cost: (costRate * h) / 1e4, u: P_UNIT.day,
-    }
-  }
-  if (p === 'month') {
-    return {
-      energy: (energy * h) / 1e4, elec: (elec * h) / 10, co2: (co2 * h) / 1e4,
-      direct: (direct * h) / 1e4, indirect: (indirect * h) / 1e4, steel: (steel * h) / 1e4,
-      cost: (costRate * h) / 1e4, u: P_UNIT.month,
-    }
-  }
-  return { // year
-    energy: (energy * h) / 1e4, elec: (elec * h) / 1e5, co2: (co2 * h) / 1e4,
-    direct: (direct * h) / 1e4, indirect: (indirect * h) / 1e4, steel: (steel * h) / 1e4,
-    cost: (costRate * h) / 1e8, u: P_UNIT.year,
+  const a = accum[p]
+  const v = (a && a.v) || {}
+  const cv = (k) => v[k] || 0
+  return {
+    energy: cv('energy'), elec: cv('elec'), co2: cv('co2'),
+    direct: cv('direct'), indirect: cv('indirect'), steel: cv('steel'),
+    cost: cv('cost'), rev: periodRev.value, u: P_UNIT[p] || P_UNIT.day,
   }
 })
 const periodDesc = computed(() => {
   const p = plantPeriod.value
-  if (p === 'realtime') return t('口径：当前小时速率 · 综合能耗 GJ/h · 电耗 MWh/h · 总排放 tCO₂/h · 钢产量 t/h')
+  if (p === 'realtime') return t('口径：当前小时速率 · 综合能耗 GJ/h · 电耗 MWh/h · 总排放 tCO₂/h · 产量 t/h')
   const n = new Date()
   const pad = (x) => String(x).padStart(2, '0')
   const dayMark = `${n.getMonth() + 1}月${n.getDate()}日 ${pad(n.getHours())}:${pad(n.getMinutes())}`
-  if (p === 'day') return t('累计口径：今日 0 点起至 ') + dayMark + t('（速率 × 已过小时 · 跨日自动归零）')
-  if (p === 'month') return t('累计口径：本月 1 日 0 点起至 ') + dayMark
-  return t('累计口径：本年 1 月 1 日 0 点起至 ') + dayMark
+  if (p === 'day') return t('累计口径：今日 0 点起至 ') + dayMark + t('（按实时速率连续积分 · 跨日自动归零）')
+  if (p === 'month') return t('累计口径：本月 1 日 0 点起至 ') + dayMark + t('（按实时速率连续积分 · 跨月自动归零）')
+  return t('累计口径：本年 1 月 1 日 0 点起至 ') + dayMark + t('（按实时速率连续积分）')
 })
 
 // ---------- 同比 / 环比（日度 / 月度档） ----------
@@ -419,11 +686,6 @@ const stratCmp = computed(() => {
   }
 })
 
-const directPct = computed(() => {
-  const t = totals.value.co2_total || 0
-  return t ? Math.round((totals.value.co2_direct || 0) / t * 100) : 0
-})
-const indirectPct = computed(() => 100 - directPct.value)
 const co2Color = computed(() => {
   const v = totals.value.intensity
   if (v > 1200) return 'var(--red)'
@@ -433,11 +695,11 @@ const co2Color = computed(() => {
 const topEmitters = computed(() => {
   const r = store.resultForView
   if (!r || !r.units) return []
-  const total = r.units.reduce((s, u) => s + (u.co2_total || 0), 0) || 1
+  const total = r.units.reduce((s, u) => s + (u.co2_direct || 0), 0) || 1
   return [...r.units]
-    .sort((a, b) => b.co2_total - a.co2_total)
+    .sort((a, b) => b.co2_direct - a.co2_direct)
     .slice(0, 4)
-    .map((u) => ({ ...u, share: (u.co2_total || 0) / total }))
+    .map((u) => ({ ...u, share: (u.co2_direct || 0) / total }))
 })
 
 function shareColor(p) {
@@ -502,6 +764,38 @@ function fmt(n) {
 .cd-amt i, .cd-qty i { font-style: normal; color: var(--muted); }
 .cd-empty { justify-content: center; color: var(--muted); border-top: none !important; }
 .cd-note { margin-top: 4px; font-size: 9px; line-height: 1.5; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 4px; }
+/* 总排放展开：全国碳市场核算方法（多行公式说明） */
+.emi-detail .meth-line { font-size: 9.5px; line-height: 1.6; color: var(--text); padding: 2px 0; }
+.quota-bar {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  margin-top: 6px; padding: 5px 8px; background: var(--panel-2);
+  border: 1px solid var(--line); border-radius: 4px;
+}
+.quota-bar .qk { font-size: 10px; color: var(--muted); }
+.quota-bar b { font-size: 12px; }
+/* 产品 / 能源 / 碳排 分组小标题 */
+.sec { display: flex; align-items: center; gap: 5px; margin: 7px 0 3px; font-size: 9px; color: var(--muted); letter-spacing: .5px; }
+.sec .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.sec .d-prod { background: #3f9d6b; }
+.sec .d-ene { background: #c9a33e; }
+.sec .d-co2 { background: #c0574a; }
+/* 展开区计算式行：序号标签 + 右对齐实测值（与能耗/排放展开共用） */
+.meth-line { display: flex; align-items: baseline; gap: 6px; font-size: 9.5px; line-height: 1.6; color: var(--text); padding: 2px 0; }
+.meth-line .ml { flex: 1; min-width: 0; }
+.meth-line .mval { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.meth-line.sub { font-size: 9px; color: var(--muted); border-top: 1px dashed var(--line); margin-top: 4px; padding-top: 4px; }
+.rev-sel { width: 100%; height: 20px; }
+/* 预估碳成本展开：配额/碳价维护输入 */
+.carb-edit { display: flex; gap: 12px; flex-wrap: wrap; padding: 6px 0 4px; }
+.carb-edit label { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted); }
+.q-in {
+  width: 110px; height: 20px; padding: 0 6px; font-size: 11px;
+  border: 1px solid var(--line); border-radius: 3px;
+  background: var(--input-bg, #fff); color: var(--text);
+}
+.q-in:focus { outline: none; border-color: var(--accent); }
+.carb-detail .cd-row b.worse { color: var(--red); font-weight: 700; }
+.carb-detail .cd-row b.better { color: var(--green); font-weight: 700; }
 .app.sim-dark .chip2.tog.open { background: rgba(95,130,148,.15); }
 /* 直接/间接 图例：百分占比小注与色点间距 */
 .scope-legend em { font-style: normal; color: var(--muted); }

@@ -1,0 +1,7 @@
+{
+  "grid_ef": 0.5703,
+  "grid_desc": "电网排放因子 0.5703 tCO₂/MWh（2022 年全国电力平均 CO₂ 排放因子，可替换）",
+  "fuels": {},
+  "carbonate": {},
+  "electrode_ef": 0
+}

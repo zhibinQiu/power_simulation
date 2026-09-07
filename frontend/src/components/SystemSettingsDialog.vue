@@ -160,15 +160,15 @@
             </div>
           </section>
 
-          <!-- 场景 -->
+          <!-- 场景 / 资源包 -->
           <section v-if="active === 'scene'" class="ss-page">
             <div class="ss-page-title">{{ t('场景') }}</div>
-            <div class="ss-page-desc">{{ t('数字孪生仿真场景设置') }}</div>
+            <div class="ss-page-desc">{{ t('行业情景 + 场景资源包（.ec）：资源包面向企业定制的仿真内容（工艺编排等）') }}</div>
             <div class="ss-card">
               <div class="ss-row">
                 <div class="ss-info">
                   <div class="ss-name">{{ t('仿真情景') }}</div>
-                  <div class="ss-desc">{{ t('四大控排行业情景') }}</div>
+                  <div class="ss-desc">{{ t('钢铁 / 水泥 / 化工 / 有色 / 其它（资源包场景）') }}</div>
                 </div>
                 <div class="ss-ctrl ss-segs">
                   <button v-for="s in store.scenarios" :key="s.id" class="ss-seg"
@@ -185,6 +185,43 @@
                           :class="{ on: e.id === store.envMode }" @click="store.setEnvMode(e.id)">{{ t(e.label) }}</button>
                 </div>
               </div>
+            </div>
+
+            <!-- 场景资源包管理：内置包 + 企业导入的 .ec 定制包 -->
+            <div class="ss-card" style="margin-top: 12px;">
+              <div class="ss-row">
+                <div class="ss-info">
+                  <div class="ss-name">{{ t('场景资源包') }}</div>
+                  <div class="ss-desc">{{ t('系统内置钢铁示例与机房热控示例；企业定制包经「导入资源包」安装后即可打开') }}</div>
+                </div>
+                <div class="ss-ctrl">
+                  <input ref="pkgFile" type="file" accept=".ec" style="display:none" @change="onPickPackage" />
+                  <button class="ss-btn" :disabled="store.sceneBusy" @click="pkgFile.click()">
+                    {{ store.sceneBusy ? t('导入中…') : t('导入资源包 (.ec)') }}
+                  </button>
+                </div>
+              </div>
+
+              <div v-for="g in sceneGroups" :key="g.name" class="ss-pkg-group">
+                <div class="ss-pkg-group-name">{{ g.name }}</div>
+                <div v-for="m in g.items" :key="m.id" class="ss-pkg-row" :class="{ active: m.id === store.sceneId }">
+                  <span class="ss-pkg-dot" :class="{ on: !!m.ready }"></span>
+                  <div class="ss-pkg-main">
+                    <div class="ss-name">{{ sceneLabel(m) }}<em v-if="m.enterprise" class="ss-pkg-ent">·{{ m.enterprise }}</em></div>
+                    <div class="ss-desc">{{ m.desc || m.industry || m.id }}</div>
+                    <div v-if="m.ready && pkgVersion(m)" class="ss-pkg-ver">{{ pkgVersion(m) }}</div>
+                  </div>
+                  <div class="ss-ctrl">
+                    <button v-if="m.ready" class="ss-btn small" :class="{ primary: m.id !== store.sceneId }"
+                            :disabled="store.sceneBusy" @click="openPkg(m)">
+                      {{ m.id === store.sceneId ? t('当前') : t('打开') }}
+                    </button>
+                    <span v-else class="ss-pkg-pending">{{ t('未安装 .ec') }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-if="!store.sceneIndex.length" class="ss-hint">{{ sceneIndexHint }}</div>
+              <div class="ss-hint">{{ t('切换场景后将重建编排方案与数字孪生；其它分组内的工艺数据随资源包（系统内置示例：机房热控）加载。') }}</div>
             </div>
           </section>
 
@@ -305,6 +342,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useSimStore } from '../stores/sim'
 import Icon from './Icon.vue'
+import { api } from '../api/client'
 import { soundEnabled, toggleSound } from '../utils/feedback'
 import { t, setLang, getLang } from '../i18n'
 import { ACCENTS, accent, setAccent, themeMode, setThemeMode } from '../theme'
@@ -336,6 +374,51 @@ const pages = [
 const active = ref('display')
 
 const feedText = computed(() => ({ open: t('已连接'), closed: t('已断开'), error: t('异常'), init: t('连接中…') }[store.feedStatus] || ''))
+
+// ---- 场景资源包管理（内置 + 企业 .ec 定制包） ----
+const pkgFile = ref(null)
+const sceneLabel = (m) => m.label || m.name || m.industry || m.id
+const pkgVersion = (m) => (m.package && (m.package.version || m.version)) || ''
+const sceneGroups = computed(() => {
+  const map = new Map()
+  for (const m of store.sceneIndex) {
+    const g = m.industryGroup || '其它'
+    if (!map.has(g)) map.set(g, [])
+    map.get(g).push(m)
+  }
+  const groups = [...map.entries()].map(([name, items]) => ({
+    name,
+    items: items.slice().sort((a, b) => (a.order == null ? 99 : a.order) - (b.order == null ? 99 : b.order)),
+  }))
+  groups.sort((a, b) => {
+    const oa = a.items[0] && a.items[0].order != null ? a.items[0].order : 99
+    const ob = b.items[0] && b.items[0].order != null ? b.items[0].order : 99
+    return oa - ob
+  })
+  return groups
+})
+const sceneIndexHint = computed(() => (store.sceneIndex.length ? '' : t('场景注册表为空：请确认后端可用，或导入 .ec 资源包')))
+async function openPkg(m) {
+  await store.openScene(m.id)
+}
+async function onPickPackage(e) {
+  const f = e.target && e.target.files && e.target.files[0]
+  if (e.target) e.target.value = ''
+  if (!f) return
+  try {
+    const res = await api.installScenePackage(f)
+    if (res && res.ok) {
+      await store.refreshSceneIndex()
+      const label = (res.scene && (res.scene.label || res.scene.industry || res.scene.id)) || ''
+      store.toast = t('资源包导入成功') + (label ? t('：') + label : '')
+      if (res.scene && res.scene.id && res.scene.ready) await store.openScene(res.scene.id)
+    } else {
+      store.toast = t('资源包导入失败：') + (res && res.error ? res.error : t('未知错误'))
+    }
+  } catch (err) {
+    store.toast = t('资源包导入失败：') + err.message
+  }
+}
 
 // ------------------------- LLM 配置 -------------------------
 const llmForm = ref({ baseUrl: '', apiKey: '', model: '' })
@@ -474,7 +557,7 @@ async function resetKb() {
   }
 }
 
-onMounted(() => { loadLlmConfig(); loadKbConfig() })
+onMounted(() => { loadLlmConfig(); loadKbConfig(); store.refreshSceneIndex() })
 
 // 恢复默认设置：所有设置项实时生效于 store，无需保存
 function resetDefaults() {
@@ -554,7 +637,7 @@ function resetDefaults() {
 .ss-sw.on i { left: 20px; background: #fff; }
 .ss-sw:disabled { opacity: .4; cursor: not-allowed; }
 /* 分段选择 */
-.ss-segs { display: flex; gap: 4px; flex-wrap: wrap; max-width: 320px; justify-content: flex-end; }
+.ss-segs { display: flex; gap: 4px; flex-wrap: wrap; max-width: 360px; justify-content: flex-end; }
 .ss-seg { padding: 4px 10px; border: 1px solid var(--border); border-radius: 2px; font-size: 10px; color: var(--muted); background: var(--panel); cursor: pointer; }
 .ss-seg:hover { border-color: var(--accent-d); }
 .ss-seg.on { background: var(--accent-l); border-color: var(--accent-d); color: var(--accent-d); font-weight: 600; }
@@ -588,4 +671,18 @@ function resetDefaults() {
 .ss-btn.primary:hover { background: var(--accent-d); }
 .ss-btn.ghost { background: transparent; }
 .sp { flex: 1; }
+/* ---- 场景资源包列表 ---- */
+.ss-pkg-group { border-top: 1px solid var(--border); padding-top: 2px; }
+.ss-pkg-group:first-of-type { border-top: none; }
+.ss-pkg-group-name { font-size: 10px; color: var(--faint); padding: 4px 14px 0; letter-spacing: 1px; opacity: .8; }
+.ss-pkg-row { display: flex; align-items: center; gap: 10px; padding: 7px 14px 7px 14px; border-radius: 6px; }
+.ss-pkg-row.active { background: var(--accent-l); }
+.ss-pkg-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); opacity: .5; flex: none; }
+.ss-pkg-dot.on { background: var(--accent); opacity: 1; box-shadow: 0 0 0 3px var(--accent-l); }
+.ss-pkg-main { flex: 1; min-width: 0; }
+.ss-pkg-ent { font-style: normal; color: var(--faint); font-weight: 400; }
+.ss-pkg-ver { font-size: 10px; color: var(--faint); }
+.ss-pkg-pending { font-size: 10px; color: var(--faint); font-style: normal; }
+.ss-hint { font-size: 11px; color: var(--faint); padding: 6px 14px; line-height: 1.5; }
+.ss-btn.small { padding: 3px 9px; font-size: 10px; }
 </style>

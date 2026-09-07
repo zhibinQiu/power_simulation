@@ -158,8 +158,13 @@ export function computeScheme(scheme, factors, factorsDefault, overrides) {
     if (!drive) continue
     const srcVal = (f.params && f.params[drive.src] != null) ? Number(f.params[drive.src]) : null
     if (srcVal == null) continue
-    // 驱动连线：工辅供给绝对量直接写入同量纲目标参数（如 鼓风量 kNm³/h → 高炉风量 kNm³/h）
-    driveOpParams[c.to] = Object.assign(driveOpParams[c.to] || {}, { [drive.dst]: srcVal })
+    // 驱动连线：工辅供给绝对量直接写入同量纲目标参数（如 鼓风量 kNm³/h → 高炉风量 kNm³/h）。
+    // 例外：喷吹系统 inj_rate 为绝对量(t/h) → 高炉 coal_inj 为相对量(kg/t)，按铁水产量折算
+    const dstNode = nodeById[c.to]
+    const hm = dstNode && dstNode.params && dstNode.params.hot_metal != null ? Number(dstNode.params.hot_metal) : null
+    let driveVal = srcVal
+    if (drive.dst === 'coal_inj' && drive.src === 'inj_rate' && hm && hm > 0) driveVal = (srcVal * 1000) / hm
+    driveOpParams[c.to] = Object.assign(driveOpParams[c.to] || {}, { [drive.dst]: driveVal })
   }
   for (const d of devices) {
     if (d.kind === 'device' && d.metering) continue

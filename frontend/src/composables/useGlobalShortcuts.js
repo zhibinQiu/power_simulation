@@ -16,7 +16,9 @@ export function useGlobalShortcuts({ store, onSimToggle, focusSel, onMenuEsc, on
       if (onMenuEsc) onMenuEsc()
       return
     }
-    if (!store.editMode) {
+    // 编排快捷键（Ctrl+Z/Ctrl+Y 撤销重做）仅在编排画布标签前台时生效；
+    // 编排态切到三维仿真 / 其它标签时按当前视图处理（F 聚焦等）
+    if (!store.flowEditing) {
       // 仿真态：F 聚焦选中工序
       if ((e.key === 'f' || e.key === 'F') && store.selectedUnitId) { e.preventDefault(); focusSel('focus') }
       return

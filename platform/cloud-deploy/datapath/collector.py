@@ -50,7 +50,7 @@ TSDB_USER = os.getenv("TSDB_USER", "root")
 TSDB_PASS = os.getenv("TSDB_PASS", "taosdata")
 TSDB_DB = os.getenv("TSDB_DB", "nengtan")
 TSDB_STABLE = f"{TSDB_DB}.readings"
-_TS_BUF: "deque[str]" = deque(maxlen=4096)  # 待写入的行 (ts,value,'box',...) 转义后片段
+_TS_BUF: "deque[str]" = deque(maxlen=4096)  # 待写入的行 (box,device,instance,prop,value,ts)
 _TS_LOCK = threading.Lock()
 _TS_FLUSH_SEC = 1.0  # 批量冲刷间隔
 _TS_MAX_BATCH = 512  # 单次批量最大行数
@@ -94,16 +94,25 @@ def _ts_record(topic: str, payload: bytes) -> None:
     parts = topic.split("/")
     if len(parts) != 5 or parts[0] != "data":
         return
+    if parts[1].startswith("ext-"):  # 外部数据源（经数据中间件接入，ext-* 前缀）不入一体机时序库
+        return
     raw = payload.decode("utf-8", errors="replace").strip()
     value = None
     try:
         value = float(raw)
     except (ValueError, TypeError):
-        # 兼容 JSON payload: {"weight":0.54} / {"value":1.2} / {"val":3}
+        # 兼容 JSON payload：{"weight":0.54} / {"value":1.2} / {"val":3} /
+        # {"price":95.6}（碳价）/ 任意属性名 {"temperature":1450.2}（模拟数据源按主题属性名取键）。
+        # 优先按主题第 5 段属性名取键（与真实 box_mapper 的 payload 键 = 属性名一致），
+        # 使模拟源/碳价等「统一数据接入」旁路源（任意属性名）也能正确入库。
         try:
             obj = json.loads(raw)
             if isinstance(obj, dict):
-                for k in ("value", "val", "weight", "reading", "data"):
+                prop = parts[4] if len(parts) == 5 else ""
+                keys = (["price", "close", "val", "value", "weight", "reading", "data"]
+                        if not prop else [prop, "price", "close", "val", "value", "weight",
+                                          "reading", "data"])
+                for k in keys:
                     if k in obj and obj[k] not in (None, ""):
                         try:
                             value = float(obj[k]); break
@@ -116,7 +125,7 @@ def _ts_record(topic: str, payload: bytes) -> None:
     ts_ms = int(time.time() * 1000)
     box, device, instance, prop = (_esc(parts[1]), _esc(parts[2]), _esc(parts[3]), _esc(parts[4]))
     with _TS_LOCK:
-        _TS_BUF.append((box, device, instance, prop, ts_ms, value))
+        _TS_BUF.append((box, device, instance, prop, value, ts_ms))
 
 
 def _ts_flush() -> None:
@@ -129,7 +138,7 @@ def _ts_flush() -> None:
     if not rows:
         return
     groups = {}
-    for (box, device, instance, prop, ts_ms, value) in rows:
+    for (box, device, instance, prop, value, ts_ms) in rows:
         groups.setdefault((box, device, instance, prop), []).append(
             f"({ts_ms},{value!r})")
     for (box, device, instance, prop), vals in groups.items():

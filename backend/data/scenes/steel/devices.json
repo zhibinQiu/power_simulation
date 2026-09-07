@@ -1,0 +1,702 @@
+{
+  "library": {
+    "belt_scale": {
+      "label": "皮带秤",
+      "icon": "⚖️",
+      "color": "#6f9e74",
+      "measures": "固体质量流量",
+      "unit": "t/h",
+      "accuracy": "±0.5%",
+      "range": "0–6000 t/h",
+      "desc": "安装在输送皮带上的连续称重装置，计量矿、焦、煤、烧结矿、球团等固体物料的质量流量，是碳核算「活动数据」的主源头。"
+    },
+    "loss_in_weight": {
+      "label": "失重秤",
+      "icon": "🪨",
+      "color": "#8a9a5b",
+      "measures": "粉料/喷吹质量流量",
+      "unit": "t/h",
+      "accuracy": "±1.0%",
+      "range": "0–500 t/h",
+      "desc": "用于高炉喷吹煤粉、熔剂添加等精确给料计量的失重式喂料秤。"
+    },
+    "hopper_scale": {
+      "label": "料斗秤",
+      "icon": "🪣",
+      "color": "#5f7d52",
+      "measures": "批料质量",
+      "unit": "t/批",
+      "accuracy": "±0.5%",
+      "range": "0–300 t/批",
+      "desc": "配料仓/喷吹罐的批重计量，对应焦比、喷煤比、熔剂比等单耗的实测来源。"
+    },
+    "weigher": {
+      "label": "钢水/铸坯秤",
+      "icon": "🏋️",
+      "color": "#5b83a8",
+      "measures": "产品/半产品质量",
+      "unit": "t/h",
+      "accuracy": "±0.3%",
+      "range": "0–400 t/h",
+      "desc": "铁水罐秤、钢包秤、连铸坯秤等，计量产出侧质量，用于「钢中固碳」扣减与钢产量统计。"
+    },
+    "gas_flowmeter": {
+      "label": "气体流量计",
+      "icon": "💨",
+      "color": "#c0903e",
+      "measures": "气体体积流量（标态）",
+      "unit": "m³/h",
+      "accuracy": "±1.5%",
+      "range": "0–5e6 m³/h",
+      "desc": "配温度/压力补偿，计量高炉煤气(BFG)、转炉煤气(LDG)、天然气、氧气等气体体积流量，对应燃料类直接排放的「活动数据」。"
+    },
+    "power_meter": {
+      "label": "智能电表",
+      "icon": "⚡",
+      "color": "#8a7bb0",
+      "measures": "电功率/电量",
+      "unit": "MWh/h",
+      "accuracy": "±0.5%",
+      "range": "0–2000 MWh/h",
+      "desc": "总降/工序变压器/单台大电机的分项计量，对应范围二（外购电）间接排放的活动数据。"
+    },
+    "composition_analyzer": {
+      "label": "成分分析仪",
+      "icon": "🔬",
+      "color": "#4f97a0",
+      "measures": "物料成分/品位",
+      "unit": "—",
+      "accuracy": "±0.1%",
+      "range": "—",
+      "desc": "XRF/碳硫分析仪/LIBS 等，测定矿石品位、燃料实际含碳率，用以精化排放因子（替代默认 CC 假设）。"
+    },
+    "cems": {
+      "label": "CEMS 烟气监测",
+      "icon": "📡",
+      "color": "#c4774a",
+      "measures": "CO₂ 浓度×流量（直接排放）",
+      "unit": "tCO₂/h",
+      "accuracy": "±2.0%",
+      "range": "—",
+      "desc": "烟气排放连续监测系统，直接用 CO₂ 浓度×标态流量测得排放，作为因子法的交叉校验（点源直接监测法）。"
+    }
+  },
+  "unit_specs": {
+    "sinter_plant": [
+      {
+        "dev": "power_meter",
+        "mount": "power",
+        "label": "智能电表·烧结主抽",
+        "measured": "烧结机电耗",
+        "feeds": "引擎输入 electricity（范围二，自变量）"
+      },
+      {
+        "dev": "composition_analyzer",
+        "mount": "control",
+        "label": "成分分析仪·烧结矿",
+        "measured": "烧结矿品位/TFe",
+        "feeds": "精化熔剂需求与排放因子"
+      }
+    ],
+    "pelletizing": [
+      {
+        "dev": "power_meter",
+        "mount": "power",
+        "label": "智能电表·造球辊",
+        "measured": "造球/焙烧电耗",
+        "feeds": "引擎输入 electricity"
+      },
+      {
+        "dev": "composition_analyzer",
+        "mount": "control",
+        "label": "成分分析仪·球团",
+        "measured": "球团品位",
+        "feeds": "精化排放因子"
+      }
+    ],
+    "coke_oven": [
+      {
+        "dev": "gas_flowmeter",
+        "mount": "gas",
+        "label": "气体流量计·焦炉煤气",
+        "measured": "焦炉煤气(COG)产量",
+        "feeds": "副产煤气利用量（能源平衡）"
+      },
+      {
+        "dev": "power_meter",
+        "mount": "power",
+        "label": "智能电表·炼焦",
+        "measured": "炼焦电耗",
+        "feeds": "引擎输入 electricity"
+      }
+    ],
+    "blast_furnace": [
+      {
+        "dev": "belt_scale",
+        "mount": "feed",
+        "label": "皮带秤·炉料",
+        "measured": "烧结矿/球团/矿石入炉量",
+        "feeds": "炉料总质量（矿量，自变量）"
+      },
+      {
+        "dev": "belt_scale",
+        "mount": "fuel",
+        "label": "皮带秤·焦炭",
+        "measured": "焦炭入炉量",
+        "feeds": "引擎输入 coke_rate→焦碳质量"
+      },
+      {
+        "dev": "hopper_scale",
+        "mount": "flux",
+        "label": "料斗秤·熔剂",
+        "measured": "石灰石/白云石添加量",
+        "feeds": "引擎输入 flux（碳酸盐分解源）"
+      },
+      {
+        "dev": "weigher",
+        "mount": "product",
+        "label": "铁水秤",
+        "measured": "出铁量（铁水）",
+        "feeds": "引擎输入 hot_metal / 钢中固碳扣减"
+      },
+      {
+        "dev": "gas_flowmeter",
+        "mount": "gas",
+        "label": "气体流量计·高炉煤气",
+        "measured": "高炉煤气(BFG)产量",
+        "feeds": "煤气利用量（能源平衡）"
+      },
+      {
+        "dev": "power_meter",
+        "mount": "power",
+        "label": "智能电表·鼓风/除尘",
+        "measured": "鼓风/除尘电耗",
+        "feeds": "引擎输入 electricity（范围二）"
+      },
+      {
+        "dev": "composition_analyzer",
+        "mount": "control",
+        "label": "成分分析仪·焦炭",
+        "measured": "焦炭固定碳含量",
+        "feeds": "精化 CC 排放因子"
+      },
+      {
+        "dev": "cems",
+        "mount": "gas",
+        "label": "CEMS·高炉烟囱",
+        "measured": "烟囱 CO₂ 直接排放",
+        "feeds": "因子法交叉校验（直接监测）"
+      }
+    ],
+    "bof": [
+      {
+        "dev": "weigher",
+        "mount": "feed",
+        "label": "钢水秤·铁水/废钢",
+        "measured": "铁水+废钢装入量",
+        "feeds": "引擎输入 steel_in（金属料，自变量）"
+      },
+      {
+        "dev": "hopper_scale",
+        "mount": "flux",
+        "label": "料斗秤·造渣熔剂",
+        "measured": "石灰/白云石添加量",
+        "feeds": "引擎输入 flux（碳酸盐分解源）"
+      },
+      {
+        "dev": "gas_flowmeter",
+        "mount": "gas",
+        "label": "气体流量计·转炉煤气",
+        "measured": "转炉煤气(LDG)回收量",
+        "feeds": "煤气回收（能源平衡）"
+      },
+      {
+        "dev": "power_meter",
+        "mount": "power",
+        "label": "智能电表·吹炼",
+        "measured": "吹炼/除尘电耗",
+        "feeds": "引擎输入 electricity"
+      },
+      {
+        "dev": "composition_analyzer",
+        "mount": "control",
+        "label": "副枪·终点碳",
+        "measured": "终点碳含量/炉气 CO/CO₂",
+        "feeds": "交叉校验脱碳碳排"
+      }
+    ],
+    "eaf": [
+      {
+        "dev": "weigher",
+        "mount": "feed",
+        "label": "钢水秤·废钢/DRI",
+        "measured": "废钢+直接还原铁装入量",
+        "feeds": "引擎输入 scrap/dri（金属料）"
+      },
+      {
+        "dev": "loss_in_weight",
+        "mount": "fuel",
+        "label": "失重秤·电极",
+        "measured": "电极消耗量",
+        "feeds": "引擎输入 electrode（电极碳排源）"
+      },
+      {
+        "dev": "gas_flowmeter",
+        "mount": "gas",
+        "label": "气体流量计·氧气/天然气",
+        "measured": "吹氧/烧嘴燃气量",
+        "feeds": "燃料类直接排放活动数据"
+      },
+      {
+        "dev": "composition_analyzer",
+        "mount": "control",
+        "label": "成分分析仪·钢水",
+        "measured": "钢水碳含量",
+        "feeds": "精化固碳量与排放因子"
+      }
+    ],
+    "hydrogen_bf": [
+      {
+        "dev": "belt_scale",
+        "mount": "feed",
+        "label": "皮带秤·炉料",
+        "measured": "矿/球团入炉量",
+        "feeds": "炉料总质量（矿量）"
+      },
+      {
+        "dev": "loss_in_weight",
+        "mount": "fuel",
+        "label": "失重秤·补偿煤",
+        "measured": "少量补偿煤粉量",
+        "feeds": "引擎输入 coal_inj"
+      },
+      {
+        "dev": "power_meter",
+        "mount": "power",
+        "label": "智能电表·电解制氢",
+        "measured": "电解制氢电耗（大）",
+        "feeds": "引擎输入 electricity（氢冶金主排放源）"
+      },
+      {
+        "dev": "composition_analyzer",
+        "mount": "control",
+        "label": "成分分析仪·铁水",
+        "measured": "铁水碳含量",
+        "feeds": "精化固碳量"
+      }
+    ],
+    "ladle_furnace": [
+      {
+        "dev": "weigher",
+        "mount": "feed",
+        "label": "钢水秤·钢水",
+        "measured": "钢水周转量",
+        "feeds": "引擎输入 steel_in"
+      },
+      {
+        "dev": "composition_analyzer",
+        "mount": "control",
+        "label": "成分分析仪·合金",
+        "measured": "合金化成分",
+        "feeds": "精化排放因子"
+      }
+    ],
+    "caster": [
+      {
+        "dev": "weigher",
+        "mount": "product",
+        "label": "铸坯秤",
+        "measured": "连铸坯产量",
+        "feeds": "引擎输入 steel_in / 钢产量"
+      },
+      {
+        "dev": "power_meter",
+        "mount": "power",
+        "label": "智能电表·结晶/拉矫",
+        "measured": "结晶/拉矫电耗",
+        "feeds": "引擎输入 electricity"
+      }
+    ],
+    "rolling_mill": [
+      {
+        "dev": "weigher",
+        "mount": "feed",
+        "label": "钢材秤·钢坯",
+        "measured": "入轧钢坯量",
+        "feeds": "引擎输入 steel_in（钢材产量）"
+      },
+      {
+        "dev": "gas_flowmeter",
+        "mount": "gas",
+        "label": "气体流量计·加热炉煤气",
+        "measured": "加热/退火炉燃气量",
+        "feeds": "引擎输入 ng_rate（天然气直接排放）"
+      },
+      {
+        "dev": "power_meter",
+        "mount": "power",
+        "label": "智能电表·轧制",
+        "measured": "轧制主电机电耗",
+        "feeds": "引擎输入 electricity（间接排放）"
+      }
+    ],
+    "h2_dri": [
+      {
+        "dev": "belt_scale",
+        "mount": "feed",
+        "label": "皮带秤·球团/块矿",
+        "measured": "入炉球团/块矿量",
+        "feeds": "引擎输入 dri_out（竖炉处理量）"
+      },
+      {
+        "dev": "gas_flowmeter",
+        "mount": "gas",
+        "label": "气体流量计·氢气",
+        "measured": "还原气(H₂)量",
+        "feeds": "引擎输入 h2_rate（氢耗，直接排放近零）"
+      },
+      {
+        "dev": "power_meter",
+        "mount": "power",
+        "label": "智能电表·电解制氢",
+        "measured": "电解制氢电耗",
+        "feeds": "引擎输入 electricity（氢冶金主排放源）"
+      }
+    ],
+    "dri_midrex": [
+      {
+        "dev": "belt_scale",
+        "mount": "feed",
+        "label": "皮带秤·球团/块矿",
+        "measured": "入炉球团/块矿量",
+        "feeds": "引擎输入 pellet_rate"
+      },
+      {
+        "dev": "gas_flowmeter",
+        "mount": "gas",
+        "label": "气体流量计·天然气",
+        "measured": "还原气(天然气)量",
+        "feeds": "引擎输入 ng_rate（直接排放）"
+      },
+      {
+        "dev": "power_meter",
+        "mount": "power",
+        "label": "智能电表·压球/压缩",
+        "measured": "压球/压缩电耗",
+        "feeds": "引擎输入 electricity"
+      }
+    ]
+  },
+  "process_specs": {
+    "blast_furnace": [
+      {
+        "key": "bf_1000",
+        "label": "小型高炉（1000m³级）",
+        "desc": "适合 300 万吨/年以下产线，铁水产量偏低、焦比偏高",
+        "defaults": {
+          "hot_metal": 500,
+          "coke_rate": 510,
+          "coal_inj": 140,
+          "flux": 130,
+          "slag_rate": 300
+        },
+        "ranges": {
+          "hot_metal": {
+            "min": 250,
+            "max": 900,
+            "step": 50
+          }
+        },
+        "device_ranges": {
+          "belt_scale": {
+            "min": 0,
+            "max": 600
+          }
+        }
+      },
+      {
+        "key": "bf_2000",
+        "label": "中型高炉（2000m³级）",
+        "desc": "主流配置，铁水产量与焦比均衡",
+        "defaults": {
+          "hot_metal": 800,
+          "coke_rate": 485,
+          "coal_inj": 150,
+          "flux": 120,
+          "slag_rate": 300
+        },
+        "ranges": {
+          "hot_metal": {
+            "min": 500,
+            "max": 1400,
+            "step": 50
+          }
+        },
+        "device_ranges": {
+          "belt_scale": {
+            "min": 0,
+            "max": 900
+          }
+        }
+      },
+      {
+        "key": "bf_3200",
+        "label": "大型高炉（3200m³级）",
+        "desc": "大型产线主力炉，产量高、焦比低",
+        "defaults": {
+          "hot_metal": 1200,
+          "coke_rate": 465,
+          "coal_inj": 155,
+          "flux": 110,
+          "slag_rate": 300
+        },
+        "ranges": {
+          "hot_metal": {
+            "min": 800,
+            "max": 1800,
+            "step": 50
+          }
+        },
+        "device_ranges": {
+          "belt_scale": {
+            "min": 0,
+            "max": 1400
+          }
+        }
+      }
+    ],
+    "sinter_plant": [
+      {
+        "key": "sp_90",
+        "label": "烧结机 90m²",
+        "desc": "小型烧结机，矿量低",
+        "defaults": {
+          "ore_rate": 550,
+          "fuel_rate": 52,
+          "electricity": 22.0
+        },
+        "ranges": {
+          "ore_rate": {
+            "min": 300,
+            "max": 900,
+            "step": 50
+          }
+        }
+      },
+      {
+        "key": "sp_180",
+        "label": "烧结机 180m²",
+        "desc": "主流中型烧结机",
+        "defaults": {
+          "ore_rate": 1100,
+          "fuel_rate": 47,
+          "electricity": 44.0
+        },
+        "ranges": {
+          "ore_rate": {
+            "min": 700,
+            "max": 1700,
+            "step": 50
+          }
+        }
+      },
+      {
+        "key": "sp_360",
+        "label": "烧结机 360m²",
+        "desc": "大型烧结机，矿量大、燃耗低",
+        "defaults": {
+          "ore_rate": 1750,
+          "fuel_rate": 44,
+          "electricity": 70.0
+        },
+        "ranges": {
+          "ore_rate": {
+            "min": 1300,
+            "max": 2300,
+            "step": 50
+          }
+        }
+      }
+    ],
+    "coke_oven": [
+      {
+        "key": "co_60",
+        "label": "焦炉 60 孔",
+        "desc": "小型焦炉组",
+        "defaults": {
+          "coal_rate": 300,
+          "electricity": 6.0
+        },
+        "ranges": {
+          "coal_rate": {
+            "min": 200,
+            "max": 500,
+            "step": 50
+          }
+        }
+      },
+      {
+        "key": "co_120",
+        "label": "焦炉 120 孔",
+        "desc": "主流焦炉组",
+        "defaults": {
+          "coal_rate": 500,
+          "electricity": 10.0
+        },
+        "ranges": {
+          "coal_rate": {
+            "min": 350,
+            "max": 750,
+            "step": 50
+          }
+        }
+      }
+    ],
+    "bof": [
+      {
+        "key": "bof_120",
+        "label": "转炉 120t",
+        "desc": "小型转炉",
+        "defaults": {
+          "hot_metal_in": 500,
+          "scrap": 60,
+          "flux": 65,
+          "slag_rate": 120
+        },
+        "ranges": {
+          "hot_metal_in": {
+            "min": 300,
+            "max": 900,
+            "step": 50
+          }
+        }
+      },
+      {
+        "key": "bof_250",
+        "label": "转炉 250t",
+        "desc": "主流大型转炉",
+        "defaults": {
+          "hot_metal_in": 1000,
+          "scrap": 110,
+          "flux": 58,
+          "slag_rate": 120
+        },
+        "ranges": {
+          "hot_metal_in": {
+            "min": 700,
+            "max": 1500,
+            "step": 50
+          }
+        }
+      }
+    ],
+    "eaf": [
+      {
+        "key": "eaf_70",
+        "label": "电炉 70t",
+        "desc": "小型电弧炉（短流程）",
+        "defaults": {
+          "scrap": 450,
+          "dri": 0,
+          "electricity": 180.0,
+          "electrode": 0.9
+        },
+        "ranges": {
+          "scrap": {
+            "min": 250,
+            "max": 650,
+            "step": 50
+          }
+        }
+      },
+      {
+        "key": "eaf_150",
+        "label": "电炉 150t",
+        "desc": "主流电弧炉（短流程）",
+        "defaults": {
+          "scrap": 900,
+          "dri": 0,
+          "electricity": 360.0,
+          "electrode": 1.8
+        },
+        "ranges": {
+          "scrap": {
+            "min": 600,
+            "max": 1200,
+            "step": 50
+          }
+        }
+      }
+    ],
+    "caster": [
+      {
+        "key": "cc_1",
+        "label": "连铸机 1 机 1 流",
+        "desc": "小型连铸",
+        "defaults": {
+          "steel_in": 500,
+          "electricity": 7.5
+        },
+        "ranges": {
+          "steel_in": {
+            "min": 300,
+            "max": 800,
+            "step": 50
+          }
+        }
+      },
+      {
+        "key": "cc_2",
+        "label": "连铸机 2 机 2 流",
+        "desc": "主流连铸配置",
+        "defaults": {
+          "steel_in": 1000,
+          "electricity": 15.0
+        },
+        "ranges": {
+          "steel_in": {
+            "min": 700,
+            "max": 1500,
+            "step": 50
+          }
+        }
+      }
+    ],
+    "rolling_mill": [
+      {
+        "key": "rm_1780",
+        "label": "热轧 1780 线",
+        "desc": "主流热轧产线",
+        "defaults": {
+          "steel_in": 1000,
+          "ng_rate": 32,
+          "electricity": 80.0
+        },
+        "ranges": {
+          "steel_in": {
+            "min": 700,
+            "max": 1500,
+            "step": 50
+          }
+        }
+      },
+      {
+        "key": "rm_2250",
+        "label": "热轧 2250 线",
+        "desc": "大型热轧产线",
+        "defaults": {
+          "steel_in": 1400,
+          "ng_rate": 30,
+          "electricity": 112.0
+        },
+        "ranges": {
+          "steel_in": {
+            "min": 1000,
+            "max": 1900,
+            "step": 50
+          }
+        }
+      }
+    ]
+  }
+}

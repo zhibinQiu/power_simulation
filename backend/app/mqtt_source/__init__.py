@@ -21,12 +21,15 @@ from ._shared import (BOX_APP_EVENTS, BOX_DEVICES_FILE, BOX_SERVICES,
                       BROKER_STATS, CLOUD_DEVICES, CONFIG_DIR, CONFIG_PATH,
                       DEFAULT_CFG, GC_TTL, LINKS_FILE, MESSAGE_LOG,
                       MESSAGE_LOG_MAX, READINGS, REPLAY_HISTORY,
-                      REPLAY_HISTORY_MAX, RUNTIME_CONFIG_PATH, _BOX_KEYS,
-                      _BROKER, _CLIENT, _DEVICE_ID_KEYS, _GC_MIN_INTERVAL,
+                      REPLAY_HISTORY_MAX, RUNTIME_CONFIG_PATH, _BROKER,
+                      _BOX_KEYS, _CLIENT, _DEVICE_ID_KEYS, _ENDPOINTS,
+                      _EP_CLIENTS, _EP_STATE, _EXT_STATS,
+                      _GC_MIN_INTERVAL,
                       _IGNORED_DEVICES, _INVALID_READING_VALUES, _LINKS,
                       _LINKS_FACTOR, _LINKS_REV, _LOCK, _MAIN_PROPS,
                       _MAPPING, _PAHO_OK, _PRIMARY_KEYS, _REV_MAPPING,
-                      _STATE, _TOPICS, _config, _last_gc_ts, mqtt)
+                      _STATE, _TOPICS, _config, _last_gc_ts, endpoint_states,
+                      mqtt, sync_endpoints)
 
 from .. import cloud_agent  # noqa: E402 兼容旧模块属性（mqtt_source.cloud_agent）
 
@@ -65,7 +68,7 @@ from .config import (  # noqa: E402
 # 订阅客户端
 from .client import (  # noqa: E402
     _make_client, _on_connect, _on_disconnect, _on_message, _restart_subscriber,
-    start,
+    restart_all, restart_middleware, start,
 )
 
 __all__ = [
@@ -78,6 +81,10 @@ __all__ = [
     "_last_gc_ts", "BROKER_STATS", "_STATE", "_LINKS", "_LINKS_REV", "_LINKS_FACTOR",
     "_BOX_KEYS", "_DEVICE_ID_KEYS", "_PRIMARY_KEYS", "_MAIN_PROPS",
     "_INVALID_READING_VALUES", "BOX_SERVICES", "BOX_APP_EVENTS", "_CLIENT",
+    "_EXT_STATS",
+    # 多 Broker 订阅端点（云端 Broker + 中间件内置 Broker）
+    "_ENDPOINTS", "_EP_STATE", "_EP_CLIENTS", "endpoint_states", "sync_endpoints",
+    "restart_middleware", "restart_all",
     # 解析
     "_is_invalid_reading", "_main_property_of_topic", "_identify_cloud_device",
     "_primary_value", "_box_device_name_of_cloud_id", "_crd_twin_reading",

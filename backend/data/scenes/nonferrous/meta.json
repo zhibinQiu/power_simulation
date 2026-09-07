@@ -1,0 +1,22 @@
+{
+  "id": "nonferrous",
+  "label": "有色",
+  "industry": "有色",
+  "industryGroup": "四大控排",
+  "kind": "process",
+  "order": 4,
+  "ready": false,
+  "icon": "gem",
+  "color": "#b57a45",
+  "engines": [],
+  "resources": [],
+  "package": { "vendor": "能碳生态 · 官方", "product": "有色行业（四大控排）企业资源包 · 待安装", "version": null, "builtin": true },
+  "method": null,
+  "shortDesc": "有色（四大控排）行业核算能力入口：安装面向有色行业企业的 .ec 资源包后启用仿真",
+  "intro": [
+    "覆盖电解铝、氧化铝、铜铅锌冶炼等有色金属冶炼能碳仿真。",
+    "核算重点：电解槽阳极消耗与温室气体（PFC）逸散、冶炼燃料燃烧与电力间接排放。",
+    "减碳路径：绿电替代、惰性阳极、余热回收与低碳冶炼工艺。",
+    "本项为平台内置行业入口（资源包面向具体企业，不按行业整体打包）：点击 文件 → 打开资源包… 选择面向有色企业的 .ec 资源包后即可进入仿真。"
+  ]
+}

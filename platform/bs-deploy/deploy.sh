@@ -2,8 +2,11 @@
 # ============================================================================
 # 能碳智控平台 · 全新服务器一键部署（源码卷挂载 + reload · 仅需 Docker）
 #
-# 服务器只需安装 Docker；镜像只固化 Python 运行环境（依赖），业务代码
-# backend/ 与前端产物 frontend/dist、文档站 platform/doc-deploy/docs-site/dist 均入库并随仓库克隆：
+# 服务器只需安装 Docker；镜像只固化 Python 运行环境（依赖）。业务代码 backend/
+# 与前端产物 frontend/dist、文档站 docs-site/dist 不入版本库（产物一律由开发机
+# 构建后 rsync，见 platform/bs-deploy/update.sh），git clone 仅拿到源码骨架：
+#   - 全新 clone 后需先在开发机执行一次 bash platform/bs-deploy/update.sh 补产物
+#     （否则平台/文档站前端为空目录；后端 reload 生效逻辑见下）
 #   - docker compose up -d --build 首次构建运行环境镜像（仅 Python 依赖层）
 #   - 容器以卷挂载 backend/ + frontend/dist 运行，容器内 uvicorn --reload
 #   - 日常更新走 update.sh（开发机 rsync / 服务器 git pull），后端 reload 秒级生效
@@ -89,6 +92,14 @@ mkdir -p "$(dirname "$INSTALL_DIR")"
 log "克隆源码：https://github.com/${REPO}（分支 ${BRANCH}）→ $INSTALL_DIR"
 git clone --depth 1 -b "$BRANCH" "https://github.com/$REPO.git" "$INSTALL_DIR"
 [ -f "$INSTALL_DIR/platform/bs-deploy/docker-compose.yml" ] || err "源码结构异常：缺少 platform/bs-deploy/docker-compose.yml"
+
+# 前端/文档站产物不入版本库：全新 clone 后 dist 为空，提示先补产物（产物由开发机 rsync）
+if [ ! -d "$INSTALL_DIR/frontend/dist" ] || [ -z "$(ls -A "$INSTALL_DIR/frontend/dist" 2>/dev/null)" ]; then
+  log "注意：frontend/dist 为空（产物不入版本库，git clone 不含）。"
+  log "      请在本机（开发机）先执行：bash platform/update.sh bs"
+  log "      （也可：bash platform/update.sh docs 补文档站）再回来访问平台。"
+  log "      后端可先行启动，/api/health 自检不受影响。"
+fi
 
 # ---------- 2. 端口占位替换（可选） ----------
 if [ "$PORT" != "40014" ]; then

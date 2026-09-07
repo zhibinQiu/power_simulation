@@ -49,7 +49,12 @@
   --sb-ok: #1E7B4F;                 /* 底栏语义色（亮底可读的深色版本） */
   --sb-err: #B3372B;
   --sb-warn: #8F6509;
+  /* 底栏「实时链路」状态圆点：open=已连接（跟随系统主题色）/ error=异常（ISA-101 报警红，不随主题）
+     closed=已断开（中性灰）/ init=连接中；明暗两套值见 .app.sim-dark */
   --feed-init: #AEB8C6;             /* 底栏数据源「连接中」圆点 */
+  --feed-open: var(--accent-d);     /* 已连接（主题色深版，浅底可读） */
+  --feed-closed: #98A2B3;           /* 已断开（中性灰，弱存在感） */
+  --feed-error: var(--red);         /* 异常（报警语义色） */
   --gas: #35808F;           /* 气体/能源管道（沉静青） */
   --ok: #2E8B57;            /* 通用「正常/通过」状态色 */
   --warn: #8F6509;          /* 通用「提醒/提示」文字色 */
@@ -117,6 +122,9 @@
   --sb-err: #FFB3A8;
   --sb-warn: #F5D48A;
   --feed-init: rgba(255,255,255,.42);
+  --feed-open: var(--accent-d);     /* 已连接（深底用主题色亮版，由 .app.sim-dark 的 accent 覆盖自动跟随） */
+  --feed-closed: #6E7A8E;           /* 已断开（暗底中性灰） */
+  --feed-error: var(--red);
   --gas: #3FC0D4;
   --ok: #3EDC9B;
   --warn: #C9A02C;
@@ -195,7 +203,7 @@ button b, button strong,
 .app {
   display: grid;
   grid-template-columns: 48px var(--lw, 286px) minmax(0, 1fr) var(--rw, 372px);
-  grid-template-rows: 34px 35px minmax(0, 1fr) var(--cmd-h, 132px) 22px;
+  grid-template-rows: 30px 35px minmax(0, 1fr) var(--cmd-h, 132px) 22px;
   /* 命令行窗口（cmd）与中间数字孪生（stage）同列同宽；工具栏宽度与数字孪生一致（仅占中间列），左右侧栏/活动栏顶到顶部（延伸至工具栏行），VSCode 面板式布局 */
   grid-template-areas:
     "topbar topbar topbar topbar"
@@ -219,12 +227,39 @@ body.panel-dragging .app { transition: none; }
 .app.left-collapsed .sidebar { visibility: hidden; pointer-events: none; }
 .app.right-collapsed .inspector { visibility: hidden; pointer-events: none; }
 /* 底栏（命令行窗口 + 状态条）收起：仅隐藏命令行窗口，蓝色系统状态条保留；行高 0 + 内容裁剪实现平滑收起 */
-.app.bottom-collapsed { grid-template-rows: 34px 35px 1fr 0 22px; }
+.app.bottom-collapsed { grid-template-rows: 30px 35px 1fr 0 22px; }
 .app.bottom-collapsed .cmdwin { visibility: hidden; pointer-events: none; transition: visibility .22s; }
-/* 非数字孪生独立视图（工况数据分析 / CEA 行情 / 碳排核算 / 能流分析 / 能碳一体机）沉浸模式：
-   默认隐藏左/右/下侧面板，中间视图占满剩余空间，底部状态栏保留；
-   用户通过顶栏按钮 / 左侧活动栏展开面板后，命令行行高由 --cmd-h 接管（状态条行常驻 22px） */
-.app.view-immersive { grid-template-rows: 34px 35px minmax(0, 1fr) var(--cmd-h, 132px) 22px; }
+
+/* ============ 功能视图窗口（tab 化） ============
+   功能视图（流程编排 / 数据分析 / AI群控 / 碳资产管理 / 全景碳核查 / 能流分析 / 能碳一体机管理）；
+   HMI人机交互屏与 3D 数字孪生同为主视图（同一槽位互斥切换，不进 tab 列表）
+   不再独占整个界面（沉浸），改为开在中间内容区（stage）内的窗口：
+   窗口顶部为 tab 标签条（首项「三维仿真」固定），可同时打开多个视图并切换，
+   左右侧栏 / 底部面板保持原状态不再被强制收起。
+   窗口本体整层默认不拦截指针事件（pointer-events: none），仅标签条与内容窗格接管交互，
+   这样切回「三维仿真」标签时，下方的 3D 场景仍可正常点选与拖拽。 */
+.view-window { position: absolute; inset: 0; display: flex; flex-direction: column; pointer-events: none; }
+.view-window > * { pointer-events: auto; }
+/* 窗口内工具栏：tab 模式下工具条移入窗口顶部（标签条下方、视图内容上方），
+   覆盖其网格定位（.ribbon 默认占 toolbar 行），改为窗口内的第一行 */
+.view-window .ribbon {
+  grid-area: auto; flex: 0 0 auto; width: 100%;
+  border-left: none; border-right: none;
+}
+/* 内容区：窗口窗格相对其定位，四周留白露出场景底色，形成窗口悬浮感 */
+.vw-body { position: relative; flex: 1 1 auto; min-height: 0; }
+.vw-pane {
+  position: absolute; inset: 8px; overflow: hidden;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .14);
+}
+/* 切回「三维仿真」标签：所有视图窗格隐藏，内容区不再遮挡下方 3D 场景 */
+.view-window.on-scene .vw-body { pointer-events: none; }
+/* 流程编排窗格：画布是编辑主区域，铺满内容区（无留白 / 圆角 / 阴影），
+   与功能视图的「悬浮窗口」样式区分；工具条仍位于窗格上方（35px 工具行） */
+.view-window .vw-pane.flow-pane {
+  inset: 0; border: none; border-radius: 0; box-shadow: none; background: var(--bg);
+}
 
 /* 全屏模式（3D 数字孪生 / HMI人机交互屏）：隐藏全部边栏（菜单栏/活动栏/侧栏/工具栏/检视器/命令行/状态栏/视图名标识栏），
    仅保留中间内容区占满全屏；视图切换与退出全屏入口由内容区自身浮动提供 */
@@ -239,9 +274,10 @@ body.panel-dragging .app { transition: none; }
 .app.fullscreen-on .ribbon,
 .app.fullscreen-on .inspector,
 .app.fullscreen-on .cmdwin,
-.app.fullscreen-on .statusbar,
-.app.fullscreen-on .view-banner { display: none !important; }
+.app.fullscreen-on .statusbar { display: none !important; }
 .app.fullscreen-on .stage { border: none; }
+/* 全屏：窗格铺满内容区（无留白/圆角），仅展示视图本体（工具栏由 .fullscreen-on .ribbon 统一隐藏） */
+.app.fullscreen-on .view-window .vw-pane { inset: 0; border: none; border-radius: 0; box-shadow: none; }
 
 /* 全屏浮动工具按钮（3D 数字孪生 / HMI人机交互屏 共用统一风格）：
    与数据概览大屏明暗切换按钮 .ov-theme 同风格：方角 40×40、面板底+细边框、仅图标，hover 转强调色。
@@ -258,52 +294,16 @@ body.panel-dragging .app { transition: none; }
 .fs-tool-btn:active { transform: scale(0.95); }
 @media (hover: hover) { .fs-tool-btn:hover { border-color: var(--accent); color: var(--accent); } }
 
-/* ============ 视图名标识栏：占 ribbon 同行 grid-area（toolbar），与 RibbonToolbar 互斥显示
-   仅 boxManageOn 时渲染；高度与 ribbon 一致（35px），与 TopBar/Ribbon 风格统一 ============ */
-.view-banner {
-  grid-area: toolbar;
-  display: flex; align-items: center; justify-content: space-between;
-  height: 35px; padding: 0 12px;
-  background: var(--panel); color: var(--text);
-  border-bottom: 1px solid var(--border);
-  border-left: 1px solid var(--border); border-right: 1px solid var(--border);
-  font-family: var(--ui, -apple-system, "Segoe UI", "PingFang SC", sans-serif);
-  font-size: 12px; user-select: none;
-}
-.view-banner .vb-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.view-banner .vb-right { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 11px; }
-.view-banner .vb-logo {
-  font-size: 14px; line-height: 1; color: var(--accent-d);
-}
-.view-banner .vb-title { font-size: 12.5px; font-weight: 700; letter-spacing: .4px; white-space: nowrap; }
-.view-banner .vb-close {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 10px; font-size: 11px; cursor: pointer; border-radius: 5px;
-  border: 1px solid var(--border); background: var(--panel-2); color: var(--muted);
-  transition: background .12s, color .12s, border-color .12s;
-}
-.view-banner .vb-close:hover { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, var(--border)); }
-
-/* 碳资产管理标题栏：CEA/CCER 行情 与 企业台账与策略 页签切换（风格与 vb-close 一致） */
-.view-banner .vb-market-tabs { display: inline-flex; align-items: center; gap: 4px; }
-.view-banner .vb-tab {
-  padding: 3px 10px; font-size: 11px; cursor: pointer; border-radius: 5px;
-  border: 1px solid var(--border); background: var(--panel-2); color: var(--muted);
-  transition: background .12s, color .12s, border-color .12s;
-}
-.view-banner .vb-tab:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
-.view-banner .vb-tab.on { background: color-mix(in srgb, var(--accent) 18%, var(--panel-2)); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
-
 /* ============ 顶栏：VS Code 标题栏 + 菜单栏（白天亮色 / 夜间深色，扁平，无图标菜单） ============ */
 .topbar {
-  grid-area: topbar; display: flex; align-items: stretch; height: 34px;
+  grid-area: topbar; display: flex; align-items: stretch; height: 30px;
   background: var(--topbar-bg); color: var(--topbar-fg); position: relative; z-index: 60;
   border-bottom: 1px solid var(--topbar-line);
   font-family: var(--ui);
 }
 /* 菜单条（门户风格：白天亮色底深字 / 夜间深黑底白字，hover 高亮） */
 .menubar { display: flex; align-items: center; gap: 2px; height: 100%; padding: 0 6px; }
-.mbar-item { position: relative; display: flex; align-items: center; padding: 0 12px; height: 26px; font-size: 13px; color: var(--topbar-fg-mute);
+.mbar-item { position: relative; display: flex; align-items: center; padding: 0 12px; height: 23px; font-size: 12px; color: var(--topbar-fg-mute);
   cursor: pointer; font-family: var(--ui); background: transparent; user-select: none; border-radius: var(--radius);
   transition: background .1s; }
 .mbar-item:hover { background: var(--topbar-hover-bg); color: var(--topbar-hover-fg); }
@@ -332,7 +332,7 @@ body.panel-dragging .app { transition: none; }
   min-width: 180px; box-shadow: var(--shadow); z-index: 60; }
 .topbar .spacer { flex: 1; }
 .top-actions { display: flex; align-items: center; gap: 3px; padding: 0 10px; height: 100%; }
-.tdiv { width: 1px; height: 15px; background: var(--topbar-sep); margin: 0 3px; }
+.tdiv { width: 1px; height: 13px; background: var(--topbar-sep); margin: 0 3px; }
 .tbtn { display: flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; font-size: 12px;
   background: transparent; border: 1px solid transparent; color: var(--text); border-radius: var(--radius);
   cursor: pointer; white-space: nowrap; font-family: var(--ui);
@@ -341,13 +341,14 @@ body.panel-dragging .app { transition: none; }
 .tbtn:active { background: var(--sel); transform: translateY(1px); }
 .tbtn.on { color: var(--accent-d); background: var(--accent-l); }
 /* 顶栏右侧快捷按钮（白天亮色 / 夜间深色顶栏上的图标按钮） */
-.topbar .tbtn { color: var(--topbar-fg-mute); }
+.topbar .tbtn { height: 21px; font-size: 11px; color: var(--topbar-fg-mute); }
 .topbar .tbtn:hover { background: var(--topbar-hover-bg); color: var(--topbar-hover-fg); }
 .topbar .tbtn:active { background: var(--topbar-hover-bg); transform: translateY(1px); }
 .topbar .tbtn.on { color: var(--accent-d); background: var(--accent-l); }
 .tbtn:disabled, .tbtn.disabled { color: var(--faint); cursor: default; opacity: .55; }
 .tbtn:disabled:hover, .tbtn.disabled:hover { background: transparent; color: var(--faint); }
 .tbtn .ui-icon { width: 15px; height: 15px; }
+.topbar .tbtn .ui-icon { width: 13px; height: 13px; }
 
 /* ============ 工具条（独立行：顶部菜单条下方、3D 视图/编排画布上方，横贯全宽，顶边与左右侧栏对齐） ============ */
 .ribbon { grid-area: toolbar; height: 35px;
@@ -675,15 +676,16 @@ body.panel-dragging .app { transition: none; }
 .statusbar .lic-warn { color: var(--sb-warn); cursor: pointer; }
 .statusbar .lic-warn .lic-tri { font-size: 10px; line-height: 1; }
 .statusbar .mono { font-family: var(--mono); }
-.feed-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; }
-.feed-open { background: #4FC98A; } .feed-closed { background: #F08A78; } .feed-init { background: var(--feed-init); }
+.feed-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--feed-init); transition: background .15s; }
+.feed-open { background: var(--feed-open); } .feed-closed { background: var(--feed-closed); }
+.feed-error { background: var(--feed-error); } .feed-init { background: var(--feed-init); }
 
 /* ============ 底栏通知按钮（仿 VS Code 铃铛） ============ */
 .statusbar .st-notif { position: relative; padding: 0 12px; border-right: none; cursor: pointer; }
 .statusbar .st-notif svg { width: 15px; height: 15px; fill: var(--sb-icon); display: block; }
-.statusbar .st-notif .ntf-badge { position: absolute; top: 2px; right: 4px; min-width: 14px; height: 14px; padding: 0 3px;
-  background: var(--red); color: #fff; border-radius: 7px; font-size: 9px; font-family: var(--ui);
-  display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1.5px var(--accent); }
+.statusbar .st-notif .ntf-badge { position: absolute; top: 3px; right: 5px; min-width: 10px; height: 10px; padding: 0 2px;
+  background: var(--red); color: #fff; border-radius: 5px; font-size: 7.5px; line-height: 1; font-family: var(--ui);
+  display: flex; align-items: center; justify-content: center; }
 .statusbar .st-notif.open { background: var(--sb-open-bg); }
 /* ============ 系统通知中心（仿 VS Code 通知中心） ============ */
 .notif-center { position: fixed; right: 8px; bottom: 30px; width: 372px; max-width: calc(100vw - 16px);

@@ -39,11 +39,24 @@ cloud-deploy/
 │       ├── nengtan-cloud-broker.service
 │       ├── nengtan-cloud-dashboard.service
 │       └── nengtan-collector.service
-└── agent/                     # ── 云端 agent（替代平台 SSH 数据通道）──
-    ├── cloud_agent.py         #   零依赖 agent：MQTT 推送读 + HTTP 42083 写
-    ├── install_agent.sh       #   一键安装（systemd 常驻）
-    └── cloud-agent.service    #   systemd 单元（install_agent.sh 内嵌渲染）
+├── agent/                     # ── 云端 agent（替代平台 SSH 数据通道）──
+│   ├── cloud_agent.py         #   零依赖 agent：MQTT 推送读 + HTTP 42083 写
+│   ├── install_agent.sh       #   一键安装（systemd 常驻）
+│   └── cloud-agent.service    #   systemd 单元（install_agent.sh 内嵌渲染）
+├── middleware/                # ── 能碳数据中间件（外部数据源接入）──
+│   ├── runner.py              #   进程入口（适配器注册中心 + 管理 API :42084）
+│   ├── adapters/              #   采集适配器（当前：mqtt；模拟不是内置类型）
+│   ├── config.json            #   服务器形态：external 直发云端 Broker 41883
+│   ├── config.dev.json        #   开发机形态：订阅本机模拟源 → 直发 41883
+│   └── deploy_middleware.sh   #   部署/更新脚本（--server / --local-only / sync）
+└── sim-source/                # ── 独立模拟数据源（外部系统仿真，非平台代码）──
+    ├── sim_source.py          #   自带 Broker(41885) + 钢铁仿真/机房热控数据生成（零依赖）
+    ├── config.json            #   两类模拟数据与测点定义
+    ├── deploy_sim_source.sh   #   启停脚本（默认开发机本地启动）
+    └── systemd/               #   systemd 单元模板（可选部署到服务器）
 ```
+
+> 外部数据接入方法详见 `../../doc-deploy/docs/外部数据接入中间件指南.md`。
 
 ## 2. 快速开始（全新云服务器）
 

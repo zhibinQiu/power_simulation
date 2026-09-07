@@ -1,0 +1,80 @@
+{
+  "comment": "能碳数据中间件配置示例。两种形态：mode=external（推荐，与服务器云端 Broker 同机：不启内置 Broker，数据直发 output.broker 41883，平台经云端端点统一订阅）；mode=local（起内置 Broker 41884，平台单独订阅中间件端口）。server = 管理 API（平台在此注册/启停数据源）；adapters = 数据源（一般由平台经 API 写入，无需手工编辑）。模拟数据不是内置适配器类型：由独立服务 sim-source 生成后经 mqtt 适配器接入（平台与中间件自身都不产生模拟数据）",
+  "server": {
+    "host": "0.0.0.0",
+    "port": 42084,
+    "token": "",
+    "broker": {
+      "enabled": false
+    }
+  },
+  "output": {
+    "mode": "external",
+    "comment": "mode=external：paho 直发下方 broker（推荐：服务器云端 Broker 41883）；mode=local：进程内直投内置 Broker（需 server.broker.enabled=true）",
+    "broker": {
+      "host": "127.0.0.1",
+      "port": 41883,
+      "username": "",
+      "password": ""
+    },
+    "qos": 0
+  },
+  "log_level": "info",
+  "adapters": [
+    {
+      "comment": "示例：外部系统自带 Broker 且不经能碳一体机时，中间件直连其 Broker 订阅（平台登记的前缀 box=ext-weigh）。若该外部系统是经一体机接入，则 broker 填云端 Broker 41883、topics 填一体机上行空间 ext/<源>/#",
+      "id": "weigh_ext",
+      "type": "mqtt",
+      "name": "外部秤站",
+      "enabled": false,
+      "box": "ext-weigh",
+      "device": "scale1",
+      "deviceKeys": ["device", "deviceId", "sensor", "id"],
+      "fieldMap": {
+        "gross": "weight"
+      },
+      "broker": {
+        "host": "10.0.0.20",
+        "port": 1883,
+        "username": "",
+        "password": ""
+      },
+      "topics": ["factory/scale1/#"],
+      "qos": 0
+    },
+    {
+      "comment": "示例（推荐形态）：外部数据源经网线接入能碳一体机，一体机把原始数据上行到云端 Broker 的 ext/<源>/# 空间；中间件订阅该上行空间做转换（此处即云端 Broker 41883）",
+      "id": "steel_sim",
+      "type": "mqtt",
+      "name": "钢铁仿真数据源",
+      "enabled": false,
+      "box": "ext-steel",
+      "deviceKeys": ["device", "deviceId", "sensor", "id"],
+      "broker": {
+        "host": "127.0.0.1",
+        "port": 41883,
+        "username": "",
+        "password": ""
+      },
+      "topics": ["ext/steel/#"],
+      "qos": 0
+    },
+    {
+      "comment": "示例：同一上行空间里的机房热控数据（ext/idc/#）→ 标准主题 data/ext-idc/…",
+      "id": "idc_sim",
+      "type": "mqtt",
+      "name": "机房热控数据源",
+      "enabled": false,
+      "box": "ext-idc",
+      "deviceKeys": ["device", "deviceId", "sensor", "id"],
+      "broker": {
+        "host": "127.0.0.1",
+        "port": 41883,
+        "username": "",
+        "password": ""
+      },
+      "topics": ["ext/idc/#"],
+      "qos": 0
+    }
+  ]
+}

@@ -162,5 +162,95 @@ _IGNORED_DEVICES: set = set(_config.get("ignored_devices") or [])
 BOX_SERVICES: Dict[str, Dict[str, Any]] = {}      # box -> {"services": [...], "last_seen": ts}
 BOX_APP_EVENTS: Dict[str, List[Dict[str, Any]]] = {}  # box -> 最近部署/启停命令执行结果（最多 20 条）
 
-# 当前订阅客户端引用（供配置热更新时断开重连）
+# 外部数据源摄取统计：box 前缀 -> {received, last_at, last_topic, last_msg}
+# （外部源为登记制，无平台进程内线程；此处统计供 external 条目状态展示「最近读数」，
+#   由 mqtt_source.ingest 在归类 external 消息时原地更新，_LOCK 保护）
+_EXT_STATS: Dict[str, Dict[str, Any]] = {}
+
+# 当前订阅客户端引用（供配置热更新时断开重连）。多 Broker 场景下此处保存
+# **云端（一体机）** 的客户端，中间件 Broker 的客户端见 _EP_CLIENTS。
 _CLIENT = None
+
+# ------------------------- 多 Broker 订阅端点 -------------------------
+# 平台订阅两类数据入口（消息归属按前缀+src 自动区分，与入口无关）：
+#   cloud      云端 Broker（默认 41883）：能碳一体机盒子/云端 agent 推送（cloud/#、
+#              state/#、$SYS/#、data/#）——原有数据与统计来源；
+#              external 形态下外部数据源/模拟数据也直发本 Broker（data/ext-*/...）；
+#   middleware 中间件独立数据端口（仅 local 形态，默认 41884 可经 middleware.json
+#              subscribe=false 停用）：外部数据源（含独立模拟源），仅收数据主题
+#              （不订阅 $SYS，避免与云端 Broker 的统计互相污染）。
+# 两端共享同一条摄取管道（ingest._record_message），按 source 区分统计口径。
+_ENDPOINTS: Dict[str, Dict[str, Any]] = {}
+_EP_STATE: Dict[str, Dict[str, Any]] = {}
+_EP_CLIENTS: Dict[str, Any] = {}
+
+# 中间件端点只订阅数据主题（中间件只发布 data/{box}/... ，不产生 cloud/state/$SYS）
+MW_TOPICS = ["data/#"]
+
+
+def _init_endpoints() -> None:
+    """初始化订阅端点（云端取自 Broker 配置，中间件取自 middleware_client 配置）。"""
+    _ENDPOINTS["cloud"] = {
+        "key": "cloud",
+        "label": "云端 Broker（能碳一体机）",
+        "broker": dict(_BROKER),
+        "topics": list(_TOPICS),
+        "sys": True,          # 采集 $SYS/broker/# 统计
+        "enabled": True,      # 云端是主数据源，始终订阅
+    }
+    _ENDPOINTS["middleware"] = {
+        "key": "middleware",
+        "label": "数据中间件（外部数据源）",
+        "broker": {"host": "127.0.0.1", "port": 41884, "username": "", "password": "",
+                   "client_id": "carbon-sim-mw", "keepalive": 60, "qos": 0},
+        "topics": list(MW_TOPICS),
+        "sys": False,
+        "enabled": True,
+    }
+    for key in ("cloud", "middleware"):
+        _EP_STATE.setdefault(key, {
+            "connected": False, "last_connect_rc": None, "last_error": "",
+            "enabled": True, "message_count": 0, "last_message_at": None,
+        })
+
+
+_init_endpoints()
+
+
+def sync_endpoints() -> None:
+    """把最新配置同步到订阅端点（云端 Broker 配置/中间件配置热更新后调用）。"""
+    cloud = _ENDPOINTS.get("cloud")
+    if cloud is not None:
+        cloud["broker"] = dict(_BROKER)
+        cloud["topics"] = list(_TOPICS)
+    mw = _ENDPOINTS.get("middleware")
+    if mw is not None:
+        try:
+            from .. import middleware_client as _mwc
+            cfg = _mwc.load_config()
+            bkr = dict(cfg.get("broker") or {})
+            mw["broker"] = {
+                "host": str(bkr.get("host") or "127.0.0.1"),
+                "port": int(bkr.get("port") or 41884),
+                "username": str(bkr.get("username") or ""),
+                "password": str(bkr.get("password") or ""),
+                "client_id": "carbon-sim-mw", "keepalive": 60, "qos": 0,
+            }
+            # 端点订阅开关：subscribe=false（external 形态）时不再单独订阅中间件端口，
+            # 外部数据已直发云端 Broker，平台经云端端点（41883）统一取数
+            mw["enabled"] = bool(cfg.get("subscribe", True)) and bool(cfg.get("enabled", True))
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def endpoint_states() -> Dict[str, Dict[str, Any]]:
+    """各订阅端点的连接状态快照（前端展示「同时订阅两个 Broker」的连通情况）。"""
+    out: Dict[str, Dict[str, Any]] = {}
+    for key, ep in _ENDPOINTS.items():
+        st = dict(_EP_STATE.get(key) or {})
+        st["label"] = ep.get("label")
+        st["host"] = (ep.get("broker") or {}).get("host")
+        st["port"] = (ep.get("broker") or {}).get("port")
+        st["topics"] = list(ep.get("topics") or [])
+        out[key] = st
+    return out

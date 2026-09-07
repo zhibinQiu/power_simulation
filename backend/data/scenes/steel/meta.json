@@ -1,0 +1,27 @@
+{
+  "id": "steel",
+  "label": "钢铁",
+  "enterprise": "示例钢铁企业",
+  "industry": "钢铁",
+  "industryGroup": "四大控排",
+  "kind": "process",
+  "order": 1,
+  "ready": true,
+  "icon": "flame",
+  "color": "#4f9d6b",
+  "defaultRoute": "long",
+  "routes": ["short", "long"],
+  "engines": ["steel-carbon"],
+  "resources": ["model", "strategy", "factor", "param-schema", "device", "methods", "templates", "dictionary"],
+  "package": { "vendor": "能碳生态 · 官方", "product": "示例钢铁企业能碳仿真资源包", "version": "2.0.0", "builtin": true },
+  "method": {
+    "name": "钢铁工序能碳核算方法学（工序物料/能量平衡 + 排放因子法）",
+    "engine": "steel-carbon",
+    "standard": "GB/T 32151.5、GB 21256、GB/T 21370 等"
+  },
+  "shortDesc": "示例钢铁企业（长/短流程炼钢）能碳仿真：工序级参数寻优与碳排放核算（官方内置企业包）",
+  "intro": [
+    "本资源包面向示例钢铁企业：覆盖烧结 → 高炉/电炉 → 转炉 → 精炼 → 连铸 → 轧钢等工序的炼钢碳排模拟，支持参数配置、工艺编排、算法优化与排放因子调整。",
+    "资源齐全：工艺模板、物料库、工序参数、监测设备库、排放因子与预置策略均已就绪。"
+  ]
+}

@@ -14,6 +14,8 @@
 #   目标          功能                                    脚本（在哪台机器执行）
 #   ------------  ---------------------------------------  --------------------------
 #   update|bs     平台更新：本地构建 + 推送代码到平台机     bs-deploy/update.sh（开发机）
+#   middleware|mw 数据中间件更新：推送中间件代码到平台机      cloud-deploy/middleware/deploy_middleware.sh
+#   simsource|sim 模拟数据源服务更新（独立进程，非平台代码）  cloud-deploy/sim-source/deploy_sim_source.sh
 #   push          提交并推送到 GitHub                      push.sh（仓库根）
 #   portal        门户官网内容更新                          portal-deploy/update.sh（开发机）
 #   docs          文档站 + 源文档更新                       doc-deploy/update.sh（开发机）
@@ -41,6 +43,15 @@ case "$TARGET" in
   update|bs|platform)
     echo "==> 平台更新：本地构建 + 推送代码到平台机（开发机执行 → ${PLATFORM_SSH:-root@36.151.146.71} 容器 reload 生效）"
     exec bash "$DIR/bs-deploy/update.sh" "$@"
+    ;;
+  middleware|mw)
+    echo "==> 数据中间件更新：推送中间件代码到平台机并重启服务（开发机执行 → ${PLATFORM_SSH:-root@36.151.146.71}）"
+    exec bash "$DIR/cloud-deploy/middleware/deploy_middleware.sh" sync \
+      --server "${PLATFORM_SSH:-root@36.151.146.71}" "$@"
+    ;;
+  simsource|sim)
+    echo "==> 模拟数据源服务（独立进程，默认在**开发机**本地启动：sim-source/deploy_sim_source.sh）"
+    exec bash "$DIR/cloud-deploy/sim-source/deploy_sim_source.sh" "$@"
     ;;
   push)
     exec bash "$DIR/../push.sh" "$@"

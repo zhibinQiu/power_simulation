@@ -6,24 +6,26 @@
 // 能源类：电网电 0.5703 tCO₂/MWh（2022 年全国电力平均 CO₂ 排放因子）；副产品煤气按发热量折算。
 export const MATERIALS = [
   // 原料
-  // price：外购参考单价（元/单位，行业参考价），供「全厂总览 → 成本 = 外购用量 × 单价」核算；
+  // price：外购参考单价（万元/单位，行业参考价 ÷1e4 统一口径），供「全厂总览 → 成本 = 外购用量 × 单价」核算；
   //        可在物料属性中按采购合同调整（随方案持久化）。
-  { id: 'iron_ore', name: '铁矿石', cat: '原料', unit: 't', color: '#8a9a5b', carbon: 0.02, price: 900 },
-  { id: 'coke', name: '焦炭', cat: '原料', unit: 't', color: '#5a5a5a', carbon: 3.0, price: 2100 },
-  { id: 'coal', name: '煤', cat: '原料', unit: 't', color: '#6a6a6a', carbon: 2.4, price: 1200 },
-  { id: 'limestone', name: '石灰石', cat: '原料', unit: 't', color: '#c9c2a8', carbon: 0.44, price: 200 },
-  { id: 'scrap', name: '废钢', cat: '原料', unit: 't', color: '#6f9e74', carbon: 0.1, price: 2600 },
-  { id: 'electrode', name: '石墨电极', cat: '原料', unit: 't', color: '#7a6a8a', carbon: 0.5, price: 40000 },
+  // salePrice：产品（PRODUCT_IDS）销售参考单价（万元/单位，行业参考价 ÷1e4 统一口径），供收益核算
+  //        「收入 = 产品产量 × 销售单价 − 外购成本」使用；可在物料属性中按市场行情调整（随方案持久化）。
+  { id: 'iron_ore', name: '铁矿石', cat: '原料', unit: 't', color: '#8a9a5b', carbon: 0.02, price: 0.09 },
+  { id: 'coke', name: '焦炭', cat: '原料', unit: 't', color: '#5a5a5a', carbon: 3.0, price: 0.21 },
+  { id: 'coal', name: '煤', cat: '原料', unit: 't', color: '#6a6a6a', carbon: 2.4, price: 0.12 },
+  { id: 'limestone', name: '石灰石', cat: '原料', unit: 't', color: '#c9c2a8', carbon: 0.44, price: 0.02 },
+  { id: 'scrap', name: '废钢', cat: '原料', unit: 't', color: '#6f9e74', carbon: 0.1, price: 0.26 },
+  { id: 'electrode', name: '石墨电极', cat: '原料', unit: 't', color: '#7a6a8a', carbon: 0.5, price: 4.0 },
   { id: 'dri', name: '直接还原铁/热压块铁', cat: '原料', unit: 't', color: '#7d9b6a', carbon: 0.2 },
   { id: 'pig_iron', name: '生铁', cat: '原料', unit: 't', color: '#5f7d52', carbon: 1.6 },
   { id: 'ferroalloy', name: '合金', cat: '原料', unit: 't', color: '#8a7bb0', carbon: 1.5 },
   { id: 'oxygen', name: '氧气', cat: '能源', unit: 'Nm³', color: '#5b83a8', carbon: 0 },
   { id: 'water', name: '水', cat: '原料', unit: 't', color: '#4f97a0', carbon: 0 },
-  { id: 'ngas', name: '天然气', cat: '能源', unit: 'Nm³', color: '#a0a0a0', carbon: 0.00216, price: 3.2 },
+  { id: 'ngas', name: '天然气', cat: '能源', unit: 'Nm³', color: '#a0a0a0', carbon: 0.00216, price: 0.00032 },
   // 电力类（外购电 / 绿电 / 自发电）；process 模板的 electricity 端口即指向「外购电」
-  { id: 'electricity', name: '外购电', cat: '能源', unit: 'MWh', color: '#e0b24a', carbon: 0.57, price: 550 },
+  { id: 'electricity', name: '外购电', cat: '能源', unit: 'MWh', color: '#e0b24a', carbon: 0.57, price: 0.055 },
   { id: 'green_power', name: '绿电', cat: '能源', unit: 'MWh', color: '#3fae7a', carbon: 0.02 },
-  { id: 'biomass', name: '生物质碳', cat: '能源', unit: 't', color: '#7fae5a', carbon: 0.0, price: 400 },
+  { id: 'biomass', name: '生物质碳', cat: '能源', unit: 't', color: '#7fae5a', carbon: 0.0, price: 0.04 },
   // 中间产物
   { id: 'sinter', name: '烧结矿', cat: '中间产物', unit: 't', color: '#9a8b5b', carbon: 0.2 },
   { id: 'pellet', name: '球团', cat: '中间产物', unit: 't', color: '#b0a060', carbon: 0.1 },
@@ -36,9 +38,9 @@ export const MATERIALS = [
   { id: 'steel_slag', name: '钢渣', cat: '中间产物', unit: 't', color: '#8a7aa0', carbon: 0 },
   { id: 'ldg', name: '转炉煤气', cat: '能源', unit: 'Nm³', color: '#7a8a5a', carbon: 0.002 },
   { id: 'conv_dust', name: '转炉尘/污泥', cat: '中间产物', unit: 't', color: '#9a9a8a', carbon: 0 },
-  { id: 'refined_steel', name: '精炼钢水', cat: '中间产物', unit: 't', color: '#4fb07a', carbon: 0.05 },
-  { id: 'billet', name: '连铸坯', cat: '中间产物', unit: 't', color: '#5fae7a', carbon: 0.05 },
-  { id: 'steel_product', name: '钢材', cat: '中间产物', unit: 't', color: '#3f9d6b', carbon: 0.05 },
+  { id: 'refined_steel', name: '精炼钢水', cat: '中间产物', unit: 't', color: '#4fb07a', carbon: 0.05, salePrice: 0.32 },
+  { id: 'billet', name: '连铸坯', cat: '中间产物', unit: 't', color: '#5fae7a', carbon: 0.05, salePrice: 0.35 },
+  { id: 'steel_product', name: '钢材', cat: '中间产物', unit: 't', color: '#3f9d6b', carbon: 0.05, salePrice: 0.39 },
   { id: 'scale', name: '氧化铁皮', cat: '中间产物', unit: 't', color: '#a05a4a', carbon: 0 },
   // 能源/副产品
   { id: 'cog', name: '焦炉煤气', cat: '能源', unit: 'Nm³', color: '#8a9a4a', carbon: 0.002 },
@@ -87,6 +89,7 @@ export function nodeHeight(n) {
 }
 
 // 终端产品（用于资产浏览器「产品」标签）：钢材 / 连铸坯 / 精炼钢水
+// 以上三产品已在 MATERIALS 中配置 salePrice（销售参考价，万元/t），可在物料属性中按市场行情调整。
 export const PRODUCT_IDS = ['steel_product', 'billet', 'refined_steel']
 export const PRODUCTS = PRODUCT_IDS.map((id) => MATERIAL_MAP[id]).filter(Boolean)
 
@@ -99,7 +102,7 @@ export const PROCESS_TEMPLATES = [
   { type: 'sinter_plant', label: '烧结机', route: 'steel', mainIn: 'iron_ore', mainOut: 'sinter',
     efDirect: 0.20, efIndirect: 0.02, yield: 0.86,
     inputs: ['iron_ore', 'coke', 'limestone', 'draft'], outputs: ['sinter', 'bfg', 'co2'],
-    params: [{ key: 'ore_rate', label: '矿量', unit: 't/h', min: 200, max: 2500, step: 50, def: 1100 },
+    params: [{ key: 'ore_rate', label: '矿量', unit: 't/h', min: 200, max: 2500, step: 50, def: 385 },
              { key: 'fuel_rate', label: '燃料比', unit: 'kg/t', min: 20, max: 80, step: 1, def: 45 }],
     greenStrategies: [
       { id: 'sinter_hr', name: '烧结余热回收', desc: '回收烧结矿冷却废气显热，产蒸汽或发电', saving: '节电 25 kWh/t-烧结矿', carbon: 7.5, tags: ['余热'] },
@@ -111,7 +114,7 @@ export const PROCESS_TEMPLATES = [
   { type: 'pelletizing', label: '球团', route: 'steel', mainIn: 'iron_ore', mainOut: 'pellet',
     efDirect: 0.10, efIndirect: 0.03, yield: 0.90,
     inputs: ['iron_ore', 'limestone', 'draft'], outputs: ['pellet', 'co2'],
-    params: [{ key: 'ore_rate', label: '矿量', unit: 't/h', min: 100, max: 1200, step: 50, def: 500 },
+    params: [{ key: 'ore_rate', label: '矿量', unit: 't/h', min: 100, max: 1200, step: 50, def: 175 },
              { key: 'fuel_rate', label: '燃料比', unit: 'kg/t', min: 5, max: 40, step: 1, def: 18 }],
     greenStrategies: [
       { id: 'pellet_grate_hr', name: '链篦机-回转窑余热回收', desc: '回收回转窑和环冷机废气余热用于干燥预热', saving: '节煤 8 kg/t-球团', carbon: 10.0, tags: ['余热'] },
@@ -121,7 +124,7 @@ export const PROCESS_TEMPLATES = [
   { type: 'coke_oven', label: '焦炉', route: 'steel', mainIn: 'coal', mainOut: 'coke',
     efDirect: 0.30, efIndirect: 0.015, yield: 0.75,
     inputs: ['coal', 'combustion_air'], outputs: ['coke', 'cog', 'co2'],
-    params: [{ key: 'coal_rate', label: '入炉煤', unit: 't/h', min: 100, max: 1200, step: 50, def: 475 }],
+    params: [{ key: 'coal_rate', label: '入炉煤', unit: 't/h', min: 100, max: 1200, step: 50, def: 170 }],
     greenStrategies: [
       { id: 'coke_cdq', name: '干熄焦(CDQ)', desc: '惰性气体冷却红焦并回收热量发电', saving: '节电 50 kWh/t-焦', carbon: 15.0, tags: ['余热'] },
       { id: 'coke_riser_hr', name: '焦炉上升管余热回收', desc: '回收荒煤气显热产蒸汽，取代管式炉', saving: '节煤 10 kg/t-焦', carbon: 12.0, tags: ['余热'] },
@@ -133,9 +136,9 @@ export const PROCESS_TEMPLATES = [
     inputs: ['sinter', 'pellet', 'coke', 'limestone', 'self_power', 'blast_air', 'hot_blast', 'pulverized_coal', 'electricity'], outputs: ['hot_metal', 'bf_slag', 'bfg', 'co2'],
     // 由独立工辅(鼓风机/热风炉/喷吹系统)经物料连线供给的驱动量，连线存在时覆盖下方手动参数
     drivenBy: { blast_air: 'wind_rate', hot_blast: 'hot_blast_temp', pulverized_coal: 'coal_inj', draft: 'draft' },
-    params: [{ key: 'hot_metal', label: '铁水产量', unit: 't/h', min: 200, max: 2000, step: 50, def: 1000 },
+    params: [{ key: 'hot_metal', label: '铁水产量', unit: 't/h', min: 200, max: 2000, step: 50, def: 350 },
             { key: 'coke_rate', label: '焦比', unit: 'kg/t', min: 300, max: 550, step: 5, def: 410 },
-            { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 5, max: 60, step: 5, def: 30 },
+            { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 5, max: 60, step: 5, def: 11 },
             { key: 'coal_inj', label: '喷煤比', unit: 'kg/t', min: 0, max: 220, step: 5, def: 130 },
             // 炉料结构（百分比配比 + 总入炉矿量）：矿源脉石(CaO/SiO₂/MgO/Al₂O₃)参与炉渣二元碱度计算，
             // 成分取物料面板「详细化学成分」（烧结矿/球团/块矿=铁矿石）；各矿量 = 总矿量 × 配比/Σ配比
@@ -145,7 +148,7 @@ export const PROCESS_TEMPLATES = [
             { key: 'lump_pct', label: '块矿配比', unit: '%', min: 0, max: 100, step: 1, def: 7 },
             { key: 'slag_rate', label: '渣比', unit: 'kg/t', min: 200, max: 450, step: 5, def: 300 },
             { key: 'flux', label: '熔剂比', unit: 'kg/t', min: 0, max: 150, step: 5, def: 10 },
-            { key: 'wind_rate', label: '风量', unit: 'kNm³/h', min: 50, max: 480, step: 10, def: 228 },
+            { key: 'wind_rate', label: '风量', unit: 'kNm³/h', min: 50, max: 480, step: 10, def: 80 },
             { key: 'hot_blast_temp', label: '热风温度', unit: '℃', min: 1100, max: 1250, step: 10, def: 1150 },
             { key: 'o2_flow', label: '纯氧流量', unit: 'Nm³/h', min: 0, max: 60000, step: 500, def: 0 },
             { key: 'draft', label: '炉顶抽力(相对)', unit: '×', min: 0.5, max: 1.5, step: 0.02, def: 1.0 },
@@ -162,7 +165,7 @@ export const PROCESS_TEMPLATES = [
   { type: 'hot_metal_pretreat', label: '铁水预处理', route: 'steel', mainIn: 'hot_metal', mainOut: 'pre_hm',
     efDirect: 0.02, efIndirect: 0.02, yield: 0.99,
     inputs: ['hot_metal', 'oxygen'], outputs: ['pre_hm', 'co2'],
-    params: [{ key: 'hm_rate', label: '铁水量', unit: 't/h', min: 200, max: 2000, step: 50, def: 1000 }],
+    params: [{ key: 'hm_rate', label: '铁水量', unit: 't/h', min: 200, max: 2000, step: 50, def: 350 }],
     greenStrategies: [
       { id: 'hmpt_mg_opt', name: '铁水预处理镁基脱硫优化', desc: '优化喷吹参数降低镁粉消耗与铁损', saving: '降耗 20% 脱硫剂', carbon: 1.0, tags: ['节能'] },
       { id: 'hmpt_kr_opt', name: 'KR搅拌能效优化', desc: '优化搅拌转速和叶片结构降低电耗', saving: '节电 3 kWh/t-铁水', carbon: 0.9, tags: ['节能'] },
@@ -170,9 +173,9 @@ export const PROCESS_TEMPLATES = [
   { type: 'bof', label: '转炉', route: 'steel', mainIn: 'pre_hm', mainOut: 'crude_steel',
     efDirect: 0.10, efIndirect: 0.03, yield: 0.96,
     inputs: ['pre_hm', 'scrap', 'limestone', 'oxygen'], outputs: ['crude_steel', 'steel_slag', 'ldg', 'conv_dust', 'co2'],
-    params: [{ key: 'hot_metal_in', label: '铁水入炉', unit: 't/h', min: 200, max: 2000, step: 50, def: 1000 },
-             { key: 'scrap', label: '废钢', unit: 't/h', min: 0, max: 600, step: 50, def: 100 },
-             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 5, max: 60, step: 5, def: 30 },
+    params: [{ key: 'hot_metal_in', label: '铁水入炉', unit: 't/h', min: 200, max: 2000, step: 50, def: 350 },
+             { key: 'scrap', label: '废钢', unit: 't/h', min: 0, max: 600, step: 50, def: 35 },
+             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 5, max: 60, step: 5, def: 11 },
              { key: 'slag_rate', label: '渣比', unit: 'kg/t', min: 80, max: 200, step: 5, def: 120 },
              { key: 'flux', label: '熔剂比', unit: 'kg/t', min: 0, max: 150, step: 5, def: 60 }],
     greenStrategies: [
@@ -185,8 +188,8 @@ export const PROCESS_TEMPLATES = [
   { type: 'ladle_furnace', label: 'LF精炼', route: 'steel', mainIn: 'crude_steel', mainOut: 'refined_steel',
     efDirect: 0.0, efIndirect: 0.015, yield: 0.995,
     inputs: ['crude_steel', 'electricity'], outputs: ['refined_steel', 'co2'],
-    params: [{ key: 'steel_in', label: '钢水量', unit: 't/h', min: 200, max: 2000, step: 50, def: 1000 },
-             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 5, max: 60, step: 5, def: 25 }],
+    params: [{ key: 'steel_in', label: '钢水量', unit: 't/h', min: 200, max: 2000, step: 50, def: 350 },
+             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 5, max: 60, step: 5, def: 9 }],
     greenStrategies: [
       { id: 'lf_submerged_arc', name: 'LF埋弧加热优化', desc: '优化造渣和电压档位提高电弧热效率', saving: '节电 5 kWh/t-钢', carbon: 1.5, tags: ['节能'] },
       { id: 'lf_ladle_heater', name: '钢包蓄热式烘烤', desc: '蓄热式燃烧技术回收烟气余热预热烘烤空气', saving: '节气 40 %', carbon: 2.0, tags: ['余热'] },
@@ -194,8 +197,8 @@ export const PROCESS_TEMPLATES = [
   { type: 'rh_vacuum', label: 'RH精炼', route: 'steel', mainIn: 'refined_steel', mainOut: 'refined_steel',
     efDirect: 0.0, efIndirect: 0.005, yield: 0.998,
     inputs: ['refined_steel', 'electricity'], outputs: ['refined_steel', 'co2'],
-    params: [{ key: 'steel_in', label: '钢水量', unit: 't/h', min: 200, max: 2000, step: 50, def: 1000 },
-             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 1, max: 15, step: 1, def: 5 }],
+    params: [{ key: 'steel_in', label: '钢水量', unit: 't/h', min: 200, max: 2000, step: 50, def: 350 },
+             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 1, max: 15, step: 1, def: 2 }],
     greenStrategies: [
       { id: 'rh_vac_vfd', name: 'RH真空泵变频调速', desc: '根据脱气阶段自动调节真空泵转速', saving: '节电 2 kWh/t-钢', carbon: 0.6, tags: ['节能'] },
       { id: 'rh_light_treat', name: 'RH轻处理工艺', desc: '减少深真空处理时间仅作成分微调', saving: '节电 1 kWh/t-钢', carbon: 0.3, tags: ['节能'] },
@@ -203,8 +206,8 @@ export const PROCESS_TEMPLATES = [
   { type: 'caster', label: '连铸机', route: 'steel', mainIn: 'refined_steel', mainOut: 'billet',
     efDirect: 0.0, efIndirect: 0.01, yield: 0.97,
     inputs: ['refined_steel', 'electricity'], outputs: ['billet', 'scale'],
-    params: [{ key: 'steel_in', label: '钢水量', unit: 't/h', min: 200, max: 2000, step: 50, def: 1000 },
-             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 2, max: 40, step: 2, def: 15 }],
+    params: [{ key: 'steel_in', label: '钢水量', unit: 't/h', min: 200, max: 2000, step: 50, def: 350 },
+             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 2, max: 40, step: 2, def: 6 }],
     greenStrategies: [
       { id: 'cc_hcr', name: '连铸坯热送热装(HCR)', desc: '高温连铸坯直接送入加热炉，减少加热能耗', saving: '节气 50 %', carbon: 15.0, tags: ['节能'] },
       { id: 'cc_tundish_heat', name: '中间包感应加热', desc: '等离子/感应加热精准控温降低过热度', saving: '节电 2 kWh/t-钢', carbon: 0.6, tags: ['节能'] },
@@ -213,9 +216,9 @@ export const PROCESS_TEMPLATES = [
   { type: 'rolling_mill', label: '热轧机', route: 'steel', mainIn: 'billet', mainOut: 'steel_product',
     efDirect: 0.02, efIndirect: 0.03, yield: 0.95,
     inputs: ['billet', 'ngas', 'electricity'], outputs: ['steel_product', 'scale', 'co2'],
-    params: [{ key: 'steel_in', label: '钢水量', unit: 't/h', min: 200, max: 2000, step: 50, def: 1000 },
+    params: [{ key: 'steel_in', label: '钢水量', unit: 't/h', min: 200, max: 2000, step: 50, def: 350 },
              { key: 'ng_rate', label: '天然气', unit: 'm³/t', min: 0, max: 80, step: 2, def: 32 },
-             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 10, max: 160, step: 5, def: 80 }],
+             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 10, max: 160, step: 5, def: 28 }],
     greenStrategies: [
       { id: 'rm_regen_burner', name: '加热炉蓄热式燃烧', desc: '蓄热体交替回收烟气余热预热助燃空气', saving: '节气 30 %', carbon: 12.0, tags: ['余热'] },
       { id: 'rm_laminar_hr', name: '热轧层流冷却余热回收', desc: '回收层流冷却水余热用于供暖或预热', saving: '余热回收 1.5 GJ/t-钢', carbon: 4.0, tags: ['余热'] },
@@ -227,9 +230,9 @@ export const PROCESS_TEMPLATES = [
   { type: 'eaf', label: '电炉', route: 'steel', mainIn: 'scrap', mainOut: 'crude_steel',
     efDirect: 0.05, efIndirect: 0.25, yield: 0.95,
     inputs: ['scrap', 'dri', 'pig_iron', 'electricity', 'oxygen', 'self_power', 'drive_power', 'electrode_power'], outputs: ['crude_steel', 'steel_slag', 'ldg', 'co2'],
-    params: [{ key: 'scrap', label: '废钢', unit: 't/h', min: 0, max: 2000, step: 50, def: 900 },
+    params: [{ key: 'scrap', label: '废钢', unit: 't/h', min: 0, max: 2000, step: 50, def: 350 },
              { key: 'dri', label: '直接还原铁', unit: 't/h', min: 0, max: 800, step: 50, def: 150 },
-             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 50, max: 700, step: 20, def: 360 }],
+             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 50, max: 700, step: 20, def: 140 }],
     greenStrategies: [
       { id: 'eaf_scrap_preheat', name: '废钢连续预热', desc: '利用电炉烟气(1200℃+)预热废钢降低电耗', saving: '节电 80 kWh/t-钢', carbon: 48.0, tags: ['余热'] },
       { id: 'eaf_foamy_slag', name: '泡沫渣操作', desc: '优化埋弧操作减少电弧热辐射损失', saving: '节电 20 kWh/t-钢', carbon: 12.0, tags: ['节能'] },
@@ -243,8 +246,8 @@ export const PROCESS_TEMPLATES = [
   { type: 'dri_midrex', label: 'DRI竖炉', route: 'steel', mainIn: 'iron_ore', mainOut: 'dri',
     efDirect: 0.60, efIndirect: 0.09, yield: 0.92,
     inputs: ['iron_ore', 'ngas', 'oxygen', 'self_power', 'drive_power'], outputs: ['dri', 'co2', 'top_gas'],
-    params: [{ key: 'ore_rate', label: '矿量', unit: 't/h', min: 100, max: 800, step: 50, def: 330 },
-             { key: 'dri_out', label: 'DRI产量', unit: 't/h', min: 50, max: 700, step: 50, def: 300 },
+    params: [{ key: 'ore_rate', label: '矿量', unit: 't/h', min: 100, max: 800, step: 50, def: 116 },
+             { key: 'dri_out', label: 'DRI产量', unit: 't/h', min: 50, max: 700, step: 50, def: 105 },
              { key: 'ng_rate', label: '天然气耗', unit: 'm³/t-DRI', min: 200, max: 400, step: 10, def: 300 },
              { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 10, max: 150, step: 5, def: 45 },
              { key: 'h2_ratio', label: 'H₂占比', unit: '%', min: 40, max: 95, step: 5, def: 55 }],
@@ -259,7 +262,7 @@ export const PROCESS_TEMPLATES = [
   { type: 'gas_power', label: '煤气发电', route: 'util', mainIn: 'bfg', mainOut: 'self_power',
     efDirect: 0.0, efIndirect: 0.0, yield: 0.30,
     inputs: ['bfg', 'ldg', 'cog'], outputs: ['self_power', 'steam'],
-    params: [{ key: 'gas_in', label: '煤气量', unit: 'kNm³/h', min: 50, max: 2000, step: 20, def: 600 }] },
+    params: [{ key: 'gas_in', label: '煤气量', unit: 'kNm³/h', min: 50, max: 2000, step: 20, def: 210 }] },
   { type: 'waste_heat', label: '余热回收', route: 'util', mainIn: 'waste_heat', mainOut: 'self_power',
     efDirect: 0.0, efIndirect: 0.0, yield: 0.12,
     inputs: ['waste_heat'], outputs: ['self_power', 'steam'],
@@ -278,8 +281,8 @@ export const PROCESS_TEMPLATES = [
     // oxygen: 全厂供氧系统集中供氧（富氧率由供氧系统·供氧量驱动，鼓风机不再单独喷氧）
     inputs: ['oxygen'], outputs: ['blast_air'],
     // power: 配套电机功率 MW；air_rate: 实际供风量 kNm³/h；humidity: 鼓风湿度 g/Nm³（加湿/脱湿调节，影响风口热制度）
-    params: [{ key: 'power', label: '电机功率', unit: 'MW', min: 10, max: 80, step: 1, def: 36 },
-             { key: 'air_rate', label: '供风量', unit: 'kNm³/h', min: 100, max: 900, step: 10, def: 600 },
+    params: [{ key: 'power', label: '电机功率', unit: 'MW', min: 10, max: 80, step: 1, def: 13 },
+             { key: 'air_rate', label: '供风量', unit: 'kNm³/h', min: 100, max: 900, step: 10, def: 210 },
              { key: 'humidity', label: '鼓风湿度', unit: 'g/Nm³', min: 0, max: 30, step: 1, def: 10 },
              { key: 'pressure', label: '出口风压', unit: 'kPa', min: 200, max: 600, step: 10, def: 420 }],
     // 高炉 wind_rate 为绝对供风量（kNm³/h），与鼓风机 air_rate 同量纲，连线直接写入。
@@ -294,9 +297,11 @@ export const PROCESS_TEMPLATES = [
     inputs: ['blast_air'], outputs: ['hot_blast'],
     // firing_rate: 燃烧煤气量 kNm³/h（计入被服务工艺碳排，本工艺不计直接碳）；
     // power: 助燃风机电机功率 MW（本工艺电耗）；blast_temp: 送风温度 ℃
-    params: [{ key: 'power', label: '助燃风机功率', unit: 'MW', min: 1, max: 12, step: 0.5, def: 6 },
-             { key: 'firing_rate', label: '燃烧煤气量', unit: 'kNm³/h', min: 50, max: 400, step: 10, def: 220 },
-             { key: 'blast_temp', label: '送风温度', unit: '℃', min: 950, max: 1300, step: 10, def: 1250 },
+    params: [{ key: 'power', label: '助燃风机功率', unit: 'MW', min: 1, max: 12, step: 0.5, def: 2 },
+             { key: 'firing_rate', label: '燃烧煤气量', unit: 'kNm³/h', min: 50, max: 400, step: 10, def: 77 },
+             // blast_temp 默认 1150 = 高炉模板 hot_blast_temp def（名义风温基准，默认工况无扰动）；
+             // 改动须同步 calculators.py 风温名义基准 1150 与 bfFuel.js 动态基准
+             { key: 'blast_temp', label: '送风温度', unit: '℃', min: 950, max: 1300, step: 10, def: 1150 },
              { key: 'thermal_eff', label: '热效率', unit: '%', min: 60, max: 92, step: 1, def: 80 }],
     drives: { hot_blast: { src: 'blast_temp', dst: 'hot_blast_temp' } },
     greenStrategies: [
@@ -306,7 +311,7 @@ export const PROCESS_TEMPLATES = [
     efDirect: 0.0, efIndirect: 0.0, yield: 0,
     inputs: [], outputs: ['draft'],
     // power: 电机功率 MW；draught: 抽力 kPa
-    params: [{ key: 'power', label: '电机功率', unit: 'MW', min: 2, max: 20, step: 0.5, def: 8 },
+    params: [{ key: 'power', label: '电机功率', unit: 'MW', min: 2, max: 20, step: 0.5, def: 3 },
              { key: 'draught', label: '抽力', unit: 'kPa', min: 1, max: 8, step: 0.2, def: 3.5 }],
     drives: { draft: { src: 'draught', dst: 'draft' } },
     greenStrategies: [
@@ -315,9 +320,9 @@ export const PROCESS_TEMPLATES = [
   { type: 'injector', label: '喷吹系统', route: 'aux', mainIn: null, mainOut: 'pulverized_coal',
     efDirect: 0.0, efIndirect: 0.0, yield: 0,
     inputs: [], outputs: ['pulverized_coal'],
-    params: [{ key: 'power', label: '载气压缩机功率', unit: 'MW', min: 1, max: 15, step: 0.5, def: 7 },
-             { key: 'inj_rate', label: '喷吹量', unit: 't/h', min: 0, max: 200, step: 5, def: 120 },
-             { key: 'transport_air', label: '载气量', unit: 'kNm³/h', min: 0, max: 120, step: 5, def: 60 }],
+    params: [{ key: 'power', label: '载气压缩机功率', unit: 'MW', min: 1, max: 15, step: 0.5, def: 2 },
+             { key: 'inj_rate', label: '喷吹量', unit: 't/h', min: 0, max: 200, step: 5, def: 42 },
+             { key: 'transport_air', label: '载气量', unit: 'kNm³/h', min: 0, max: 120, step: 5, def: 21 }],
     drives: { pulverized_coal: { src: 'inj_rate', dst: 'coal_inj' } },
     greenStrategies: [
       { id: 'inj_opt', name: '喷吹均匀性优化', desc: '优化分配器降低吨煤载气能耗', saving: '节电 5%', carbon: 1.5, tags: ['节能'] },
@@ -325,8 +330,8 @@ export const PROCESS_TEMPLATES = [
   { type: 'combustion_blower', label: '助燃风机', route: 'aux', mainIn: null, mainOut: 'combustion_air',
     efDirect: 0.0, efIndirect: 0.0, yield: 0,
     inputs: [], outputs: ['combustion_air'],
-    params: [{ key: 'power', label: '电机功率', unit: 'MW', min: 1, max: 15, step: 0.5, def: 5 },
-             { key: 'air_rate', label: '供风量', unit: 'kNm³/h', min: 20, max: 300, step: 10, def: 150 }],
+    params: [{ key: 'power', label: '电机功率', unit: 'MW', min: 1, max: 15, step: 0.5, def: 2 },
+             { key: 'air_rate', label: '供风量', unit: 'kNm³/h', min: 20, max: 300, step: 10, def: 53 }],
     drives: { combustion_air: { src: 'air_rate', dst: 'combustion_air' } },
     greenStrategies: [
       { id: 'cb_vfd', name: '助燃风机变频', desc: '按燃烧需氧量自动调节供风', saving: '节电 7%', carbon: 2.0, tags: ['节能'] },
@@ -334,7 +339,7 @@ export const PROCESS_TEMPLATES = [
   { type: 'drive_supply', label: '驱动供电', route: 'aux', mainIn: null, mainOut: 'drive_power',
     efDirect: 0.0, efIndirect: 0.0, yield: 0,
     inputs: ['electricity'], outputs: ['drive_power'],
-    params: [{ key: 'power', label: '供电功率', unit: 'MW', min: 1, max: 120, step: 1, def: 60 },
+    params: [{ key: 'power', label: '供电功率', unit: 'MW', min: 1, max: 120, step: 1, def: 21 },
              { key: 'green_ratio', label: '绿电占比', unit: '%', min: 0, max: 100, step: 5, def: 20 }],
     drives: { drive_power: { src: 'power', dst: 'power' } },
     greenStrategies: [
@@ -352,8 +357,8 @@ export const PROCESS_TEMPLATES = [
   { type: 'belt_conv', label: '皮带机', route: 'aux', mainIn: 'feeder_flow', mainOut: 'feeder_flow',
     efDirect: 0.0, efIndirect: 0.0, yield: 0,
     inputs: ['feeder_flow'], outputs: ['feeder_flow'],
-    params: [{ key: 'power', label: '电机功率', unit: 'MW', min: 0.5, max: 8, step: 0.5, def: 3 },
-             { key: 'throughput', label: '输送量', unit: 't/h', min: 100, max: 5000, step: 50, def: 1500 }],
+    params: [{ key: 'power', label: '电机功率', unit: 'MW', min: 0.5, max: 8, step: 0.5, def: 1 },
+             { key: 'throughput', label: '输送量', unit: 't/h', min: 100, max: 5000, step: 50, def: 525 }],
     drives: {},
     greenStrategies: [
       { id: 'bc_vfd', name: '皮带机变频', desc: '按料流自动调速减少空转', saving: '节电 12%', carbon: 2.0, tags: ['节能'] },
@@ -361,15 +366,15 @@ export const PROCESS_TEMPLATES = [
   { type: 'feeder', label: '给料机', route: 'aux', mainIn: 'feeder_flow', mainOut: 'feeder_flow',
     efDirect: 0.0, efIndirect: 0.0, yield: 0,
     inputs: ['feeder_flow'], outputs: ['feeder_flow'],
-    params: [{ key: 'power', label: '电机功率', unit: 'MW', min: 0.2, max: 4, step: 0.2, def: 1.2 },
-             { key: 'rate', label: '给料速率', unit: 't/h', min: 10, max: 2000, step: 10, def: 400 }],
+    params: [{ key: 'power', label: '电机功率', unit: 'MW', min: 0.2, max: 4, step: 0.2, def: 0.4 },
+             { key: 'rate', label: '给料速率', unit: 't/h', min: 10, max: 2000, step: 10, def: 140 }],
     drives: {},
     greenStrategies: [] },
   { type: 'cool_pump', label: '冷却水泵', route: 'aux', mainIn: null, mainOut: 'cool_water',
     efDirect: 0.0, efIndirect: 0.0, yield: 0,
     inputs: [], outputs: ['cool_water'],
-    params: [{ key: 'power', label: '电机功率', unit: 'MW', min: 0.5, max: 12, step: 0.5, def: 4 },
-             { key: 'flow', label: '循环水量', unit: 't/h', min: 100, max: 6000, step: 50, def: 2000 }],
+    params: [{ key: 'power', label: '电机功率', unit: 'MW', min: 0.5, max: 12, step: 0.5, def: 1.5 },
+             { key: 'flow', label: '循环水量', unit: 't/h', min: 100, max: 6000, step: 50, def: 700 }],
     drives: {},
     greenStrategies: [
       { id: 'cp_vfd', name: '冷却水泵变频', desc: '按温差自动调节循环水量', saving: '节电 15%', carbon: 2.5, tags: ['节能'] },
@@ -377,7 +382,7 @@ export const PROCESS_TEMPLATES = [
   { type: 'aux_boiler', label: '辅助锅炉', route: 'aux', mainIn: null, mainOut: 'aux_steam',
     efDirect: 0.0, efIndirect: 0.0, yield: 0,
     inputs: ['ngas'], outputs: ['aux_steam'],
-    params: [{ key: 'steam_rate', label: '产汽量', unit: 't/h', min: 5, max: 200, step: 5, def: 80 },
+    params: [{ key: 'steam_rate', label: '产汽量', unit: 't/h', min: 5, max: 200, step: 5, def: 28 },
              { key: 'thermal_eff', label: '热效率', unit: '%', min: 70, max: 95, step: 1, def: 88 }],
     drives: {},
     greenStrategies: [
@@ -386,8 +391,8 @@ export const PROCESS_TEMPLATES = [
   { type: 'oxy_plant', label: '空分制氧', route: 'aux', mainIn: null, mainOut: 'oxy_supply',
     efDirect: 0.0, efIndirect: 0.0, yield: 0,
     inputs: ['electricity'], outputs: ['oxy_supply'],
-    params: [{ key: 'power', label: '电耗功率', unit: 'MW', min: 5, max: 80, step: 2, def: 40 },
-             { key: 'oxygen_rate', label: '产氧量', unit: 'kNm³/h', min: 20, max: 600, step: 10, def: 260 }],
+    params: [{ key: 'power', label: '电耗功率', unit: 'MW', min: 5, max: 80, step: 2, def: 14 },
+             { key: 'oxygen_rate', label: '产氧量', unit: 'kNm³/h', min: 20, max: 600, step: 10, def: 91 }],
     drives: { oxy_supply: { src: 'oxygen_rate', dst: 'oxygen_enrich' } },
     greenStrategies: [
       { id: 'ox_vsa', name: '变压吸附优化', desc: '优化吸附周期降低单位氧电耗', saving: '节电 6%', carbon: 3.5, tags: ['节能'] },
@@ -397,8 +402,8 @@ export const PROCESS_TEMPLATES = [
   { type: 'oxy_supply', label: '供氧系统', route: 'aux', mainIn: null, mainOut: 'oxygen',
     efDirect: 0.0, efIndirect: 0.0, yield: 0,
     inputs: ['electricity'], outputs: ['oxygen'],
-    params: [{ key: 'power', label: '制氧电耗', unit: 'MW', min: 5, max: 200, step: 5, def: 80 },
-             { key: 'oxygen_rate', label: '供氧量', unit: 'kNm³/h', min: 20, max: 1500, step: 20, def: 600 },
+    params: [{ key: 'power', label: '制氧电耗', unit: 'MW', min: 5, max: 200, step: 5, def: 6 },
+             { key: 'oxygen_rate', label: '供氧量', unit: 'kNm³/h', min: 20, max: 1500, step: 20, def: 60 },
              { key: 'green_ratio', label: '绿电占比', unit: '%', min: 0, max: 100, step: 5, def: 15 }],
     drives: { oxygen: { src: 'oxygen_rate', dst: 'oxygen_enrich' } },
     greenStrategies: [
@@ -409,7 +414,7 @@ export const PROCESS_TEMPLATES = [
   { type: 'power_supply', label: '供电系统', route: 'aux', mainIn: null, mainOut: 'electricity',
     efDirect: 0.0, efIndirect: 0.0, yield: 0,
     inputs: ['electricity'], outputs: ['electricity'],
-    params: [{ key: 'power', label: '供电负荷', unit: 'MW', min: 1, max: 600, step: 5, def: 200 },
+    params: [{ key: 'power', label: '供电负荷', unit: 'MW', min: 1, max: 600, step: 5, def: 70 },
              { key: 'green_ratio', label: '绿电占比', unit: '%', min: 0, max: 100, step: 5, def: 15 },
              { key: 'self_gen_ratio', label: '自发电占比', unit: '%', min: 0, max: 100, step: 5, def: 40 }],
     drives: { electricity: { src: 'power', dst: 'electricity' } },
@@ -1186,12 +1191,17 @@ export function buildScheme(route) {
 // 每个主工艺的整棵工辅子树（如 热风炉→鼓风机、喷吹）排在其正下方，
 // 横向并排、超出每行容量自动折行；行高按工辅行数精确计算，保证任意卡片互不重叠。
 // 无连线时以类型兜底（TYPE_TARGET）、再以最近主工艺兜底。就地修改 nodes 的 x/y。
+// 自动布局：分层工艺树排版。
+// 主工艺（含公用/节能类）按「最长路径深度」分列，从左到右形成清晰工艺流；
+// 每列内主工艺自上而下排列，其全部工辅（含多级子树）整齐堆叠在该主工艺正下方，
+// 互不重叠；最后整体水平居中、顶部留白，保证自动布局规整、清晰。
 export function treeLayoutNodes(nodes, connections, opts = {}) {
   if (!Array.isArray(nodes) || !nodes.length) return
   const byId = {}
   for (const n of nodes) byId[n.id] = n
   const tplOf = (n) => (n ? PROCESS_MAP[n.type] : null)
-  const isMainN = (n) => { const t = tplOf(n); return !!t && t.route !== 'aux' && t.route !== 'util' }
+  // 树干 = 主工艺 + 公用/节能类（route !== 'aux'）；工辅 = route === 'aux'
+  const isTrunkN = (n) => { const t = tplOf(n); return !!t && t.route !== 'aux' }
   const isAuxN = (n) => { const t = tplOf(n); return !!t && t.route === 'aux' }
   // 类型兜底：工辅默认服务的主工艺（无连线时使用）
   const TYPE_TARGET = {
@@ -1201,34 +1211,39 @@ export function treeLayoutNodes(nodes, connections, opts = {}) {
     belt_conv: 'sinter_plant', feeder: 'sinter_plant', cool_pump: 'caster',
     aux_boiler: 'reheating_furnace', oxy_plant: 'bof',
   }
-  const mains = nodes.filter(isMainN)
-  if (!mains.length) return
-  const mainIds = new Set(mains.map((n) => n.id))
-  const auxSet = new Set(nodes.filter(isAuxN).map((n) => n.id))
+  const trunks = nodes.filter(isTrunkN)
+  if (!trunks.length) return
+  const trunkIds = new Set(trunks.map((n) => n.id))
+  const auxIds = new Set(nodes.filter(isAuxN).map((n) => n.id))
 
-  // 1) 主干拓扑排序：按「正向物料连线」（排除反馈弧）从左到右，形成工艺树干
-  const indeg = new Map(), outg = new Map()
-  for (const n of mains) { indeg.set(n.id, 0); outg.set(n.id, []) }
+  // 1) 主干图：仅取「主工艺→主工艺」的非反馈连线，按最长路径计算每层深度 → 列
+  const outg = new Map(), indeg = new Map()
+  for (const n of trunks) { outg.set(n.id, []); indeg.set(n.id, 0) }
   for (const c of connections || []) {
     if (c.feedback) continue
     const f = byId[c.from], t = byId[c.to]
-    if (!f || !t || !mainIds.has(f.id) || !mainIds.has(t.id)) continue
+    if (!f || !t || !trunkIds.has(f.id) || !trunkIds.has(t.id)) continue
     outg.get(f.id).push(t.id)
     indeg.set(t.id, indeg.get(t.id) + 1)
   }
+  const depth = new Map()
   const order = []
-  const q0 = mains.filter((n) => !indeg.get(n.id))
-  while (q0.length) {
-    const n = q0.shift()
-    order.push(n.id)
-    for (const d of outg.get(n.id)) {
-      indeg.set(d, indeg.get(d) - 1)
-      if (indeg.get(d) === 0) q0.push(byId[d])
+  const q = trunks.filter((n) => !indeg.get(n.id)).map((n) => n.id)
+  for (const id of q) depth.set(id, 0)
+  const ind = new Map(indeg)
+  const qq = [...q]
+  while (qq.length) {
+    const id = qq.shift(); order.push(id)
+    for (const d of outg.get(id)) {
+      ind.set(d, ind.get(d) - 1)
+      depth.set(d, Math.max(depth.get(d) ?? 0, (depth.get(id) || 0) + 1))
+      if (ind.get(d) === 0) qq.push(d)
     }
   }
-  for (const n of mains) if (!order.includes(n.id)) order.push(n.id)
+  for (const n of trunks) if (!depth.has(n.id)) depth.set(n.id, 0)
+  for (const n of trunks) if (!order.includes(n.id)) order.push(n.id)
 
-  // 2) 工艺树归属：工辅 -> 父节点（主工艺或另一工辅），连线投票 + 主输出物料优先
+  // 2) 工辅归属父节点（主工艺或另一工辅）：连线投票 + 主输出物料优先
   //    （鼓风机输出 blast_air 供热风炉 → 鼓风机挂在热风炉下，而非直接挂高炉）
   const parentOf = new Map()
   const childrenOf = new Map()
@@ -1243,18 +1258,18 @@ export function treeLayoutNodes(nodes, connections, opts = {}) {
       const fromMe = f.id === n.id, toMe = t.id === n.id
       if (!fromMe && !toMe) continue
       const other = fromMe ? t : f
-      if (other.id === n.id || !(mainIds.has(other.id) || auxSet.has(other.id))) continue
+      if (other.id === n.id || !(trunkIds.has(other.id) || auxIds.has(other.id))) continue
       const w = want && c.material === want ? 10 : 1
       votes.set(other.id, (votes.get(other.id) || 0) + w)
     }
     for (const [id, c] of votes) if (c > best) { best = c; target = byId[id] }
     if (!target) {
       const wt = TYPE_TARGET[n.type]
-      if (wt) target = mains.find((m) => m.type === wt) || null
+      if (wt) target = trunks.find((m) => m.type === wt) || null
     }
     if (!target) {
       let near = null, nd = Infinity
-      for (const m of mains) {
+      for (const m of trunks) {
         const d = Math.abs((m.x || 0) - (n.x || 0))
         if (d < nd) { nd = d; near = m }
       }
@@ -1266,72 +1281,72 @@ export function treeLayoutNodes(nodes, connections, opts = {}) {
     childrenOf.get(target.id).push(n)
   }
 
-  // 3) 一级子树归属：每个主工艺的直接工辅子树根（保持挂载顺序，如 热风炉→鼓风机）
-  const subRootsOf = new Map()    // mainId -> [一级子树根 id]
-  for (const m of mains) {
-    subRootsOf.set(m.id, childrenOf.get(m.id) || [])
+  // 3) 每棵工辅子树（BFS 展平，保持挂载顺序）挂在其归属的主工艺下
+  const auxListOf = new Map()
+  function auxBfs(rootId) {
+    const ids = [], q2 = [rootId]
+    while (q2.length) {
+      const id = q2.shift(); ids.push(id)
+      for (const c of childrenOf.get(id) || []) q2.push(c.id)
+    }
+    return ids
+  }
+  for (const m of trunks) {
+    auxListOf.set(m.id, auxBfs(m.id).filter((id) => id !== m.id))
   }
 
-  // 4) 布局（横向流式网格）：主工艺按拓扑序从左到右、每行 PER_ROW 个
-  //    （画布足够宽时每行 4 个、较窄时 3 个，即「一行 3-4 个」）；
-  //    每个主工艺下方排它的整棵工辅子树（BFS 展平、保持挂载顺序），横向并排、超出每行容量自动折行。
-  //    行高 = 主工艺占位高 + 该行工辅最多行数 × 工辅行高，精确计算保证任意卡片互不重叠；
-  //    整张图在画布内水平、垂直居中。
-  const XSTEP = 264            // 横向步距（卡片宽 NODE_NW=196 + 空隙，容纳端口与连线）
-  const MAIN_H = 252           // 主工艺卡片占位高（含标题/端口/碳排估算条）
-  const AUX_H = 196            // 工辅卡片占位高
-  const MAIN_VGAP = 112        // 主工艺卡片与其下方工辅的垂直间距
-  const AUX_VGAP = 48          // 工辅行之间 / 工辅行与下一行主工艺的间距
-  const edge = 60              // 画布左右留白
-  const cw = (opts && opts.canvasW) || 1600
-  const PER_ROW = Math.min(4, Math.max(3, Math.floor((cw - 2 * edge) / XSTEP)))
-  const mainRows = []
-  for (let i = 0; i < order.length; i += PER_ROW) mainRows.push(order.slice(i, i + PER_ROW))
-  // 每个主工艺的工辅整树（BFS 展平）
-  const auxAllOf = new Map()
-  for (const m of mains) {
-    const ids = []
-    for (const r of subRootsOf.get(m.id) || []) {
-      const qq = [r.id]
-      while (qq.length) {
-        const id = qq.shift()
-        ids.push(id)
-        for (const c of childrenOf.get(id) || []) qq.push(c.id)
-      }
+  // 4) 落位：主干居中 + 工辅两侧（与 3D 数字孪生的空间语义一致）
+  //    画布 y → 3D z：主工艺沿水平中线自左向右排成一条主干（3D 中即主干道），
+  //    其工辅按序交替落在主干的上 / 下两侧（3D 中即主干两侧），相邻的工辅层依次外扩，
+  //    使流程主干一目了然、工辅归属清晰（不再是多列网格堆叠）。
+  const COL_STEP = 300        // 主干相邻主工艺列间距（X）：卡片宽 196 + 横向连线/空隙
+  const TRUNK_Y = 420         // 主干水平基准线（画布 y，主工艺顶边对齐）
+  const AUX_GAP = 56          // 主干卡片与最近一层工辅的垂直净距
+  const AUX_VGAP = 36         // 同侧相邻工辅层之间的垂直净距
+
+  // 主干顺序：按拓扑深度（上游在前）+ 同层保持拓扑序，保证主干连线不回折
+  const ordIdx = new Map(order.map((id, i) => [id, i]))
+  const trunkOrder = trunks.map((n) => n.id)
+    .sort((a, b) => ((depth.get(a) || 0) - (depth.get(b) || 0)) || ((ordIdx.get(a) ?? 0) - (ordIdx.get(b) ?? 0)))
+
+  const moved = []
+  const downTopOf = new Map()   // 各主工艺下侧工辅已占用的底边，供孤立工辅兜底续排
+  trunkOrder.forEach((id, i) => {
+    const n = byId[id]
+    n.x = Math.round(i * COL_STEP); n.y = TRUNK_Y; moved.push(n)
+    const auxs = auxListOf.get(id) || []
+    let upBottom = TRUNK_Y - AUX_GAP                      // 上侧下一层的底边
+    let downTop = TRUNK_Y + nodeHeight(n) + AUX_GAP       // 下侧下一层的顶边
+    auxs.forEach((aid, k) => {
+      const a = byId[aid]
+      a.x = n.x
+      // 工辅按序交替落在主干上 / 下两侧（自内向外逐层外扩）；相邻主工艺的起始侧再交替一次，
+      // 避免工辅整体偏向一侧，形成"主干居中、工辅分列两侧"的均衡布局
+      const up = (k + i) % 2 === 0
+      if (up) { a.y = Math.round(upBottom - nodeHeight(a)); upBottom = a.y - AUX_VGAP }
+      else { a.y = Math.round(downTop); downTop = a.y + nodeHeight(a) + AUX_VGAP }
+      moved.push(a)
+    })
+    downTopOf.set(id, downTop)
+  })
+
+  // 5) 兜底：未归属任何主工艺的孤立工辅，续排到首个主工艺的下侧
+  const placedAux = new Set(moved.filter((n) => isAuxN(n)).map((n) => n.id))
+  const orphans = nodes.filter(isAuxN).filter((n) => !placedAux.has(n.id))
+  if (orphans.length && trunks.length) {
+    const base = byId[trunkOrder[0]]
+    let ay = downTopOf.get(base.id) ?? (base.y + nodeHeight(base) + AUX_GAP)
+    for (const a of orphans) {
+      a.x = Math.round(base.x); a.y = Math.round(ay); moved.push(a)
+      ay += nodeHeight(a) + AUX_VGAP
     }
-    auxAllOf.set(m.id, ids)
   }
-  // 每行总高度：主工艺占位 + 下方工辅最多行数（行内超过 PER_ROW 个自动折行）
-  const rowHs = mainRows.map((row) => {
-    let maxLines = 0
-    for (const id of row) {
-      const cnt = (auxAllOf.get(id) || []).length
-      if (cnt) maxLines = Math.max(maxLines, Math.ceil(cnt / PER_ROW))
-    }
-    return MAIN_H + (maxLines ? MAIN_VGAP + maxLines * AUX_H + (maxLines - 1) * AUX_VGAP : 0)
-  })
-  // 逐行落位：主工艺与下方工辅均从行首 X 对齐铺开；垂直方向依次下移
-  let yTop = 100
-  mainRows.forEach((row, ri) => {
-    const rw = row.length * XSTEP - (XSTEP - NODE_NW)   // 本行实际占宽（最后一个卡片不补尾距）
-    let x0 = -rw / 2
-    for (const id of row) {
-      const n = byId[id]
-      n.x = Math.round(x0)
-      n.y = Math.round(yTop)
-      const auxs = auxAllOf.get(id) || []
-      let ax = x0, ay = yTop + MAIN_H + MAIN_VGAP
-      auxs.forEach((aid, k) => {
-        if (k > 0 && k % PER_ROW === 0) { ax = x0; ay += AUX_H + AUX_VGAP }
-        const a = byId[aid]
-        a.x = Math.round(ax)
-        a.y = Math.round(ay)
-        ax += XSTEP
-      })
-      x0 += XSTEP
-    }
-    yTop += rowHs[ri] + AUX_VGAP
-  })
+
+  // 6) 整体水平居中（主干保持在水平中线）
+  let minX = Infinity, maxX = -Infinity
+  for (const n of moved) { minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x + NODE_NW) }
+  const shiftX = -Math.round((minX + maxX) / 2)
+  for (const n of moved) n.x = Math.round(n.x + shiftX)
 }
 
 // 参数键 → 中文业务标签（单一来源：PROCESS_TEMPLATES 的 params）。

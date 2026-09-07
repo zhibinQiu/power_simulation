@@ -80,7 +80,7 @@
                 <tr v-for="(row, idx) in rows" :key="idx">
                   <td v-for="c in columns" :key="c.key" :class="`text-${c.align || 'right'}`">
                     <template v-if="c.key === 'name'">{{ row.name }}</template>
-                    <template v-else-if="c.key === 'intensity'">{{ fmt(row[c.key]) }} <span class="cc-unit">kgCO₂/t</span></template>
+                    <template v-else-if="c.key === 'intensity'">{{ fmt(row[c.key] / 1000) }} <span class="cc-unit">tCO₂/t</span></template>
                     <template v-else-if="c.key === 'control'">{{ t(row.control) }}</template>
                     <template v-else>{{ fmt(qty(row[c.key])) }}</template>
                   </td>

@@ -25,11 +25,11 @@ def default_model() -> ProcessModel:
         _u("rm1", "rolling_mill", "热轧机", 34),
     ]
     flows = [
-        Flow(id="f0", from_unit="s1", to_unit="bf1", material="sinter", rate=1100),
-        Flow(id="f1", from_unit="bf1", to_unit="bof1", material="hot_metal", rate=1000),
-        Flow(id="f2", from_unit="bof1", to_unit="lf1", material="steel", rate=1000),
-        Flow(id="f3", from_unit="lf1", to_unit="cc1", material="steel", rate=1000),
-        Flow(id="f4", from_unit="cc1", to_unit="rm1", material="steel", rate=1000),
+        Flow(id="f0", from_unit="s1", to_unit="bf1", material="sinter", rate=385),
+        Flow(id="f1", from_unit="bf1", to_unit="bof1", material="hot_metal", rate=350),
+        Flow(id="f2", from_unit="bof1", to_unit="lf1", material="steel", rate=350),
+        Flow(id="f3", from_unit="lf1", to_unit="cc1", material="steel", rate=350),
+        Flow(id="f4", from_unit="cc1", to_unit="rm1", material="steel", rate=350),
     ]
     return ProcessModel(units=units, flows=flows)
 

@@ -58,34 +58,56 @@
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- 物料：直接展示 原料 / 中间产物 / 产品 三棵子树，均可下拉 -->
-      <div v-else-if="tab === 'material'">
-        <div v-for="g in materialTrees" :key="g.key" class="tnode">
-          <div class="tch sub hdr" @click="toggle('g_mat_' + g.key)">
-            <span class="twisty" :class="{ open: expanded['g_mat_' + g.key] }">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-            </span>
-            <span class="tch-tt">{{ g.label }}</span>
-            <span class="tch-count">{{ g.items.length }}</span>
-          </div>
-          <div class="tchildren" v-show="expanded['g_mat_' + g.key]">
-            <div v-for="m in g.items" :key="m.id" class="tchild leaf flat click"
-                 :class="{ active: store.selectedMaterialId === m.id, drag: store.editMode && !store.simMode }"
-                 :draggable="store.editMode && !store.simMode"
-                 @dragstart="onDrag($event, 'material', m.id)"
-                 @click="store.selectMaterial(m.id)"
-                 @contextmenu.prevent="onLeafContext($event, { kind: 'material', id: m.id })">
-              <span class="tc-tt">{{ m.name }}</span>
-            </div>
+      <!-- 传感器 / 可变设备：系统内置通用附加资源，可在编排中绑定到具体工艺设备（点击条目直接绑定到画布选中工艺；也可在右侧工艺属性面板添加） -->
+      <div v-for="ag in attachGroups" :key="'att_' + ag.kind" class="tnode attach-tree">
+        <div class="tch sub hdr" @click="toggle('g_att_' + ag.kind)">
+          <span class="twisty" :class="{ open: expanded['g_att_' + ag.kind] !== false }">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </span>
+          <span class="tch-tt">{{ ag.label }}</span>
+          <span class="tch-count">{{ ag.items.length }}</span>
+        </div>
+        <div class="tchildren" v-show="expanded['g_att_' + ag.kind] !== false">
+          <div v-for="it in ag.items" :key="it.type" class="tchild leaf flat click attach-leaf"
+               :class="{ active: attachActive(it) }" :title="it.desc"
+               @click="onAttachClick(ag.kind, it)">
+            <span class="tc-tt">{{ it.label }}</span>
+            <span class="tc-tag">{{ ag.unitOf(it) }}</span>
           </div>
         </div>
+      </div>
+      </div>
+
+      <!-- 物料：直接展示 原料 / 中间产物 / 产品 三棵子树，均可下拉（通用资源包场景未提供物料字典时提示） -->
+      <div v-else-if="tab === 'material'">
+        <template v-if="!store.customSceneOn">
+          <div v-for="g in materialTrees" :key="g.key" class="tnode">
+            <div class="tch sub hdr" @click="toggle('g_mat_' + g.key)">
+              <span class="twisty" :class="{ open: expanded['g_mat_' + g.key] }">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </span>
+              <span class="tch-tt">{{ g.label }}</span>
+              <span class="tch-count">{{ g.items.length }}</span>
+            </div>
+            <div class="tchildren" v-show="expanded['g_mat_' + g.key]">
+              <div v-for="m in g.items" :key="m.id" class="tchild leaf flat click"
+                   :class="{ active: store.selectedMaterialId === m.id, drag: store.editMode && !store.simMode }"
+                   :draggable="store.editMode && !store.simMode"
+                   @dragstart="onDrag($event, 'material', m.id)"
+                   @click="store.selectMaterial(m.id)"
+                   @contextmenu.prevent="onLeafContext($event, { kind: 'material', id: m.id })">
+                <span class="tc-tt">{{ m.name }}</span>
+              </div>
+            </div>
+          </div>
+        </template>
+        <div v-else class="empty-hint">{{ t('该资源包未提供物料字典；系统内置「传感器 / 可变设备」见「工艺」目录底部') }}</div>
       </div>
 
       <!-- 策略：直接展示 AI优化模型（系统缺省）/ 自定义（仿真模式下保存的策略）/ 工艺流程优化（各工艺策略 + 系统预置） -->
       <div v-else>
-
+        <template v-if="!store.customSceneOn">
           <!-- AI优化模型：系统缺省（默认）AI 优化模型 -->
           <div class="tnode">
             <div class="tch sub hdr" @click="toggle('g_strat_ai')">
@@ -169,6 +191,8 @@
 
             </div>
           </div>
+        </template>
+        <div v-else class="empty-hint">{{ t('通用资源包场景暂无策略库：参数调整在编排属性面板，折碳展示见主场景') }}</div>
       </div>
     </div>
     </template>
@@ -177,8 +201,6 @@
     <SearchPanel v-else-if="store.activityView === 'search'" />
     <!-- ======== 场景面板：当前编排对应场景的资源树 ======== -->
     <ScenePanel v-else-if="store.activityView === 'scene'" />
-    <!-- ======== 连接面板：多数据源管理 + 传感器字段对齐 ======== -->
-    <ConnectionsPanel v-else-if="store.activityView === 'connections'" />
   </aside>
 </template>
 
@@ -186,11 +208,11 @@
 import { reactive, ref, computed, watch, nextTick } from 'vue'
 import { useSimStore, AI_MODELS } from '../stores/sim'
 import { MATERIALS, PRODUCTS, ROUTE_GROUPS, PROCESS_TEMPLATES, PROCESS_ADJUSTABLE, DEVICE_MAP, PROCESS_MAP } from '../data/flowLibrary'
+import { SENSOR_TEMPLATES, ADJUSTABLE_TEMPLATES } from '../data/attachLibrary'
 import Icon from './Icon.vue'
 import { openContextMenu } from '../composables/contextMenu'
 import SearchPanel from './SearchPanel.vue'
 import ScenePanel from './ScenePanel.vue'
-import ConnectionsPanel from './ConnectionsPanel.vue'
 import { t } from '../i18n'
 
 const store = useSimStore()
@@ -200,7 +222,6 @@ const headMeta = {
   explorer: { title: t('资源管理器'), icon: 'open' },
   search: { title: t('搜索'), icon: 'search' },
   scene: { title: t('场景'), icon: 'scene3d' },
-  connections: { title: t('连接'), icon: 'link' },
 }
 const headTitle = computed(() => (headMeta[store.activityView] || headMeta.explorer).title)
 const headIcon = computed(() => (headMeta[store.activityView] || headMeta.explorer).icon)
@@ -212,10 +233,29 @@ function onScroll() {
   clearTimeout(scrollTimer)
   scrollTimer = setTimeout(() => { scrolling.value = false }, 2000)
 }
-// 工艺树分组：炼钢 + 工辅（鼓风机/热风炉等辅助生产工序）；
-// 节能减碳措施（煤气发电/余热回收/碳捕集）统一在「策略」中展示，不进入工艺树
-const routeGroups = ROUTE_GROUPS
-const routeLabel = { steel: t('炼钢'), aux: t('工辅') }
+// 工艺树分组：钢铁 = 炼钢 + 工辅（鼓风机/热风炉等辅助生产工序）；
+// 节能减碳措施（煤气发电/余热回收/碳捕集）统一在「策略」中展示，不进入工艺树。
+// 通用资源包场景（机房热控等）：工艺按包内模板 route 分组（同一包模板下多实例去重）
+const routeGroups = computed(() => {
+  if (!store.customSceneOn) return ROUTE_GROUPS
+  const m = {}
+  for (const tpl of store.sceneTemplates) {
+    const items = m[tpl.id] || (m[tpl.id] = [])
+    const seen = new Set()
+    for (const n of (tpl.scheme && tpl.scheme.nodes) || []) {
+      if (n.kind !== 'process' || seen.has(n.type)) continue
+      seen.add(n.type)
+      items.push({ type: n.type, label: (n.name || n.type).replace(/(·.+)$/, ''), route: tpl.id })
+    }
+  }
+  return m
+})
+const routeLabel = computed(() => {
+  if (!store.customSceneOn) return { steel: t('炼钢'), aux: t('工辅') }
+  const m = {}
+  for (const tpl of store.sceneTemplates) m[tpl.id] = tpl.label || tpl.name || tpl.id
+  return m
+})
 // 策略分类：工艺流程优化 = 各工艺策略（含系统预置归入对应工艺）；自定义 = 仿真模式下保存的策略
 // 系统预置策略 → 归入的工艺类型（与 backend presets 顺序一一对应；余热+碳捕集归节能减碳）
 const PRESET_PROCESS = [
@@ -286,7 +326,7 @@ const devByType = computed(() => {
     else { m[k].meters.push(e); m[k].all.push(e) }
   }
   // 2) 补全每个工艺类型的「典型可调设备」（与右侧属性面板一致）
-  for (const group of Object.values(routeGroups)) {
+  for (const group of Object.values(routeGroups.value)) {
     for (const t of group) {
       const adjs = PROCESS_ADJUSTABLE[t.type] || []
       if (!adjs.length) continue
@@ -315,12 +355,13 @@ function isOpen(key) { return expanded[key] === true }
 function toggleDev(key) { expanded[key] = !expanded[key] }
 // 分组标题是否可折叠（显示下拉箭头）：分组下含工艺节点即可折叠，炼钢/工辅均为一级菜单
 function groupHasDevs(key) {
-  const group = routeGroups[key] || []
+  const group = (routeGroups.value || {})[key] || []
   return group.length > 0
 }
-// 分组展开状态：按 expanded 折叠/展开（炼钢/工辅均为一级菜单，点击标题展开具体工艺）
+// 分组展开状态：按 expanded 折叠/展开（炼钢/工辅均为一级菜单，点击标题展开具体工艺；
+// 资源包场景下的工艺分组 / 传感器 / 可变设备组默认展开，仅在显式折叠后收起）
 function groupOpen(key) {
-  return !!expanded['g_' + key]
+  return expanded['g_' + key] !== false
 }
 // 工艺节点下的设备子项：工辅工艺的设备子项仅是其自身，直接作为叶子展示，不再次下钻。
 function devSubItems(t) {
@@ -341,6 +382,28 @@ function processActive(t) {
 // 点击工艺节点：工辅优先打开其设备详情（DeviceDetail 设备详情面板，与从工序「可调设备」
 // 打开的形式一致）；普通工艺无独立属性面板，跳转到该类型首个实例的实例属性面板
 function onProcessClick(t) { onProcessClickFromType(t.type) }
+
+// ===== 附加资源：传感器 / 可变设备（系统内置，可绑定到具体工艺设备）=====
+const attachGroups = [
+  { kind: 'sensor', label: t('传感器'), items: SENSOR_TEMPLATES, unitOf: (it) => it.measure.unit },
+  { kind: 'adjustable', label: t('可变设备'), items: ADJUSTABLE_TEMPLATES, unitOf: (it) => (it.setpoint ? it.setpoint.unit : '') },
+]
+// 高亮：编辑态当前选中的工艺节点已绑定同类资源
+function attachActive(it) {
+  if (!store.editMode) return false
+  const sel = store.selectedFlowNode
+  return !!(sel && sel.kind === 'process' && (sel.attached || []).some((a) => a.kind === it.kind && a.type === it.type))
+}
+// 点击绑定：编辑态把传感器 / 可变设备绑定到当前画布选中的工艺节点（写入 node.attached[]，随方案持久化）
+function onAttachClick(kind, it) {
+  const sel = store.selectedFlowNode
+  if (!store.editMode || !sel || sel.kind !== 'process') {
+    store.toast = t('请先在编排模式选中目标工艺设备节点，再点击绑定「{label}」（也可在右侧工艺属性面板「附加传感 / 可变设备」中添加）', { label: it.label })
+    return
+  }
+  const att = store.addAttachToNode(sel.id, kind, it.type)
+  if (att) store.toast = t('已为工艺「{name}」绑定「{label}」：可在右侧属性面板调整其数值来源', { name: sel.name || sel.type, label: it.label })
+}
 function onProcessClickFromType(type) {
   const t = PROCESS_MAP[type]
   if (t && t.route === 'aux') {

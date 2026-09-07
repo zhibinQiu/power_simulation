@@ -2144,8 +2144,12 @@ export class TwinScene {
         childrenOf.get(target.id).push(n)
       }
     }
-    // 3.4 子树信息：每个主工艺的一级子树（大小=节点总数、层数=根起最大深度）。
-    //     子树是「工辅→主工艺」接入的最短链路单位（如 热风炉→鼓风机、喷吹）。
+    // 3.4 子树信息：每个主工艺的一级子树（大小=节点总数、层数=根起最大深度、
+    //     宽度 maxW=单层最多节点数）。子树是「工辅→主工艺」接入的最短链路单位。
+    //     关键：子树沿 Z 轴按深度分层展开（见 6），同层兄弟才沿 X 并排 —— 因此子树占用的
+    //     「水平宽度」是 maxW（最宽一层的节点数），而非 size（节点总数）。链式子树
+    //     （如 热风炉→鼓风机→供氧，每层仅 1 个节点）size 大而 maxW=1，若按 size 计宽会
+    //     成倍高估其水平占位，把相邻主干无谓推开。
     const subtreeInfo = new Map()
     const subRootsOf = new Map()
     for (const m of mainNodes) {
@@ -2153,37 +2157,45 @@ export class TwinScene {
       subRootsOf.set(m.id, roots)
       for (const r of roots) {
         let size = 0, maxD = 0
+        const levelCount = new Map()
         const qq = [{ id: r.id, d: 1 }]
         while (qq.length) {
           const { id, d } = qq.shift()
           size++; if (d > maxD) maxD = d
+          levelCount.set(d, (levelCount.get(d) || 0) + 1)
           for (const c of childrenOf.get(id) || []) qq.push({ id: c.id, d: d + 1 })
         }
-        subtreeInfo.set(r.id, { size, depth: maxD })
+        let maxW = 0
+        for (const c of levelCount.values()) if (c > maxW) maxW = c
+        subtreeInfo.set(r.id, { size, depth: maxD, maxW })
       }
     }
-    // 3.5 左右平衡分配：一级子树按大小降序，贪心放到「累计槽位少」的一侧
+    // 3.5 左右平衡分配：一级子树按大小降序，贪心放到「累计列宽少」的一侧
     //     （两侧总宽尽量均衡），形成「辅助工艺在主干工艺的两侧」。
+    //     left/right 记录该侧的「水平占用列数」= ΣmaxW + (子树数 - 1)，与 6 中 colCursor
+    //     的实际落位一致（每棵子树占 maxW 列、相邻子树间留 1 列空隙）。
     const sidesOf = new Map()
     const spanOf = new Map()
     for (const m of mainNodes) {
       const roots = subRootsOf.get(m.id) || []
-      const items = roots.map((r) => ({ id: r.id, size: subtreeInfo.get(r.id).size }))
+      const items = roots.map((r) => ({ id: r.id, size: subtreeInfo.get(r.id).size, w: subtreeInfo.get(r.id).maxW }))
       items.sort((a, b) => b.size - a.size)
       const sides = { '-1': [], '1': [] }
-      let ls = 0, rs = 0
+      let ls = 0, rs = 0, lc = 0, rc = 0
       for (const it of items) {
-        if (ls <= rs) { sides['-1'].push(it.id); ls += it.size }
-        else { sides['1'].push(it.id); rs += it.size }
+        if (ls <= rs) { sides['-1'].push(it.id); ls += it.w; lc++ }
+        else { sides['1'].push(it.id); rs += it.w; rc++ }
       }
       sidesOf.set(m.id, sides)
-      spanOf.set(m.id, { left: ls, right: rs })
+      spanOf.set(m.id, { left: ls + Math.max(0, lc - 1), right: rs + Math.max(0, rc - 1) })
     }
 
     // 4) 主节点沿 X 轴排布（原料在左、成品在右），Z=0 居中；相邻主干间距 =
-    //    净距 + 前一主工艺分支水平铺开宽 + 后一主工艺分支水平铺开宽，保证分支不被相邻主干遮挡。
-    //    参数取紧凑值：BSTEP=分支列步距、HW=主干半槽、MARGIN=主干净距——使大工艺间距更近、
-    //    整条主线收拢，观感紧凑（仍保证分支列与相邻主干不重叠）。
+    //    净距 + max(前一主工艺右侧分支列宽, 后一主工艺左侧分支列宽)。
+    //    取 max 而非相加：右侧分支位于主干「后侧(Z>0)」、左侧分支位于「前侧(Z<0)」，
+    //    二者在 Z 方向天然分离（层距 ZSTEP=150 > 主干半槽 HW），彼此不会碰撞，
+    //    各自只需不侵入对方主干即可 —— 相加会成倍放大挂了大子树工序左右两侧的留白。
+    //    参数取紧凑值：BSTEP=分支列步距、HW=主干半槽、MARGIN=主干净距。
     const nMain = order.length
     const BSTEP = 110, HW = 62, MARGIN = 16
     const mainX = new Map()
@@ -2191,7 +2203,9 @@ export class TwinScene {
     order.forEach((id, i) => {
       if (i > 0) {
         const prev = order[i - 1]
-        cursor += (spanOf.get(prev)?.right || 0) * BSTEP + (spanOf.get(id)?.left || 0) * BSTEP + MARGIN + 2 * HW
+        const prevRight = spanOf.get(prev)?.right || 0
+        const curLeft = spanOf.get(id)?.left || 0
+        cursor += Math.max(prevRight, curLeft) * BSTEP + MARGIN + 2 * HW
       }
       mainX.set(id, cursor)
     })

@@ -69,6 +69,34 @@ export const api = {
   archiveOptimizer: (id) => jpost('/optimizers/' + id + '/archive', {}),
   switchOptimizerVersion: (id, versionId) => jpost('/optimizers/' + id + '/switch', { version_id: versionId }),
   ackOptimizer: (id) => jpost('/optimizers/' + id + '/ack', {}),
+  // ---- 场景 / 资源包（.ec）：场景注册表、资源装载、打开/卸载/导出资源包 ----
+  listScenes: () => jget('/scenes'),
+  getSceneResource: (id) => jget('/scene/' + encodeURIComponent(id) + '/resource'),
+  installScenePackage: (file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return fetch(BASE + '/scene/package', { method: 'POST', body: fd }).then((r) => r.json())
+  },
+  uninstallScenePackage: (id) =>
+    fetch(BASE + '/scene/package/' + encodeURIComponent(id), { method: 'DELETE' }).then((r) => r.json()),
+  exportScenePackage: (payload) => jpost('/scene/export', payload),
+  // 导出场景包（二进制 .ec）：后端返回 application/zip（jpost 会按 JSON 解析失败），
+  // 故单独以 blob 拉取，并从 Content-Disposition 取回文件名，供「文件 → 另存为场景…」下载。
+  exportSceneBlob: async (payload) => {
+    const r = await fetch(BASE + '/scene/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload || {}),
+    })
+    if (!r.ok) {
+      let msg = `API /scene/export -> ${r.status}`
+      try { const j = await r.json(); if (j && j.detail) msg = j.detail } catch (e) { /* 非 JSON 错误体：沿用状态码文案 */ }
+      throw new Error(msg)
+    }
+    const disp = r.headers.get('Content-Disposition') || ''
+    const m = disp.match(/filename="?([^";]+)"?/)
+    return { blob: await r.blob(), filename: m ? m[1] : null }
+  },
   // 碳市场实时行情（CEA / CCER）
   carbonMarketQuotes: () => jget('/carbon-market/quotes'),
   carbonMarketChart: (instrument = 'cea', kind = 'daily') =>
@@ -136,6 +164,21 @@ export const api = {
   // 云端 Broker 配置（前端配置化：能碳一体机管理 -> 总览 -> 云端数据链路「配置」，免手工编辑 mqtt.yaml）
   boxConfig: () => jget('/box/config'),
   boxConfigSave: (payload) => jpost('/box/config', payload),
+  // ---- 统一数据源接入（能碳一体机 box / 外部数据源 external；模拟数据也是 external 的一种，
+  //      由数据中间件 adapter=sim 生成）----
+  dataSources: () => jget('/data-sources'),
+  dataSourceToggle: (id, enabled) => jpost('/data-sources/toggle', { id, enabled }),
+  dataSourceSave: (id, payload) => jpost('/data-sources/save', { id, ...payload }),
+  dataSourceAdd: (payload) => jpost('/data-sources/add', payload),
+  dataSourceRemove: (id) => jpost('/data-sources/remove', { id }),
+  dataSourceTest: (payload) => jpost('/data-sources/test', payload),
+  dataSourceTypes: () => jget('/data-sources/types'),
+  // 数据中间件服务（外部数据采集与发布的独立进程；平台订阅其内置 Broker）
+  middlewareStatus: () => jget('/middleware/status'),
+  middlewareConfig: (payload) => jpost('/middleware/config', payload),
+  middlewareTest: (payload) => jpost('/middleware/test', payload),
+  middlewareSync: () => jpost('/middleware/sync', {}),
+  middlewareTypes: () => jget('/middleware/types'),
   // 云端实时推送 WebSocket（/api/ws/cloud）：云端 agent 经 MQTT cloud/# 推送的概览/CRD/日志，平台后端实时转发
   openCloudFeed,
   // 知识库（LLM-WIKI 式：多级文件夹 + 文档上传解析，无需权限）

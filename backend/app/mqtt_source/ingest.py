@@ -34,13 +34,83 @@ def _log_msg(topic: str, payload: Any) -> None:
         _STATE["last_message_at"] = time.time()
 
 
-def _record_message(msg) -> None:
-    """解析一条 MQTT 消息：更新 READINGS（数值字段）、$SYS 统计并记入消息日志。"""
+def _classify_source(topic: str, data: Dict[str, Any], box: str = "") -> "tuple[str, str]":
+    """消息归属的数据源类型与外部前缀：返回 (kind, ext_prefix)。
+
+    kind ∈ external | box（统一数据源接入语义）：
+    - box 前缀命中 external 目录条目（config/data_sources.json，前缀=config.box）
+      或 payload src 以 external 开头 → external（ext_prefix=box）；
+    - 其余（真实盒子，能碳一体机云端上报）→ box。
+
+    注：模拟数据由独立服务（platform/cloud-deploy/sim-source/）生成并经中间件 mqtt
+    适配器接入，平台与中间件自身都不产生模拟数据；因此不再有 sim kind——模拟数据与
+    其它外部源一样按登记前缀归属 external 条目。
+    """
+    b = str(box or data.get("box") or "").strip().lower()
+    if b and _ext_entry(b) is not None:
+        return "external", b
+    src = data.get("src")
+    if isinstance(src, str) and src.startswith("external"):
+        return "external", b
+    return "box", ""
+
+
+def _ext_entry(box: str) -> Any:
+    """查外部源条目映射（box 前缀 → {id,name,enabled,target}）；未登记返回 None。"""
+    try:
+        from ..data_sources import config as _ds_config
+        return _ds_config.external_by_box(box)
+    except Exception:
+        return None
+
+
+def _box_source_active() -> bool:
+    """真实盒子数据源（能碳一体机）是否启用；查询失败时默认启用（不误杀数据）。"""
+    try:
+        from ..data_sources import config as _ds_config
+        return _ds_config.is_source_enabled("box")
+    except Exception:
+        return True
+
+
+def _record_ext_message(prefix: str, topic: str, payload: Any) -> None:
+    """外部源消息：按前缀累计统计（最近读数）。
+
+    统计写 _shared._EXT_STATS（external.status_of 读取，供数据源卡片「最近读数」）。
+    注：历史版本曾在此按 config.target 自动关联仿真设备，该行为**已取消**——设备与仿真
+    工序的关联一律由用户在平台手动建立，自动关联会在改绑后反复抢占，语义不可控。
+    """
+    now = time.time()
+    with _LOCK:
+        st = _shared._EXT_STATS.setdefault(prefix, {})
+        st["received"] = int(st.get("received") or 0) + 1
+        st["last_at"] = now
+        st["last_topic"] = topic
+        st["last_msg"] = {
+            "ts": now, "topic": topic,
+            "payload": payload if isinstance(payload, str)
+            else json.dumps(payload, ensure_ascii=False)[:500],
+        }
+
+
+def _record_message(msg, source: str = "cloud") -> None:
+    """解析一条 MQTT 消息：更新 READINGS（数值字段）、$SYS 统计并记入消息日志。
+
+    source：消息来自哪个订阅端点（'cloud' 云端 Broker / 'middleware' 中间件内置 Broker）。
+    两端共享本摄取管道，仅 $SYS 统计按 source 区分（只采云端 Broker 的 Broker 统计，
+    避免中间件内置 Broker 的 $SYS 覆盖仪表盘数据）。
+    """
     topic = getattr(msg, "topic", "")
     try:
         payload = msg.payload.decode("utf-8", "replace")
     except Exception:
         payload = repr(getattr(msg, "payload", b""))
+
+    # ext/#：外部数据**上行空间**——外部数据源（仪表/PLC/数据中台）经网线接入能碳一体机，
+    # 一体机把原始数据上行到本空间交给云端中间件转换；平台只消费中间件转换后的标准数据
+    # （data/ext-*/…），此处直接跳过，避免同一条数据被摄取两次、避免建出无归属设备。
+    if topic.startswith("ext/"):
+        return
 
     # cloud/#：云端 agent 推送（概览/CRD/日志，MQTT 长连接数据通道，替代 SSH）。
     # 只更新 cloud_agent 缓存并广播给前端，不计入设备读数/消息流（避免刷屏）。
@@ -67,7 +137,10 @@ def _record_message(msg) -> None:
     _log_msg(topic, payload)
 
     # $SYS/broker/*：Broker 统计（实时仪表盘数据源，参照 dashboard.py）
+    # 仅采云端 Broker（source='cloud'）：中间件内置 Broker 的 $SYS 不参与平台仪表盘统计
     if topic.startswith("$SYS/broker/"):
+        if source != "cloud":
+            return
         key = topic[len("$SYS/broker/"):]
         val: Any = payload.strip()
         try:
@@ -125,6 +198,24 @@ def _record_message(msg) -> None:
             CLOUD_DEVICES.pop(cloud_id, None)
             READINGS.pop(cloud_id, None)
         return
+    # 统一数据源接入（box 能碳一体机 / external 外部源 均按目录启停过滤；
+    # external 含中间件接入的外部数据（含独立模拟源），停用后该前缀消息不再驱动仿真）：
+    kind, ext_prefix = _classify_source(topic, data, box)
+    if cloud_id and kind == "box" and not _box_source_active():
+        with _LOCK:
+            CLOUD_DEVICES.pop(cloud_id, None)
+            READINGS.pop(cloud_id, None)
+        return
+    if cloud_id and kind == "external" and ext_prefix:
+        entry = _ext_entry(ext_prefix)
+        if entry is not None and not bool(entry.get("enabled") is not False):
+            with _LOCK:
+                CLOUD_DEVICES.pop(cloud_id, None)
+                READINGS.pop(cloud_id, None)
+            return
+    # 外部源：按前缀累计最近读数统计（见 _record_ext_message；不做任何自动关联）
+    if kind == "external" and ext_prefix:
+        _record_ext_message(ext_prefix, topic, payload)
     prop = _main_property_of_topic(topic)
     if prop:
         # 属性级主题（data/<box>/<device>/<instance>/<property>）：payload 仅 {t, v}，

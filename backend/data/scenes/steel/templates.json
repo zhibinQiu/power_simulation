@@ -1,0 +1,2058 @@
+[
+  {
+    "id": "long",
+    "label": "长流程模板",
+    "desc": "载入长流程炼钢模板（高炉-转炉长流程）",
+    "icon": "flow",
+    "route": "long",
+    "scheme": {
+      "nodes": [
+        {
+          "id": "n_mtns8iv50",
+          "kind": "process",
+          "type": "sinter_plant",
+          "name": "烧结机",
+          "x": -1148,
+          "y": 120,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "ore_rate": 385,
+            "fuel_rate": 45
+          },
+          "recipe": [
+            {
+              "material": "iron_ore",
+              "ratio": 1
+            },
+            {
+              "material": "coke",
+              "ratio": 1
+            },
+            {
+              "material": "limestone",
+              "ratio": 1
+            },
+            {
+              "material": "draft",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv51",
+                "material": "iron_ore"
+              },
+              {
+                "id": "in_mtns8iv52",
+                "material": "coke"
+              },
+              {
+                "id": "in_mtns8iv53",
+                "material": "limestone"
+              },
+              {
+                "id": "in_mtns8iv54",
+                "material": "draft"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv55",
+                "material": "sinter"
+              },
+              {
+                "id": "out_mtns8iv56",
+                "material": "bfg"
+              },
+              {
+                "id": "out_mtns8iv57",
+                "material": "co2"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv58",
+          "kind": "process",
+          "type": "pelletizing",
+          "name": "球团",
+          "x": -1148,
+          "y": 564,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "ore_rate": 175,
+            "fuel_rate": 18
+          },
+          "recipe": [
+            {
+              "material": "iron_ore",
+              "ratio": 1
+            },
+            {
+              "material": "limestone",
+              "ratio": 1
+            },
+            {
+              "material": "draft",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv59",
+                "material": "iron_ore"
+              },
+              {
+                "id": "in_mtns8iv5a",
+                "material": "limestone"
+              },
+              {
+                "id": "in_mtns8iv5b",
+                "material": "draft"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv5c",
+                "material": "pellet"
+              },
+              {
+                "id": "out_mtns8iv5d",
+                "material": "co2"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv5e",
+          "kind": "process",
+          "type": "coke_oven",
+          "name": "焦炉",
+          "x": -1148,
+          "y": 984,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "coal_rate": 170
+          },
+          "recipe": [
+            {
+              "material": "coal",
+              "ratio": 1
+            },
+            {
+              "material": "combustion_air",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv5f",
+                "material": "coal"
+              },
+              {
+                "id": "in_mtns8iv5g",
+                "material": "combustion_air"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv5h",
+                "material": "coke"
+              },
+              {
+                "id": "out_mtns8iv5i",
+                "material": "cog"
+              },
+              {
+                "id": "out_mtns8iv5j",
+                "material": "co2"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv5k",
+          "kind": "process",
+          "type": "blast_furnace",
+          "name": "高炉",
+          "x": -848,
+          "y": 120,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "hot_metal": 350,
+            "coke_rate": 410,
+            "electricity": 11,
+            "coal_inj": 130,
+            "burden_total": 1625,
+            "sinter_pct": 62,
+            "pellet_pct": 31,
+            "lump_pct": 7,
+            "slag_rate": 300,
+            "flux": 10,
+            "wind_rate": 80,
+            "hot_blast_temp": 1150,
+            "o2_flow": 0,
+            "draft": 1,
+            "blast_humidity": 10
+          },
+          "recipe": [
+            {
+              "material": "sinter",
+              "ratio": 1
+            },
+            {
+              "material": "pellet",
+              "ratio": 1
+            },
+            {
+              "material": "coke",
+              "ratio": 1
+            },
+            {
+              "material": "limestone",
+              "ratio": 1
+            },
+            {
+              "material": "self_power",
+              "ratio": 1
+            },
+            {
+              "material": "blast_air",
+              "ratio": 1
+            },
+            {
+              "material": "hot_blast",
+              "ratio": 1
+            },
+            {
+              "material": "pulverized_coal",
+              "ratio": 1
+            },
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv5l",
+                "material": "sinter"
+              },
+              {
+                "id": "in_mtns8iv5m",
+                "material": "pellet"
+              },
+              {
+                "id": "in_mtns8iv5n",
+                "material": "coke"
+              },
+              {
+                "id": "in_mtns8iv5o",
+                "material": "limestone"
+              },
+              {
+                "id": "in_mtns8iv5p",
+                "material": "self_power"
+              },
+              {
+                "id": "in_mtns8iv5q",
+                "material": "blast_air"
+              },
+              {
+                "id": "in_mtns8iv5r",
+                "material": "hot_blast"
+              },
+              {
+                "id": "in_mtns8iv5s",
+                "material": "pulverized_coal"
+              },
+              {
+                "id": "in_mtns8iv5t",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv5u",
+                "material": "hot_metal"
+              },
+              {
+                "id": "out_mtns8iv5v",
+                "material": "bf_slag"
+              },
+              {
+                "id": "out_mtns8iv5w",
+                "material": "bfg"
+              },
+              {
+                "id": "out_mtns8iv5x",
+                "material": "co2"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv5y",
+          "kind": "process",
+          "type": "hot_metal_pretreat",
+          "name": "铁水预处理",
+          "x": -548,
+          "y": 120,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "hm_rate": 350
+          },
+          "recipe": [
+            {
+              "material": "hot_metal",
+              "ratio": 1
+            },
+            {
+              "material": "oxygen",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv5z",
+                "material": "hot_metal"
+              },
+              {
+                "id": "in_mtns8iv510",
+                "material": "oxygen"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv511",
+                "material": "pre_hm"
+              },
+              {
+                "id": "out_mtns8iv512",
+                "material": "co2"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv513",
+          "kind": "process",
+          "type": "bof",
+          "name": "转炉",
+          "x": -248,
+          "y": 120,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "hot_metal_in": 350,
+            "scrap": 35,
+            "electricity": 11,
+            "slag_rate": 120,
+            "flux": 60
+          },
+          "recipe": [
+            {
+              "material": "pre_hm",
+              "ratio": 1
+            },
+            {
+              "material": "scrap",
+              "ratio": 1
+            },
+            {
+              "material": "limestone",
+              "ratio": 1
+            },
+            {
+              "material": "oxygen",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv514",
+                "material": "pre_hm"
+              },
+              {
+                "id": "in_mtns8iv515",
+                "material": "scrap"
+              },
+              {
+                "id": "in_mtns8iv516",
+                "material": "limestone"
+              },
+              {
+                "id": "in_mtns8iv517",
+                "material": "oxygen"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv518",
+                "material": "crude_steel"
+              },
+              {
+                "id": "out_mtns8iv519",
+                "material": "steel_slag"
+              },
+              {
+                "id": "out_mtns8iv51a",
+                "material": "ldg"
+              },
+              {
+                "id": "out_mtns8iv51b",
+                "material": "conv_dust"
+              },
+              {
+                "id": "out_mtns8iv51c",
+                "material": "co2"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv51d",
+          "kind": "process",
+          "type": "ladle_furnace",
+          "name": "LF精炼",
+          "x": 52,
+          "y": 120,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "steel_in": 350,
+            "electricity": 9
+          },
+          "recipe": [
+            {
+              "material": "crude_steel",
+              "ratio": 1
+            },
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv51e",
+                "material": "crude_steel"
+              },
+              {
+                "id": "in_mtns8iv51f",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv51g",
+                "material": "refined_steel"
+              },
+              {
+                "id": "out_mtns8iv51h",
+                "material": "co2"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv51i",
+          "kind": "process",
+          "type": "rh_vacuum",
+          "name": "RH精炼",
+          "x": 352,
+          "y": 120,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "steel_in": 350,
+            "electricity": 2
+          },
+          "recipe": [
+            {
+              "material": "refined_steel",
+              "ratio": 1
+            },
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv51j",
+                "material": "refined_steel"
+              },
+              {
+                "id": "in_mtns8iv51k",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv51l",
+                "material": "refined_steel"
+              },
+              {
+                "id": "out_mtns8iv51m",
+                "material": "co2"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv51n",
+          "kind": "process",
+          "type": "caster",
+          "name": "连铸机",
+          "x": 652,
+          "y": 120,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "steel_in": 350,
+            "electricity": 6
+          },
+          "recipe": [
+            {
+              "material": "refined_steel",
+              "ratio": 1
+            },
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv51o",
+                "material": "refined_steel"
+              },
+              {
+                "id": "in_mtns8iv51p",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv51q",
+                "material": "billet"
+              },
+              {
+                "id": "out_mtns8iv51r",
+                "material": "scale"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv51s",
+          "kind": "process",
+          "type": "rolling_mill",
+          "name": "热轧机",
+          "x": 952,
+          "y": 120,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "steel_in": 350,
+            "ng_rate": 32,
+            "electricity": 28
+          },
+          "recipe": [
+            {
+              "material": "billet",
+              "ratio": 1
+            },
+            {
+              "material": "ngas",
+              "ratio": 1
+            },
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv51t",
+                "material": "billet"
+              },
+              {
+                "id": "in_mtns8iv51u",
+                "material": "ngas"
+              },
+              {
+                "id": "in_mtns8iv51v",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv51w",
+                "material": "steel_product"
+              },
+              {
+                "id": "out_mtns8iv51x",
+                "material": "scale"
+              },
+              {
+                "id": "out_mtns8iv51y",
+                "material": "co2"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv628",
+          "kind": "process",
+          "type": "hot_blast_stove",
+          "name": "热风炉",
+          "x": -848,
+          "y": 495,
+          "count": 3,
+          "spec": "",
+          "params": {
+            "power": 2,
+            "firing_rate": 77,
+            "blast_temp": 1150,
+            "thermal_eff": 80
+          },
+          "recipe": [
+            {
+              "material": "blast_air",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv629",
+                "material": "blast_air"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv62a",
+                "material": "hot_blast"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv63p"
+        },
+        {
+          "id": "n_mtns8iv62c",
+          "kind": "process",
+          "type": "hot_blast_stove",
+          "name": "热风炉2",
+          "x": -848,
+          "y": 634,
+          "count": 3,
+          "spec": "",
+          "params": {
+            "power": 2,
+            "firing_rate": 77,
+            "blast_temp": 1150,
+            "thermal_eff": 80
+          },
+          "recipe": [
+            {
+              "material": "blast_air",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv62d",
+                "material": "blast_air"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv62e",
+                "material": "hot_blast"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv63p"
+        },
+        {
+          "id": "n_mtns8iv62g",
+          "kind": "process",
+          "type": "hot_blast_stove",
+          "name": "热风炉3",
+          "x": -848,
+          "y": 773,
+          "count": 3,
+          "spec": "",
+          "params": {
+            "power": 2,
+            "firing_rate": 77,
+            "blast_temp": 1150,
+            "thermal_eff": 80
+          },
+          "recipe": [
+            {
+              "material": "blast_air",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv62h",
+                "material": "blast_air"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv62i",
+                "material": "hot_blast"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv63p"
+        },
+        {
+          "id": "n_mtns8iv62k",
+          "kind": "process",
+          "type": "blower",
+          "name": "鼓风机",
+          "x": -848,
+          "y": 1051,
+          "count": 3,
+          "spec": "",
+          "params": {
+            "power": 13,
+            "air_rate": 210,
+            "humidity": 10,
+            "pressure": 420
+          },
+          "recipe": [
+            {
+              "material": "oxygen",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv62l",
+                "material": "oxygen"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv62m",
+                "material": "blast_air"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv63q"
+        },
+        {
+          "id": "n_mtns8iv62o",
+          "kind": "process",
+          "type": "blower",
+          "name": "鼓风机2",
+          "x": -848,
+          "y": 1190,
+          "count": 3,
+          "spec": "",
+          "params": {
+            "power": 13,
+            "air_rate": 210,
+            "humidity": 10,
+            "pressure": 420
+          },
+          "recipe": [
+            {
+              "material": "oxygen",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv62p",
+                "material": "oxygen"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv62q",
+                "material": "blast_air"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv63q"
+        },
+        {
+          "id": "n_mtns8iv62s",
+          "kind": "process",
+          "type": "blower",
+          "name": "鼓风机3",
+          "x": -848,
+          "y": 1329,
+          "count": 3,
+          "spec": "",
+          "params": {
+            "power": 13,
+            "air_rate": 210,
+            "humidity": 10,
+            "pressure": 420
+          },
+          "recipe": [
+            {
+              "material": "oxygen",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv62t",
+                "material": "oxygen"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv62u",
+                "material": "blast_air"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv63q"
+        },
+        {
+          "id": "n_mtns8iv62w",
+          "kind": "process",
+          "type": "id_fan",
+          "name": "引风机",
+          "x": -1148,
+          "y": 375,
+          "count": 2,
+          "spec": "",
+          "params": {
+            "power": 3,
+            "draught": 3.5
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": [
+              {
+                "id": "out_mtns8iv62x",
+                "material": "draft"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv63r"
+        },
+        {
+          "id": "n_mtns8iv62z",
+          "kind": "process",
+          "type": "id_fan",
+          "name": "引风机2",
+          "x": -1148,
+          "y": 795,
+          "count": 2,
+          "spec": "",
+          "params": {
+            "power": 3,
+            "draught": 3.5
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": [
+              {
+                "id": "out_mtns8iv630",
+                "material": "draft"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv63r"
+        },
+        {
+          "id": "n_mtns8iv632",
+          "kind": "process",
+          "type": "injector",
+          "name": "喷吹系统",
+          "x": -848,
+          "y": 912,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 2,
+            "inj_rate": 42,
+            "transport_air": 21
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": [
+              {
+                "id": "out_mtns8iv633",
+                "material": "pulverized_coal"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv635",
+          "kind": "process",
+          "type": "oxy_supply",
+          "name": "供氧系统",
+          "x": -548,
+          "y": 327,
+          "count": 5,
+          "spec": "",
+          "params": {
+            "power": 6,
+            "oxygen_rate": 60,
+            "green_ratio": 15
+          },
+          "recipe": [
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv636",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv637",
+                "material": "oxygen"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv63s"
+        },
+        {
+          "id": "n_mtns8iv639",
+          "kind": "process",
+          "type": "oxy_supply",
+          "name": "供氧系统2",
+          "x": -248,
+          "y": 399,
+          "count": 5,
+          "spec": "",
+          "params": {
+            "power": 6,
+            "oxygen_rate": 60,
+            "green_ratio": 15
+          },
+          "recipe": [
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv63a",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv63b",
+                "material": "oxygen"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv63s"
+        },
+        {
+          "id": "n_mtns8iv63d",
+          "kind": "process",
+          "type": "oxy_supply",
+          "name": "供氧系统3",
+          "x": -848,
+          "y": 1468,
+          "count": 5,
+          "spec": "",
+          "params": {
+            "power": 6,
+            "oxygen_rate": 60,
+            "green_ratio": 15
+          },
+          "recipe": [
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv63e",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv63f",
+                "material": "oxygen"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv63s"
+        },
+        {
+          "id": "n_mtns8iv63h",
+          "kind": "process",
+          "type": "oxy_supply",
+          "name": "供氧系统4",
+          "x": -848,
+          "y": 1607,
+          "count": 5,
+          "spec": "",
+          "params": {
+            "power": 6,
+            "oxygen_rate": 60,
+            "green_ratio": 15
+          },
+          "recipe": [
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv63i",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv63j",
+                "material": "oxygen"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv63s"
+        },
+        {
+          "id": "n_mtns8iv63l",
+          "kind": "process",
+          "type": "oxy_supply",
+          "name": "供氧系统5",
+          "x": -848,
+          "y": 1746,
+          "count": 5,
+          "spec": "",
+          "params": {
+            "power": 6,
+            "oxygen_rate": 60,
+            "green_ratio": 15
+          },
+          "recipe": [
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv63m",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv63n",
+                "material": "oxygen"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv63s"
+        }
+      ],
+      "connections": [
+        {
+          "id": "c_mtns8iv51z",
+          "from": "n_mtns8iv50",
+          "fromPort": "out_mtns8iv55",
+          "to": "n_mtns8iv5k",
+          "toPort": "in_mtns8iv5l",
+          "material": "sinter",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv520",
+          "from": "n_mtns8iv58",
+          "fromPort": "out_mtns8iv5c",
+          "to": "n_mtns8iv5k",
+          "toPort": "in_mtns8iv5m",
+          "material": "pellet",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv521",
+          "from": "n_mtns8iv5e",
+          "fromPort": "out_mtns8iv5h",
+          "to": "n_mtns8iv5k",
+          "toPort": "in_mtns8iv5n",
+          "material": "coke",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv522",
+          "from": "n_mtns8iv5k",
+          "fromPort": "out_mtns8iv5u",
+          "to": "n_mtns8iv5y",
+          "toPort": "in_mtns8iv5z",
+          "material": "hot_metal",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv523",
+          "from": "n_mtns8iv5y",
+          "fromPort": "out_mtns8iv511",
+          "to": "n_mtns8iv513",
+          "toPort": "in_mtns8iv514",
+          "material": "pre_hm",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv524",
+          "from": "n_mtns8iv513",
+          "fromPort": "out_mtns8iv518",
+          "to": "n_mtns8iv51d",
+          "toPort": "in_mtns8iv51e",
+          "material": "crude_steel",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv625",
+          "from": "n_mtns8iv51d",
+          "fromPort": "out_mtns8iv51g",
+          "to": "n_mtns8iv51i",
+          "toPort": "in_mtns8iv51j",
+          "material": "refined_steel",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv626",
+          "from": "n_mtns8iv51i",
+          "fromPort": "out_mtns8iv51l",
+          "to": "n_mtns8iv51n",
+          "toPort": "in_mtns8iv51o",
+          "material": "refined_steel",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv627",
+          "from": "n_mtns8iv51n",
+          "fromPort": "out_mtns8iv51q",
+          "to": "n_mtns8iv51s",
+          "toPort": "in_mtns8iv51t",
+          "material": "billet",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv62b",
+          "from": "n_mtns8iv628",
+          "fromPort": "out_mtns8iv62a",
+          "to": "n_mtns8iv5k",
+          "toPort": "in_mtns8iv5r",
+          "material": "hot_blast",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv62f",
+          "from": "n_mtns8iv62c",
+          "fromPort": "out_mtns8iv62e",
+          "to": "n_mtns8iv5k",
+          "toPort": "in_mtns8iv5r",
+          "material": "hot_blast",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv62j",
+          "from": "n_mtns8iv62g",
+          "fromPort": "out_mtns8iv62i",
+          "to": "n_mtns8iv5k",
+          "toPort": "in_mtns8iv5r",
+          "material": "hot_blast",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv62n",
+          "from": "n_mtns8iv62k",
+          "fromPort": "out_mtns8iv62m",
+          "to": "n_mtns8iv628",
+          "toPort": "in_mtns8iv629",
+          "material": "blast_air",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv62r",
+          "from": "n_mtns8iv62o",
+          "fromPort": "out_mtns8iv62q",
+          "to": "n_mtns8iv62c",
+          "toPort": "in_mtns8iv62d",
+          "material": "blast_air",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv62v",
+          "from": "n_mtns8iv62s",
+          "fromPort": "out_mtns8iv62u",
+          "to": "n_mtns8iv62g",
+          "toPort": "in_mtns8iv62h",
+          "material": "blast_air",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv62y",
+          "from": "n_mtns8iv62w",
+          "fromPort": "out_mtns8iv62x",
+          "to": "n_mtns8iv50",
+          "toPort": "in_mtns8iv54",
+          "material": "draft",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv631",
+          "from": "n_mtns8iv62z",
+          "fromPort": "out_mtns8iv630",
+          "to": "n_mtns8iv58",
+          "toPort": "in_mtns8iv5b",
+          "material": "draft",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv634",
+          "from": "n_mtns8iv632",
+          "fromPort": "out_mtns8iv633",
+          "to": "n_mtns8iv5k",
+          "toPort": "in_mtns8iv5s",
+          "material": "pulverized_coal",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv638",
+          "from": "n_mtns8iv635",
+          "fromPort": "out_mtns8iv637",
+          "to": "n_mtns8iv5y",
+          "toPort": "in_mtns8iv510",
+          "material": "oxygen",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv63c",
+          "from": "n_mtns8iv639",
+          "fromPort": "out_mtns8iv63b",
+          "to": "n_mtns8iv513",
+          "toPort": "in_mtns8iv517",
+          "material": "oxygen",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv63g",
+          "from": "n_mtns8iv63d",
+          "fromPort": "out_mtns8iv63f",
+          "to": "n_mtns8iv62k",
+          "toPort": "in_mtns8iv62l",
+          "material": "oxygen",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv63k",
+          "from": "n_mtns8iv63h",
+          "fromPort": "out_mtns8iv63j",
+          "to": "n_mtns8iv62o",
+          "toPort": "in_mtns8iv62p",
+          "material": "oxygen",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv63o",
+          "from": "n_mtns8iv63l",
+          "fromPort": "out_mtns8iv63n",
+          "to": "n_mtns8iv62s",
+          "toPort": "in_mtns8iv62t",
+          "material": "oxygen",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv63t",
+          "from": "n_mtns8iv5e",
+          "fromPort": "out_mtns8iv5h",
+          "to": "n_mtns8iv50",
+          "toPort": "in_mtns8iv52",
+          "material": "coke",
+          "feedback": true
+        }
+      ],
+      "devices": [],
+      "groups": [
+        {
+          "id": "g_mtns8iv63p",
+          "name": "热风炉",
+          "x": -30,
+          "y": -50,
+          "members": [
+            "n_mtns8iv628",
+            "n_mtns8iv62c",
+            "n_mtns8iv62g"
+          ],
+          "inputs": [
+            {
+              "material": "blast_air"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "hot_blast"
+            }
+          ]
+        },
+        {
+          "id": "g_mtns8iv63q",
+          "name": "鼓风机",
+          "x": -30,
+          "y": -50,
+          "members": [
+            "n_mtns8iv62k",
+            "n_mtns8iv62o",
+            "n_mtns8iv62s"
+          ],
+          "inputs": [
+            {
+              "material": "oxygen"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "blast_air"
+            }
+          ]
+        },
+        {
+          "id": "g_mtns8iv63r",
+          "name": "引风机",
+          "x": -30,
+          "y": -50,
+          "members": [
+            "n_mtns8iv62w",
+            "n_mtns8iv62z"
+          ],
+          "inputs": [],
+          "outputs": [
+            {
+              "material": "draft"
+            }
+          ]
+        },
+        {
+          "id": "g_mtns8iv63s",
+          "name": "供氧系统",
+          "x": -30,
+          "y": -50,
+          "members": [
+            "n_mtns8iv635",
+            "n_mtns8iv639",
+            "n_mtns8iv63d",
+            "n_mtns8iv63h",
+            "n_mtns8iv63l"
+          ],
+          "inputs": [
+            {
+              "material": "electricity"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "oxygen"
+            }
+          ]
+        }
+      ],
+      "activeGroupId": null
+    }
+  },
+  {
+    "id": "short",
+    "label": "短流程模板",
+    "desc": "载入短流程炼钢模板（电炉短流程）",
+    "icon": "process",
+    "route": "short",
+    "scheme": {
+      "nodes": [
+        {
+          "id": "n_mtns8iv73u",
+          "kind": "process",
+          "type": "eaf",
+          "name": "电炉",
+          "x": -698,
+          "y": 120,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "scrap": 350,
+            "dri": 150,
+            "electricity": 140
+          },
+          "recipe": [
+            {
+              "material": "scrap",
+              "ratio": 1
+            },
+            {
+              "material": "dri",
+              "ratio": 1
+            },
+            {
+              "material": "pig_iron",
+              "ratio": 1
+            },
+            {
+              "material": "electricity",
+              "ratio": 1
+            },
+            {
+              "material": "oxygen",
+              "ratio": 1
+            },
+            {
+              "material": "self_power",
+              "ratio": 1
+            },
+            {
+              "material": "drive_power",
+              "ratio": 1
+            },
+            {
+              "material": "electrode_power",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv73v",
+                "material": "scrap"
+              },
+              {
+                "id": "in_mtns8iv73w",
+                "material": "dri"
+              },
+              {
+                "id": "in_mtns8iv73x",
+                "material": "pig_iron"
+              },
+              {
+                "id": "in_mtns8iv73y",
+                "material": "electricity"
+              },
+              {
+                "id": "in_mtns8iv73z",
+                "material": "oxygen"
+              },
+              {
+                "id": "in_mtns8iv740",
+                "material": "self_power"
+              },
+              {
+                "id": "in_mtns8iv741",
+                "material": "drive_power"
+              },
+              {
+                "id": "in_mtns8iv742",
+                "material": "electrode_power"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv743",
+                "material": "crude_steel"
+              },
+              {
+                "id": "out_mtns8iv744",
+                "material": "steel_slag"
+              },
+              {
+                "id": "out_mtns8iv745",
+                "material": "ldg"
+              },
+              {
+                "id": "out_mtns8iv746",
+                "material": "co2"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv747",
+          "kind": "process",
+          "type": "ladle_furnace",
+          "name": "LF精炼",
+          "x": -398,
+          "y": 120,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "steel_in": 350,
+            "electricity": 9
+          },
+          "recipe": [
+            {
+              "material": "crude_steel",
+              "ratio": 1
+            },
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv748",
+                "material": "crude_steel"
+              },
+              {
+                "id": "in_mtns8iv749",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv74a",
+                "material": "refined_steel"
+              },
+              {
+                "id": "out_mtns8iv74b",
+                "material": "co2"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv74c",
+          "kind": "process",
+          "type": "rh_vacuum",
+          "name": "RH精炼",
+          "x": -98,
+          "y": 120,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "steel_in": 350,
+            "electricity": 2
+          },
+          "recipe": [
+            {
+              "material": "refined_steel",
+              "ratio": 1
+            },
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv74d",
+                "material": "refined_steel"
+              },
+              {
+                "id": "in_mtns8iv74e",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv74f",
+                "material": "refined_steel"
+              },
+              {
+                "id": "out_mtns8iv74g",
+                "material": "co2"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv74h",
+          "kind": "process",
+          "type": "caster",
+          "name": "连铸机",
+          "x": 202,
+          "y": 120,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "steel_in": 350,
+            "electricity": 6
+          },
+          "recipe": [
+            {
+              "material": "refined_steel",
+              "ratio": 1
+            },
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv74i",
+                "material": "refined_steel"
+              },
+              {
+                "id": "in_mtns8iv74j",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv74k",
+                "material": "billet"
+              },
+              {
+                "id": "out_mtns8iv74l",
+                "material": "scale"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv74m",
+          "kind": "process",
+          "type": "rolling_mill",
+          "name": "热轧机",
+          "x": 502,
+          "y": 120,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "steel_in": 350,
+            "ng_rate": 32,
+            "electricity": 28
+          },
+          "recipe": [
+            {
+              "material": "billet",
+              "ratio": 1
+            },
+            {
+              "material": "ngas",
+              "ratio": 1
+            },
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv74n",
+                "material": "billet"
+              },
+              {
+                "id": "in_mtns8iv74o",
+                "material": "ngas"
+              },
+              {
+                "id": "in_mtns8iv74p",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv74q",
+                "material": "steel_product"
+              },
+              {
+                "id": "out_mtns8iv74r",
+                "material": "scale"
+              },
+              {
+                "id": "out_mtns8iv74s",
+                "material": "co2"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv74x",
+          "kind": "process",
+          "type": "dri_midrex",
+          "name": "DRI竖炉",
+          "x": -698,
+          "y": 1077,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "ore_rate": 116,
+            "dri_out": 105,
+            "ng_rate": 300,
+            "electricity": 45,
+            "h2_ratio": 55
+          },
+          "recipe": [
+            {
+              "material": "iron_ore",
+              "ratio": 1
+            },
+            {
+              "material": "ngas",
+              "ratio": 1
+            },
+            {
+              "material": "oxygen",
+              "ratio": 1
+            },
+            {
+              "material": "self_power",
+              "ratio": 1
+            },
+            {
+              "material": "drive_power",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv74y",
+                "material": "iron_ore"
+              },
+              {
+                "id": "in_mtns8iv74z",
+                "material": "ngas"
+              },
+              {
+                "id": "in_mtns8iv750",
+                "material": "oxygen"
+              },
+              {
+                "id": "in_mtns8iv751",
+                "material": "self_power"
+              },
+              {
+                "id": "in_mtns8iv752",
+                "material": "drive_power"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv753",
+                "material": "dri"
+              },
+              {
+                "id": "out_mtns8iv754",
+                "material": "co2"
+              },
+              {
+                "id": "out_mtns8iv755",
+                "material": "top_gas"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv756",
+          "kind": "process",
+          "type": "oxy_supply",
+          "name": "供氧系统",
+          "x": -698,
+          "y": 471,
+          "count": 3,
+          "spec": "",
+          "params": {
+            "power": 6,
+            "oxygen_rate": 60,
+            "green_ratio": 15
+          },
+          "recipe": [
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv757",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv758",
+                "material": "oxygen"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv75k"
+        },
+        {
+          "id": "n_mtns8iv75a",
+          "kind": "process",
+          "type": "electrode_reg",
+          "name": "电极调节",
+          "x": -698,
+          "y": 610,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 90,
+            "current": 70
+          },
+          "recipe": [
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv75b",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv75c",
+                "material": "electrode_power"
+              }
+            ]
+          },
+          "deviceBindings": []
+        },
+        {
+          "id": "n_mtns8iv75e",
+          "kind": "process",
+          "type": "oxy_supply",
+          "name": "供氧系统2",
+          "x": -698,
+          "y": 749,
+          "count": 3,
+          "spec": "",
+          "params": {
+            "power": 6,
+            "oxygen_rate": 60,
+            "green_ratio": 15
+          },
+          "recipe": [
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv75f",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv75g",
+                "material": "oxygen"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv75k"
+        },
+        {
+          "id": "n_mtns8iv75h",
+          "kind": "process",
+          "type": "oxy_supply",
+          "name": "供氧系统3",
+          "x": -698,
+          "y": 888,
+          "count": 3,
+          "spec": "",
+          "params": {
+            "power": 6,
+            "oxygen_rate": 60,
+            "green_ratio": 15
+          },
+          "recipe": [
+            {
+              "material": "electricity",
+              "ratio": 1
+            }
+          ],
+          "ports": {
+            "in": [
+              {
+                "id": "in_mtns8iv75i",
+                "material": "electricity"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_mtns8iv75j",
+                "material": "oxygen"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "groupId": "g_mtns8iv75k"
+        }
+      ],
+      "connections": [
+        {
+          "id": "c_mtns8iv74t",
+          "from": "n_mtns8iv73u",
+          "fromPort": "out_mtns8iv743",
+          "to": "n_mtns8iv747",
+          "toPort": "in_mtns8iv748",
+          "material": "crude_steel",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv74u",
+          "from": "n_mtns8iv747",
+          "fromPort": "out_mtns8iv74a",
+          "to": "n_mtns8iv74c",
+          "toPort": "in_mtns8iv74d",
+          "material": "refined_steel",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv74v",
+          "from": "n_mtns8iv74c",
+          "fromPort": "out_mtns8iv74f",
+          "to": "n_mtns8iv74h",
+          "toPort": "in_mtns8iv74i",
+          "material": "refined_steel",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv74w",
+          "from": "n_mtns8iv74h",
+          "fromPort": "out_mtns8iv74k",
+          "to": "n_mtns8iv74m",
+          "toPort": "in_mtns8iv74n",
+          "material": "billet",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv759",
+          "from": "n_mtns8iv756",
+          "fromPort": "out_mtns8iv758",
+          "to": "n_mtns8iv73u",
+          "toPort": "in_mtns8iv73z",
+          "material": "oxygen",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv75d",
+          "from": "n_mtns8iv75a",
+          "fromPort": "out_mtns8iv75c",
+          "to": "n_mtns8iv73u",
+          "toPort": "in_mtns8iv742",
+          "material": "electrode_power",
+          "feedback": false
+        },
+        {
+          "id": "c_mtns8iv75l",
+          "from": "n_mtns8iv74x",
+          "fromPort": "out_mtns8iv753",
+          "to": "n_mtns8iv73u",
+          "toPort": "in_mtns8iv73w",
+          "material": "dri",
+          "feedback": true
+        }
+      ],
+      "devices": [],
+      "groups": [
+        {
+          "id": "g_mtns8iv75k",
+          "name": "供氧系统",
+          "x": -30,
+          "y": -50,
+          "members": [
+            "n_mtns8iv756",
+            "n_mtns8iv75e",
+            "n_mtns8iv75h"
+          ],
+          "inputs": [
+            {
+              "material": "electricity"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "oxygen"
+            }
+          ]
+        }
+      ],
+      "activeGroupId": null
+    }
+  }
+]

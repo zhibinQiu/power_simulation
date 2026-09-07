@@ -1,8 +1,8 @@
 {
   "links": {
-    "202603041423": "n_mtia00w05m::weigher_0"
+    "meter1": "blast_furnace::belt_scale_0"
   },
   "factors": {
-    "202603041423": 3.6
+    "meter1": 1.0
   }
 }

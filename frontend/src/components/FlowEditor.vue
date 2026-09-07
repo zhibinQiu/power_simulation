@@ -145,7 +145,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { MATERIALS, MATERIAL_MAP, PROCESS_MAP, DEVICE_MAP, materialFamily } from '../data/flowLibrary'
 import DeviceGlyph from './DeviceGlyph.vue'
@@ -668,6 +668,9 @@ onMounted(() => {
   // 进入编排：自动布局后做"适应视图"，将全部节点缩放居中显示
   nextTick(() => { applySize(); store.flowZoomFit() })
 })
+// 编排画布以 tab 窗口形式呈现：从三维仿真 / 其它标签切回画布时重新上报画布尺寸
+// （隐藏期间 clientWidth/Height 为 0，缩放与「适配视图」依赖该尺寸）
+watch(() => store.flowEditing, (v) => { if (v) nextTick(applySize) })
 onBeforeUnmount(() => {
   window.removeEventListener('mousemove', onMove)
   window.removeEventListener('mouseup', onUp)

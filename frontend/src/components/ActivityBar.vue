@@ -4,7 +4,7 @@
       v-for="b in buttons"
       :key="b.id"
       class="act-btn"
-      :class="{ on: store.activityView === b.id }"
+      :class="{ on: b.view ? store[b.view] : store.activityView === b.id }"
       :title="t(b.title)"
       :aria-label="t(b.title)"
       @click="onClick(b.id)"
@@ -28,16 +28,24 @@ import { t } from '../i18n'
 
 const store = useSimStore()
 
-// 活动栏：场景 / 资源管理器 / 搜索 / 连接
+// 活动栏：场景 / 资源管理器 / 搜索 / AI 群控
+// AI 群控为独立视图（非左栏面板），其 on 态与开关注册在按钮的 view 字段（模板据此高亮）
 const buttons = [
   { id: 'scene', icon: 'scene3d', title: '场景', badge: null },
   { id: 'explorer', icon: 'open', title: '资源管理器', badge: null },
   { id: 'search', icon: 'search', title: '搜索', badge: null },
-  { id: 'connections', icon: 'link', title: '连接（数据源管理）', badge: () => (store.dataSources || []).filter((s) => s.enabled !== false).length },
+  { id: 'aiGroup', icon: 'ai', title: 'AI群控', badge: null, view: 'aiGroupOn' },
 ]
 
 // 点击行为（VS Code 风格）：点击当前活动按钮收起侧栏，点击其它按钮切换面板并展开
 function onClick(id) {
+  // AI 群控：打开独立群控视图（自动展开左侧「场景」树供拖入受控设备）；已打开时再次点击关闭返回孪生
+  if (id === 'aiGroup') {
+    if (store.aiGroupOn) { store.toggleAiGroup(); return }
+    store.openAiGroup()
+    store.pushCmd(t('AI群控：从左侧「场景」资源树拖入受控设备 —— 左栏「训练前测试」（滤波→稳态）验证滤波与闭环稳定，右栏「训练相关设定」训练低能耗稳态最优参数。'), 'out')
+    return
+  }
   if (store.activityView === id) {
     store.toggleLeft()
   } else {

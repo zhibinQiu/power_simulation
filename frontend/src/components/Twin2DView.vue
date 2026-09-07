@@ -4,7 +4,7 @@
     <div class="t2d-kpi" :class="{ fs: store.fullscreenOn }">
       <div class="kpi"><span>{{ t('总碳排放') }}</span><b :style="{ color: '#a0522d' }">{{ fmt(totals.co2_total) }}</b><i>tCO₂/h</i></div>
       <div class="kpi"><span>{{ t('综合能耗') }}</span><b>{{ fmt(totals.energy_total) }}</b><i>GJ/h</i></div>
-      <div class="kpi"><span>{{ t('吨钢强度') }}</span><b>{{ fmt(totals.intensity) }}</b><i>kgCO₂/t</i></div>
+      <div class="kpi"><span>{{ t('吨钢强度') }}</span><b>{{ fmt(totals.intensity / 1000) }}</b><i>tCO₂/t</i></div>
       <div class="kpi"><span>{{ t('钢产量') }}</span><b>{{ fmt(totals.steel_output) }}</b><i>t/h</i></div>
       <div class="kpi-sep"></div>
       <div class="kpi hint">

@@ -1,0 +1,127 @@
+{
+  "comment": "独立模拟数据源配置：模拟「外部数据系统 + 能碳一体机上行」两段链路。broker=本服务自带的私有 MQTT Broker（模拟外部数据系统的接入端口，仅本机）；sources=两类外部数据（钢铁仿真 / 机房热控），以外部系统原生主题发布（steel/…、idc/…）；uplink=模拟能碳一体机：从本机私有 Broker 采集后上行到云端 Broker 的 ext/<源>/# 空间，交给云端数据中间件转换。数值模型=基准 base + 正弦波动(amplitude/period) + 噪声 noise。停掉本服务即无模拟数据。",
+  "broker": {
+    "host": "127.0.0.1",
+    "port": 41885
+  },
+  "uplink": {
+    "enabled": true,
+    "comment": "模拟能碳一体机的上行转发：真实环境由现场一体机（box_mapper）经网线采集外部数据系统后上报云端；此处由本进程内的上行器完成同一职责",
+    "local": {
+      "host": "127.0.0.1",
+      "port": 41885,
+      "topics": ["steel/#", "idc/#"]
+    },
+    "cloud": {
+      "host": "36.151.146.71",
+      "port": 41883,
+      "prefix": "ext"
+    },
+    "keepalive": 30
+  },
+  "sources": [
+    {
+      "box": "ext-steel",
+      "name": "钢铁仿真数据源",
+      "topic_prefix": "steel",
+      "interval": 2.0,
+      "devices": [
+        {
+          "id": "blast_furnace",
+          "name": "1#高炉",
+          "topic": "blast_furnace",
+          "properties": [
+            {"name": "hot_blast_temp", "base": 1150.0, "amplitude": 25.0, "noise": 4.0, "period": 45.0, "unit": "℃"},
+            {"name": "blast_volume", "base": 3200.0, "amplitude": 120.0, "noise": 25.0, "period": 60.0, "unit": "Nm³/min"},
+            {"name": "top_pressure", "base": 220.0, "amplitude": 8.0, "noise": 1.5, "period": 90.0, "unit": "kPa"},
+            {"name": "hot_metal_temp", "base": 1480.0, "amplitude": 20.0, "noise": 3.0, "period": 120.0, "unit": "℃"},
+            {"name": "coke_ratio", "base": 360.0, "amplitude": 12.0, "noise": 2.5, "period": 180.0, "unit": "kg/t"},
+            {"name": "coal_injection", "base": 150.0, "amplitude": 10.0, "noise": 2.0, "period": 150.0, "unit": "kg/t"}
+          ]
+        },
+        {
+          "id": "converter",
+          "name": "1#转炉",
+          "topic": "converter",
+          "properties": [
+            {"name": "oxygen_flow", "base": 18000.0, "amplitude": 600.0, "noise": 120.0, "period": 70.0, "unit": "Nm³/h"},
+            {"name": "molten_steel_temp", "base": 1650.0, "amplitude": 25.0, "noise": 4.0, "period": 90.0, "unit": "℃"},
+            {"name": "carbon_content", "base": 0.38, "amplitude": 0.05, "noise": 0.01, "period": 80.0, "unit": "%"},
+            {"name": "scrap_ratio", "base": 180.0, "amplitude": 15.0, "noise": 3.0, "period": 200.0, "unit": "kg/t"}
+          ]
+        },
+        {
+          "id": "sintering",
+          "name": "1#烧结机",
+          "topic": "sintering",
+          "properties": [
+            {"name": "machine_speed", "base": 1.85, "amplitude": 0.12, "noise": 0.03, "period": 100.0, "unit": "m/min"},
+            {"name": "ignition_temp", "base": 1150.0, "amplitude": 30.0, "noise": 6.0, "period": 110.0, "unit": "℃"},
+            {"name": "exhaust_temp", "base": 132.0, "amplitude": 10.0, "noise": 2.0, "period": 95.0, "unit": "℃"}
+          ]
+        },
+        {
+          "id": "power_plant",
+          "name": "自备电厂",
+          "topic": "power_plant",
+          "properties": [
+            {"name": "active_power", "base": 320.0, "amplitude": 25.0, "noise": 5.0, "period": 40.0, "unit": "MW"},
+            {"name": "steam_flow", "base": 220.0, "amplitude": 18.0, "noise": 4.0, "period": 55.0, "unit": "t/h"},
+            {"name": "boiler_pressure", "base": 3.8, "amplitude": 0.2, "noise": 0.05, "period": 85.0, "unit": "MPa"}
+          ]
+        }
+      ]
+    },
+    {
+      "box": "ext-idc",
+      "name": "机房热控数据源",
+      "topic_prefix": "idc",
+      "interval": 3.0,
+      "devices": [
+        {
+          "id": "room_a",
+          "name": "机房A",
+          "topic": "room_a",
+          "properties": [
+            {"name": "supply_air_temp", "base": 18.5, "amplitude": 0.8, "noise": 0.2, "period": 60.0, "unit": "℃"},
+            {"name": "return_air_temp", "base": 26.8, "amplitude": 1.2, "noise": 0.3, "period": 60.0, "unit": "℃"},
+            {"name": "humidity", "base": 45.0, "amplitude": 3.0, "noise": 0.8, "period": 120.0, "unit": "%"},
+            {"name": "cabinet_power", "base": 42.0, "amplitude": 4.0, "noise": 1.0, "period": 45.0, "unit": "kW"},
+            {"name": "it_load", "base": 78.0, "amplitude": 6.0, "noise": 1.5, "period": 70.0, "unit": "%"}
+          ]
+        },
+        {
+          "id": "chilled_water",
+          "name": "冷冻水系统",
+          "topic": "chilled_water",
+          "properties": [
+            {"name": "supply_water_temp", "base": 7.2, "amplitude": 0.4, "noise": 0.1, "period": 90.0, "unit": "℃"},
+            {"name": "return_water_temp", "base": 12.6, "amplitude": 0.6, "noise": 0.15, "period": 90.0, "unit": "℃"},
+            {"name": "flow", "base": 320.0, "amplitude": 18.0, "noise": 4.0, "period": 75.0, "unit": "m³/h"},
+            {"name": "cop", "base": 5.2, "amplitude": 0.35, "noise": 0.08, "period": 150.0, "unit": ""}
+          ]
+        },
+        {
+          "id": "hvac",
+          "name": "空调机组",
+          "topic": "hvac",
+          "properties": [
+            {"name": "fan_freq", "base": 45.0, "amplitude": 3.0, "noise": 0.6, "period": 50.0, "unit": "Hz"},
+            {"name": "compressor_load", "base": 72.0, "amplitude": 8.0, "noise": 2.0, "period": 65.0, "unit": "%"},
+            {"name": "outlet_temp", "base": 16.5, "amplitude": 0.9, "noise": 0.2, "period": 70.0, "unit": "℃"}
+          ]
+        },
+        {
+          "id": "environment",
+          "name": "室外环境",
+          "topic": "environment",
+          "properties": [
+            {"name": "outdoor_temp", "base": 29.0, "amplitude": 4.0, "noise": 0.5, "period": 300.0, "unit": "℃"},
+            {"name": "outdoor_humidity", "base": 62.0, "amplitude": 7.0, "noise": 1.0, "period": 300.0, "unit": "%"},
+            {"name": "pue", "base": 1.38, "amplitude": 0.04, "noise": 0.01, "period": 200.0, "unit": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}

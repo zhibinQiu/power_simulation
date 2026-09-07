@@ -22,8 +22,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections import OrderedDict
 from typing import Dict, List, Tuple
+
+logger = logging.getLogger(__name__)
 
 from .models import ProcessModel, SimResult, SimTotals, UnitResult, SankeyNode, SankeyLink, LedgerItem
 from .devices import compute_device_readings
@@ -40,33 +43,34 @@ from .factors import (
 DEFAULT_PARAMS: Dict[str, Dict[str, float]] = {
     # —— 原料准备 ——
     # 电耗显式值 = 产量 × 实际强度（kWh/t）/1000，与 calculators 中 fallback 一致
-    # 默认规模：铁水 1000 t/h（约 2 座 3200m³ 高炉的演示规模），强度参数均按实际工业值标定
-    "sinter_plant":      {"ore_rate": 1100, "fuel_rate": 45, "electricity": 44.0},    # 40 kWh/t
-    "pelletizing":       {"ore_rate": 500,  "fuel_rate": 18, "electricity": 22.5},    # 45 kWh/t
-    "coke_oven":         {"coal_rate": 475, "electricity": 9.5},                      # 20 kWh/t 煤
-    "reheating_furnace": {"steel_in": 1000, "ng_rate": 45, "electricity": 8.0},       # 8 kWh/t
+    # 默认规模：铁水 350 t/h、年产钢约 300 万吨（中型联合钢厂，如 2×1500m³ 级高炉配套），
+    # 强度参数均按实际工业值标定（吨钢排放/能耗落在行业区间）
+    "sinter_plant":      {"ore_rate": 385, "fuel_rate": 45, "electricity": 15.4},    # 40 kWh/t
+    "pelletizing":       {"ore_rate": 175, "fuel_rate": 18, "electricity": 7.9},     # 45 kWh/t
+    "coke_oven":         {"coal_rate": 170, "electricity": 3.4},                     # 20 kWh/t 煤
+    "reheating_furnace": {"steel_in": 350, "ng_rate": 45, "electricity": 2.8},       # 8 kWh/t
     # —— 炼铁（焦比/煤比标定到真实高炉区间，使吨钢强度进入 1800–2200 kg/t）——
-    "blast_furnace":     {"hot_metal": 1000, "coke_rate": 470, "coal_inj": 150, "flux": 120, "slag_rate": 300},
+    "blast_furnace":     {"hot_metal": 350, "coke_rate": 410, "coal_inj": 150, "flux": 120, "slag_rate": 300},
     # 氢冶金：电耗 = h2_rate(kg/t)×产量×55 kWh/kgH₂ /1000（电解制氢）
-    "hydrogen_bf":       {"hot_metal": 1000, "h2_rate": 90, "electricity": 4950.0},
-    "h2_dri":            {"dri_out": 750, "h2_rate": 90, "electricity": 3712.5},
-    "dri_midrex":        {"pellet_rate": 750, "ng_rate": 300, "electricity": 112.5},  # 150 kWh/t-DRI
-    "smelting_reduction":{"ore_rate": 750, "coal_rate": 900, "electricity": 30.0},    # 40 kWh/t
-    "biochar_injection": {"biomass_rate": 25, "electricity": 2.5},                    # 100 kWh/t
+    "hydrogen_bf":       {"hot_metal": 350, "h2_rate": 90, "electricity": 1732.5},
+    "h2_dri":            {"dri_out": 263, "h2_rate": 90, "electricity": 1299.4},
+    "dri_midrex":        {"pellet_rate": 263, "ng_rate": 300, "electricity": 39.4},  # 150 kWh/t-DRI
+    "smelting_reduction":{"ore_rate": 263, "coal_rate": 900, "electricity": 10.5},    # 40 kWh/t
+    "biochar_injection": {"biomass_rate": 9, "electricity": 0.9},                    # 100 kWh/t
     # —— 炼钢 ——
-    "bof":               {"hot_metal_in": 1000, "scrap": 100, "flux": 60, "slag_rate": 120},
-    "eaf":               {"scrap": 900, "dri": 0, "electricity": 360.0, "electrode": 1.8},  # 400 kWh/t·2 kg/t
+    "bof":               {"hot_metal_in": 350, "scrap": 35, "flux": 60, "slag_rate": 120},
+    "eaf":               {"scrap": 315, "dri": 0, "electricity": 126.0, "electrode": 1.8},  # 400 kWh/t·2 kg/t
     # —— 精炼 ——
-    "ladle_furnace":     {"steel_in": 1000, "electricity": 25.0},                     # 25 kWh/t
-    "rh_vacuum":         {"steel_in": 1000, "electricity": 5.0},                      # 5 kWh/t
-    "vd_vacuum":         {"steel_in": 1000, "electricity": 4.0},                      # 4 kWh/t
-    "aod":               {"steel_in": 1000, "electricity": 12.0},                     # 12 kWh/t
+    "ladle_furnace":     {"steel_in": 350, "electricity": 8.8},                     # 25 kWh/t
+    "rh_vacuum":         {"steel_in": 350, "electricity": 1.8},                      # 5 kWh/t
+    "vd_vacuum":         {"steel_in": 350, "electricity": 1.4},                      # 4 kWh/t
+    "aod":               {"steel_in": 350, "electricity": 4.2},                     # 12 kWh/t
     # —— 连铸 ——
-    "caster":            {"steel_in": 1000, "electricity": 15.0},                     # 15 kWh/t
-    "ingot_casting":     {"steel_in": 1000, "ng_rate": 20, "electricity": 8.0},       # 8 kWh/t
+    "caster":            {"steel_in": 350, "electricity": 5.3},                     # 15 kWh/t
+    "ingot_casting":     {"steel_in": 350, "ng_rate": 20, "electricity": 2.8},       # 8 kWh/t
     # —— 轧制 ——
-    "rolling_mill":      {"steel_in": 1000, "ng_rate": 32, "electricity": 80.0},      # 80 kWh/t
-    "cold_rolling":      {"steel_in": 1000, "ng_rate": 25, "electricity": 100.0},     # 100 kWh/t
+    "rolling_mill":      {"steel_in": 350, "ng_rate": 32, "electricity": 28.0},      # 80 kWh/t
+    "cold_rolling":      {"steel_in": 350, "ng_rate": 25, "electricity": 35.0},     # 100 kWh/t
 }
 
 # 工序展示元数据：中文名 / 几何形状 / 工艺分类（用于工序库分组与3D建模）
@@ -278,7 +282,8 @@ def simulate(model: ProcessModel, factors: Dict = None) -> SimResult:
         ))
 
     steel = totals["steel_output"] or 1.0
-    intensity = totals["co2_total"] / steel * 1000.0
+    # 吨钢排放（范围一/CEA 口径）：与「总排放」卡一致，仅计直接排放
+    intensity = totals["co2_direct"] / steel * 1000.0
     util = ((totals["carbon_to_steel"] + totals["carbon_to_slag"] + totals["carbon_captured"]) / totals["carbon_in"]) if totals["carbon_in"] else 0.0
     energy_intensity = (totals["energy_total"] * KGCE_PER_GJ) / steel if steel > 0 else 0.0
     t = SimTotals(
@@ -340,14 +345,31 @@ def _chain_layout(raw, flows) -> Tuple[set, Dict[str, list], Dict[str, int]]:
     for vs in fadj.values():
         all_flow_ids.update(d for d, _m in vs)
     depth = {pid: 0 for pid in all_flow_ids}
-    changed = True
-    while changed:
+    # 环/自环防护：有向无环图的最长链 < 节点数，故最多迭代 len(all_flow_ids) 轮即可收敛；
+    # 若流程连线存在工艺回流（环/自环），原 while changed 会无限自增 depth 死循环（后台卡死根因）。
+    # 这里加轮数上限：有环时不再无限增长，仅记录告警便于定位。
+    n_nodes = len(all_flow_ids)
+    for _round in range(max(n_nodes, 1)):
         changed = False
         for s in all_flow_ids:
             for t, _m in fadj.get(s, []):
                 if depth[t] < depth[s] + 1:
                     depth[t] = depth[s] + 1
                     changed = True
+        if not changed:
+            break
+    else:
+        cycle_edges = [
+            f"{s}->{t}"
+            for s in all_flow_ids
+            for t, _m in fadj.get(s, [])
+            if depth[t] == depth[s] + 1 and s in depth and t in depth
+        ]
+        logger.warning(
+            "流程连线检测到环/自环（工序回流），已限制深度计算轮数避免死循环；"
+            "flows=%d 节点=%d 环边=%s",
+            len(flows or []), n_nodes, cycle_edges[:10],
+        )
     return ids, fadj, depth
 
 
@@ -601,9 +623,11 @@ def build_energy_sankey(raw, cfg: Dict, flows=None) -> Dict[str, object]:
         # 既无能量流入也无综合能耗的工序（孤立节点，无实际能流）不在能流中体现
         if elec_gj <= 1e-6 and not fuel and energy_total <= 1e-6:
             continue
+        gross_gj = elec_gj + sum(fuel.values())   # 毛能量流入（焦炉净差口径下 > energy_total）
         _node(pid, u.name, proc_col[u.id], "process")
-        per_unit[pid] = {"energy_total": energy_total, "elec_gj": elec_gj, "fuel": fuel,
+        per_unit[pid] = {"energy_total": energy_total, "gross_gj": gross_gj, "elec_gj": elec_gj, "fuel": fuel,
                          "recovery_gj": 0.0, "internal_out": 0.0, "type": u.type,
+                         "c_prod": float(res.get("carbon_to_product", 0.0) or 0.0),
                          "eff": EFF_EFFICIENCY.get(u.type, DEF_EFF_EFFICIENCY)}
 
     # 余热回收能量：由台账「余热回收(节电)」减排量(tCO2/h)反推节电量 -> GJ/h
@@ -628,7 +652,14 @@ def build_energy_sankey(raw, cfg: Dict, flows=None) -> Dict[str, object]:
                 continue
             if not bf_ids:
                 continue
-            prod_eff = info["energy_total"] * info["eff"]   # 中间产品带走有效能
+            # 中间产品带走有效能：优先按「产品实际带出碳 → 化学能」。
+            # 焦炉能耗为净差口径（energy_total=干馏损失），若沿用 eff×energy_total 会
+            # 严重低估焦炭能量（约 10 倍）且节点能流不守恒；焦炭能量 = 焦炭含碳 / 单位热值含碳量
+            cc_k = CC_FUEL.get(tgt_key) or 0.0
+            if info.get("c_prod") and cc_k:
+                prod_eff = float(info["c_prod"]) / cc_k
+            else:
+                prod_eff = info["energy_total"] * info["eff"]
             for bf in bf_ids:
                 demand = float(per_unit[bf]["fuel"].get(tgt_key, 0.0))
                 v = min(prod_eff, demand)
@@ -656,13 +687,21 @@ def build_energy_sankey(raw, cfg: Dict, flows=None) -> Dict[str, object]:
         links.append(SankeyLink(source=mid_id, target=tgt, value=round(v, 2)))
 
     # 工序 -> 去向（产品有效能 = 总有效能 − 内部转移给下游的部分）
+    # 净差口径节点（焦炉 energy_total=干馏损失，gross_gj=毛流入 > energy_total）：
+    # 出侧以毛能量守恒拆分——焦炭化学能整体转出、余量为工艺损失，保证节点能流闭合
     for pid, info in per_unit.items():
         e = float(info["energy_total"])
-        if e <= 1e-6:
+        gross = float(info.get("gross_gj") or e)
+        if e <= 1e-6 and gross <= 1e-6:
             continue
-        r = min(float(info["recovery_gj"]), e)
+        r = min(float(info["recovery_gj"]), max(gross, e))
         p = e * float(info["eff"])
-        loss = max(e - p - r, 0.0)
+        if info.get("c_prod") and info["type"] == "coke_oven":
+            # 焦炭化学能 = 焦炭含碳 / 单位热值含碳量（焦炉净差口径下不可用 eff×energy_total）
+            cc_k = CC_FUEL.get("coke") or 0.0
+            if cc_k:
+                p = float(info["c_prod"]) / cc_k
+        loss = max(gross - p - r, 0.0) if gross > e else max(e - p - r, 0.0)
         p_ext = max(p - float(info["internal_out"]), 0.0)
         if p_ext > 1e-6:
             links.append(SankeyLink(source=pid, target="es:product", value=round(p_ext, 2)))

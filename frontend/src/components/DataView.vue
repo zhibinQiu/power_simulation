@@ -1,12 +1,13 @@
 <template>
   <!-- ============ 数据分析 / AI 群控 数据区 ============
-       variant='analysis'（数据分析，AI → 数据分析）：tabs = 原始数据/时序预测/聚类分析；
-       variant='group'（AI 群控，AI → AI群控）：与数据分析同布局（左侧数据源），无 tab，仅展示参数优化内容。
-       数据源从左侧「场景」资源树拖入，右侧策略面板联动 -->
-  <div class="data-view" :class="{ drop: dragOver }"
+       variant='analysis'（数据分析，AI → 数据分析）：tabs = 原始数据/时序预测/聚类分析，
+       左侧数据源栏从「场景」资源树拖入设备（同图对比/聚类用，可多选）；
+       variant='group'（AI 群控，AI → AI群控）：左设定·右图——右侧从上至下：实时序列 → 滤波后序列 → 优化模型控制的训练
+       （GA/PSO/RL 均以控制 PID 参数形式训练：N 个可调设备 ×3 参数；训练区占大范围）；EKF 滤波为勾选项 -->
+  <div class="data-view" :class="{ drop: dragOver && !isGroup }"
        @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
-    <!-- 左侧：数据源（从左侧「场景」资源树拖入，可多选） -->
-    <div class="dv-sheets">
+    <!-- 左侧：数据源（数据分析形态；从左侧「场景」资源树拖入，可多选） -->
+    <div class="dv-sheets" v-if="!isGroup">
       <div class="dv-src-tip">{{ source === 'local' ? t('场景设备 · 从左侧资源树拖入数据源') : t('云端时序库（TDengine）') }}</div>
       <div class="dv-sel-bar">
         <button @click="selectAll" :disabled="!sheetDevs.length">{{ t('全选') }}</button>
@@ -66,7 +67,7 @@
         </div>
       </div>
 
-      <!-- 视图切换 tab（统一工具栏）：数据分析可用；AI 群控形态无 tab 切换，固定展示下方参数优化内容 -->
+      <!-- 视图切换 tab（统一工具栏，数据分析形态）：原始/预测/聚类。AI 群控形态无 tab（单一 PID·EKF 控制台） -->
       <div class="dv-view-bar" v-if="!isGroup">
         <button class="dv-mode" :class="{ on: viewMode === 'chart' }" @click="goChart">{{ t('原始数据') }}</button>
         <button class="dv-mode" :class="{ on: viewMode === 'seq' }" @click="goSeq">{{ t('时序预测') }}</button>
@@ -225,62 +226,12 @@
         <div v-else class="dv-chart-empty">{{ t('请多选 ≥2 台设备（进入本视图后自动执行聚类分析）') }}</div>
       </div>
 
-      <!-- 中间：参数优化（联动右侧「参数优化」策略 ai::ga/pso/rl，显示优化进度与最优参数）。
-           数据分析形态：该 tab 已移除（本分支仅兜底）；AI 群控形态：无 tab，本分支即唯一内容，恒展示 -->
-      <div class="dv-chart-wrap" v-else>
-        <div class="dv-compare-bar">
-          <span class="dv-compare-title">{{ isGroup ? t('AI群控') + ' · ' + t('参数优化') : t('参数优化') }} · {{ t('策略联动') }}</span>
-          <span v-if="optSt" class="dv-link-tag">{{ optIdLabel }} · {{ optSt.running ? t('优化中') : t('就绪') }}</span>
-        </div>
-        <div v-if="!optSt" class="dv-chart-empty">
-          {{ t('未选择「参数优化」策略：请在右侧属性面板点击「参数优化」并开始训练') }}
-        </div>
-        <template v-else>
-          <div class="dv-cluster-meta">
-            <span>{{ t('优化目标') }} <b>{{ optObjLabel }}</b></span>
-            <span>{{ t('迭代') }} <b>{{ optSt.iteration || 0 }}</b></span>
-            <span>{{ t('最优值') }} <b>{{ fmtOpt(optSt.best_fitness) }} {{ optSt.objective_unit }}</b></span>
-            <span v-if="optSt.improvement_pct != null">
-              {{ t('较初始') }} <b class="dv-sil" :class="silCls(optSt.improvement_pct)">{{ optSt.improvement_pct }}%</b>
-            </span>
-          </div>
-          <div v-if="optHist.length >= 2" class="dv-opt-body">
-            <div class="dv-opt-sub">{{ t('最优目标值收敛曲线（迭代 → 目标值）') }}</div>
-            <svg class="dv-chart-svg" :viewBox="optSvg.viewBox">
-              <g class="dv-axis">
-                <line :x1="optSvg.PL" :y1="optSvg.Y0" :x2="optSvg.W - optSvg.PR" :y2="optSvg.Y0" />
-                <line :x1="optSvg.PL" :y1="optSvg.Y0" :x2="optSvg.PL" :y2="optSvg.PT" />
-                <g v-for="t in optSvg.yTicks" :key="t.y">
-                  <line class="dv-grid" :x1="optSvg.PL" :y1="t.y" :x2="optSvg.W - optSvg.PR" :y2="t.y" />
-                  <text class="dv-tick" :x="optSvg.PL - 6" :y="t.y + 3" text-anchor="end">{{ t.label }}</text>
-                </g>
-                <g v-for="t in optSvg.xTicks" :key="t.x">
-                  <text class="dv-tick" :x="t.x" :y="optSvg.H - 10" text-anchor="middle">{{ t.label }}</text>
-                </g>
-              </g>
-              <path class="dv-opt-line" :d="optSvg.line" fill="none" />
-              <circle v-for="p in optSvg.pts" :key="p.x" class="dv-opt-dot" :cx="p.x" :cy="p.y" r="2.2" />
-            </svg>
-          </div>
-          <table v-if="optSt.best_params && optSt.best_params.length" class="dv-cluster-feat dv-opt-tbl">
-            <thead>
-              <tr>
-                <th>{{ t('参数') }}</th>
-                <th>{{ t('当前值') }}</th>
-                <th>{{ t('初始值') }}</th>
-                <th>{{ t('变化') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="p in optSt.best_params" :key="p.dkey || (p.unit_id + ':' + p.key)">
-                <td>{{ p.unit_label }} · {{ p.label }}<em v-if="p.unit">（{{ p.unit }}）</em></td>
-                <td class="mono">{{ fmtOpt(p.value) }}</td>
-                <td class="mono">{{ fmtOpt(p.initial) }}</td>
-                <td class="mono" :class="p.delta >= 0 ? 'dv-delta-up' : 'dv-delta-dn'">{{ fmtOpt(p.delta) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </template>
+      <!-- ============ 中间：AI 群控（variant='group'） 布局理念：左设定 · 右图 ============
+           左侧设定：数据源 / 回路组+PID 参数 / 滤波（EKF 为勾选项）/ 运行控制；
+           右侧图（从上至下）：① 实时序列 ② 滤波后的序列 ③ 优化模型控制的训练（占大范围——
+           三种算法都以控制 PID 参数形式训练：一个可调设备 = Kp/Ki/Kd 三个参数，N 个可调设备 = 3N 维） -->
+      <div class="grp-view" v-else-if="isGroup">
+        <PidControlView />
       </div>
     </div>
   </div>
@@ -292,19 +243,19 @@ import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
 import { t } from '../i18n'
 import TrendChart from './TrendChart.vue'
+import PidControlView from './PidControlView.vue'
 import MultiTrendChart from './MultiTrendChart.vue'
-
 const store = useSimStore()
 
 // 形态：'analysis' 数据分析（AI → 数据分析：tabs = 原始数据/时序预测/聚类分析）；
-//       'group' AI 群控（AI → AI群控：与数据分析同布局，但无 tab 切换，仅固定展示参数优化内容）
+//       'group' AI 群控（AI → AI群控）：单组件「左设定 · 右图」（PID 整定演示 + GA/PSO/RL 参数训练均内嵌于 PidControlView）
 const props = defineProps({
   variant: { type: String, default: 'analysis' },
 })
 const isGroup = computed(() => props.variant === 'group')
 
 const curId = ref(null)
-const viewMode = ref('chart')   // 'chart' 原始数据（含列表切换、同图对比） / 'seq' 时序预测 / 'cluster' 聚类分析（'opt' 仅存在于 AI 群控形态，数据分析无该 tab）
+const viewMode = ref('chart')   // 'chart' 原始数据（含列表切换、同图对比） / 'seq' 时序预测 / 'cluster' 聚类分析（AI 群控形态无 tab，主区固定为 PID·EKF 控制台）
 const chartOverlay = ref('chart') // 'chart' 图表 / 'list' 列表（仅在 viewMode === 'chart' 时生效）
 const source = ref('local')    // 'local' 场景设备 / 'cloud' 云端时序库（TDengine）
 
@@ -673,64 +624,9 @@ watch(selIds, () => {
   if (viewMode.value === 'cluster' && selDevs.value.length >= 2 && !clusterBusy.value) runCluster()
 }, { deep: true })
 
-// ==================== 策略联动：参数优化（ai::ga/pso/rl） ====================
-// 右侧属性面板选中策略后，本数据区自动切换对应视图；数据来自 store.optimizers（每 3s 轮询刷新）
-const STRAT_OPT_RE = /^ai::(ga|pso|rl)$/
-
-// 坐标轴刻度格式化（参数优化收敛曲线共用）
-const fmtAxis = (v) => {
-  if (v == null || !isFinite(v)) return ''
-  const a = Math.abs(v)
-  if (a >= 1e4) return (v / 1e4).toFixed(1) + t('万')
-  if (a >= 1e3) return (v / 1e3).toFixed(1) + 'k'
-  if (a >= 100) return v.toFixed(0)
-  if (a >= 1) return v.toFixed(1)
-  return v.toExponential(1)
-}
-// 参数优化视图
-const optSt = computed(() =>
-  STRAT_OPT_RE.test(store.selectedStrategyId || '') ? (store.optimizers[store.selectedStrategyId] || null) : null)
-const optHist = computed(() => (optSt.value && Array.isArray(optSt.value.history) ? optSt.value.history : []))
-const optIdLabel = computed(() => {
-  const id = store.selectedStrategyId || ''
-  return id === 'ai::ga' ? t('遗传算法') : id === 'ai::pso' ? t('粒子群') : id === 'ai::rl' ? t('强化学习') : id
-})
-const optObjLabel = computed(() => {
-  const st = optSt.value
-  if (!st) return ''
-  const o = (st.objectives || []).find((x) => x.key === st.objective)
-  return o ? o.label : (st.objective || '')
-})
-const fmtOpt = (v) => (v == null || isNaN(v) ? '—' : Number(v).toFixed(4).replace(/\.?0+$/, ''))
-const optSvg = computed(() => {
-  const h = optHist.value
-  if (h.length < 2) return null
-  const W = 880, H = 200, PL = 52, PR = 18, PT = 20, PB = 30
-  const y0 = Math.min(...h), y1 = Math.max(...h)
-  const ySpan = (y1 - y0) || (Math.abs(y0) * 0.1 + 1)
-  const Y = (v) => H - PB - ((v - y0) / ySpan) * (H - PT - PB)
-  const X = (i) => PL + (i / (h.length - 1)) * (W - PL - PR)
-  const yTicks = []
-  for (let i = 0; i <= 4; i++) {
-    const v = y0 + (ySpan * i) / 4
-    yTicks.push({ y: Y(v).toFixed(1), label: fmtAxis(v) })
-  }
-  const xTicks = []
-  for (let i = 0; i <= 4; i++) {
-    const idx = Math.round((i / 4) * (h.length - 1))
-    xTicks.push({ x: X(idx).toFixed(1), label: `#${idx + 1}` })
-  }
-  return {
-    W, H, PL, PR, PT, viewBox: `0 0 ${W} ${H}`,
-    Y0: Y(y0).toFixed(1),
-    line: h.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' '),
-    pts: h.map((v, i) => ({ x: X(i).toFixed(1), y: Y(v).toFixed(1) })),
-    yTicks, xTicks,
-  }
-})
-
-// 右侧属性面板选中策略 → 数据区自动跟随（聚类 / 预测趋势）
-// 参数优化（ai::ga/pso/rl）与数据拟合（ai::fit）：数据分析已移除对应 tab → 不切换；AI 群控固定参数优化 → 同样无需切换
+// ==================== 策略联动 ====================
+// 右侧属性面板选中策略 → 数据区自动跟随（聚类 / 预测趋势）。
+// 参数优化（ai::ga/pso/rl）与数据拟合（ai::fit）：无对应 tab；AI 群控固定为 PID·EKF 控制台 → 均不切换
 function syncStrategyMode(id) {
   if (isGroup.value) return
   if (id === 'ai::clu') {
@@ -742,12 +638,13 @@ function syncStrategyMode(id) {
   }
 }
 watch(() => store.selectedStrategyId, (id) => {
-  if (!store.dataViewOn && !store.aiGroupOn) return
+  // 窗口化后本组件可能已挂载但未被激活（切到其它 tab）：仅自身窗口激活时才跟随切换
+  if (store.activeViewId !== (isGroup.value ? 'aiGroup' : 'dataView')) return
   syncStrategyMode(id)
 })
 
-// 关闭数据视图，返回数字孪生
-const close = () => store.toggleDataView()
+// 关闭本窗口（供外部调用）：AI 群控与数据分析各自关闭自己的 tab
+const close = () => (isGroup.value ? store.toggleAiGroup() : store.toggleDataView())
 
 // 重新拉取设备历史数据（供视图工具栏「刷新数据」按钮调用）
 async function refresh() {
@@ -803,6 +700,7 @@ const sheetDevs = computed(() => {
 // ==================== 本地数据源：从左侧「场景」资源树拖入（整个区域均可拖放） ====================
 const dragOver = ref(false)
 function onDragOver(e) {
+  if (isGroup.value) return // 群控形态无拖拽接收区
   e.preventDefault()
   if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
   dragOver.value = true
@@ -813,6 +711,7 @@ function onDragLeave(e) {
   dragOver.value = false
 }
 function onDrop(e) {
+  if (isGroup.value) return
   e.preventDefault()
   dragOver.value = false
   try {
@@ -1058,6 +957,8 @@ defineExpose({ close, refresh })
 .dv-compare-chart { flex: 1 1 auto; min-height: 0; }
 .dv-compare-chart :deep(.multi-trend) { height: 100%; display: flex; flex-direction: column; }
 .dv-compare-chart :deep(.cv) { flex: 1 1 auto; }
+/* ---- AI 群控：左设定 · 右图（实时序列 / 滤波后序列 / 训练大区），单组件承载 ---- */
+.grp-view { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 8px 14px 6px; }
 /* ---- 聚类分析 ---- */
 .dv-cluster-body { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 4px; }
 .dv-cluster-meta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 11px; }

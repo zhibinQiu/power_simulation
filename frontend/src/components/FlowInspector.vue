@@ -1,7 +1,7 @@
 <template>
   <div class="flow-insp">
-    <!-- 工艺设备小组属性（优先于节点/总览） -->
-    <template v-if="group">
+    <!-- 工艺设备小组属性（优先于节点/总览；钢铁场景专属逻辑） -->
+    <template v-if="group && !store.customSceneOn">
       <CollapseSection :title="t('工艺设备小组')" tone="blue">
         <div class="card">
           <div class="kv2"><span>{{ t('名称') }}</span><input class="gname-in" :value="group.name" @input="store.renameFlowGroup(group.id, $event.target.value)" /></div>
@@ -50,7 +50,10 @@
       <button v-if="store.editMode" class="del-node" @click="store.removeFlowGroup(group.id)">{{ t('删除该小组') }}</button>
     </template>
 
-    <!-- 未选中：方案总览 -->
+    <!-- 其它场景（行业资源包）：通用编排属性（方案总览 / 工序属性与参数 / 设备） -->
+    <OtherFlowPanel v-else-if="store.customSceneOn" />
+
+    <!-- 未选中：方案总览（钢铁） -->
     <template v-else-if="!node">
       <CollapseSection :title="t('编排方案总览')" tone="blue" :show-more="false">
       <div class="chips">
@@ -228,6 +231,34 @@
       </div>
       </CollapseSection>
 
+      <!-- ===== 附加传感 / 可变设备：绑定到本工序设备；数值来源支持下拉 ===== -->
+      <CollapseSection :title="t('附加传感 / 可变设备')" tone="blue" :show-more="false">
+      <div class="card">
+        <div class="pr-hint">{{ t('在编排模式中把传感器 / 可变设备绑定到具体的工艺设备（数据绑定方向：工序 ← 传感）。每个绑定可设「数值来源」：模拟数据 / 固定值 / 工艺参数。运行态出现在设备树与数据分析中。') }}</div>
+        <div v-for="ag in attachGroups" :key="ag.kind" class="ports-col">
+          <span class="pc-t">{{ ag.label }}（已绑 {{ attachedOf(ag.kind).length }}）</span>
+          <div v-for="att in attachedOf(ag.kind)" :key="att.uid" class="gio-row att-row">
+            <span class="att-lbl" :title="t('数值来源：') + srcTextOf(att)">{{ att.label }}</span>
+            <select class="att-src" :value="srcOf(att)" @change="onAttSrc(att, $event.target.value)">
+              <option value="sim">{{ t('模拟数据（缓变）') }}</option>
+              <option value="fixed">{{ t('固定值（模板默认）') }}</option>
+              <optgroup :label="t('工艺参数')">
+                <option v-for="o in paramOpts" :key="'p' + o.key" :value="'param::' + o.key">{{ o.label }}</option>
+              </optgroup>
+            </select>
+            <button class="x-btn danger" :title="t('解除绑定')" @click="store.removeAttachFromNode(node.id, att.uid)">✕</button>
+          </div>
+          <div v-if="!attachedOf(ag.kind).length" class="pr-hint att-empty">{{ t('未绑定：下方选择模板添加，或在左侧资源管理「传感器 / 可变设备」目录中点击条目直接绑定') }}</div>
+          <div class="att-add-row">
+            <select class="att-add" :value="''" @change="onAddAttach(ag.kind, $event.target.value)">
+              <option value="" disabled>＋ {{ t('添加') }} {{ ag.label }}…</option>
+              <option v-for="it in ag.items" :key="it.type" :value="it.type">{{ it.label }}（{{ ag.unitOf(it) }}）</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      </CollapseSection>
+
       <button class="del-node" @click="store.removeFlowNode(node.id)">{{ t('删除该工序节点') }}</button>
     </template>
 
@@ -306,8 +337,10 @@
 import { computed } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { MATERIALS, MATERIAL_MAP, PROCESS_MAP, DEVICE_MAP } from '../data/flowLibrary'
+import { ATTACH_GROUPS } from '../data/attachLibrary'
 import { EDITABLE_PARAMS } from '../data/processMeta'
 import CollapseSection from './CollapseSection.vue'
+import OtherFlowPanel from './OtherFlowPanel.vue'
 import { calcSlagBasicity } from '../utils/slagBasicity'
 import { t } from '../i18n'
 
@@ -315,6 +348,40 @@ const store = useSimStore()
 
 const node = computed(() => store.selectedFlowNode)
 const group = computed(() => store.selectedGroup)
+
+// ===== 附加传感 / 可变设备（绑定到当前工艺节点）=====
+const attachGroups = ATTACH_GROUPS.map((g) => ({
+  kind: g.key,
+  label: g.label,
+  items: g.items,
+  unitOf: (it) => (g.key === 'sensor' ? (it.measure ? it.measure.unit : '') : (it.setpoint ? it.setpoint.unit : '')),
+}))
+const attachedOf = (kind) => (node.value ? (node.value.attached || []).filter((a) => a.kind === kind) : [])
+// 数值来源选项（工艺参数部分来自 store 候选，label 带单位便于辨识）
+const paramOpts = computed(() => {
+  if (!node.value) return []
+  return store.attachSourceOptions(node.value.id).filter((o) => o.value === 'param')
+})
+const srcOf = (att) => (att.src === 'param' ? 'param::' + (att.param || '') : att.src || 'fixed')
+function srcTextOf(att) {
+  if (att.src === 'param') {
+    const o = paramOpts.value.find((x) => x.param === att.param)
+    return o ? o.label : att.param
+  }
+  return t(att.src === 'sim' ? '模拟数据（缓变）' : '固定值（模板默认）')
+}
+// 添加：把模板实例绑定到当前工艺节点
+function onAddAttach(kind, type) {
+  if (!type || !node.value) return
+  const att = store.addAttachToNode(node.value.id, kind, type)
+  if (att) store.toast = t('已为工艺「{name}」绑定「{label}」：数值来源默认模拟数据，可下拉切换为工艺参数 / 固定值', { name: node.value.name, label: att.label })
+}
+// 下拉切换数值来源（param::key / sim / fixed）
+function onAttSrc(att, v) {
+  if (!node.value) return
+  if (v.indexOf('param::') === 0) store.setAttachSource(node.value.id, att.uid, { src: 'param', param: v.slice(7) })
+  else store.setAttachSource(node.value.id, att.uid, { src: v })
+}
 const groupMembers = computed(() => {
   if (!group.value) return []
   const ids = new Set(group.value.members || [])
@@ -521,6 +588,12 @@ function bindToProcess(pid) {
   color: var(--accent2); border: 1px solid var(--accent2); background: transparent; cursor: pointer; }
 .comp-btn:hover { background: var(--accent2); color: #fff; }
 .spec-sel { width: 100%; }
+/* 附加传感 / 可变设备绑定行 */
+.att-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.att-lbl { flex: 1; min-width: 0; font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att-src, .att-add { flex: 1; min-width: 0; font-size: 11px; padding: 3px 4px; border: 1px solid var(--border); border-radius: 2px; background: var(--panel); color: var(--text); }
+.att-add-row { display: flex; margin-top: 2px; }
+.att-empty { color: var(--muted); }
 .recipe-row { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
 .recipe-row select, .bind-row select { flex: 1; }
 .recipe-row input { width: 64px; }

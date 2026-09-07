@@ -87,16 +87,8 @@
           </div>
           <!-- AI 分析入口已下沉到 DataView 内部视图 tab，顶部工具栏不再重复展示 -->
         </template>
-        <!-- ============ AI 群控：与数据分析同布局，仅参数优化（无 tab，训练控制/进度在右侧面板与中间内容区） ============ -->
+        <!-- ============ AI 群控：工具栏已下沉到 PID·EKF 控制台内部（含标题/状态/操作），顶部工具栏不再渲染 ============ -->
         <template v-else-if="view === 'group'">
-          <span class="ribbon-title">{{ t('AI群控') }}</span>
-          <span class="rdiv"></span>
-          <div class="rbtns">
-            <button class="rbtn" @click="actions.dataRefresh()" :title="t('重新拉取工况数据')">
-              <Icon name="refresh"/><span>{{ t('刷新数据') }}</span>
-            </button>
-          </div>
-          <!-- 参数优化（遗传算法 / 粒子群 / 强化学习）训练控制统一在右侧属性面板，中间内容区实时展示收敛进度与最优参数 -->
         </template>
         <!-- ============ CEA & CCER 行情 ============ -->
         <template v-else-if="view === 'market'">
@@ -138,10 +130,6 @@
         <template v-else-if="view === 'box'">
         </template>
       </div>
-      <!-- 关闭：非数字孪生态（含流程编排）显示在最右侧，点击关闭当前视图返回数字孪生 -->
-      <button v-if="view !== 'twin'" class="rbtn close-btn" @click="actions.closeView()" :title="t('关闭当前视图，返回数字孪生场景')">
-        <Icon name="close"/><span>{{ t('关闭') }}</span>
-      </button>
     </div>
 </template>
 
@@ -157,9 +145,11 @@ const props = defineProps({
 
 const store = useSimStore()
 
-// 当前工具栏所属视图：数字孪生 / 流程编排 / 工况数据分析 / 碳资产管理 / 碳排核算 / 能流分析 / 能碳一体机
+// 当前工具栏所属视图：流程编排 / 工况数据分析 / 碳资产管理 / 碳排核算 / 能流分析 / 能碳一体机 / 数字孪生
+// 流程编排：仅当编排画布标签在前台（flowEditing）时渲染编排工具条；
+// 编排态切到三维仿真 / 其它标签时按该视图渲染其工具条
 const view = computed(() => {
-  if (store.editMode) return 'edit'
+  if (store.flowEditing) return 'edit'
   if (store.dataViewOn) return 'data'
   if (store.aiGroupOn) return 'group'
   if (store.carbonMarketOn) return 'market'
@@ -180,11 +170,6 @@ const view = computed(() => {
   color: var(--text);
   white-space: nowrap;
 }
-.close-btn {
-  flex: 0 0 auto; margin-left: auto; padding: 0 12px;
-  color: var(--muted); white-space: nowrap;
-}
-.close-btn:hover { color: var(--red); background: var(--panel-3); }
 /* 视图切换按钮（三维仿真 / HMI人机交互屏）：置于仿真启动旁，选中态高亮强调。
    UI 规则：选中态背景非白色，不再绘制边框（border 透明保留占位） */
 .view-switch { border: 1px solid var(--border); }

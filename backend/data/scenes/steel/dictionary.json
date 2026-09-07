@@ -1,0 +1,2845 @@
+{
+  "format": "dictionary/1",
+  "scene": "steel",
+  "materials": [
+    {
+      "id": "iron_ore",
+      "name": "铁矿石",
+      "cat": "原料",
+      "unit": "t",
+      "color": "#8a9a5b",
+      "carbon": 0.02,
+      "price": 0.09
+    },
+    {
+      "id": "coke",
+      "name": "焦炭",
+      "cat": "原料",
+      "unit": "t",
+      "color": "#5a5a5a",
+      "carbon": 3,
+      "price": 0.21
+    },
+    {
+      "id": "coal",
+      "name": "煤",
+      "cat": "原料",
+      "unit": "t",
+      "color": "#6a6a6a",
+      "carbon": 2.4,
+      "price": 0.12
+    },
+    {
+      "id": "limestone",
+      "name": "石灰石",
+      "cat": "原料",
+      "unit": "t",
+      "color": "#c9c2a8",
+      "carbon": 0.44,
+      "price": 0.02
+    },
+    {
+      "id": "scrap",
+      "name": "废钢",
+      "cat": "原料",
+      "unit": "t",
+      "color": "#6f9e74",
+      "carbon": 0.1,
+      "price": 0.26
+    },
+    {
+      "id": "electrode",
+      "name": "石墨电极",
+      "cat": "原料",
+      "unit": "t",
+      "color": "#7a6a8a",
+      "carbon": 0.5,
+      "price": 4
+    },
+    {
+      "id": "dri",
+      "name": "直接还原铁/热压块铁",
+      "cat": "原料",
+      "unit": "t",
+      "color": "#7d9b6a",
+      "carbon": 0.2
+    },
+    {
+      "id": "pig_iron",
+      "name": "生铁",
+      "cat": "原料",
+      "unit": "t",
+      "color": "#5f7d52",
+      "carbon": 1.6
+    },
+    {
+      "id": "ferroalloy",
+      "name": "合金",
+      "cat": "原料",
+      "unit": "t",
+      "color": "#8a7bb0",
+      "carbon": 1.5
+    },
+    {
+      "id": "oxygen",
+      "name": "氧气",
+      "cat": "能源",
+      "unit": "Nm³",
+      "color": "#5b83a8",
+      "carbon": 0
+    },
+    {
+      "id": "water",
+      "name": "水",
+      "cat": "原料",
+      "unit": "t",
+      "color": "#4f97a0",
+      "carbon": 0
+    },
+    {
+      "id": "ngas",
+      "name": "天然气",
+      "cat": "能源",
+      "unit": "Nm³",
+      "color": "#a0a0a0",
+      "carbon": 0.00216,
+      "price": 0.00032
+    },
+    {
+      "id": "electricity",
+      "name": "外购电",
+      "cat": "能源",
+      "unit": "MWh",
+      "color": "#e0b24a",
+      "carbon": 0.57,
+      "price": 0.055
+    },
+    {
+      "id": "green_power",
+      "name": "绿电",
+      "cat": "能源",
+      "unit": "MWh",
+      "color": "#3fae7a",
+      "carbon": 0.02
+    },
+    {
+      "id": "biomass",
+      "name": "生物质碳",
+      "cat": "能源",
+      "unit": "t",
+      "color": "#7fae5a",
+      "carbon": 0,
+      "price": 0.04
+    },
+    {
+      "id": "sinter",
+      "name": "烧结矿",
+      "cat": "中间产物",
+      "unit": "t",
+      "color": "#9a8b5b",
+      "carbon": 0.2
+    },
+    {
+      "id": "pellet",
+      "name": "球团",
+      "cat": "中间产物",
+      "unit": "t",
+      "color": "#b0a060",
+      "carbon": 0.1
+    },
+    {
+      "id": "hot_metal",
+      "name": "铁水",
+      "cat": "中间产物",
+      "unit": "t",
+      "color": "#5f7d52",
+      "carbon": 1.6
+    },
+    {
+      "id": "bf_slag",
+      "name": "高炉渣",
+      "cat": "中间产物",
+      "unit": "t",
+      "color": "#7a7a6a",
+      "carbon": 0
+    },
+    {
+      "id": "pre_hm",
+      "name": "预处理铁水",
+      "cat": "中间产物",
+      "unit": "t",
+      "color": "#5f8d62",
+      "carbon": 1.6
+    },
+    {
+      "id": "crude_steel",
+      "name": "钢水",
+      "cat": "中间产物",
+      "unit": "t",
+      "color": "#4f9d6b",
+      "carbon": 0.1
+    },
+    {
+      "id": "steel_slag",
+      "name": "钢渣",
+      "cat": "中间产物",
+      "unit": "t",
+      "color": "#8a7aa0",
+      "carbon": 0
+    },
+    {
+      "id": "ldg",
+      "name": "转炉煤气",
+      "cat": "能源",
+      "unit": "Nm³",
+      "color": "#7a8a5a",
+      "carbon": 0.002
+    },
+    {
+      "id": "conv_dust",
+      "name": "转炉尘/污泥",
+      "cat": "中间产物",
+      "unit": "t",
+      "color": "#9a9a8a",
+      "carbon": 0
+    },
+    {
+      "id": "refined_steel",
+      "name": "精炼钢水",
+      "cat": "中间产物",
+      "unit": "t",
+      "color": "#4fb07a",
+      "carbon": 0.05,
+      "salePrice": 0.32
+    },
+    {
+      "id": "billet",
+      "name": "连铸坯",
+      "cat": "中间产物",
+      "unit": "t",
+      "color": "#5fae7a",
+      "carbon": 0.05,
+      "salePrice": 0.35
+    },
+    {
+      "id": "steel_product",
+      "name": "钢材",
+      "cat": "中间产物",
+      "unit": "t",
+      "color": "#3f9d6b",
+      "carbon": 0.05,
+      "salePrice": 0.39
+    },
+    {
+      "id": "scale",
+      "name": "氧化铁皮",
+      "cat": "中间产物",
+      "unit": "t",
+      "color": "#a05a4a",
+      "carbon": 0
+    },
+    {
+      "id": "cog",
+      "name": "焦炉煤气",
+      "cat": "能源",
+      "unit": "Nm³",
+      "color": "#8a9a4a",
+      "carbon": 0.002
+    },
+    {
+      "id": "bfg",
+      "name": "高炉煤气",
+      "cat": "能源",
+      "unit": "Nm³",
+      "color": "#6b7a55",
+      "carbon": 0.0009
+    },
+    {
+      "id": "waste_heat",
+      "name": "余热",
+      "cat": "能源",
+      "unit": "GJ",
+      "color": "#c0903e",
+      "carbon": 0
+    },
+    {
+      "id": "steam",
+      "name": "蒸汽",
+      "cat": "能源",
+      "unit": "t",
+      "color": "#9fb0b5",
+      "carbon": 0
+    },
+    {
+      "id": "self_power",
+      "name": "自发电",
+      "cat": "能源",
+      "unit": "MWh",
+      "color": "#d4b24a",
+      "carbon": 0.18
+    },
+    {
+      "id": "co2",
+      "name": "CO₂",
+      "cat": "副产品",
+      "unit": "t",
+      "color": "#c75a52",
+      "carbon": 1
+    },
+    {
+      "id": "blast_air",
+      "name": "鼓风(风量)",
+      "cat": "能源",
+      "unit": "kNm³/h",
+      "color": "#5b9ac8",
+      "carbon": 0
+    },
+    {
+      "id": "hot_blast",
+      "name": "热风",
+      "cat": "能源",
+      "unit": "℃·kNm³/h",
+      "color": "#c8804e",
+      "carbon": 0
+    },
+    {
+      "id": "draft",
+      "name": "抽力",
+      "cat": "能源",
+      "unit": "kPa",
+      "color": "#7a8ac8",
+      "carbon": 0
+    },
+    {
+      "id": "drive_power",
+      "name": "驱动电",
+      "cat": "能源",
+      "unit": "MWh",
+      "color": "#e0b24a",
+      "carbon": 0.57
+    },
+    {
+      "id": "pulverized_coal",
+      "name": "喷吹煤粉",
+      "cat": "能源",
+      "unit": "t/h",
+      "color": "#6a6a6a",
+      "carbon": 2.4
+    },
+    {
+      "id": "combustion_air",
+      "name": "助燃风",
+      "cat": "能源",
+      "unit": "kNm³/h",
+      "color": "#5b9ab0",
+      "carbon": 0
+    },
+    {
+      "id": "feeder_flow",
+      "name": "给料流",
+      "cat": "原料",
+      "unit": "t/h",
+      "color": "#8a9a5b",
+      "carbon": 0
+    },
+    {
+      "id": "cool_water",
+      "name": "冷却水",
+      "cat": "原料",
+      "unit": "t/h",
+      "color": "#4f97a0",
+      "carbon": 0
+    },
+    {
+      "id": "aux_steam",
+      "name": "辅助蒸汽",
+      "cat": "能源",
+      "unit": "t/h",
+      "color": "#9fb0b5",
+      "carbon": 0
+    },
+    {
+      "id": "electrode_power",
+      "name": "电极电",
+      "cat": "能源",
+      "unit": "MWh",
+      "color": "#e0c24a",
+      "carbon": 0.57
+    },
+    {
+      "id": "oxy_supply",
+      "name": "供氧",
+      "cat": "能源",
+      "unit": "kNm³/h",
+      "color": "#5b83c8",
+      "carbon": 0
+    }
+  ],
+  "products": [
+    "steel_product",
+    "billet",
+    "refined_steel"
+  ],
+  "processes": [
+    {
+      "type": "sinter_plant",
+      "label": "烧结机",
+      "route": "steel",
+      "mainIn": "iron_ore",
+      "mainOut": "sinter",
+      "efDirect": 0.2,
+      "efIndirect": 0.02,
+      "yield": 0.86,
+      "inputs": [
+        "iron_ore",
+        "coke",
+        "limestone",
+        "draft"
+      ],
+      "outputs": [
+        "sinter",
+        "bfg",
+        "co2"
+      ],
+      "params": [
+        {
+          "key": "ore_rate",
+          "label": "矿量",
+          "unit": "t/h",
+          "min": 200,
+          "max": 2500,
+          "step": 50,
+          "def": 385
+        },
+        {
+          "key": "fuel_rate",
+          "label": "燃料比",
+          "unit": "kg/t",
+          "min": 20,
+          "max": 80,
+          "step": 1,
+          "def": 45
+        }
+      ],
+      "greenStrategies": [
+        {
+          "id": "sinter_hr",
+          "name": "烧结余热回收",
+          "desc": "回收烧结矿冷却废气显热，产蒸汽或发电",
+          "saving": "节电 25 kWh/t-烧结矿",
+          "carbon": 7.5,
+          "tags": [
+            "余热"
+          ]
+        },
+        {
+          "id": "sinter_flue_recirc",
+          "name": "烟气循环烧结",
+          "desc": "部分烧结烟气返回料层，减少烟气排放总量",
+          "saving": "减碳 8 kgCO₂/t-烧结矿",
+          "carbon": 8,
+          "tags": [
+            "减排"
+          ]
+        },
+        {
+          "id": "sinter_seal",
+          "name": "烧结机密封改造",
+          "desc": "降低台车与风箱间漏风率，提升有效风量",
+          "saving": "节电 5 kWh/t-烧结矿",
+          "carbon": 1.5,
+          "tags": [
+            "节能"
+          ]
+        },
+        {
+          "id": "sinter_deep_bed",
+          "name": "厚料层烧结",
+          "desc": "增加烧结料层高度至 700mm+，降低固体燃料消耗",
+          "saving": "节焦 3 kg/t-烧结矿",
+          "carbon": 6,
+          "tags": [
+            "节能"
+          ]
+        },
+        {
+          "id": "sinter_desox",
+          "name": "烧结烟气脱硫脱硝一体化",
+          "desc": "活性焦一体化脱硫脱硝，降低末端治理能耗",
+          "saving": "节电 2 kWh/t-烧结矿",
+          "carbon": 0.6,
+          "tags": [
+            "减排"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "pelletizing",
+      "label": "球团",
+      "route": "steel",
+      "mainIn": "iron_ore",
+      "mainOut": "pellet",
+      "efDirect": 0.1,
+      "efIndirect": 0.03,
+      "yield": 0.9,
+      "inputs": [
+        "iron_ore",
+        "limestone",
+        "draft"
+      ],
+      "outputs": [
+        "pellet",
+        "co2"
+      ],
+      "params": [
+        {
+          "key": "ore_rate",
+          "label": "矿量",
+          "unit": "t/h",
+          "min": 100,
+          "max": 1200,
+          "step": 50,
+          "def": 175
+        },
+        {
+          "key": "fuel_rate",
+          "label": "燃料比",
+          "unit": "kg/t",
+          "min": 5,
+          "max": 40,
+          "step": 1,
+          "def": 18
+        }
+      ],
+      "greenStrategies": [
+        {
+          "id": "pellet_grate_hr",
+          "name": "链篦机-回转窑余热回收",
+          "desc": "回收回转窑和环冷机废气余热用于干燥预热",
+          "saving": "节煤 8 kg/t-球团",
+          "carbon": 10,
+          "tags": [
+            "余热"
+          ]
+        },
+        {
+          "id": "pellet_deep_bed",
+          "name": "带式焙烧机料层加厚",
+          "desc": "增加焙烧料层厚度提升热效率",
+          "saving": "节气 5 %",
+          "carbon": 3,
+          "tags": [
+            "节能"
+          ]
+        },
+        {
+          "id": "pellet_gas_recirc",
+          "name": "球团预热废气循环",
+          "desc": "部分预热段废气返回利用，减少外排",
+          "saving": "节煤 3 kg/t-球团",
+          "carbon": 4,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "coke_oven",
+      "label": "焦炉",
+      "route": "steel",
+      "mainIn": "coal",
+      "mainOut": "coke",
+      "efDirect": 0.3,
+      "efIndirect": 0.015,
+      "yield": 0.75,
+      "inputs": [
+        "coal",
+        "combustion_air"
+      ],
+      "outputs": [
+        "coke",
+        "cog",
+        "co2"
+      ],
+      "params": [
+        {
+          "key": "coal_rate",
+          "label": "入炉煤",
+          "unit": "t/h",
+          "min": 100,
+          "max": 1200,
+          "step": 50,
+          "def": 170
+        }
+      ],
+      "greenStrategies": [
+        {
+          "id": "coke_cdq",
+          "name": "干熄焦(CDQ)",
+          "desc": "惰性气体冷却红焦并回收热量发电",
+          "saving": "节电 50 kWh/t-焦",
+          "carbon": 15,
+          "tags": [
+            "余热"
+          ]
+        },
+        {
+          "id": "coke_riser_hr",
+          "name": "焦炉上升管余热回收",
+          "desc": "回收荒煤气显热产蒸汽，取代管式炉",
+          "saving": "节煤 10 kg/t-焦",
+          "carbon": 12,
+          "tags": [
+            "余热"
+          ]
+        },
+        {
+          "id": "coke_flue_hr",
+          "name": "焦炉烟道气余热利用",
+          "desc": "烟道废气余热产蒸汽或预热煤料",
+          "saving": "节煤 5 kg/t-焦",
+          "carbon": 6,
+          "tags": [
+            "余热"
+          ]
+        },
+        {
+          "id": "coke_cmc",
+          "name": "煤调湿(CMC)",
+          "desc": "利用焦炉余热干燥入炉煤，降低水分提高堆密度",
+          "saving": "节煤 4 kg/t-焦",
+          "carbon": 5,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "blast_furnace",
+      "label": "高炉",
+      "route": "steel",
+      "mainIn": "sinter",
+      "mainOut": "hot_metal",
+      "efDirect": 1.6,
+      "efIndirect": 0.03,
+      "yield": 0.62,
+      "inputs": [
+        "sinter",
+        "pellet",
+        "coke",
+        "limestone",
+        "self_power",
+        "blast_air",
+        "hot_blast",
+        "pulverized_coal",
+        "electricity"
+      ],
+      "outputs": [
+        "hot_metal",
+        "bf_slag",
+        "bfg",
+        "co2"
+      ],
+      "drivenBy": {
+        "blast_air": "wind_rate",
+        "hot_blast": "hot_blast_temp",
+        "pulverized_coal": "coal_inj",
+        "draft": "draft"
+      },
+      "params": [
+        {
+          "key": "hot_metal",
+          "label": "铁水产量",
+          "unit": "t/h",
+          "min": 200,
+          "max": 2000,
+          "step": 50,
+          "def": 350
+        },
+        {
+          "key": "coke_rate",
+          "label": "焦比",
+          "unit": "kg/t",
+          "min": 300,
+          "max": 550,
+          "step": 5,
+          "def": 410
+        },
+        {
+          "key": "electricity",
+          "label": "电耗",
+          "unit": "MWh/h",
+          "min": 5,
+          "max": 60,
+          "step": 5,
+          "def": 11
+        },
+        {
+          "key": "coal_inj",
+          "label": "喷煤比",
+          "unit": "kg/t",
+          "min": 0,
+          "max": 220,
+          "step": 5,
+          "def": 130
+        },
+        {
+          "key": "burden_total",
+          "label": "总入炉矿量",
+          "unit": "kg/t",
+          "min": 1000,
+          "max": 2200,
+          "step": 10,
+          "def": 1625
+        },
+        {
+          "key": "sinter_pct",
+          "label": "烧结矿配比",
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "def": 62
+        },
+        {
+          "key": "pellet_pct",
+          "label": "球团配比",
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "def": 31
+        },
+        {
+          "key": "lump_pct",
+          "label": "块矿配比",
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "def": 7
+        },
+        {
+          "key": "slag_rate",
+          "label": "渣比",
+          "unit": "kg/t",
+          "min": 200,
+          "max": 450,
+          "step": 5,
+          "def": 300
+        },
+        {
+          "key": "flux",
+          "label": "熔剂比",
+          "unit": "kg/t",
+          "min": 0,
+          "max": 150,
+          "step": 5,
+          "def": 10
+        },
+        {
+          "key": "wind_rate",
+          "label": "风量",
+          "unit": "kNm³/h",
+          "min": 50,
+          "max": 480,
+          "step": 10,
+          "def": 80
+        },
+        {
+          "key": "hot_blast_temp",
+          "label": "热风温度",
+          "unit": "℃",
+          "min": 1100,
+          "max": 1250,
+          "step": 10,
+          "def": 1150
+        },
+        {
+          "key": "o2_flow",
+          "label": "纯氧流量",
+          "unit": "Nm³/h",
+          "min": 0,
+          "max": 60000,
+          "step": 500,
+          "def": 0
+        },
+        {
+          "key": "draft",
+          "label": "炉顶抽力(相对)",
+          "unit": "×",
+          "min": 0.5,
+          "max": 1.5,
+          "step": 0.02,
+          "def": 1
+        },
+        {
+          "key": "blast_humidity",
+          "label": "鼓风湿度",
+          "unit": "g/Nm³",
+          "min": 2,
+          "max": 30,
+          "step": 1,
+          "def": 10
+        }
+      ],
+      "greenStrategies": [
+        {
+          "id": "bf_trt",
+          "name": "炉顶余压发电(TRT)",
+          "desc": "利用高炉炉顶煤气压力驱动透平发电",
+          "saving": "节电 40 kWh/t-铁水",
+          "carbon": 12,
+          "tags": [
+            "余能"
+          ]
+        },
+        {
+          "id": "bf_pci",
+          "name": "高炉富氧喷煤",
+          "desc": "提高喷煤量替代焦炭，降低焦比和碳排放",
+          "saving": "减碳 50 kgCO₂/t-铁水",
+          "carbon": 50,
+          "tags": [
+            "减排"
+          ]
+        },
+        {
+          "id": "bf_hot_stove_hr",
+          "name": "热风炉余热回收",
+          "desc": "回收热风炉烟气余热预热煤气和助燃空气",
+          "saving": "节气 8 %",
+          "carbon": 8,
+          "tags": [
+            "余热"
+          ]
+        },
+        {
+          "id": "bf_slag_hr",
+          "name": "高炉渣水淬余热回收",
+          "desc": "高炉水淬渣热水用于厂区供暖或低温发电",
+          "saving": "节标煤 15 kg/t-铁水",
+          "carbon": 6,
+          "tags": [
+            "余热"
+          ]
+        },
+        {
+          "id": "bf_dry_dedust",
+          "name": "高炉煤气干法除尘",
+          "desc": "干法布袋除尘替代湿法，节水节电",
+          "saving": "节电 5 kWh/t-铁水",
+          "carbon": 1.5,
+          "tags": [
+            "节能"
+          ]
+        },
+        {
+          "id": "bf_waste_plastic",
+          "name": "高炉喷吹废塑料",
+          "desc": "废塑料颗粒替代部分焦炭喷入风口",
+          "saving": "减碳 20 kgCO₂/t-铁水",
+          "carbon": 20,
+          "tags": [
+            "减排"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "hot_metal_pretreat",
+      "label": "铁水预处理",
+      "route": "steel",
+      "mainIn": "hot_metal",
+      "mainOut": "pre_hm",
+      "efDirect": 0.02,
+      "efIndirect": 0.02,
+      "yield": 0.99,
+      "inputs": [
+        "hot_metal",
+        "oxygen"
+      ],
+      "outputs": [
+        "pre_hm",
+        "co2"
+      ],
+      "params": [
+        {
+          "key": "hm_rate",
+          "label": "铁水量",
+          "unit": "t/h",
+          "min": 200,
+          "max": 2000,
+          "step": 50,
+          "def": 350
+        }
+      ],
+      "greenStrategies": [
+        {
+          "id": "hmpt_mg_opt",
+          "name": "铁水预处理镁基脱硫优化",
+          "desc": "优化喷吹参数降低镁粉消耗与铁损",
+          "saving": "降耗 20% 脱硫剂",
+          "carbon": 1,
+          "tags": [
+            "节能"
+          ]
+        },
+        {
+          "id": "hmpt_kr_opt",
+          "name": "KR搅拌能效优化",
+          "desc": "优化搅拌转速和叶片结构降低电耗",
+          "saving": "节电 3 kWh/t-铁水",
+          "carbon": 0.9,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "bof",
+      "label": "转炉",
+      "route": "steel",
+      "mainIn": "pre_hm",
+      "mainOut": "crude_steel",
+      "efDirect": 0.1,
+      "efIndirect": 0.03,
+      "yield": 0.96,
+      "inputs": [
+        "pre_hm",
+        "scrap",
+        "limestone",
+        "oxygen"
+      ],
+      "outputs": [
+        "crude_steel",
+        "steel_slag",
+        "ldg",
+        "conv_dust",
+        "co2"
+      ],
+      "params": [
+        {
+          "key": "hot_metal_in",
+          "label": "铁水入炉",
+          "unit": "t/h",
+          "min": 200,
+          "max": 2000,
+          "step": 50,
+          "def": 350
+        },
+        {
+          "key": "scrap",
+          "label": "废钢",
+          "unit": "t/h",
+          "min": 0,
+          "max": 600,
+          "step": 50,
+          "def": 35
+        },
+        {
+          "key": "electricity",
+          "label": "电耗",
+          "unit": "MWh/h",
+          "min": 5,
+          "max": 60,
+          "step": 5,
+          "def": 11
+        },
+        {
+          "key": "slag_rate",
+          "label": "渣比",
+          "unit": "kg/t",
+          "min": 80,
+          "max": 200,
+          "step": 5,
+          "def": 120
+        },
+        {
+          "key": "flux",
+          "label": "熔剂比",
+          "unit": "kg/t",
+          "min": 0,
+          "max": 150,
+          "step": 5,
+          "def": 60
+        }
+      ],
+      "greenStrategies": [
+        {
+          "id": "bof_ldg_recov",
+          "name": "转炉煤气回收(OG法)",
+          "desc": "回收转炉吹炼CO气体作为燃料气，降低外购能源",
+          "saving": "回收 0.8 GJ/t-钢",
+          "carbon": 30,
+          "tags": [
+            "余能"
+          ]
+        },
+        {
+          "id": "bof_neg_energy",
+          "name": "转炉负能炼钢",
+          "desc": "通过蒸汽回收+煤气回收实现净能量输出",
+          "saving": "节电 30 kWh/t-钢",
+          "carbon": 9,
+          "tags": [
+            "节能"
+          ]
+        },
+        {
+          "id": "bof_flue_hr",
+          "name": "转炉烟气余热回收",
+          "desc": "回收转炉烟气(1450℃)显热产蒸汽",
+          "saving": "节标煤 8 kg/t-钢",
+          "carbon": 10,
+          "tags": [
+            "余热"
+          ]
+        },
+        {
+          "id": "bof_co2_bottom",
+          "name": "转炉底吹CO₂搅拌",
+          "desc": "CO₂替代Ar/N₂底吹搅拌，实现碳利用",
+          "saving": "减碳 5 kgCO₂/t-钢",
+          "carbon": 5,
+          "tags": [
+            "减排"
+          ]
+        },
+        {
+          "id": "bof_ladle_cover",
+          "name": "钢包加盖保温",
+          "desc": "钢包全程加盖减少钢水温降和烘烤能耗",
+          "saving": "节电 3 kWh/t-钢",
+          "carbon": 1,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ladle_furnace",
+      "label": "LF精炼",
+      "route": "steel",
+      "mainIn": "crude_steel",
+      "mainOut": "refined_steel",
+      "efDirect": 0,
+      "efIndirect": 0.015,
+      "yield": 0.995,
+      "inputs": [
+        "crude_steel",
+        "electricity"
+      ],
+      "outputs": [
+        "refined_steel",
+        "co2"
+      ],
+      "params": [
+        {
+          "key": "steel_in",
+          "label": "钢水量",
+          "unit": "t/h",
+          "min": 200,
+          "max": 2000,
+          "step": 50,
+          "def": 350
+        },
+        {
+          "key": "electricity",
+          "label": "电耗",
+          "unit": "MWh/h",
+          "min": 5,
+          "max": 60,
+          "step": 5,
+          "def": 9
+        }
+      ],
+      "greenStrategies": [
+        {
+          "id": "lf_submerged_arc",
+          "name": "LF埋弧加热优化",
+          "desc": "优化造渣和电压档位提高电弧热效率",
+          "saving": "节电 5 kWh/t-钢",
+          "carbon": 1.5,
+          "tags": [
+            "节能"
+          ]
+        },
+        {
+          "id": "lf_ladle_heater",
+          "name": "钢包蓄热式烘烤",
+          "desc": "蓄热式燃烧技术回收烟气余热预热烘烤空气",
+          "saving": "节气 40 %",
+          "carbon": 2,
+          "tags": [
+            "余热"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "rh_vacuum",
+      "label": "RH精炼",
+      "route": "steel",
+      "mainIn": "refined_steel",
+      "mainOut": "refined_steel",
+      "efDirect": 0,
+      "efIndirect": 0.005,
+      "yield": 0.998,
+      "inputs": [
+        "refined_steel",
+        "electricity"
+      ],
+      "outputs": [
+        "refined_steel",
+        "co2"
+      ],
+      "params": [
+        {
+          "key": "steel_in",
+          "label": "钢水量",
+          "unit": "t/h",
+          "min": 200,
+          "max": 2000,
+          "step": 50,
+          "def": 350
+        },
+        {
+          "key": "electricity",
+          "label": "电耗",
+          "unit": "MWh/h",
+          "min": 1,
+          "max": 15,
+          "step": 1,
+          "def": 2
+        }
+      ],
+      "greenStrategies": [
+        {
+          "id": "rh_vac_vfd",
+          "name": "RH真空泵变频调速",
+          "desc": "根据脱气阶段自动调节真空泵转速",
+          "saving": "节电 2 kWh/t-钢",
+          "carbon": 0.6,
+          "tags": [
+            "节能"
+          ]
+        },
+        {
+          "id": "rh_light_treat",
+          "name": "RH轻处理工艺",
+          "desc": "减少深真空处理时间仅作成分微调",
+          "saving": "节电 1 kWh/t-钢",
+          "carbon": 0.3,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "caster",
+      "label": "连铸机",
+      "route": "steel",
+      "mainIn": "refined_steel",
+      "mainOut": "billet",
+      "efDirect": 0,
+      "efIndirect": 0.01,
+      "yield": 0.97,
+      "inputs": [
+        "refined_steel",
+        "electricity"
+      ],
+      "outputs": [
+        "billet",
+        "scale"
+      ],
+      "params": [
+        {
+          "key": "steel_in",
+          "label": "钢水量",
+          "unit": "t/h",
+          "min": 200,
+          "max": 2000,
+          "step": 50,
+          "def": 350
+        },
+        {
+          "key": "electricity",
+          "label": "电耗",
+          "unit": "MWh/h",
+          "min": 2,
+          "max": 40,
+          "step": 2,
+          "def": 6
+        }
+      ],
+      "greenStrategies": [
+        {
+          "id": "cc_hcr",
+          "name": "连铸坯热送热装(HCR)",
+          "desc": "高温连铸坯直接送入加热炉，减少加热能耗",
+          "saving": "节气 50 %",
+          "carbon": 15,
+          "tags": [
+            "节能"
+          ]
+        },
+        {
+          "id": "cc_tundish_heat",
+          "name": "中间包感应加热",
+          "desc": "等离子/感应加热精准控温降低过热度",
+          "saving": "节电 2 kWh/t-钢",
+          "carbon": 0.6,
+          "tags": [
+            "节能"
+          ]
+        },
+        {
+          "id": "cc_2nd_cool",
+          "name": "连铸二冷动态控制",
+          "desc": "基于实时温度模型优化各段冷却水量",
+          "saving": "节水 15 %",
+          "carbon": 0.3,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "rolling_mill",
+      "label": "热轧机",
+      "route": "steel",
+      "mainIn": "billet",
+      "mainOut": "steel_product",
+      "efDirect": 0.02,
+      "efIndirect": 0.03,
+      "yield": 0.95,
+      "inputs": [
+        "billet",
+        "ngas",
+        "electricity"
+      ],
+      "outputs": [
+        "steel_product",
+        "scale",
+        "co2"
+      ],
+      "params": [
+        {
+          "key": "steel_in",
+          "label": "钢水量",
+          "unit": "t/h",
+          "min": 200,
+          "max": 2000,
+          "step": 50,
+          "def": 350
+        },
+        {
+          "key": "ng_rate",
+          "label": "天然气",
+          "unit": "m³/t",
+          "min": 0,
+          "max": 80,
+          "step": 2,
+          "def": 32
+        },
+        {
+          "key": "electricity",
+          "label": "电耗",
+          "unit": "MWh/h",
+          "min": 10,
+          "max": 160,
+          "step": 5,
+          "def": 28
+        }
+      ],
+      "greenStrategies": [
+        {
+          "id": "rm_regen_burner",
+          "name": "加热炉蓄热式燃烧",
+          "desc": "蓄热体交替回收烟气余热预热助燃空气",
+          "saving": "节气 30 %",
+          "carbon": 12,
+          "tags": [
+            "余热"
+          ]
+        },
+        {
+          "id": "rm_laminar_hr",
+          "name": "热轧层流冷却余热回收",
+          "desc": "回收层流冷却水余热用于供暖或预热",
+          "saving": "余热回收 1.5 GJ/t-钢",
+          "carbon": 4,
+          "tags": [
+            "余热"
+          ]
+        },
+        {
+          "id": "rm_oil_mist",
+          "name": "轧制油雾回收",
+          "desc": "油雾过滤回收减少油耗和排放",
+          "saving": "降耗 15 % 轧制油",
+          "carbon": 0.5,
+          "tags": [
+            "减排"
+          ]
+        },
+        {
+          "id": "rm_vfd",
+          "name": "主传动变频调速节能",
+          "desc": "主轧机传动电机变频化替代直流调速",
+          "saving": "节电 8 %",
+          "carbon": 2.5,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "eaf",
+      "label": "电炉",
+      "route": "steel",
+      "mainIn": "scrap",
+      "mainOut": "crude_steel",
+      "efDirect": 0.05,
+      "efIndirect": 0.25,
+      "yield": 0.95,
+      "inputs": [
+        "scrap",
+        "dri",
+        "pig_iron",
+        "electricity",
+        "oxygen",
+        "self_power",
+        "drive_power",
+        "electrode_power"
+      ],
+      "outputs": [
+        "crude_steel",
+        "steel_slag",
+        "ldg",
+        "co2"
+      ],
+      "params": [
+        {
+          "key": "scrap",
+          "label": "废钢",
+          "unit": "t/h",
+          "min": 0,
+          "max": 2000,
+          "step": 50,
+          "def": 350
+        },
+        {
+          "key": "dri",
+          "label": "直接还原铁",
+          "unit": "t/h",
+          "min": 0,
+          "max": 800,
+          "step": 50,
+          "def": 150
+        },
+        {
+          "key": "electricity",
+          "label": "电耗",
+          "unit": "MWh/h",
+          "min": 50,
+          "max": 700,
+          "step": 20,
+          "def": 140
+        }
+      ],
+      "greenStrategies": [
+        {
+          "id": "eaf_scrap_preheat",
+          "name": "废钢连续预热",
+          "desc": "利用电炉烟气(1200℃+)预热废钢降低电耗",
+          "saving": "节电 80 kWh/t-钢",
+          "carbon": 48,
+          "tags": [
+            "余热"
+          ]
+        },
+        {
+          "id": "eaf_foamy_slag",
+          "name": "泡沫渣操作",
+          "desc": "优化埋弧操作减少电弧热辐射损失",
+          "saving": "节电 20 kWh/t-钢",
+          "carbon": 12,
+          "tags": [
+            "节能"
+          ]
+        },
+        {
+          "id": "eaf_oxyfuel",
+          "name": "氧燃枪助熔",
+          "desc": "吹氧+喷碳加速熔化缩短冶炼周期",
+          "saving": "节电 30 kWh/t-钢",
+          "carbon": 18,
+          "tags": [
+            "节能"
+          ]
+        },
+        {
+          "id": "eaf_flue_hr",
+          "name": "电炉烟气余热回收",
+          "desc": "回收第四孔烟气余热产蒸汽",
+          "saving": "节标煤 10 kg/t-钢",
+          "carbon": 8,
+          "tags": [
+            "余热"
+          ]
+        },
+        {
+          "id": "eaf_smart_power",
+          "name": "电弧炉智能供电",
+          "desc": "基于神经网络优化各冶炼期供电曲线",
+          "saving": "节电 15 kWh/t-钢",
+          "carbon": 9,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "dri_midrex",
+      "label": "DRI竖炉",
+      "route": "steel",
+      "mainIn": "iron_ore",
+      "mainOut": "dri",
+      "efDirect": 0.6,
+      "efIndirect": 0.09,
+      "yield": 0.92,
+      "inputs": [
+        "iron_ore",
+        "ngas",
+        "oxygen",
+        "self_power",
+        "drive_power"
+      ],
+      "outputs": [
+        "dri",
+        "co2",
+        "top_gas"
+      ],
+      "params": [
+        {
+          "key": "ore_rate",
+          "label": "矿量",
+          "unit": "t/h",
+          "min": 100,
+          "max": 800,
+          "step": 50,
+          "def": 116
+        },
+        {
+          "key": "dri_out",
+          "label": "DRI产量",
+          "unit": "t/h",
+          "min": 50,
+          "max": 700,
+          "step": 50,
+          "def": 105
+        },
+        {
+          "key": "ng_rate",
+          "label": "天然气耗",
+          "unit": "m³/t-DRI",
+          "min": 200,
+          "max": 400,
+          "step": 10,
+          "def": 300
+        },
+        {
+          "key": "electricity",
+          "label": "电耗",
+          "unit": "MWh/h",
+          "min": 10,
+          "max": 150,
+          "step": 5,
+          "def": 45
+        },
+        {
+          "key": "h2_ratio",
+          "label": "H₂占比",
+          "unit": "%",
+          "min": 40,
+          "max": 95,
+          "step": 5,
+          "def": 55
+        }
+      ],
+      "greenStrategies": [
+        {
+          "id": "dri_h2_shift",
+          "name": "氢基还原切换",
+          "desc": "提高还原气中H₂占比，降低天然气碳强度",
+          "saving": "减碳 60 kgCO₂/t-DRI",
+          "carbon": 60,
+          "tags": [
+            "减排"
+          ]
+        },
+        {
+          "id": "dri_topgas_recirc",
+          "name": "竖炉顶气循环",
+          "desc": "净化后顶气(CO+H₂)再循环入炉，提高还原气利用率",
+          "saving": "节气 15%",
+          "carbon": 12,
+          "tags": [
+            "节能"
+          ]
+        },
+        {
+          "id": "dri_green_ng",
+          "name": "绿氢/绿电制气",
+          "desc": "以绿电电解水制氢或绿电驱动重整，降低范围二排放",
+          "saving": "减碳随绿电占比",
+          "carbon": 0,
+          "tags": [
+            "减排"
+          ]
+        },
+        {
+          "id": "dri_heat_recovery",
+          "name": "竖炉余热回收",
+          "desc": "回收冷却段显热与高温DRI物理热用于发电或供热",
+          "saving": "节标煤 20 kg/t-DRI",
+          "carbon": 8,
+          "tags": [
+            "余热"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "gas_power",
+      "label": "煤气发电",
+      "route": "util",
+      "mainIn": "bfg",
+      "mainOut": "self_power",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0.3,
+      "inputs": [
+        "bfg",
+        "ldg",
+        "cog"
+      ],
+      "outputs": [
+        "self_power",
+        "steam"
+      ],
+      "params": [
+        {
+          "key": "gas_in",
+          "label": "煤气量",
+          "unit": "kNm³/h",
+          "min": 50,
+          "max": 2000,
+          "step": 20,
+          "def": 210
+        }
+      ]
+    },
+    {
+      "type": "waste_heat",
+      "label": "余热回收",
+      "route": "util",
+      "mainIn": "waste_heat",
+      "mainOut": "self_power",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0.12,
+      "inputs": [
+        "waste_heat"
+      ],
+      "outputs": [
+        "self_power",
+        "steam"
+      ],
+      "params": [
+        {
+          "key": "heat_in",
+          "label": "余热",
+          "unit": "GJ/h",
+          "min": 50,
+          "max": 3000,
+          "step": 20,
+          "def": 800
+        }
+      ]
+    },
+    {
+      "type": "ccs",
+      "label": "碳捕集",
+      "route": "util",
+      "mainIn": "co2",
+      "mainOut": null,
+      "efDirect": 0,
+      "efIndirect": 0.05,
+      "yield": 0.9,
+      "inputs": [
+        "co2"
+      ],
+      "outputs": [],
+      "params": [
+        {
+          "key": "capture",
+          "label": "捕集率",
+          "unit": "%",
+          "min": 0,
+          "max": 95,
+          "step": 5,
+          "def": 60
+        }
+      ]
+    },
+    {
+      "type": "blower",
+      "label": "鼓风机",
+      "route": "aux",
+      "mainIn": null,
+      "mainOut": "blast_air",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0,
+      "inputs": [
+        "oxygen"
+      ],
+      "outputs": [
+        "blast_air"
+      ],
+      "params": [
+        {
+          "key": "power",
+          "label": "电机功率",
+          "unit": "MW",
+          "min": 10,
+          "max": 80,
+          "step": 1,
+          "def": 13
+        },
+        {
+          "key": "air_rate",
+          "label": "供风量",
+          "unit": "kNm³/h",
+          "min": 100,
+          "max": 900,
+          "step": 10,
+          "def": 210
+        },
+        {
+          "key": "humidity",
+          "label": "鼓风湿度",
+          "unit": "g/Nm³",
+          "min": 0,
+          "max": 30,
+          "step": 1,
+          "def": 10
+        },
+        {
+          "key": "pressure",
+          "label": "出口风压",
+          "unit": "kPa",
+          "min": 200,
+          "max": 600,
+          "step": 10,
+          "def": 420
+        }
+      ],
+      "drives": {
+        "blast_air": {
+          "src": "air_rate",
+          "dst": "wind_rate"
+        }
+      },
+      "greenStrategies": [
+        {
+          "id": "blower_vfd",
+          "name": "鼓风机变频调速",
+          "desc": "按高炉需风量自动调节转速，避免恒速节流损耗",
+          "saving": "节电 8%",
+          "carbon": 6,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "hot_blast_stove",
+      "label": "热风炉",
+      "route": "aux",
+      "mainIn": null,
+      "mainOut": "hot_blast",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0,
+      "inputs": [
+        "blast_air"
+      ],
+      "outputs": [
+        "hot_blast"
+      ],
+      "params": [
+        {
+          "key": "power",
+          "label": "助燃风机功率",
+          "unit": "MW",
+          "min": 1,
+          "max": 12,
+          "step": 0.5,
+          "def": 2
+        },
+        {
+          "key": "firing_rate",
+          "label": "燃烧煤气量",
+          "unit": "kNm³/h",
+          "min": 50,
+          "max": 400,
+          "step": 10,
+          "def": 77
+        },
+        {
+          "key": "blast_temp",
+          "label": "送风温度",
+          "unit": "℃",
+          "min": 950,
+          "max": 1300,
+          "step": 10,
+          "def": 1150
+        },
+        {
+          "key": "thermal_eff",
+          "label": "热效率",
+          "unit": "%",
+          "min": 60,
+          "max": 92,
+          "step": 1,
+          "def": 80
+        }
+      ],
+      "drives": {
+        "hot_blast": {
+          "src": "blast_temp",
+          "dst": "hot_blast_temp"
+        }
+      },
+      "greenStrategies": [
+        {
+          "id": "hbs_preheat",
+          "name": "热风炉烟气预热",
+          "desc": "回收热风炉烟气余热预热煤气与助燃空气",
+          "saving": "节气 8%",
+          "carbon": 8,
+          "tags": [
+            "余热"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "id_fan",
+      "label": "引风机",
+      "route": "aux",
+      "mainIn": null,
+      "mainOut": "draft",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0,
+      "inputs": [],
+      "outputs": [
+        "draft"
+      ],
+      "params": [
+        {
+          "key": "power",
+          "label": "电机功率",
+          "unit": "MW",
+          "min": 2,
+          "max": 20,
+          "step": 0.5,
+          "def": 3
+        },
+        {
+          "key": "draught",
+          "label": "抽力",
+          "unit": "kPa",
+          "min": 1,
+          "max": 8,
+          "step": 0.2,
+          "def": 3.5
+        }
+      ],
+      "drives": {
+        "draft": {
+          "src": "draught",
+          "dst": "draft"
+        }
+      },
+      "greenStrategies": [
+        {
+          "id": "idfan_vfd",
+          "name": "引风机变频调速",
+          "desc": "按系统负压自动调节变频转速",
+          "saving": "节电 10%",
+          "carbon": 3,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "injector",
+      "label": "喷吹系统",
+      "route": "aux",
+      "mainIn": null,
+      "mainOut": "pulverized_coal",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0,
+      "inputs": [],
+      "outputs": [
+        "pulverized_coal"
+      ],
+      "params": [
+        {
+          "key": "power",
+          "label": "载气压缩机功率",
+          "unit": "MW",
+          "min": 1,
+          "max": 15,
+          "step": 0.5,
+          "def": 2
+        },
+        {
+          "key": "inj_rate",
+          "label": "喷吹量",
+          "unit": "t/h",
+          "min": 0,
+          "max": 200,
+          "step": 5,
+          "def": 42
+        },
+        {
+          "key": "transport_air",
+          "label": "载气量",
+          "unit": "kNm³/h",
+          "min": 0,
+          "max": 120,
+          "step": 5,
+          "def": 21
+        }
+      ],
+      "drives": {
+        "pulverized_coal": {
+          "src": "inj_rate",
+          "dst": "coal_inj"
+        }
+      },
+      "greenStrategies": [
+        {
+          "id": "inj_opt",
+          "name": "喷吹均匀性优化",
+          "desc": "优化分配器降低吨煤载气能耗",
+          "saving": "节电 5%",
+          "carbon": 1.5,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "combustion_blower",
+      "label": "助燃风机",
+      "route": "aux",
+      "mainIn": null,
+      "mainOut": "combustion_air",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0,
+      "inputs": [],
+      "outputs": [
+        "combustion_air"
+      ],
+      "params": [
+        {
+          "key": "power",
+          "label": "电机功率",
+          "unit": "MW",
+          "min": 1,
+          "max": 15,
+          "step": 0.5,
+          "def": 2
+        },
+        {
+          "key": "air_rate",
+          "label": "供风量",
+          "unit": "kNm³/h",
+          "min": 20,
+          "max": 300,
+          "step": 10,
+          "def": 53
+        }
+      ],
+      "drives": {
+        "combustion_air": {
+          "src": "air_rate",
+          "dst": "combustion_air"
+        }
+      },
+      "greenStrategies": [
+        {
+          "id": "cb_vfd",
+          "name": "助燃风机变频",
+          "desc": "按燃烧需氧量自动调节供风",
+          "saving": "节电 7%",
+          "carbon": 2,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "drive_supply",
+      "label": "驱动供电",
+      "route": "aux",
+      "mainIn": null,
+      "mainOut": "drive_power",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0,
+      "inputs": [
+        "electricity"
+      ],
+      "outputs": [
+        "drive_power"
+      ],
+      "params": [
+        {
+          "key": "power",
+          "label": "供电功率",
+          "unit": "MW",
+          "min": 1,
+          "max": 120,
+          "step": 1,
+          "def": 21
+        },
+        {
+          "key": "green_ratio",
+          "label": "绿电占比",
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "def": 20
+        }
+      ],
+      "drives": {
+        "drive_power": {
+          "src": "power",
+          "dst": "power"
+        }
+      },
+      "greenStrategies": [
+        {
+          "id": "ds_green",
+          "name": "提高绿电占比",
+          "desc": "驱动供电切换绿电降低范围二排放",
+          "saving": "降碳随绿电占比",
+          "carbon": 0,
+          "tags": [
+            "减排"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "electrode_reg",
+      "label": "电极调节",
+      "route": "aux",
+      "mainIn": null,
+      "mainOut": "electrode_power",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0,
+      "inputs": [
+        "electricity"
+      ],
+      "outputs": [
+        "electrode_power"
+      ],
+      "params": [
+        {
+          "key": "power",
+          "label": "电极功率",
+          "unit": "MW",
+          "min": 10,
+          "max": 200,
+          "step": 5,
+          "def": 90
+        },
+        {
+          "key": "current",
+          "label": "电弧电流",
+          "unit": "kA",
+          "min": 20,
+          "max": 120,
+          "step": 2,
+          "def": 70
+        }
+      ],
+      "drives": {
+        "electrode_power": {
+          "src": "power",
+          "dst": "power"
+        }
+      },
+      "greenStrategies": [
+        {
+          "id": "er_smart",
+          "name": "智能电极控制",
+          "desc": "基于阻抗模型优化供电曲线降低短网损耗",
+          "saving": "节电 4%",
+          "carbon": 2.4,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "belt_conv",
+      "label": "皮带机",
+      "route": "aux",
+      "mainIn": "feeder_flow",
+      "mainOut": "feeder_flow",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0,
+      "inputs": [
+        "feeder_flow"
+      ],
+      "outputs": [
+        "feeder_flow"
+      ],
+      "params": [
+        {
+          "key": "power",
+          "label": "电机功率",
+          "unit": "MW",
+          "min": 0.5,
+          "max": 8,
+          "step": 0.5,
+          "def": 1
+        },
+        {
+          "key": "throughput",
+          "label": "输送量",
+          "unit": "t/h",
+          "min": 100,
+          "max": 5000,
+          "step": 50,
+          "def": 525
+        }
+      ],
+      "drives": {},
+      "greenStrategies": [
+        {
+          "id": "bc_vfd",
+          "name": "皮带机变频",
+          "desc": "按料流自动调速减少空转",
+          "saving": "节电 12%",
+          "carbon": 2,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "feeder",
+      "label": "给料机",
+      "route": "aux",
+      "mainIn": "feeder_flow",
+      "mainOut": "feeder_flow",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0,
+      "inputs": [
+        "feeder_flow"
+      ],
+      "outputs": [
+        "feeder_flow"
+      ],
+      "params": [
+        {
+          "key": "power",
+          "label": "电机功率",
+          "unit": "MW",
+          "min": 0.2,
+          "max": 4,
+          "step": 0.2,
+          "def": 0.4
+        },
+        {
+          "key": "rate",
+          "label": "给料速率",
+          "unit": "t/h",
+          "min": 10,
+          "max": 2000,
+          "step": 10,
+          "def": 140
+        }
+      ],
+      "drives": {},
+      "greenStrategies": []
+    },
+    {
+      "type": "cool_pump",
+      "label": "冷却水泵",
+      "route": "aux",
+      "mainIn": null,
+      "mainOut": "cool_water",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0,
+      "inputs": [],
+      "outputs": [
+        "cool_water"
+      ],
+      "params": [
+        {
+          "key": "power",
+          "label": "电机功率",
+          "unit": "MW",
+          "min": 0.5,
+          "max": 12,
+          "step": 0.5,
+          "def": 1.5
+        },
+        {
+          "key": "flow",
+          "label": "循环水量",
+          "unit": "t/h",
+          "min": 100,
+          "max": 6000,
+          "step": 50,
+          "def": 700
+        }
+      ],
+      "drives": {},
+      "greenStrategies": [
+        {
+          "id": "cp_vfd",
+          "name": "冷却水泵变频",
+          "desc": "按温差自动调节循环水量",
+          "saving": "节电 15%",
+          "carbon": 2.5,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "aux_boiler",
+      "label": "辅助锅炉",
+      "route": "aux",
+      "mainIn": null,
+      "mainOut": "aux_steam",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0,
+      "inputs": [
+        "ngas"
+      ],
+      "outputs": [
+        "aux_steam"
+      ],
+      "params": [
+        {
+          "key": "steam_rate",
+          "label": "产汽量",
+          "unit": "t/h",
+          "min": 5,
+          "max": 200,
+          "step": 5,
+          "def": 28
+        },
+        {
+          "key": "thermal_eff",
+          "label": "热效率",
+          "unit": "%",
+          "min": 70,
+          "max": 95,
+          "step": 1,
+          "def": 88
+        }
+      ],
+      "drives": {},
+      "greenStrategies": [
+        {
+          "id": "ab_hr",
+          "name": "锅炉烟道余热",
+          "desc": "回收排烟余热预热给水",
+          "saving": "节气 5%",
+          "carbon": 3,
+          "tags": [
+            "余热"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "oxy_plant",
+      "label": "空分制氧",
+      "route": "aux",
+      "mainIn": null,
+      "mainOut": "oxy_supply",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0,
+      "inputs": [
+        "electricity"
+      ],
+      "outputs": [
+        "oxy_supply"
+      ],
+      "params": [
+        {
+          "key": "power",
+          "label": "电耗功率",
+          "unit": "MW",
+          "min": 5,
+          "max": 80,
+          "step": 2,
+          "def": 14
+        },
+        {
+          "key": "oxygen_rate",
+          "label": "产氧量",
+          "unit": "kNm³/h",
+          "min": 20,
+          "max": 600,
+          "step": 10,
+          "def": 91
+        }
+      ],
+      "drives": {
+        "oxy_supply": {
+          "src": "oxygen_rate",
+          "dst": "oxygen_enrich"
+        }
+      },
+      "greenStrategies": [
+        {
+          "id": "ox_vsa",
+          "name": "变压吸附优化",
+          "desc": "优化吸附周期降低单位氧电耗",
+          "saving": "节电 6%",
+          "carbon": 3.5,
+          "tags": [
+            "节能"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "oxy_supply",
+      "label": "供氧系统",
+      "route": "aux",
+      "mainIn": null,
+      "mainOut": "oxygen",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0,
+      "inputs": [
+        "electricity"
+      ],
+      "outputs": [
+        "oxygen"
+      ],
+      "params": [
+        {
+          "key": "power",
+          "label": "制氧电耗",
+          "unit": "MW",
+          "min": 5,
+          "max": 200,
+          "step": 5,
+          "def": 6
+        },
+        {
+          "key": "oxygen_rate",
+          "label": "供氧量",
+          "unit": "kNm³/h",
+          "min": 20,
+          "max": 1500,
+          "step": 20,
+          "def": 60
+        },
+        {
+          "key": "green_ratio",
+          "label": "绿电占比",
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "def": 15
+        }
+      ],
+      "drives": {
+        "oxygen": {
+          "src": "oxygen_rate",
+          "dst": "oxygen_enrich"
+        }
+      },
+      "greenStrategies": [
+        {
+          "id": "ox_green",
+          "name": "制氧绿电化",
+          "desc": "空分制氧为高耗电环节，切换绿电可显著降低范围二排放",
+          "saving": "降碳随绿电占比",
+          "carbon": 0,
+          "tags": [
+            "减排"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "power_supply",
+      "label": "供电系统",
+      "route": "aux",
+      "mainIn": null,
+      "mainOut": "electricity",
+      "efDirect": 0,
+      "efIndirect": 0,
+      "yield": 0,
+      "inputs": [
+        "electricity"
+      ],
+      "outputs": [
+        "electricity"
+      ],
+      "params": [
+        {
+          "key": "power",
+          "label": "供电负荷",
+          "unit": "MW",
+          "min": 1,
+          "max": 600,
+          "step": 5,
+          "def": 70
+        },
+        {
+          "key": "green_ratio",
+          "label": "绿电占比",
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "def": 15
+        },
+        {
+          "key": "self_gen_ratio",
+          "label": "自发电占比",
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "def": 40
+        }
+      ],
+      "drives": {
+        "electricity": {
+          "src": "power",
+          "dst": "electricity"
+        }
+      },
+      "greenStrategies": [
+        {
+          "id": "ps_green",
+          "name": "提升绿电占比",
+          "desc": "外购电切换风电/光伏绿电降低范围二排放",
+          "saving": "降碳随绿电占比",
+          "carbon": 0,
+          "tags": [
+            "减排"
+          ]
+        },
+        {
+          "id": "ps_selfgen",
+          "name": "提高自发电",
+          "desc": "提升 BFG/CDQ/余热自发电比例，减少外购电",
+          "saving": "降碳随自发电占比",
+          "carbon": 0,
+          "tags": [
+            "余热"
+          ]
+        }
+      ]
+    }
+  ],
+  "devices": [
+    {
+      "type": "belt_scale",
+      "label": "皮带秤",
+      "kind": "metering",
+      "unit": "t/h",
+      "measures": "物料流量",
+      "icon": "belt",
+      "desc": "本工序的计量设备，连续称量输送带上的固体物料（矿、焦、煤、熔剂等）质量流量，其读数作为碳核算「活动数据」的主源头。"
+    },
+    {
+      "type": "loss_in_weight",
+      "label": "失重秤",
+      "kind": "metering",
+      "unit": "t/h",
+      "measures": "给料量",
+      "icon": "hopper",
+      "desc": "本工序的计量设备，用于喷吹煤粉、熔剂等粉料的精确给料计量，对应喷煤比、熔剂比等单耗的实测来源。"
+    },
+    {
+      "type": "hopper_scale",
+      "label": "料斗秤",
+      "kind": "metering",
+      "unit": "t",
+      "measures": "批料重量",
+      "icon": "hopper",
+      "desc": "本工序的计量设备，计量配料仓/喷吹罐的批料重量，对应焦比、喷煤比、熔剂比等单耗的实测来源。"
+    },
+    {
+      "type": "weighbridge",
+      "label": "平台秤",
+      "kind": "metering",
+      "unit": "t",
+      "measures": "进出厂重量",
+      "icon": "hopper",
+      "desc": "本工序的计量设备，计量原燃料与产品的进出厂重量，用于厂界物料平衡与碳流核算。"
+    },
+    {
+      "type": "gas_flowmeter",
+      "label": "气体流量计",
+      "kind": "metering",
+      "unit": "Nm³/h",
+      "measures": "煤气/空气/氧气",
+      "icon": "pipe",
+      "desc": "本工序的计量设备，配温度/压力补偿计量高炉煤气、转炉煤气、天然气、氧气等气体体积流量，对应燃料类直接排放的「活动数据」。"
+    },
+    {
+      "type": "liquid_flowmeter",
+      "label": "液体流量计",
+      "kind": "metering",
+      "unit": "m³/h",
+      "measures": "冷却水/喷吹",
+      "icon": "pipe",
+      "desc": "本工序的计量设备，计量冷却水、喷吹介质等液体流量，支撑水耗与工艺能耗核算。"
+    },
+    {
+      "type": "power_meter",
+      "label": "电能表",
+      "kind": "metering",
+      "unit": "kWh",
+      "measures": "电耗",
+      "icon": "gauge",
+      "desc": "本工序的计量设备，分项计量工序/大电机电耗，对应范围二（外购电）间接排放的活动数据。"
+    },
+    {
+      "type": "composition_analyzer",
+      "label": "成分分析仪",
+      "kind": "metering",
+      "unit": "%",
+      "measures": "品位/成分",
+      "icon": "flask",
+      "desc": "本工序的计量设备，测定矿石品位、燃料含碳率等成分，用于精化排放因子（替代默认含碳假设）。"
+    },
+    {
+      "type": "cems",
+      "label": "烟气连续监测",
+      "kind": "metering",
+      "unit": "mg/m³",
+      "measures": "CO₂/SO₂/NOx",
+      "icon": "stack",
+      "desc": "本工序的计量设备，连续监测烟气中 CO₂/SO₂/NOx 浓度与流量，直接测得排放，作为因子法的交叉校验（点源直接监测法）。"
+    },
+    {
+      "type": "thermo",
+      "label": "测温仪",
+      "kind": "metering",
+      "unit": "℃",
+      "measures": "温度",
+      "icon": "gauge",
+      "desc": "本工序的计量设备，实时监测炉膛/烟气温度，用于燃烧控制与热效率核算。"
+    },
+    {
+      "type": "blower",
+      "label": "鼓风机",
+      "kind": "adjustable",
+      "unit": "m³/h",
+      "setpoint": {
+        "min": 3000,
+        "max": 9000,
+        "def": 5200,
+        "unit": "m³/h",
+        "label": "风量"
+      },
+      "extraSetpoints": [
+        {
+          "key": "humidity",
+          "label": "鼓风湿度",
+          "unit": "g/Nm³",
+          "min": 0,
+          "max": 30,
+          "def": 10,
+          "step": 1,
+          "powerPerUnit": 0
+        }
+      ],
+      "powerPerUnit": 6e-05,
+      "effType": "blower",
+      "measures": "风量",
+      "response": {
+        "bias": 0.03,
+        "noise": 0.01
+      },
+      "desc": "本工序的可调设备，其风量设定经碳引擎折算为鼓风电耗与间接排放；风量↑→风口燃烧带活性↑、允许更高喷煤，是减排策略的作用对象；鼓风湿度（加湿/脱湿）参与高炉热制度（TFT）计算，湿度↑→理论燃烧温度↓。"
+    },
+    {
+      "type": "id_fan",
+      "label": "引风机",
+      "kind": "adjustable",
+      "unit": "m³/h",
+      "setpoint": {
+        "min": 2000,
+        "max": 8000,
+        "def": 4000,
+        "unit": "m³/h"
+      },
+      "powerPerUnit": 4e-05,
+      "effType": "none",
+      "measures": "烟气抽力",
+      "response": {
+        "bias": 0.04,
+        "noise": 0.012
+      },
+      "desc": "本工序的可调设备，其设定值经碳引擎折算为运行电耗与间接排放，是减排策略的作用对象。"
+    },
+    {
+      "type": "belt_conv",
+      "label": "皮带机",
+      "kind": "adjustable",
+      "unit": "m/s",
+      "setpoint": {
+        "min": 0.5,
+        "max": 4,
+        "def": 2,
+        "unit": "m/s"
+      },
+      "powerPerUnit": 0.8,
+      "effType": "feeder",
+      "measures": "带速/给料量",
+      "response": {
+        "bias": 0.02,
+        "noise": 0.008
+      },
+      "desc": "本工序的可调设备，控制物料输送带速与给料量，其设定值经碳引擎折算为传动电耗与间接排放，是减排策略的作用对象。"
+    },
+    {
+      "type": "feeder",
+      "label": "给料机",
+      "kind": "adjustable",
+      "unit": "t/h",
+      "setpoint": {
+        "min": 10,
+        "max": 500,
+        "def": 200,
+        "unit": "t/h"
+      },
+      "powerPerUnit": 0.01,
+      "effType": "feeder",
+      "measures": "给料速率",
+      "response": {
+        "bias": 0.03,
+        "noise": 0.01
+      },
+      "desc": "本工序的可调设备，控制矿、燃料、熔剂等给料速率，其设定值经碳引擎折算为给料电耗与间接排放，是减排策略的作用对象。"
+    },
+    {
+      "type": "pump",
+      "label": "泵",
+      "kind": "adjustable",
+      "unit": "m³/h",
+      "setpoint": {
+        "min": 10,
+        "max": 1000,
+        "def": 300,
+        "unit": "m³/h"
+      },
+      "powerPerUnit": 0.002,
+      "effType": "none",
+      "measures": "流量/扬程",
+      "response": {
+        "bias": 0.05,
+        "noise": 0.015
+      },
+      "desc": "本工序的可调设备，控制流体输送流量/扬程，其设定值经碳引擎折算为泵组电耗与间接排放，是减排策略的作用对象。"
+    },
+    {
+      "type": "valve",
+      "label": "调节阀",
+      "kind": "adjustable",
+      "unit": "%",
+      "setpoint": {
+        "min": 0,
+        "max": 100,
+        "def": 50,
+        "unit": "%"
+      },
+      "powerPerUnit": 0,
+      "effType": "none",
+      "measures": "开度",
+      "response": {
+        "bias": 0.05,
+        "noise": 0.02
+      },
+      "desc": "本工序的可调设备，控制管路开度以调节介质流量，其设定值经碳引擎折算为调节能耗与间接排放，是减排策略的作用对象。"
+    },
+    {
+      "type": "burner",
+      "label": "燃烧器",
+      "kind": "adjustable",
+      "unit": "ratio",
+      "setpoint": {
+        "min": 0.8,
+        "max": 1.3,
+        "def": 1,
+        "unit": "空燃比"
+      },
+      "powerPerUnit": 0,
+      "effType": "burner",
+      "measures": "空燃比",
+      "response": {
+        "bias": 0.02,
+        "noise": 0.008
+      },
+      "desc": "本工序的可调设备，其空燃比设定影响燃料完全燃烧程度，经碳引擎折算为燃料消耗与直接/间接排放，是减排策略的作用对象。"
+    },
+    {
+      "type": "injector",
+      "label": "喷吹系统",
+      "kind": "metering",
+      "unit": "kg/h",
+      "setpoint": {
+        "min": 0,
+        "max": 300,
+        "def": 120,
+        "unit": "kg/h"
+      },
+      "powerPerUnit": 0.005,
+      "effType": "feeder",
+      "measures": "喷吹速率",
+      "response": {
+        "bias": 0.03,
+        "noise": 0.01
+      },
+      "desc": "本工序的喷吹设备，喷吹煤粉以顶替焦炭。喷煤量已锁定不可调节（随工况设定固定，富氧率提升时自动联动增加）。"
+    },
+    {
+      "type": "electrode_reg",
+      "label": "电极调节器",
+      "kind": "adjustable",
+      "unit": "MW",
+      "setpoint": {
+        "min": 20,
+        "max": 120,
+        "def": 70,
+        "unit": "MW"
+      },
+      "powerPerUnit": 0.01,
+      "effType": "none",
+      "measures": "电弧功率",
+      "response": {
+        "bias": 0.02,
+        "noise": 0.008
+      },
+      "desc": "本工序的可调设备，控制电弧功率以调节熔化/加热强度，其设定值经碳引擎折算为电耗与间接排放，是减排策略的作用对象。"
+    },
+    {
+      "type": "vfd",
+      "label": "变频器",
+      "kind": "adjustable",
+      "unit": "Hz",
+      "setpoint": {
+        "min": 0,
+        "max": 50,
+        "def": 40,
+        "unit": "Hz"
+      },
+      "powerPerUnit": 0,
+      "effType": "none",
+      "measures": "电机转速",
+      "response": {
+        "bias": 0.01,
+        "noise": 0.005
+      },
+      "desc": "本工序的可调设备，通过改变电机频率调节转速，其设定值经碳引擎折算为节电效果与间接排放，是减排策略的作用对象。"
+    },
+    {
+      "type": "oxygen_lance",
+      "label": "氧枪",
+      "kind": "adjustable",
+      "unit": "Nm³/h",
+      "setpoint": {
+        "min": 0,
+        "max": 60000,
+        "def": 4000,
+        "unit": "Nm³/h"
+      },
+      "powerPerUnit": 2e-05,
+      "effType": "none",
+      "measures": "供氧强度",
+      "response": {
+        "bias": 0.02,
+        "noise": 0.008
+      },
+      "desc": "本工序的可调设备，控制纯氧流量(Nm³/h)以强化冶炼/富氧——其设定值即注入主风管的纯氧流量，经物理混合折算为富氧率与制氧能耗/间接排放，是减排策略的作用对象。"
+    },
+    {
+      "type": "cool_pump",
+      "label": "冷却水泵",
+      "kind": "adjustable",
+      "unit": "m³/h",
+      "setpoint": {
+        "min": 50,
+        "max": 800,
+        "def": 300,
+        "unit": "m³/h"
+      },
+      "powerPerUnit": 0.002,
+      "effType": "none",
+      "measures": "水量/温度",
+      "response": {
+        "bias": 0.04,
+        "noise": 0.012
+      },
+      "desc": "本工序的可调设备，控制冷却水量维持设备热平衡，其设定值经碳引擎折算为泵组电耗与间接排放，是减排策略的作用对象。"
+    },
+    {
+      "type": "dedust_fan",
+      "label": "除尘风机",
+      "kind": "adjustable",
+      "unit": "m³/h",
+      "setpoint": {
+        "min": 1000,
+        "max": 6000,
+        "def": 3000,
+        "unit": "m³/h"
+      },
+      "powerPerUnit": 5e-05,
+      "effType": "none",
+      "measures": "风量",
+      "response": {
+        "bias": 0.03,
+        "noise": 0.01
+      },
+      "desc": "本工序的可调设备，控制除尘风量维持收尘效率，其设定值经碳引擎折算为运行电耗与间接排放，是减排策略的作用对象。"
+    },
+    {
+      "type": "waste_heat_boiler",
+      "label": "余热锅炉",
+      "kind": "adjustable",
+      "unit": "t/h",
+      "setpoint": {
+        "min": 10,
+        "max": 300,
+        "def": 120,
+        "unit": "t/h"
+      },
+      "powerPerUnit": 0,
+      "effType": "none",
+      "measures": "蒸汽产量",
+      "response": {
+        "bias": 0.03,
+        "noise": 0.01
+      },
+      "desc": "本工序的可调设备，控制余热回收蒸汽产量，其设定值经碳引擎折算为余热回收量（负向排放），是减排策略的作用对象。"
+    },
+    {
+      "type": "hot_blast_stove",
+      "label": "热风炉",
+      "kind": "adjustable",
+      "unit": "℃",
+      "setpoint": {
+        "min": 900,
+        "max": 1300,
+        "def": 1250,
+        "unit": "℃"
+      },
+      "powerPerUnit": 0,
+      "effType": "none",
+      "measures": "热风温度",
+      "response": {
+        "bias": 0.01,
+        "noise": 0.005
+      },
+      "desc": "本工序的可调设备，其热风温度设定经碳引擎折算为煤气消耗与直接排放；风温↑→热效率↑、焦比↓，是减排策略的作用对象。"
+    },
+    {
+      "type": "oxy_supply",
+      "label": "供氧系统",
+      "kind": "adjustable",
+      "unit": "kNm³/h",
+      "setpoint": {
+        "min": 20,
+        "max": 1500,
+        "def": 600,
+        "unit": "kNm³/h",
+        "label": "供氧量"
+      },
+      "powerPerUnit": 0,
+      "effType": "none",
+      "measures": "供氧量",
+      "response": {
+        "bias": 0.02,
+        "noise": 0.01
+      },
+      "desc": "全厂供氧系统（空分制氧机组）的可调设备，供氧量设定对应供氧系统工艺参数，经连线集中供给高炉富氧鼓风、转炉吹炼、铁水预处理喷吹与精炼等用氧工序，是富氧强化冶炼减排策略的作用对象。"
+    },
+    {
+      "type": "power_supply",
+      "label": "供电系统",
+      "kind": "adjustable",
+      "unit": "MW",
+      "setpoint": {
+        "min": 1,
+        "max": 600,
+        "def": 200,
+        "unit": "MW",
+        "label": "供电负荷"
+      },
+      "powerPerUnit": 0,
+      "effType": "none",
+      "measures": "供电负荷",
+      "response": {
+        "bias": 0.01,
+        "noise": 0.005
+      },
+      "desc": "全厂供电系统（总降/主变电站）的可调设备，汇集外购电、自发电（BFG/CDQ/余热）与绿电统一分配，供电负荷设定对应全厂范围二电耗，是提升绿电/自发电占比减排策略的作用对象。"
+    }
+  ]
+}

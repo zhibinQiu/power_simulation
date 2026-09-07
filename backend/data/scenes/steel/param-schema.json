@@ -1,0 +1,734 @@
+{
+  "schema": {
+    "sinter_plant": [
+      {
+        "key": "ore_rate",
+        "label": "矿量",
+        "unit": "t/h",
+        "min": 1000,
+        "max": 15000,
+        "step": 200,
+        "kind": "config",
+        "ref": "烧结规模给定"
+      },
+      {
+        "key": "fuel_rate",
+        "label": "燃料比",
+        "unit": "kg/t",
+        "min": 20,
+        "max": 80,
+        "step": 1,
+        "kind": "config",
+        "ref": "典型 40–55 kg/t"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 1,
+        "max": 20,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "设备额定（缺省按规模估算）"
+      }
+    ],
+    "pelletizing": [
+      {
+        "key": "ore_rate",
+        "label": "矿量",
+        "unit": "t/h",
+        "min": 500,
+        "max": 8000,
+        "step": 100,
+        "kind": "config",
+        "ref": "球团规模给定"
+      },
+      {
+        "key": "fuel_rate",
+        "label": "燃料比",
+        "unit": "kg/t",
+        "min": 5,
+        "max": 40,
+        "step": 1,
+        "kind": "config",
+        "ref": "典型 15–25 kg/t"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 1,
+        "max": 20,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "设备额定（缺省按规模估算）"
+      }
+    ],
+    "coke_oven": [
+      {
+        "key": "coal_rate",
+        "label": "入炉煤",
+        "unit": "t/h",
+        "min": 500,
+        "max": 8000,
+        "step": 100,
+        "kind": "config",
+        "ref": "焦化规模给定"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 1,
+        "max": 20,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "设备额定（缺省按规模估算）"
+      }
+    ],
+    "reheating_furnace": [
+      {
+        "key": "steel_in",
+        "label": "钢水量",
+        "unit": "t/h",
+        "min": 1000,
+        "max": 12000,
+        "step": 100,
+        "kind": "config",
+        "ref": "处理规模给定"
+      },
+      {
+        "key": "ng_rate",
+        "label": "天然气",
+        "unit": "m³/t",
+        "min": 0,
+        "max": 120,
+        "step": 2,
+        "kind": "config",
+        "ref": "加热炉设计值"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 1,
+        "max": 20,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "设备额定"
+      }
+    ],
+    "blast_furnace": [
+      {
+        "key": "hot_metal",
+        "label": "铁水产量",
+        "unit": "t/h",
+        "min": 2000,
+        "max": 12000,
+        "step": 100,
+        "kind": "config",
+        "ref": "高炉规模给定"
+      },
+      {
+        "key": "coke_rate",
+        "label": "焦比",
+        "unit": "kg/t",
+        "min": 250,
+        "max": 550,
+        "step": 5,
+        "kind": "config",
+        "ref": "典型 470–530 kg/t（直接调参模式·给定约束）"
+      },
+      {
+        "key": "coal_inj",
+        "label": "喷煤比",
+        "unit": "kg/t",
+        "min": 0,
+        "max": 250,
+        "step": 5,
+        "kind": "config",
+        "ref": "典型 120–180 kg/t（直接调参模式·给定约束）"
+      },
+      {
+        "key": "flux",
+        "label": "熔剂比",
+        "unit": "kg/t",
+        "min": 0,
+        "max": 250,
+        "step": 5,
+        "kind": "config",
+        "ref": "典型 60–150 kg/t"
+      },
+      {
+        "key": "wind_rate",
+        "label": "风量",
+        "unit": "kNm³/h",
+        "min": 100,
+        "max": 900,
+        "step": 10,
+        "kind": "optim",
+        "ref": "实际供风量·提升喷煤能力→焦比↓（设备/操作驱动）"
+      },
+      {
+        "key": "hot_blast_temp",
+        "label": "热风温度",
+        "unit": "℃",
+        "min": 950,
+        "max": 1300,
+        "step": 10,
+        "kind": "optim",
+        "ref": "鼓风温度·提升热效率→焦比↓（设备/操作驱动）"
+      },
+      {
+        "key": "oxygen_enrich",
+        "label": "富氧率",
+        "unit": "%",
+        "min": 0,
+        "max": 14,
+        "step": 0.5,
+        "kind": "optim",
+        "ref": "鼓风富氧增量(相对空气 21%)·提升喷煤→焦比↓（设备/操作驱动）"
+      }
+    ],
+    "hydrogen_bf": [
+      {
+        "key": "hot_metal",
+        "label": "铁水产量",
+        "unit": "t/h",
+        "min": 2000,
+        "max": 12000,
+        "step": 100,
+        "kind": "config",
+        "ref": "规模给定"
+      },
+      {
+        "key": "h2_rate",
+        "label": "氢耗",
+        "unit": "kg/t",
+        "min": 0,
+        "max": 200,
+        "step": 5,
+        "kind": "optim",
+        "ref": "氢替代比例·影响直接碳排（决策变量）"
+      },
+      {
+        "key": "electricity",
+        "label": "制氢电耗",
+        "unit": "MWh/h",
+        "min": 100,
+        "max": 1200,
+        "step": 20,
+        "kind": "config",
+        "ref": "由氢耗与电源结构决定"
+      }
+    ],
+    "h2_dri": [
+      {
+        "key": "dri_out",
+        "label": "DRI产量",
+        "unit": "t/h",
+        "min": 1000,
+        "max": 12000,
+        "step": 200,
+        "kind": "config",
+        "ref": "规模给定"
+      },
+      {
+        "key": "h2_rate",
+        "label": "氢耗",
+        "unit": "kg/t",
+        "min": 0,
+        "max": 200,
+        "step": 5,
+        "kind": "optim",
+        "ref": "氢替代比例·深度脱碳杠杆（决策变量）"
+      },
+      {
+        "key": "electricity",
+        "label": "制氢电耗",
+        "unit": "MWh/h",
+        "min": 100,
+        "max": 1200,
+        "step": 20,
+        "kind": "config",
+        "ref": "由电源结构决定"
+      }
+    ],
+    "dri_midrex": [
+      {
+        "key": "pellet_rate",
+        "label": "球团矿量",
+        "unit": "t/h",
+        "min": 1000,
+        "max": 12000,
+        "step": 200,
+        "kind": "config",
+        "ref": "规模给定"
+      },
+      {
+        "key": "ng_rate",
+        "label": "天然气",
+        "unit": "m³/t",
+        "min": 0,
+        "max": 400,
+        "step": 10,
+        "kind": "optim",
+        "ref": "天然气→可切换绿氢的能源配比杠杆（决策变量）"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 1,
+        "max": 30,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "设备额定"
+      }
+    ],
+    "smelting_reduction": [
+      {
+        "key": "ore_rate",
+        "label": "矿量",
+        "unit": "t/h",
+        "min": 1000,
+        "max": 12000,
+        "step": 200,
+        "kind": "config",
+        "ref": "规模给定"
+      },
+      {
+        "key": "coal_rate",
+        "label": "非炼焦煤",
+        "unit": "t/h",
+        "min": 100,
+        "max": 2000,
+        "step": 50,
+        "kind": "config",
+        "ref": "燃料设计值"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 1,
+        "max": 30,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "设备额定"
+      }
+    ],
+    "biochar_injection": [
+      {
+        "key": "biomass_rate",
+        "label": "生物质碳",
+        "unit": "t/h",
+        "min": 0,
+        "max": 1000,
+        "step": 20,
+        "kind": "optim",
+        "ref": "碳中性替代比例·抵消化石碳（决策变量）"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 0,
+        "max": 10,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "设备额定"
+      }
+    ],
+    "bof": [
+      {
+        "key": "hot_metal_in",
+        "label": "铁水入炉",
+        "unit": "t/h",
+        "min": 2000,
+        "max": 12000,
+        "step": 100,
+        "kind": "config",
+        "ref": "上游铁水量给定"
+      },
+      {
+        "key": "scrap",
+        "label": "废钢",
+        "unit": "t/h",
+        "min": 0,
+        "max": 3000,
+        "step": 100,
+        "kind": "optim",
+        "ref": "废钢比·提高可降单位碳排（决策变量）"
+      },
+      {
+        "key": "flux",
+        "label": "熔剂比",
+        "unit": "kg/t",
+        "min": 0,
+        "max": 150,
+        "step": 5,
+        "kind": "config",
+        "ref": "典型 40–80 kg/t"
+      }
+    ],
+    "eaf": [
+      {
+        "key": "scrap",
+        "label": "废钢",
+        "unit": "t/h",
+        "min": 0,
+        "max": 12000,
+        "step": 100,
+        "kind": "optim",
+        "ref": "废钢比·短流程核心降碳杠杆（决策变量）"
+      },
+      {
+        "key": "dri",
+        "label": "DRI",
+        "unit": "t/h",
+        "min": 0,
+        "max": 6000,
+        "step": 100,
+        "kind": "optim",
+        "ref": "原料配比·搭配绿氢 DRI 可近零碳（决策变量）"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 50,
+        "max": 800,
+        "step": 10,
+        "kind": "config",
+        "ref": "由电源结构决定"
+      }
+    ],
+    "ladle_furnace": [
+      {
+        "key": "steel_in",
+        "label": "钢水量",
+        "unit": "t/h",
+        "min": 1000,
+        "max": 12000,
+        "step": 100,
+        "kind": "config",
+        "ref": "处理规模给定"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 1,
+        "max": 20,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "设备额定"
+      }
+    ],
+    "rh_vacuum": [
+      {
+        "key": "steel_in",
+        "label": "钢水量",
+        "unit": "t/h",
+        "min": 1000,
+        "max": 12000,
+        "step": 100,
+        "kind": "config",
+        "ref": "处理规模给定"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 1,
+        "max": 20,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "设备额定"
+      }
+    ],
+    "vd_vacuum": [
+      {
+        "key": "steel_in",
+        "label": "钢水量",
+        "unit": "t/h",
+        "min": 1000,
+        "max": 12000,
+        "step": 100,
+        "kind": "config",
+        "ref": "处理规模给定"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 1,
+        "max": 20,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "设备额定"
+      }
+    ],
+    "aod": [
+      {
+        "key": "steel_in",
+        "label": "钢水量",
+        "unit": "t/h",
+        "min": 1000,
+        "max": 12000,
+        "step": 100,
+        "kind": "config",
+        "ref": "处理规模给定"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 1,
+        "max": 20,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "设备额定"
+      }
+    ],
+    "caster": [
+      {
+        "key": "steel_in",
+        "label": "钢水量",
+        "unit": "t/h",
+        "min": 1000,
+        "max": 12000,
+        "step": 100,
+        "kind": "config",
+        "ref": "处理规模给定"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 1,
+        "max": 20,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "设备额定（缺省按规模估算）"
+      }
+    ],
+    "ingot_casting": [
+      {
+        "key": "steel_in",
+        "label": "钢水量",
+        "unit": "t/h",
+        "min": 1000,
+        "max": 12000,
+        "step": 100,
+        "kind": "config",
+        "ref": "处理规模给定"
+      },
+      {
+        "key": "ng_rate",
+        "label": "保温燃气",
+        "unit": "m³/t",
+        "min": 0,
+        "max": 80,
+        "step": 2,
+        "kind": "config",
+        "ref": "均热炉设计值"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 1,
+        "max": 20,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "设备额定"
+      }
+    ],
+    "rolling_mill": [
+      {
+        "key": "steel_in",
+        "label": "钢水量",
+        "unit": "t/h",
+        "min": 1000,
+        "max": 12000,
+        "step": 100,
+        "kind": "config",
+        "ref": "处理规模给定"
+      },
+      {
+        "key": "ng_rate",
+        "label": "天然气",
+        "unit": "m³/t",
+        "min": 0,
+        "max": 80,
+        "step": 2,
+        "kind": "config",
+        "ref": "退火炉设计值"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 1,
+        "max": 20,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "设备额定"
+      }
+    ],
+    "cold_rolling": [
+      {
+        "key": "steel_in",
+        "label": "钢水量",
+        "unit": "t/h",
+        "min": 1000,
+        "max": 12000,
+        "step": 100,
+        "kind": "config",
+        "ref": "处理规模给定"
+      },
+      {
+        "key": "ng_rate",
+        "label": "退火燃气",
+        "unit": "m³/t",
+        "min": 0,
+        "max": 80,
+        "step": 2,
+        "kind": "config",
+        "ref": "退火炉设计值"
+      },
+      {
+        "key": "electricity",
+        "label": "电耗",
+        "unit": "MWh/h",
+        "min": 1,
+        "max": 20,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "设备额定"
+      }
+    ]
+  },
+  "unit_types": [
+    {
+      "type": "sinter_plant",
+      "label": "烧结机",
+      "cat": "原料准备"
+    },
+    {
+      "type": "pelletizing",
+      "label": "球团",
+      "cat": "原料准备"
+    },
+    {
+      "type": "coke_oven",
+      "label": "焦炉",
+      "cat": "原料准备"
+    },
+    {
+      "type": "reheating_furnace",
+      "label": "加热炉",
+      "cat": "原料准备"
+    },
+    {
+      "type": "blast_furnace",
+      "label": "高炉",
+      "cat": "炼铁"
+    },
+    {
+      "type": "hydrogen_bf",
+      "label": "氢冶金高炉",
+      "cat": "炼铁"
+    },
+    {
+      "type": "h2_dri",
+      "label": "氢基竖炉",
+      "cat": "炼铁"
+    },
+    {
+      "type": "dri_midrex",
+      "label": "直接还原炉",
+      "cat": "炼铁"
+    },
+    {
+      "type": "smelting_reduction",
+      "label": "熔融还原",
+      "cat": "炼铁"
+    },
+    {
+      "type": "biochar_injection",
+      "label": "生物质喷吹",
+      "cat": "炼铁"
+    },
+    {
+      "type": "bof",
+      "label": "转炉",
+      "cat": "炼钢"
+    },
+    {
+      "type": "eaf",
+      "label": "电炉",
+      "cat": "炼钢"
+    },
+    {
+      "type": "ladle_furnace",
+      "label": "精炼炉",
+      "cat": "精炼"
+    },
+    {
+      "type": "rh_vacuum",
+      "label": "RH精炼",
+      "cat": "精炼"
+    },
+    {
+      "type": "vd_vacuum",
+      "label": "VD脱气",
+      "cat": "精炼"
+    },
+    {
+      "type": "aod",
+      "label": "AOD精炼",
+      "cat": "精炼"
+    },
+    {
+      "type": "caster",
+      "label": "连铸机",
+      "cat": "连铸"
+    },
+    {
+      "type": "ingot_casting",
+      "label": "模铸",
+      "cat": "连铸"
+    },
+    {
+      "type": "rolling_mill",
+      "label": "热轧机",
+      "cat": "轧制"
+    },
+    {
+      "type": "cold_rolling",
+      "label": "冷轧机",
+      "cat": "轧制"
+    }
+  ],
+  "techs": [
+    {
+      "tech": "ccs",
+      "label": "碳捕集(CCS)"
+    },
+    {
+      "tech": "waste_heat",
+      "label": "余热回收"
+    },
+    {
+      "tech": "h2_inj",
+      "label": "富氢喷吹"
+    }
+  ],
+  "kinds": {
+    "config": "给定约束/因变量：由工厂既定条件决定，提供参考范围，不在策略自动优化范围",
+    "optim": "节能减排决策变量/自变量：会直接影响能耗与碳排的操作与配比杠杆"
+  }
+}

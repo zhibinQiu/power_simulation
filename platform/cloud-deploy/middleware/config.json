@@ -1,0 +1,24 @@
+{
+  "comment": "能碳数据中间件配置（服务器 external 形态，与云端 Broker 同机）。server = 管理 API（平台在此注册/启停数据源）；server.broker.enabled=false = 不启内置 Broker，转换数据经 output 直发外部 Broker（127.0.0.1:41883 云端 Broker），与一体机数据同 Broker 按前缀区分；adapters = 已注册的数据源（一般由平台经 API 写入，无需手工编辑；模拟数据由开发机的 sim-source + 开发机中间件实例采集，服务器侧不采集模拟数据，见 config.dev.json）",
+  "server": {
+    "host": "0.0.0.0",
+    "port": 42084,
+    "token": "",
+    "broker": {
+      "enabled": false
+    }
+  },
+  "output": {
+    "mode": "external",
+    "comment": "mode=external：paho 直发 output.broker（服务器云端 Broker 41883），适配器转换数据与一体机数据同 Broker 共存、按前缀区分",
+    "broker": {
+      "host": "127.0.0.1",
+      "port": 41883,
+      "username": "",
+      "password": ""
+    },
+    "qos": 0
+  },
+  "log_level": "info",
+  "adapters": []
+}

@@ -13,8 +13,9 @@
 #
 # 产物：
 #   ghcr.io/zhibinqiu/power_simulation:latest      平台运行环境镜像（仅 Python 依赖，
-#                                                   不含业务代码；代码走源码卷挂载）
-#   ghcr.io/zhibinqiu/power_simulation-docs:latest 文档站（docs-site/dist 已入库，自包含）
+#                                                   不含业务代码与前端产物；均走源码卷挂载/rsync）
+#   ghcr.io/zhibinqiu/power_simulation-docs:latest 文档站服务镜像（仅 serve 器，不含 dist；
+#                                                   运行须卷挂载宿主机 dist，模式同平台镜像）
 #
 # 前提：仓库为 public（ghcr 公开包可匿名拉取），仓库 Settings→Actions→
 #       General 勾选 Read and write permissions。
@@ -59,6 +60,11 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Runner 默认 docker driver 不支持 gha 缓存导出（Cache export is not supported
+      # for the docker driver），必须显式创建 docker-container driver（默认即此）。
+      - name: 设置 Buildx（docker-container driver）
+        uses: docker/setup-buildx-action@v3
 
       - name: 构建并推送平台运行环境镜像
         uses: docker/build-push-action@v6

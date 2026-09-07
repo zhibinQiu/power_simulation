@@ -1,0 +1,15 @@
+[Unit]
+Description=NengTan Simulated External Data Source (steel + IDC)
+Documentation=file:/opt/nengtan-sim-source/README.md
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/nengtan-sim-source
+# 零第三方依赖，直接用系统 python3 运行；Broker 默认监听 127.0.0.1:41885（仅本机中间件订阅）
+ExecStart=/usr/bin/python3 /opt/nengtan-sim-source/sim_source.py --config /opt/nengtan-sim-source/config.json
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

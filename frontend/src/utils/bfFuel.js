@@ -33,7 +33,7 @@ import { DEFAULT_PC_FUEL_CONFIG, compositionToFuelConfig, blendedComposition } f
 // 名义工况基准（与后端 calculators._bf_effective_fuel 常量一致）
 // 「模板=基准，自动跟随」：基准煤比/风温动态读取 flowLibrary 模板默认值——
 //  - 基准煤比 = 高炉模板 coal_inj def（当前 130，改模板后前端自动跟随）
-//  - 基准风温 = 高炉模板 hot_blast_temp 默认（当前 1200，改模板后自动跟随；与高炉默认风温对齐使默认工况无扰动）
+//  - 基准风温 = 高炉模板 hot_blast_temp 默认（当前 1150，改模板后自动跟随；与高炉默认风温对齐使默认工况无扰动）
 // 效果：模板默认工况下无扰动（前端显示 = 模板值）；偏离模板（拖煤比/调风温/富氧）才联动。
 const _templateDef = (type, key) => {
   const t = PROCESS_MAP[type]
@@ -42,7 +42,7 @@ const _templateDef = (type, key) => {
 }
 export const BF_NOMINAL = {
   wind: 600,        // 风量基准 kNm³/h = 相对 1.0 倍
-  temp: _templateDef('blast_furnace', 'hot_blast_temp') ?? 1250,  // 风温扰动基准 ℃（= 高炉模板 hot_blast_temp 默认 1200，与默认风温对齐 → 默认工况无扰动、焦比锚点=显示值）
+  temp: _templateDef('blast_furnace', 'hot_blast_temp') ?? 1150,  // 风温扰动基准 ℃（= 高炉模板 hot_blast_temp 默认 1150，与默认风温对齐 → 默认工况无扰动、焦比锚点=显示值）
   o2air: 21,        // 空气氧含量基准 %
   coal: _templateDef('blast_furnace', 'coal_inj') ?? 175,  // 基准煤比 kg/tFe（= 高炉模板 coal_inj def，喷煤置换零点）
   cokeMin: 300,     // 焦比夹取下限 kg/tFe

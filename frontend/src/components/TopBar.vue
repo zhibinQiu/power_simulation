@@ -91,11 +91,15 @@ function onMenuItem(m, it) {
   openMenu.value = null; openSub.value = null; openSub2.value = null
 }
 function onSubItem(c) {
-  if (c.run) c.run()
+  // 兼容两种写法：act（与顶层菜单一致，如「工具 → AI」各子项）/ run（子菜单历史写法）
+  if (c.act) c.act()
+  else if (c.run) c.run()
   openMenu.value = null; openSub.value = null; openSub2.value = null
 }
 function onSubSubItem(g) {
-  if (g.run) g.run()
+  // 三级子菜单同样兼容 act / run 两种写法
+  if (g.act) g.act()
+  else if (g.run) g.run()
   openMenu.value = null; openSub.value = null; openSub2.value = null
 }
 

@@ -67,7 +67,7 @@ command -v rsync >/dev/null 2>&1 || { echo "❌ 缺少 rsync" >&2; exit 1; }
 echo "==> 仓库根：$ROOT"
 echo "==> 同步目标：$SERVER:$SERVER_DIR"
 
-# ---- [1/3] 本地构建前端/文档站产物（dist 已入库，随 rsync 同步；失败不阻断） ----
+# ---- [1/3] 本地构建前端/文档站产物（dist 不入版本库，构建后随 rsync 同步到服务器；失败不阻断） ----
 if [ "$RUN_BUILD" = "1" ]; then
   echo "==> [1/3] 本地构建前端与文档站产物..."
   (cd frontend && npx vite build >/dev/null 2>&1) && echo "    frontend/dist 已构建" \
@@ -79,11 +79,17 @@ else
 fi
 
 # ---- [2/3] rsync 源码到服务器（排除运行时数据/本机环境） ----
-EXCLUDES="--exclude=.git --exclude=.venv --exclude=venv --exclude=node_modules --exclude=__pycache__
+# 注：backend/data/scenes 为平台内置/安装的企业资源包目录（不入 git、须随部署同步），
+# 其余 backend/data 运行时数据仍排除；include 须先于排除规则。
+# 注：backend/config/data_sources.json = 数据源目录（运行环境状态，服务器与开发机各自的
+#     登记/启停可能不同，如开发机登记模拟源而服务器不登记），不随代码同步，避免互相覆盖。
+EXCLUDES="--include=backend/data/scenes/ --include=backend/data/scenes/***
+  --exclude=.git --exclude=.venv --exclude=venv --exclude=node_modules --exclude=__pycache__
   --exclude=*.pyc --exclude=.DS_Store --exclude=.env --exclude=*.log
   --exclude=platform/doc-deploy/docs-site/node_modules
   --exclude=outputs --exclude=generated-images --exclude=.playwright-cli --exclude=chrome_*
-  --exclude=backend/data --exclude=backend/knowledge"
+  --exclude=backend/data/* --exclude=backend/knowledge
+  --exclude=backend/config/data_sources.json"
 echo "==> [2/3] rsync 源码 + 配置 + 前端产物到服务器..."
 rsync_run $EXCLUDES ./ "$SERVER:$SERVER_DIR/"
 

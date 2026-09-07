@@ -89,6 +89,8 @@ def get_status() -> Dict[str, Any]:
         st["broker_port"] = _shared._BROKER.get("port")
         st["mapping"] = dict(_shared._MAPPING)
         st["broker_stats"] = dict(BROKER_STATS)
+        # 多 Broker 订阅：同时给出云端 Broker 与中间件内置 Broker 的连通状态
+        st["endpoints"] = _shared.endpoint_states()
         st["cloud_devices"] = [
             {
                 "id": c,

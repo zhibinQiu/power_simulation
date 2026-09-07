@@ -102,11 +102,11 @@ const compareRows = computed(() => {
       { key: 'co2_total', name: '总排放量', a: pick(base, 'co2_total'), b: pick(cur, 'co2_total'), u: 'tCO₂/h', dir: 'down' },
       { key: 'co2_direct', name: '直接排放(范围一)', a: pick(base, 'co2_direct'), b: pick(cur, 'co2_direct'), u: 'tCO₂/h', dir: 'down' },
       { key: 'co2_indirect', name: '间接排放(范围二)', a: pick(base, 'co2_indirect'), b: pick(cur, 'co2_indirect'), u: 'tCO₂/h', dir: 'down' },
-      { key: 'intensity', name: '吨钢碳排放强度', a: pick(base, 'intensity'), b: pick(cur, 'intensity'), u: 'kgCO₂/t', dir: 'down' },
+      { key: 'intensity', name: '吨钢碳排放强度', a: pick(base, 'intensity') / 1000, b: pick(cur, 'intensity') / 1000, u: 'tCO₂/t', dir: 'down' },
     ] },
     { key: 'energy', name: '能耗', rows: [
       { key: 'energy_total', name: '综合能耗', a: pick(base, 'energy_total', 'energy'), b: pick(cur, 'energy_total', 'energy'), u: 'GJ/h', dir: 'down' },
-      { key: 'energy_intensity', name: '单位产品综合能耗', a: pick(base, 'energy_intensity'), b: pick(cur, 'energy_intensity'), u: 'kgce/t', dir: 'down' },
+      { key: 'energy_intensity', name: '单位产品综合能耗', a: pick(base, 'energy_intensity') / 1000, b: pick(cur, 'energy_intensity') / 1000, u: 'tce/t', dir: 'down' },
       { key: 'elec', name: '电耗', a: pick(base, 'elec'), b: pick(cur, 'elec'), u: 'MWh/h', dir: 'down' },
       { key: 'fuel_energy', name: '燃料能耗', a: pick(base, 'fuel_energy'), b: pick(cur, 'fuel_energy'), u: 'GJ/h', dir: 'down' },
     ] },

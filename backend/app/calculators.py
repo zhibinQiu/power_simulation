@@ -22,7 +22,7 @@ from .factors import (
     replacement_ratio,    # 喷煤置换比（Geerdes 公式）
 )
 
-# 喷煤置换比（与前端 bfFuel.js RR 一致，当前 ≈ 0.71）
+# 喷煤置换比（与前端 bfFuel.js RR 一致，默认混合煤成分 → ≈ 0.89）
 RR = replacement_ratio()
 
 
@@ -124,6 +124,7 @@ def calc_coke(p, cfg=DEFAULT_FACTORS):
     ]
     r["notes"] = ["焦炉约 75% 的碳进入焦炭(后续入高炉)，作为中间产品碳离开本工序",
                   "焦炭产品碳已按物料连线流入高炉（焦炭碳节点 → 高炉），构成 煤→焦炉→高炉 碳素流闭环；高炉焦炭外源仅含自产不足部分"]
+    r["_coke_carried_tC"] = c_to_coke   # 自产焦炭带出碳：能耗净口径用（扣入炉煤中焦炭能量，避免与高炉双计）
     _purchases(r, coal=coal)                 # 外购：入炉炼焦煤（自产焦炭成本随煤计入）
     return r
 
@@ -162,12 +163,14 @@ def _bf_effective_fuel(p):
     返回 (coke_rate, coal_inj, op_mode, info)。
     - 喷煤置换（无条件，节点定义了煤比即生效）：有效煤比偏离名义基准(175 kg/tFe)时，
       焦比按 Δ焦比 = −RR × Δ煤比 反向联动（RR = 喷煤置换比，Geerdes 公式，
-      成分见 factors.PULVERIZED_COAL_COMP，当前 ≈ 0.71）。
+      成分见 factors.PULVERIZED_COAL_COMP，默认混合煤 → ≈ 0.89）。
     - 富氧为「派生煤比」通道（不再直接节焦）：每 +1% 富氧允许多喷 15 kg/tFe 煤粉
       （BF_OXY_COAL_PER_PCT，实测出处见 factors.py），有效煤比 = 设定煤比 + 15×富氧率，
       再经喷煤置换联动降低焦比。
     - op_mode=True：节点带操作参数(风量/风温/富氧/抽力)，按相对「名义工况」
-      (风温 1250℃ / 抽力 1.0) 的偏离叠加扰动推算（风温/抽力直接节焦）；否则只应用
+      (风温 1150℃ / 抽力 1.0) 的偏离叠加扰动推算（风温/抽力直接节焦）；
+      风温名义基准与前端 flowLibrary 模板 blast_furnace.hot_blast_temp def(1150) 同步，
+      改模板须同步此处；否则只应用
       喷煤置换项。
     - 风量是产量通道：提高铁水产量但单位焦比不变，不参与焦比/煤比推算。
     - 设定煤比原样读取（输入值即基准），不再做总燃料比守恒补偿。
@@ -190,13 +193,15 @@ def _bf_effective_fuel(p):
     has_op = any(v is not None for v in (wind, t_blast, o2, draft))
     base_coke = ref_coke if ref_coke is not None else 470
     # 富氧派生煤比：设定煤比为基准，富氧每 +1% 允许多喷 15 kg/tFe；无煤比参数时不派生
-    coal_base = _clamp(ref_coal, 0, 260) if ref_coal is not None else None
+    # 煤比夹取上限与前端模板 coal_inj.max=220 对齐（基准煤比设定上限即物理上限）
+    coal_base = _clamp(ref_coal, 0, 220) if ref_coal is not None else None
     coal_oxy = (BF_OXY_COAL_PER_PCT * o2) if o2 is not None else 0.0
-    coal = _clamp(coal_base + coal_oxy, 0, 260) if coal_base is not None else 150
-    # 喷煤置换：Δ焦比 = −RR × (有效煤比 − 名义基准煤比 175)；无煤比参数时不耦合
+    coal = _clamp(coal_base + coal_oxy, 0, 220) if coal_base is not None else 150
+    # 喷煤置换：Δ焦比 = −RR × (有效煤比 − 名义基准煤比 130)；无煤比参数时不耦合
     d_coke = -RR * (coal - BF_COAL_REF) if coal_base is not None else 0.0
     if has_op:
-        temp_f = (t_blast / 1250.0) if t_blast is not None else 1.0
+        # 风温名义基准 1150 = 前端 flowLibrary blast_furnace.hot_blast_temp def（模板同步）
+        temp_f = (t_blast / 1150.0) if t_blast is not None else 1.0
         draft_f = draft if draft is not None else 1.0
         # 风温↑/抽力↑ → 焦比下降（敏感性系数经验取值，与前端 dCoke 完全一致）；
         # 富氧不直接节焦，其作用经「派生煤比 → 喷煤置换 → 焦比联动」体现
