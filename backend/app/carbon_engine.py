@@ -50,7 +50,7 @@ DEFAULT_PARAMS: Dict[str, Dict[str, float]] = {
     "coke_oven":         {"coal_rate": 170, "electricity": 3.4},                     # 20 kWh/t 煤
     "reheating_furnace": {"steel_in": 350, "ng_rate": 45, "electricity": 2.8},       # 8 kWh/t
     # —— 炼铁（焦比/煤比标定到真实高炉区间，使吨钢强度进入 1800–2200 kg/t）——
-    "blast_furnace":     {"hot_metal": 350, "coke_rate": 410, "coal_inj": 150, "flux": 120, "slag_rate": 300},
+    "blast_furnace":     {"hot_metal": 1000, "util_coeff": 2.0, "coke_rate": 470, "coal_inj": 150, "flux": 120, "slag_rate": 300},   # util_coeff: 炉容利用系数 t/(m³·d)，日产量(t/d) = 炉容(m³)×系数（暂仅数据录入，未接入计算）
     # 氢冶金：电耗 = h2_rate(kg/t)×产量×55 kWh/kgH₂ /1000（电解制氢）
     "hydrogen_bf":       {"hot_metal": 350, "h2_rate": 90, "electricity": 1732.5},
     "h2_dri":            {"dri_out": 263, "h2_rate": 90, "electricity": 1299.4},

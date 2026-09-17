@@ -269,20 +269,23 @@ export const T2D_ICONS = {
 // 高炉（9 个入口）实际盒高 ~314 略高，属端口空间需求。
 // h 为「基础高」，端口数多时自动向上扩展；主工艺底部有悬浮 KPI 再额外 +26。
 export const T2D_GEOM = {
-  // —— 主工艺（炼铁/炼钢/轧钢）—— 统一 330×230
-  sinter_plant:      { w: 330, h: 230 },  // 烧结台车（原 395×200 宽扁）
-  pelletizing:       { w: 330, h: 230 },  // 球团圆盘
-  coke_oven:         { w: 330, h: 230 },  // 焦炉：多室体
-  blast_furnace:     { w: 330, h: 230 },  // 高炉（原 210×300 高耸；端口多自动加高）
-  hot_metal_pretreat:{ w: 330, h: 230 },  // 铁水包
-  bof:               { w: 330, h: 230 },  // 转炉
-  ladle_furnace:     { w: 330, h: 230 },
-  rh_vacuum:         { w: 330, h: 230 },
-  caster:            { w: 330, h: 230 },  // 连铸：弧形辊列
-  rolling_mill:      { w: 330, h: 230 },  // 轧机
-  reheating_furnace: { w: 330, h: 230 },  // （短流程）
-  eaf:               { w: 330, h: 230 },  // （短流程）
-  dri_midrex:        { w: 330, h: 230 },  // （短流程）
+  // —— 主工艺（炼铁/炼钢/轧钢）—— 统一 340×240；竖长图设备(高炉/预处理/DRI 图比<0.5)加高到 320
+  // 源列两台原料设备是**极扁长图**（烧结机 3554×855 比 4.16、球团 2382×804 比 2.96）：
+  // 盒宽 340 时图形只能撑到 334×80 / 334×113 的细条，明显小于竖长设备（高炉图形高 296）。
+  // 二者独占「源列」且纵向只占两格，加宽列不会挤压别列高度 → 盒宽 430（图形 424 宽，+27%）。
+  sinter_plant:      { w: 430, h: 240 },  // 烧结台车（图比 4.16 极扁）
+  pelletizing:       { w: 430, h: 240 },  // 球团回转窑（图比 2.96 扁）
+  coke_oven:         { w: 340, h: 240 },  // 焦炉：多室体
+  blast_furnace:     { w: 340, h: 320 },  // 高炉：新图 1248×2887(比 0.43)竖长，加高盒让图形撑满（原 230）
+  hot_metal_pretreat:{ w: 340, h: 320 },  // 铁水预处理：新图 812×1680(比 0.48)竖长，加高盒
+  bof:               { w: 340, h: 240 },  // 转炉
+  ladle_furnace:     { w: 340, h: 240 },
+  rh_vacuum:         { w: 340, h: 240 },
+  caster:            { w: 340, h: 240 },  // 连铸：弧形辊列
+  rolling_mill:      { w: 340, h: 240 },  // 轧机
+  reheating_furnace: { w: 340, h: 240 },  // （短流程）
+  eaf:               { w: 340, h: 240 },  // （短流程）
+  dri_midrex:        { w: 340, h: 320 },  // DRI竖炉：图 799×1888(比 0.42)竖长，加高盒（短流程）
   // —— 公用 / 节能减碳 ——
   gas_power:         { w: 180, h: 155 },
   waste_heat:        { w: 180, h: 165 },
@@ -304,6 +307,12 @@ export const T2D_GEOM = {
   aux_boiler:        { w: 160, h: 155 },
   default:           { w: 145, h: 135 },
 }
+
+// —— 设备 PNG 显示缩放微调（缺省 1 = 面积归一基准，2026-09-10 新图组改版）——
+// devImgBox 已按「图带面积归一」等比缩放（竖长图撑满高、横长图撑满宽，视觉面积统一），
+// 旧「按内容密度缩小」的补偿值(0.75~0.95)是针对上一组图的 contain 口径，对新图失真，已清空。
+// 个别设备需要单独放大/缩小时在此填 type → 系数（>1 放大，<1 缩小），devImgBox 应用。
+export const T2D_IMG_SCALE = {}
 
 // —— 设备入出口锚点：按「行业入料特点」把每个端口放到设备图符上真实的入/出口位置
 // （高炉炉顶料钟装料 / 风口带送风喷煤 / 出铁口出铁水；BOF 氧枪顶 / 炉口装料 / 耳轴出钢；
@@ -367,7 +376,7 @@ export const T2D_INOUT = {
       { cx: 5,  cy: 21,   side: 'L' },  // 8: electricity
     ],
     out: [
-      { cx: 21, cy: 21,   side: 'R' },  // 0: hot_metal  出铁口（铁水）
+      { cx: 21, cy: 10,   side: 'R' },  // 0: hot_metal  出铁口（铁水）与预处理 in cy10 对齐 → 笔直横线右送
       { cx: 21, cy: 18,   side: 'R' },  // 1: bf_slag    渣口
       { cx: 21, cy: 6,    side: 'R' },  // 2: bfg        炉顶煤气（右出）
       { cx: 21, cy: 3,    side: 'R' },  // 3: co2        右出
@@ -391,7 +400,7 @@ export const T2D_INOUT = {
       { cx: 14, cy: 21,   side: 'B' },  // 3: oxygen     供氧系统在下方 → 底面进
     ],
     out: [
-      { cx: 21, cy: 18,   side: 'R' },  // 0: crude_steel 耳轴侧出钢
+      { cx: 21, cy: 10,   side: 'R' },  // 0: crude_steel 与 LF in cy10 对齐 → 笔直横线右送
       { cx: 21, cy: 15,   side: 'R' },  // 1: steel_slag  右出
       { cx: 21, cy: 6,    side: 'R' },  // 2: ldg        罩顶 LD 煤气（右出）
       { cx: 21, cy: 9,    side: 'R' },  // 3: conv_dust  右出
@@ -402,16 +411,18 @@ export const T2D_INOUT = {
     in: [
       { cx: 1,  cy: 10,   side: 'L' },  // 0: crude_steel 转炉在左侧同行 → 左壁入
       { cx: 15, cy: 9,    side: 'T' },  // 1: electricity 三电极
+      { cx: 6,  cy: 20,   side: 'B' },  // 2: oxygen      精炼吹氧(供氧系统在下方组,底部上插)
     ],
     out: [
-      { cx: 21, cy: 11,   side: 'R' },  // 0: refined_steel
-      { cx: 21, cy: 15,   side: 'R' },  // 1: co2        右出
+      { cx: 17, cy: 11,   side: 'R' },  // 0: refined_steel
+      { cx: 17, cy: 15,   side: 'R' },  // 1: co2        右出
     ],
   },
   rh_vacuum: {
     in: [
-      { cx: 8,  cy: 10,   side: 'L' },  // 0: refined_steel 下降管
+      { cx: 15, cy: 2,    side: 'T' },  // 0: refined_steel 钢水经 LF 右拐后自顶部上方注入(与 electricity 顶口 cx12 错开 ~43px)
       { cx: 12, cy: 3,    side: 'T' },  // 1: electricity  真空泵
+      { cx: 11, cy: 20,   side: 'B' },  // 2: oxygen       吹氧脱碳(供氧系统在下方组,底部上插)
     ],
     out: [
       { cx: 21, cy: 10,   side: 'R' },  // 0: refined_steel 上升管出钢
@@ -419,7 +430,7 @@ export const T2D_INOUT = {
   },
   caster: {
     in: [
-      { cx: 1,  cy: 10,   side: 'L' },  // 0: refined_steel RH 在左侧同行、cy 与其 out 对齐 → 笔直横线
+      { cx: 15, cy: 2,    side: 'T' },  // 0: refined_steel RH 钢水自上方注入(与 electricity 顶口 cx17 错开 ~28px)
       { cx: 17, cy: 1,    side: 'T' },  // 1: electricity
     ],
     out: [
@@ -429,7 +440,7 @@ export const T2D_INOUT = {
   },
   rolling_mill: {
     in: [
-      { cx: 2,  cy: 12,   side: 'L' },  // 0: billet      板坯入
+      { cx: 15, cy: 2,    side: 'T' },  // 0: billet       铸坯自上方注入(与 ngas cx11/electricity cx17 错开 57/28px)
       { cx: 11, cy: 4,    side: 'T' },  // 1: ngas        加热炉
       { cx: 17, cy: 4,    side: 'T' },  // 2: electricity
     ],

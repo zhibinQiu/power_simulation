@@ -10,29 +10,39 @@ import { fileURLToPath } from 'node:url'
 // 改为构建期清单后：打开 2D 工艺图即直接上图，零探测请求、零跳变。
 // 新增/删除图片后：生产重新 build 即可；dev 下由 watcher 自动失效清单并刷新页面。
 const DEV_IMG_ABS = fileURLToPath(new URL('./public/2D-image/devices', import.meta.url))
+// 设备图「图形真实边界」清单（scripts/gen-devimg-meta.py 解析 PNG alpha 通道生成）。
+// 透明背景素材的设备本体并不铺满画布（热风炉仅占 46%、铁水预处理 50%…），前端必须按
+// 图形边界而非整张图定位，否则透明留白会把设备图形挤小、与连线端点脱开。
+const DEV_IMG_META = fileURLToPath(new URL('./src/data/deviceImgMeta.json', import.meta.url))
 const VID_DEV_IMG = 'virtual:device-images'
 const deviceImages = () => {
   const read = () => {
     try { return fs.readdirSync(DEV_IMG_ABS).filter((f) => /\.png$/i.test(f)).sort() } catch { return [] }
+  }
+  const readMeta = () => {
+    try { return JSON.parse(fs.readFileSync(DEV_IMG_META, 'utf8')) } catch { return {} }
   }
   let names = read()
   const vid = '\0' + VID_DEV_IMG
   return {
     name: 'device-images',
     resolveId(id) { return id === VID_DEV_IMG ? vid : null },
-    load(id) { return id === vid ? `export const names = ${JSON.stringify(names)}` : null },
+    load(id) {
+      if (id !== vid) return null
+      return `export const names = ${JSON.stringify(names)}\nexport const meta = ${JSON.stringify(readMeta())}`
+    },
     configureServer(server) {
       server.watcher.add(DEV_IMG_ABS)
+      server.watcher.add(DEV_IMG_META)
       const onChange = (f) => {
-        if (!String(f).includes('2D-image')) return
+        if (!String(f).includes('2D-image') && !String(f).includes('deviceImgMeta')) return
         const next = read()
-        if (next.join('|') === names.join('|')) return
         names = next
         const mod = server.moduleGraph.getModuleById(vid)
         if (mod) server.moduleGraph.invalidateModule(mod)
         server.ws.send({ type: 'full-reload' })
       }
-      server.watcher.on('add', onChange).on('unlink', onChange)
+      server.watcher.on('add', onChange).on('unlink', onChange).on('change', onChange)
     },
   }
 }

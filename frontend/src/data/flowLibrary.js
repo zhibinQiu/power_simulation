@@ -187,18 +187,20 @@ export const PROCESS_TEMPLATES = [
     ] },
   { type: 'ladle_furnace', label: 'LF精炼', route: 'steel', mainIn: 'crude_steel', mainOut: 'refined_steel',
     efDirect: 0.0, efIndirect: 0.015, yield: 0.995,
-    inputs: ['crude_steel', 'electricity'], outputs: ['refined_steel', 'co2'],
-    params: [{ key: 'steel_in', label: '钢水量', unit: 't/h', min: 200, max: 2000, step: 50, def: 350 },
-             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 5, max: 60, step: 5, def: 9 }],
+    inputs: ['crude_steel', 'electricity', 'oxygen'], outputs: ['refined_steel', 'co2'],
+    // 短流程 SCHEME_AUX.short 为 LF/RH 各配一台供氧系统(oxy_supply)：补 oxygen 输入口使驱动连线成立
+    params: [{ key: 'steel_in', label: '钢水量', unit: 't/h', min: 200, max: 2000, step: 50, def: 1000 },
+             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 5, max: 60, step: 5, def: 25 }],
     greenStrategies: [
       { id: 'lf_submerged_arc', name: 'LF埋弧加热优化', desc: '优化造渣和电压档位提高电弧热效率', saving: '节电 5 kWh/t-钢', carbon: 1.5, tags: ['节能'] },
       { id: 'lf_ladle_heater', name: '钢包蓄热式烘烤', desc: '蓄热式燃烧技术回收烟气余热预热烘烤空气', saving: '节气 40 %', carbon: 2.0, tags: ['余热'] },
     ] },
   { type: 'rh_vacuum', label: 'RH精炼', route: 'steel', mainIn: 'refined_steel', mainOut: 'refined_steel',
     efDirect: 0.0, efIndirect: 0.005, yield: 0.998,
-    inputs: ['refined_steel', 'electricity'], outputs: ['refined_steel', 'co2'],
-    params: [{ key: 'steel_in', label: '钢水量', unit: 't/h', min: 200, max: 2000, step: 50, def: 350 },
-             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 1, max: 15, step: 1, def: 2 }],
+    inputs: ['refined_steel', 'electricity', 'oxygen'], outputs: ['refined_steel', 'co2'],
+    // 短流程 SCHEME_AUX.short 为 LF/RH 各配一台供氧系统：补 oxygen 输入口使驱动连线成立
+    params: [{ key: 'steel_in', label: '钢水量', unit: 't/h', min: 200, max: 2000, step: 50, def: 1000 },
+             { key: 'electricity', label: '电耗', unit: 'MWh/h', min: 1, max: 15, step: 1, def: 5 }],
     greenStrategies: [
       { id: 'rh_vac_vfd', name: 'RH真空泵变频调速', desc: '根据脱气阶段自动调节真空泵转速', saving: '节电 2 kWh/t-钢', carbon: 0.6, tags: ['节能'] },
       { id: 'rh_light_treat', name: 'RH轻处理工艺', desc: '减少深真空处理时间仅作成分微调', saving: '节电 1 kWh/t-钢', carbon: 0.3, tags: ['节能'] },

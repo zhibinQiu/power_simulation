@@ -1218,15 +1218,16 @@ export const useSimStore = defineStore('sim', {
       u.params = params
       this.refresh(); this.autoLayout()
     },
-    // 点击 3D 场景中模型旁的小铭牌：选中该工序实例并聚焦（右侧显示统一的工序实例属性面板）。
-    // 无论从场景、左侧工艺目录还是列表点击，同一实例都只对应同一个实例属性面板。
+    // 点击场景中设备/节点（3D 模型旁小铭牌、2D 工艺图设备卡片等）：选中该工序实例并聚焦。
+    // 右侧显示统一的工序实例属性面板（UnitCarbonDetail）；与 selectUnit/openDeviceDetail 一致，
+    // 自动展开右栏，避免图上点选后无任何面板反馈（2026-09-09）。
     pickUnit(id) {
       this._clearBrowse()
       const u = this.model.units.find((x) => x.id === id)
       if (u && PROCESS_MAP[u.type]) this.selectedAssetType = u.type
       this.selectedMaterialId = null; this.selectedGroupId = null; this.selectedFlowId = null
       this.deviceDetailId = null
-      this.selectedUnitId = id; this.inspectorView = 'auto'; this.requestFocus('unit', id)
+      this.selectedUnitId = id; this.inspectorView = 'auto'; this.rightOpen = true; this.requestFocus('unit', id)
     },
     // 查看/关闭监测设备详情（3D 图点设备、或工序设备列表触发）
     openDeviceDetail(devId) { this._clearBrowse(); this.selectedMaterialId = null; this.selectedGroupId = null; this.selectedFlowId = null; this.deviceDetailId = devId; this.inspectorView = 'auto'; this.rightOpen = true; this.requestFocus('device', devId) },
@@ -2209,6 +2210,12 @@ export const useSimStore = defineStore('sim', {
       this.selectedGroupId = null
       try { localStorage.setItem('sim.processRoute', route) } catch (e) {}
       this._saveScheme()   // 持久化当前模板方案，刷新后保持
+      // 切模板后必须重编译模型并重算（与 openProject 对齐）：否则 model / baseline 仍挂着
+      // 旧模板的工艺节点 id，而新方案节点 id 已更换 —— 管道速率、设备树、KPI 会整片取不到值。
+      this.compileSchemeToModel()
+      this.autoLayout()
+      this.refresh()
+      this.sceneRev++
       // 编排模式下载入模板后自动适配视图：新方案分行排布，让画布尽量占满屏幕
       if (this.editMode) this.flowZoomFit()
       this.toast = route === 'short' ? t('已载入短流程炼钢模板') : t('已载入长流程炼钢模板')

@@ -10,7 +10,6 @@
       <div class="kpi hint">
         <span class="lg"><i class="dot ok"></i>{{ t('数据') }}</span>
         <span class="lg"><i class="dot sel"></i>{{ t('选中') }}</span>
-        <span class="lg"><i class="dot aux"></i>{{ t('辅助') }}</span>
         <span class="lg"><i class="dot feed"></i>{{ t('反馈') }}</span>
       </div>
       <button type="button" class="t2d-fit" @click="fitAll()" :title="t('适配画布（双击也可）')">{{ t('适配') }}</button>
@@ -40,13 +39,7 @@
           <linearGradient id="g-cool-h" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" stop-color="#7ec1ec"/><stop offset="1" stop-color="#2c6e9e"/>
           </linearGradient>
-          <!-- 管线流向箭头（线色自动继承） -->
-          <marker id="arrow-fwd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" opacity="0.95"/>
-          </marker>
-          <marker id="arrow-back" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#8a97a5" opacity="0.9"/>
-          </marker>
+          <!-- 管线流向改为「沿线运动的箭头」（见下方 animateMotion），不再使用末端静态 marker -->
           <!-- 卡片金属底 + 顶部色条渐变 -->
           <linearGradient id="g-card" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stop-color="#fbfcfd"/><stop offset="1" stop-color="#dde3ea"/>
@@ -65,41 +58,80 @@
             <path v-for="l in gridH" :key="'gh'+l" :d="`M0 ${l} H${bounds.w}`"/>
           </g>
 
-          <!-- 辅助系统分组虚线框（衬于卡片/连线之下，展示「一组辅助设备」；不拦截交互） -->
-          <g v-for="g in groups" :key="g.key" class="t2d-grp" :transform="`translate(${g.x},${g.y})`">
-            <rect class="t2d-grp-frame" :width="g.w" :height="g.h" rx="7"/>
-            <circle class="t2d-grp-dot" cx="13" cy="17" r="3"/>
-            <text class="t2d-grp-title" x="24" y="21">{{ g.label }}</text>
-            <text class="t2d-grp-n" :x="g.w - 14" y="21" text-anchor="end">{{ g.count }} 台</text>
-          </g>
+          <!-- 设备节点：主工艺与辅助设备均为独立节点，统一参与下方 nodes 分层排布（见 relayout） -->
 
-          <!-- 组中组：系统框内按设备类型再套一层二级虚线框（如同一送风系统里的 热风炉×3 / 鼓风机×3） -->
-          <g v-for="s in subFrames" :key="s.kid" class="t2d-subgrp" :transform="`translate(${s.x},${s.y})`">
-            <rect class="t2d-subgrp-frame" :width="s.w" :height="s.h" rx="4"/>
-            <text class="t2d-subgrp-title" x="7" y="14">{{ s.label }}</text>
-            <text class="t2d-subgrp-n" :x="s.w - 8" y="14" text-anchor="end">{{ s.count }} 台</text>
-          </g>
-
-          <!-- 管线（正交折线，物料色；反馈弧虚线。中点标物料名小标签，不参与点击） -->
+          <!-- 管线（正交折线 → 管道形态。中点标物料名小标签，不参与点击）
+               管道 = 三层同路径描边叠加（见 PIPE_* 常量）：
+                 ① 管壁：深色外描边，比管体每侧宽出 PIPE_EDGE_ADD/2 → 形成管子轮廓与厚度感；
+                 ② 管体：物料色实心，管道主体（不透明，多线共线叠加不会变色）；
+                 ③ 高光：细白线居中，模拟圆柱管顶面反光（低透明度，共线段叠加仍在可控范围）。
+               折角用 round linejoin → 直角转弯呈「弯管」观感；反馈回流为虚线管（dash 三层同步）。
+               流向表达：末端静态箭头已移除，改为「沿折线运动的小箭头」——
+               箭头从源设备端口出发，经折线各折角抵达目标设备端口，直观表达物料流向。 -->
           <g>
-            <path v-for="c in lines" :key="c.id" :d="c.d" :stroke="c.color" :stroke-width="c.feedback ? 1.6 : c.sw"
-              fill="none" :stroke-dasharray="c.feedback ? '5 4' : '0'" :marker-end="c.feedback ? 'url(#arrow-back)' : 'url(#arrow-fwd)'" class="t2d-link"/>
-            <circle v-for="c in lines" :key="'m'+c.id" :cx="c.mx" :cy="c.my" r="2.5" fill="#fff" :stroke="c.color" stroke-width="1.4" class="t2d-mid"/>
-            <text v-for="c in lines" :key="'t'+c.id" :x="c.mx + 6" :y="c.my + 3" class="t2d-mat" :fill="c.color">{{ c.matName }}</text>
+            <path v-for="c in lines" :key="'pe'+c.id" :d="c.d" fill="none" :stroke="PIPE_EDGE_COLOR"
+              :stroke-width="c.pipeEdgeW" :stroke-dasharray="c.dash" :stroke-opacity="c.pipeEdgeOp"
+              stroke-linecap="round" stroke-linejoin="round" class="t2d-pipe"/>
+            <path v-for="c in lines" :key="'pb'+c.id" :d="c.d" fill="none" :stroke="c.color"
+              :stroke-width="c.pipeW" :stroke-dasharray="c.dash"
+              stroke-linecap="round" stroke-linejoin="round" class="t2d-pipe"/>
+            <path v-for="c in lines" :key="'ph'+c.id" :d="c.d" fill="none" stroke="#ffffff"
+              :stroke-width="c.pipeHiW" :stroke-dasharray="c.dash" :stroke-opacity="c.pipeHiOp"
+              stroke-linecap="round" stroke-linejoin="round" class="t2d-pipe"/>
+            <!-- 动态流向箭头：path 直接复用折线 d（随布局重排自动跟随），rotate=auto 使箭头始终指向
+                 当前段切线方向；opacity 与位移同周期淡入淡出，避免箭头在起点/终点突兀出现或消失。
+                 每条 conn 都承载自己的箭头：母线汇流组内三台热风炉各有一个箭头从炉底出发，
+                 在「母线带 → 高炉顶」段共线并入同一根总管（组内周期统一 + 相位均分，间距恒定）。
+                 配色：箭头 = **管道物料色加深一档**（fill = 物料色 × FLOW_DARKEN，stroke = × FLOW_DARKEN_EDGE），
+                 用「深色实心块 + 更深轮廓」从管体上脱开 —— 既保留物料色语义，也不像纯白箭头那样扎眼。
+                 尺寸略宽于管径（PIPE_W + PIPE_EDGE_ADD ≈ 8.8），凸出管壁保证可辨。 -->
+            <polygon v-for="c in lines" :key="'f'+c.id" class="t2d-flow" :fill="c.arrowFill"
+              :stroke="c.arrowEdge" :stroke-width="FLOW_STROKE_W" stroke-linejoin="round"
+              :points="c.feedback ? FLOW_PTS_FB : FLOW_PTS">
+              <animateMotion :path="c.d" :dur="c.dur" :begin="c.begin" calcMode="linear" rotate="auto" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.94;1"
+                :dur="c.dur" :begin="c.begin" repeatCount="indefinite"/>
+            </polygon>
+            <circle v-for="c in lines" :key="'m'+c.id" :cx="c.mx" :cy="c.my" :r="c.pipeW * 0.54" fill="#fff"
+              :stroke="c.color" stroke-width="1.6" class="t2d-mid"/>
+            <!-- 物料卡片：管道旁独立小卡片，上行材料名、下行流动速率（速率来自后端读数解析，
+                 无量测点的管道只显示材料名）。卡片落在管道最长水平段旁，位置由 cards 计算并避让设备盒。 -->
+            <g v-for="c in cards" :key="'k'+c.id" class="t2d-card" :transform="`translate(${c.x},${c.y})`">
+              <!-- 卡片底：白底 + 物料色细边；左侧色条标记物料（与管道配色一致） -->
+              <rect class="t2d-card-bg" x="0" y="0" :width="c.w" :height="c.h" rx="5"
+                :stroke="c.color" stroke-opacity="0.45"/>
+              <rect class="t2d-card-bar" x="1" y="1" width="2.6" :height="c.h - 2" rx="1.3" :fill="c.color"/>
+              <text class="t2d-card-mat" :fill="c.color" :x="CARD_PAD_X" :y="CARD_PAD_Y + 10">{{ c.matName }}</text>
+              <text v-if="c.rate" class="t2d-card-rate" :x="CARD_PAD_X" :y="CARD_PAD_Y + CARD_LINE_H + 10.5">
+                <tspan class="t2d-card-val" :fill="c.rate.src === 'live' ? CARD_VAL_LIVE : CARD_VAL_SIM">{{ formatRate(c.rate.value) }}</tspan>
+                <tspan class="t2d-card-unit" dx="2.5" :fill="c.rate.src === 'live' ? CARD_VAL_LIVE : CARD_VAL_SIM">{{ c.rate.unit }}</tspan>
+              </text>
+            </g>
           </g>
 
           <!-- 设备节点：无卡片底，设备平面图直接作为主体（参考水泥行业图：设备本体 + 名称浮签 + 实时数据） -->
           <g v-for="n in nodes" :key="n.id" :transform="`translate(${n.x},${n.y})`"
             :class="['t2d-node', { on: isSel(n), aux: isAux(n) }]"
             @click.stop="onNode(n)" @mouseenter="hovered = n.id" @mouseleave="hovered = null">
-            <!-- 设备名称浮签（节点顶部居中） -->
-            <text class="t2d-name" :x="boxW(n)/2" y="18" text-anchor="middle">{{ n.name }}</text>
+            <!-- 设备名称浮签（贴设备图形上缘，见 nameY） -->
+            <text class="t2d-name" :x="boxW(n)/2" :y="nameY(n)" text-anchor="middle">{{ n.name }}</text>
 
             <!-- 设备主体：优先贴真实设备图（已自动裁透明边；视口铺满可用图带并横向外扩，等比 contain 居中）；
                  无图时退回矢量图元（立体图符按节点图带等比放大，描边宽随缩放反除保持细线质感） -->
-            <image v-if="devImgOf(n)" :x="devImgBox(n).x" :y="devImgBox(n).y" :width="devImgBox(n).w" :height="devImgBox(n).h" :href="devImgOf(n)" preserveAspectRatio="xMidYMid meet" class="t2d-figimg"/>
+            <!-- 设备图按「图形真实边界」(PNG alpha 外接矩形)裁剪后铺满显示盒：
+                 嵌套 <svg viewBox=边界> 把透明留白切掉，设备本体四缘即显示盒四缘，
+                 连线端点贴该盒边缘（figRect），因此设备与管线之间不再有空隙。
+                 显示盒宽高比 = 图形宽高比 → preserveAspectRatio=none 恰好严格铺满。 -->
+            <svg v-if="devImgOf(n) && devImgMetaOf(n)" :x="devImgBox(n).x" :y="devImgBox(n).y"
+              :width="devImgBox(n).w" :height="devImgBox(n).h"
+              :viewBox="`${devImgMetaOf(n).bx} ${devImgMetaOf(n).by} ${devImgMetaOf(n).bw} ${devImgMetaOf(n).bh}`"
+              preserveAspectRatio="none" class="t2d-figimg">
+              <image :x="0" :y="0" :width="devImgMetaOf(n).W" :height="devImgMetaOf(n).H" :href="devImgOf(n)"/>
+            </svg>
+            <!-- 无边界元数据（新图未重跑 scripts/gen-devimg-meta.py）：回退整图等比 contain -->
+            <image v-else-if="devImgOf(n)" :x="devImgBox(n).x" :y="devImgBox(n).y" :width="devImgBox(n).w" :height="devImgBox(n).h" :href="devImgOf(n)" preserveAspectRatio="xMidYMid meet" class="t2d-figimg"/>
             <g v-else class="t2d-fig" :transform="`translate(${figOf(n).x},${figOf(n).y}) scale(${figOf(n).s})`">
-              <template v-for="(el, ei) in iconOf(n.type)" :key="ei">
+              <template v-for="(el, ei) in iconOf(n.repType || n.type)" :key="ei">
                 <path v-if="el.tag === 'path'" :d="el.d" :stroke="el.stroke" :stroke-width="(el.sw||0)/figOf(n).s" :stroke-linecap="el.lc" :stroke-linejoin="el.lj" :fill="el.fill || 'none'"/>
                 <circle v-else-if="el.tag === 'circle'" :cx="el.cx" :cy="el.cy" :r="el.r" :stroke="el.stroke" :stroke-width="(el.sw||0)/figOf(n).s" :fill="el.fill || 'none'"/>
                 <ellipse v-else-if="el.tag === 'ellipse'" :cx="el.cx" :cy="el.cy" :rx="el.rx" :ry="el.ry" :stroke="el.stroke" :stroke-width="(el.sw||0)/figOf(n).s" :fill="el.fill || 'none'" :transform="el.transform || ''"/>
@@ -107,6 +139,9 @@
                 <polygon v-else-if="el.tag === 'polygon'" :points="el.pts.map(p => p.join(',')).join(' ')" :stroke="el.stroke" :stroke-width="(el.sw||0)/figOf(n).s" :fill="el.fill || 'none'"/>
               </template>
             </g>
+            <!-- 高炉温度标注叠加层：在 PNG 基底各区域标注温度（与图片共用显示盒/viewBox，随图缩放） -->
+            <BfTempOverlay v-if="n.type === 'blast_furnace' && devImgOf(n) && devImgMetaOf(n)"
+              :box="devImgBox(n)" :meta="devImgMetaOf(n)" :node="n"/>
 
 
             <!-- 底部实时 KPI（仅主工艺，悬浮在设备下方） -->
@@ -130,9 +165,13 @@ import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { t } from '../i18n'
 import { useSimStore } from '../stores/sim'
 import { MATERIAL_MAP, PROCESS_MAP } from '../data/flowLibrary'
-import { T2D_ICONS, T2D_GEOM, T2D_INOUT } from '../data/twin2dIcons'
+import { T2D_ICONS, T2D_GEOM, T2D_IMG_SCALE } from '../data/twin2dIcons'
+import { resolvePipeRate, formatRate } from '../utils/pipeRate'
+import BfTempOverlay from './BfTempOverlay.vue'
 // 设备图清单（构建期由 vite 插件 device-images 扫描 public/2D-image/devices 生成）
-import { names as DEV_IMG_NAMES } from 'virtual:device-images'
+// meta：每张图「图形真实边界」(PNG alpha 外接矩形，scripts/gen-devimg-meta.py 生成) ——
+//       透明背景素材的设备本体不铺满画布，按边界定位才能让图形贴住节点/连线端点。
+import { names as DEV_IMG_NAMES, meta as DEV_IMG_META } from 'virtual:device-images'
 
 const store = useSimStore()
 const wrap = ref(null)
@@ -140,290 +179,548 @@ const svg = ref(null)
 
 const PAD = 56
 
-// —— 辅助系统分组（2D 图将非主工艺节点按「系统」归组，每组一个虚线框） ——
-const AUX_SYS_DEF = [
-  { key: 'wind',    label: '高炉送风系统',   types: ['hot_blast_stove', 'blower', 'combustion_blower'] },
-  { key: 'pci',     label: '喷煤系统',       types: ['injector'] },
-  { key: 'dedust',  label: '除尘抽风系统',   types: ['id_fan'] },
-  { key: 'oxygen',  label: '全厂供氧系统',   types: ['oxy_supply', 'oxy_plant'] },
-  { key: 'power',   label: '供配电系统',     types: ['power_supply', 'drive_supply', 'electrode_reg'] },
-  { key: 'therm',   label: '热力与冷却系统', types: ['aux_boiler', 'cool_pump'] },
-  { key: 'feed',    label: '原料输送系统',   types: ['belt_conv', 'feeder'] },
-  { key: 'carbon',  label: '节能减碳(公用)', types: ['gas_power', 'waste_heat', 'ccs'] },
-  { key: 'others',  label: '其他辅助',       types: [] },
-]
-const GRP_HEAD = 34     // 组框标题带高
-const GRP_PAD_X = 26    // 组框左右内边距
-const GRP_PAD_B = 16    // 组框底部内边距
-const GRP_GAP_X = 40    // 组间横向间距
-const GRP_GAP_Y = 30    // 组间纵向间距（放不下换行时）
-const AUX_GAP_X = 34    // 组内设备横向间距
-const AUX_ROW_CAP = 5   // 组内每行设备上限
-const AUX_GAP_ROW = 26  // 组内行间距
-// —— 组中组几何 ——
-const SUB_PAD_X = 14
-const SUB_PAD_Y = 12
-const SUB_TITLE_H = 20
-const SUB_GAP_Y = 16
-const SUB_TOP = 14
-const SUB_BOTTOM = 14
+// —— 布局常量：全厂统一拓扑分层(2026-09-09 需求重构) ——
+// 不再把辅助设备合并成「系统模块 / 分组框」(孪生平台形态作废)：主工艺与全部辅助设备都是
+// 独立节点，统一按方案连线(排除 feedback 回流)做「最长路径」分层 —— 无上游的原始节点
+// (原料源/辅助源)落 rank0 竖列，下游逐层向右推进；每台设备只占一列，供料边只指向更右的
+// 层，杜绝「前段→后段」连线横穿整条产线。
+const TOP = 100            // 每列首台设备顶 y
+const ROW_GAP_Y = 44       // 同列内上下相邻设备盒净空（含名称/KPI 与端口余量）
+const COL_GAP_X = 84       // 相邻层列间距：设备盒右缘 → 下一列设备盒左缘的空档（路由竖道）
 
-// —— 布局（深拷贝方案节点，用工艺树布局在 2D 画布上独立排布，不污染编辑画布） ——
+// —— 布局（深拷贝方案节点，在 2D 画布上独立排布，不污染编辑画布） ——
 const nodes = ref([])
 const conns = ref([])
-const groups = ref([])
-const subFrames = ref([])
 const bounds = ref({ x: 0, y: 0, w: 1000, h: 600 })
 const mainBand = ref({ l: 80, r: 900, top: 100, bot: 700 })
 
 function relayout() {
+  // —— 建图逻辑(2026-09-09 vC)：主工艺拓扑骨架 + 辅助设备外挂 ——
+  // 用户要求改变建图方式：
+  //   1) 先将主流程设备(main)按拓扑分层建图 —— 仅 main↔main 正向边做最长路径分层，
+  //      rank0 原料源(焦炉→烧结→球团 / DRI竖炉→电炉)合并为同一「源列」自上而下竖排，
+  //      主链(高炉→预处理→…→热轧)顶对齐主链行从左向右推进；
+  //   2) 详细的辅助设备(aux)作为「外挂节点」，不再占主链列位 —— 每台 aux 沿其
+  //      非 feedback 正向服务链锚定到被服务的主工艺设备，挂在主设备正下方；
+  //      同链辅助(供氧→鼓风机→热风炉→高炉)纵向续排成「服务通道」，连线竖直短接。
   const raw = store.scheme && store.scheme.nodes ? store.scheme.nodes : []
   const rawC = store.scheme && store.scheme.connections ? store.scheme.connections : []
   const ns = JSON.parse(JSON.stringify(raw)).filter((n) => n && n.kind === 'process')
-  const cs = JSON.parse(JSON.stringify(rawC))
+  const cs = JSON.parse(JSON.stringify(rawC)).filter((c) => c && c.from && c.to)
+  let byId = new Map(ns.map((n) => [n.id, n]))
+  const baseOrd = new Map(ns.map((n, i) => [n.id, i]))
+  const isMainN = (n) => isMain(n)
 
-  const mainNodes = [], auxNodes = []
-  for (const n of ns) {
-    if (isMain(n)) mainNodes.push(n)
-    else auxNodes.push(n)
+  // —— A) 主工艺拓扑分层(仅 main↔main 正向边) ——
+  const mains = ns.filter((n) => isMainN(n))
+  const mset = new Set(mains.map((n) => n.id))
+  const rank = new Map(mains.map((n) => [n.id, 0]))
+  for (let pass = 0; pass <= mains.length; pass++) {
+    let ch = false
+    for (const c of cs) {
+      if (c.feedback) continue
+      const f = byId.get(c.from), t = byId.get(c.to)
+      if (!f || !t || !mset.has(f.id) || !mset.has(t.id)) continue
+      const v = rank.get(f.id) + 1
+      if (v > rank.get(t.id)) { rank.set(t.id, v); ch = true }
+    }
+    if (!ch) break
   }
-  // 主工艺按 scheme 原始顺序横排，设备以平面图落地
-  // 矩形布局：主工艺占右半（右上 rowA 横排 + 右下 LF 折返竖链），辅助占左半。
-  // rowA 从「辅助目标宽 + 主辅间距」开始，把左侧整块留给辅助组铺开，主+辅合起来填满矩形画布。
-  // 紧凑参数：AUX_TARGET_W/MAIN_GAP 调小让画布宽 ≤ 容器宽，zoom 自然升高、设备屏幕更大。
-  const MAIN_GAP = 50
-  const FOLD_GAP = 116 // 横向主带与折返纵向链之间 / 纵向链层间的净空（留折返横带）
-  const AUX_TARGET_W = 700    // 辅助区域目标宽度（矩形左半，~3 列 × 单台宽 200+gaps）
-  const MAIN_AUX_GAP = 50      // 主行与辅助区的横向间距
-  // 折返：LF(LF 精炼)之后的工序不再继续向右横排成一条直线，而是沿 LF 中心列逐台向下排成
-  // 「纵向链」（RH → 连铸 → 热轧），像产线总图一样竖着走下去，占矩形右半下部。
-  const FOLD_TYPE = 'ladle_furnace'
-  const foldI = mainNodes.findIndex((n) => n.type === FOLD_TYPE)
-  const rowA = foldI >= 0 ? mainNodes.slice(0, foldI + 1) : mainNodes
-  const colB = foldI >= 0 ? mainNodes.slice(foldI + 1) : []
-  let x = AUX_TARGET_W + MAIN_AUX_GAP, y = 100
-  for (const n of rowA) { n.x = x; n.y = y; x += boxW(n) + MAIN_GAP }
-  if (colB.length) {
-    const lf = rowA[rowA.length - 1]
-    const lfCx = lf.x + boxW(lf) / 2
-    let cy = lf.y + boxH(lf) + FOLD_GAP
-    for (const n of colB) { n.x = lfCx - boxW(n) / 2; n.y = cy; cy += boxH(n) + FOLD_GAP }
+  const maxRank = Math.max(0, ...rank.values())
+  const byRank = []
+  for (let r = 0; r <= maxRank; r++) byRank.push([])
+  for (const m of mains) byRank[rank.get(m.id)].push(m)
+
+  // rank0 主源(原料源)合并为同一「源列」，按工艺顺序自上而下竖排一列(焦炉→烧结→球团 /
+  // DRI竖炉→电炉)，避免三源横排时 焦炉/烧结机→高炉 的箭头横穿 球团 等设备；
+  // rank≥1 主工艺一列一台，顶对齐主链行向右推进。
+  const MAIN_SOURCE_ORDER = ['coke_oven', 'sinter_plant', 'pelletizing', 'dri_midrex', 'eaf']
+  const SRC_IDX = new Map(MAIN_SOURCE_ORDER.map((t, i) => [t, i]))
+  const srcOrd = (a, b) => {
+    const ia = SRC_IDX.has(a.type) ? SRC_IDX.get(a.type) : 999
+    const ib = SRC_IDX.has(b.type) ? SRC_IDX.get(b.type) : 999
+    if (ia !== ib) return ia - ib
+    return baseOrd.get(a.id) - baseOrd.get(b.id)
   }
-  const bandBot = rowA.length ? Math.max(...rowA.map((n) => n.y + boxH(n))) : 0
-  const mainBottom = mainNodes.length
-    ? Math.max(...mainNodes.map((n) => n.y + boxH(n)))
-    : null
-  const mainW = mainNodes.length
-    ? Math.max(...mainNodes.map((n) => n.x + boxW(n))) - Math.min(...mainNodes.map((n) => n.x))
-    : 900
-  mainBand.value = {
-    l: mainNodes.length ? Math.min(...mainNodes.map((n) => n.x)) : 80,
-    r: mainNodes.length ? Math.max(...mainNodes.map((n) => n.x + boxW(n))) : 900,
-    top: mainNodes.length ? rowA[0].y : 100,
-    bot: bandBot, // 只指「横向主带」底；折返纵向链在它下方，走廊/顶带判定不把它当主带
+  const colMain = [(byRank[0] || []).slice().sort(srcOrd)]   // colMain[c] = 该列自上而下的主设备数组
+  for (let r = 1; r <= maxRank; r++) {
+    for (const m of (byRank[r] || []).slice().sort((a, b) => baseOrd.get(a.id) - baseOrd.get(b.id))) {
+      colMain.push([m])
+    }
   }
 
-  // —— 辅助设备 → 系统分组 ——
-  const sysOf = (n) => {
-    const def = AUX_SYS_DEF.find((d) => d.types.includes(n.type))
-    return def ? def.key : 'others'
-  }
-  const bySys = new Map(AUX_SYS_DEF.map((d) => [d.key, { ...d, items: [] }]))
-  for (const n of auxNodes) bySys.get(sysOf(n)).items.push(n)
-  const auxGroups = AUX_SYS_DEF.map((d) => bySys.get(d.key)).filter((g) => g.items.length)
-
-  // —— 每个辅助组的「主连接目标列 x 中心」 ——
-  // 把辅助组摆到「它对外连线最密集的主设备」正下方，让组↔主设备之间的折线尽量短（多数情况下
-  // 就只是一段短竖线 / 一个直角）。权重：连到主设备 = 1、连到另一辅助组 = 0.5、组内自连 = 0。
-  const mainCenX = new Map(mainNodes.map((m) => [m.id, m.x + boxW(m) / 2]))
-  const allById = new Map(ns.map((n) => [n.id, n]))
-  const groupOfNode = new Map()
-  for (const g of auxGroups) for (const n of g.items) groupOfNode.set(n.id, g)
-  const anchorX = (g) => {
-    let sx = 0, sw = 0
-    for (const n of g.items) {
+  // —— B) 辅助设备锚定：沿非 feedback 正向边走，记录 (被服务main, 跳数) ——
+  // depth=1 直达主设备(热风炉/引风机/喷吹…)，depth>1 为链路中继(鼓风机→热风炉 之类)
+  const anchor = new Map()          // aux.id -> { mainId, depth } | null(游离)
+  for (const a of ns) {
+    if (isMainN(a)) continue
+    let cur = a, depth = 0
+    const seen = new Set([a.id])
+    let anchored = null
+    for (let k = 0; k < 30 && !anchored; k++) {
+      let nxt = null
       for (const c of cs) {
-        let peer = null, isInternal = false
-        if (c.from === n.id) { peer = allById.get(c.to); isInternal = groupOfNode.get(c.to) === g }
-        else if (c.to === n.id) { peer = allById.get(c.from); isInternal = groupOfNode.get(c.from) === g }
-        if (!peer || isInternal) continue
-        if (mainCenX.has(peer.id)) { sx += mainCenX.get(peer.id); sw += 1 }
-        else if (groupOfNode.has(peer.id)) { sx += peer.x + boxW(peer) / 2; sw += 0.5 }
+        if (c.feedback || c.from !== cur.id) continue
+        const v = byId.get(c.to)
+        if (v && !seen.has(v.id)) { nxt = v; break }
+      }
+      if (!nxt) break
+      cur = nxt; depth++
+      if (isMainN(cur)) anchored = cur.id
+      else seen.add(cur.id)
+    }
+    anchor.set(a.id, anchored ? { mainId: anchored, depth } : null)
+  }
+
+  // —— B1) 同类辅助合并(2026-09-10 用户需求)：**同类型**的多台辅助在 2D 显示层合成一台
+  // 节点 —— 高炉送风簇 三套「供氧→鼓风机→热风炉」→ 一套竖链；全厂集中供氧/多台引风机
+  // 也各并为一台(如 供氧系统 供 预处理/转炉/送风链，引风机 服务 烧结机+球团)。
+  // 数据层 store.scheme 仍按真实设备建模不动，这里只聚合 2D 显示口径：
+  //   - 代表节点取 baseOrd 最小的一台(通常是未带序号的首台，名称即类型中文名；
+  //     若代表是第 N 台则把名称还原为类型中文名，去掉「热风炉3」之类序号)；
+  //   - 非代表节点从画布移除，其连线端点改写到代表节点；
+  //   - 改写后按 (from,to,toPort,material,feedback) 去重：多台→同一目标的同端口连线
+  //     合成一条，母线汇流(≥2 源)不再触发。
+  // 合并后节点的落位锚定取组内**最深服务链**(见下方重锚定)，其余目标的连线由管线
+  // 经主带上方/下方走廊绕行(如 引风机 挂烧结机左侧、另有管线接球团)。
+  {
+    const groups = new Map()      // key(type) -> [auxId..]
+    for (const a of ns) {
+      if (isMainN(a)) continue
+      if (!groups.has(a.type)) groups.set(a.type, [])
+      groups.get(a.type).push(a.id)
+    }
+    const mergeMap = new Map()    // 被合并 auxId -> { rep, ports: Map(旧端口id -> 代表端口id) }
+    for (const ids of groups.values()) {
+      if (ids.length < 2) continue
+      const rep = byId.get(ids[0])
+      rep.name = (PROCESS_MAP[rep.type] || {}).label || rep.name
+      // 合并组重锚定：取组内**最深**的服务链(如全厂供氧系统的深链
+      // 供氧→鼓风机→热风炉→高炉，depth3 锚到高炉送风簇，而非 铁水预处理 depth1)
+      // —— 深链成员在通道内竖直短接；若沿用首台锚定(浅链)，供氧会被压在
+      // 铁水预处理正下方，向上接鼓风机的管线被预处理盒堵死，只能绕全图外圈。
+      // 同深取首台自身(id_fan 两台都 depth1 → 维持 烧结机 锚定不动)。
+      let best = anchor.get(ids[0])
+      for (let i = 1; i < ids.length; i++) {
+        const a2 = anchor.get(ids[i])
+        if (a2 && (!best || a2.depth > best.depth)) best = a2
+      }
+      if (best) anchor.set(ids[0], best)
+      for (let i = 1; i < ids.length; i++) {
+        // 端口映射：被合并实例与代表节点同模板，按「方向+物料」对齐到代表端口
+        // （三台鼓风机各吹各自热风炉的 in 口，端口 id 不同 —— 不映射则去重键不一致，
+        //   会残留 3 条平行线）
+        const dup = byId.get(ids[i])
+        const pm = new Map()
+        for (const dir of ['in', 'out']) {
+          const a = (dup.ports && dup.ports[dir]) || []
+          const b = (rep.ports && rep.ports[dir]) || []
+          const used = new Set()
+          for (const pa of a) {
+            const t = b.find((p) => p.material === pa.material && !used.has(p.id))
+            if (t) { pm.set(pa.id, t.id); used.add(t.id) }
+          }
+        }
+        mergeMap.set(ids[i], { rep: ids[0], ports: pm })
       }
     }
-    return sw > 0 ? sx / sw : (mainNodes.length ? mainCenX.get(mainNodes[Math.floor(mainNodes.length / 2)].id) : 600)
-  }
-
-  const typeLabel = (type) => (PROCESS_MAP[type] && PROCESS_MAP[type].label) || type
-
-  // 平铺排布（单类型组）
-  const placeFlat = (g, gx0, gy0) => {
-    g.x = gx0; g.y = gy0
-    g.count = g.items.length
-    g.subs = []
-    let cy = gy0 + GRP_HEAD
-    let maxRowW = 0
-    for (let i = 0; i < g.items.length; i += AUX_ROW_CAP) {
-      const row = g.items.slice(i, i + AUX_ROW_CAP)
-      let cx = gx0 + GRP_PAD_X, rh = 0
-      for (const n of row) { n.x = cx; n.y = cy; cx += boxW(n) + AUX_GAP_X; rh = Math.max(rh, boxH(n)) }
-      const rowW = cx - AUX_GAP_X - (gx0 + GRP_PAD_X)
-      maxRowW = Math.max(maxRowW, rowW)
-      cy += rh + AUX_GAP_ROW
-    }
-    g.w = maxRowW + GRP_PAD_X * 2
-    g.h = cy - gy0 - AUX_GAP_ROW + GRP_PAD_B
-  }
-  // 组中组排布（多类型组）
-  const placeNested = (g, gx0, gy0) => {
-    g.x = gx0; g.y = gy0
-    g.count = g.items.length
-    const order = [], byType = new Map()
-    for (const n of g.items) {
-      let cl = byType.get(n.type)
-      if (!cl) { cl = { type: n.type, label: typeLabel(n.type), count: 0, items: [] }; byType.set(n.type, cl); order.push(n.type) }
-      cl.count++; cl.items.push(n)
-    }
-    g.subs = []
-    let top = gy0 + GRP_HEAD + SUB_TOP, maxW = 0
-    for (const type of order) {
-      const cl = byType.get(type)
-      cl.x = gx0 + SUB_PAD_X
-      cl.y = top
-      let cy = cl.y + SUB_TITLE_H, maxRowW = 0
-      for (let i = 0; i < cl.items.length; i += AUX_ROW_CAP) {
-        const row = cl.items.slice(i, i + AUX_ROW_CAP)
-        let cx = cl.x + SUB_PAD_X, rh = 0
-        for (const n of row) { n.x = cx; n.y = cy; cx += boxW(n) + AUX_GAP_X; rh = Math.max(rh, boxH(n)) }
-        const rowW = cx - AUX_GAP_X - (cl.x + SUB_PAD_X)
-        maxRowW = Math.max(maxRowW, rowW)
-        cy += rh + AUX_GAP_ROW
+    if (mergeMap.size) {
+      for (const c of cs) {
+        {
+          const m = mergeMap.get(c.from)
+          if (m) { c.from = m.rep; c.fromPort = m.ports.get(c.fromPort) || c.fromPort }
+        }
+        {
+          const m = mergeMap.get(c.to)
+          if (m) { c.to = m.rep; c.toPort = m.ports.get(c.toPort) || c.toPort }
+        }
       }
-      cl.w = maxRowW + SUB_PAD_X * 2
-      cl.h = cy - AUX_GAP_ROW - cl.y + SUB_PAD_Y
-      maxW = Math.max(maxW, cl.w)
-      g.subs.push(cl)
-      top = cl.y + cl.h + SUB_GAP_Y
+      const seen = new Set()
+      for (let i = cs.length - 1; i >= 0; i--) {
+        const c = cs[i]
+        const k = [c.from, c.to, c.toPort, c.material, c.feedback ? 1 : 0].join('|')
+        if (seen.has(k)) cs.splice(i, 1)
+        else seen.add(k)
+      }
+      const drop = new Set(mergeMap.keys())
+      for (let i = ns.length - 1; i >= 0; i--) if (drop.has(ns[i].id)) ns.splice(i, 1)
+      // byId 重建：E) 段以 byId.has 过滤脏连线，必须与裁减后的 ns 一致
+      byId = new Map(ns.map((n) => [n.id, n]))
     }
-    g.w = maxW + SUB_PAD_X * 2
-    g.h = top - SUB_GAP_Y - gy0 + SUB_BOTTOM
-  }
-  const placeGroup = (g, gx0, gy0) => {
-    const multiType = new Set(g.items.map((n) => n.type)).size > 1
-    multiType ? placeNested(g, gx0, gy0) : placeFlat(g, gx0, gy0)
   }
 
-  // —— 4 个辅助系统按用户指定位置分列排布 ——
-  //   焦炉列：喷煤(pci) 在焦炉正下，高炉送风(wind) 在喷煤之下。
-  //   烧结/球团列：除尘抽风(dedust) 留在烧结/球团正下方中央列。
-  //   铁水预处理/转炉列：全厂供氧(oxygen) 右移到该列正下方，并额外下压 OXY_DROP(画布右下角)。
-  // 每列起始 y = 该列参考设备盒底 + STACK_TOP_PAD + drop；组中心对齐该列参考中心 x。
-  //   drop 只给 oxygen 用：避免它与左侧除尘抽风组在同一水平带上互相挤占。
-  const STACK_TOP_PAD = 30
-  const STACK_GAP_Y = 40
-  // 主设备带底 → 辅助系统组框顶 之间的最小留白(即「横向走廊」宽度)。
-  // 必须 > feedback 回流虚线的走廊偏移(mainBot + 24),否则虚线会压在辅助系统虚线框上。
-  const CORRIDOR_GAP = 40
-  const OXY_DROP = 150      // 全厂供氧组相对「参考盒底 + STACK_TOP_PAD」的额外下压量
-  const findN = (type) => mainNodes.find((n) => n.type === type)
-  const sinterN = findN('sinter_plant')
-  const pelletN = findN('pelletizing')
-  const cokeN   = findN('coke_oven')
-  const bfN     = findN('blast_furnace')
-  const pretN   = findN('hot_metal_pretreat')
-  const bofN    = findN('bof')
-  const colCx = (a, b) => (a && b)
-    ? (a.x + boxW(a) / 2 + b.x + boxW(b) / 2) / 2
-    : (a ? a.x + boxW(a) / 2 : (b ? b.x + boxW(b) / 2 : null))
-  const STACK_COLUMNS = [
-    { keys: ['pci', 'wind'],
-      cx: cokeN ? cokeN.x + boxW(cokeN) / 2 : null,
-      refY: cokeN ? cokeN.y + boxH(cokeN) : mainBand.value.bot },
-    { keys: ['dedust'],
-      cx: colCx(sinterN, pelletN),
-      refY: Math.min(
-        sinterN ? sinterN.y + boxH(sinterN) : Infinity,
-        pelletN ? pelletN.y + boxH(pelletN) : Infinity) },
-    { keys: ['oxygen'],
-      cx: colCx(pretN, bofN) || (pretN ? pretN.x + boxW(pretN) / 2 : (bfN ? bfN.x + boxW(bfN) / 2 : null)),
-      refY: Math.max(
-        bfN ? bfN.y + boxH(bfN) : -Infinity,
-        pretN ? pretN.y + boxH(pretN) : -Infinity),
-      drop: OXY_DROP },
-  ]
-  const stackGroups = []
-  // 1) 其余组(restGroups)走「原 anchorX 升序 + 流式多行」,放在主带左外侧辅助矩形(80..AUX_TARGET_W)
-  const STACK_KEY_SET = new Set(STACK_COLUMNS.flatMap((c) => c.keys))
-  const restGroups = auxGroups.filter((g) => !STACK_KEY_SET.has(g.key))
-  restGroups.forEach((g) => { g.anchorX = anchorX(g); g._order = AUX_SYS_DEF.findIndex((d) => d.key === g.key) })
-  restGroups.sort((a, b) => a.anchorX - b.anchorX || a._order - b._order)
-  // 2) 每列在「该列参考设备盒底之下」按列内 keys 顺序纵向堆叠,每组中心对齐该列 cx
-  //    (x 允许落在主带盒所在 x 段,但 gy 起点已 > 参考盒底,y 与主带盒 y 段不交,不冲突)
-  for (const col of STACK_COLUMNS) {
-    if (col.cx == null) continue
-    // 下限 = 主带底 + CORRIDOR_GAP：在主设备带与辅助系统之间留出横向走廊,
-    // 供 feedback 回流虚线(cy = mainBot + 24)等走线,避免压住辅助系统的虚线框。
-    let gy = Math.max(col.refY + STACK_TOP_PAD + (col.drop || 0), mainBand.value.bot + CORRIDOR_GAP)
-    for (const k of col.keys) {
-      const g = auxGroups.find((g) => g.key === k)
-      if (!g) continue
-      // 用占位 x 算出 g.w/g.h 后再覆盖为最终 cx 对齐的 x
-      placeGroup(g, 80, gy)
-      const finalX = Math.max(80, col.cx - g.w / 2)
-      placeGroup(g, finalX, gy)
-      stackGroups.push(g)
-      gy += g.h + STACK_GAP_Y
+  // 每个主设备收集其外挂辅助 → 组织成「服务通道」：直达主设备的 aux 为通道根，
+  // 其上游(aux→aux 回溯)纵向续在同一通道 —— 保证 供氧→鼓风机→热风炉→高炉 竖直短接。
+  const chainsOf = new Map()      // mainId -> [ [aux..], [aux..], ... ](根在前，越深越靠下)
+  const usedAux = new Set()
+  for (const m of mains) {
+    const mid = m.id
+    const list = ns.filter((a) => {
+      if (isMainN(a)) return false
+      const mt = anchor.get(a.id)
+      return !!mt && mt.mainId === mid
+    })
+    const roots = list.filter((a) => anchor.get(a.id).depth === 1)
+      .sort((a, b) => baseOrd.get(a.id) - baseOrd.get(b.id))
+    const chains = roots.map((r) => [r])
+    for (const r of roots) usedAux.add(r.id)
+    const deeper = list.filter((a) => anchor.get(a.id).depth > 1)
+      .sort((a, b) => {
+        const da = anchor.get(a.id).depth, db = anchor.get(b.id).depth
+        if (da !== db) return da - db
+        return baseOrd.get(a.id) - baseOrd.get(b.id)
+      })
+    for (const a of deeper) {
+      // 找该 aux 的 forward 目标：在**全部**正向连线里取第一条「目标已在本主设备
+      // 某条通道中」的连线 —— 不能只看第一条连线：同类合并后的节点(如全厂供氧系统)
+      // 首条出线可能指向别的目标(→铁水预处理)，按首条判定会误判为游离节点
+      let tgt = null
+      for (const c of cs) {
+        if (c.feedback || c.from !== a.id) continue
+        const v = byId.get(c.to)
+        if (v && chains.some((c2) => c2.some((x) => x.id === v.id))) { tgt = v; break }
+      }
+      const ch = chains.find((c2) => tgt && c2.some((x) => x.id === tgt.id))
+      if (ch) { ch.push(a); usedAux.add(a.id) }
     }
+    chainsOf.set(mid, chains)
   }
-  // 3) restGroups 走原「组外流式」排布(同原逻辑,仅在 restGroups 数组上)
-  const auxX0 = 80
-  const auxY0 = 100
-  const auxMaxW = AUX_TARGET_W
-  let gy = auxY0, lineH = 0, lineEnd = auxX0
-  for (const g of restGroups) {
-    placeGroup(g, auxX0, gy)
-    const prefX = Math.max(auxX0, Math.min(g.anchorX - g.w / 2, auxX0 + auxMaxW - g.w))
-    let rowEnd = lineEnd
-    if (prefX < rowEnd + GRP_GAP_X && rowEnd > auxX0) {
-      gy += lineH + GRP_GAP_Y
-      lineH = 0
-      rowEnd = auxX0
-    }
-    const finalX = Math.max(prefX, rowEnd + GRP_GAP_X)
-    placeGroup(g, finalX, gy)
-    lineEnd = finalX + g.w
-    lineH = Math.max(lineH, g.h)
-  }
-  // 合并回 auxGroups 供后续 subFrames / bounds 使用;顺序 rest 在前(展示用),stack 在后(主带下方)
-  auxGroups.length = 0
-  auxGroups.push(...restGroups, ...stackGroups)
-  // 展平二级子框（多类型组才有），模板据此画「组中组」虚线框
-  const sf = []
-  for (const g of auxGroups) for (const s of g.subs || []) sf.push({ kid: `${g.key}--${s.type}`, label: s.label, count: s.count, x: s.x, y: s.y, w: s.w, h: s.h })
-  subFrames.value = sf
 
-  // 计算包围盒（主卡 ∪ 辅助组框），保证「适配」后全部框与连线可见
-  // 矩形化：外框强制为 (80,100) → (mainRight, max(主底, 辅底)) 的矩形，主+辅合起来填满画布。
-  const rectL = 80
-  const rectT = 100
-  const rectR = mainNodes.length ? Math.max(...mainNodes.map((n) => n.x + boxW(n))) : 1200
-  const mainBotY = mainBottom != null ? mainBottom : 0
-  // 逆向连线数（估算返回通道占用高度）
+  // —— B2) 独立下挂链抽取(2026-09-09 用户需求：喷吹系统放到高炉下面) ——
+  // 高炉默认 top 上挂送风簇，但其中 root=injector 的喷吹链要求单独挂在高炉正下方，
+  // 与三套「热风炉→鼓风机→供氧」送风链分开摆放 —— 抽出的链进 bottomOf[mainId]，
+  // placeMainAux 时先在其主设备下方单独排布。
+  const bottomOf = new Map()
+  for (const m of mains) {
+    const chains = chainsOf.get(m.id) || []
+    const bChains = []
+    const tChains = []
+    for (const ch of chains) {
+      if (ch[0] && ch[0].type === 'injector') bChains.push(ch)
+      else tChains.push(ch)
+    }
+    if (bChains.length) bottomOf.set(m.id, bChains)
+    if (tChains.length !== chains.length) chainsOf.set(m.id, tChains)
+  }
+  const orphans = ns.filter((a) => !isMainN(a) && !usedAux.has(a.id))
+    .sort((a, b) => baseOrd.get(a.id) - baseOrd.get(b.id))
+
+  // —— C) 坐标：源列主源自上而下竖排；下游主列顶对齐同一条「主链行」向右推进 ——
+  // 外挂方位(2026-09-09 微调)：
+  //   'bottom' 默认：簇在主设备下方竖直续链(供氧系统/供氧系统2 等)
+  //   'left'   ：引风机 放在主源(烧结机/球团)左侧并排 —— 不再占源列纵向空间
+  //   'top'    ：高炉送风簇放在高炉上方，簇内自下而上 depth 升序(热风炉→鼓风机→供氧)，
+  //              即 供氧系统(顶)→鼓风机(中)→热风炉(底,贴高炉) 竖直短接
+  const AUX_SIDE = { sinter_plant: 'left', pelletizing: 'left', blast_furnace: 'top' }
+  const sideOf = (m) => AUX_SIDE[m.type] || 'bottom'
+  // —— 手工落位干预(2026-09-11 用户需求) ——
+  // 卡片要贴在管道旁，几处设备贴得太紧、缝隙塞不下卡片，按用户指定位置手工挪开：
+  //   AUX_PIN  ：改挂到指定主设备的指定方位。被 pin 的辅助**仍留在原服务簇里参与占位
+  //              计算**(chainH/chainW 不变)，只是不执行自动落位 —— 否则簇高变化会连带
+  //              推动主链行中线，整幅图跟着位移。
+  //   AUX_SHIFT：在当前落位基础上做纯平移(单位 px)，用于「挪一点」这类微调。
+  //   AUX_PIN.alignRow：落位后再把**垂直中线**对齐到指定设备(同级辅助)，使两者之间的
+  //              横连成为一条直线；与 side:'top' 联用时 = 主设备正上方那一列 + 指定行。
+  const AUX_PIN = {
+    // 供氧系统原为高炉送风簇的共享型链根(挂鼓风机右侧)，改挂铁水预处理正上方：
+    // 它本来就直供预处理/转炉，落在这里三段连线都变短，也让出送风簇右侧的卡片位。
+    // alignRow:'blower' —— 纵向与鼓风机同排(两者盒高都是 140，行对齐即盒顶对齐)，
+    // 「供氧系统→鼓风机」的氧气线整段水平，不再先上折再左行。
+    oxy_supply: { main: 'hot_metal_pretreat', side: 'top', alignRow: 'blower' },
+  }
+  const AUX_SHIFT = {
+    injector: [0, 46],     // 喷吹系统：下移，让开高炉底部与「喷吹煤粉」卡片之间的横缝
+    id_fan: [-34, 0],      // 引风机：左移，拉开与烧结机左缘的间距，给「抽力」卡片腾位
+  }
+  const AUX_GAP = 16        // 主设备(边) → 外挂区首层净空
+  const LINK_GAP_Y = 14     // 服务通道内上下级辅助净空
+  const CHAIN_GX = 16       // 相邻服务通道横向净空
+  const chainW = (ch) => Math.max(0, ...ch.map((n) => boxW(n)))
+  const chainH = (ch) => ch.reduce((s, a, i) => s + boxH(a) + (i ? LINK_GAP_Y : 0), 0)
+  const auxSpanW = (chains) => {
+    if (!chains.length) return 0
+    return chains.reduce((s, ch) => s + chainW(ch), 0) + (chains.length - 1) * CHAIN_GX
+  }
+  const auxSpanH = (chains) => (chains.length ? Math.max(0, ...chains.map(chainH)) : 0)
+  const chainsOfM = (m) => chainsOf.get(m.id) || []
+  // 左挂簇宽(引风机类):主设备左缘向左让出的水平空间
+  const leftPadOf = (m) => (sideOf(m) === 'left' && chainsOfM(m).length
+    ? AUX_GAP + Math.max(0, ...chainsOfM(m).map(chainW)) : 0)
+  // 某台辅助直接服务的「主设备」集合 —— 同类合并后 供氧系统/引风机 会同时服务多台主设备，
+  // 这类「共享型」辅助的落位必须兼顾多个目标，不能只顺着自己那条服务链竖直叠放。
+  const mainTargetsOf = (a) => {
+    const s = new Set()
+    for (const c of cs) {
+      if (c.feedback || c.from !== a.id || !mset.has(c.to)) continue
+      s.add(c.to)
+    }
+    return [...s]
+  }
+  // 通道「横向伸出量」= 该通道内所有辅助服务到的最右主设备的**拓扑位置序**
+  // （列序号 × 1000 + 列内序号；-∞ 记最左）。用于同排横排时的左右次序：伸出越远的越靠右，
+  // 出线才不会被同排左侧邻居的节点盒挡住。
+  // 注意：这里必须用「拓扑序」而不是节点 x —— placeMainAux 在源列阶段就被调用，
+  // 右侧各列的主设备 x 此时尚未落位(是 undefined)，用 x 会算出 NaN、排序静默失效。
+  const colPosOf = new Map()
+  colMain.forEach((col, ci) => col.forEach((mm, ri) => colPosOf.set(mm.id, ci * 1000 + ri)))
+  const chainReachOf = (ch) => {
+    let r = -Infinity
+    for (const a of ch) {
+      for (const t of mainTargetsOf(a)) {
+        if (colPosOf.has(t)) r = Math.max(r, colPosOf.get(t))
+      }
+    }
+    return r
+  }
+  // 按方位摆放某台主设备的外挂簇(须在 m.x/m.y 确定后调用)
+  const placeMainAux = (m) => {
+    // 0) 独立下挂链(喷吹系统等抽出的特殊链)：先以主设备中心横排、挂在主设备底
+    const bch = bottomOf.get(m.id)
+    if (bch && bch.length) {
+      const center = m.x + boxW(m) / 2
+      let x0 = center - auxSpanW(bch) / 2
+      const rootY = m.y + boxH(m) + AUX_GAP
+      for (const ch of bch) {
+        const cw = chainW(ch)
+        const ccx = x0 + cw / 2
+        x0 += cw + CHAIN_GX
+        let yy = rootY
+        for (const a of ch) {
+          a.x = ccx - boxW(a) / 2
+          a.y = yy
+          yy += boxH(a) + LINK_GAP_Y
+        }
+      }
+    }
+    const chains = chainsOfM(m)
+    if (!chains.length) return
+    const side = sideOf(m)
+    if (side === 'left') {
+      // 引风机等:右缘贴主设备左缘、整簇垂直居中于主设备盒
+      const stackH = chains.reduce((s, ch) => s + chainH(ch), 0) + (chains.length - 1) * LINK_GAP_Y
+      let cy = m.y + (boxH(m) - stackH) / 2
+      for (const ch of chains) {
+        const cw = chainW(ch)
+        const x = m.x - AUX_GAP - cw
+        for (const a of ch) {
+          a.x = x + (cw - boxW(a)) / 2
+          a.y = cy
+          cy += boxH(a) + LINK_GAP_Y
+        }
+        cy -= LINK_GAP_Y                      // 撤销链尾多算的间距，链间仍留 LINK_GAP_Y
+      }
+      return
+    }
+    if (side === 'top') {
+      // 送风簇(高炉)：竖直叠链，自下而上 depth 升序(热风炉 底贴 主设备顶)。
+      // —— 轴对齐(2026-09-10)：整簇按**图形外接盒中心**对齐到主设备顶口的 x(见 axisX)，
+      //    而不是把「盒左缘」对齐主设备盒左缘。旧口径下 热风炉/鼓风机 的图形中心(x=735)
+      //    与高炉顶口夹取后的 x(= 高炉图形左缘+8 = 779) 相差 44px，导致 热风炉→高炉
+      //    每次都要先横挪一段再下落(小折角)。按轴对齐后 供氧→鼓风机→热风炉→高炉
+      //    三段竖连的 x 完全相同 → 全为直线。
+      const mr = figRect(m)
+      const axisX = Math.min(Math.max(mr.x + mr.w / 2, mr.x + 8), mr.x + mr.w - 8)
+      const botY = m.y - AUX_GAP
+      for (const ch of chains) {
+        // 链根(最深一级，如全厂供氧系统)若同时服务 ≥2 台**主设备**，它是「共享型」公用设备：
+        // 竖直叠在簇顶会让它的跨设备连线从画布顶部绕一整圈(供氧→转炉 曾达 1277px)。
+        // 改为挂在「下游节点」同一行的右侧 —— 跨设备连线变成「右行 + 下落」短折线，
+        // 与下游的横连也保持直线(同排对齐)。
+        const tail = ch[ch.length - 1]
+        const sideRoot = ch.length > 1 && mainTargetsOf(tail).length >= 2 ? tail : null
+        const col = sideRoot ? ch.slice(0, -1) : ch
+        let cyBot = botY
+        let right = -Infinity
+        for (const a of col) {
+          const b = devImgBox(a)
+          a.x = axisX - (b.x + b.w / 2)          // 图形中心落在竖直通道轴上
+          a.y = cyBot - boxH(a)
+          cyBot = a.y - LINK_GAP_Y
+          right = Math.max(right, a.x + boxW(a))
+        }
+        if (sideRoot && !AUX_PIN[sideRoot.type]) {
+          const down = col[col.length - 1]        // 链根的下一级(如鼓风机)
+          sideRoot.x = right + AUX_GAP
+          sideRoot.y = down.y + (boxH(down) - boxH(sideRoot)) / 2   // 同排 → 横连为直线
+        }
+      }
+      return
+    }
+    // bottom(默认):簇在主设备正下方以主设备中心横排，链内自上而下 depth 升序。
+    // 横排左→右按「目标伸出量」升序：服务目标越靠右的辅助越靠右放 —— 否则它向右的
+    // 出线会被同排左侧邻居的节点盒挡住，只能绕到底部车道再爬回目标(短流程 供氧系统
+    // →LF/RH 曾达 721/1133px、4 个折角；换序后降为 2 折角的直角折线)。
+    const ordered = [...chains].sort((p, q) => chainReachOf(p) - chainReachOf(q))
+    const center = m.x + boxW(m) / 2
+    let x0 = center - auxSpanW(ordered) / 2
+    const rootY = m.y + boxH(m) + AUX_GAP
+    for (const ch of ordered) {
+      const cw = chainW(ch)
+      const ccx = x0 + cw / 2
+      x0 += cw + CHAIN_GX
+      let yy = rootY
+      for (const a of ch) {
+        a.x = ccx - boxW(a) / 2
+        a.y = yy
+        yy += boxH(a) + LINK_GAP_Y
+      }
+    }
+  }
+  // 列宽 = 主设备(或 bottom/top 簇横宽) + 左挂让位；左挂簇不计入列宽(独占左侧让位)
+  const colW = colMain.map((col) => {
+    const padL = Math.max(0, ...col.map(leftPadOf))
+    const span = Math.max(0, ...col.map((m) => {
+      const bspan = auxSpanW(bottomOf.get(m.id) || [])
+      return Math.max(boxW(m), auxSpanW(chainsOfM(m)), bspan)
+    }))
+    return padL + span
+  })
+  const orphanColW = orphans.length ? Math.max(...orphans.map((n) => boxW(n))) : 0
+  if (orphanColW) colW.push(orphanColW)
+  const colX = []
+  let cx = 80
+  for (let i = 0; i < colW.length; i++) { colX.push(cx); cx += colW[i] + COL_GAP_X }
+
+  // 1) 源列(col0)：主源自上而下竖排(左挂引风机占主源左侧让位，不再撑高列)；bottom 挂才占纵向空间。
+  //    这里只算「各台相对源列起点的纵向偏移」(自身高度 + bottom 外挂 + 间距)，绝对 y 由第 3 步统一落位
+  //    —— 因为主链行中线与源列起点互相依赖（烧结机中线要落在主链行上），必须先解耦。
+  const srcCol = colMain[0]
+  const c0PadL = Math.max(0, ...srcCol.map(leftPadOf))
+  const srcOff = []
+  {
+    let acc = 0
+    for (let i = 0; i < srcCol.length; i++) {
+      srcOff.push(acc)
+      acc += boxH(srcCol[i])
+      if (sideOf(srcCol[i]) === 'bottom' && chainsOfM(srcCol[i]).length) acc += AUX_GAP + auxSpanH(chainsOfM(srcCol[i]))
+      if (i < srcCol.length - 1) acc += ROW_GAP_Y
+    }
+  }
+
+  // 2) 主链行 = 主链设备的**垂直中线**所在水平线 rowMid（2026-09-10 中线对齐改版）
+  //    背景：新图组里 高炉(1248×2887 比 0.43)/铁水预处理(812×1680 比 0.48)/DRI竖炉(比 0.42)
+  //    是极竖长图，只有加高节点盒才能把图形撑满；各盒高不再相同后，若仍按「盒顶对齐」，
+  //    各设备盒中心高低不一 → sideAnchorOf 取对端中心 y → 主带 R→L 连线两端 y 不等(dy≠0)，
+  //    会出现「stub + 竖爬段」台阶。改为按中心对齐：各主设备中心同高，主带连线严格水平。
+  //    三步定序：① 短流程源列锚 → ② 上挂簇顶约束 → ③ 长流程源列锚定（烧结机中线落行上）。
+  const anchorIdx = srcCol.findIndex((m) => m.type === 'sinter_plant')
+  const rowH = Math.max(...mains.map((m) => boxH(m)))   // 最高主设备盒（决定主链行中线的最低位置）
+  const midOf = (m) => boxH(m) / 2
+  let rowMid = TOP + rowH / 2
+  if (anchorIdx < 0) {
+    const fwdSrc = srcCol.filter((m) =>
+      cs.some((c) => !c.feedback && c.from === m.id && mset.has(c.from) && mset.has(c.to)))
+    if (fwdSrc.length === 1) {
+      const s = fwdSrc[0]
+      rowMid = TOP + srcOff[srcCol.indexOf(s)] + midOf(s)
+    } else if (fwdSrc.length > 1) {
+      const cys = fwdSrc.map((m) => TOP + srcOff[srcCol.indexOf(m)] + midOf(m))
+      rowMid = Math.max(TOP + rowH / 2, (Math.min(...cys) + Math.max(...cys)) / 2)
+    }
+  }
+  //    ② 上挂簇顶不得贴画布顶:主链行最高盒的盒顶至少让出 AUX_GAP + 簇深 + 顶部留白(30)
+  for (const m of mains) {
+    if (sideOf(m) !== 'top' || !chainsOfM(m).length) continue
+    rowMid = Math.max(rowMid, AUX_GAP + auxSpanH(chainsOfM(m)) + 30 + midOf(m))
+  }
+  //    ③ 源列锚定(长流程)：源列含烧结机时，让**烧结机的中线**落在主链行上(与高炉同高)，
+  //       烧结矿→高炉 走水平直连；源列整体下移、各台相对间距与次序不变。
+  //       源列起点会顶到 TOP(`want < TOP`)时**以对齐为准、把主链行一起下移**到
+  //       TOP + 源列偏移 —— 不能放弃对齐：送风簇层数变化会改变 rowMid(如 3 层→2 层)，
+  //       若此处让 rowMid 优先就会让烧结机与高炉差几像素、水平直连失效。
+  let srcY0 = TOP
+  if (anchorIdx >= 0) {
+    const sSinter = srcCol[anchorIdx]
+    const want = rowMid - midOf(sSinter) - srcOff[anchorIdx]
+    if (want >= TOP) srcY0 = want
+    rowMid = srcY0 + srcOff[anchorIdx] + midOf(sSinter)
+  }
+
+  // 3) 源列落位(绝对 y = 源列起点 + 相对偏移)
+  //    水平方向**在列内居中**（而非左对齐）：源列里原料设备盒宽不等（烧结机/球团 430、
+  //    焦炉 340），左对齐会让各台中心错开 45px —— 列内纵向流（焦炉→烧结机 焦炭回供）
+  //    会从"竖直线"退化成斜折线，源列右侧也参差不齐。
+  const c0Span = Math.max(...srcCol.map((m) => boxW(m)))
+  for (let i = 0; i < srcCol.length; i++) {
+    const m = srcCol[i]
+    m.x = colX[0] + c0PadL + (c0Span - boxW(m)) / 2
+    m.y = srcY0 + srcOff[i]
+    placeMainAux(m)
+  }
+
+  // 4) 其余列：每列一台主设备，**中线对齐**主链行(盒高不同也不会出现中心高差)；外挂簇按方位摆放
+  for (let ci = 1; ci < colMain.length; ci++) {
+    const m = colMain[ci][0]
+    m.x = colX[ci] + (colW[ci] - boxW(m)) / 2
+    m.y = Math.round(rowMid - midOf(m))
+    placeMainAux(m)
+  }
+  if (orphans.length) {
+    let yy = TOP
+    const ocx = colX[colW.length - 1] + orphanColW / 2
+    for (const a of orphans) { a.x = ocx - boxW(a) / 2; a.y = yy; yy += boxH(a) + ROW_GAP_Y }
+  }
+
+  // 5) 手工落位干预(2026-09-11 用户需求)：见上方 AUX_PIN/AUX_SHIFT 说明。
+  //    必须放在所有自动落位之后：这里只做最终覆写，不参与列宽/簇高的解算。
+  for (const a of ns) {
+    const pin = AUX_PIN[a.type]
+    if (pin) {
+      const t = mains.find((m) => m.type === pin.main)
+      if (t) {
+        const b = devImgBox(a)                    // 图形外接盒(含图内偏移)，用于轴对齐
+        if (pin.side === 'top' || pin.side === 'bottom') {
+          const tr = figRect(t)
+          const axisX = Math.min(Math.max(tr.x + tr.w / 2, tr.x + 8), tr.x + tr.w - 8)
+          a.x = Math.round(axisX - (b.x + b.w / 2))
+          a.y = Math.round(pin.side === 'top' ? t.y - AUX_GAP - boxH(a) : t.y + boxH(t) + AUX_GAP)
+          // 指定行对齐：与同级设备垂直中线等高 —— 行对齐后两者横连即为直线
+          const rowDev = pin.alignRow ? ns.find((n) => n.type === pin.alignRow) : null
+          if (rowDev) a.y = Math.round(rowDev.y + (boxH(rowDev) - boxH(a)) / 2)
+        } else {
+          a.x = Math.round(pin.side === 'left' ? t.x - AUX_GAP - boxW(a) : t.x + boxW(t) + AUX_GAP)
+          a.y = Math.round(t.y + (boxH(t) - boxH(a)) / 2)
+        }
+      }
+    }
+    const sh = AUX_SHIFT[a.type]
+    if (sh) { a.x += sh[0]; a.y += sh[1] }
+  }
+
+  // —— D) 主带 = 全部设备包围盒(路由走廊基准) ——
+  if (ns.length) {
+    mainBand.value = {
+      l: Math.min(...ns.map((n) => n.x)),
+      r: Math.max(...ns.map((n) => n.x + boxW(n))),
+      top: Math.min(...ns.map((n) => n.y)),
+      bot: Math.max(...ns.map((n) => n.y + boxH(n))),
+    }
+  }
+
+  // —— E) 显示连线：与 scheme 一一对应，剔除端点缺失的脏连线 ——
+  const dcs = []
+  for (const c of cs) {
+    if (!byId.has(c.from) || !byId.has(c.to)) continue
+    dcs.push({ id: c.id, from: c.from, fromPort: c.fromPort, to: c.to, toPort: c.toPort, material: c.material, feedback: !!c.feedback })
+  }
+
+  // —— F) 包围盒：内容区 + 回流车道预留，保证「适配」后全部可见 ——
+  const rectL = ns.length ? Math.min(80, ...ns.map((n) => n.x)) : 80
+  const rectT = ns.length ? Math.min(TOP, ...ns.map((n) => n.y)) : TOP
+  const rectR = ns.length ? Math.max(...ns.map((n) => n.x + boxW(n))) : 1200
+  const rectB = ns.length ? Math.max(...ns.map((n) => n.y + boxH(n))) : 400
   let bwdN = 0
   for (const c of cs) {
-    const f = ns.find((n) => n.id === c.from)
-    const t = ns.find((n) => n.id === c.to)
+    if (!c.feedback) continue
+    const f = byId.get(c.from), t = byId.get(c.to)
     if (!f || !t) continue
     if ((f.x + boxW(f) - 13) - (t.x + 13) > FWD_TOL) bwdN++
   }
-  const frameBottom = auxGroups.length ? Math.max(...auxGroups.map((g) => g.y + g.h)) : 0
-  const rectB = Math.max(mainBotY, frameBottom)
   const floor = rectB + 26 + bwdN * LANE_STEP + 20
   const pad = PAD
   bounds.value = { x: rectL - pad, y: rectT - pad, w: rectR - rectL + pad * 2, h: Math.max(rectB, floor) - rectT + pad * 2 }
   nodes.value = ns
-  groups.value = auxGroups
-  conns.value = rewriteConnTopology(ns, cs)
+  conns.value = dcs
   nextTick(fitAll)
 }
 
@@ -447,132 +744,38 @@ function boxH(n) {
   const cnt = Math.max(
     (n.ports && n.ports.in ? n.ports.in.length : 0),
     (n.ports && n.ports.out ? n.ports.out.length : 0), 1)
-  // 端口扩展间距 12（原 24）：主工艺端口位置已全部由 T2D_INOUT 图标坐标决定（portPos
-  // 走 anc 分支），此扩展只对 portY 均布兜底的设备生效；间距过大会把高炉(9 入口)撑到
-  // 304 高、破坏主工艺统一尺寸(330×230 → 246)，收紧后全部回落统一高度。
+  // 端口扩展间距 12：多入口设备（如高炉）仅按端口数保守补高，防止顶部名称/
+  // 底部 KPI 与密集入口互压；实际统一尺寸仍以 T2D_GEOM 高度为准（端口数扩展几乎不触发）。
   const h = Math.max(g.h, 96 + (cnt - 1) * 12)
   return isMain(n) ? h + KPI_H : h
 }
-// 端口纵向：在节点腰部带内均布（顶部名称之下、底部 KPI/留白之上）
-function portY(n, dir, i) {
-  const arr = (n.ports && n.ports[dir]) || []
-  const cnt = Math.max(arr.length, 1)
-  const H = boxH(n)
-  const top = 30
-  const bot = H - (isMain(n) ? 50 : 16)
-  const span = Math.max(24, bot - top)
-  return top + (i + 0.5) * (span / cnt)
-}
 
-// —— 连接拓扑按位置重映射 ————————————————————————
-//
-// store.scheme.connections 的 from/to 是「具体实例 id」(oxy_supply_1 / 鼓风机3 等),
-// 它是按工艺树手工写死的。但 2D 视图的矩形布局里我们把同一组(`oxy_supply`,`blower` ...)
-// 的多台设备「贴左下角矩形铺开」，物理位置与「原来从属哪个主设备」不再对应 ——
-// 例如「供氧系统 1」原本从属转炉，但在新布局里它被塞到了离「鼓风机 3」很近的位置，
-// 此时仍按 store 把 from=供氧1 to=转炉 画出来，就会出线从左下角一路折回到右上主行，
-// 主↔辅连线大弯。
-//
-// 这里的策略是：**2D 视图渲染时,只重写 conn 里「辅助」那一端的设备引用** ——
-// 对每条 conn，取其 from/to 中「是辅助」的那个端,改指到「与对端主设备位置最近、且
-// 已被引用次数最少的同 type 设备」。
-// - 主设备端不改（保持工艺拓扑稳定）。
-// - 设备本身(id/image/label)不变 —— 只换「连线接哪台」。
-// - 不会污染 store：conns.value 是 relayout 内部副本，store 仍按原拓扑供 3D/引擎用。
-// - 平衡分配：`ref` 计数约束,后到的 conn 不全扎堆最近那台,允许次近距离替补。
-//
-// 编号语义锁定：这些辅助类型在 SCHEME_AUX 中显式指定了「第几台服务谁」
-// (如 供氧系统1/2/3→鼓风机1/2/3、供氧系统4→铁水预处理、供氧系统5→转炉)，
-// 2D 渲染不再就近重排,严格按 store 拓扑显示(保证图上编号对应与数据语义一致)。
-const LOCKED_AUX = ['oxy_supply']
-function rewriteConnTopology(ns, cs) {
-  const allById = new Map()
-  const poolByType = new Map()
-  for (const n of ns) {
-    allById.set(n.id, n)
-    if (isMain(n)) continue
-    if (!poolByType.has(n.type)) poolByType.set(n.type, [])
-    poolByType.get(n.type).push({
-      id: n.id,
-      cx: n.x + boxW(n) / 2,
-      cy: n.y + boxH(n) / 2,
-      ref: 0,
-    })
+// 连线端点锚定（2026-09-09 用户约束改版）：不强制按端口模板固定进出侧（旧规「出必右、
+// 入必左/上/下」已废弃）。连线两端一律按「对端盒中心相对自身中心的主导轴」在 上/下/左/右
+// 四侧中自动贴边 —— 分层列内同列上下相邻的纵向流自然走上(T)下(B)，横向邻接流走 左(L)右(R)。
+// 锚点取对端中心在该边上的投影并夹取到边内可用区间：
+//   - L/R 边 y ∈ 名称带之下 ~ 底边之上（主设备 30..H-40；辅助设备 24..H-16）；
+//   - T/B 边 x ∈ 盒缘内 8..W-8（避开四角与名称浮签居中区）。
+// （2026-09-11 按用户要求回退：曾试过「L/R 夹到图形盒内缩 22%、T/B 按设备轮廓剖面吸附
+//   端点」，但轮廓剖面会在设备带支架/附件的一侧把端点拉到很低处（如 供氧→转炉 落到
+//   76% 高度、引风机→球团 落到 48%），观感反而不如贴盒缘，故恢复为上述口径。）
+function sideAnchorOf(n, peer) {
+  const W = boxW(n), H = boxH(n)
+  const cx = n.x + W / 2, cy = n.y + H / 2
+  const px = peer.x + boxW(peer) / 2, py = peer.y + boxH(peer) / 2
+  const nx = (px - cx) / (W / 2), ny = (py - cy) / (H / 2)
+  const side = Math.abs(ny) >= Math.abs(nx) ? (ny >= 0 ? 'B' : 'T') : (nx >= 0 ? 'R' : 'L')
+  // 贴边坐标取「设备图形外接盒」(figRect)：有 PNG 图时已裁掉透明留白，
+  // 连线端点落在设备本体边缘而非节点盒缘 —— 消除留白造成的设备↔管线空隙。
+  const r = figRect(n)
+  if (side === 'T' || side === 'B') {
+    const x = Math.min(Math.max(px, r.x + 8), r.x + r.w - 8)
+    return { x, y: side === 'T' ? r.y : r.y + r.h, side }
   }
-  const csOut = []
-  for (const c of cs) {
-    const c2 = { ...c }
-    for (const end of ['from', 'to']) {
-      const oldN = allById.get(c2[end])
-      const peerKey = end === 'from' ? 'to' : 'from'
-      const peer = allById.get(c2[peerKey])
-      if (!oldN || isMain(oldN) || !peer) continue
-      if (LOCKED_AUX.includes(oldN.type)) continue // 编号锁定：该辅助端保持 store 指定,不就近重排
-      const pool = poolByType.get(oldN.type) || []
-      if (pool.length < 2) continue // 单台：没有备选,不浪费重算
-      const bx = peer.x + boxW(peer) / 2
-      const by = peer.y + boxH(peer) / 2
-      // 选「ref 最小、距离最近」的候选;ref 越小越优先(均摊),距离越小越优先
-      let best = null
-      let bestRef = Infinity
-      let bestDist = Infinity
-      for (const cand of pool) {
-        const d = Math.hypot(cand.cx - bx, cand.cy - by)
-        if (cand.ref < bestRef || (cand.ref === bestRef && d < bestDist)) {
-          best = cand
-          bestRef = cand.ref
-          bestDist = d
-        }
-      }
-      // 当前 from/to 已经是最优邻位：不重排,但同样要记一次引用(ref++)——
-      // 否则该设备被占用却不计数,后续 conn 会把它误当「空闲最近台」抢走,
-      // 造成一台设备被多个不同主目标争用、连线反而变长。
-      const cur = pool.find((c3) => c3.id === c2[end])
-      if (cur && cur.id === best.id) { cur.ref++; continue }
-      // 防自环：from/to 分属不同 type 池理论上不会同指,但防御性兜底——
-      // 若改后两端变成同一台设备,回退本次改写。
-      const prevEnd = c2[end]
-      c2[end] = best.id
-      if (c2.from === c2.to) { c2[end] = prevEnd }
-      else {
-        best.ref++
-        // 端口 id 是 per-instance uid,旧设备的端口在新设备的 ports[] 里 findIndex === -1
-        // → portPos 会走 fallback 把所有改写线都画到「右/左边的第一个端口」(顶槽),5 条
-        // 氧气线从同一开口出来,视觉重叠。同步把 fromPort/toPort 换成「同 material 的端口」,
-        // 让新设备按物料语义打开对应端口,5 条氧气线分散到不同端口开口。
-        const dir = end === 'from' ? 'out' : 'in'
-        const newN = allById.get(c2[end])
-        if (newN && newN.ports && newN.ports[dir]) {
-          const port = newN.ports[dir].find((p) => p.material === c.material)
-          if (port) c2[end + 'Port'] = port.id
-        }
-      }
-    }
-    csOut.push(c2)
-  }
-  return csOut
-}
-
-// 端口锚点：按行业入料特点，把端口放到设备图符上真实的入/出口位置（T2D_INOUT），
-// 下标缺失时回退到「图幅左右均布」的旧行为（保证未知设备仍可渲染）。
-function portPos(n, dir, portId) {
-  const arr = (n.ports && n.ports[dir]) || []
-  const i = arr.findIndex((p) => p.id === portId)
-  const def = T2D_INOUT[n.type] && T2D_INOUT[n.type][dir]
-  const anc = def && def[i]
-  if (anc) {
-    const fo = figOf(n)
-    return {
-      x: n.x + fo.x + anc.cx * fo.s,
-      y: n.y + fo.y + anc.cy * fo.s,
-      side: anc.side,
-    }
-  }
-  return {
-    x: dir === 'in' ? n.x + 13 : n.x + boxW(n) - 13,
-    y: n.y + portY(n, dir, Math.max(i, 0)),
-    side: dir === 'in' ? 'L' : 'R',
-  }
+  const main = isMain(n)
+  const yTop = n.y + (main ? 30 : 24)
+  const yBot = n.y + H - (main ? 40 : 16)
+  return { x: side === 'L' ? r.x : r.x + r.w, y: Math.min(Math.max(py, yTop), yBot), side }
 }
 // 图符绘制区：从名称带(24)到图带底(主工艺留出 KPI、辅助留出底部留白)，等比 contain 居中。
 function figOf(n) {
@@ -599,28 +802,74 @@ function iconOf(t) { return T2D_ICONS[t] || T2D_ICONS.default }
 const BASE = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '')
 const IMG_DIR = BASE + '/2D-image/devices/'
 const IMG_SET = new Set(DEV_IMG_NAMES)   // 构建期固化的「已存在图片名」集合，同步可用
-function devImgOf(n) {
+// 图片匹配键：设备名 → 去序号名 → 类型中文名 → type（返回文件名 key，未命中 null）
+function devImgKeyOf(n) {
   const nm = (n.name || '').trim()
-  if (nm && IMG_SET.has(nm + '.png')) return IMG_DIR + encodeURIComponent(nm) + '.png'
+  if (nm && IMG_SET.has(nm + '.png')) return nm
   // 实例名去掉末尾序号（热风炉1 → 热风炉）：多台同类型实例共享「类型图」如 热风炉.png
   const base = nm.replace(/\s*\d+$/, '')
-  if (base && base !== nm && IMG_SET.has(base + '.png')) return IMG_DIR + encodeURIComponent(base) + '.png'
+  if (base && base !== nm && IMG_SET.has(base + '.png')) return base
   // 类型中文名兜底：节点被重命名（如「热风炉1」→「1号炉」）时仍能命中 热风炉.png
   const tl = PROCESS_MAP[n.type] && PROCESS_MAP[n.type].label
-  if (tl && IMG_SET.has(tl + '.png')) return IMG_DIR + encodeURIComponent(tl) + '.png'
-  if (n.type && IMG_SET.has(n.type + '.png')) return IMG_DIR + n.type + '.png'
+  if (tl && IMG_SET.has(tl + '.png')) return tl
+  if (n.type && IMG_SET.has(n.type + '.png')) return n.type
   return null
 }
-// 设备 PNG 显示盒：铺满节点「名称下方 → KPI/底部上方」的可用图带（等比 contain 居中）；
-// 宽向外扩 10%（主设备行间距大，溢出不碰相邻盒），高度方向收在 KPI 之上，主体比原归一框大得多。
+function devImgOf(n) {
+  const k = devImgKeyOf(n)
+  return k ? IMG_DIR + encodeURIComponent(k) + '.png' : null
+}
+// 图形真实边界（原图像素坐标 {W,H,bx,by,bw,bh}）：由 PNG alpha 外接矩形离线解析得到。
+// 透明背景素材的设备本体不铺满画布（热风炉仅占 46%、铁水预处理 50%…），必须按边界裁剪显示，
+// 否则透明留白会被当成图形的一部分，把设备挤小并与连线端点脱开。
+function devImgMetaOf(n) {
+  const k = devImgKeyOf(n)
+  return (k && DEV_IMG_META && DEV_IMG_META[k]) || null
+}
+// 设备 PNG 显示盒（节点局部坐标）：以「图形真实边界」的宽高比等比 contain 到图带
+// （名称带下方 → KPI/底部上方）。返回的 x/y/w/h 即图形边界在节点内的位置 ——
+// 连线端点直接贴该盒四缘（见 figRect/sideAnchorOf），设备本体与管线严丝合缝。
+// 无边界元数据（新增图片未重跑脚本）时回退旧口径：整图 contain。
+// —— 面积归一化(2026-09-10 新图组改版)：新图内容宽高比差异极大(0.43 竖长 ~ 2.4 扁长)，
+// 旧「先撑宽→限高」会把竖长设备压成 80px 细条、与横长设备(占满 275px 宽)大小悬殊。
+// 改为按「目标视觉面积」归一：显示盒面积 = 图带面积 × sc²，等比缩放后 clamp 到图带内
+// —— 中等比例设备两维都更饱满，极端比例设备由图片形状决定(竖图撑满高、横图撑满宽)。
 function devImgBox(n) {
   const W = boxW(n), H = boxH(n)
   const main = isMain(n)
-  const top = 30
-  const bot = H - (main ? 40 : 12)
-  const aw = (W - 6) * 1.1
-  const ah = Math.max(24, bot - top)
-  return { x: (W - aw) / 2, y: top, w: aw, h: ah }
+  const top = 24
+  const bot = H - (main ? 26 : 10)
+  const availH = Math.max(24, bot - top)
+  const availW = Math.max(24, W - 6)
+  const sc = T2D_IMG_SCALE[n.type] || 1
+  const m = devImgMetaOf(n)
+  if (!m) {
+    const aw = availW * sc
+    const ah = availH * sc
+    return { x: (W - aw) / 2, y: top + (availH - ah) / 2, w: aw, h: ah }
+  }
+  const ar = m.bw / m.bh
+  const s = sc * Math.sqrt((availW * availH) / (m.bw * m.bh))
+  let aw = m.bw * s
+  let ah = m.bh * s
+  if (aw > availW) { aw = availW; ah = aw / ar }
+  if (ah > availH) { ah = availH; aw = ah * ar }
+  return { x: (W - aw) / 2, y: top + (availH - ah) / 2, w: aw, h: ah }
+}
+// 设备「图形外接盒」(绝对坐标)：有 PNG 图时取图形边界盒（已裁掉透明留白），
+// 无图时回退节点盒。连线端点/障碍判定以此为准，保证端点贴在设备本体边缘。
+function figRect(n) {
+  if (!devImgOf(n)) return { x: n.x, y: n.y, w: boxW(n), h: boxH(n) }
+  const b = devImgBox(n)
+  return { x: n.x + b.x, y: n.y + b.y, w: b.w, h: b.h }
+}
+// 名称浮签的纵向位置（节点内坐标）：紧贴「设备图形外接盒」上缘 8px。
+// 原为固定 y=18 —— 对图形盒垂直居中且偏下的扁长图（烧结机 4.2:1、球团 3.0:1、热轧机 2.2:1）
+// 图形盒上缘离节点顶很远，名称会浮在图形上方几十像素的空白里（烧结机曾达 86px），
+// 看起来像贴着上一台设备。改为跟随图形盒后，所有设备的「名称→设备」间距一致。
+function nameY(n) {
+  const rel = figRect(n).y - n.y
+  return Math.max(14, Math.round(rel - 8))
 }
 
 // 端口外接点：把端口沿 side 方向向外推 STUB，得到 stub 的外端点（折线从此开始/结束）
@@ -635,6 +884,16 @@ function stubPoint(p, side) {
 }
 function portColor(m) { return (MATERIAL_MAP[m] || {}).color || '#8a97a5' }
 function matName(m) { return (MATERIAL_MAP[m] || {}).name || m }
+// 颜色加深（箭头用）：RGB 等比例缩放 → 保持同一色系，只把明度压暗。
+// k < 1 越深。比 HSL 往返转换更短，对物料色这种中等明度的色板足够自然。
+function shade(hex, k) {
+  const h = String(hex).replace('#', '')
+  const v = [0, 2, 4].map((i) => {
+    const x = Math.round(parseInt(h.slice(i, i + 2), 16) * k)
+    return Math.max(0, Math.min(255, x)).toString(16).padStart(2, '0')
+  })
+  return '#' + v.join('')
+}
 
 function unitOf(n) {
   const units = store.resultForView && store.resultForView.units ? store.resultForView.units : []
@@ -643,25 +902,24 @@ function unitOf(n) {
 function isSel(n) { return store.selectedUnitId === n.id || store.selectedFlowId === n.id }
 
 // —— 管线正交路径(工业流程图) ——
-// 出入口口径(用户约束)：设备「左/上/下 = 输入端、右 = 输出端」，T2D_INOUT 已按此落位；
+// 端点口径(2026-09-09 用户约束改版)：连线端不再按设备 in/out 端口模板固定进出侧，
+// 一律按「对端方位」自动贴 上/下/左/右 侧（见 sideAnchorOf）。
 // 路由原则：每条线尽量「少转折、每段笔直」，杜绝网格锯齿(旧 A* 兜底会拉出一串 10px 小台阶，
 // 视觉上像“波动”)。做法：
-//   1) 先试直连 H-then-V / 纵向主链折返(_foldChain)；
+//   1) 先试直连 H-then-V（同目标同侧多线各自走独立「入口接近列」，不共线）；
 //   2) 若穿第三方设备框，枚举「候选走廊」(直连高度 / 主行顶上方走廊 / 主行底下方车道 /
 //      源组/目标组顶底空带) ×「候选竖列」(源口列 / 源组右缘外 / 主带左右外侧 / 目标左右外)，
 //      用穿盒检测过滤，取「不穿任何设备框」中路径最短者 → 每段都是长直段；
 //   3) 极端兜底走主带顶大走廊，几乎不会进入。
-// 共享端口(同口多线)在端口处按 ±k*14 错开，保持束状整齐。
+// 端点重叠(同节点同侧同坐标)沿边按 ±k*14 错开，保持束状整齐。
 const FWD_TOL = 100
 const LINE_STEP = 14
+const BUS_GAP = 30  // 母线带离源组盒底的间距（>STUB 让竖直段明显、便于看清箭头从源出发的路径）
 const LANE_STEP = 16
-const STUB = 16
+const STUB = 8   // 端口引线长度：端口已贴设备图缘，stub 只需短引段把箭头/线头送到图缘外即可
 const UPPER_GAP = 22
 const OBST_PAD = 4
 
-function _grpOf(id) {
-  return groups.value.find((g) => g.items && g.items.some((n) => n.id === id))
-}
 function _dedupe(pts) {
   const o = [pts[0]]
   for (let i = 1; i < pts.length; i++) { const p = pts[i], q = o[o.length - 1]; if (p.x !== q.x || p.y !== q.y) o.push(p) }
@@ -713,6 +971,21 @@ function _crossCount(pts, obs) {
   }
   return n
 }
+// 单线端点手工修正表(2026-09-11 用户需求)：只改列出的连线端点，其它连线维持 sideAnchorOf。
+// 键 = 'fromType>toType:material'（与 CARD_PIN 同口径）；from/to 指定该端「贴 figRect 的某侧」：
+//   R/L：x = 图形该侧缘，y = 对端中心 y 夹取到「图形纵区间」内（不再用节点盒区间 ——
+//        节点盒含名称带/KPI 带比图形大，供氧→转炉源端曾因此悬到图形下方留白 9px）；
+//   T/B：y = 图形该侧缘，x = 图形横向中点。
+//   dx/dy：在贴边结果上再平移（如转炉图形盒顶缘仅氧枪尖(中心右 +10)是实心，角上是透明留白）。
+const ENDPOINT_PIN = {
+  'oxy_supply>bof:oxygen': { from: { side: 'R' }, to: { side: 'T', dx: 10 } },
+}
+function _figSideAnchor(n, peer, side, dx = 0, dy = 0) {
+  const r = figRect(n)
+  if (side === 'T' || side === 'B') return { x: r.x + r.w / 2 + dx, y: (side === 'T' ? r.y : r.y + r.h) + dy, side }
+  const py = peer.y + boxH(peer) / 2
+  return { x: (side === 'L' ? r.x : r.x + r.w) + dx, y: Math.min(Math.max(py, r.y + 4), r.y + r.h - 4) + dy, side }
+}
 function _lineRoutes() {
   const mainTop = mainBand.value.top, mainBot = mainBand.value.bot
   const list = []
@@ -720,48 +993,135 @@ function _lineRoutes() {
     const f = nodes.value.find((n) => n.id === c.from)
     const t = nodes.value.find((n) => n.id === c.to)
     if (!f || !t) continue
-    const p1 = portPos(f, 'out', c.fromPort)
-    const p2 = portPos(t, 'in', c.toPort)
+    // 端点一律按「对端方位」自动贴边(上/下/左/右 四侧)，不区分固定 in/out 端口侧
+    let p1 = sideAnchorOf(f, t)
+    let p2 = sideAnchorOf(t, f)
+    // 单线修正：仅 ENDPOINT_PIN 命中的连线覆盖端点（见上方注释）
+    const ep = ENDPOINT_PIN[`${f.repType || f.type}>${t.repType || t.type}:${c.material}`]
+    if (ep) {
+      if (ep.from) p1 = _figSideAnchor(f, t, ep.from.side, ep.from.dx, ep.from.dy)
+      if (ep.to) p2 = _figSideAnchor(t, f, ep.to.side, ep.to.dx, ep.to.dy)
+    }
     list.push({ c, p1, p2, f, t })
   }
-  // 同源同口 / 同目标同口的多线在端口处错开（保持束状、不叠线）
+  // 端点错开：同一节点同一侧「落点坐标相同」的多线在沿边方向错开 ±k*LINE_STEP。
+  // 旧「同端口 id」分组已无意义 —— 几何锚定后，(节点,侧,沿边坐标) 相同即视觉完全共线。
+  const coordOf = (p) => (p.side === 'L' || p.side === 'R' ? Math.round(p.y) : Math.round(p.x))
   const srcSt = {}
   {
     const m = {}
-    for (const r of list) { const k = r.c.from + '|' + r.c.fromPort; (m[k] = m[k] || []).push(r) }
-    for (const arr of Object.values(m)) arr.forEach((r, i) => {
-      if (arr.length > 1) srcSt[r.c.id] = (i - (arr.length - 1) / 2) * LINE_STEP
-    })
+    for (const r of list) {
+      const k = r.f.id + '|' + r.p1.side + '|' + coordOf(r.p1)
+      ;(m[k] = m[k] || []).push(r)
+    }
+    // 同源同侧多线的错开位：按「目标距离」**降序**分配 —— 最远的目标拿最靠外的口，
+    // 近目标先拐入自己的目标竖列，远目标的横段从近目标竖段的**外侧**越过(不横穿)。
+    // 距离按出口轴向取(R/L 比横距,T/B 比纵距)；「外侧」的方位见 outwardOf。
+    const distOf = (r) => (r.p1.side === 'L' || r.p1.side === 'R'
+      ? Math.abs(r.p2.x - r.p1.x) : Math.abs(r.p2.y - r.p1.y))
+    // 错开方向：以「最外侧口」在**目标一侧的反方向**为准 —— 远目标的横段必须从近目标
+    // 竖段的「外侧」越过，才不会横穿近目标那段竖直。出口轴为横(R/L)时垂直向是 y：
+    // 目标在下方(y 增大) → 外侧是上方，远目标取更小的 y；目标在上方 → 外侧是下方，
+    // 远目标取更大的 y。出口轴为纵(T/B)时同理用 x 判定(左右)。
+    // 若只按「远目标取上方」写死：短流程 供氧→LF/RH(目标在上方)会把远目标 RH 顶到靠近
+    // 目标口的一侧，其横段必穿近目标 LF 的竖爬段(实测交点 555,789)。
+    const outwardOf = (arr) => {
+      const side = arr[0].p1.side
+      let sum = 0
+      for (const r of arr) sum += side === 'L' || side === 'R' ? r.p2.y - r.p1.y : r.p2.x - r.p1.x
+      return sum >= 0 ? 1 : -1
+    }
+    for (const arr of Object.values(m)) if (arr.length > 1) {
+      const sorted = [...arr].sort((a, b) => distOf(b) - distOf(a))
+      const outward = outwardOf(arr)
+      sorted.forEach((r, i) => { srcSt[r.c.id] = outward * (i - (sorted.length - 1) / 2) * LINE_STEP })
+    }
   }
   const dstOff = {}
   {
     const m = {}
-    for (const r of list) { const k = r.c.to + '|' + r.c.toPort; (m[k] = m[k] || []).push(r) }
-    for (const arr of Object.values(m)) arr.forEach((r, i) => {
-      if (arr.length > 1) dstOff[r.c.id] = (i - (arr.length - 1) / 2) * LINE_STEP
+    for (const r of list) {
+      const k = r.t.id + '|' + r.p2.side + '|' + coordOf(r.p2)
+      ;(m[k] = m[k] || []).push(r)
+    }
+    for (const arr of Object.values(m)) if (arr.length > 1) arr.forEach((r, i) => {
+      dstOff[r.c.id] = (i - (arr.length - 1) / 2) * LINE_STEP
     })
   }
   // —— 共享目标端口的多源「母线汇流」预解析 ——
-  // 条件：同 (to,toPort)、源同属一辅助组、源 out 口 y 相同、≥2 条 conn。
-  // 几何：支线沿各自槽竖上到「母线带 yBus」(组顶 -16),首尾相接汇入下一源槽；
-  // 最后一条（干线）从最右源槽在 yBus 横跨到端口 stub x,再沿 L 槽入端口。
-  // 收益：热风炉1/2/3 共用一根热风总管进风口带,避免画面 3 个独立 stub。
+  // 目标：三台热风炉 → 高炉(同一 hot_blast 入口)不再画 3 条平行入线，合并为
+  // 「母线带 + 支线逐级横接 + 干线单线入端口」一条热风总管。
+  // 分组：同 (to,toPort) 且 ≥2 条 conn。
+  // 走向：以「目标中心相对源组包围盒中心」的主导轴判定母线带方位(不再依赖各源
+  //   sideAnchorOf 的原出口侧 —— top 簇中超出目标盒范围的源会被判成 L/R 而破坏同侧
+  //   假设，这是旧实现「母线不合并」的根因)：
+  //   - 目标在源组下方(B)：全部源口强制 B(盒底)出、母线带在源组底外 STUB、
+  //     目标口强制 T(顶)入 —— 支线各从源底竖下 8px 到带、横接下一条源槽，
+  //     最后一条(干线)沿带横到目标顶口竖落 8px 进盒；
+  //   - 目标在源组右方(R)：源口强制 R(盒右)出、母线带在源组顶上方(旧位)，
+  //     目标口维持 sideAnchorOf 结果 —— 兼容旧横排布局。
+  // 收益：热风炉1/2/3 共用一根热风总管进风口带，避免画面 3 个独立 stub/3 条平行入线。
   const busData = new Map()
   {
     const m = {}
     for (const r of list) { const k = r.c.to + '|' + r.c.toPort; (m[k] = m[k] || []).push(r) }
     for (const arr of Object.values(m)) {
       if (arr.length < 2) continue
-      const y0 = arr[0].p1.y
-      if (!arr.every((r) => (r.p1.side || 'R') === 'R' && Math.abs(r.p1.y - y0) < 0.5)) continue
-      const grp = _grpOf(arr[0].f.id)
-      if (!grp || !arr.every((r) => _grpOf(r.f.id) === grp)) continue
-      const yBus = Math.min(...arr.map((r) => r.f.y)) - 16
-      const rows = arr.map((r) => ({ r, slot: r.p1.x + STUB })).sort((a, b) => a.slot - b.slot)
+      const t = arr[0].t
+      const fr = new Map(arr.map((r) => [r.c.id, figRect(r.f)]))
+      const frt = figRect(t)
+      const gx0 = Math.min(...[...fr.values()].map((b) => b.x))
+      const gx1 = Math.max(...[...fr.values()].map((b) => b.x + b.w))
+      // 母线带位置按「节点盒缘」而非图形缘推算：源口贴图形边缘后，若母线带也贴图形外，
+      // 带会落在源盒内部高度上，水平段将横穿相邻源盒而被穿盒检测拒绝 → 退回三线直连。
+      const gy0box = Math.min(...arr.map((r) => r.f.y))
+      const gy1box = Math.max(...arr.map((r) => r.f.y + boxH(r.f)))
+      const ax = (t.x + boxW(t) / 2 - (gx0 + gx1) / 2) / Math.max(1, (gx1 - gx0) / 2)
+      const ay = (t.y + boxH(t) / 2 - (gy0box + gy1box) / 2) / Math.max(1, (gy1box - gy0box) / 2)
+      const sd = Math.abs(ay) >= Math.abs(ax) ? (ay >= 0 ? 'B' : null) : (ax >= 0 ? 'R' : null)
+      if (!sd) continue
+      // 母线带：B 走源组盒底外 BUS_GAP（≥ STUB 使竖直段可见、箭头沿「源底 → 母线带 → 横移 → 高炉」路径清晰可辨）；
+      //        R 走源组盒顶上方(旧位，源口竖上引带)。
+      if (sd === 'B' && t.y - gy1box < STUB * 2) continue
+      const yBus = sd === 'B' ? gy1box + BUS_GAP : gy0box - 16
+      // 源口统一重定向到母线走向侧，并贴在「设备图形边缘」(figRect)：B → 图形底；R → 图形右
+      for (const r of arr) {
+        const b = fr.get(r.c.id)
+        if (sd === 'B') {
+          r.p1 = { side: 'B', x: Math.min(Math.max(t.x + boxW(t) / 2, b.x + 8), b.x + b.w - 8), y: b.y + b.h }
+        } else {
+          r.p1 = { side: 'R', x: b.x + b.w, y: Math.min(Math.max(t.y + boxH(t) / 2, b.y + 8), b.y + b.h - 8) }
+        }
+      }
+      // 源槽位（按源口 x 排序）：决定组内顺序（末位为干线），用于相位均分与支线标记
+      const rows = arr
+        .map((r) => ({ r, slot: sd === 'B' ? r.p1.x : r.p1.x + STUB }))
+        .sort((a, b) => a.slot - b.slot)
+      // 目标口统一重定向：B 走向从母线带垂直投影进目标图形顶(T)。
+      // 全部源（含支线）统一到同一目标口 —— 三条支线在「母线带 → 目标」段完全共线，
+      // 视觉上合并为一根总管，且**每条 conn 的路径都真实抵达目标设备**（热风炉1/2/3 三条线都连到高炉）。
+      if (sd === 'B') {
+        const gcx = (gx0 + gx1) / 2
+        const tx = Math.min(Math.max(gcx, frt.x + 8), frt.x + frt.w - 8)
+        for (const r of arr) r.p2 = { side: 'T', x: tx, y: frt.y }
+      }
       busData.set(arr[0].c.to + '|' + arr[0].c.toPort, { rows, yBus })
       // 母线组端口错开清零（共用单端口,不再 ±14 错开生成多个 stub）
       for (const x of arr) delete dstOff[x.c.id]
     }
+  }
+  // 同目标「同缘列」(to+side+x 相同)的多条入线：进入端口的竖列与上方走廊需错开分道，
+  // 否则多条线会共用同一竖列/同一走廊高度 → SVG 完全共线（后画的盖住先画的）。
+  // colIdx 给每条冲突线一个组内序号，走廊/兜底分支按序号左移竖列、抬高走廊。
+  const colIdx = new Map()
+  {
+    const m = {}
+    for (const r of list) {
+      const k = r.t.id + '|' + r.p2.side + '|' + Math.round(r.p2.x)
+      if (r.p2.side !== 'L') continue
+      ;(m[k] = m[k] || []).push(r)
+    }
+    for (const arr of Object.values(m)) if (arr.length > 1) arr.forEach((r, i) => { colIdx.set(r.c.id, i) })
   }
   // —— 每条 conn 的确定性折线路径 ——
   const path = new Map()
@@ -775,52 +1135,50 @@ function _lineRoutes() {
     const p2s = stubPoint(p2a, s2)
     const obs = _obstaclesFor(c)
     let pts = null
-    // 0) 共享目标端口的「母线汇流」：支线首尾相接、干线单线入端口
+    // 同目标同侧多线（colIdx>0）：各线走独立「入口接近列」，避免共用同一竖列而完全共线。
+    // L 入口列在盒左退回 colK*LINE_STEP、R 入口在盒右推进 colK*LINE_STEP；单线退化为 stub 点。
+    const colK = colIdx.get(c.id)
+    const colP = colK === undefined ? p2s
+      : { x: s2 === 'L' ? p2a.x - STUB - colK * LINE_STEP
+          : s2 === 'R' ? p2a.x + STUB + colK * LINE_STEP : p2a.x, y: p2a.y }
+    // 0) 共享目标端口的「母线汇流」：全部源同路径 —— 源底竖下 STUB 到母线带 →
+    //    沿带横移到目标口正上方 → 竖落 STUB 进目标图形顶。
+    //    支线与干线走同一条折线（在「母线带 → 目标」段完全共线，视觉合并为一根总管），
+    //    因此三条热风炉连线的箭头轨迹都完整抵达高炉；每条线各带一个箭头（组内相位均分防追尾）。
     const busKey = c.to + '|' + c.toPort
     if (busData.has(busKey)) {
       const bus = busData.get(busKey)
       const idx = bus.rows.findIndex((row) => row.r.c.id === c.id)
       if (idx >= 0) {
-        if (idx < bus.rows.length - 1) {
-          const nextSlot = bus.rows[idx + 1].slot
-          const seg = _dedupe([p1a, p1s, { x: p1s.x, y: bus.yBus }, { x: nextSlot, y: bus.yBus }])
-          if (seg.length >= 2 && !_hasCross(seg, obs)) pts = seg
-        } else {
-          // 干线：最右源槽 yBus → 端口 stub x,y
-          const seg = _dedupe([p1a, p1s, { x: p1s.x, y: bus.yBus }, { x: p2s.x, y: bus.yBus }, p2s, p2a])
-          if (seg.length >= 2 && !_hasCross(seg, obs)) pts = seg
-        }
+        const seg = _dedupe([p1a, p1s, { x: p1s.x, y: bus.yBus }, { x: p2s.x, y: bus.yBus }, p2s, p2a])
+        if (seg.length >= 2 && !_hasCross(seg, obs)) pts = seg
       }
     }
-    // 0.5) 回流弧（feedback 虚线）优先走「主带下缘走廊」
-    //   回供线在工艺上是下游→上游（图中多为从右往左），若按常规最短路径会绕到画面最上方
-    //   横穿整幅图（跨越所有设备顶部，视觉上很突兀）。这里先试主带下方三条车道，
-    //   取不穿任何设备框的最短者；全部受阻才退回常规候选枚举。
-    if (!pts && c.feedback) {
+    // 0.5) 回流弧（feedback 虚线）：仅「真右→左跨厂回流」才优先走整图底缘下方车道
+    //   —— 短距回供(如 焦炉→烧结 的焦粉回供)直接走直连短竖线，不绕场。
+    if (!pts && c.feedback && f.x > t.x + FWD_TOL) {
       const under = []
       for (let k = 0; k < 3; k++) {
-        const cy = mainBot -24 + k * LANE_STEP
+        const cy = mainBot + 10 + k * LANE_STEP
         const seg = _dedupe([p1a, p1s, { x: p1s.x, y: cy }, { x: p2s.x, y: cy }, p2s, p2a])
         if (seg.length >= 2 && !_hasCross(seg, obs)) under.push(seg)
       }
       if (under.length) pts = under.sort((a, b) => _pathLen(a) - _pathLen(b))[0]
     }
-    // 1) 主工艺纵向折返链（LF 后 RH/连铸/热轧 逐台向下）→ 两带间确定性折线
-    if (isMain(f) && isMain(t) && Math.abs(p1a.y - p2a.y) > 140) {
-      const fp = _foldChain(p1a, s1, p2a, s2, f, t)
-      if (fp && fp.length >= 2 && !_hasCross(fp, obs)) pts = fp
-    }
+    // 1) 直连：横向到「入口接近列」再沿列直落入口高度、横插进盒(同侧多线各自错列，互不共线)
     if (!pts) {
-      // 2) 直连 H-then-V（同带短连 / 栈组垂直对齐时的近直线）
-      const flat = _dedupe([p1a, p1s, { x: p2s.x, y: p1s.y }, p2s, p2a])
+      const flat = colK === undefined
+        ? _dedupe([p1a, p1s, { x: p2s.x, y: p1s.y }, p2s, p2a])
+        : _dedupe([p1a, p1s, { x: colP.x, y: p1s.y }, { x: colP.x, y: p2a.y }, p2s, p2a])
       if (flat.length >= 2 && !_hasCross(flat, obs)) pts = flat
     }
     if (!pts) {
-      // 3) 候选走廊枚举：横移带 cy × 竖列 bx 的网格组合，取不穿盒的最短折线
-      const srcGrp = _grpOf(f.id)
-      const tgtGrp = _grpOf(t.id)
+      // 2) 候选走廊枚举：横移带 cy × 竖列 bx 的网格组合，取不穿盒的最短折线
+      //    —— 同缘列多线(组内序号 colK>0)：竖列左移 colK*14、走廊最低通道抬高 colK 档，
+      //       使烧结/球团等长走廊入线不在同一 y 水平带、同一竖列上重叠。
+      const p2c = colP // 与直连同一条「入口接近列」
       const cySet = new Set([
-        p1s.y, p2s.y,
+        p1s.y, p2c.y,
         mainTop - UPPER_GAP,
         mainTop - UPPER_GAP - LINE_STEP,
         mainTop - UPPER_GAP - LINE_STEP * 2,
@@ -828,22 +1186,19 @@ function _lineRoutes() {
         mainBot + 24 + LANE_STEP,
         mainBot + 24 + LANE_STEP * 2,
       ])
-      if (srcGrp) { cySet.add(srcGrp.y - 16); cySet.add(srcGrp.y + srcGrp.h + 16) }
-      if (tgtGrp) { cySet.add(tgtGrp.y - 16); cySet.add(tgtGrp.y + tgtGrp.h + 16) }
+      if (colK) { for (let j = 0; j < colK; j++) cySet.delete(mainTop - UPPER_GAP - j * LINE_STEP) }
       const bxSet = new Set([
         p1s.x,
         f.x + boxW(f) + 16,
-        srcGrp ? srcGrp.x + srcGrp.w + 12 : f.x + boxW(f) + 16,
         mainBand.value.r + 14,
         mainBand.value.l - 14,
         t.x - 14,
         t.x + boxW(t) + 14,
       ])
-      if (tgtGrp) { bxSet.add(tgtGrp.x - 14); bxSet.add(tgtGrp.x + tgtGrp.w + 14) }
       const cand = []
       for (const bx of bxSet) {
         for (const cy of cySet) {
-          const seg = _dedupe([p1a, p1s, { x: bx, y: p1s.y }, { x: bx, y: cy }, { x: p2s.x, y: cy }, p2s, p2a])
+          const seg = _dedupe([p1a, p1s, { x: bx, y: p1s.y }, { x: bx, y: cy }, { x: p2c.x, y: cy }, p2c, p2a])
           if (seg.length >= 2 && !_hasCross(seg, obs)) cand.push(seg)
         }
       }
@@ -851,14 +1206,14 @@ function _lineRoutes() {
       if (!cand.length) {
         for (let k = 0; k < 6; k++) {
           const cy = mainTop - 24 - k * LINE_STEP
-          const seg = _dedupe([p1a, p1s, { x: p1s.x, y: p1s.y }, { x: p1s.x, y: cy }, { x: p2s.x, y: cy }, p2s, p2a])
+          const seg = _dedupe([p1a, p1s, { x: p1s.x, y: p1s.y }, { x: p1s.x, y: cy }, { x: p2c.x, y: cy }, p2c, p2a])
           if (seg.length >= 2 && !_hasCross(seg, obs)) { cand.push(seg); break }
         }
       }
       if (!cand.length) {
         const outer = [
-          _dedupe([p1a, p1s, { x: mainBand.value.r + 20, y: p1s.y }, { x: mainBand.value.r + 20, y: mainTop - 24 }, { x: p2s.x, y: mainTop - 24 }, p2s, p2a]),
-          _dedupe([p1a, p1s, { x: mainBand.value.r + 20, y: p1s.y }, { x: mainBand.value.r + 20, y: mainBot + 24 }, { x: p2s.x, y: mainBot + 24 }, p2s, p2a]),
+          _dedupe([p1a, p1s, { x: mainBand.value.r + 20, y: p1s.y }, { x: mainBand.value.r + 20, y: mainTop - 24 }, { x: p2c.x, y: mainTop - 24 }, p2c, p2a]),
+          _dedupe([p1a, p1s, { x: mainBand.value.r + 20, y: p1s.y }, { x: mainBand.value.r + 20, y: mainBot + 24 }, { x: p2c.x, y: mainBot + 24 }, p2c, p2a]),
         ]
         pts = outer.sort((a, b) => _crossCount(a, obs) - _crossCount(b, obs) || _pathLen(a) - _pathLen(b))[0]
       } else {
@@ -867,7 +1222,18 @@ function _lineRoutes() {
     }
     path.set(c.id, pts)
   }
-  return { list, srcSt, dstOff, path }
+  // 母线组：同目标端口多源汇流的全部 conn（含支线与干线）→ connId 映射到组 key。
+  // busBranch = 组内非干线的那些（idx < last），仅作标记（审计/识别用）。
+  // 三条 conn 路径均抵达目标，因此**每条都承载自己的流向箭头**（表示每台源设备都在输出），
+  // 组内由 lines computed 统一周期 + 相位均分，使共线段上的多个箭头保持稳定间距不追尾。
+  const busBranch = new Set()
+  const busGroup = new Map()
+  for (const [key, bus] of busData.entries()) {
+    const rows = bus.rows
+    for (const row of rows) busGroup.set(row.r.c.id, key)
+    for (let i = 0; i < rows.length - 1; i++) busBranch.add(rows[i].r.c.id)
+  }
+  return { list, srcSt, dstOff, path, busBranch, busGroup }
 }
 function applyOff(p, side, off) {
   if (!off) return p
@@ -875,25 +1241,6 @@ function applyOff(p, side, off) {
   if (side === 'T' || side === 'B') return { x: p.x + off, y: p.y, side: p.side }
   return p
 }
-// —— 主工艺纵向链折返连线（LF 折返后 RH→连铸→热轧 逐台向下的链式连接） ——
-// 两端盒不在同一横向主带时（纵向距离 >140），钢流线从端口伸出后在「两带之间的空档」横向转移，
-// 再直落/直入目标口，形成 4~7 段的干净折线。端口 side 组合为当前主链实际出现的三类：
-// LF.out(R)→RH.in(L)、RH.out(R)→caster.in(T)、caster.out(R)→rolling.in(L)。
-function _foldChain(p1a, s1, p2a, s2, f, t) {
-  const p1s = stubPoint(p1a, s1)
-  const p2s = stubPoint(p2a, s2)
-  if (f.y > t.y) return null // 只处理上→下的链式流
-  const ex = f.x + boxW(f) + 10 // 出盒右侧通道
-  if (s1 === 'R' && (s2 === 'L' || s2 === 'T')) {
-    const band = t.y - 46 // 目标盒上方的空档
-    return [p1a, p1s, { x: ex, y: p1s.y }, { x: ex, y: band }, { x: p2s.x, y: band }, p2s, p2a]
-  }
-  if (s1 === 'B' && s2 === 'L') {
-    return [p1a, p1s, { x: p2s.x, y: p1s.y }, p2s, p2a]
-  }
-  return null
-}
-
 function lineOf(c, routes) {
   const pts = routes.path.get(c.id)
   if (!pts || pts.length < 2) return null
@@ -909,26 +1256,280 @@ function lineOf(c, routes) {
       if (len > best) { best = len; mx = (pts[i].x + pts[i - 1].x) / 2; my = pts[i].y }
     }
   }
-  return { d, mx, my: my - 4, p1: pts[0], p2: pts[pts.length - 1], pts }
+  // onH：锚点确实落在水平段上（false = 全竖直管道，锚点退化为两端点中点）。
+  // 物料卡片据此选择排布轴：水平管道 → 卡片上下并排；竖直管道 → 卡片左右并排。
+  return { d, mx, my: my - 4, onH: best > 0, p1: pts[0], p2: pts[pts.length - 1], pts }
 }
+// 流向箭头线速度（图形坐标 px/s）：调小 = 箭头更舒缓、调大 = 更急促。
+// 全图箭头速度只由此常量控制（每帧位移 = 速度 × 时间，与线长解耦）。
+const FLOW_SPEED = 130
+const FLOW_DUR_MIN = 1.6
+const FLOW_DUR_MAX = 8
+
+// —— 管道形态参数（图形坐标 px）——
+// 连线不再是单根细线，而是「管壁 + 管体 + 高光」三层同路径描边叠出的管道。
+// 调管道粗细只改 PIPE_W（虚线回流管 PIPE_W_FB）；调轮廓厚度只改 PIPE_EDGE_ADD。
+const PIPE_W = 7            // 管道主体（管体）宽度
+const PIPE_W_FB = 4.5       // 回流虚线管主体宽度（比正流细，语义弱化）
+const PIPE_EDGE_ADD = 1.8   // 管壁比管体每侧宽出 0.9px → 细深色轮廓，不压管体
+const PIPE_HI_RATIO = 0.42  // 高光宽度 = 管体 × 0.42（居中细白线，圆柱反光）
+const PIPE_EDGE_COLOR = '#202a34'
+
+// —— 流向箭头参数（图形坐标 px）——
+// 箭头色 = **管道物料色加深**（不是白色）：管体是物料色，箭头取同色系压暗一档，
+// 靠「深色实心块 + 更深描边」从管体上脱开，既不破坏管道的物料色语义，也不会白得扎眼。
+// 调深浅只改 FLOW_DARKEN / FLOW_DARKEN_EDGE（越小越深）；调大小只改 FLOW_PTS / FLOW_PTS_FB。
+const FLOW_DARKEN = 0.68        // 箭头填充 = 物料色 × 0.68（比管体深约 32%）
+const FLOW_DARKEN_EDGE = 0.44   // 箭头描边 = 物料色 × 0.44（同色系更深轮廓，勾出箭头形状）
+const FLOW_STROKE_W = 1.2
+const FLOW_PTS = '-9,-5.6 9,0 -9,5.6'      // 正流箭头（宽 18 / 高 11.2，略凸出管壁）
+const FLOW_PTS_FB = '-7.5,-4.6 7.5,0 -7.5,4.6' // 回流虚线管箭头（比正流略小，语义弱化）
 const lines = computed(() => {
-  // 2D 工艺流程图定位：管线只沿折线中点标「物料名」小标签，不再挂数据卡数值。
+  // 2D 工艺流程图定位：管线沿折线中点标「物料名 + 材料流动速率」小标签。
   const routes = _lineRoutes()
   const out = []
+  // —— 材料流速上下文：按「材料 → 计量点」规则从后端下发的读数解析（见 utils/pipeRate.js）。
+  //   ① 实时遥测 store.deviceLive（WebSocket /api/ws/feed 推送的现场设备读数）
+  //   ② 未关联/未上报时回退 baseline 里后端算出的仿真读数
+  //   ③ 工辅介质（鼓风/热风/供氧/抽力/喷煤）取该工辅的运行工况参数
+  // upstream 用于「预处理铁水」这类无独立计量设备的管道反向复用上游铁水计量。
+  const byIdNode = new Map(nodes.value.map((n) => [n.id, n]))
+  const baseById = new Map(((store.baseline && store.baseline.units) || []).map((u) => [u.id, u]))
+  const devsOfUnit = new Map()
+  for (const d of store.allDevices) {
+    if (!devsOfUnit.has(d.unitId)) devsOfUnit.set(d.unitId, [])
+    devsOfUnit.get(d.unitId).push(d)
+  }
+  const rateCtxOf = (conn, seen) => ({
+    unit: (id) => byIdNode.get(id) || null,
+    devices: (id) => devsOfUnit.get(id) || [],
+    live: (devId) => (store.deviceLive[devId] != null ? store.deviceLive[devId] : null),
+    // 上游工序主产物产量（后端 UnitResult.steel_output，t/h），作为无计量点管道的兜底口径
+    out: (id) => { const u = baseById.get(id); return u ? u.steel_output : null },
+    upstream: (mats) => {
+      const up = conns.value.find((x) => x.to === conn.from && mats.includes(x.material) && !seen.has(x.id))
+      if (!up) return null
+      seen.add(up.id)
+      return resolvePipeRate(up, rateCtxOf(up, seen))
+    },
+  })
   for (const c of conns.value) {
     const g = lineOf(c, routes)
     if (!g) continue
+    // 流向箭头运动时长按折线实际长度归一（FLOW_SPEED px/s）：短线快速掠过、长管线匀速缓行，
+    // 避免「同一时长」下长线箭头飞奔、短线箭头爬行。相位按序错开，防止全图箭头同时到达终点。
+    let len = 0
+    for (let i = 1; i < g.pts.length; i++) {
+      len += Math.abs(g.pts[i].x - g.pts[i - 1].x) + Math.abs(g.pts[i].y - g.pts[i - 1].y)
+    }
+    const dur = Math.min(FLOW_DUR_MAX, Math.max(FLOW_DUR_MIN, len / FLOW_SPEED))
+    // 材料流动速率（后端读数解析）：null = 该管道无量测点，只显示材料名
+    const rate = resolvePipeRate(c, rateCtxOf(c, new Set([c.id])))
+    const fb = !!c.feedback
+    const pipeW = fb ? PIPE_W_FB : PIPE_W
+    // 稳定标识（源类型>目标类型:物料）—— 卡片手工落位表 CARD_PIN 按此键匹配，
+    // 不能用连线 id（每次载入模板都是新生成的 uid）。
+    const aN = byIdNode.get(c.from), bN = byIdNode.get(c.to)
     out.push({
-      id: c.id, d: g.d, mx: g.mx, my: g.my,
-      sw: c.feedback ? 1.6 : 2.6,
-      feedback: !!c.feedback,
-      color: c.feedback ? '#8a97a5' : portColor(c.material),
+      id: c.id,
+      key: `${aN ? aN.repType || aN.type : '?'}>${bN ? bN.repType || bN.type : '?'}:${c.material}`,
+      d: g.d, mx: g.mx, my: g.my, onH: g.onH,
+      pipeW,
+      pipeEdgeW: pipeW + PIPE_EDGE_ADD,
+      pipeHiW: Math.max(1, pipeW * PIPE_HI_RATIO),
+      pipeEdgeOp: fb ? 0.65 : 0.7,
+      pipeHiOp: fb ? 0.25 : 0.42,
+      dash: fb ? '6 5' : '0',
+      feedback: fb,
+      color: fb ? '#8a97a5' : portColor(c.material),
+      // 箭头色：物料色加深两档（填充 / 轮廓），与管体同色系但更沉，避免白色箭头抢眼。
+      arrowFill: shade(fb ? '#8a97a5' : portColor(c.material), FLOW_DARKEN),
+      arrowEdge: shade(fb ? '#8a97a5' : portColor(c.material), FLOW_DARKEN_EDGE),
       matName: matName(c.material),
+      // 材料流动速率（后端读数解析结果）：rate=null 表示该管道无量测点，只显示材料名
+      rate,
+      rateText: rate ? `${formatRate(rate.value)} ${rate.unit}` : '',
+      isBusBranch: routes.busBranch ? routes.busBranch.has(c.id) : false,
+      busKey: routes.busGroup ? (routes.busGroup.get(c.id) || null) : null,
+      dur: `${dur.toFixed(2)}s`,
+      begin: `-${((out.length * 0.53) % dur).toFixed(2)}s`,
+    })
+  }
+  // 母线组（同目标端口多源汇流）内统一节奏：取组内最长周期为共同周期，相位按组内序号均分。
+  // 这样三台热风炉各有一个箭头从自己炉底出发 → 沿母线带 → 汇入同一根总管进高炉，
+  // 且彼此保持恒定间距依次推进（不会因各线速度不同而追尾重叠成一个箭头）。
+  const grp = new Map()
+  for (const l of out) {
+    if (!l.busKey) continue
+    if (!grp.has(l.busKey)) grp.set(l.busKey, [])
+    grp.get(l.busKey).push(l)
+  }
+  for (const arr of grp.values()) {
+    const dur = Math.max(...arr.map((l) => parseFloat(l.dur)))
+    arr.forEach((l, i) => {
+      l.dur = `${dur.toFixed(2)}s`
+      l.begin = `-${((i * dur) / arr.length).toFixed(2)}s`
     })
   }
   return out
 })
 
+// —— 管道旁的「物料卡片」：材料名 + 流动速率 ——
+// 用户要求：材料信息不再贴着管道书写，改为在管道旁边立一张独立小卡片。
+// 锚点取管道最长水平段的中点（与 lineOf 的标签锚点同一处），默认贴在管道上方、与管壁留间隙；
+// 该位置若被设备盒或已放置的卡片占用，依次尝试 下方 → 更上方 → 更下方，保证卡片
+// 既不压管道、也不压设备、彼此不叠。
+const CARD_PAD_X = 8      // 卡片内左右留白
+const CARD_PAD_Y = 5      // 卡片内上下留白
+const CARD_LINE_H = 13    // 卡片内行高（材料名行 / 速率行）
+const CARD_GAP = 6        // 卡片边缘与管壁外缘的间隙
+const CARD_SHIFT = 24     // 上下方都被占用时，向更外侧再让出的距离
+const CARD_SCAN = 8       // 兜底避让的扫描步长
+const CARD_SCAN_MAX = 480 // 兜底避让的扫描范围（需大于一台设备盒宽，才能横越到设备外侧）
+const CARD_SIDE_MIN = 64  // 竖直线卡片开始横向绕开相邻设备的阈值（小于此值只沿管道方向让位）
+// 速率数值配色：实时遥测读数用深色（可信度最高），仿真/工况回退值用灰色弱化。
+const CARD_VAL_LIVE = '#2b3a4a'
+const CARD_VAL_SIM = '#96a1ad'
+// 文字宽度估算：SVG 无自动排版，中文按 1em、西文数字按 0.56em 估算，用于定卡片宽度。
+function estTextW(s, fs) {
+  let w = 0
+  for (const ch of String(s)) w += /[\u2e80-\u9fff\uff00-\uffef\u3000-\u303f]/.test(ch) ? fs : fs * 0.56
+  return w
+}
+
+// —— 卡片手工落位表（用户逐条指定）——
+// 键 = `${源type}>${目标type}:${material}`，与 lines 输出的 key 一致。
+//   side：卡片相对管道的方位（right/left/above/below），按管壁外缘 + CARD_GAP 贴管；
+//   dx/dy：在基准位上的微调（用于避开设备名称浮签这类细碎障碍）。
+// 被指定的卡片改用「图形边界」(figRect) 参与避让 —— 设备节点盒含名称带、KPI 带与大量
+// 左右留白，若仍按节点盒避让，卡片根本落不进「管道贴身处」这条窄缝，会被逼到很远处。
+const CARD_PIN = {
+  // 热风卡片：热风炉→高炉 的竖直短管右侧。x 右移 5px：热风炉图形下缘(513)与高炉名称浮签
+  // 上缘(555)之间只有 42px，卡片高 36px 两头都贴死；让到名称右侧后可用带扩到 60px。
+  'hot_blast_stove>blast_furnace:hot_blast': { side: 'right', dx: 5 },
+  // 抽力卡片：引风机→烧结机 的水平短管上方（落在引风机与烧结机图形之间的空档）
+  'id_fan>sinter_plant:draft': { side: 'above' },
+  // 焦炭卡片：焦炉→烧结机 的回流虚线管右侧（贴管）。dx 右移 20px：烧结机换图后
+  // 名称浮签（x 390~431）正好压在该管右侧的贴身位上，右移后落在名称右侧留白带。
+  'coke_oven>sinter_plant:coke': { side: 'right', dx: 20 },
+}
+// 手工落位求值：先试基准位，再沿管道方向逐级外移让开设备（保持「贴管」的观感）。
+// valid(rect) 由调用方注入（判定该矩形是否可用），返回矩形或 null（落不下则回落通用避让）。
+function pinRectOf(l, w, h, valid) {
+  const pin = CARD_PIN[l.key]
+  if (!pin) return null
+  const ay = l.my + 4                                  // 管道锚点真实 y（lineOf 内已上移 4px）
+  const half = l.pipeEdgeW / 2 + CARD_GAP
+  const base = {
+    right: [l.mx + half, ay - h / 2],
+    left: [l.mx - half - w, ay - h / 2],
+    above: [l.mx - w / 2, ay - half - h],
+    below: [l.mx - w / 2, ay + half],
+  }[pin.side]
+  if (!base) return null
+  const bx = base[0] + (pin.dx || 0), by = base[1] + (pin.dy || 0)
+  const at = (x, y) => { const t = { x: Math.round(x), y: Math.round(y), w, h }; return valid(t) ? t : null }
+  const t0 = at(bx, by)
+  if (t0) return t0
+  // 让位轴 = 管道走向：水平管道左右滑动、竖直管道上下滑动
+  const slideY = pin.side === 'right' || pin.side === 'left'
+  for (let d = CARD_SCAN; d <= CARD_SCAN_MAX; d += CARD_SCAN) {
+    const a = at(bx, by - d)
+    if (a) return a
+    const b = slideY ? at(bx, by + d) : at(bx + d, by)
+    if (b) return b
+  }
+  return null
+}
+const cards = computed(() => {
+  // 避让对象取「节点盒」而非设备图形外接盒：卡片带白底，若压在设备名浮签或底部 KPI 带上
+  // 会遮住文字，故按整个节点占位（含名称带与 KPI 带）避让。
+  const boxes = nodes.value.map((n) => ({ x: n.x, y: n.y, w: boxW(n), h: boxH(n) }))
+  const figs = nodes.value.map((n) => figRect(n))
+  const bd = bounds.value
+  const hitBox = (r) => boxes.some((b) => r.x < b.x + b.w + 4 && r.x + r.w + 4 > b.x && r.y < b.y + b.h + 4 && r.y + r.h + 4 > b.y)
+  // 图形边界（裁除透明留白后的图形外接盒，不含名称带/KPI 带）—— 仅供 CARD_PIN 指定的卡片使用。
+  const hitFig = (r) => figs.some((b) => r.x < b.x + b.w + 2 && r.x + r.w + 2 > b.x && r.y < b.y + b.h + 2 && r.y + r.h + 2 > b.y)
+  const oob = (r) => r.x < bd.x || r.y < bd.y || r.x + r.w > bd.x + bd.w || r.y + r.h > bd.y + bd.h
+  const occupied = []
+  const hitCard = (r) => occupied.some((o) => r.x < o.x + o.w + 3 && r.x + r.w + 3 > o.x && r.y < o.y + o.h + 3 && r.y + r.h + 3 > o.y)
+  // 管线占位：只避让设备与其他卡片时，卡片会被塞到别的管线上遮住流向（如「鼓风(风量)」
+  // 曾压住 供氧系统→鼓风机 的氧气线）。这里把全部管道的正交段按管壁半宽膨胀成矩形，
+  // 卡片不得与之相交 —— 贴身位本身留了 CARD_GAP 间隙，故靠近自己的管道不会被误判。
+  // 按线 id 分组存放：手工落位的卡片要豁免「自己那条管道」，否则贴管位恒被判冲突。
+  const pipeSegs = new Map()
+  for (const l of lines.value) {
+    const nums = String(l.d).match(/-?\d+(?:\.\d+)?/g) || []
+    const pts = []
+    for (let i = 0; i + 1 < nums.length; i += 2) pts.push([+nums[i], +nums[i + 1]])
+    const pad = l.pipeEdgeW / 2
+    const arr = []
+    for (let i = 1; i < pts.length; i++) {
+      arr.push({
+        x1: Math.min(pts[i - 1][0], pts[i][0]), x2: Math.max(pts[i - 1][0], pts[i][0]),
+        y1: Math.min(pts[i - 1][1], pts[i][1]), y2: Math.max(pts[i - 1][1], pts[i][1]), pad,
+      })
+    }
+    pipeSegs.set(l.id, arr)
+  }
+  const hitPipe = (r, skipId) => {
+    for (const [id, segs] of pipeSegs) {
+      if (id === skipId) continue
+      for (const s of segs) {
+        if (r.x - s.pad < s.x2 && r.x + r.w + s.pad > s.x1 && r.y - s.pad < s.y2 && r.y + r.h + s.pad > s.y1) return true
+      }
+    }
+    return false
+  }
+  const hit = (r, skipId) => hitBox(r) || oob(r) || hitCard(r) || hitPipe(r, skipId)
+  const out = []
+  for (const l of lines.value) {
+    const w = Math.round(Math.max(estTextW(l.matName, 11), l.rate ? estTextW(l.rateText, 11.5) : 0) + CARD_PAD_X * 2 + 2)
+    const h = Math.round(CARD_PAD_Y * 2 + (l.rate ? CARD_LINE_H * 2 : 12))
+    const lineY = l.my + 4                    // 水平段真实 y（lineOf 内标签锚点已上移 4px）
+    const half = l.pipeEdgeW / 2 + CARD_GAP   // 卡片近管侧与管道中心线的距离
+    // ① 手工落位（CARD_PIN）：按用户指定方位贴管放置，只避让「图形边界 + 已放卡片 + 其他管线」。
+    let r = pinRectOf(l, w, h, (t) => !hitFig(t) && !oob(t) && !hitCard(t) && !hitPipe(t, l.id))
+    // ② 贴身位：按锚点所在段的走向给出，水平管道优先上下并排、竖直管道优先左右并排，
+    //    再依次退到另一轴与更外侧。
+    const near = l.onH
+      ? [[l.mx - w / 2, lineY - half - h], [l.mx - w / 2, lineY + half],
+         [l.mx + half, l.my - h / 2], [l.mx - half - w, l.my - h / 2],
+         [l.mx - w / 2, lineY - half - h - CARD_SHIFT], [l.mx - w / 2, lineY + half + CARD_SHIFT]]
+      : [[l.mx + half, l.my - h / 2], [l.mx - half - w, l.my - h / 2],
+         [l.mx - w / 2, lineY - half - h], [l.mx - w / 2, lineY + half],
+         [l.mx + half + CARD_SHIFT, l.my - h / 2], [l.mx - half - w - CARD_SHIFT, l.my - h / 2]]
+    if (!r) {
+      for (const [x, y] of near) {
+        const t = { x: Math.round(x), y: Math.round(y), w, h }
+        if (!hit(t)) { r = t; break }
+      }
+    }
+    // ③ 兜底扫描：工辅通道里相邻设备的缝隙可能比卡片还窄（如「引风机→烧结机」仅 46px），
+    //    贴身位会被设备全占。此时优先沿管道方向让位（卡片仍在管道旁、顺着管道滑动，观感贴合），
+    //    横向绕开相邻设备只作为最后手段（走远了卡片会与管道脱节，故设阈值后才启用）。
+    for (let d = CARD_SCAN; !r && d <= CARD_SCAN_MAX; d += CARD_SCAN) {
+      const cand = l.onH
+        ? [[l.mx - w / 2, lineY - half - h - d], [l.mx - w / 2, lineY + half + d],
+           [l.mx - w / 2 - d, lineY - half - h], [l.mx - w / 2 + d, lineY - half - h],
+           [l.mx - w / 2 - d, lineY + half], [l.mx - w / 2 + d, lineY + half]]
+        : [[l.mx + half, l.my - h / 2 - d], [l.mx + half, l.my - h / 2 + d],
+           [l.mx - half - w, l.my - h / 2 - d], [l.mx - half - w, l.my - h / 2 + d]]
+      if (!l.onH && d > CARD_SIDE_MIN) {
+        const dx = d - CARD_SIDE_MIN
+        cand.push([l.mx + half + dx, l.my - h / 2], [l.mx - half - w - dx, l.my - h / 2])
+      }
+      for (const [x, y] of cand) {
+        const t = { x: Math.round(x), y: Math.round(y), w, h }
+        if (!hit(t)) { r = t; break }
+      }
+    }
+    if (!r) { const [x, y] = near[0]; r = { x: Math.round(x), y: Math.round(y), w, h } }   // 四周都挤：仍贴管道，保证不丢信息
+    occupied.push(r)
+    out.push({ id: l.id, x: r.x, y: r.y, w, h, matName: l.matName, color: l.color, rate: l.rate })
+  }
+  return out
+})
 
 // 交互：缩放 / 平移 / 选中
 const zoom = ref(1)
@@ -1039,7 +1640,6 @@ watch(() => store.scheme, () => relayout(), { deep: true })
 .kpi.hint .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .dot.ok { background: #3a9d6d; }
 .dot.sel { background: #2c6e9e; }
-.dot.aux { background: #aab3bd; }
 .dot.feed { background: #8a97a5; }
 .t2d-fit {
   margin-left: auto;
@@ -1054,31 +1654,21 @@ watch(() => store.scheme, () => relayout(), { deep: true })
 }
 .t2d-canvas svg { width: 100%; height: 100%; display: block; }
 .t2d-grid { opacity: 0.5; }
-/* 辅助系统分组虚线框 */
-.t2d-grp { pointer-events: none; }
-.t2d-grp-frame {
-  fill: rgba(226, 234, 242, 0.45);
-  stroke: #9fb2c4; stroke-width: 1.3; stroke-dasharray: 7 5;
-}
-.t2d-grp-dot { fill: #8a97a5; }
-.t2d-grp-title { font-size: 12px; font-weight: 600; fill: #44566a; }
-.t2d-grp-n { font-size: 10px; fill: #98a5b2; }
-/* 组中组二级虚线框 */
-.t2d-subgrp { pointer-events: none; }
-.t2d-subgrp-frame {
-  fill: rgba(246, 250, 253, 0.6);
-  stroke: #b9c6d4; stroke-width: 1; stroke-dasharray: 4 4;
-}
-.t2d-subgrp-title { font-size: 11px; font-weight: 600; fill: #5a6b7d; }
-.t2d-subgrp-n { font-size: 9px; fill: #a2afbc; }
 /* 管线 */
-.t2d-link { opacity: 0.92; pointer-events: none; }
+/* 管道三层描边（管壁 / 管体 / 高光）：同路径叠加，仅承担视觉层次，不参与交互 */
+.t2d-pipe { pointer-events: none; }
+/* 沿线运动的流向箭头（SMIL animateMotion 驱动，位置/朝向由路径决定，此处只管层次与点击穿透） */
+.t2d-flow { pointer-events: none; }
 .t2d-mid { pointer-events: none; }
-.t2d-mat {
-  font-size: 10px; fill: #6b7785; letter-spacing: 0.02em;
-  pointer-events: none;
-  paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round;
-}
+/* 物料卡片：管道旁的独立小卡片（上行材料名、下行流动速率）。
+   卡片底为白底 + 物料色细边，左侧色条与管道同色 —— 卡片与管道的从属关系一眼可辨。
+   速率数值：实时读数深色、回退值浅灰（配色常量见 script 中的 CARD_VAL_*）。 */
+.t2d-card { pointer-events: none; }
+.t2d-card-bg { fill: #ffffff; fill-opacity: 0.93; stroke-width: 1.1; }
+.t2d-card-mat { font-size: 11px; font-weight: 600; letter-spacing: 0.01em; }
+.t2d-card-rate { font-variant-numeric: tabular-nums; }
+.t2d-card-val { font-size: 12px; font-weight: 700; letter-spacing: 0.01em; }
+.t2d-card-unit { font-size: 9.5px; font-weight: 400; }
 
 /* —— 设备节点 —— */
 .t2d-node { cursor: pointer; }

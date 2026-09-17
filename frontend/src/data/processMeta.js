@@ -27,6 +27,7 @@ export const DIRECT_PARAM_KEYS = new Set(['coke_rate', 'coal_inj'])
 export const EDITABLE_PARAMS = {
   blast_furnace: [
     { key: 'hot_metal', label: '铁水产量', unit: 't/h', min: 200, max: 2000, step: 50, mode: 'direct' },
+    { key: 'util_coeff', label: '有效系数', unit: 't/(m³·d)', min: 1, max: 4, step: 0.1, def: 2.0, mode: 'direct' },
     { key: 'coke_rate', label: '焦比', unit: 'kg/t', min: 250, max: 550, step: 5, mode: 'direct' },
     { key: 'coal_inj', label: '喷煤比', unit: 'kg/t', min: 0, max: 250, step: 5, mode: 'direct' },
     { key: 'flux', label: '熔剂比', unit: 'kg/t', min: 0, max: 250, step: 5, mode: 'direct' },
