@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { watch, nextTick } from 'vue'
 import { t } from '../i18n'
+import { visiblePoll } from '../utils/poll'
 import { api, openFeed } from '../api/client'
 import { buildScheme, makeProcessNode, makeDeviceNode, makeMaterialNode, PROCESS_MAP, MATERIAL_MAP, PROCESS_ADJUSTABLE, DEVICE_MAP, DEVICE_COUPLE_REGISTRY, deriveProcessOpParams, materialFamily, loadCalibrations, NODE_NW, NODE_HEADER, NODE_PORT_Y0, NODE_GAP, nodeHeight, PROCESS_TEMPLATES, applySetpointResponse, migrateLegacyDevices, treeLayoutNodes } from '../data/flowLibrary'
 import { computeScheme } from '../flow/compute'
@@ -40,13 +41,17 @@ export const VIEW_DEFS = [
   { id: 'carbonMarket', title: '碳资产管理' },
   { id: 'carbonCalc', title: '全景碳核查' },
   { id: 'energyFlow', title: '能流分析' },
-  { id: 'boxManage', title: '能碳一体机管理' },
+  // boxManage = 数据源管理（能碳一体机 + 外部数据源统一接入管理），标题对外展示为「数据源管理」
+  { id: 'boxManage', title: '数据源管理' },
 ]
 export const VIEW_IDS = VIEW_DEFS.map((v) => v.id)
 export const VIEW_TITLE = Object.fromEntries(VIEW_DEFS.map((v) => [v.id, v.title]))
 
 let _idc = 0
 const uid = (p) => `${p}_${Date.now().toString(36)}${(_idc++).toString(36)}`
+// 数据源管理设备列表轮询：_boxSrcBusy 防并发重入，_boxSrcTimer 常驻定时器
+let _boxSrcBusy = false
+let _boxSrcTimer = null
 // 数值展示：保留 2 位小数并去掉末尾多余的 0
 const fmtNum = (v) => (v == null || isNaN(v) ? '—' : Number(v).toFixed(2).replace(/\.?0+$/, ''))
 
@@ -57,9 +62,27 @@ function _attachTpl(kind, type) {
   const m = ATTACH_MAP[kind] || {}
   return m[type] || null
 }
+// 数据源管理（能碳一体机）中的传感器设备 → 「设备名::点位名」当前读数映射
+// 供附加设备 src='device' 时取值（轮询刷新 store.boxSourceDevices 即自动更新）
+function _boxSrcMap(s) {
+  const m = {}
+  for (const d of (s.boxSourceDevices || [])) {
+    const props = d.props || []
+    for (const p of props) {
+      if (p.value == null) continue
+      const key = `${d.name}::${p.name}`
+      if (m[key] == null) m[key] = { v: p.value, ts: p.ts }
+      // 未指定点位时（旧数据/设备仅一个点位）取该设备第一个有值点位
+      const dk = `${d.name}::`
+      if (m[dk] == null) m[dk] = { v: p.value, ts: p.ts }
+    }
+  }
+  return m
+}
 // 附加设备当前读数：按「数值来源」解析
-//  src = fixed → att.def（模板默认）；param → 绑定工艺节点的某数值参数；sim → 以默认值为基准的缓变模拟
-function _attachReading(att, unit, now) {
+//  src = fixed → att.def（模板默认）；param → 绑定工艺节点的某数值参数；
+//  sim → 以默认值为基准的随机模拟；device → 数据源管理中某传感器设备的实时读数
+function _attachReading(att, unit, now, srcMap) {
   if (!att) return null
   const tpl = _attachTpl(att.kind, att.type)
   const def = att.def != null ? att.def
@@ -76,16 +99,21 @@ function _attachReading(att, unit, now) {
     const w = ((now || Date.now()) / 1200) + phase
     return Math.round(base * (1 + 0.08 * Math.sin(w)) * 1000) / 1000
   }
+  if (att.src === 'device') {
+    if (!att.device) return null
+    const hit = (srcMap || {})[`${att.device}::${att.prop || ''}`]
+    return hit && hit.v != null ? hit.v : null
+  }
   return null
 }
 // 工艺节点 → 附加设备合成（结构对齐计量/可调设备，详情面板可打开）
-function _extDevice(node, unit, att, now) {
+function _extDevice(node, unit, att, now, srcMap) {
   const tpl = _attachTpl(att.kind, att.type)
   if (!tpl) return null
   const extId = `ext::${node.id}::${att.uid}`
   const isSensor = tpl.kind === 'sensor'
   const mUnit = isSensor ? tpl.measure.unit : tpl.setpoint.unit
-  const reading = _attachReading(att, unit, now)
+  const reading = _attachReading(att, unit, now, srcMap)
   return {
     id: extId,
     type: att.type,
@@ -101,7 +129,7 @@ function _extDevice(node, unit, att, now) {
     attachKind: att.kind,
     src: att.src || 'fixed',
     param: att.param || null,
-    desc: `${tpl.label}（${isSensor ? '传感器' : '可变设备'}）：${tpl.desc || ''}${att.src === 'param' && att.param ? '　读数来源：绑定工艺参数「' + att.param + '」。' : ''}`,
+    desc: `${tpl.label}（${isSensor ? '传感器' : '可变设备'}）：${tpl.desc || ''}${att.src === 'param' && att.param ? '　读数来源：绑定工艺参数「' + att.param + '」。' : ''}${att.src === 'device' && att.device ? '　读数来源：数据源管理设备「' + att.device + (att.prop ? ' · ' + att.prop : '') + '」实时读数。' : ''}`,
     unitId: node.id,
     unitName: (unit && unit.name) || node.name || node.type,
     unitType: (unit && unit.type) || node.type,
@@ -330,6 +358,9 @@ export const useSimStore = defineStore('sim', {
     activeDataSourceId: 'sim',  // 当前活动数据源 id（状态栏/指令区使用的活动源）
     sourceStatus: {},           // 各数据源连接状态：sourceId -> 'init'|'open'|'closed'|'error'
     lastFields: {},             // 各数据源最近一次遥测收到的外部字段：sourceId -> string[]
+    // 「数据源管理」（能碳一体机管理 → 数据源管理）中的传感器设备：附加设备绑定真实读数的数据源候选
+    // 结构：[{ name, model, node, protocol, state, props: [{ name, unit, value, ts, invalid }] }]，5s 轮询刷新
+    boxSourceDevices: [],
     // ---- 编辑态：节点编排方案 ----
     editMode: false,        // 是否处于流程编辑态（中间区显示节点画布）
     scheme: { nodes: [], connections: [], devices: [], groups: [], activeGroupId: null }, // 流程编排方案（groups：工艺设备小组；activeGroupId：当前子编排组 id）
@@ -478,7 +509,7 @@ export const useSimStore = defineStore('sim', {
         const att = node && (node.attached || []).find((a) => a.uid === auid)
         if (!att) return null
         const u = ((s.baseline && s.baseline.units) || []).find((x) => x.id === nid)
-        const dev = _extDevice(node, u, att)
+        const dev = _extDevice(node, u, att, Date.now(), _boxSrcMap(s))
         if (!dev) return null
         return { device: dev, unitId: nid, unitName: (u && u.name) || node.name, unitType: (u && u.type) || node.type }
       }
@@ -608,10 +639,12 @@ export const useSimStore = defineStore('sim', {
       }
       // 附加设备（传感器 / 可变设备）：挂在具体工艺节点 node.attached[] 上，
       // 附加后该工艺在资源管理器 / 设备树 / 数据分析中即出现对应设备（数值来源可按需解析）
+      const srcMap = _boxSrcMap(s)
+      const nowMs = Date.now()
       for (const n of (s.scheme && s.scheme.nodes) || []) {
         for (const att of (n.attached || [])) {
           const u = ((s.baseline && s.baseline.units) || []).find((x) => x.id === n.id)
-          const dev = _extDevice(n, u, att)
+          const dev = _extDevice(n, u, att, nowMs, srcMap)
           if (!dev) continue
           out.push({
             ...dev,
@@ -624,6 +657,15 @@ export const useSimStore = defineStore('sim', {
     },
     deviceHistoryOf: (s) => (id) => s.deviceHistory[id] || [],
     deviceLiveOf: (s) => (id) => (s.deviceLive[id] != null ? s.deviceLive[id] : null),
+    // 「数据源管理」中的传感器设备（按设备分组，组内为点位）——附加设备数值来源下拉用。
+    // 数据源 = 能碳一体机管理中已接入的设备（/box/devices 定义 + /box/devices/realtime 实时读数）。
+    boxSourceGroups: (s) => (s.boxSourceDevices || []).map((d) => ({
+      name: d.name,
+      model: d.model,
+      node: d.node,
+      state: d.state,
+      props: d.props || [],
+    })),
     // 某工艺节点可绑定的「数值来源」候选：工艺自身数值参数 + 固定值 + 模拟（供附加设备绑定下拉）
     attachSourceOptions: (s) => (nodeId) => {
       const node = ((s.scheme && s.scheme.nodes) || []).find((n) => n.id === nodeId)
@@ -697,6 +739,9 @@ export const useSimStore = defineStore('sim', {
         loadCalibrations()   // 启动即恢复本厂标定耦合（localStorage），否则用默认机理/经验系数
         this._loadDataSource() // 恢复上次设置的实时数据源（平台 MQTT 实时 / 自定义 WS / HTTP）
         this._startMqttPolling() // 定时拉取 MQTT 数据源状态（连接状态/订阅主题/最近消息）
+        // 「数据源管理」中的传感器设备：附加设备绑定真实读数的数据源候选（首次加载 + 常驻轮询）
+        this.loadBoxSourceDevices()
+        this._startBoxSourcePolling()
         this.fetchLicense() // 查询平台激活状态（后台加载，不阻塞主流程）
         const [m, presets, factors, schema, devs, hist] = await Promise.all([
           api.presetModel(), api.presetStrategies(), api.getFactors(), api.getParamSchema(),
@@ -1002,10 +1047,10 @@ export const useSimStore = defineStore('sim', {
     startOptimizerPolling(ms = 3000) {
       if (this.optimizerPolling) return
       this.optimizerPolling = true
-      this._optTimer = setInterval(() => this.refreshOptimizers(), ms)
+      this._optTimer = visiblePoll(() => this.refreshOptimizers(), ms)
     },
     stopOptimizerPolling() {
-      if (this._optTimer) { clearInterval(this._optTimer); this._optTimer = null }
+      if (this._optTimer) { this._optTimer(); this._optTimer = null }
       this.optimizerPolling = false
     },
     async startOptimizer(id) {
@@ -1420,8 +1465,9 @@ export const useSimStore = defineStore('sim', {
         this.rightOpen = false
       }
       this.activeViewId = id
-      // 数据分析 / AI群控 的数据源需从左侧「场景」资源树拖入 → 打开时自动展开左侧并定位到场景面板
-      if (id === 'dataView' || id === 'aiGroup') { this.leftOpen = true; this.activityView = 'scene' }
+      // 数据分析 / AI群控 的数据源来自左侧「场景」资源树 → 仅把左栏定位到场景面板，
+      // 不自动展开左侧（左栏只在用户手动点击活动栏 / 顶栏开关 / 系统设置时才展开）
+      if (id === 'dataView' || id === 'aiGroup') this.activityView = 'scene'
     },
     // 工况数据分析：数据源增删（从左侧「场景」资源树拖入添加；拖回场景即移除）
     addDvSource(src) {
@@ -1471,7 +1517,7 @@ export const useSimStore = defineStore('sim', {
         this.rightOpen = false
         this.bottomOpen = false
       } else {
-        this.leftOpen = true
+        // 退出全屏不自动展开左侧资源菜单（仅在用户手动点击时展开），保持退出前的收起状态
         this.rightOpen = false
         this.bottomOpen = false
       }
@@ -2349,8 +2395,10 @@ export const useSimStore = defineStore('sim', {
         kind,
         type,
         label: tpl.label,
-        src: 'sim',        // 默认数值来源：模拟（可在属性面板切换为工艺参数 / 固定值）
+        src: 'sim',        // 默认数值来源：随机模拟值（可在属性面板切换为固定值 / 数据源设备 / 工艺参数）
         param: null,       // src=param 时绑定的工艺数值参数 key
+        device: null,      // src=device 时绑定的数据源管理设备名
+        prop: null,        // src=device 时绑定的设备点位名
         def: tpl.kind === 'sensor' ? tpl.def : (tpl.setpoint ? tpl.setpoint.def : null),
       }
       if (!node.attached) node.attached = []
@@ -2370,17 +2418,89 @@ export const useSimStore = defineStore('sim', {
       const extId = `ext::${nodeId}::${uidToRemove}`
       if (this.deviceDetailId === extId) this.deviceDetailId = null
     },
-    // 设置附加设备的数值来源：{ src: 'fixed' | 'sim' | 'param', param?: 工艺参数 key }
+    // 设置附加设备的数值来源：
+    //   { src: 'fixed' }                      固定值（模板默认）
+    //   { src: 'sim' }                        随机模拟值
+    //   { src: 'param', param }               工艺参数
+    //   { src: 'device', device, prop }       数据源管理中的传感器设备点位实时读数
     setAttachSource(nodeId, uidToSet, patch) {
       const node = this.scheme.nodes.find((n) => n.id === nodeId)
       const att = node && Array.isArray(node.attached) ? node.attached.find((a) => a.uid === uidToSet) : null
       if (!att) return
       if (patch && patch.src) att.src = patch.src
       if (patch && 'param' in patch) att.param = patch.param
+      if (patch && 'device' in patch) att.device = patch.device
+      if (patch && 'prop' in patch) att.prop = patch.prop
       if (patch && 'def' in patch) att.def = patch.def
       this._histCapture('src_' + nodeId + uid('h'))
       this._saveScheme()
     },
+    // 加载「数据源管理」中的传感器设备（设备定义 + 实时读数），供附加设备绑定真实数据源
+    async loadBoxSourceDevices() {
+      if (_boxSrcBusy) return
+      _boxSrcBusy = true
+      try {
+        const [defs, rt] = await Promise.all([api.boxDevices(), api.boxDevicesRealtime()])
+        const rtMap = {}
+        for (const d of ((rt && rt.devices) || [])) rtMap[d.name] = d
+        // 设备自身未存点位时回退到其模型的点位定义（模型承载点位语义）
+        const modelProps = {}
+        for (const m of ((defs && defs.models) || [])) modelProps[m.name] = m.properties || []
+        const defList = (defs && defs.devices) || []
+        // 定义为空时（异常场景）以实时接口的设备为准，保证下拉不为空
+        const base = defList.length ? defList : ((rt && rt.devices) || []).map((d) => ({
+          name: d.name, model: d.model, node: d.node, properties: [],
+        }))
+        this.boxSourceDevices = base.map((d) => {
+          const r = rtMap[d.name] || {}
+          const tw = {}
+          for (const t of (r.twins || [])) tw[t.propertyName] = t
+          const propDefs = (d.properties || []).length
+            ? d.properties
+            : (modelProps[d.model] || []).length
+              ? modelProps[d.model]
+              : (r.twins || []).map((t) => ({ name: t.propertyName, unit: t.unit }))
+          const props = propDefs.map((p) => {
+            const t = tw[p.name] || {}
+            const raw = t.reported
+            const v = (raw != null && raw !== '') ? Number(raw) : null
+            return {
+              name: p.name,
+              unit: t.unit || p.unit || '',
+              value: (v != null && !isNaN(v) && !t.invalid) ? v : null,
+              ts: t.timestamp || null,
+              invalid: !!t.invalid,
+            }
+          })
+          // 无点位定义的旧设备：回退到该设备的实时主读数（list_devices 的 primary）
+          if (!props.length && d.primary != null && d.primary !== '') {
+            const pv = Number(d.primary)
+            props = [{ name: 'primary', unit: '', value: isNaN(pv) ? null : pv, ts: null, invalid: false }]
+          }
+          return {
+            name: d.name,
+            model: d.model || '',
+            node: d.node || '',
+            protocol: d.protocol || '',
+            state: r.state || 'offline',
+            props,
+          }
+        })
+      } catch (e) {
+        // 后端不可达时保留上一次结果，不打断编排交互
+      } finally {
+        _boxSrcBusy = false
+      }
+    },
+    // 常驻轮询：数据源管理设备列表与其读数（10s），保证附加设备绑定的真实读数持续更新
+    _startBoxSourcePolling(ms = 10000) {
+      if (_boxSrcTimer) return
+      // 可见性感知：后台标签不拉（该轮询常驻不停，否则切走后仍在每 10s 拉全量设备+读数）
+      _boxSrcTimer = visiblePoll(() => this.loadBoxSourceDevices(), ms)
+    },
+    // 编排面板打开时即时拉一次（下拉里立刻能看到最新设备与读数）
+    startBoxSourcePolling() { this.loadBoxSourceDevices() },
+    stopBoxSourcePolling() { /* 轮询常驻，无需停止 */ },
 
     addFlowNode(kind, type, x, y) {
       if (this._simEditBlocked()) return null
@@ -3083,7 +3203,7 @@ export const useSimStore = defineStore('sim', {
         api.realtimeSource().then((s) => { this.mqttSource = s }).catch(() => {})
       }
       poll()
-      this._mqttTimer = setInterval(poll, 3000)
+      this._mqttTimer = visiblePoll(poll, 3000)
     },
     // 云端设备 <-> 仿真设备实例关联：仅关联后云端读数才同步到对应设备实例
     async linkMqttDevice(cloudId, localId) {

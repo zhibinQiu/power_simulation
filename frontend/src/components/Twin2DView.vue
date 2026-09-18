@@ -1,20 +1,5 @@
 <template>
   <div class="twin2d">
-    <!-- 顶部厂级 KPI 条（ISA-101：克制、层次清晰、信息密度适中）；全屏时右侧避让全屏工具按钮 -->
-    <div class="t2d-kpi" :class="{ fs: store.fullscreenOn }">
-      <div class="kpi"><span>{{ t('总碳排放') }}</span><b :style="{ color: '#a0522d' }">{{ fmt(totals.co2_total) }}</b><i>tCO₂/h</i></div>
-      <div class="kpi"><span>{{ t('综合能耗') }}</span><b>{{ fmt(totals.energy_total) }}</b><i>GJ/h</i></div>
-      <div class="kpi"><span>{{ t('吨钢强度') }}</span><b>{{ fmt(totals.intensity / 1000) }}</b><i>tCO₂/t</i></div>
-      <div class="kpi"><span>{{ t('钢产量') }}</span><b>{{ fmt(totals.steel_output) }}</b><i>t/h</i></div>
-      <div class="kpi-sep"></div>
-      <div class="kpi hint">
-        <span class="lg"><i class="dot ok"></i>{{ t('数据') }}</span>
-        <span class="lg"><i class="dot sel"></i>{{ t('选中') }}</span>
-        <span class="lg"><i class="dot feed"></i>{{ t('反馈') }}</span>
-      </div>
-      <button type="button" class="t2d-fit" @click="fitAll()" :title="t('适配画布（双击也可）')">{{ t('适配') }}</button>
-    </div>
-
     <!-- 全新 2D 工艺流程图 SVG 画布（非 3D 俯视）：树状布局、正交管线、标准工艺图符 -->
     <div class="t2d-canvas" ref="wrap" @wheel.prevent="onWheel" @mousedown="onDown" @mousemove="onMove" @mouseup="onUp" @mouseleave="onUp" @dblclick="fitAll()">
       <!-- 不用 viewBox，完全由 JS 控制 zoom/pan，避免 viewBox 自动缩放与 group transform 双重缩放 -->
@@ -50,8 +35,67 @@
           <linearGradient id="g-card-hdr-aux" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" stop-color="#7d8a9a"/><stop offset="1" stop-color="#5a6675"/>
           </linearGradient>
+
+          <!-- ===== 程序化设备图形的伪 3D 材质（供 data/twin2dFigures.js 使用） =====
+               横向渐变模拟圆柱受光（光源左上：左暗→中偏左最亮→右暗），
+               任何竖直筒体一填就有体积感；热态版本用于炉缸/转炉等高温部位。 -->
+          <linearGradient id="g-cyl" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#5d6b79"/><stop offset="0.34" stop-color="#dfe6ed"/>
+            <stop offset="0.6" stop-color="#aab6c2"/><stop offset="1" stop-color="#4e5b68"/>
+          </linearGradient>
+          <linearGradient id="g-cyl-hot" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#6e2c10"/><stop offset="0.34" stop-color="#ffb04a"/>
+            <stop offset="0.62" stop-color="#d2601c"/><stop offset="1" stop-color="#5f2510"/>
+          </linearGradient>
+          <!-- 顶面/封头：比侧壁亮一档，与侧壁形成明暗交替 -->
+          <linearGradient id="g-top" x1="0" y1="0" x2="0.9" y2="1">
+            <stop offset="0" stop-color="#f4f8fb"/><stop offset="1" stop-color="#96a3b1"/>
+          </linearGradient>
+          <!-- 箱体/炉墙：左上亮、右下暗 -->
+          <linearGradient id="g-box" x1="0" y1="0" x2="0.3" y2="1">
+            <stop offset="0" stop-color="#dae2ea"/><stop offset="1" stop-color="#78868f"/>
+          </linearGradient>
+          <linearGradient id="g-box-hot" x1="0" y1="0" x2="0.3" y2="1">
+            <stop offset="0" stop-color="#e8b07a"/><stop offset="1" stop-color="#8d4320"/>
+          </linearGradient>
+          <!-- 钢液/铁水：自上而下由亮黄过渡到暗红 -->
+          <linearGradient id="g-molten" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffd98a"/><stop offset="0.45" stop-color="#ff9d3c"/>
+            <stop offset="1" stop-color="#a83208"/>
+          </linearGradient>
+          <!-- 炉膛/弧光热核（径向） -->
+          <radialGradient id="g-hearth" cx="0.5" cy="0.42" r="0.62">
+            <stop offset="0" stop-color="#fff6c9"/><stop offset="0.45" stop-color="#ffab3d"/>
+            <stop offset="1" stop-color="#a83208"/>
+          </radialGradient>
+          <!-- 轧辊/托辊：径向金属 + 偏心亮心 -->
+          <radialGradient id="g-roll" cx="0.38" cy="0.34" r="0.72">
+            <stop offset="0" stop-color="#eef3f8"/><stop offset="0.55" stop-color="#a9b5c2"/>
+            <stop offset="1" stop-color="#55626f"/>
+          </radialGradient>
+          <!-- 主体投影：伪 3D 的主要来源之一（设备从背景上「浮」起来） -->
+          <filter id="f-fig" x="-35%" y="-35%" width="180%" height="190%">
+            <feDropShadow dx="0.3" dy="0.5" stdDeviation="0.45" flood-color="#0d1b2a" flood-opacity="0.45"/>
+          </filter>
+          <!-- 接地柔影 / 烟气：用**径向渐变**而非 feGaussianBlur。
+               渐变是纯填充、零滤镜开销；模糊滤镜会在每帧动画（管线流向箭头）触发重新栅格化，
+               是 2D 视图掉帧的主因之一，视觉上两者几乎没有差别。 -->
+          <radialGradient id="g-ground" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stop-color="#0b1a2b" stop-opacity="0.85"/>
+            <stop offset="0.55" stop-color="#0b1a2b" stop-opacity="0.45"/>
+            <stop offset="1" stop-color="#0b1a2b" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="g-puff" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stop-color="#eef4fa" stop-opacity="0.95"/>
+            <stop offset="0.6" stop-color="#e8eef4" stop-opacity="0.5"/>
+            <stop offset="1" stop-color="#e8eef4" stop-opacity="0"/>
+          </radialGradient>
         </defs>
-        <g :transform="`translate(${pan.x},${pan.y}) scale(${zoom})`">
+        <!-- 世界坐标系根节点：视图变换**不绑定响应式数据**，由 applyView() 直接写到 <svg> 的
+             CSS transform 上（见下）。原因：① 拖拽/缩放是每帧事件，若走 Vue 响应式，每帧都要对
+             上千个 SVG 节点做一次 vdom diff + patch；② 用 CSS transform 而不是 SVG transform
+             属性，浏览器可以把整幅图提升为合成层，平移只做合成而不重绘内容。 -->
+        <g>
           <!-- 网格底纹（工业图低对比网格） -->
           <g class="t2d-grid" stroke="#dfe4ea" stroke-width="1">
             <path v-for="l in gridV" :key="'gv'+l" :d="`M${l} 0 V${bounds.h}`"/>
@@ -101,7 +145,9 @@
               <rect class="t2d-card-bg" x="0" y="0" :width="c.w" :height="c.h" rx="5"
                 :stroke="c.color" stroke-opacity="0.45"/>
               <rect class="t2d-card-bar" x="1" y="1" width="2.6" :height="c.h - 2" rx="1.3" :fill="c.color"/>
-              <text class="t2d-card-mat" :fill="c.color" :x="CARD_PAD_X" :y="CARD_PAD_Y + 10">{{ c.matName }}</text>
+              <!-- 卡片高度统一为两行：无速率的管道只显示材料名，垂直居中不显空 -->
+              <text class="t2d-card-mat" :fill="c.color" :x="CARD_PAD_X"
+                :y="CARD_PAD_Y + 10 + (c.rate ? 0 : CARD_LINE_H / 2)">{{ c.matName }}</text>
               <text v-if="c.rate" class="t2d-card-rate" :x="CARD_PAD_X" :y="CARD_PAD_Y + CARD_LINE_H + 10.5">
                 <tspan class="t2d-card-val" :fill="c.rate.src === 'live' ? CARD_VAL_LIVE : CARD_VAL_SIM">{{ formatRate(c.rate.value) }}</tspan>
                 <tspan class="t2d-card-unit" dx="2.5" :fill="c.rate.src === 'live' ? CARD_VAL_LIVE : CARD_VAL_SIM">{{ c.rate.unit }}</tspan>
@@ -116,32 +162,14 @@
             <!-- 设备名称浮签（贴设备图形上缘，见 nameY） -->
             <text class="t2d-name" :x="boxW(n)/2" :y="nameY(n)" text-anchor="middle">{{ n.name }}</text>
 
-            <!-- 设备主体：优先贴真实设备图（已自动裁透明边；视口铺满可用图带并横向外扩，等比 contain 居中）；
-                 无图时退回矢量图元（立体图符按节点图带等比放大，描边宽随缩放反除保持细线质感） -->
-            <!-- 设备图按「图形真实边界」(PNG alpha 外接矩形)裁剪后铺满显示盒：
-                 嵌套 <svg viewBox=边界> 把透明留白切掉，设备本体四缘即显示盒四缘，
-                 连线端点贴该盒边缘（figRect），因此设备与管线之间不再有空隙。
-                 显示盒宽高比 = 图形宽高比 → preserveAspectRatio=none 恰好严格铺满。 -->
-            <svg v-if="devImgOf(n) && devImgMetaOf(n)" :x="devImgBox(n).x" :y="devImgBox(n).y"
-              :width="devImgBox(n).w" :height="devImgBox(n).h"
-              :viewBox="`${devImgMetaOf(n).bx} ${devImgMetaOf(n).by} ${devImgMetaOf(n).bw} ${devImgMetaOf(n).bh}`"
-              preserveAspectRatio="none" class="t2d-figimg">
-              <image :x="0" :y="0" :width="devImgMetaOf(n).W" :height="devImgMetaOf(n).H" :href="devImgOf(n)"/>
-            </svg>
-            <!-- 无边界元数据（新图未重跑 scripts/gen-devimg-meta.py）：回退整图等比 contain -->
-            <image v-else-if="devImgOf(n)" :x="devImgBox(n).x" :y="devImgBox(n).y" :width="devImgBox(n).w" :height="devImgBox(n).h" :href="devImgOf(n)" preserveAspectRatio="xMidYMid meet" class="t2d-figimg"/>
-            <g v-else class="t2d-fig" :transform="`translate(${figOf(n).x},${figOf(n).y}) scale(${figOf(n).s})`">
-              <template v-for="(el, ei) in iconOf(n.repType || n.type)" :key="ei">
-                <path v-if="el.tag === 'path'" :d="el.d" :stroke="el.stroke" :stroke-width="(el.sw||0)/figOf(n).s" :stroke-linecap="el.lc" :stroke-linejoin="el.lj" :fill="el.fill || 'none'"/>
-                <circle v-else-if="el.tag === 'circle'" :cx="el.cx" :cy="el.cy" :r="el.r" :stroke="el.stroke" :stroke-width="(el.sw||0)/figOf(n).s" :fill="el.fill || 'none'"/>
-                <ellipse v-else-if="el.tag === 'ellipse'" :cx="el.cx" :cy="el.cy" :rx="el.rx" :ry="el.ry" :stroke="el.stroke" :stroke-width="(el.sw||0)/figOf(n).s" :fill="el.fill || 'none'" :transform="el.transform || ''"/>
-                <rect v-else-if="el.tag === 'rect'" :x="el.x" :y="el.y" :width="el.width" :height="el.height" :rx="el.rx || 0" :stroke="el.stroke" :stroke-width="(el.sw||0)/figOf(n).s" :fill="el.fill || 'none'"/>
-                <polygon v-else-if="el.tag === 'polygon'" :points="el.pts.map(p => p.join(',')).join(' ')" :stroke="el.stroke" :stroke-width="(el.sw||0)/figOf(n).s" :fill="el.fill || 'none'"/>
-              </template>
-            </g>
-            <!-- 高炉温度标注叠加层：在 PNG 基底各区域标注温度（与图片共用显示盒/viewBox，随图缩放） -->
-            <BfTempOverlay v-if="n.type === 'blast_furnace' && devImgOf(n) && devImgMetaOf(n)"
-              :box="devImgBox(n)" :meta="devImgMetaOf(n)" :node="n"/>
+            <!-- 设备主体：程序化绘制的伪 3D 图形（data/twin2dFigures.js，零图片资源）。
+                 图形自带 viewBox → 显示盒宽高比 = 图形宽高比，图形四缘即显示盒四缘，
+                 连线端点贴该盒（figRect），设备与管线之间不留空隙；描边用 non-scaling-stroke，
+                 缩放时始终保持细线质感。 -->
+            <DeviceFigure :type="n.repType || n.type" :box="figBox(n)"/>
+            <!-- 高炉温度分区：与炉体图形共用同一份归一化轮廓（BF_PROFILE），天然对齐，
+                 不再需要按 PNG 像素逐行标定（旧方案换图必错位） -->
+            <BfTempOverlay v-if="n.type === 'blast_furnace'" :box="figBox(n)" :node="n"/>
 
 
             <!-- 底部实时 KPI（仅主工艺，悬浮在设备下方） -->
@@ -153,6 +181,8 @@
           </g>
         </g>
       </svg>
+      <!-- 适配画布：原顶部 KPI 条已移除，按钮改为画布右下角悬浮（双击画布同效） -->
+      <button type="button" class="t2d-fit" @click.stop="fitAll()" :title="t('适配画布（双击也可）')">{{ t('适配') }}</button>
     </div>
 
     <!-- 空方案提示 -->
@@ -161,17 +191,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onUpdated, watch, nextTick } from 'vue'
 import { t } from '../i18n'
 import { useSimStore } from '../stores/sim'
 import { MATERIAL_MAP, PROCESS_MAP } from '../data/flowLibrary'
-import { T2D_ICONS, T2D_GEOM, T2D_IMG_SCALE } from '../data/twin2dIcons'
+import { T2D_GEOM, T2D_IMG_SCALE } from '../data/twin2dIcons'
+import { figureAspect } from '../data/twin2dFigures'
 import { resolvePipeRate, formatRate } from '../utils/pipeRate'
 import BfTempOverlay from './BfTempOverlay.vue'
-// 设备图清单（构建期由 vite 插件 device-images 扫描 public/2D-image/devices 生成）
-// meta：每张图「图形真实边界」(PNG alpha 外接矩形，scripts/gen-devimg-meta.py 生成) ——
-//       透明背景素材的设备本体不铺满画布，按边界定位才能让图形贴住节点/连线端点。
-import { names as DEV_IMG_NAMES, meta as DEV_IMG_META } from 'virtual:device-images'
+import DeviceFigure from './DeviceFigure.vue'
 
 const store = useSimStore()
 const wrap = ref(null)
@@ -532,7 +560,7 @@ function relayout() {
         let cyBot = botY
         let right = -Infinity
         for (const a of col) {
-          const b = devImgBox(a)
+          const b = figBox(a)                    // 图形外接盒（节点内偏移），用于轴对齐
           a.x = axisX - (b.x + b.w / 2)          // 图形中心落在竖直通道轴上
           a.y = cyBot - boxH(a)
           cyBot = a.y - LINK_GAP_Y
@@ -668,7 +696,7 @@ function relayout() {
     if (pin) {
       const t = mains.find((m) => m.type === pin.main)
       if (t) {
-        const b = devImgBox(a)                    // 图形外接盒(含图内偏移)，用于轴对齐
+        const b = figBox(a)                       // 图形外接盒(含图内偏移)，用于轴对齐
         if (pin.side === 'top' || pin.side === 'bottom') {
           const tr = figRect(t)
           const axisX = Math.min(Math.max(tr.x + tr.w / 2, tr.x + 8), tr.x + tr.w - 8)
@@ -791,50 +819,15 @@ function figOf(n) {
 
 function isAux(n) { return !isMain(n) }
 function isMain(n) { const t = PROCESS_MAP[n.type]; return !!t && t.route === 'steel' }
-function iconOf(t) { return T2D_ICONS[t] || T2D_ICONS.default }
 
-// —— 设备 PNG 图替：public/2D-image/devices/{设备名}.png 或 {type}.png 存在时，
-//    用真实设备图片替代矢量图元（按设备名中文优先、type 兜底），不存在仍画矢量。
-// 图片清单由 vite 插件 device-images 在构建期扫描目录生成（virtual:device-images），
-// 打开视图即可直接上图 —— 不再运行时 HEAD 探测（旧方案首帧先画矢量、探测回来再换图，有跳变）。
-// 必须拼接 Vite 的 base（vite.config.js base: '/sim/'，门户以 /sim/ 前缀反代）；
-// 写死 '/2D-image/...' 在带前缀的部署下会 404（或被 SPA fallback 返回 HTML），导致全图回退矢量。
-const BASE = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '')
-const IMG_DIR = BASE + '/2D-image/devices/'
-const IMG_SET = new Set(DEV_IMG_NAMES)   // 构建期固化的「已存在图片名」集合，同步可用
-// 图片匹配键：设备名 → 去序号名 → 类型中文名 → type（返回文件名 key，未命中 null）
-function devImgKeyOf(n) {
-  const nm = (n.name || '').trim()
-  if (nm && IMG_SET.has(nm + '.png')) return nm
-  // 实例名去掉末尾序号（热风炉1 → 热风炉）：多台同类型实例共享「类型图」如 热风炉.png
-  const base = nm.replace(/\s*\d+$/, '')
-  if (base && base !== nm && IMG_SET.has(base + '.png')) return base
-  // 类型中文名兜底：节点被重命名（如「热风炉1」→「1号炉」）时仍能命中 热风炉.png
-  const tl = PROCESS_MAP[n.type] && PROCESS_MAP[n.type].label
-  if (tl && IMG_SET.has(tl + '.png')) return tl
-  if (n.type && IMG_SET.has(n.type + '.png')) return n.type
-  return null
-}
-function devImgOf(n) {
-  const k = devImgKeyOf(n)
-  return k ? IMG_DIR + encodeURIComponent(k) + '.png' : null
-}
-// 图形真实边界（原图像素坐标 {W,H,bx,by,bw,bh}）：由 PNG alpha 外接矩形离线解析得到。
-// 透明背景素材的设备本体不铺满画布（热风炉仅占 46%、铁水预处理 50%…），必须按边界裁剪显示，
-// 否则透明留白会被当成图形的一部分，把设备挤小并与连线端点脱开。
-function devImgMetaOf(n) {
-  const k = devImgKeyOf(n)
-  return (k && DEV_IMG_META && DEV_IMG_META[k]) || null
-}
-// 设备 PNG 显示盒（节点局部坐标）：以「图形真实边界」的宽高比等比 contain 到图带
-// （名称带下方 → KPI/底部上方）。返回的 x/y/w/h 即图形边界在节点内的位置 ——
-// 连线端点直接贴该盒四缘（见 figRect/sideAnchorOf），设备本体与管线严丝合缝。
-// 无边界元数据（新增图片未重跑脚本）时回退旧口径：整图 contain。
-// —— 面积归一化(2026-09-10 新图组改版)：新图内容宽高比差异极大(0.43 竖长 ~ 2.4 扁长)，
-// 旧「先撑宽→限高」会把竖长设备压成 80px 细条、与横长设备(占满 275px 宽)大小悬殊。
-// 改为按「目标视觉面积」归一：显示盒面积 = 图带面积 × sc²，等比缩放后 clamp 到图带内
-// —— 中等比例设备两维都更饱满，极端比例设备由图片形状决定(竖图撑满高、横图撑满宽)。
-function devImgBox(n) {
+// —— 设备图形显示盒（节点局部坐标）——
+// 图形由 data/twin2dFigures.js 程序化绘制，每种设备自带 viewBox（自然比例：高炉竖长、
+// 烧结机扁长、风机近方）。这里按该比例等比 contain 到图带（名称带下方 → KPI/底部上方），
+// 并按 T2D_IMG_SCALE 做「视觉面积归一」：显示盒面积 = 图带面积 × sc²，再由比例反解两维 ——
+// 极端比例设备不会被压成细条，与中等比例设备观感大小一致（沿用 PNG 时代的调校结论）。
+// 返回的 x/y/w/h 即「图形真实边界」在节点内的位置：图形四缘 = 显示盒四缘，
+// 连线端点直接贴该盒（见 figRect/sideAnchorOf），设备与管线严丝合缝。
+function figBox(n) {
   const W = boxW(n), H = boxH(n)
   const main = isMain(n)
   const top = 24
@@ -842,25 +835,16 @@ function devImgBox(n) {
   const availH = Math.max(24, bot - top)
   const availW = Math.max(24, W - 6)
   const sc = T2D_IMG_SCALE[n.type] || 1
-  const m = devImgMetaOf(n)
-  if (!m) {
-    const aw = availW * sc
-    const ah = availH * sc
-    return { x: (W - aw) / 2, y: top + (availH - ah) / 2, w: aw, h: ah }
-  }
-  const ar = m.bw / m.bh
-  const s = sc * Math.sqrt((availW * availH) / (m.bw * m.bh))
-  let aw = m.bw * s
-  let ah = m.bh * s
-  if (aw > availW) { aw = availW; ah = aw / ar }
-  if (ah > availH) { ah = availH; aw = ah * ar }
-  return { x: (W - aw) / 2, y: top + (availH - ah) / 2, w: aw, h: ah }
+  const ar = figureAspect(n.repType || n.type)     // 宽 / 高
+  let w = Math.sqrt(availW * availH * sc * sc * ar)
+  let h = w / ar
+  if (w > availW) { w = availW; h = w / ar }
+  if (h > availH) { h = availH; w = h * ar }
+  return { x: (W - w) / 2, y: top + (availH - h) / 2, w, h }
 }
-// 设备「图形外接盒」(绝对坐标)：有 PNG 图时取图形边界盒（已裁掉透明留白），
-// 无图时回退节点盒。连线端点/障碍判定以此为准，保证端点贴在设备本体边缘。
+// 设备「图形外接盒」(绝对坐标)：连线端点/障碍判定以此为准，保证端点贴在设备本体边缘。
 function figRect(n) {
-  if (!devImgOf(n)) return { x: n.x, y: n.y, w: boxW(n), h: boxH(n) }
-  const b = devImgBox(n)
+  const b = figBox(n)
   return { x: n.x + b.x, y: n.y + b.y, w: b.w, h: b.h }
 }
 // 名称浮签的纵向位置（节点内坐标）：紧贴「设备图形外接盒」上缘 8px。
@@ -1285,34 +1269,13 @@ const FLOW_STROKE_W = 1.2
 const FLOW_PTS = '-9,-5.6 9,0 -9,5.6'      // 正流箭头（宽 18 / 高 11.2，略凸出管壁）
 const FLOW_PTS_FB = '-7.5,-4.6 7.5,0 -7.5,4.6' // 回流虚线管箭头（比正流略小，语义弱化）
 const lines = computed(() => {
-  // 2D 工艺流程图定位：管线沿折线中点标「物料名 + 材料流动速率」小标签。
+  // **只算几何**（折线路由 / 管径 / 箭头节奏），不含任何实时读数 —— 材料流动速率见 rates。
+  // 为什么必须拆开：实时遥测（WebSocket /api/ws/feed）每几秒推送一次，而 lines 一旦依赖它，
+  // 每次推送都会连带重算全部折线路由、并让 40 条管线的三层描边与 SMIL 动画元素进入 diff，
+  // 表现为「每隔几秒卡一下」。拆开后推送只会更新卡片里的速率文本。
   const routes = _lineRoutes()
   const out = []
-  // —— 材料流速上下文：按「材料 → 计量点」规则从后端下发的读数解析（见 utils/pipeRate.js）。
-  //   ① 实时遥测 store.deviceLive（WebSocket /api/ws/feed 推送的现场设备读数）
-  //   ② 未关联/未上报时回退 baseline 里后端算出的仿真读数
-  //   ③ 工辅介质（鼓风/热风/供氧/抽力/喷煤）取该工辅的运行工况参数
-  // upstream 用于「预处理铁水」这类无独立计量设备的管道反向复用上游铁水计量。
   const byIdNode = new Map(nodes.value.map((n) => [n.id, n]))
-  const baseById = new Map(((store.baseline && store.baseline.units) || []).map((u) => [u.id, u]))
-  const devsOfUnit = new Map()
-  for (const d of store.allDevices) {
-    if (!devsOfUnit.has(d.unitId)) devsOfUnit.set(d.unitId, [])
-    devsOfUnit.get(d.unitId).push(d)
-  }
-  const rateCtxOf = (conn, seen) => ({
-    unit: (id) => byIdNode.get(id) || null,
-    devices: (id) => devsOfUnit.get(id) || [],
-    live: (devId) => (store.deviceLive[devId] != null ? store.deviceLive[devId] : null),
-    // 上游工序主产物产量（后端 UnitResult.steel_output，t/h），作为无计量点管道的兜底口径
-    out: (id) => { const u = baseById.get(id); return u ? u.steel_output : null },
-    upstream: (mats) => {
-      const up = conns.value.find((x) => x.to === conn.from && mats.includes(x.material) && !seen.has(x.id))
-      if (!up) return null
-      seen.add(up.id)
-      return resolvePipeRate(up, rateCtxOf(up, seen))
-    },
-  })
   for (const c of conns.value) {
     const g = lineOf(c, routes)
     if (!g) continue
@@ -1323,8 +1286,6 @@ const lines = computed(() => {
       len += Math.abs(g.pts[i].x - g.pts[i - 1].x) + Math.abs(g.pts[i].y - g.pts[i - 1].y)
     }
     const dur = Math.min(FLOW_DUR_MAX, Math.max(FLOW_DUR_MIN, len / FLOW_SPEED))
-    // 材料流动速率（后端读数解析）：null = 该管道无量测点，只显示材料名
-    const rate = resolvePipeRate(c, rateCtxOf(c, new Set([c.id])))
     const fb = !!c.feedback
     const pipeW = fb ? PIPE_W_FB : PIPE_W
     // 稳定标识（源类型>目标类型:物料）—— 卡片手工落位表 CARD_PIN 按此键匹配，
@@ -1346,9 +1307,6 @@ const lines = computed(() => {
       arrowFill: shade(fb ? '#8a97a5' : portColor(c.material), FLOW_DARKEN),
       arrowEdge: shade(fb ? '#8a97a5' : portColor(c.material), FLOW_DARKEN_EDGE),
       matName: matName(c.material),
-      // 材料流动速率（后端读数解析结果）：rate=null 表示该管道无量测点，只显示材料名
-      rate,
-      rateText: rate ? `${formatRate(rate.value)} ${rate.unit}` : '',
       isBusBranch: routes.busBranch ? routes.busBranch.has(c.id) : false,
       busKey: routes.busGroup ? (routes.busGroup.get(c.id) || null) : null,
       dur: `${dur.toFixed(2)}s`,
@@ -1372,6 +1330,42 @@ const lines = computed(() => {
     })
   }
   return out
+})
+
+// —— 材料流动速率（与管线几何解耦，随实时读数变化）——
+// 按「材料 → 计量点」规则从后端下发的读数解析（见 utils/pipeRate.js）：
+//   ① 实时遥测 store.deviceLive（WebSocket /api/ws/feed 推送的现场设备读数）
+//   ② 未关联/未上报时回退 baseline 里后端算出的仿真读数
+//   ③ 工辅介质（鼓风/热风/供氧/抽力/喷煤）取该工辅的运行工况参数
+// upstream 用于「预处理铁水」这类无独立计量设备的管道反向复用上游铁水计量。
+// 返回 Map<connId, rate>；无计量点的管道不在表里（卡片只显示材料名）。
+const rates = computed(() => {
+  const m = new Map()
+  const byIdNode = new Map(nodes.value.map((n) => [n.id, n]))
+  const baseById = new Map(((store.baseline && store.baseline.units) || []).map((u) => [u.id, u]))
+  const devsOfUnit = new Map()
+  for (const d of store.allDevices) {
+    if (!devsOfUnit.has(d.unitId)) devsOfUnit.set(d.unitId, [])
+    devsOfUnit.get(d.unitId).push(d)
+  }
+  const rateCtxOf = (conn, seen) => ({
+    unit: (id) => byIdNode.get(id) || null,
+    devices: (id) => devsOfUnit.get(id) || [],
+    live: (devId) => (store.deviceLive[devId] != null ? store.deviceLive[devId] : null),
+    // 上游工序主产物产量（后端 UnitResult.steel_output，t/h），作为无计量点管道的兜底口径
+    out: (id) => { const u = baseById.get(id); return u ? u.steel_output : null },
+    upstream: (mats) => {
+      const up = conns.value.find((x) => x.to === conn.from && mats.includes(x.material) && !seen.has(x.id))
+      if (!up) return null
+      seen.add(up.id)
+      return resolvePipeRate(up, rateCtxOf(up, seen))
+    },
+  })
+  for (const c of conns.value) {
+    const r = resolvePipeRate(c, rateCtxOf(c, new Set([c.id])))
+    if (r) m.set(c.id, r)
+  }
+  return m
 })
 
 // —— 管道旁的「物料卡片」：材料名 + 流动速率 ——
@@ -1441,7 +1435,11 @@ function pinRectOf(l, w, h, valid) {
   }
   return null
 }
-const cards = computed(() => {
+// 卡片尺寸：宽度取「材料名」与「速率文本预留宽」的较大者 —— **不随速率变化**。
+// 否则实时读数每次刷新都会改变卡片宽度 → 触发下面那套 O(n²) 避让布局重算（每几秒一次全图重排）。
+// 尺寸统一后卡片也更整齐。
+const CARD_RATE_W = 62        // 速率行预留宽（够放 "1,234.5 t/h"）
+const cardLayout = computed(() => {
   // 避让对象取「节点盒」而非设备图形外接盒：卡片带白底，若压在设备名浮签或底部 KPI 带上
   // 会遮住文字，故按整个节点占位（含名称带与 KPI 带）避让。
   const boxes = nodes.value.map((n) => ({ x: n.x, y: n.y, w: boxW(n), h: boxH(n) }))
@@ -1484,8 +1482,8 @@ const cards = computed(() => {
   const hit = (r, skipId) => hitBox(r) || oob(r) || hitCard(r) || hitPipe(r, skipId)
   const out = []
   for (const l of lines.value) {
-    const w = Math.round(Math.max(estTextW(l.matName, 11), l.rate ? estTextW(l.rateText, 11.5) : 0) + CARD_PAD_X * 2 + 2)
-    const h = Math.round(CARD_PAD_Y * 2 + (l.rate ? CARD_LINE_H * 2 : 12))
+    const w = Math.round(Math.max(estTextW(l.matName, 11), CARD_RATE_W) + CARD_PAD_X * 2 + 2)
+    const h = Math.round(CARD_PAD_Y * 2 + CARD_LINE_H * 2)
     const lineY = l.my + 4                    // 水平段真实 y（lineOf 内标签锚点已上移 4px）
     const half = l.pipeEdgeW / 2 + CARD_GAP   // 卡片近管侧与管道中心线的距离
     // ① 手工落位（CARD_PIN）：按用户指定方位贴管放置，只避让「图形边界 + 已放卡片 + 其他管线」。
@@ -1526,62 +1524,109 @@ const cards = computed(() => {
     }
     if (!r) { const [x, y] = near[0]; r = { x: Math.round(x), y: Math.round(y), w, h } }   // 四周都挤：仍贴管道，保证不丢信息
     occupied.push(r)
-    out.push({ id: l.id, x: r.x, y: r.y, w, h, matName: l.matName, color: l.color, rate: l.rate })
+    out.push({ id: l.id, x: r.x, y: r.y, w, h, matName: l.matName, color: l.color })
   }
   return out
 })
+// 速率单独附加：layout 走缓存，只有 rate 字段随实时读数变化（渲染时仅更新卡片里的两行文本）
+const cards = computed(() => cardLayout.value.map((c) => ({ ...c, rate: rates.value.get(c.id) || null })))
 
 // 交互：缩放 / 平移 / 选中
-const zoom = ref(1)
-const pan = ref({ x: 0, y: 0 })
+// 视图状态（zoom/pan）**故意不用 ref**：它们每帧都在变，若做成响应式会触发整棵 SVG 的
+// vdom 重算。这里用普通变量 + applyView() 直接写 <svg> 的 CSS transform。
+// 注意视口基准一律取外层 .t2d-canvas（ref="wrap"）的 rect —— svg 自身被 transform 后
+// 它的 getBoundingClientRect 会跟着变，用它算鼠标世界坐标会「越缩越飘」。
+let view = { z: 1, x: 0, y: 0 }
 const hovered = ref(null)
 const dragging = ref(false)
-const last = ref({ x: 0, y: 0 })
+const last = { x: 0, y: 0 }
 const cursor = computed(() => (dragging.value ? 'grabbing' : 'grab'))
 
+/** 把当前 zoom/pan 写到 <svg> 的 CSS transform（唯一的视图更新出口）。
+ *  用 CSS transform 而非 SVG transform 属性：前者可被浏览器提升为合成层，
+ *  拖拽时只做层合成、不重绘内容，实测帧时间明显更低。 */
+function applyView() {
+  if (!svg.value) return
+  const s = svg.value
+  if (s.style.transform !== `translate(${view.x}px, ${view.y}px) scale(${view.z})`) {
+    s.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.z})`
+  }
+}
+
+// —— 管线流向动画的暂停/恢复 ——
+// 每条管线都有一个常驻 SMIL 动画（animateMotion + opacity），箭头每帧移动都会触发
+// 重绘；拖拽/缩放时它与平移重绘叠加，帧率骤降。交互期间直接暂停整个 SVG 的 SMIL 时钟
+// （pauseAnimations），停手后再恢复 —— 时间线是暂停而非重置，箭头从原处继续，不会跳。
+// 同时把设备投影也临时关掉（走 CSS class，避免触发 Vue 重渲染）：平移/缩放时整幅图每帧重绘，
+// 哪怕只剩「每台设备一次」的滤镜，栅格化成本依然可观；交互时去掉、停手恢复，肉眼几乎无感。
+let animResumeTimer = null
+function pauseFlow() {
+  if (animResumeTimer) { clearTimeout(animResumeTimer); animResumeTimer = null }
+  if (!svg.value) return
+  svg.value.classList.add('dragging')
+  if (svg.value.pauseAnimations) svg.value.pauseAnimations()
+}
+function resumeFlow(delay = 260) {
+  if (animResumeTimer) clearTimeout(animResumeTimer)
+  animResumeTimer = setTimeout(() => {
+    animResumeTimer = null
+    if (!svg.value) return
+    svg.value.classList.remove('dragging')
+    if (svg.value.unpauseAnimations) svg.value.unpauseAnimations()
+  }, delay)
+}
+
 function fitAll() {
-  if (!svg.value || !nodes.value.length) { zoom.value = 1; pan.value = { x: 0, y: 0 }; return }
-  const rect = svg.value.getBoundingClientRect()
+  if (!wrap.value || !nodes.value.length) { view = { z: 1, x: 0, y: 0 }; applyView(); return }
+  const rect = wrap.value.getBoundingClientRect()
   // 矩形化：zoom 同时受整体 bounds 宽高约束（取 min），让矩形画布完整适配视口；
   // 兜底下调到 0.28，避免矩形化后宽高变大被人为压缩。
   const bw = bounds.value.w, bh = bounds.value.h
   const z = Math.min((rect.width * 0.92) / bw, (rect.height * 0.92) / bh)
-  zoom.value = Math.max(0.28, Math.min(1.1, z))
+  const nz = Math.max(0.28, Math.min(1.1, z))
   // 让矩形画布在视口居中：屏中心 = pan + 世界中心 × z → pan = 屏中心 - 世界中心 × z
   const centerX = bounds.value.x + bw / 2
   const centerY = bounds.value.y + bh / 2
-  pan.value = {
-    x: rect.width / 2 - centerX * z,
-    y: rect.height / 2 - centerY * z,
-  }
+  view = { z: nz, x: rect.width / 2 - centerX * nz, y: rect.height / 2 - centerY * nz }
+  applyView()
 }
 function onWheel(e) {
-  if (!svg.value) return
-  const rect = svg.value.getBoundingClientRect()
+  if (!wrap.value) return
+  const rect = wrap.value.getBoundingClientRect()
   if (!rect.width || !rect.height) return
   const mx = e.clientX - rect.left, my = e.clientY - rect.top
-  const worldX = mx / zoom.value - pan.value.x
-  const worldY = my / zoom.value - pan.value.y
+  // 屏幕 → 世界：screen = pan + world × z（变换是 translate 后 scale，pan 单位为屏幕像素），
+  // 故 world = (screen - pan) / z。原实现写成 mx / z - pan，与 fitAll 用的语义不一致，
+  // 结果是**缩放锚点漂移**（鼠标下的设备会跑开），这里一并修正。
+  const worldX = (mx - view.x) / view.z
+  const worldY = (my - view.y) / view.z
   const f = e.deltaY < 0 ? 1.12 : 0.88
-  const nz = Math.min(3.2, Math.max(0.25, zoom.value * f))
-  pan.value = {
-    x: mx / nz - worldX,
-    y: my / nz - worldY,
-  }
-  zoom.value = nz
+  const nz = Math.min(3.2, Math.max(0.25, view.z * f))
+  // 反解 pan，使同一世界点在缩放后仍落在鼠标处：pan' = mx - world × nz
+  view = { z: nz, x: mx - worldX * nz, y: my - worldY * nz }
+  applyView()
+  pauseFlow()          // 连续滚动期间保持暂停，停手 260ms 后自动恢复
+  resumeFlow()
 }
 function onDown(e) {
   if (e.button !== 0) return
   dragging.value = true
-  last.value = { x: e.clientX, y: e.clientY }
+  last.x = e.clientX
+  last.y = e.clientY
+  pauseFlow()
 }
 function onMove(e) {
   if (!dragging.value || !svg.value) return
-  const dx = e.clientX - last.value.x, dy = e.clientY - last.value.y
-  pan.value = { x: pan.value.x + dx / zoom.value, y: pan.value.y + dy / zoom.value }
-  last.value = { x: e.clientX, y: e.clientY }
+  view = { z: view.z, x: view.x + (e.clientX - last.x) / view.z, y: view.y + (e.clientY - last.y) / view.z }
+  last.x = e.clientX
+  last.y = e.clientY
+  applyView()
 }
-function onUp() { dragging.value = false }
+function onUp() {
+  if (!dragging.value) return
+  dragging.value = false
+  resumeFlow(120)
+}
 
 function onNode(n) {
   if (n.kind === 'device') return
@@ -1592,23 +1637,88 @@ function fmt(n) {
   if (n == null || Number.isNaN(n)) return '—'
   return Number(n).toLocaleString('zh-CN', { maximumFractionDigits: 1 })
 }
-const totals = computed(() => (store.resultForView && store.resultForView.totals) || {})
-
 let ro = null
-let _prevLeftOpen = null
+let fitTimer = null
+let fitted = false
+let frozen = false
+
+/** 面板开合动画结束后的容器尺寸：.app 的 grid 正在插值，但**目标列宽/行高**已写在
+ *  --lw / --rw / --cmd-h 里（App.vue 的 inline style 是瞬时切换的），二者相减即得增量。
+ *  拿不到（全屏态等列数变化）时返回 null，调用方退化为「不冻结」。 */
+function targetCanvasSize() {
+  const app = document.querySelector('.app')
+  if (!app) return null
+  const cs = getComputedStyle(app)
+  const cols = (cs.gridTemplateColumns || '').split(/\s+/).map(parseFloat)
+  const rows = (cs.gridTemplateRows || '').split(/\s+/).map(parseFloat)
+  const num = (k) => { const v = parseFloat(cs.getPropertyValue(k)); return Number.isFinite(v) ? v : null }
+  const tl = num('--lw'), tr = num('--rw'), tc = num('--cmd-h')
+  if (cols.length < 3 || rows.length < 4 || tl == null || tr == null || tc == null) return null
+  const w = cols[2] + (cols[1] - tl) + (cols[3] - tr)
+  const h = rows[2] + (rows[3] - tc)
+  return w > 0 && h > 0 ? { w, h } : null
+}
+
+/** 冻结 SVG 元素尺寸。
+ *  关键：svg 是「每帧重栅格」的大图层（数千个矢量元素），容器宽度一变它就要整体重画 ——
+ *  这才是开合侧栏掉帧的主因（fitAll/transform 本身很便宜）。这里把它固定到
+ *  max(当前, 动画结束后的最终) 尺寸：图层大小全程不变 → 不重栅格；画面缩放仍由 fitAll
+ *  每帧按**容器**尺寸改 CSS transform（合成层变换，不引发重绘），观感与原先一致。
+ *  取 max 是为了保证内容永远画在 svg 盒子内（svg 根元素默认裁剪溢出内容）。 */
+function freezeCanvas() {
+  if (!svg.value || !wrap.value) return
+  const t = targetCanvasSize()
+  const r = wrap.value.getBoundingClientRect()
+  const w = Math.ceil(Math.max(r.width, t ? t.w : r.width))
+  const h = Math.ceil(Math.max(r.height, t ? t.h : r.height))
+  svg.value.style.width = w + 'px'
+  svg.value.style.height = h + 'px'
+}
+function unfreezeCanvas() {
+  if (!svg.value) return
+  svg.value.style.width = ''
+  svg.value.style.height = ''
+}
+
+// 容器尺寸变化：默认立即重新适配视图。
+// **面板开合动画期间**（body.panel-animating，见 App.vue）容器宽度每帧都在变：
+//   ① 冻结 SVG 图层尺寸，避免整幅矢量图每帧重栅格；
+//   ② 暂停流向动画（SMIL），避免与上面的重绘叠加；
+//   ③ 动画结束后解冻 + 补一次 fitAll 精确适配 + 恢复流向动画。
+function onCanvasResize() {
+  if (!fitted) { fitted = true; fitAll(); return }   // 首次进入必须立即适配（可能正处在收起侧栏的动画里）
+  if (document.body.classList.contains('panel-animating')) {
+    if (!frozen) { frozen = true; freezeCanvas() }
+    pauseFlow()
+    fitAll()                                          // 按容器当前尺寸平滑缩放（只改 transform）
+    clearTimeout(fitTimer)
+    fitTimer = setTimeout(() => {
+      fitTimer = null
+      frozen = false
+      unfreezeCanvas()
+      fitAll()
+      resumeFlow(0)
+    }, 300)
+    return
+  }
+  fitAll()
+}
 onMounted(() => {
-  // 2D 工艺流程图进入时收起左侧栏（资源/编排树），让 SVG 容器撑大、主设备屏幕占比↑；
-  // 退出时恢复原状态，不影响其他视图。
-  _prevLeftOpen = store.leftOpen
+  // 2D 工艺流程图进入时收起左侧栏（资源/编排树），让 SVG 容器撑大、主设备屏幕占比↑。
+  // 左侧资源菜单只在用户手动点击（活动栏 / 顶栏开关 / 系统设置）时展开：
+  // 退出 2D 回到 3D 不再还原此前的展开态，避免「2D → 3D 自动弹出资源菜单」。
   store.leftOpen = false
   relayout()
-  ro = new ResizeObserver(() => fitAll())
+  ro = new ResizeObserver(() => onCanvasResize())
   if (wrap.value) ro.observe(wrap.value)
 })
 onBeforeUnmount(() => {
   if (ro) ro.disconnect()
-  if (_prevLeftOpen !== null) store.leftOpen = _prevLeftOpen
+  if (fitTimer) { clearTimeout(fitTimer); fitTimer = null }
 })
+// 视图 transform 现在由 JS 直接写 DOM（不经过 Vue），若世界节点因数据变化被重建，
+// 属性会丢失 —— 每次更新后补写一次（一次 setAttribute，开销可忽略）。
+onUpdated(applyView)
 watch(() => store.scheme, () => relayout(), { deep: true })
 </script>
 
@@ -1620,31 +1730,12 @@ watch(() => store.scheme, () => relayout(), { deep: true })
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   user-select: none;
 }
-/* —— 厂级 KPI 条 —— */
-.t2d-kpi {
-  display: flex; align-items: center; gap: 20px;
-  padding: 8px 16px 8px 54px;
-  background: #fff;
-  border-bottom: 1px solid #dde3ea;
-  box-shadow: 0 1px 3px rgba(20, 40, 60, 0.06);
-  z-index: 2;
-}
-.t2d-kpi.fs { padding-right: 96px; }
-.kpi { display: flex; align-items: baseline; gap: 6px; }
-.kpi span { font-size: 11px; color: #6b7785; }
-.kpi b { font-size: 15px; color: #2b3a4a; font-variant-numeric: tabular-nums; }
-.kpi i { font-size: 11px; color: #8a97a5; font-style: normal; }
-.kpi-sep { width: 1px; height: 24px; background: #e2e7ec; }
-.kpi.hint { gap: 10px; font-size: 11px; color: #6b7785; white-space: nowrap; }
-.kpi.hint .lg { display: inline-flex; align-items: center; gap: 4px; }
-.kpi.hint .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.dot.ok { background: #3a9d6d; }
-.dot.sel { background: #2c6e9e; }
-.dot.feed { background: #8a97a5; }
+/* —— 适配按钮（画布右下角悬浮） —— */
 .t2d-fit {
-  margin-left: auto;
+  position: absolute; right: 12px; bottom: 12px; z-index: 3;
   border: 1px solid #cdd5dd; background: #fff; color: #33475b;
-  border-radius: 4px; font-size: 12px; padding: 3px 12px; cursor: pointer;
+  border-radius: 4px; font-size: 12px; padding: 4px 12px; cursor: pointer;
+  box-shadow: 0 1px 4px rgba(20, 40, 60, 0.12);
 }
 .t2d-fit:hover { border-color: #2c6e9e; color: #2c6e9e; }
 /* —— 画布 —— */
@@ -1652,7 +1743,16 @@ watch(() => store.scheme, () => relayout(), { deep: true })
   position: relative; flex: 1; overflow: hidden;
   cursor: grab;
 }
-.t2d-canvas svg { width: 100%; height: 100%; display: block; }
+.t2d-canvas svg {
+  width: 100%; height: 100%; display: block;
+  /* 视图变换（拖拽/缩放）写在 <svg> 的 CSS transform 上，便于浏览器提升为合成层。
+     transform-origin 必须是 0 0 —— 默认的 50% 50% 会让缩放围绕画布中心，与 JS 里
+     按左上角计算的 pan 不一致，表现为「缩放时画面乱跑」。 */
+  transform-origin: 0 0; will-change: transform;
+}
+/* 拖拽/缩放期间（svg 上临时挂 .dragging）关闭设备投影：平移时整幅图每帧重绘，
+   滤镜是其中最贵的一环；交互结束自动恢复（见 pauseFlow/resumeFlow）。 */
+.t2d-canvas.dragging :deep(.t2d-figsvg > g[filter]) { filter: none; }
 .t2d-grid { opacity: 0.5; }
 /* 管线 */
 /* 管道三层描边（管壁 / 管体 / 高光）：同路径叠加，仅承担视觉层次，不参与交互 */

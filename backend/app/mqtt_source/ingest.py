@@ -34,34 +34,35 @@ def _log_msg(topic: str, payload: Any) -> None:
         _STATE["last_message_at"] = time.time()
 
 
-def _classify_source(topic: str, data: Dict[str, Any], box: str = "") -> "tuple[str, str]":
-    """消息归属的数据源类型与外部前缀：返回 (kind, ext_prefix)。
-
-    kind ∈ external | box（统一数据源接入语义）：
-    - box 前缀命中 external 目录条目（config/data_sources.json，前缀=config.box）
-      或 payload src 以 external 开头 → external（ext_prefix=box）；
-    - 其余（真实盒子，能碳一体机云端上报）→ box。
-
-    注：模拟数据由独立服务（platform/cloud-deploy/sim-source/）生成并经中间件 mqtt
-    适配器接入，平台与中间件自身都不产生模拟数据；因此不再有 sim kind——模拟数据与
-    其它外部源一样按登记前缀归属 external 条目。
-    """
-    b = str(box or data.get("box") or "").strip().lower()
-    if b and _ext_entry(b) is not None:
-        return "external", b
-    src = data.get("src")
-    if isinstance(src, str) and src.startswith("external"):
-        return "external", b
-    return "box", ""
-
-
 def _ext_entry(box: str) -> Any:
-    """查外部源条目映射（box 前缀 → {id,name,enabled,target}）；未登记返回 None。"""
+    """查外部源条目映射（box 前缀 → {id,name,box,enabled}）；未登记返回 None。"""
     try:
         from ..data_sources import config as _ds_config
         return _ds_config.external_by_box(box)
     except Exception:
         return None
+
+
+def _classify_source(data: Dict[str, Any], box: str = "") -> "tuple[str, str, Any]":
+    """消息归属：返回 (kind, ext_prefix, 外部源条目)，一次目录查询同时得到三者。
+
+    原实现先判 kind、再按前缀回查一次目录，热路径上每条消息查两遍。判据：
+    - 前缀命中 external 条目 → external + 该条目（启停由该源决定）；
+    - payload src 以 external 开头但前缀**未登记** → external + 条目 None：不按任何源
+      启停过滤（外部数据不该被 box 开关误杀，见 test_mw_message_not_treated_as_box）；
+    - 其余（真实盒子，能碳一体机云端上报）→ box。
+
+    注：模拟数据由独立服务（platform/cloud-deploy/sim-source/）生成并经中间件 mqtt
+    适配器接入，与其它外部源一样按登记前缀归属 external 条目。
+    """
+    b = str(box or data.get("box") or "").strip().lower()
+    entry = _ext_entry(b) if b else None
+    if entry is not None:
+        return "external", str(entry.get("box") or b), entry
+    src = data.get("src")
+    if isinstance(src, str) and src.startswith("external"):
+        return "external", b, None
+    return "box", "", None
 
 
 def _box_source_active() -> bool:
@@ -93,12 +94,11 @@ def _record_ext_message(prefix: str, topic: str, payload: Any) -> None:
         }
 
 
-def _record_message(msg, source: str = "cloud") -> None:
+def _record_message(msg) -> None:
     """解析一条 MQTT 消息：更新 READINGS（数值字段）、$SYS 统计并记入消息日志。
 
-    source：消息来自哪个订阅端点（'cloud' 云端 Broker / 'middleware' 中间件内置 Broker）。
-    两端共享本摄取管道，仅 $SYS 统计按 source 区分（只采云端 Broker 的 Broker 统计，
-    避免中间件内置 Broker 的 $SYS 覆盖仪表盘数据）。
+    平台只有云端 Broker 一个订阅入口（中间件转投的外部数据同在该 Broker），
+    因此不再需要按端点区分统计口径。
     """
     topic = getattr(msg, "topic", "")
     try:
@@ -137,10 +137,7 @@ def _record_message(msg, source: str = "cloud") -> None:
     _log_msg(topic, payload)
 
     # $SYS/broker/*：Broker 统计（实时仪表盘数据源，参照 dashboard.py）
-    # 仅采云端 Broker（source='cloud'）：中间件内置 Broker 的 $SYS 不参与平台仪表盘统计
     if topic.startswith("$SYS/broker/"):
-        if source != "cloud":
-            return
         key = topic[len("$SYS/broker/"):]
         val: Any = payload.strip()
         try:
@@ -200,21 +197,19 @@ def _record_message(msg, source: str = "cloud") -> None:
         return
     # 统一数据源接入（box 能碳一体机 / external 外部源 均按目录启停过滤；
     # external 含中间件接入的外部数据（含独立模拟源），停用后该前缀消息不再驱动仿真）：
-    kind, ext_prefix = _classify_source(topic, data, box)
-    if cloud_id and kind == "box" and not _box_source_active():
+    kind, ext_prefix, entry = _classify_source(data, box)
+    if kind == "box":
+        gate = _box_source_active()
+    else:
+        # 已登记外部源：按该源启停；前缀未登记的外部形态数据：不过滤（见 _classify_source）
+        gate = True if entry is None else bool(entry.get("enabled", True))
+    if cloud_id and not gate:
         with _LOCK:
             CLOUD_DEVICES.pop(cloud_id, None)
             READINGS.pop(cloud_id, None)
         return
-    if cloud_id and kind == "external" and ext_prefix:
-        entry = _ext_entry(ext_prefix)
-        if entry is not None and not bool(entry.get("enabled") is not False):
-            with _LOCK:
-                CLOUD_DEVICES.pop(cloud_id, None)
-                READINGS.pop(cloud_id, None)
-            return
     # 外部源：按前缀累计最近读数统计（见 _record_ext_message；不做任何自动关联）
-    if kind == "external" and ext_prefix:
+    if ext_prefix:
         _record_ext_message(ext_prefix, topic, payload)
     prop = _main_property_of_topic(topic)
     if prop:

@@ -1,13 +1,4 @@
 {
-  "comment": "开发机中间件配置（本地调试/演示用）：订阅开发机本机 sim-source 私有 Broker(127.0.0.1:41885) 的钢铁仿真与机房热控数据，转换后直发服务器云端 Broker(36.151.146.71:41883)，与一体机数据同 Broker 按 ext-* 前缀区分。模拟数据服务跑在开发机，服务器中间件（config.json）不采集模拟数据。启动：python runner.py --config config.dev.json",
-  "server": {
-    "host": "0.0.0.0",
-    "port": 42084,
-    "token": "",
-    "broker": {
-      "enabled": false
-    }
-  },
   "output": {
     "mode": "external",
     "comment": "开发机形态：数据直发服务器云端 Broker（平台生产/开发实例均订阅该 Broker）",
@@ -19,23 +10,37 @@
     },
     "qos": 0
   },
-  "log_level": "info",
+  "server": {
+    "host": "0.0.0.0",
+    "port": 42084,
+    "token": "",
+    "broker": {
+      "enabled": false
+    }
+  },
   "adapters": [
     {
       "comment": "开发机中间件：订阅**云端 Broker** 的上行空间 ext/steel/#（外部数据经能碳一体机上行，模拟源 sim-source 模拟该上行），转换为标准主题 data/ext-steel/… 后仍发回云端 Broker",
       "id": "steel_sim",
       "type": "mqtt",
       "name": "钢铁仿真数据源",
-      "enabled": true,
+      "enabled": false,
       "box": "ext-steel",
-      "deviceKeys": ["device", "deviceId", "sensor", "id"],
+      "deviceKeys": [
+        "device",
+        "deviceId",
+        "sensor",
+        "id"
+      ],
       "broker": {
         "host": "36.151.146.71",
         "port": 41883,
         "username": "",
         "password": ""
       },
-      "topics": ["ext/steel/#"],
+      "topics": [
+        "ext/steel/#"
+      ],
       "qos": 0
     },
     {
@@ -43,17 +48,26 @@
       "id": "idc_sim",
       "type": "mqtt",
       "name": "机房热控数据源",
-      "enabled": true,
+      "enabled": false,
       "box": "ext-idc",
-      "deviceKeys": ["device", "deviceId", "sensor", "id"],
+      "deviceKeys": [
+        "device",
+        "deviceId",
+        "sensor",
+        "id"
+      ],
       "broker": {
         "host": "36.151.146.71",
         "port": 41883,
         "username": "",
         "password": ""
       },
-      "topics": ["ext/idc/#"],
+      "topics": [
+        "ext/idc/#"
+      ],
       "qos": 0
     }
-  ]
+  ],
+  "comment": "开发机中间件配置（本地调试/演示用）：订阅开发机本机 sim-source 私有 Broker(127.0.0.1:41885) 的钢铁仿真与机房热控数据，转换后直发服务器云端 Broker(36.151.146.71:41883)，与一体机数据同 Broker 按 ext-* 前缀区分。模拟数据服务跑在开发机，服务器中间件（config.json）不采集模拟数据。启动：python runner.py --config config.dev.json",
+  "log_level": "info"
 }

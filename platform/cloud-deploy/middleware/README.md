@@ -27,12 +27,11 @@
 平台摄取 → 识别归属（登记前缀 ↔ 外部源条目）→ 启停过滤 → 关联驱动仿真
 ```
 
-### 两种输出形态
+### 输出形态（唯一）
 
-| 形态 | 配置 | 说明 | 平台订阅 |
-|---|---|---|---|
-| `external`（推荐，服务器形态） | `output.mode=external` + `server.broker.enabled=false` | 不起内置 Broker，转换数据 paho 直发**云端 Broker(41883)**，与一体机数据同 Broker 按前缀区分 | 经云端端点订阅即可，无需单独订阅中间件（`config/middleware.json` 里 `subscribe=false`） |
-| `local` | `output.mode=local` + `server.broker.enabled=true` | 起内置 Broker(41884)，进程内直投，零网络跳 | 平台单独订阅中间件端口（`subscribe=true`） |
+paho 直发 `output.broker`：服务器上即同机**云端 Broker(41883)**，与一体机数据同 Broker
+按前缀区分；平台经云端端点订阅即可取数，无需单独订阅中间件端口
+（`config/middleware.json` 已无 `subscribe` 字段）。
 
 平台侧不订阅外部 Broker、不做协议转换：**转换只发生在中间件**。平台对某条外部
 数据源的管理 = 「登记 + 启停 + 最近读数展示」，全部锚定在 box 前缀上。

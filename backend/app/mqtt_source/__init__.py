@@ -18,7 +18,7 @@ from __future__ import annotations
 # 状态与基础设施（先初始化 _shared，再导入子模块；_shared 同时作为包属性被外部引用）
 from . import _shared  # noqa: F401
 from ._shared import (BOX_APP_EVENTS, BOX_DEVICES_FILE, BOX_SERVICES,
-                      BROKER_STATS, CLOUD_DEVICES, CONFIG_DIR, CONFIG_PATH,
+                      BROKER_STATS, CLOUD_DEVICES, CONFIG_DIR,
                       DEFAULT_CFG, GC_TTL, LINKS_FILE, MESSAGE_LOG,
                       MESSAGE_LOG_MAX, READINGS, REPLAY_HISTORY,
                       REPLAY_HISTORY_MAX, RUNTIME_CONFIG_PATH, _BROKER,
@@ -67,14 +67,13 @@ from .config import (  # noqa: E402
 
 # 订阅客户端
 from .client import (  # noqa: E402
-    _make_client, _on_connect, _on_disconnect, _on_message, _restart_subscriber,
-    restart_all, restart_middleware, start,
+    _make_client, _on_connect, _on_disconnect, _on_message, _restart_subscriber, start,
 )
 
 __all__ = [
     # 基础设施/状态
     "mqtt", "_PAHO_OK", "cloud_agent",
-    "CONFIG_DIR", "CONFIG_PATH", "RUNTIME_CONFIG_PATH", "LINKS_FILE", "BOX_DEVICES_FILE",
+    "CONFIG_DIR", "RUNTIME_CONFIG_PATH", "LINKS_FILE", "BOX_DEVICES_FILE",
     "DEFAULT_CFG", "_config", "_BROKER", "_TOPICS", "_MAPPING", "_REV_MAPPING",
     "_IGNORED_DEVICES", "_LOCK", "READINGS", "CLOUD_DEVICES", "REPLAY_HISTORY",
     "REPLAY_HISTORY_MAX", "MESSAGE_LOG", "MESSAGE_LOG_MAX", "GC_TTL", "_GC_MIN_INTERVAL",
@@ -82,9 +81,8 @@ __all__ = [
     "_BOX_KEYS", "_DEVICE_ID_KEYS", "_PRIMARY_KEYS", "_MAIN_PROPS",
     "_INVALID_READING_VALUES", "BOX_SERVICES", "BOX_APP_EVENTS", "_CLIENT",
     "_EXT_STATS",
-    # 多 Broker 订阅端点（云端 Broker + 中间件内置 Broker）
+    # 订阅端点（唯一入口：云端 Broker）
     "_ENDPOINTS", "_EP_STATE", "_EP_CLIENTS", "endpoint_states", "sync_endpoints",
-    "restart_middleware", "restart_all",
     # 解析
     "_is_invalid_reading", "_main_property_of_topic", "_identify_cloud_device",
     "_primary_value", "_box_device_name_of_cloud_id", "_crd_twin_reading",

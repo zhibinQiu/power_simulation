@@ -11,7 +11,7 @@
     <LeftSidebar :key="'ls:' + store.sceneId + ':' + store.sceneVersion" @rsz="startLeftResize" />
 
     <!-- 中间：主视图（3D 数字孪生 ⇄ HMI人机交互屏，二者对等、同一槽位） / 功能视图窗口（tab 化：
-         流程编排、数据分析、AI群控、碳资产管理、全景碳核查、能流分析、能碳一体机管理） -->
+         流程编排、数据分析、AI群控、碳资产管理、全景碳核查、能流分析、数据源管理） -->
     <!-- SceneViewer 首次进入数字孪生视图时懒加载（three.js ~500KB 不进首屏关键路径），
          加载后保持挂载，不销毁 WebGL 上下文，切换速度与原先一致 -->
     <main class="stage">
@@ -31,7 +31,7 @@
           <div v-if="viewOpened('dataView')" v-show="store.activeViewId === 'dataView'" class="vw-pane">
             <DataView variant="analysis" ref="dataViewRef" />
           </div>
-          <div v-if="viewOpened('aiGroup')" v-show="store.activeViewId === 'aiGroup'" class="vw-pane">
+          <div v-if="viewOpened('aiGroup')" v-show="store.activeViewId === 'aiGroup'" class="vw-pane flush-pane">
             <DataView variant="group" ref="groupViewRef" />
           </div>
           <div v-if="viewOpened('carbonMarket')" v-show="store.activeViewId === 'carbonMarket'" class="vw-pane">
@@ -43,7 +43,7 @@
           <div v-if="viewOpened('energyFlow')" v-show="store.activeViewId === 'energyFlow'" class="vw-pane">
             <EnergyFlowView />
           </div>
-          <div v-if="viewOpened('boxManage')" v-show="store.activeViewId === 'boxManage'" class="vw-pane">
+          <div v-if="viewOpened('boxManage')" v-show="store.activeViewId === 'boxManage'" class="vw-pane flush-pane">
             <CarbonBoxView ref="boxViewRef" />
           </div>
         </div>
@@ -84,7 +84,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useSimStore } from './stores/sim'
 import { t } from './i18n'
 import { accent, themeMode } from './theme'
@@ -118,7 +118,7 @@ const ConservationAuditDialog = defineAsyncComponent(() => import('./components/
 // 场景文件对话框（文件 → 新建场景 / 打开场景 / 另存为场景）
 const SceneFileDialog = defineAsyncComponent(() => import('./components/SceneFileDialog.vue'))
 
-// 视图类组件同样按需懒加载：CarbonBoxView（能碳一体机管理）等体量巨大（数千行），
+// 视图类组件同样按需懒加载：CarbonBoxView（数据源管理）等体量巨大（数千行），
 // 首屏同步打包会让 index 主包高达 600+KB；改为进入对应视图时才加载，首屏只保留
 // SceneViewer/LeftSidebar/RightInspector 等数字孪生核心组件，显著降低首屏加载与内存占用。
 // 3D 数字孪生场景：three.js（~500KB）+ 场景构建代码体积巨大，改为异步加载。
@@ -133,15 +133,22 @@ const CarbonBoxView = defineAsyncComponent(() => import('./components/CarbonBoxV
 const DataOverview = defineAsyncComponent(() => import('./components/DataOverview.vue'))
 const FlowEditor = defineAsyncComponent(() => import('./components/FlowEditor.vue'))
 
-// 等待视图组件挂载完成：懒加载组件首次打开需异步加载代码，ref 可能延迟可用
+// 等待视图组件挂载完成：懒加载组件首次打开需异步加载代码，ref 可能延迟可用。
+// 用 watch 等 ref 由 null 变为组件实例，而不是 setInterval 每 80ms 轮询一次
+// （6s 超时 = 最多 75 次无意义的定时器唤醒，且每次都要读一遍响应式 ref）。
 function waitViewRef(r, timeout = 6000) {
   if (r.value) return Promise.resolve(true)
   return new Promise((resolve) => {
-    const t0 = Date.now()
-    const iv = setInterval(() => {
-      if (r.value) { clearInterval(iv); resolve(true) }
-      else if (Date.now() - t0 > timeout) { clearInterval(iv); resolve(false) }
-    }, 80)
+    let settled = false
+    const finish = (v) => {
+      if (settled) return
+      settled = true
+      stopWatch()
+      clearTimeout(timer)
+      resolve(v)
+    }
+    const stopWatch = watch(r, (v) => { if (v) finish(true) })
+    const timer = setTimeout(() => finish(false), timeout)
   })
 }
 
@@ -154,6 +161,26 @@ watch(() => store.activeViewId, (n, o) => {
     store.grpRightBackup = null
   }
 })
+// —— 面板开合动画标记（供重组件延后昂贵响应）——
+// .app 的 grid 列宽过渡（220ms）会让中间舞台宽度**每帧**变化，而数字孪生视图对尺寸变化的
+// 响应极贵：3D 要重建 WebGL 绘制缓冲（renderer.setSize），2D 要重新适配整幅 SVG 视图并持续
+// 重绘流向动画。每帧各来一次 → 开合侧栏时明显掉帧（实测 2D 下 p95 帧间隔 150~880ms）。
+// 这里在动画期间给 body 打标记，两个视图据此把响应**延后到动画结束执行一次**（见
+// SceneViewer.onResize / Twin2DView.onCanvasResize）；过渡时长见 main.css 的 .app 规则。
+const PANEL_ANIM_MS = 260   // 略大于 CSS 过渡 .22s，确保覆盖最后一帧
+let panelAnimTimer = null
+function markPanelAnim() {
+  // 用户偏好「减少动效」时 .app 无过渡，宽度一次到位，不需要延后
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  document.body.classList.add('panel-animating')
+  clearTimeout(panelAnimTimer)
+  panelAnimTimer = setTimeout(() => {
+    document.body.classList.remove('panel-animating')
+    panelAnimTimer = null
+  }, PANEL_ANIM_MS)
+}
+watch(() => [store.leftOpen, store.rightOpen, store.bottomOpen], () => markPanelAnim())
+
 // 3D 场景挂载标记：首次加载后保持 true，避免卸载 WebGL 上下文（切换视图速度不受影响）
 const sceneMounted = ref(false)
 const topBarRef = ref(null)
@@ -310,18 +337,11 @@ const marketSubNav = async (id) => {
   if (marketViewRef.value) marketViewRef.value.switchTab(id)
   pushCmd(t('工具 >> 双碳 >> 碳资产管理 >> ') + (id === 'market' ? t('CEA / CCER 行情') : t('企业台账与策略')) + t('。'), 'out')
 }
-// 顶栏「视图」菜单：打开能碳一体机管理（原数据概览/设备管理两页签已合并为一界面）
+// 顶栏「视图」菜单：打开数据源管理（能碳一体机 + 外部数据源统一接入；
+// 原「数据概览 / 设备管理」两页签已合并为同一界面，对外名称为「数据源管理」）
 const boxSubNav = () => {
   store.openView('boxManage')
-  pushCmd(t('视图 >> 能碳一体机管理。'), 'out')
-}
-// 「工具 >> 数据源接入」：数据源管理已合并进「能碳一体机管理」页（数据源接入区块，
-// 能碳一体机 + 外部数据源[含模拟数据] 统一管理），此处直接跳转并定位到该区块
-const openDataSourcesSection = async () => {
-  store.openView('boxManage')
-  await waitViewRef(boxViewRef)
-  pushCmd(t('工具 >> 数据源接入：能碳一体机 / 外部数据源（注册到数据中间件）统一接入与管理。'), 'out')
-  setTimeout(() => { if (boxViewRef.value && boxViewRef.value.scrollToSec) boxViewRef.value.scrollToSec('sources') }, 300)
+  pushCmd(t('视图 >> 数据源管理。'), 'out')
 }
 // 碳资产管理视图：刷新企业台账（CarbonAssistantView 暴露的 refreshLedger，转发到台账面板 loadAll）
 const marketLedgerRefresh = async () => { await waitViewRef(marketViewRef); if (marketViewRef.value?.refreshLedger) marketViewRef.value.refreshLedger() }
@@ -369,7 +389,7 @@ const menus = computed(() => [
     ] },
     // HMI人机交互屏：与 3D 数字孪生对等的主视图形态（同槽位切换，不开 tab）
     { label: t('HMI人机交互屏'), toggle: () => store.overviewOn, act: () => toggleOverview() },
-    { label: t('能碳一体机管理'), toggle: () => store.boxManageOn, act: () => boxSubNav() },
+    { label: t('数据源管理'), toggle: () => store.boxManageOn, act: () => boxSubNav() },
   ] },
   { id: 'edit', label: t('编辑'), items: [
     { label: store.editMode ? t('完成编排') : t('进入流程编排'), act: onToggleEdit },
@@ -392,8 +412,6 @@ const menus = computed(() => [
     { label: t('清空画布'), hide: () => !store.editMode, act: () => clearScheme() },
   ] },
   { id: 'tools', label: t('工具'), items: [
-    { label: t('数据源接入…'), act: openDataSourcesSection },
-    { sep: true },
     // AI（原顶层「AI」菜单整体下沉到工具菜单）：数据分析 / 群控 + 知识库 / 智能体 / 技能 / 本体
     { sub: true, label: t('AI'), items: () => [
       { label: t('数据分析'), toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
@@ -465,6 +483,14 @@ onMounted(async () => {
     import('./views/CarbonAssistantView.vue')
     import('./components/DataView.vue')
     import('./views/AgentChatView.vue')
+    // 右侧高频面板（选中工序的详情 / 编排属性）：已从首屏主包异步拆出，这里补一次空闲预取，
+    // 保证点开时不出现等待
+    import('./components/UnitCarbonDetail.vue')
+    import('./components/FlowInspector.vue')
   }, { timeout: 8000 })
+})
+onBeforeUnmount(() => {
+  if (panelAnimTimer) { clearTimeout(panelAnimTimer); panelAnimTimer = null }
+  document.body.classList.remove('panel-animating')
 })
 </script>

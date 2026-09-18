@@ -51,34 +51,26 @@ def compose_message(box: str, device: str, prop: str, value: float,
 
 
 class OutputBridge:
-    """数据输出桥：默认**进程内直投**中间件内置 Broker（零网络跳）；
+    """数据输出桥：paho 直发 output.broker（唯一输出形态）。
 
-    也可配置为发布到外部 Broker（output.mode = "external"），此时用 paho 客户端，
-    断线由 loop_start 自动重连。两种模式对适配器完全透明（都是 publish()）。
+    服务器上 output.broker 即同机云端 Broker :41883，与一体机上报同一 Broker、
+    按主题前缀区分；断线由 loop_start 自动重连，适配器只管 publish()。
     """
 
-    def __init__(self, out_cfg: Dict[str, Any], local_broker: Any = None,
-                 logger: Any = None):
+    def __init__(self, out_cfg: Dict[str, Any], logger: Any = None):
         out_cfg = out_cfg or {}
-        self.local = local_broker          # MiniBroker 实例（内置模式）
         self.log = logger or (lambda *a: None)
         broker = (out_cfg or {}).get("broker") or {}
         self.host = str(broker.get("host") or "127.0.0.1")
-        self.port = int(broker.get("port") or 41884)
+        self.port = int(broker.get("port") or 41883)
         self.username = str(broker.get("username") or "")
         self.password = str(broker.get("password") or "")
         self.qos = int((out_cfg or {}).get("qos", 0))
-        self.mode = "local" if self.local is not None else \
-            str(out_cfg.get("mode") or "external")
         self.connected = False
         self.publish_ok = 0
         self.publish_fail = 0
         self.last_error = ""
         self._client: Any = None
-        if self.mode == "local":
-            # 进程内直投：无需 paho 连接，随内置 Broker 启动即就绪
-            self.connected = bool(getattr(self.local, "stats", {}).get("running"))
-            return
         kwargs = {}
         if getattr(mqtt, "CallbackAPIVersion", None) is not None:  # paho>=2.0
             kwargs["callback_api_version"] = mqtt.CallbackAPIVersion.VERSION2
@@ -115,14 +107,8 @@ class OutputBridge:
         try:
             topic, payload = compose_message(box, device, prop, value,
                                              ts if ts is not None else now_ms())
-            if self.mode == "local" and self.local is not None:
-                # 进程内直投内置 Broker：无网络往返，平台订阅端立即可见
-                self.local.publish(topic, payload, qos=self.qos)
-                ok = True
-                self.connected = bool(getattr(self.local, "stats", {}).get("running"))
-            else:
-                info = self._client.publish(topic, payload, qos=self.qos)
-                ok = bool(getattr(info, "rc", 0) == mqtt.MQTT_ERR_SUCCESS)
+            info = self._client.publish(topic, payload, qos=self.qos)
+            ok = bool(getattr(info, "rc", 0) == mqtt.MQTT_ERR_SUCCESS)
         except Exception as e:  # noqa: BLE001
             ok = False
             self.last_error = f"发布失败: {e}"
@@ -134,12 +120,11 @@ class OutputBridge:
 
     def status(self) -> Dict[str, Any]:
         return {
-            "mode": self.mode,
             "connected": self.connected,
             "publish_ok": self.publish_ok,
             "publish_fail": self.publish_fail,
             "last_error": self.last_error,
-            "broker": f"{self.host}:{self.port}" if self.mode != "local" else "builtin",
+            "broker": f"{self.host}:{self.port}",
         }
 
     def stop(self) -> None:

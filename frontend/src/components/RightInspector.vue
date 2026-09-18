@@ -243,16 +243,22 @@ import { energyOf } from '../utils/energy'
 import { useSimStore, UNIT_TYPES } from '../stores/sim'
 import { MATERIALS, MATERIAL_MAP, PRODUCTS } from '../data/flowLibrary'
 import { t } from '../i18n'
+import { visiblePoll } from '../utils/poll.js'
 const AgentChatView = defineAsyncComponent(() => import('../views/AgentChatView.vue'))
-import UnitCarbonDetail from './UnitCarbonDetail.vue'
+// 右侧内容面板按需懒加载：首屏默认只显示「总览」，而报告 / 工序详情 / 编排属性 / 原料 /
+// 策略详情 / 设备详情这几个面板合计约 350KB 产物，全部静态 import 会让它们白白躺在首屏主包里。
+// 改为异步组件后主包显著瘦身；这些 chunk 体积很小（多在 10~30KB）且 App.vue 空闲时会预取
+// 最常用的工序/编排面板，实际点开基本无感。
+const ReportPanel = defineAsyncComponent(() => import('./ReportPanel.vue'))
+const UnitCarbonDetail = defineAsyncComponent(() => import('./UnitCarbonDetail.vue'))
+const MaterialInspector = defineAsyncComponent(() => import('./MaterialInspector.vue'))
+const StrategyDetailPanel = defineAsyncComponent(() => import('./StrategyDetailPanel.vue'))
+const FlowInspector = defineAsyncComponent(() => import('./FlowInspector.vue'))
+const DeviceDetail = defineAsyncComponent(() => import('./DeviceDetail.vue'))
+// 交互高频、体量很小的面板保持同步，避免频繁切换时出现加载空档
 import OtherUnitPanel from './OtherUnitPanel.vue'
-import DeviceDetail from './DeviceDetail.vue'
-import FlowInspector from './FlowInspector.vue'
 import GroupDetail from './GroupDetail.vue'
-import MaterialInspector from './MaterialInspector.vue'
 import CollapseSection from './CollapseSection.vue'
-import StrategyDetailPanel from './StrategyDetailPanel.vue'
-import ReportPanel from './ReportPanel.vue'
 import { useDragLayout } from '../composables/useDragSort'
 
 /* 总览面板模块布局：顺序 + 折叠状态持久化到 localStorage（打开面板恢复上次状态）
@@ -611,12 +617,13 @@ function settleAccum(now) {
 }
 // 速率变化（调参/遥测更新）先结清上一段；时间流逝由 30s tick 结算推进
 watch(totals, () => settleAccum(Date.now()), { deep: true })
-let _accTimer = null
+let _stopAcc = null   // visiblePoll 返回的停止函数
 onMounted(() => {
   settleAccum(Date.now())
-  _accTimer = setInterval(() => settleAccum(Date.now()), 30000)
+  // 可见性感知：后台标签不结算累计量（切回可见时立即按真实经过时间补算一次）
+  _stopAcc = visiblePoll(() => settleAccum(Date.now()), 30000)
 })
-onBeforeUnmount(() => { if (_accTimer) clearInterval(_accTimer) })
+onBeforeUnmount(() => { if (_stopAcc) { _stopAcc(); _stopAcc = null } })
 settleAccum(Date.now())  // setup 阶段先结算一次，首帧即有累计值
 
 // 当前档位核算：realtime = 实时速率；day/month/year = 当日/当月/当年 0 点起按实时速率连续积分的累计量

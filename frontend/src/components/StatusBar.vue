@@ -61,17 +61,18 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
+import { visiblePoll } from '../utils/poll.js'
 import { t } from '../i18n'
 
 const store = useSimStore()
 const clock = ref('')
-let timer = null
+let stopClock = null   // visiblePoll 返回的停止函数
 
 // —— 市场快讯（中国煤炭交易网）——
 const newsItems = ref([])
 const newsError = ref(false)
 const newsDur = computed(() => Math.max(60, newsItems.value.length * 18)) // 滚动周期随条数自适应（每条约 18s，慢速舒缓）
-let newsTimer = null
+let stopNews = null
 
 async function loadNews() {
   try {
@@ -130,14 +131,15 @@ function fmtNotifTime(t) {
 }
 
 onMounted(() => {
-  tickClock(); timer = setInterval(tickClock, 1000)
-  loadNews(); newsTimer = setInterval(loadNews, 5 * 60 * 1000) // 每 5 分钟刷新一次快讯
+  // 可见性感知：后台标签不跳秒、不拉快讯（切回可见时立即补一轮）
+  tickClock(); stopClock = visiblePoll(tickClock, 1000)
+  loadNews(); stopNews = visiblePoll(loadNews, 5 * 60 * 1000) // 每 5 分钟刷新一次快讯
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', onKey)
 })
 onBeforeUnmount(() => {
-  if (timer) clearInterval(timer)
-  if (newsTimer) clearInterval(newsTimer)
+  if (stopClock) { stopClock(); stopClock = null }
+  if (stopNews) { stopNews(); stopNews = null }
   document.removeEventListener('click', onDocClick)
   document.removeEventListener('keydown', onKey)
 })

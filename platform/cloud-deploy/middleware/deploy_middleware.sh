@@ -28,8 +28,6 @@ MW_DIR="${INSTALL_DIR}/middleware"
 VENV_DIR="${INSTALL_DIR}/.venv"
 SERVICE_NAME="nengtan-middleware"
 API_PORT="42084"
-BROKER_HOST="127.0.0.1"
-BROKER_PORT="41883"
 SERVER=""
 MODE="deploy"
 RESET_CONFIG="no"
@@ -39,8 +37,6 @@ while [[ $# -gt 0 ]]; do
     --server) SERVER="$2"; shift 2 ;;
     --dir) INSTALL_DIR="$2"; MW_DIR="${INSTALL_DIR}/middleware"; VENV_DIR="${INSTALL_DIR}/.venv"; shift 2 ;;
     --api-port) API_PORT="$2"; shift 2 ;;
-    --broker-host) BROKER_HOST="$2"; shift 2 ;;
-    --broker-port) BROKER_PORT="$2"; shift 2 ;;
     --reset-config) RESET_CONFIG="yes"; shift 1 ;;
     --local-only) MODE="local"; shift 1 ;;
     sync) MODE="sync"; shift 1 ;;
@@ -80,7 +76,6 @@ if [[ "$MODE" == "deploy" ]]; then
   echo "==> [2/2] 远端执行本地安装"
   ssh -t "$SERVER" "bash ${MW_DIR}/deploy_middleware.sh --local-only \
     --dir ${INSTALL_DIR} --api-port ${API_PORT} \
-    --broker-host ${BROKER_HOST} --broker-port ${BROKER_PORT} \
     $([[ "$RESET_CONFIG" == "yes" ]] && echo --reset-config)"
   exit 0
 fi
@@ -100,7 +95,7 @@ if [[ "${SRC_DIR}" != "${MW_DIR}" ]]; then
 fi
 if [[ ! -f "${MW_DIR}/config.json" || "$RESET_CONFIG" == "yes" ]]; then
   cp "${MW_DIR}/config.json" "${MW_DIR}/config.json.bak.$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
-  echo "    使用仓库默认 config.json（external 形态：直发 ${BROKER_HOST}:${BROKER_PORT}）"
+  echo "    使用仓库默认 config.json（唯一形态：paho 直发 output.broker，服务器即同机云端 41883）"
 else
   echo "    保留已有 config.json（平台注册的数据源在里头；--reset-config 可覆盖）"
 fi
@@ -116,7 +111,7 @@ fi
 echo "==> 4/5 写入 systemd 单元 ${SERVICE_NAME}.service"
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
 [Unit]
-Description=NengTan Data Middleware (external output -> cloud broker ${BROKER_PORT})
+Description=NengTan Data Middleware (paho publish -> output.broker)
 After=network.target
 
 [Service]

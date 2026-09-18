@@ -121,11 +121,19 @@
           <div v-for="ag in attachGroups" :key="ag.kind" class="ports-col">
             <span class="pc-t">{{ ag.label }}（{{ t('已绑') }} {{ attachedOf(ag.kind).length }}）</span>
             <div v-for="att in attachedOf(ag.kind)" :key="att.uid" class="gio-row att-row">
-              <span class="att-lbl" :title="t('数值来源：') + srcTextOf(att)">{{ att.label }}</span>
+              <span class="att-lbl" :title="t('数据源：') + srcTextOf(att)">{{ att.label }}</span>
               <select class="att-src" :value="srcOf(att)" @change="onAttSrc(att, $event.target.value)">
-                <option value="sim">{{ t('模拟数据（缓变）') }}</option>
-                <option value="fixed">{{ t('固定值（模板默认）') }}</option>
-                <optgroup :label="t('工艺参数')">
+                <option value="fixed">{{ t('固定值') }}</option>
+                <option value="sim">{{ t('随机模拟值') }}</option>
+                <!-- 数据源管理（能碳一体机）中已接入的传感器设备：每台设备一个分组，组内为其点位 -->
+                <optgroup v-for="g in boxSourceGroups" :key="g.name"
+                          :label="t('数据源设备') + ' · ' + g.name + (g.model ? '（' + g.model + '）' : '')">
+                  <option v-for="p in g.props" :key="p.name" :value="'device::' + g.name + '::' + p.name">
+                    {{ p.name }}{{ p.unit ? '（' + p.unit + '）' : '' }}{{ p.value != null ? ' · ' + p.value : '' }}
+                  </option>
+                </optgroup>
+                <option v-if="!boxSourceGroups.length" disabled>{{ t('暂无数据源设备') }}</option>
+                <optgroup v-if="att.src === 'param'" :label="t('工艺参数')">
                   <option v-for="o in paramOpts" :key="'p' + o.param" :value="'param::' + o.param">{{ o.label }}</option>
                 </optgroup>
               </select>
@@ -178,7 +186,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { t } from '../i18n'
 import CollapseSection from './CollapseSection.vue'
@@ -285,28 +293,43 @@ const attachGroups = ATTACH_GROUPS.map((g) => ({
   unitOf: (it) => (g.key === 'sensor' ? (it.measure ? it.measure.unit : '') : (it.setpoint ? it.setpoint.unit : '')),
 }))
 const attachedOf = (kind) => (node.value ? (node.value.attached || []).filter((a) => a.kind === kind) : [])
+// 数据源下拉分组：数据源管理（能碳一体机）中已接入的传感器设备，组内为该设备的点位
+const boxSourceGroups = computed(() => store.boxSourceGroups)
 const paramOpts = computed(() => {
   if (!node.value) return []
   return store.attachSourceOptions(node.value.id).filter((o) => o.value === 'param')
 })
-const srcOf = (att) => (att.src === 'param' ? 'param::' + (att.param || '') : att.src || 'fixed')
+const srcOf = (att) => {
+  if (att.src === 'param') return 'param::' + (att.param || '')
+  if (att.src === 'device') return 'device::' + (att.device || '') + '::' + (att.prop || '')
+  return att.src || 'fixed'
+}
 function srcTextOf(att) {
   if (att.src === 'param') {
     const o = paramOpts.value.find((x) => x.param === att.param)
     return o ? o.label : att.param
   }
-  return t(att.src === 'sim' ? '模拟数据（缓变）' : '固定值（模板默认）')
+  if (att.src === 'device') return (att.device || '—') + (att.prop ? ' · ' + att.prop : '')
+  return t(att.src === 'sim' ? '随机模拟值' : '固定值')
 }
 function onAddAttach(kind, type) {
   if (!type || !node.value) return
   const att = store.addAttachToNode(node.value.id, kind, type)
-  if (att) store.toast = t('已为工艺「{name}」绑定「{label}」：数值来源默认模拟数据，可下拉切换为工艺参数 / 固定值', { name: node.value.name, label: att.label })
+  if (att) store.toast = t('已为工艺「{name}」绑定「{label}」：数据源默认随机模拟值，可下拉切换为固定值 / 数据源管理中的传感器设备', { name: node.value.name, label: att.label })
 }
 function onAttSrc(att, v) {
   if (!node.value) return
+  if (v.indexOf('device::') === 0) {
+    const rest = v.slice(8)
+    const i = rest.indexOf('::')
+    store.setAttachSource(node.value.id, att.uid, { src: 'device', device: rest.slice(0, i), prop: rest.slice(i + 2) })
+    return
+  }
   if (v.indexOf('param::') === 0) store.setAttachSource(node.value.id, att.uid, { src: 'param', param: v.slice(7) })
   else store.setAttachSource(node.value.id, att.uid, { src: v })
 }
+onMounted(() => store.startBoxSourcePolling())
+onBeforeUnmount(() => store.stopBoxSourcePolling())
 
 // ---- 设备 ----
 const devMeasureText = computed(() => {

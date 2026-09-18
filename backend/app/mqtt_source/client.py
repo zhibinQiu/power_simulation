@@ -1,19 +1,15 @@
-"""mqtt_source 包：多 Broker 订阅客户端生命周期（每端点独立 client + 重连退避）。
+"""mqtt_source 包：订阅客户端生命周期（连接 + 重连退避）。
 
-平台订阅两类数据入口（用户诉求：外部数据注册到中间件，平台订阅取数）：
-  - cloud      ：云端 Broker（一体机盒子/agent 推送），订阅配置主题 + $SYS/#；
-                 中间件 external 形态下，外部数据源/模拟数据也直发本 Broker 的
-                 data/ext-*/... 主题（消息归属按前缀自动区分，见 ingest）。
-  - middleware ：中间件独立数据端口（仅 local 形态，middleware.json subscribe=true）：
-                 外部数据源（含独立模拟源），只订阅 data/#；external 形态 subscribe=false
-                 时本端点停用。
+平台**只有一个**订阅入口——云端 Broker（默认 41883）：
+- 能碳一体机盒子/云端 agent 推送（cloud/#、state/#、$SYS/#、data/#）；
+- 中间件转投的外部数据源（含独立模拟源）也直发该 Broker 的 data/ext-*/... 主题。
 
-两端共享同一条摄取管道（ingest._record_message，用 source 参数区分口径），因此
-设备识别、读数解析、关联驱动仿真完全复用，无重复代码。
+两类消息在同一条摄取管道（ingest._record_message）上处理，归属按 box 前缀识别，
+设备识别/读数解析/关联驱动仿真完全复用。历史上另起端口订阅中间件内置 Broker 的
+端点已随中间件输出形态收敛而废弃。
 
-start() 由 main.py 启动时调用一次，为每个端点各起一个线程；
-update_config（云端 Broker 配置）经 _restart_subscriber 只重启 cloud 端点；
-中间件配置变更经 restart_middleware() 只重启 middleware 端点。
+start() 由 main.py 启动时调用一次；update_config（云端 Broker 配置）经
+_restart_subscriber 重启本端点。
 """
 from __future__ import annotations
 
@@ -127,7 +123,7 @@ class _Endpoint:
             st = _shared._EP_STATE.setdefault(self.key, {})
             st["message_count"] = int(st.get("message_count") or 0) + 1
             st["last_message_at"] = time.time()
-        _record_message(msg, source=self.key)
+        _record_message(msg)
 
     def _notify_down(self, reason: str) -> None:
         host, port = self.broker.get("host"), self.broker.get("port")
@@ -242,27 +238,13 @@ def start() -> None:
     _shared.sync_endpoints()
     with _LOCK:
         _STATE["enabled"] = True
-    for key in ("cloud", "middleware"):
-        _endpoint(key).start()
-
-
-def _restart_subscriber() -> None:
-    """断开云端订阅端点，按最新配置重启（云端 Broker 配置热更新）。"""
-    _shared.sync_endpoints()
     _endpoint("cloud").start()
 
 
-def restart_middleware() -> None:
-    """断开中间件订阅端点，按最新中间件配置重启（中间件地址/Broker 端口热更新）。"""
+def _restart_subscriber() -> None:
+    """断开订阅端点，按最新配置重启（云端 Broker 配置热更新）。"""
     _shared.sync_endpoints()
-    _endpoint("middleware").start()
-
-
-def restart_all() -> None:
-    """全部端点按最新配置重启（云端 Broker 与中间件配置同时变更时使用）。"""
-    _shared.sync_endpoints()
-    for key in ("cloud", "middleware"):
-        _endpoint(key).start()
+    _endpoint("cloud").start()
 
 
 # ---------------------------------------------------------------------------

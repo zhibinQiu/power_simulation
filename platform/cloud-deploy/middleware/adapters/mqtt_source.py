@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import os
-import time
+import threading
 import uuid
 from typing import Any, Dict
 
@@ -83,6 +83,9 @@ class MqttSourceAdapter(BaseAdapter):
         kwargs = {}
         if getattr(mqtt, "CallbackAPIVersion", None) is not None:  # paho>=2.0
             kwargs["callback_api_version"] = mqtt.CallbackAPIVersion.VERSION2
+        # 用事件等待 CONNACK，避免 sleep(0.1) 忙轮询（10Hz 空转浪费 CPU，
+        # 且实际连接往往在几十毫秒内就绪，忙轮询至少要等一个 tick）
+        connected = threading.Event()
         probe: Dict[str, Any] = {"rc": None}
         try:
             client = mqtt.Client(client_id=f"carbon-mw-probe-{uuid.uuid4().hex[:8]}",
@@ -94,15 +97,13 @@ class MqttSourceAdapter(BaseAdapter):
 
         def _on_connect(c, u, flags, rc, *extra):
             probe["rc"] = getattr(rc, "value", rc)
+            connected.set()
 
         client.on_connect = _on_connect
         try:
             client.connect_async(self.host, self.port, keepalive=10)
             client.loop_start()
-            for _ in range(50):  # 5s
-                if probe["rc"] is not None:
-                    break
-                time.sleep(0.1)
+            connected.wait(5.0)
             rc = probe["rc"]
             if rc is None:
                 return {"ok": False,

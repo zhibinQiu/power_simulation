@@ -4,6 +4,7 @@ import { carbonAssistantApi } from '../../api/carbonAssistant.js'
 import { carbonComplianceApi } from '../../api/carbonCompliance.js'
 import { renderMarkdown, parseToc } from '../../utils/markdown.js'
 import { t } from '../../i18n'
+import { visiblePoll } from '../../utils/poll.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -93,7 +94,7 @@ function toggleFocus(key) {
 const submitting = ref(false)
 const statusMsg = ref('')
 const trackingTask = ref(null)
-let pollTimer = null
+let stopPoll = null   // visiblePoll 返回的停止函数
 
 async function startAnalysis() {
   if (submitting.value) return
@@ -125,7 +126,8 @@ async function startAnalysis() {
 
 function pollTask(taskId) {
   clearPoll()
-  pollTimer = setInterval(async () => {
+  // 可见性感知：后台标签不轮询任务状态（切回可见时立即补查一次，任务早已完成即可立刻收尾）
+  stopPoll = visiblePoll(async () => {
     try {
       const t = await carbonAssistantApi.getTask(taskId)
       trackingTask.value = t
@@ -161,7 +163,7 @@ async function cancelRunning() {
 }
 
 function clearPoll() {
-  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+  if (stopPoll) { stopPoll(); stopPoll = null }
 }
 
 // ---------- 历史报告：搜索 / 筛选 / 分页 ----------

@@ -1,292 +1,298 @@
 <template>
-  <!-- ============ AI 群控主区：左设定 · 右图 ============
-       左侧设定：数据源 / 回路组 + PID 参数 / 滤波（EKF 为勾选项）/ 运行控制；
-       右侧图（从上至下）：① 实时序列  ② 滤波后的序列  ③ 优化模型控制的训练（占右区大范围）
-       训练理念：无论遗传算法 / 粒子群 / 强化学习，训练输出始终是「控制 PID 参数」——
-       一个可调设备 = Kp·Ki·Kd 三个参数，N 个可调设备 = 3N 维决策变量 -->
-  <div class="pid-wrap">
-    <!-- ============ 空态 ============ -->
-    <div v-if="!adjOptions.length && !allMetering.length" class="pid-empty">
-      <svg class="pid-empty-ico" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.02a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.02a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l.06.06a1.65 1.65 0 0 0 .33 1.82v.02a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      <p>{{ t('未找到任何工艺设备：请先加载/打开一个流程场景，再进入本控制实验。') }}</p>
-    </div>
-    <div v-else-if="!adjOptions.length" class="pid-empty">
-      <p>{{ t('当前场景没有可调设备（PID 需要一个可调设备作为被调对象）。左侧场景中选取「可调设备」后即可启用本控制实验。') }}</p>
-    </div>
-
-    <template v-else>
-      <div class="pid-main">
-        <!-- ════════════ 左：设定 ════════════ -->
-        <aside class="pid-set">
-          <header class="pid-top">
-            <span class="pid-kbd">PID · EKF</span>
-            <span class="pid-ttl">{{ t('多回路整定台') }}</span>
-            <span class="pid-sub">{{ grps.length }} {{ t('回路') }} · {{ t('平台实时读数') }}</span>
-            <span class="pid-state" :class="stateCls"><i class="pid-dot"></i>{{ stateText }}</span>
-          </header>
-
-          <!-- ① 数据与回路（每组 = 1 个可调设备 → 3 个 PID 参数） -->
-          <section class="set-sec">
-            <div class="sec-head">
-              <span class="sec-no">1</span><span class="sec-ttl">{{ t('数据与回路') }}</span>
-              <button class="mini-btn add" :disabled="running || !canAddGrp"
-                      :title="t('为另一台可调设备建立控制回路')" @click="addGroup">＋ {{ t('回路') }}</button>
-            </div>
-            <!-- 数据源：一律为平台实时读数，本视图不生成任何模拟数据 -->
-            <p class="hint src-note">{{ t('数据源：平台实时读数（MQTT / 设备实时读数）。本视图不生成任何模拟数据，观测真值 y 直接取自实时链路。') }}</p>
-            <div class="grp-list">
-              <div class="grp-row" v-for="(g, i) in grps" :key="g.key" :class="{ on: i === viewIdx }" @click="viewIdx = i">
-                <div class="grp-l1">
-                  <span class="grp-no">{{ i + 1 }}</span>
-                  <label class="cell" @click.stop>
-                    <em>{{ t('被调（可调）') }}</em>
-                    <select v-model="g.adjId" :disabled="running" @change="onGrpChange(i)">
-                      <option v-for="d in adjOptions" :key="d.id" :value="d.id">{{ optTxt(d) }}</option>
-                    </select>
-                  </label>
-                  <span class="grp-arrow">→</span>
-                  <label class="cell" @click.stop>
-                    <em>{{ t('观测（反馈）') }}</em>
-                    <select v-model="g.obsId" :disabled="running" @change="onGrpChange(i)">
-                      <optgroup v-if="obsOpts(i).primary.length" :label="t('同工艺')">
-                        <option v-for="d in obsOpts(i).primary" :key="d.id" :value="d.id">{{ optTxt(d) }}</option>
-                      </optgroup>
-                      <optgroup v-if="obsOpts(i).secondary.length" :label="t('其它工艺')">
-                        <option v-for="d in obsOpts(i).secondary" :key="d.id" :value="d.id">{{ optTxt(d) }}</option>
-                      </optgroup>
-                    </select>
-                  </label>
-                  <button class="mini-btn del" :title="t('移除该回路')" :disabled="running || grps.length <= 1" @click.stop="removeGroup(i)">✕</button>
-                </div>
-                <div class="grp-l2">
-                  <label class="sp" @click.stop>
-                    <em>{{ t('目标 SP') }}</em>
-                    <input class="num" type="number" v-model.number="g.sp" :step="spStep(i)" :disabled="!grpOk(i)" @change="g.touch = true" />
-                    <i class="u">{{ obsUnitOf(i) }}</i>
-                  </label>
-                  <span class="kv"><em>y</em><b class="mono" :style="{ color: cRaw }">{{ fmtNum(yRawOf(i)) }}</b></span>
-                  <span class="kv"><em>ỹ</em><b class="mono" :style="{ color: cEkf }">{{ fmtNum(yEkfOf(i)) }}</b></span>
-                  <span class="kv" :title="t('EKF 估计的、传感器测不到的机房热扰动 d̂')"><em>d̂</em><b class="mono dim">{{ fmtNum(dHatOf(i)) }}</b></span>
-                  <span class="kv"><em>u</em><b class="mono acc">{{ fmtNum(uOf(i)) }}</b></span>
-                  <span class="badge-s" :class="stBadge(i)">{{ stTxt(i) }}</span>
-                </div>
-                <div class="grp-l3" @click.stop>
-                  <label class="chk auto"><input type="checkbox" v-model="g.kAuto" :disabled="running" />{{ t('自动整定') }}</label>
-                  <span v-if="g.kAuto" class="auto-cfg mono">{{ kCfgTxt(i) }}</span>
-                  <template v-else>
-                    <label class="kv-g"><em>Kp</em><input class="num k" type="number" step="0.001" :value="g.kp == null ? 0 : g.kp" @input="onPidNum(i, 'kp', $event.target.value)" :disabled="running" /></label>
-                    <label class="kv-g"><em>Ki</em><input class="num k" type="number" step="0.001" :value="g.ki == null ? 0 : g.ki" @input="onPidNum(i, 'ki', $event.target.value)" :disabled="running" /></label>
-                    <label class="kv-g"><em>Kd</em><input class="num k" type="number" step="0.001" :value="g.kd == null ? 0 : g.kd" @input="onPidNum(i, 'kd', $event.target.value)" :disabled="running" /></label>
-                  </template>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- ② 滤波（EKF 为勾选项） -->
-          <section class="set-sec">
-            <div class="sec-head"><span class="sec-no">2</span><span class="sec-ttl">{{ t('滤波') }}</span></div>
-            <div class="flt-line">
-              <label class="chk"><input type="checkbox" v-model="ekfOn" :disabled="running" />{{ t('EKF 滤波') }}</label>
-              <template v-if="ekfOn">
-                <label class="kv-g h"><em>σ<sub>m</sub></em><input class="num w48" type="number" step="0.1" v-model.number="ekfRmPct" :disabled="running" /><i class="u">%</i></label>
-                <label class="kv-g h"><em>σ<sub>p</sub></em><input class="num w48" type="number" step="0.1" v-model.number="ekfQpct" :disabled="running" /><i class="u">%</i></label>
-              </template>
-            </div>
-            <p class="hint">{{ t('EKF（二维增广状态）平滑平台实时读数作为 PID 反馈，并估计传感器测不到的机房热扰动 d̂：σm 越大越平滑、σp 越大越跟随；关闭则直接用原始读数作反馈，可在上图 ① 对比滤波效果。') }}</p>
-          </section>
-
-          <!-- ③ 运行控制 -->
-          <section class="set-sec">
-            <div class="sec-head"><span class="sec-no">3</span><span class="sec-ttl">{{ t('运行控制') }}</span></div>
-            <div class="run-line">
-              <button class="run-btn primary" :disabled="!canRun || trainBusy" @click="toggleRun">{{ running ? t('暂停') : t('开始运行') }}</button>
-              <button class="run-btn" :disabled="running || trainBusy || !anyPoints" @click="resetRun">{{ t('复位') }}</button>
-              <label class="chk" :title="t('运行中周期把各组 PID 输出写入被调设备真实设定（驱动仿真重算）')">
-                <input type="checkbox" v-model="autoApply" :disabled="!canRun || trainBusy" />{{ t('自动下发') }}
-              </label>
-              <select class="freq" v-model="autoApplyEvery" :disabled="!autoApply || !canRun">
-                <option value="tick">{{ t('每周期') }}</option>
-                <option value="5s">{{ t('每 5s') }}</option>
-              </select>
-            </div>
-            <div class="run-meta">
-              <span>{{ totalPts }} {{ t('点') }} @{{ runHz }}Hz</span>
-              <b v-if="convN > 0" class="ok-n">{{ convN }}/{{ grps.length }} {{ t('已收敛') }}</b>
-              <button class="mini-btn" :disabled="!running || simBusy" :title="t('把当前各组 PID 输出写入被调设备设定')" @click="applyAll">{{ t('下发设定') }}</button>
-            </div>
-          </section>
-        </aside>
-
-        <!-- ════════════ 右：图（滤波前后对比 / 实时序列 / 训练 / 优化目标变化） ════════════ -->
-        <main class="pid-charts">
-          <!-- ① 滤波前后左右并列对比 -->
-          <section class="ch-card">
-            <div class="ch-head">
-              <span class="ch-tag">①</span><span class="ch-ttl">{{ t('滤波前后对比') }}</span>
-              <span class="ch-sub">{{ ekfOn ? t('左：原始观测 y（滤波前）｜右：EKF 输出 ỹ 与热扰动估计 d̂') : t('EKF 未勾选：左右均为原始观测 y') }}</span>
-            </div>
-            <div class="cmp-grid">
-              <div class="cmp-cell">
-                <div class="cmp-h"><i class="lg-dot" :style="{ background: cRaw }"></i>{{ t('滤波前 · 原始观测 y') }}</div>
-                <MultiTrendChart v-if="rawChart.length" :series="rawChart" mode="raw" :height="112" :axis="true" />
-                <div v-else class="ch-empty sm">{{ t('开始运行后显示') }}</div>
-              </div>
-              <div class="cmp-cell">
-                <div class="cmp-h"><i class="lg-dot" :style="{ background: cEkf }"></i>{{ t('滤波后 · EKF 输出 ỹ') }}</div>
-                <MultiTrendChart v-if="ekfChart.length" :series="ekfChart" mode="raw" :height="112" :axis="true" />
-                <div v-else class="ch-empty sm">{{ t('开始运行后显示') }}</div>
-              </div>
-            </div>
-          </section>
-
-          <!-- ② 实时序列（当前回路完整实时曲线） -->
-          <section class="ch-card">
-            <div class="ch-head">
-              <span class="ch-tag">②</span><span class="ch-ttl">{{ t('实时序列') }}</span>
-              <span class="ch-sub">{{ t('原始观测 y · 叠加目标 SP') }}</span>
-              <span class="ch-right" v-if="grps.length > 1">
-                <select class="vsel" v-model.number="viewIdx">
-                  <option v-for="(g, i) in grps" :key="g.key" :value="i">{{ t('回路') }} {{ i + 1 }}：{{ pairShort(i) }}</option>
-                </select>
-              </span>
-            </div>
-            <MultiTrendChart v-if="rawChart.length" :series="rawChart" mode="raw" :height="130" :axis="true" />
-            <div v-else class="ch-empty">{{ t('点击左侧「开始运行」开始采集实时序列') }}</div>
-          </section>
-
-          <!-- ③ 优化模型控制的训练（占右区大范围） -->
-          <section class="ch-card train">
-            <div class="ch-head">
-              <span class="ch-tag">③</span><span class="ch-ttl">{{ t('优化模型控制的训练') }}</span>
-              <span class="ch-badge">{{ dimTxt }}</span>
-              <span class="ch-right"><span class="tr-state" :class="{ on: trainBusy }"><i class="dot"></i>{{ trStateTxt }}</span></span>
-            </div>
-            <div class="tr-bar">
-              <span class="seg">
-                <button v-for="a in ALGS" :key="a.id" class="seg-btn" :class="{ on: trainAlg === a.id }"
-                        :disabled="trainBusy || running" @click="trainAlg = a.id">{{ a.label }}</button>
-              </span>
-              <label v-if="trainAlg !== 'rl'" class="kv-g h"><em>{{ t('种群') }}</em><input class="num w48" type="number" min="6" max="60" step="2" v-model.number="popSize" :disabled="trainBusy || running" /></label>
-              <label class="kv-g h"><em>{{ t('迭代') }}</em><input class="num w48" type="number" min="5" max="200" step="5" v-model.number="maxGen" :disabled="trainBusy || running" /></label>
-              <button v-if="trainBusy" class="run-btn stop" @click="stopTrain">{{ t('停止') }}</button>
-              <button v-else class="run-btn primary" :disabled="!canRun || running || trainBusy" @click="startTrain">{{ t('开始训练') }}</button>
-              <button class="run-btn go" :disabled="!trainBest || running || trainBusy" @click="applyTrain">{{ t('应用最优参数并演示') }}</button>
-              <button class="mini-btn" :disabled="trainBusy || !trainCurve.length" @click="clearTrain">{{ t('清空') }}</button>
-              <button class="mini-btn set" :class="{ on: !foldSet }" @click="foldSet = !foldSet">{{ t('参数设定') }}{{ foldSet ? ' ▸' : ' ▾' }}</button>
-            </div>
-            <!-- 算法超参数 + 优化目标权重（按所选算法切换） -->
-            <div class="tr-set" v-show="!foldSet">
-              <div class="tr-set-row">
-                <template v-if="trainAlg === 'ga'">
-                  <label class="kv-g h"><em>{{ t('交叉率') }} P<sub>c</sub></em><input class="num w48" type="number" step="0.05" min="0" max="1" v-model.number="gaPc" :disabled="lockCfg" /></label>
-                  <label class="kv-g h"><em>{{ t('变异率') }} P<sub>m</sub></em><input class="num w48" type="number" step="0.02" min="0" max="1" v-model.number="gaPm" :disabled="lockCfg" /></label>
-                  <label class="kv-g h"><em>{{ t('变异幅度') }} σ</em><input class="num w48" type="number" step="0.05" min="0" v-model.number="gaMut" :disabled="lockCfg" /></label>
-                </template>
-                <template v-else-if="trainAlg === 'pso'">
-                  <label class="kv-g h"><em>{{ t('惯性') }} w</em><input class="num w48" type="number" step="0.02" min="0" max="1" v-model.number="psoW" :disabled="lockCfg" /></label>
-                  <label class="kv-g h"><em>{{ t('个体') }} c<sub>1</sub></em><input class="num w48" type="number" step="0.1" min="0" v-model.number="psoC1" :disabled="lockCfg" /></label>
-                  <label class="kv-g h"><em>{{ t('群体') }} c<sub>2</sub></em><input class="num w48" type="number" step="0.1" min="0" v-model.number="psoC2" :disabled="lockCfg" /></label>
-                </template>
-                <template v-else>
-                  <label class="kv-g h"><em>{{ t('学习率') }} lr</em><input class="num w48" type="number" step="0.001" min="0" v-model.number="ppoLr" :disabled="lockCfg" /></label>
-                  <label class="kv-g h"><em>{{ t('裁剪') }} ε</em><input class="num w48" type="number" step="0.05" min="0" max="1" v-model.number="ppoClip" :disabled="lockCfg" /></label>
-                  <label class="kv-g h"><em>{{ t('折扣') }} γ</em><input class="num w48" type="number" step="0.01" min="0" max="1" v-model.number="ppoGamma" :disabled="lockCfg" /></label>
-                  <label class="kv-g h"><em>GAE λ</em><input class="num w48" type="number" step="0.01" min="0" max="1" v-model.number="ppoLam" :disabled="lockCfg" /></label>
-                  <label class="kv-g h"><em>{{ t('熵系数') }}</em><input class="num w48" type="number" step="0.005" min="0" v-model.number="ppoEnt" :disabled="lockCfg" /></label>
-                  <label class="kv-g h"><em>{{ t('更新轮次') }} K</em><input class="num w48" type="number" step="1" min="1" v-model.number="ppoK" :disabled="lockCfg" /></label>
-                  <label class="kv-g h"><em>{{ t('采样轨迹') }}</em><input class="num w48" type="number" step="1" min="1" v-model.number="ppoEps" :disabled="lockCfg" /></label>
-                  <label class="kv-g h"><em>{{ t('探索') }} σ₀</em><input class="num w48" type="number" step="0.05" min="0" v-model.number="ppoSig" :disabled="lockCfg" /></label>
-                  <label class="kv-g h" :title="t('训练环境假设：传感器测不到的机房热扰动幅度（随机游走）')"><em>{{ t('热扰动') }} d</em><input class="num w48" type="number" step="0.5" min="0" v-model.number="distPct" :disabled="lockCfg" /><i class="u">%</i></label>
-                </template>
-              </div>
-              <div class="tr-set-row obj">
-                <template v-if="trainAlg === 'rl'">
-                  <span class="obj-lb">{{ t('奖励') }} r = −( w₁|e| + w₂|Δe| + w₃·{{ t('超调') }} + w₄·{{ t('功耗') }} )</span>
-                  <label class="kv-g h"><em>w₁ {{ t('误差') }}</em><input class="num w48" type="number" step="0.1" min="0" v-model.number="rwErr" :disabled="lockCfg" /></label>
-                  <label class="kv-g h"><em>w₂ {{ t('波动') }}</em><input class="num w48" type="number" step="0.05" min="0" v-model.number="rwDe" :disabled="lockCfg" /></label>
-                  <label class="kv-g h"><em>w₃ {{ t('超调') }}</em><input class="num w48" type="number" step="0.1" min="0" v-model.number="rwOv" :disabled="lockCfg" /></label>
-                  <label class="kv-g h" :title="t('功耗按泵/风机相似定律 P ∝ 转速³ 折算，用于倒逼节能')"><em>w₄ {{ t('功耗') }}</em><input class="num w48" type="number" step="0.1" min="0" v-model.number="rwPow" :disabled="lockCfg" /></label>
-                </template>
-                <template v-else>
-                  <span class="obj-lb">{{ t('优化目标（最小化）') }}</span>
-                  <span class="obj-it">{{ t('收敛误差') }}<b>1</b></span>
-                  <label class="kv-g h"><em>{{ t('输出能耗') }}</em><input class="num w48" type="number" step="0.5" min="0" v-model.number="lamU" :disabled="lockCfg" /><i class="u">%</i></label>
-                  <label class="kv-g h"><em>{{ t('超调') }}</em><input class="num w48" type="number" step="0.5" min="0" v-model.number="lamOv" :disabled="lockCfg" /><i class="u">%</i></label>
-                </template>
-              </div>
-            </div>
-            <!-- 本轮训练所用过程模型的来源：在线实时数据辨识 / 数据不足时的先验估计 -->
-            <div class="tr-ident" v-if="identInfo.length">
-              <span class="id-lb">{{ t('过程模型') }}</span>
-              <span class="id-it" v-for="m in identInfo" :key="m.idx">
-                {{ t('回路') }} {{ m.idx + 1 }} · <template v-if="m.src === 'ident'">{{ t('在线实时数据辨识') }}（{{ m.n }} {{ t('点') }}）</template><template v-else>{{ t('先验估计：在线数据未呈现足够激励，先让回路运行并产生响应再训练') }}</template> · τ {{ fmtSmall(m.tau) }}s · G {{ fmtSmall(m.G) }}
-              </span>
-            </div>
-            <div class="tr-vis">
-              <svg v-if="trainCurve.length > 1" class="tr-svg" :viewBox="`0 0 ${CW} ${CHH}`" preserveAspectRatio="none">
-                <line v-for="y in trGrid" :key="'g' + y" class="grid" :x1="0" :x2="CW" :y1="y" :y2="y" />
-                <line v-if="trBaseY != null" class="base" :x1="0" :x2="CW" :y1="trBaseY" :y2="trBaseY" />
-                <polyline class="cv" :points="trPath" />
-              </svg>
-              <div v-else-if="trainBusy" class="tr-empty">{{ t('训练准备中…') }}</div>
-              <div v-else class="tr-empty">
-                <p class="t1">{{ trEmptyT1 }}</p>
-                <p class="t2">{{ trEmptyT2 }}</p>
-              </div>
-              <div class="tr-ax" v-if="trainCurve.length > 1"><span>1</span><span>{{ genN }} {{ t('代') }}</span></div>
-            </div>
-            <div class="tr-best" v-if="trainBest">
-              <div class="tr-sum">
-                <span class="gain" :class="{ ok: trainGain > 0 }">{{ t('平均归一误差') }} <b>{{ fmtSmall(trainBest.baseCost) }}</b> → <b>{{ fmtSmall(trainBest.cost) }}</b>（↓{{ trainGain }}%）</span>
-                <span class="muted">{{ t('迭代') }} {{ genN }} {{ t('代') }} · {{ t('每代评估') }} {{ popSize }} {{ t('组候选') }}</span>
-              </div>
-              <div class="tr-rows">
-                <div class="tr-row" v-for="d in trainBest.dims" :key="d.idx">
-                  <span class="rn">{{ d.idx + 1 }}</span>
-                  <span class="rl">{{ d.label }}</span>
-                  <span class="rp mono">Kp {{ fmtSmall(d.kp) }} · Ki {{ fmtSmall(d.ki) }} · Kd {{ fmtSmall(d.kd) }}</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- ④ 优化目标变化情况：每代最优目标值 + 该代对应的 PID 参数（直接标在图上） -->
-          <section class="ch-card">
-            <div class="ch-head">
-              <span class="ch-tag">④</span><span class="ch-ttl">{{ t('优化目标变化 · PID 参数轨迹') }}</span>
-              <span class="ch-sub">{{ t('曲线 = 每代最优目标值；标注 = 该代对应的 Kp / Ki / Kd') }}</span>
-              <span class="ch-right">{{ t('回路') }} {{ viewIdx + 1 }}：{{ pairShort(viewIdx) }}</span>
-            </div>
-            <div class="ov-wrap">
-              <svg v-if="trainCurve.length > 1" class="ov-svg" :viewBox="`0 0 ${OVW} ${OVH}`" preserveAspectRatio="none">
-                <line v-for="y in trGrid" :key="'o' + y" class="grid" :x1="0" :x2="OVW" :y1="y" :y2="y" />
-                <polyline class="cv" :points="ovPath" />
-              </svg>
-              <template v-if="ovMarks.length">
-                <span v-for="m in ovMarks" :key="'d' + m.i" class="ov-dot" :class="{ on: m.best }" :style="{ left: m.x + '%', top: m.y + '%' }"></span>
-                <div v-for="m in ovMarks" :key="'t' + m.i" class="ov-tag" :class="{ on: m.best, below: m.y < 26 }"
-                     :style="{ left: m.x + '%', top: (m.y < 26 ? m.y + 4 : m.y - 3) + '%' }">
-                  <span class="g">{{ t('代') }} {{ m.g }} · {{ fmtSmall(m.cost) }}</span>
-                  <span class="p">Kp {{ fmtSmall(m.kp) }} Ki {{ fmtSmall(m.ki) }} Kd {{ fmtSmall(m.kd) }}</span>
-                </div>
-              </template>
-              <div v-if="trainCurve.length <= 1" class="tr-empty">
-                <p class="t2">{{ t('完成一次训练后，这里显示优化目标随迭代的变化，以及每代对应的 PID 参数值。') }}</p>
-              </div>
-            </div>
-          </section>
-        </main>
+  <!-- ============ AI 群控（重新设计） ============
+       左栏：① 可调设备（勾选后直接调设定值）② 传感设备（可绑定到可调设备 → 自动生成 PID 回路；
+             未绑定的只显示读数）③ 算法（下拉，默认强化学习）
+       右栏：① 实时观测（滤波前 / 滤波后同一张图）② 训练控制台（开始训练 · 是否滤波 · 是否调控 PID ·
+             超参数 · 模型版本 · 自动训练时间）③ 训练奖励变化 ④ 模型版本列表
+       滤波/PID 的内部参数不再暴露到界面：界面只保留「是否滤波」「是否调控 PID」两个开关。 -->
+  <div class="agc">
+    <!-- ══════════════ 左：设备与算法 ══════════════ -->
+    <aside class="agc-aside">
+      <div class="agc-hd">
+        <svg class="hd-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg>
+        <b>{{ t('AI 群控') }}</b>
+        <span class="hd-sub mono">{{ loops.length }} {{ t('回路') }} · {{ selAdj.length }}{{ t('可调') }} · {{ selSen.length }}{{ t('传感') }}</span>
       </div>
-    </template>
+
+      <!-- ① 可调设备 -->
+      <section class="pnl">
+        <div class="pnl-hd" @click="fold.adj = !fold.adj">
+          <i class="caret" :class="{ on: !fold.adj }">▸</i>
+          <span class="ph-t">{{ t('① 可调设备') }}</span>
+          <em class="cnt mono">{{ selAdj.length }}/{{ adjList.length }}</em>
+          <span class="hd-ops">
+            <button class="lk" @click.stop="pickAllAdj">{{ t('全选') }}</button>
+            <button class="lk" @click.stop="selAdj = []">{{ t('清空') }}</button>
+          </span>
+        </div>
+        <div v-show="!fold.adj" class="pnl-bd">
+          <p v-if="!adjList.length" class="emp">{{ t('当前场景没有可调设备（可调设备才能作为被控对象）。') }}</p>
+          <div v-for="d in adjList" :key="d.id" class="dev" :class="{ on: has(selAdj, d.id) }">
+            <div class="dev-hd" @click="toggle(selAdj, d.id)">
+              <span class="cbx"><i v-if="has(selAdj, d.id)">✓</i></span>
+              <span class="nm">{{ d.label }}<em>{{ d.unitName }}</em></span>
+              <b class="mono val">{{ fmt(curSp(d.id)) }}<i>{{ spUnit(d.id) }}</i></b>
+              <span v-if="boundSensors(d.id).length" class="tag pid" :title="t('已绑定传感设备，由 PID 自动调控')">PID</span>
+            </div>
+            <!-- 选中后直接调整设定值 -->
+            <div v-if="has(selAdj, d.id)" class="dev-bd">
+              <div class="sp-row">
+                <input class="rng" type="range" :min="spMin(d.id)" :max="spMax(d.id)" :step="spStepV(d.id)"
+                       :value="curSp(d.id)" :disabled="autoCtl(d.id)" @input="onSpSlide(d.id, $event)" />
+                <input class="num" type="number" :value="curSp(d.id)" :step="spStepV(d.id)"
+                       :disabled="autoCtl(d.id)" @change="onSpNum(d.id, $event)" />
+                <i class="u">{{ spUnit(d.id) }}</i>
+              </div>
+              <div class="meta">
+                <span>{{ t('量程') }} <b class="mono">{{ fmt(spMin(d.id)) }} ~ {{ fmt(spMax(d.id)) }}</b></span>
+                <span v-if="autoCtl(d.id)" class="tag on">{{ t('PID 自动调控中') }}</span>
+                <span v-else class="tag">{{ t('手动设定') }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ② 传感设备 -->
+      <section class="pnl">
+        <div class="pnl-hd" @click="fold.sen = !fold.sen">
+          <i class="caret" :class="{ on: !fold.sen }">▸</i>
+          <span class="ph-t">{{ t('② 传感设备') }}</span>
+          <em class="cnt mono">{{ selSen.length }}/{{ senList.length }}</em>
+          <span class="hd-ops">
+            <button class="lk" @click.stop="pickAllSen">{{ t('全选') }}</button>
+            <button class="lk" @click.stop="selSen = []">{{ t('清空') }}</button>
+          </span>
+        </div>
+        <div v-show="!fold.sen" class="pnl-bd">
+          <p v-if="!senList.length" class="emp">{{ t('当前场景没有传感设备。') }}</p>
+          <div v-for="s in senList" :key="s.id" class="dev" :class="{ on: has(selSen, s.id) }">
+            <div class="dev-hd" @click="toggle(selSen, s.id)">
+              <span class="cbx"><i v-if="has(selSen, s.id)">✓</i></span>
+              <span class="nm">{{ s.label }}<em>{{ s.unitName }}</em></span>
+              <b class="mono val">{{ fmt(liveOf(s.id)) }}<i>{{ s.unit || '' }}</i></b>
+            </div>
+            <div v-if="has(selSen, s.id)" class="dev-bd">
+              <div class="row">
+                <em>{{ t('绑定可调设备') }}</em>
+                <select :value="bindOf[s.id] || ''" @change="setBind(s.id, $event.target.value)">
+                  <option value="">{{ t('未绑定（只显示读数）') }}</option>
+                  <option v-for="a in adjList" :key="a.id" :value="a.id">{{ a.label }} · {{ a.unitName }}</option>
+                </select>
+              </div>
+              <template v-if="bindOf[s.id] && isLoopSensor(s.id)">
+                <div class="row">
+                  <em>{{ t('目标值') }}</em>
+                  <input class="num" type="number" :value="targetOf(s.id)" :step="spStepS(s.id)" @change="setTarget(s.id, $event.target.value)" />
+                  <i class="u">{{ s.unit || '' }}</i>
+                </div>
+                <div class="row st">
+                  <span class="kv"><em>{{ t('观测') }}</em><b class="mono raw">{{ fmt(lastRawOf(s.id)) }}</b></span>
+                  <span class="kv"><em>{{ t('滤波后') }}</em><b class="mono ekf">{{ fmt(lastEkfOf(s.id)) }}</b></span>
+                  <span class="badge" :class="badgeCls(s.id)">{{ badgeTxt(s.id) }}</span>
+                </div>
+              </template>
+              <div v-else-if="bindOf[s.id]" class="row rd">
+                <em>{{ t('实时读数') }}</em>
+                <b class="mono">{{ fmt(liveOf(s.id)) }}</b><i class="u">{{ s.unit || '' }}</i>
+                <span class="hintx">{{ t('辅助观测（该可调设备已有主控传感设备）') }}</span>
+              </div>
+              <div v-else class="row rd">
+                <em>{{ t('实时读数') }}</em>
+                <b class="mono">{{ fmt(liveOf(s.id)) }}</b><i class="u">{{ s.unit || '' }}</i>
+                <span class="hintx">{{ t('未绑定：仅显示实时读数') }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ③ 算法 -->
+      <section class="pnl">
+        <div class="pnl-hd" @click="fold.alg = !fold.alg">
+          <i class="caret" :class="{ on: !fold.alg }">▸</i>
+          <span class="ph-t">{{ t('③ 控制算法') }}</span>
+        </div>
+        <div v-show="!fold.alg" class="pnl-bd">
+          <div class="row">
+            <em>{{ t('算法') }}</em>
+            <select v-model="alg" class="grow">
+              <option v-for="a in ALGS" :key="a.id" :value="a.id" :disabled="!a.ready">
+                {{ a.label }}{{ a.ready ? '' : '（' + t('未实现') + '）' }}
+              </option>
+            </select>
+          </div>
+          <div class="io">
+            <div class="io-row"><em>{{ t('输入') }}</em><span>{{ t('观测值（滤波后）') }} + {{ t('隐藏状态（滤波估计的扰动）') }}</span></div>
+            <div class="io-row"><em>{{ t('输出') }}</em><span>{{ t('动作：可调设备调节量 + PID 参数 Kp/Ki/Kd') }}</span></div>
+          </div>
+          <div class="io" v-if="modelInfo">
+            <div class="io-row"><em>{{ t('过程模型') }}</em><span :class="modelInfo.ok ? 'okx' : 'warnx'">{{ modelInfo.txt }}</span></div>
+            <div class="io-row"><em>{{ t('含义') }}</em><span>τ {{ t('惯性时间常数') }} · θ {{ t('纯滞后') }} · K {{ t('静态增益') }} · n {{ t('样本数') }}</span></div>
+          </div>
+          <p class="emp sm">{{ t('当前仅实现强化学习（PPO）：策略网络直接输出每拍的调节量与 PID 增益倍率，在由实时数据辨识出的过程模型上离线训练，不影响正在运行的回路。') }}</p>
+        </div>
+      </section>
+    </aside>
+
+    <!-- ══════════════ 右：实时曲线 · 训练 ══════════════ -->
+    <main class="agc-main">
+      <!-- ① 实时观测：滤波前 / 滤波后同图 -->
+      <section class="card">
+        <div class="card-hd">
+          <span class="ct">{{ t('实时观测') }}</span>
+          <span class="cs">{{ t('滤波前 / 滤波后同一坐标系对比') }}</span>
+          <span class="ch-ops">
+            <select v-model="curSenId" class="sel" :disabled="!chartSensors.length">
+              <option v-for="s in chartSensors" :key="s.id" :value="s.id">{{ s.label }}</option>
+            </select>
+            <select v-model.number="runHz" class="sel xs" :disabled="sampling">
+              <option :value="1">1s</option>
+              <option :value="0.5">2s</option>
+              <option :value="0.2">5s</option>
+            </select>
+            <button class="btn" :class="{ primary: !sampling, stop: sampling }" @click="toggleSample">
+              {{ sampling ? t('停止采集') : t('开始采集') }}
+            </button>
+          </span>
+        </div>
+        <MultiTrendChart v-if="chartSeries.length" :series="chartSeries" mode="raw" :height="150" :axis="true" />
+        <div v-else class="cempty">{{ t('勾选传感设备并点击「开始采集」，这里显示滤波前后的实时曲线') }}</div>
+      </section>
+
+      <!-- ② 训练控制台 -->
+      <section class="card">
+        <div class="card-hd">
+          <span class="ct">{{ t('训练控制台') }}</span>
+          <span class="cs mono">{{ loops.length }} {{ t('回路') }} · {{ t('决策维度') }} {{ loops.length * 4 }}</span>
+          <span class="ch-ops">
+            <span class="tstate" :class="{ on: trainBusy }"><i class="dot"></i>{{ trainStateTxt }}</span>
+          </span>
+        </div>
+        <div class="bar">
+          <button class="btn primary" :disabled="trainBusy || !canTrain" @click="startTrain">{{ t('开始训练') }}</button>
+          <button class="btn stop" :disabled="!trainBusy" @click="stopTrain">{{ t('停止') }}</button>
+          <label class="chk" :title="t('对观测做滤波后再作为控制/训练输入')">
+            <input type="checkbox" v-model="useFilter" />{{ t('滤波') }}
+          </label>
+          <label class="chk" :title="t('由 PID 自动调节可调设备设定值（关闭则保持手动设定）')">
+            <input type="checkbox" v-model="ctlOn" />{{ t('调控 PID') }}
+          </label>
+          <button class="btn ghost" @click="fold.hp = !fold.hp">{{ t('超参数') }}{{ fold.hp ? ' ▸' : ' ▾' }}</button>
+        </div>
+        <!-- 超参数 -->
+        <div class="hp" v-show="!fold.hp">
+          <div class="hp-row">
+            <label class="f"><em>{{ t('迭代轮次') }}</em><input class="num w56" type="number" min="5" max="300" step="5" v-model.number="maxIter" :disabled="trainBusy" /></label>
+            <label class="f"><em>{{ t('学习率') }} lr</em><input class="num w56" type="number" step="0.001" min="0" v-model.number="ppoLr" :disabled="trainBusy" /></label>
+            <label class="f"><em>{{ t('裁剪') }} ε</em><input class="num w56" type="number" step="0.05" min="0" max="1" v-model.number="ppoClip" :disabled="trainBusy" /></label>
+            <label class="f"><em>{{ t('折扣') }} γ</em><input class="num w56" type="number" step="0.01" min="0" max="1" v-model.number="ppoGamma" :disabled="trainBusy" /></label>
+            <label class="f"><em>GAE λ</em><input class="num w56" type="number" step="0.01" min="0" max="1" v-model.number="ppoLam" :disabled="trainBusy" /></label>
+            <label class="f"><em>{{ t('熵系数') }}</em><input class="num w56" type="number" step="0.005" min="0" v-model.number="ppoEnt" :disabled="trainBusy" /></label>
+            <label class="f"><em>{{ t('更新轮次') }} K</em><input class="num w56" type="number" step="1" min="1" v-model.number="ppoK" :disabled="trainBusy" /></label>
+            <label class="f"><em>{{ t('每轮轨迹') }}</em><input class="num w56" type="number" step="1" min="1" v-model.number="ppoEps" :disabled="trainBusy" /></label>
+            <label class="f"><em>{{ t('探索') }} σ₀</em><input class="num w56" type="number" step="0.05" min="0" v-model.number="ppoSig" :disabled="trainBusy" /></label>
+            <label class="f"><em>{{ t('环境扰动') }} d</em><input class="num w56" type="number" step="0.5" min="0" v-model.number="distPct" :disabled="trainBusy" /><i class="u">%</i></label>
+            <label class="f" :title="t('训练时对辨识出的模型参数施加随机扰动，避免策略过拟合模型误差')"><em>{{ t('模型不确定度') }}</em><input class="num w56" type="number" step="1" min="0" max="50" v-model.number="modelPct" :disabled="trainBusy" /><i class="u">%</i></label>
+            <label class="f" :title="t('无足够数据时使用的保守纯滞后估计（秒），现场可按经验填写')"><em>{{ t('先验滞后') }} θ₀</em><input class="num w56" type="number" step="1" min="0" max="600" v-model.number="priTheta" :disabled="trainBusy" /><i class="u">s</i></label>
+          </div>
+          <div class="hp-row obj">
+            <span class="lb">{{ t('奖励') }} r = −( w₁|e| + w₂|Δe| + w₃·{{ t('超调') }} + w₄·{{ t('功耗') }} )</span>
+            <label class="f"><em>w₁ {{ t('误差') }}</em><input class="num w56" type="number" step="0.1" min="0" v-model.number="rwErr" :disabled="trainBusy" /></label>
+            <label class="f"><em>w₂ {{ t('波动') }}</em><input class="num w56" type="number" step="0.05" min="0" v-model.number="rwDe" :disabled="trainBusy" /></label>
+            <label class="f"><em>w₃ {{ t('超调') }}</em><input class="num w56" type="number" step="0.1" min="0" v-model.number="rwOv" :disabled="trainBusy" /></label>
+            <label class="f"><em>w₄ {{ t('功耗') }}</em><input class="num w56" type="number" step="0.1" min="0" v-model.number="rwPow" :disabled="trainBusy" /></label>
+          </div>
+        </div>
+        <!-- 模型版本 / 自动训练 -->
+        <div class="bar mv">
+          <em class="lb2">{{ t('模型版本') }}</em>
+          <select v-model="activeVer" class="sel" :disabled="!versions.length">
+            <option v-for="v in versions" :key="v.id" :value="v.id">{{ v.name }} · {{ shortTs(v.ts) }} · r {{ fmtSmall(v.reward) }}</option>
+          </select>
+          <button class="btn" :disabled="!activeVer || !hasVer(activeVer)" @click="applyVer(activeVer)">{{ t('应用版本') }}</button>
+          <button class="btn ghost" :disabled="!activeVer || !hasVer(activeVer)" @click="delVer(activeVer)">{{ t('删除') }}</button>
+          <span class="sep"></span>
+          <em class="lb2">{{ t('自动训练') }}</em>
+          <select v-model="autoMode" class="sel xs">
+            <option value="off">{{ t('关闭') }}</option>
+            <option value="1h">{{ t('每 1 小时') }}</option>
+            <option value="6h">{{ t('每 6 小时') }}</option>
+            <option value="daily">{{ t('每天') }}</option>
+          </select>
+          <input v-if="autoMode === 'daily'" class="num tm" type="time" v-model="autoAt" />
+          <span class="nx">{{ nextAutoTxt }}</span>
+        </div>
+      </section>
+
+      <!-- ③ 训练奖励变化 -->
+      <section class="card grow">
+        <div class="card-hd">
+          <span class="ct">{{ t('训练奖励') }}</span>
+          <span class="cs">{{ t('每轮迭代的平均回合奖励（越大越好）') }}</span>
+          <span class="ch-ops mono">
+            <b class="rw">{{ fmtSmall(lastReward) }}</b>
+            <span class="dim">/ {{ t('最佳') }} <b class="best">{{ fmtSmall(bestReward) }}</b></span>
+            <span v-if="baseReward != null" class="dim">· {{ t('基线') }} {{ fmtSmall(baseReward) }}</span>
+          </span>
+        </div>
+        <div class="rw-wrap">
+          <svg v-if="rwPath" class="rw-svg" :viewBox="`0 0 ${RW.W} ${RW.H}`" preserveAspectRatio="none">
+            <line v-for="y in RW.GRID" :key="'g' + y" class="grid" :x1="0" :x2="RW.W" :y1="y" :y2="y" />
+            <line v-if="baseY != null" class="base" :x1="0" :x2="RW.W" :y1="baseY" :y2="baseY" />
+            <polyline class="cv" :points="rwPath" />
+          </svg>
+          <div v-else class="cempty sm">
+            <p class="t1">{{ t('尚未训练') }}</p>
+            <p class="t2">{{ t('绑定传感设备与可调设备形成回路后，点击「开始训练」，这里显示奖励随迭代的变化。') }}</p>
+          </div>
+          <div class="rw-ax" v-if="rwPath">
+            <span>1</span><span>{{ t('迭代') }} {{ curve.length }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ④ 模型版本 -->
+      <section class="card">
+        <div class="card-hd">
+          <span class="ct">{{ t('模型版本') }}</span>
+          <span class="cs">{{ t('每轮训练自动存为新版本，可随时回退应用') }}</span>
+        </div>
+        <div class="vtb">
+          <div class="vtr hd">
+            <span>{{ t('版本') }}</span><span>{{ t('时间') }}</span><span>{{ t('算法') }}</span>
+            <span>{{ t('迭代') }}</span><span>{{ t('奖励') }}</span><span>{{ t('状态') }}</span>
+          </div>
+          <div v-if="!versions.length" class="vempty">{{ t('暂无模型版本') }}</div>
+          <div v-for="v in versions" :key="v.id" class="vtr" :class="{ on: v.id === activeVer, cur: v.id === curVerId }"
+               @click="activeVer = v.id">
+            <span class="mono">{{ v.name }}</span>
+            <span class="mono dim">{{ fullTs(v.ts) }}</span>
+            <span>{{ v.alg }}</span>
+            <span class="mono">{{ v.iters }}</span>
+            <span class="mono rw">{{ fmtSmall(v.reward) }}</span>
+            <span v-if="v.id === curVerId" class="tag on">{{ t('已应用') }}</span>
+            <span v-else class="tag">{{ t('历史') }}</span>
+          </div>
+        </div>
+        <div class="vdim" v-if="activeVerObj">
+          <div class="vdim-h">{{ t('版本') }} {{ activeVerObj.name }} · {{ t('输出（动作）') }}</div>
+          <div class="vrow" v-for="(d, i) in activeVerObj.dims" :key="i">
+            <span class="rn">{{ i + 1 }}</span>
+            <span class="rl">{{ d.adjLabel }} ← {{ d.senLabel }}</span>
+            <span class="rp mono">Δu {{ fmtSmall(d.du) }} · Kp {{ fmtSmall(d.kp) }} · Ki {{ fmtSmall(d.ki) }} · Kd {{ fmtSmall(d.kd) }}</span>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useSimStore } from '../stores/sim'
 import MultiTrendChart from './MultiTrendChart.vue'
-import { createPid, createEkf2, gauss } from '../utils/control'
+import { createPid, createEkf2 } from '../utils/control'
 import { createPpoAgent, computeGae, standardize, randn } from '../utils/rl'
 import { DEVICE_MAP } from '../data/flowLibrary'
 import { t } from '../i18n'
@@ -294,121 +300,67 @@ import { t } from '../i18n'
 const store = useSimStore()
 
 const props = defineProps({
-  // 数据源设备（DataView 拖入的设备列表，用于跟随选择/观测排序）
   devices: { type: Array, default: () => [] },
   curId: { type: String, default: null },
 })
 
 // ==================== 设备候选 ====================
+// 可调设备 = 被控对象（可写设定值）；传感设备 = 观测来源（只读）
 const all = computed(() => store.allDevices || [])
-const adjOptions = computed(() => all.value.filter((d) => d.adjustable))
-const allMetering = computed(() => all.value.filter((d) => !d.adjustable))
-const sourceMetering = computed(() => props.devices.filter((d) => !d.adjustable))
+const adjList = computed(() => all.value.filter((d) => d.adjustable))
+const senList = computed(() => all.value.filter((d) => !d.adjustable))
 
 function findInfo(id) {
   if (!id) return null
   try { return store.findDevice(id) || null } catch (e) { return null }
 }
 function findDev(id) {
-  const info = findInfo(id)
-  return info ? info.device : null
+  const i = findInfo(id)
+  return i ? i.device : null
 }
-function optTxt(d) { return (d.label || d.id) + (d.unit ? `（${d.unit}）` : '') }
-
-function adjSpCfg(id) {
+/** 设定值量程（来自设备模板） */
+function spCfg(id) {
   const d = findDev(id)
   if (!d) return null
   const tmpl = d.type ? DEVICE_MAP[d.type] : null
-  return (tmpl && tmpl.setpoint) || d.setpoint || null
+  return (tmpl && tmpl.setpoint) || null
 }
-function obsUnitOf(i) {
-  const g = grps[i]
-  if (!g) return ''
-  const d = findDev(g.obsId)
-  return (d && (d.unit || d.unitName)) || ''
+function spMin(id) { const c = spCfg(id); return c ? Number(c.min) : 0 }
+function spMax(id) { const c = spCfg(id); return c ? Number(c.max) : 100 }
+function spDef(id) { const c = spCfg(id); return c ? Number(c.def) : 0 }
+function spUnit(id) { const c = spCfg(id); return (c && (c.unit || c.label)) || '' }
+function spStepV(id) {
+  const r = spMax(id) - spMin(id)
+  if (r >= 1000) return 10
+  if (r >= 100) return 1
+  if (r >= 10) return 0.1
+  return 0.01
 }
-function gUnit(i) {
-  const c = adjSpCfg(grps[i] && grps[i].adjId)
-  return (c && c.unit) || ''
+function spStepS(id) {
+  const v = Math.abs(Number(liveOf(id)) || 1)
+  if (v >= 1000) return 10
+  if (v >= 100) return 1
+  if (v >= 10) return 0.5
+  return 0.1
 }
-function grpAdjMin(i) { const c = adjSpCfg(grps[i] && grps[i].adjId); return c ? Number(c.min) : 0 }
-function grpAdjMax(i) { const c = adjSpCfg(grps[i] && grps[i].adjId); return c ? Number(c.max) : 1 }
-function grpAdjCur(i) {
-  const id = grps[i] && grps[i].adjId
-  if (!id) return null
+/** 当前设定值（store 覆盖 → 设备实例 → 模板默认） */
+function curSp(id) {
   const d = findDev(id)
   if (!d) return null
-  const sp = store.deviceSetpoints[id]
-  return sp != null ? Number(sp) : (adjSpCfg(id) ? Number(adjSpCfg(id).def) : null)
+  if (store.deviceSetpoints[id] != null) return Number(store.deviceSetpoints[id])
+  if (d.setpoint != null && Number.isFinite(Number(d.setpoint))) return Number(d.setpoint)
+  return spDef(id)
 }
-const ginfo = computed(() =>
-  grps.map((g) => ({ adj: findDev(g.adjId), obs: findDev(g.obsId), adjInfo: findInfo(g.adjId) })))
-
-// 同工艺观测（unitId 相等优先，其次 unitType；用户拖入的传感器排前）
-function obsGroupsOf(adjInfo) {
-  const sameUnit = [], sameType = [], rest = []
-  for (const d of allMetering.value) {
-    if (!adjInfo) { rest.push(d); continue }
-    if (d.unitId && adjInfo.unitId && String(d.unitId) === String(adjInfo.unitId)) sameUnit.push(d)
-    else if (d.unitType && adjInfo.unitType && String(d.unitType) === String(adjInfo.unitType)) sameType.push(d)
-    else rest.push(d)
-  }
-  const primary = [...sameUnit, ...sameType]
-  for (const s of sourceMetering.value) {
-    if (!primary.some((d) => d.id === s.id) && !rest.some((d) => d.id === s.id)) primary.push(s)
-  }
-  const secondary = rest.filter((d) => !primary.some((p) => p.id === d.id))
-  return { primary, secondary }
+function setSp(id, v) {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return
+  store.setDeviceSetpoint(id, Math.min(spMax(id), Math.max(spMin(id), n)))
 }
-function obsOpts(i) { return obsGroupsOf(ginfo.value[i] && ginfo.value[i].adjInfo) }
-
-// 回路默认设备分配：优先不与其他组重复的被调 + 其同工艺观测
-function defaultPair() {
-  const a = adjOptions.value
-  if (!a.length) return { adjId: '', obsId: '' }
-  let adjId = a.find((d) => !grps.some((g) => g.adjId === d.id))
-  if (!adjId) adjId = a[grps.length % a.length]
-  if (!adjId) adjId = a[0]
-  const o = obsGroupsOf(findInfo(adjId.id)).primary[0] || allMetering.value[0] || null
-  return { adjId: adjId.id, obsId: o ? o.id : '' }
-}
-
-// ==================== 回路组 ====================
-const MAX_GRP = 8
-let keySeq = 0
-const grps = reactive([])
-const viewIdx = ref(0)
-const canAddGrp = computed(() => grps.length < MAX_GRP && grps.length < adjOptions.value.length)
-
-function pushGrp() {
-  const d = defaultPair()
-  const g = reactive({
-    key: 'g' + (++keySeq), adjId: d.adjId, obsId: d.obsId,
-    sp: 0, touch: false, kAuto: true, kp: null, ki: null, kd: null,
-  })
-  grps.push(g)
-  return g
-}
-function addGroup() {
-  if (running.value || !canAddGrp.value) return
-  pushGrp()
-  rebuildRuns()
-  clampView()
-}
-function removeGroup(i) {
-  if (running.value || grps.length <= 1) return
-  ctx.delete(grps[i].key)
-  grps.splice(i, 1)
-  rebuildRuns()
-  clampView()
-}
-function clampView() {
-  if (viewIdx.value > grps.length - 1) viewIdx.value = Math.max(0, grps.length - 1)
-  if (viewIdx.value < 0) viewIdx.value = 0
-}
-
-// 读取观测实时值：live → 历史末点 → device.live/reading
-function liveRead(id) {
+/** 滑杆 / 数字框直调设定值（PID 自动调控时控件已禁用） */
+function onSpSlide(id, e) { setSp(id, e.target.value) }
+function onSpNum(id, e) { setSp(id, e.target.value) }
+/** 实时读数：live → 历史末点 → 设备字段 */
+function liveOf(id) {
   if (!id) return null
   const lv = store.deviceLiveOf(id)
   if (lv != null) return Number(lv)
@@ -419,1142 +371,996 @@ function liveRead(id) {
   if (d && d.reading != null) return Number(d.reading)
   return null
 }
-function obsLiveOf(i) {
-  const g = grps[i]
-  return g ? liveRead(g.obsId) : null
+function devName(id) { const d = findDev(id); return d ? (d.label || d.id) : (id || '—') }
+
+// ==================== 选择 / 绑定 ====================
+const selAdj = ref([])                 // 已选可调设备 id
+const selSen = ref([])                 // 已选传感设备 id
+const bindOf = reactive({})            // 传感设备 id -> 可调设备 id（'' = 未绑定）
+const spOf = reactive({})              // 传感设备 id -> 目标值（PID 设定）
+const fold = reactive({ adj: false, sen: false, alg: false, hp: true })
+
+function has(arr, id) { return arr.includes(id) }
+function toggle(arr, id) {
+  const i = arr.indexOf(id)
+  if (i >= 0) arr.splice(i, 1)
+  else arr.push(id)
+}
+function pickAllAdj() { selAdj.value = adjList.value.map((d) => d.id) }
+function pickAllSen() { selSen.value = senList.value.map((d) => d.id) }
+function boundSensors(adjId) {
+  return selSen.value.filter((s) => bindOf[s] === adjId)
+}
+/** 绑定：自动给出合理目标值，并清理失效绑定 */
+function setBind(senId, adjId) {
+  bindOf[senId] = adjId || ''
+  if (adjId) {
+    const lv = liveOf(senId)
+    if (spOf[senId] == null && lv != null) spOf[senId] = Number((Math.abs(lv) * 1.05).toFixed(4))
+    if (!has(selAdj, adjId)) selAdj.value.push(adjId)
+  }
+  syncRuns()
+}
+function setTarget(senId, v) {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return
+  spOf[senId] = n
+}
+function targetOf(senId) {
+  if (spOf[senId] != null) return Number(spOf[senId])
+  const lv = liveOf(senId)
+  return lv == null ? 0 : Number((Math.abs(lv) * 1.05).toFixed(4))
 }
 
-// ==================== 运行状态 ====================
-// 数据源固定为「平台实时读数」：本视图不生成任何模拟/仿真数据，观测真值 y 一律取自实时链路
-const ekfOn = ref(true)          // EKF 滤波（勾选项：关闭时 PID 反馈直接用原始观测）
-const ekfRmPct = ref(1.5)
-const ekfQpct = ref(0.5)
+// ==================== 控制回路 ====================
+// 一个回路 = 一台可调设备 + 一台主控传感设备（其余绑定到同一可调设备的传感器作为辅助观测）
+const loops = computed(() => {
+  const out = []
+  for (const adjId of selAdj.value) {
+    const sids = boundSensors(adjId)
+    if (!sids.length) continue
+    if (!findDev(adjId) || !findDev(sids[0])) continue
+    out.push({
+      key: adjId,
+      adjId,
+      senId: sids[0],
+      adjLabel: devName(adjId),
+      senLabel: devName(sids[0]),
+      aux: sids.slice(1),
+    })
+  }
+  return out
+})
+function loopOfSen(senId) { return loops.value.find((l) => l.senId === senId) || null }
+function isLoopSensor(senId) { return !!loopOfSen(senId) }
+function loopOfAdj(adjId) { return loops.value.find((l) => l.adjId === adjId) || null }
 
-const running = ref(false)
-const runHz = ref(1)
-const simBusy = ref(false)
-const autoApply = ref(false)
-const autoApplyEvery = ref('5s')
-const cRaw = '#E07B39'
-const cEkf = '#3AA655'
-const cSp = '#9BB8CE'
+// 固定增益（由模型版本写入）；未设置则按量程自动整定
+const fixGain = reactive({})
+function autoGainOf(lp) {
+  const sc = Math.max(Math.abs(Number(liveOf(lp.senId) ?? 0)), 1e-3)
+  const uRange = Math.max(spMax(lp.adjId) - spMin(lp.adjId), 1e-6)
+  return { kp: (0.9 * uRange) / sc, ki: (0.9 * uRange) / sc, kd: (0.15 * uRange) / sc }
+}
+function gainOf(lp) {
+  const f = fixGain[lp.key]
+  return f || autoGainOf(lp)
+}
+const curVerId = ref('')   // 已应用的模型版本
+
+// ==================== 运行（采集 / 调控） ====================
+const sampling = ref(false)
+const runHz = ref(1)                 // 采集频率 Hz
+const useFilter = ref(true)          // 是否滤波（内部 EKF，参数不暴露）
+const ctlOn = ref(true)              // 是否由 PID 调控可调设备
+const FILT_Q = 0.005                 // 过程噪声（观测尺度比例）
+const FILT_R = 0.015                 // 测量噪声（观测尺度比例）
 const MAX_PTS = 600
 
-// 运行时状态（响应式驱动图表）：rt.runs[i] 与 grps[i] 一一对应
-const rt = reactive({ runs: [] })
-const ctx = new Map() // g.key -> { pid, kf } 实例
-const runModels = {}  // 回路 index -> 在线辨识的过程模型（供 EKF 预测与训练评估使用）
+const rt = reactive({ map: {} })     // loopKey -> 运行态
+const ctx = new Map()                // loopKey -> { pid, kf }
+const identOf = reactive({})         // loopKey -> 在线辨识的过程模型（含纯滞后 delay）
+const identDiag = reactive({})       // loopKey -> 辨识诊断（成功率/激励/残差，用于 UI 提示）
 let timer = null
-let lastApplyT = 0
 
-function makeRun(i) {
-  const g = grps[i]
-  const y0v = obsLiveOf(i)
-  const y0 = y0v == null ? 0 : y0v
+function makeRun(lp) {
+  const y0 = Number(liveOf(lp.senId) ?? 0)
   const scale = Math.max(Math.abs(y0), 1e-3)
-  const adjc = grpAdjCur(i)
-  const u0 = adjc != null ? adjc : (adjSpCfg(g.adjId) ? Number(adjSpCfg(g.adjId).def) : 0)
-  // EKF（二维增广状态）：同时给出滤波值 T̂ 与传感器测不到的热扰动 d̂
-  ctx.set(g.key, { pid: createPid(), kf: createEkf2() })
+  const u0 = curSp(lp.adjId) != null ? Number(curSp(lp.adjId)) : spDef(lp.adjId)
+  ctx.set(lp.key, { pid: createPid({ min: spMin(lp.adjId), max: spMax(lp.adjId) }), kf: createEkf2() })
   return reactive({
-    y0, scale, u0, uNow: u0, y: y0,
-    startT: 0, prevT: 0,
-    qv: Math.pow((ekfQpct.value / 100) * scale, 2),           // 过程噪声（T）
-    qdv: Math.pow((ekfQpct.value / 100) * scale, 2) * 0.05,   // 扰动随机游走噪声（d，变化更慢）
-    rv: Math.pow((ekfRmPct.value / 100) * scale, 2),          // 测量噪声
+    y0, scale, u0, uNow: u0,
+    prevT: 0,
+    qv: Math.pow(FILT_Q * scale, 2),
+    qdv: Math.pow(FILT_Q * scale, 2) * 0.05,
+    rv: Math.pow(FILT_R * scale, 2),
     lastRaw: null, lastEkf: null, lastD: null, conv: false,
     ptsRaw: [], ptsEkf: [], ptsU: [],
   })
 }
-function rebuildRuns() {
-  rt.runs = grps.map((_, i) => makeRun(i))
-}
-function resetRun() {
-  stopRun(false)
-  rebuildRuns()
-  // 每组目标默认：设定向可用裕量中点移动对应的稳态观测值（被调贴边界时可反向），无效时 ±5%
-  for (let i = 0; i < grps.length; i++) {
-    const g = grps[i]
-    const r = rt.runs[i]
-    if (!r) continue
-    const ok = grpOk(i)
-    if (!ok) { g.sp = 0; continue }
-    if (!g.touch || !Number.isFinite(Number(g.sp)) || Number(g.sp) === 0) {
-      const base = r.y0
-      const u0c = r.u0
-      const uMin = grpAdjMin(i), uMax = grpAdjMax(i)
-      let def = null
-      const G = effGain(i)
-      if (Number.isFinite(u0c) && uMax > uMin && Number.isFinite(G) && G !== 0) {
-        const uMid = (uMin + uMax) / 2
-        const uT = u0c + 0.5 * (uMid - u0c)
-        def = base + (uT - u0c) * G
-      }
-      if (def == null || !Number.isFinite(def)) def = base !== 0 ? base * 1.05 : 1
-      g.sp = Number(def !== 0 ? Number(def.toFixed(4)) : (base !== 0 ? Number((base * 1.05).toFixed(4)) : 1))
-    }
-    const c = ctx.get(g.key)
-    c.pid.reset()
-    c.pid.set(pidCfgOf(i))
-    c.kf.reset()
+function syncRuns() {
+  const alive = {}
+  for (const lp of loops.value) {
+    alive[lp.key] = 1
+    if (!rt.map[lp.key]) rt.map[lp.key] = makeRun(lp)
   }
-  lastApplyT = 0
-}
-
-// 有效回路：被调与观测都存在
-const grpOk = (i) => {
-  const g = grps[i]
-  return !!(g && g.adjId && g.obsId && findDev(g.adjId) && findDev(g.obsId))
-}
-const canRun = computed(() => grps.some((_, i) => grpOk(i)))
-
-// 影响系数 G（自动：被调满量程对应观测约 ±15% 尺度）
-function effGain(i) {
-  const r = rt.runs[i]
-  const s = r ? r.scale : Math.max(Math.abs(obsLiveOf(i) || 0), 1e-3)
-  return (0.15 * s) / Math.max(grpAdjMax(i) - grpAdjMin(i), 1e-6)
-}
-
-// PID 整定（自动或手动）
-function autoPidOf(i) {
-  const r = rt.runs[i]
-  const uRange = Math.max(grpAdjMax(i) - grpAdjMin(i), 1e-6)
-  const sc = r ? r.scale : Math.max(Math.abs(obsLiveOf(i) || 0), 1e-3)
-  return { kp: (0.9 * uRange) / sc, ki: (0.9 * uRange) / sc, kd: (0.15 * uRange) / sc, min: grpAdjMin(i), max: grpAdjMax(i) }
-}
-function pidCfgOf(i) {
-  const g = grps[i]
-  const min = grpAdjMin(i), max = grpAdjMax(i)
-  if (!g || !g.kAuto) {
-    return { kp: g && g.kp != null ? g.kp : 0, ki: g && g.ki != null ? g.ki : 0, kd: g && g.kd != null ? g.kd : 0, min, max }
-  }
-  return autoPidOf(i)
-}
-function kCfgTxt(i) {
-  const c = pidCfgOf(i)
-  return `Kp ${fmtSmall(c.kp)} · Ki ${fmtSmall(c.ki)} · Kd ${fmtSmall(c.kd)}`
-}
-function onPidNum(i, key, raw) {
-  const g = grps[i]
-  if (!g) return
-  g.kAuto = false
-  g[key] = Number(raw) || 0
-  if (running.value) {
-    const c = ctx.get(g.key)
-    if (c) c.pid.set(pidCfgOf(i))
+  for (const k of Object.keys(rt.map)) {
+    if (!alive[k]) { delete rt.map[k]; ctx.delete(k); delete identOf[k] }
   }
 }
-function onGrpChange(i) {
-  if (!running.value) resetRun()
-}
-function spStep(i) {
-  const d = findDev(grps[i] && grps[i].obsId)
-  if (d) {
-    const base = Math.abs(Number(d.reading) || 1)
-    if (base < 10) return 0.1
-    if (base < 100) return 1
-    return 10
-  }
-  return 1
-}
+watch(loops, () => syncRuns(), { deep: true })
 
-// ==================== 运行 ====================
-function toggleRun() {
-  if (running.value) stopRun()
-  else startRun()
+function toggleSample() {
+  if (sampling.value) stopSample()
+  else startSample()
 }
-function startRun() {
-  if (!canRun.value) return
-  // 已有曲线（暂停后继续）则保留历史；首次/复位后开始则清零重跑
-  if (!anyPoints.value) resetRun()
-  running.value = true
-  timer = setInterval(tick, 1000 / runHz.value)
+function startSample() {
+  if (!loops.value.length) return
+  syncRuns()
+  sampling.value = true
+  if (timer) clearInterval(timer)
+  timer = setInterval(tick, Math.round(1000 / runHz.value))
 }
-function stopRun(clearTimer = true) {
-  running.value = false
-  if (clearTimer && timer) { clearInterval(timer); timer = null }
+function stopSample() {
+  sampling.value = false
+  if (timer) { clearInterval(timer); timer = null }
 }
 
 function tick() {
   const now = performance.now() / 1000
-  for (let i = 0; i < grps.length; i++) {
-    const g = grps[i]
-    const r = rt.runs[i]
-    const c = ctx.get(g.key)
-    if (!r || !c || !grpOk(i)) continue
+  const ts = Date.now() / 1000
+  for (const lp of loops.value) {
+    const r = rt.map[lp.key]
+    const c = ctx.get(lp.key)
+    if (!r || !c) continue
     if (!r.prevT) r.prevT = now
     const dti = now - r.prevT
-    if (!(dti > 0) || dti > 60) { r.prevT = now; continue }
+    if (!(dti > 0) || dti > 120) { r.prevT = now; continue }
     r.prevT = now
-    const u = r.uNow != null ? Number(r.uNow) : r.u0
 
-    // —— 观测真值 y：直接取平台实时读数（本视图不做任何数据合成；无读数则该回路本周期跳过） ——
-    const live = obsLiveOf(i)
-    if (live == null) {
-      r.lastRaw = null
-      r.lastEkf = null
-      r.conv = false
-      continue
-    }
-    const yRaw = Number(live)
+    const live = liveOf(lp.senId)
+    if (live == null) { r.lastRaw = null; r.lastEkf = null; r.conv = false; continue }
+    const y = Number(live)
+    const sp = Number(targetOf(lp.senId)) || 0
 
-    // —— EKF：滤波 T̂ + 估计热扰动 d̂（勾选生效；未勾选则反馈 = 原始观测） ——
-    let yEkf = yRaw
+    // —— 滤波（关时直接用原始观测）——
+    let yF = y
     let dHat = null
-    if (ekfOn.value) {
-      const m = runModels[i] || null // 有在线辨识的过程模型时用它做预测，否则退化为「常值 + 扰动」
-      const est = c.kf.step(yRaw, u, {
+    if (useFilter.value) {
+      const m = identOf[lp.key] || null
+      const dstep = m ? (m.delay || 0) : 0
+      // 纯滞后：此刻"正在生效"的，是 dstep 拍之前发出的设定值（ptsU 末尾为上一拍发出的 u）
+      const uEff = dstep > 0 && r.ptsU.length >= dstep
+        ? Number(r.ptsU[r.ptsU.length - dstep].v)
+        : r.uNow
+      const est = c.kf.step(y, uEff, {
         a: m ? m.a : 1, b: m ? m.b : 0, c: m ? m.c : 0,
         qT: r.qv, qd: r.qdv, r: r.rv,
       })
-      yEkf = est.t
+      yF = est.t
       dHat = est.d
-    } else if (c.kf.t != null) {
-      c.kf.reset() // 关闭期间不留陈旧状态，再次勾选时从头滤波
     }
 
-    // —— PID 输出 ——
-    const pidOut = c.pid.step(Number(g.sp) || 0, yEkf, dti)
-    let uOut = pidOut.u
-    if (uOut == null || !Number.isFinite(uOut)) uOut = r.u0
+    // —— PID 调控（关时保持手动设定）——
+    if (ctlOn.value) {
+      const g = gainOf(lp)
+      c.pid.set({ ...g, min: spMin(lp.adjId), max: spMax(lp.adjId) })
+      const out = c.pid.step(sp, yF, dti)
+      let u = Number.isFinite(out.u) ? out.u : r.u0
+      r.uNow = Math.min(spMax(lp.adjId), Math.max(spMin(lp.adjId), u))
+      setSp(lp.adjId, r.uNow)
+    } else {
+      r.uNow = curSp(lp.adjId) != null ? Number(curSp(lp.adjId)) : r.u0
+    }
 
-    r.uNow = uOut
-    r.lastRaw = yRaw
-    r.lastEkf = yEkf
+    r.lastRaw = y
+    r.lastEkf = useFilter.value ? yF : null
     r.lastD = dHat
-    r.conv = Math.abs((Number(g.sp) || 0) - yEkf) <= Math.max(r.scale * 0.01, 1e-6)
-    r.ptsRaw.push({ t: now, v: yRaw })
-    r.ptsEkf.push({ t: now, v: yEkf })
-    r.ptsU.push({ t: now, v: uOut })
-    trimPts(r)
-    // 每积累 20 个点尝试用在线数据重新辨识过程模型，供 EKF 预测与训练使用
+    r.conv = Math.abs(sp - (useFilter.value ? yF : y)) <= Math.max(r.scale * 0.01, 1e-6)
+    r.ptsRaw.push({ t: ts, v: y })
+    r.ptsEkf.push({ t: ts, v: useFilter.value ? yF : null })
+    r.ptsU.push({ t: ts, v: r.uNow })
+    if (r.ptsRaw.length > MAX_PTS) {
+      const cut = r.ptsRaw.length - MAX_PTS
+      r.ptsRaw.splice(0, cut); r.ptsEkf.splice(0, cut); r.ptsU.splice(0, cut)
+    }
     if (r.ptsRaw.length % 20 === 0) {
-      const mm = identifyModel(i)
-      if (mm) runModels[i] = mm
+      const m = identify(lp)
+      if (m) identOf[lp.key] = m
     }
   }
-
-  // —— 自动下发：周期把各组 PID 输出写入真实设定（驱动仿真重算联动） ——
-  if (autoApply.value) {
-    const every = autoApplyEvery.value === 'tick' ? 0 : 5 // 秒
-    if (!lastApplyT || now - lastApplyT >= every) {
-      lastApplyT = now
-      applyAllToStore()
-    }
-  }
-  if (!rt.runs.some((r) => r != null)) stopRun()
-}
-function trimPts(r) {
-  if (r.ptsRaw.length > MAX_PTS) {
-    const cut = r.ptsRaw.length - MAX_PTS
-    r.ptsRaw.splice(0, cut)
-    r.ptsEkf.splice(0, cut)
-    r.ptsU.splice(0, cut)
-  }
-}
-function applyAllToStore() {
-  for (let i = 0; i < grps.length; i++) {
-    const g = grps[i]
-    const r = rt.runs[i]
-    if (!grpOk(i) || !r) continue
-    store.setDeviceSetpoint(g.adjId, r.uNow != null ? r.uNow : r.u0)
-  }
-}
-async function applyAll() {
-  if (!running.value) return
-  simBusy.value = true
-  try { applyAllToStore() } finally { simBusy.value = false }
 }
 
-// ==================== 展示数值 ====================
-function uOf(i) { const r = rt.runs[i]; return r ? r.uNow : (grps[i] ? grpAdjCur(i) : null) }
-function yRawOf(i) { const r = rt.runs[i]; return r ? r.lastRaw : (grps[i] ? obsLiveOf(i) : null) }
-function yEkfOf(i) { const r = rt.runs[i]; return r ? r.lastEkf : (grps[i] ? obsLiveOf(i) : null) }
-function dHatOf(i) { const r = rt.runs[i]; return r ? r.lastD : null }
-const totalPts = computed(() => (rt.runs.length && rt.runs[0] ? rt.runs[0].ptsRaw.length : 0))
-const anyPoints = computed(() => totalPts.value > 0)
-const convN = computed(() => rt.runs.reduce((n, r) => n + (r && r.conv ? 1 : 0), 0))
-const stateCls = computed(() => {
-  if (!running.value) return 'idle'
-  return convN.value >= grps.length && grps.length ? 'ok' : 'busy'
+// ==================== 展示：实时曲线 ====================
+const curSenId = ref('')
+const chartSensors = computed(() => {
+  const ids = []
+  for (const lp of loops.value) {
+    ids.push(lp.senId)
+    for (const a of lp.aux) ids.push(a)
+  }
+  for (const s of selSen.value) if (!ids.includes(s)) ids.push(s)
+  return ids.map((id) => ({ id, label: devName(id) }))
 })
-const stateText = computed(() => {
-  if (!running.value) return t('就绪')
-  return convN.value >= grps.length && grps.length ? t('运行中 · 全部观测已收敛至目标') : t('运行中 · 调节中')
+watch(chartSensors, (v) => {
+  if (!v.some((s) => s.id === curSenId.value)) curSenId.value = v.length ? v[0].id : ''
+}, { immediate: true })
+
+const curRun = computed(() => {
+  const lp = loopOfSen(curSenId.value)
+  return lp ? rt.map[lp.key] : null
 })
-function stBadge(i) {
-  if (!grpOk(i)) return 'na'
-  const r = rt.runs[i]
-  if (!running.value || !r) return 'idle'
-  if (r.lastRaw == null) return 'na'   // 实时链路暂无读数
+const C_RAW = '#E07B39'
+const C_EKF = '#3AA655'
+const C_SP = '#9BB8CE'
+const chartSeries = computed(() => {
+  const r = curRun.value
+  if (!r || !r.ptsRaw.length) return []
+  const lp = loopOfSen(curSenId.value)
+  const sen = findDev(curSenId.value)
+  const unit = (sen && (sen.unit || sen.unitName)) || ''
+  const out = [{ id: 'raw', label: t('滤波前'), color: C_RAW, unit, pts: r.ptsRaw }]
+  if (useFilter.value) out.push({ id: 'ekf', label: t('滤波后'), color: C_EKF, unit, pts: r.ptsEkf })
+  if (lp) {
+    const sp = Number(targetOf(lp.senId)) || 0
+    out.push({ id: 'sp', label: t('目标值'), color: C_SP, unit, pts: [
+      { t: r.ptsRaw[0].t, v: sp }, { t: r.ptsRaw[r.ptsRaw.length - 1].t, v: sp },
+    ] })
+  }
+  return out
+})
+function lastRawOf(senId) {
+  const lp = loopOfSen(senId)
+  const r = lp ? rt.map[lp.key] : null
+  return r ? r.lastRaw : liveOf(senId)
+}
+function lastEkfOf(senId) {
+  const lp = loopOfSen(senId)
+  const r = lp ? rt.map[lp.key] : null
+  if (!r || !useFilter.value) return null
+  return r.lastEkf
+}
+function badgeCls(senId) {
+  const lp = loopOfSen(senId)
+  const r = lp ? rt.map[lp.key] : null
+  if (!sampling.value || !r) return 'idle'
+  if (r.lastRaw == null) return 'na'
   return r.conv ? 'ok' : 'busy'
 }
-function stTxt(i) {
-  if (!grpOk(i)) return t('无效')
-  const r = rt.runs[i]
-  if (!running.value || !r) return t('就绪')
+function badgeTxt(senId) {
+  const lp = loopOfSen(senId)
+  const r = lp ? rt.map[lp.key] : null
+  if (!sampling.value || !r) return t('就绪')
   if (r.lastRaw == null) return t('无数据')
   return r.conv ? t('已收敛') : t('调节中')
 }
-
-// ==================== 曲线 series ====================
-function spLine(r, sp) {
-  if (!r || !r.ptsRaw.length) return []
-  return [{ t: r.ptsRaw[0].t, v: sp }, { t: r.ptsRaw[r.ptsRaw.length - 1].t, v: sp }]
-}
-const curRun = computed(() => rt.runs[viewIdx.value] || null)
-const rawChart = computed(() => {
-  const r = curRun.value
-  if (!r || !r.ptsRaw.length) return []
-  const g = grps[viewIdx.value]
-  const u = obsUnitOf(viewIdx.value)
-  return [
-    { id: 'raw', label: t('原始观测 y'), color: cRaw, unit: u, pts: r.ptsRaw },
-    { id: 'sp', label: 'SP', color: cSp, unit: u, pts: spLine(r, g ? Number(g.sp) || 0 : 0) },
-  ]
-})
-const ekfChart = computed(() => {
-  const r = curRun.value
-  if (!r || !r.ptsEkf.length) return []
-  const g = grps[viewIdx.value]
-  const u = obsUnitOf(viewIdx.value)
-  return [
-    { id: 'ekf', label: 'ỹ', color: cEkf, unit: u, pts: r.ptsEkf },
-    { id: 'sp', label: 'SP', color: cSp, unit: u, pts: spLine(r, g ? Number(g.sp) || 0 : 0) },
-  ]
-})
-
-// ==================== 文字 ====================
-function pairTxt(i) {
-  const g = grps[i]
-  if (!g) return ''
-  const a = findDev(g.adjId), o = findDev(g.obsId)
-  const at = a ? (a.label || a.id) : (g.adjId || '—')
-  const ot = o ? (o.label || o.id) : (g.obsId || '—')
-  return at + ' → ' + ot
-}
-function pairShort(i) { return pairTxt(i) }
-function fmtSmall(v) {
-  if (v == null || !Number.isFinite(v)) return '0'
-  if (Math.abs(v) >= 100) return v.toFixed(1)
-  if (Math.abs(v) >= 1) return v.toFixed(2)
-  return v.toFixed(4)
-}
-function fmtNum(v, d = 1) {
-  if (v == null || !Number.isFinite(v)) return '—'
-  const abs = Math.abs(v)
-  const digits = abs >= 1000 ? 0 : abs >= 10 ? 1 : 2
-  return v.toLocaleString('zh-CN', { maximumFractionDigits: Math.max(d, digits) })
+function autoCtl(adjId) {
+  const lp = loopOfAdj(adjId)
+  return !!(lp && ctlOn.value && sampling.value)
 }
 
-// ==================== 优化模型控制的训练：以 PID 参数为决策变量 ====================
-// 无论选择哪种算法，训练的都是「控制参数」本身：每个可调设备（回路）= Kp/Ki/Kd 三个参数，
-// N 个可调设备 → 3N 维决策变量。搜索的是相对当前整定值的倍率系数（×0.1 ~ ×6）。
-const ALGS = [
-  { id: 'ga', label: t('遗传算法') },
-  { id: 'pso', label: t('粒子群') },
-  { id: 'rl', label: t('强化学习') },
-]
-const COEF_LO = 0.1
-const COEF_HI = 6
-const IDENT_MIN = 12 // 过程模型辨识所需的最少在线闭环采样点（u, y 配对）
-
-const trainAlg = ref('ga')
-const popSize = ref(14)
-const maxGen = ref(24)
-// 算法超参数（按所选算法生效）与优化目标权重
-const foldSet = ref(false)   // false = 展开参数设定
-const gaPc = ref(0.9)        // 遗传算法：交叉率
-const gaPm = ref(0.12)       // 遗传算法：变异率
-const gaMut = ref(0.3)       // 遗传算法：变异幅度（标准差）
-const psoW = ref(0.72)       // 粒子群：惯性权重
-const psoC1 = ref(1.5)       // 粒子群：个体学习因子
-const psoC2 = ref(1.5)       // 粒子群：群体学习因子
-const lamU = ref(2)          // 优化目标权重（GA/PSO）：输出能耗（相对设定初值的偏离）%
-const lamOv = ref(3)         // 优化目标权重（GA/PSO）：超调惩罚 %
-// —— 强化学习（PPO）超参 ——
-const ppoLr = ref(3e-3)      // 学习率
-const ppoClip = ref(0.2)     // PPO 裁剪系数 ε
-const ppoGamma = ref(0.99)   // 折扣因子 γ
-const ppoLam = ref(0.95)     // GAE λ
-const ppoEnt = ref(0.01)     // 熵奖励系数
-const ppoK = ref(4)          // 每轮更新 epoch 数
-const ppoEps = ref(4)        // 每轮每条回路采样轨迹数
-const ppoSig = ref(0.4)      // 初始探索幅度 σ₀
-const distPct = ref(2)       // 训练环境假设：未建模热扰动幅度（观测尺度 %）
-// —— 奖励权重：r = −(w₁|e| + w₂|Δe| + w₃·超调 + w₄·功耗) ——
-const rwErr = ref(1)         // w₁ 跟踪误差
-const rwDe = ref(0.1)        // w₂ 误差变化（波动）
-const rwOv = ref(0.5)        // w₃ 超调
-const rwPow = ref(0.3)       // w₄ 设备功耗（节能核心）
-const lockCfg = computed(() => running.value || trainBusy.value)
-const trainBusy = ref(false)
-const trainStop = ref(false)
-const genN = ref(0)
-const trainCurve = ref([])  // [{ g, best }]
-const trainBest = ref(null) // { coef, cost, baseCost, dims }
-const identInfo = ref([])   // 本轮训练所用过程模型（由在线数据辨识 / 先验估计）
-
-const validN = computed(() => grps.reduce((n, _, i) => n + (grpOk(i) ? 1 : 0), 0))
-const dimTxt = computed(() => `${t('决策维度')} ${validN.value} × 3 = ${validN.value * 3} ${t('维（Kp·Ki·Kd）')}`)
-const trStateTxt = computed(() => {
-  if (trainBusy.value) return `${t('训练中')} ${genN.value}/${maxGen.value} ${t('代')}`
-  if (!trainCurve.value.length) return t('未训练')
-  return `${t('已完成')} ${genN.value} ${t('代')}`
-})
-const trEmptyT1 = computed(() => {
-  if (trainAlg.value === 'ga') return t('遗传算法：以每组回路 Kp/Ki/Kd 为基因，锦标赛选择 + 交叉变异逐代进化')
-  if (trainAlg.value === 'pso') return t('粒子群：每个粒子是一组 PID 参数，个体最优与群体最优共同引导收敛')
-  return t('强化学习 PPO：状态 s = [T̂, e, Δe, d̂] 全部取自 EKF（含传感器测不到的热扰动 d̂），动作 a = [Kp, Ki, Kd] 动态整定，奖励同时惩罚误差 / 波动 / 超调 / 设备功耗')
-})
-const trEmptyT2 = computed(() =>
-  `${t('目标：多回路收敛误差（归一化）+ 输出能耗最小；')}${t('训练在「由在线实时数据辨识出的一阶过程模型」上离线寻优（平台不内置任何模拟数据），不影响正在运行的曲线。')}`)
-const trainGain = computed(() => {
-  const b = trainBest.value
-  if (!b || !b.baseCost) return 0
-  return Math.max(0, Math.round((1 - b.cost / b.baseCost) * 100))
+/** 当前回路的过程模型诊断（FOPDT 参数 + 辨识是否可用） */
+const modelInfo = computed(() => {
+  const lp = loopOfSen(curSenId.value) || loops.value[0] || null
+  if (!lp) return null
+  const m = identOf[lp.key]
+  const dg = identDiag[lp.key]
+  if (m && dg && dg.ok) {
+    const rmse = Number.isFinite(dg.rmsePct) ? ` · RMSE ${fmt(dg.rmsePct, 1)}%` : ''
+    return { ok: true, txt: `τ ${fmt(m.tau, 1)}s · θ ${fmt(m.theta, 1)}s（${m.delay}） · K ${fmtSmall(m.G)} · n ${m.n}${rmse}` }
+  }
+  return { ok: false, txt: (dg && dg.msg) || t('尚在辨识：需 ≥12 点样本且设定值有明显调节') }
 })
 
-const CW = 360
-const CHH = 100
-const trGrid = [0, 25, 50, 75, 100]
-const trScale = computed(() => {
-  const c = trainCurve.value
-  const vals = c.map((p) => p.best)
-  if (trainBest.value) vals.push(trainBest.value.baseCost)
-  if (!vals.length) return { lo: 0, hi: 1 }
-  let lo = Math.min(...vals), hi = Math.max(...vals)
-  const pad = (hi - lo) * 0.08 || 1e-6
-  return { lo: lo - pad, hi: hi + pad }
-})
-function trY(v) {
-  const { lo, hi } = trScale.value
-  return CHH - ((Number(v) - lo) / (hi - lo || 1)) * CHH
-}
-const trPath = computed(() => {
-  const c = trainCurve.value
-  if (c.length < 2) return ''
-  return c.map((p, i) => `${((i / (c.length - 1)) * CW).toFixed(1)},${trY(p.best).toFixed(1)}`).join(' ')
-})
-const trBaseY = computed(() => (trainBest.value ? trY(trainBest.value.baseCost) : null))
-
-// ==================== ④ 优化目标变化 · PID 参数轨迹 ====================
-// 曲线 = 每代最优目标值；在等距采样点 + 末代 + 最优代上标出该代对应的 Kp/Ki/Kd
-const OVW = 360
-const OVH = 100
-const curveVal = (p) => (p.best != null ? p.best : p.cost)
-const ovScale = computed(() => {
-  const vals = trainCurve.value.map(curveVal)
-  if (!vals.length) return { lo: 0, hi: 1 }
-  let lo = Math.min(...vals), hi = Math.max(...vals)
-  const pad = (hi - lo) * 0.08 || 1e-6
-  return { lo: lo - pad, hi: hi + pad }
-})
-function ovY(v) {
-  const { lo, hi } = ovScale.value
-  return OVH - ((Number(v) - lo) / (hi - lo || 1)) * OVH
-}
-const ovPath = computed(() => {
-  const c = trainCurve.value
-  if (c.length < 2) return ''
-  return c.map((p, i) => `${((i / (c.length - 1)) * OVW).toFixed(1)},${ovY(curveVal(p)).toFixed(1)}`).join(' ')
-})
-const ovMarks = computed(() => {
-  const c = trainCurve.value
-  if (c.length < 2) return []
-  let bi = 0
-  for (let i = 1; i < c.length; i++) if (curveVal(c[i]) < curveVal(c[bi])) bi = i
-  const step = Math.max(1, Math.ceil(c.length / 6))
-  const picks = []
-  for (let i = 0; i < c.length; i += step) picks.push(i)
-  if (picks[picks.length - 1] !== c.length - 1) picks.push(c.length - 1)
-  if (!picks.includes(bi)) picks.push(bi)
-  picks.sort((a, b) => a - b)
-  return picks.map((i) => {
-    const p = c[i]
-    const v = curveVal(p)
-    const d = (p.dims || []).find((x) => x.idx === viewIdx.value) || (p.dims || [])[0] || null
-    return {
-      i, g: p.g, cost: v, best: i === bi,
-      x: (i / (c.length - 1)) * 100,   // 百分比，供 HTML 标注定位
-      y: ovY(v),
-      kp: d ? d.kp : null, ki: d ? d.ki : null, kd: d ? d.kd : null,
-    }
-  })
-})
-
-function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v) }
-function randCoef(D) { return Array.from({ length: D }, () => COEF_LO + Math.random() * (COEF_HI - COEF_LO)) }
-
-// 基准整定值（训练搜索的出发点：系数 1 = 当前整定值）
-function basePids() {
-  return grps.map((_, i) => {
-    const a = autoPidOf(i)
-    const m = pidCfgOf(i)
-    return {
-      kp: m.kp > 0 ? m.kp : a.kp,
-      ki: m.ki > 0 ? m.ki : a.ki,
-      kd: m.kd > 0 ? m.kd : a.kd,
-    }
-  })
-}
-
-// ==================== 过程模型：由在线实时数据辨识（平台不内置任何模拟数据） ====================
-// 用回路运行期间采集到的 (u, y) 闭环采样，最小二乘拟合一阶离散模型：
-//     y[k+1] = a·y[k] + b·u[k] + c
-// 由 a 反解时间常数 τ = -Δt / ln(a)，由 b 反解稳态增益 G = b / (1 - a)。
+// ==================== 过程模型：由在线实时数据辨识 ====================
+// FOPDT（First Order Plus Dead Time，一阶惯性 + 纯滞后）离散模型：
+//   y[k+1] = a·y[k] + b·u[k−d] + c
+//   a = exp(−dt/τ)：τ 时间常数（惯性，越大越迟钝）
+//   b = K·(1−a)   ：K 静态增益（单位调节量最终引起的被控量变化）
+//   d 纯滞后拍数  ：θ = d·dt，动作发出到被控量"开始"响应的等待时间
+// 必须辨识纯滞后：若模型无滞后而实际有，模型会让智能体误以为"加大增益立刻见效"，
+// 从而学出过于激进的增益，真机上线即振荡，而模型内评估指标却很好看——
+// 这是 model-based（基于模型）强化学习最典型的翻车方式。
+const IDENT_MIN = 12
+const DELAY_MAX = 60          // 纯滞后搜索上限（拍）
+const DELAY_GAIN = 1.05       // 滞后选型：残差不超过全局最优 1.05 倍的最小滞后即为首选（防混叠）
+const EXC_RATIO = 0.01        // 激励充分性：u 的波动标准差需达到量程的 1%
 function solve3(M, v) {
   const A = [M[0].slice(), M[1].slice(), M[2].slice()]
   const b = v.slice()
   for (let c = 0; c < 3; c++) {
     let p = c
-    for (let r = c + 1; r < 3; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r
+    for (let rr = c + 1; rr < 3; rr++) if (Math.abs(A[rr][c]) > Math.abs(A[p][c])) p = rr
     if (Math.abs(A[p][c]) < 1e-12) return null
     const tr = A[c]; A[c] = A[p]; A[p] = tr
     const tb = b[c]; b[c] = b[p]; b[p] = tb
-    for (let r = 0; r < 3; r++) {
-      if (r === c) continue
-      const f = A[r][c] / A[c][c]
-      for (let k = c; k < 3; k++) A[r][k] -= f * A[c][k]
-      b[r] -= f * b[c]
+    for (let rr = 0; rr < 3; rr++) {
+      if (rr === c) continue
+      const f = A[rr][c] / A[c][c]
+      for (let k = c; k < 3; k++) A[rr][k] -= f * A[c][k]
+      b[rr] -= f * b[c]
     }
   }
   return [b[0] / A[0][0], b[1] / A[1][1], b[2] / A[2][2]]
 }
-
-function identifyModel(i) {
-  const r = rt.runs[i]
-  if (!r) return null
+/** 给定纯滞后拍数 dstep，最小二乘拟合 a/b/c 并给出拟合质量；不可用返回 null */
+function fitDelay(r, dstep) {
   const n = Math.min(r.ptsRaw.length, r.ptsU.length)
-  if (n < IDENT_MIN) return null
   let Syy = 0, Syu = 0, Sy1 = 0, Suu = 0, Su1 = 0, S11 = 0, Syt = 0, Sut = 0, St1 = 0
-  for (let k = 0; k < n - 1; k++) {
-    const yk = Number(r.ptsRaw[k].v), uk = Number(r.ptsU[k].v), yn = Number(r.ptsRaw[k + 1].v)
-    if (!Number.isFinite(yk) || !Number.isFinite(uk) || !Number.isFinite(yn)) continue
+  const acc = (yk, uk, yn) => {
     Syy += yk * yk; Syu += yk * uk; Sy1 += yk; Suu += uk * uk; Su1 += uk; S11 += 1
     Syt += yk * yn; Sut += uk * yn; St1 += yn
+  }
+  for (let k = dstep; k < n - 1; k++) {
+    const yk = Number(r.ptsRaw[k].v), uk = Number(r.ptsU[k - dstep].v), yn = Number(r.ptsRaw[k + 1].v)
+    if (!Number.isFinite(yk) || !Number.isFinite(uk) || !Number.isFinite(yn)) continue
+    acc(yk, uk, yn)
   }
   if (S11 < IDENT_MIN) return null
   const sol = solve3([[Syy, Syu, Sy1], [Syu, Suu, Su1], [Sy1, Su1, S11]], [Syt, Sut, St1])
   if (!sol) return null
   const [a, b, c] = sol
-  if (!(a > 0.02 && a < 0.9995) || !Number.isFinite(b)) return null
-  const dt = Math.max(0.1, (r.ptsRaw[n - 1].t - r.ptsRaw[0].t) / (n - 1))
-  return { a, b, c, dt, n, src: 'ident', tau: -dt / Math.log(a), G: b / (1 - a) }
+  if (!(a > 0.02 && a < 0.9995) || !Number.isFinite(b) || !Number.isFinite(c)) return null
+  // 均方残差：在有效样本上重算，作为不同滞后之间可比的选型准则
+  let sse = 0
+  for (let k = dstep; k < n - 1; k++) {
+    const yk = Number(r.ptsRaw[k].v), uk = Number(r.ptsU[k - dstep].v), yn = Number(r.ptsRaw[k + 1].v)
+    if (!Number.isFinite(yk) || !Number.isFinite(uk) || !Number.isFinite(yn)) continue
+    const pr = a * yk + b * uk + c
+    sse += (yn - pr) * (yn - pr)
+  }
+  const uMean = Su1 / S11
+  return { a, b, c, m: S11, sse, uVar: Math.max(0, Suu / S11 - uMean * uMean) }
 }
 
-// 在线数据不足时的先验估计（仅作为整定计算的初始猜测，不产生任何数据）
-function priorModel(i) {
-  const r = rt.runs[i]
-  const scale = r ? r.scale : Math.max(Math.abs(obsLiveOf(i) || 0), 1e-3)
-  const uRange = Math.max(grpAdjMax(i) - grpAdjMin(i), 1e-6)
+function identify(lp) {
+  const r = rt.map[lp.key]
+  if (!r) return null
+  const n = Math.min(r.ptsRaw.length, r.ptsU.length)
+  if (n < IDENT_MIN) {
+    identDiag[lp.key] = { ok: false, msg: t('样本不足') + `（${n}/${IDENT_MIN}）` }
+    return null
+  }
+  const dt = Math.max(0.1, (r.ptsRaw[n - 1].t - r.ptsRaw[0].t) / (n - 1))
+  const uRange = Math.max(spMax(lp.adjId) - spMin(lp.adjId), 1e-6)
+  // 滞后越大可用样本越少，上限留出一半样本保证可辨识
+  const dMax = Math.min(DELAY_MAX, Math.max(0, Math.floor((n - IDENT_MIN) / 2)))
+  const cand = []
+  let optMse = Infinity
+  for (let dstep = 0; dstep <= dMax; dstep++) {
+    const f = fitDelay(r, dstep)
+    if (!f) continue
+    const mse = f.sse / Math.max(1, f.m)
+    cand.push({ a: f.a, b: f.b, c: f.c, m: f.m, uVar: f.uVar, delay: dstep, mse })
+    if (mse < optMse) optMse = mse
+  }
+  // 节俭原则 + 混叠防护：周期性激励下，滞后 θ 与 θ+周期 的残差可能同样低（滞后混叠）。
+  // 因此不取全局最优，而取"残差不显著差于全局最优（≤1.05 倍）"的**最小**滞后。
+  let pick = null
+  for (const cd of cand) {
+    if (cd.mse <= optMse * DELAY_GAIN) { pick = cd; break }
+  }
+  if (!pick) {
+    identDiag[lp.key] = { ok: false, msg: t('拟合失败（数据可能全为无效值）') }
+    return null
+  }
+  const best = pick
+  const uSd = Math.sqrt(best.uVar)
+  if (!(uSd / uRange > EXC_RATIO)) {
+    // 激励（Excitation）：u 不动作时 b/K 在数值上不可辨识，此时宁可用先验模型
+    identDiag[lp.key] = { ok: false, msg: t('激励不足：可调设备设定值几乎未变化，增益 K 不可辨识') }
+    return null
+  }
+  const m = {
+    a: best.a, b: best.b, c: best.c, dt,
+    delay: best.delay, theta: best.delay * dt,
+    tau: -dt / Math.log(best.a), G: best.b / (1 - best.a),
+    n: best.m, mse: best.mse, uSd, src: 'ident',
+  }
+  identDiag[lp.key] = {
+    ok: true, msg: '',
+    rmse: Math.sqrt(best.mse),
+    rmsePct: (Math.sqrt(best.mse) / Math.max(r.scale, 1e-9)) * 100,
+    tau: m.tau, theta: m.theta, G: m.G, n: m.n, delay: m.delay, dt,
+  }
+  return m
+}
+/** 先验模型（无足够数据时使用）：保守慢过程 + 用户给定的先验纯滞后 θ₀ */
+function priorModel(lp) {
+  const r = rt.map[lp.key]
+  const scale = r ? r.scale : Math.max(Math.abs(Number(liveOf(lp.senId) ?? 0)), 1e-3)
+  const uRange = Math.max(spMax(lp.adjId) - spMin(lp.adjId), 1e-6)
   const G = (0.15 * scale) / uRange
-  const tau = 4
-  const dt = 1
+  const tau = 4, dt = 1
   const a = Math.exp(-dt / tau)
+  const delay = Math.max(0, Math.round((Number(priTheta.value) || 0) / dt))
   const u0 = r ? r.u0 : 0
   const y0 = r ? r.y0 : 0
-  return { a, b: G * (1 - a), c: y0 * (1 - a) - G * (1 - a) * u0, dt, n: 0, src: 'prior', tau, G }
+  return {
+    a, b: G * (1 - a), c: y0 * (1 - a) - G * (1 - a) * u0, dt, delay,
+    theta: delay * dt, n: 0, src: 'prior', tau, G,
+  }
 }
-
-function buildModels() {
-  return grps.map((_, i) => (grpOk(i) ? (identifyModel(i) || priorModel(i)) : null))
-}
-// 评估窗口步数：覆盖约 5 个时间常数
+/** 推演步数：需覆盖「纯滞后 + 5 倍时间常数」，否则滞后段还没结束就截断，学不到滞后代价 */
 function simSteps(models) {
-  let dt = 1, maxTau = 1
+  let dt = 1, span = 1
   for (const m of models) {
     if (!m) continue
     dt = Math.max(dt, m.dt || 1)
-    if (m.tau > 0) maxTau = Math.max(maxTau, m.tau)
+    const theta = Number.isFinite(m.theta) ? m.theta : (m.delay || 0) * (m.dt || 1)
+    span = Math.max(span, theta + 5 * Math.max(m.tau || 0, 0))
   }
-  return Math.min(240, Math.max(30, Math.ceil((5 * maxTau) / dt)))
+  return Math.min(300, Math.max(40, Math.ceil(span / dt)))
 }
 
-// 单组候选评估：在辨识出的过程模型上离线重放闭环 → 平均归一误差（含能耗/超调惩罚）
-function evalCost(coef, base, models, steps) {
-  const sims = []
-  for (let i = 0; i < grps.length; i++) {
-    const g = grps[i]
-    const m = models[i]
-    if (!m || !grpOk(i) || !Number.isFinite(Number(g.sp))) continue
-    const y0v = Number(obsLiveOf(i) ?? 0)
-    const scale = Math.max(Math.abs(y0v), 1e-3)
-    const u0c = grpAdjCur(i)
-    const u0 = u0c != null ? Number(u0c) : 0
-    const uMin = grpAdjMin(i), uMax = grpAdjMax(i)
-    const uRange = Math.max(uMax - uMin, 1e-6)
-    const b = base[i]
-    const pid = createPid({
-      kp: b.kp * (coef[i * 3] ?? 1),
-      ki: b.ki * (coef[i * 3 + 1] ?? 1),
-      kd: b.kd * (coef[i * 3 + 2] ?? 1),
-      min: uMin, max: uMax,
-    })
-    pid.reset()
-    sims.push({ y0: y0v, u0, u: u0, y: y0v, scale, uRange, sp: Number(g.sp), pid, m })
-  }
-  if (!sims.length) return 1e9
-  let cost = 0
-  const wu = (Number(lamU.value) || 0) / 100     // 输出能耗惩罚
-  const wov = (Number(lamOv.value) || 0) / 100   // 超调惩罚
-  for (let k = 0; k < steps; k++) {
-    for (const s of sims) {
-      // 辨识得到的一阶离散模型：y⁺ = a·y + b·u + c
-      s.y = s.m.a * s.y + s.m.b * s.u + s.m.c
-      const e = s.sp - s.y
-      const out = s.pid.step(s.sp, s.y, s.m.dt)
-      s.u = out.u
-      // 超调：沿目标方向越过 SP 后继续超出的量
-      const dir = Math.sign(s.sp - s.y0) || 1
-      const ov = Math.max(0, (s.y - s.sp) * dir)
-      cost += Math.abs(e) / s.scale + wu * Math.abs(s.u - s.u0) / s.uRange + wov * ov / s.scale
-    }
-  }
-  return cost / (sims.length * steps)
-}
+// ==================== 算法 ====================
+const ALGS = [
+  { id: 'ppo', label: t('强化学习 · PPO'), ready: true },
+  { id: 'ga', label: t('遗传算法'), ready: false },
+  { id: 'pso', label: t('粒子群'), ready: false },
+]
+const alg = ref('ppo')
 
-// —— 遗传算法 ——
-function gaNext(pop, fits, size) {
-  const scored = pop.map((c, i) => ({ c, f: fits[i] })).sort((a, b) => a.f - b.f)
-  const pick = () => {
-    const a = scored[Math.floor(Math.random() * scored.length)]
-    const b = scored[Math.floor(Math.random() * scored.length)]
-    return a.f <= b.f ? a.c : b.c
-  }
-  const pc = Number(gaPc.value) || 0
-  const pm = Number(gaPm.value) || 0
-  const mut = Number(gaMut.value) || 0
-  const next = [scored[0].c.slice()]
-  while (next.length < size) {
-    const p1 = pick(), p2 = pick()
-    const cross = Math.random() < pc
-    const c = p1.map((v, j) => (cross && Math.random() < 0.5 ? p2[j] : v))
-    for (let j = 0; j < c.length; j++) {
-      if (Math.random() < pm) c[j] = clamp(c[j] + gauss() * mut, COEF_LO, COEF_HI)
-    }
-    next.push(c)
-  }
-  return next
-}
-// —— 粒子群 ——
-function initPso(D, P) {
-  const xs = [], vs = [], pbs = [], pbf = []
-  for (let p = 0; p < P; p++) {
-    const x = randCoef(D)
-    xs.push(x)
-    vs.push(Array.from({ length: D }, () => (Math.random() - 0.5) * 0.4))
-    pbs.push(x.slice())
-    pbf.push(Infinity)
-  }
-  return { xs, vs, pbs, pbf, gb: xs[0].slice(), gbf: Infinity }
-}
-function psoStep(st, coefs, fits) {
-  const D = st.xs[0].length
-  for (let p = 0; p < st.xs.length; p++) {
-    if (fits[p] < st.pbf[p]) { st.pbf[p] = fits[p]; st.pbs[p] = coefs[p].slice() }
-    if (fits[p] < st.gbf) { st.gbf = fits[p]; st.gb = coefs[p].slice() }
-  }
-  const w = Number(psoW.value) || 0
-  const c1 = Number(psoC1.value) || 0
-  const c2 = Number(psoC2.value) || 0
-  const vmax = (COEF_HI - COEF_LO) * 0.25
-  for (let p = 0; p < st.xs.length; p++) {
-    for (let j = 0; j < D; j++) {
-      const r1 = Math.random(), r2 = Math.random()
-      let v = w * st.vs[p][j] + c1 * r1 * (st.pbs[p][j] - st.xs[p][j]) + c2 * r2 * (st.gb[j] - st.xs[p][j])
-      v = clamp(v, -vmax, vmax)
-      st.vs[p][j] = v
-      st.xs[p][j] = clamp(st.xs[p][j] + v, COEF_LO, COEF_HI)
-    }
-  }
-}
-// —— 强化学习：PPO（近端策略优化）动态整定 PID 参数 ——
-//   状态 s = [T̂, e, Δe, d̂]：全部来自 EKF 的纯净估计，d̂ 为传感器测不到的机房热扰动
-//   动作 a = [a_p, a_i, a_d] → K = K₀ · exp(clip(a, ±1.6))，即 0.2 ~ 5 倍基准参数
-//   奖励 r = −(w₁|e| + w₂|Δe| + w₃·超调 + w₄·功耗)
-//   功耗按泵/风机相似定律 P ∝ 转速³ 折算，直接惩罚设备功耗，倒逼在达标前提下最小化能耗
+// ==================== 训练（PPO） ====================
+// 状态 s = [ŷ, e, Δe, d̂]：ŷ 为滤波后观测，d̂ 为滤波估计出的隐藏状态（传感器测不到的扰动）
+// 动作 a = [a_u, a_p, a_i, a_d]：a_u 直接调节量，a_p/a_i/a_d → K = K₀·exp(clip(a))
+// 奖励 r = −(w₁|e| + w₂|Δe| + w₃·超调 + w₄·功耗)
 const ACT_CLIP = 1.6
+const maxIter = ref(30)
+const ppoLr = ref(3e-3)
+const ppoClip = ref(0.2)
+const ppoGamma = ref(0.99)
+const ppoLam = ref(0.95)
+const ppoEnt = ref(0.01)
+const ppoK = ref(4)
+const ppoEps = ref(4)
+const ppoSig = ref(0.4)
+const distPct = ref(2)            // 环境扰动（隐藏噪声，%量程）
+const modelPct = ref(10)          // 模型不确定度（域随机化幅度，%参数）
+const priTheta = ref(2)           // 先验纯滞后 θ₀（秒，无数据时使用）
+const rwErr = ref(1)
+const rwDe = ref(0.1)
+const rwOv = ref(0.5)
+const rwPow = ref(0.3)
 
-// 单条轨迹：在辨识出的过程模型上闭环仿真，同时用二维 EKF 估计 T̂ 与热扰动 d̂
-function ppoRollout(agent, m, steps, b0, g, gi, deterministic = false) {
-  const scale = Math.max(Math.abs(Number(obsLiveOf(gi) ?? 0)), 1e-3)
-  const u0c = grpAdjCur(gi)
-  const u0 = u0c != null ? Number(u0c) : 0
-  const uMin = grpAdjMin(gi), uMax = grpAdjMax(gi)
+const trainBusy = ref(false)
+const trainStop = ref(false)
+const curve = ref([])          // [{ it, reward }]
+const baseReward = ref(null)   // 零动作基线
+const iterN = ref(0)
+const bestReward = ref(null)
+const lastReward = computed(() => (curve.value.length ? curve.value[curve.value.length - 1].reward : null))
+const canTrain = computed(() => loops.value.length > 0)
+
+function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v) }
+
+function rollout(agent, m, steps, b0, lp, opt = {}) {
+  const scale = Math.max(Math.abs(Number(liveOf(lp.senId) ?? 0)), 1e-3)
+  const uMin = spMin(lp.adjId), uMax = spMax(lp.adjId)
+  const uRange = Math.max(uMax - uMin, 1e-6)
   const uMaxAbs = Math.max(Math.abs(uMax), Math.abs(uMin), 1e-6)
-  const sp = Number(g.sp) || 0
-  const y0 = Number(obsLiveOf(gi) ?? 0)
+  const u0 = curSp(lp.adjId) != null ? Number(curSp(lp.adjId)) : (uMin + uMax) / 2
+  const sp = Number(targetOf(lp.senId)) || 0
+  const y0 = Number(liveOf(lp.senId) ?? 0)
   const dir = Math.sign(sp - y0) || 1
   const dt = m.dt || 1
-  const qT = Math.pow((ekfQpct.value / 100) * scale, 2)
+  const qT = Math.pow(FILT_Q * scale, 2)
   const qd = qT * 0.05
-  const rv = Math.pow((ekfRmPct.value / 100) * scale, 2)
-  const dStd = ((Number(distPct.value) || 0) / 100) * scale // 训练环境假设：未建模热扰动随机游走幅度
+  const rv = Math.pow(FILT_R * scale, 2)
+  const dStd = ((Number(distPct.value) || 0) / 100) * scale
+  const nomD = m.delay || 0                   // 名义纯滞后拍数
+
+  // —— 域随机化（Domain Randomization）：模型参数不确定性 ——
+  // 每个采样回合开始时对 a / b / θ 各扰动 ±modelPct%，让策略对"模型不准则"鲁棒，
+  // 而不是把模型当真值过拟合。评估与基线用名义模型（perturb=false），保证指标可比。
+  const pu = (Number(modelPct.value) || 0) / 100
+  const jit = () => 1 + (Math.random() * 2 - 1) * pu
+  const pert = !!opt.perturb
+  const mA = pert ? clamp(m.a * jit(), 0.05, 0.9995) : m.a
+  const mB = pert ? m.b * jit() : m.b
+  const mD = pert ? Math.max(0, Math.round(nomD * jit())) : nomD
 
   const pid = createPid({ min: uMin, max: uMax })
   pid.reset()
   const kf = createEkf2({ qT, qd, r: rv })
   let T = y0, u = u0, d = 0, ePrev = 0
+  const uH = []                               // uH[j]：第 j 步末尾发出的调节量（纯滞后回放用）
   const s = [], acts = [], logps = [], rews = [], vals = []
-  const actSum = new Float64Array(3)
+  const actSum = new Float64Array(4)
   let costSum = 0
   for (let k = 0; k < steps; k++) {
-    d += randn() * dStd                  // 机房热扰动（传感器测不到的未建模动态）
-    T = m.a * T + m.b * u + m.c + d      // 过程真实演化
-    const est = kf.step(T, u, { a: m.a, b: m.b, c: m.c, qT, qd, r: rv })
+    // 纯滞后：本拍真正生效的，是 (mD+1) 拍前发出的 u；尚未发出时用初值 u0
+    const iu = k - 1 - mD
+    const uEff = iu < 0 ? u0 : uH[iu]
+    d += randn() * dStd                       // 隐藏扰动（传感器测不到的未建模动态）
+    T = mA * T + mB * uEff + m.c + d          // 过程真实演化（含纯滞后）
+    const est = kf.step(T, uEff, { a: mA, b: mB, c: m.c, qT, qd, r: rv })
     const e = sp - est.t
     const de = e - ePrev
     ePrev = e
     const st = new Float64Array([est.t / scale, e / scale, de / scale, est.d / scale])
-    const out = agent.act(st, deterministic)
+    let a, logp = 0
+    if (opt.zero) {
+      a = new Float64Array(4)
+    } else {
+      const out = agent.act(st, !!opt.deterministic)
+      a = out.a
+      logp = out.logp
+    }
     pid.set({
-      kp: b0.kp * Math.exp(clamp(out.a[0], -ACT_CLIP, ACT_CLIP)),
-      ki: b0.ki * Math.exp(clamp(out.a[1], -ACT_CLIP, ACT_CLIP)),
-      kd: b0.kd * Math.exp(clamp(out.a[2], -ACT_CLIP, ACT_CLIP)),
+      kp: b0.kp * Math.exp(clamp(a[1], -ACT_CLIP, ACT_CLIP)),
+      ki: b0.ki * Math.exp(clamp(a[2], -ACT_CLIP, ACT_CLIP)),
+      kd: b0.kd * Math.exp(clamp(a[3], -ACT_CLIP, ACT_CLIP)),
       min: uMin, max: uMax,
     })
-    u = pid.step(sp, est.t, dt).u
-    const power = Math.pow(Math.abs(u) / uMaxAbs, 3)   // 功耗：P ∝ 转速³
+    const du = clamp(a[0], -1, 1) * 0.15 * uRange
+    u = clamp(pid.step(sp, est.t, dt).u + du, uMin, uMax)
+    uH.push(u)                                          // 记录本拍发出的动作，mD 拍后生效
+    const power = Math.pow(Math.abs(u) / uMaxAbs, 3)   // 功耗 P ∝ 转速³
     const ov = Math.max(0, (T - sp) * dir) / scale
     const r = -(rwErr.value * Math.abs(e) / scale
       + rwDe.value * Math.abs(de) / scale
       + rwOv.value * ov
       + rwPow.value * power)
-    s.push(st)
-    acts.push(out.a)
-    logps.push(out.logp)
-    rews.push(r)
-    vals.push(agent.value(st))
-    for (let q = 0; q < 3; q++) actSum[q] += out.a[q]
+    s.push(st); acts.push(a); logps.push(logp); rews.push(r)
+    if (!opt.zero) vals.push(agent.value(st))
+    for (let q = 0; q < 4; q++) actSum[q] += a[q]
     costSum += -r
   }
-  const lastVal = s.length ? agent.value(s[s.length - 1]) : 0
+  const lastVal = (s.length && !opt.zero) ? agent.value(s[s.length - 1]) : 0
   return {
     s, a: acts, logp: logps, rews, vals, lastVal,
     meanCost: costSum / Math.max(1, steps), actSum, steps,
   }
 }
 
-// 一轮迭代：各回路采样若干轨迹 → GAE 优势 → PPO 更新 → 确定性评估
-function ppoIterate(agent, models, steps, base) {
-  const trans = []
-  for (let i = 0; i < grps.length; i++) {
-    const m = models[i]
-    if (!m || !grpOk(i)) continue
-    for (let e = 0; e < ppoEps.value; e++) {
-      const ep = ppoRollout(agent, m, steps, base[i], grps[i], i)
-      const { adv, ret } = computeGae(ep.rews, ep.vals, ep.lastVal, ppoGamma.value, ppoLam.value)
-      const advN = standardize(adv)
-      for (let k = 0; k < ep.s.length; k++) {
-        trans.push({ s: ep.s[k], a: ep.a[k], logp: ep.logp[k], adv: advN[k], ret: ret[k] })
-      }
-    }
-  }
-  if (trans.length) {
-    agent.update(trans, {
-      clip: ppoClip.value, epochs: ppoK.value, entCoef: ppoEnt.value, vfCoef: 0.5, batchSize: 64,
-    })
-  }
-  return ppoEvaluate(agent, models, steps, base)
-}
-
-// 确定性评估：平均代价 + 平均动作换算成的参数倍率（与 GA/PSO 的 coef 语义一致）
-function ppoEvaluate(agent, models, steps, base) {
-  const D = grps.length * 3
-  const coef = new Array(D).fill(1)
+/** 确定性评估：平均代价 + 动作换算出的调节量/增益 */
+function evaluate(agent, models, lps, steps, bases) {
   let cost = 0, n = 0
-  for (let i = 0; i < grps.length; i++) {
-    const m = models[i]
-    if (!m || !grpOk(i)) continue
-    const ep = ppoRollout(agent, m, steps, base[i], grps[i], i, true)
+  const dims = []
+  for (let i = 0; i < lps.length; i++) {
+    const ep = rollout(agent, models[i], steps, bases[i], lps[i], { deterministic: true })
     cost += ep.meanCost
     n++
-    for (let q = 0; q < 3; q++) {
-      coef[i * 3 + q] = Math.exp(clamp(ep.actSum[q] / Math.max(1, ep.steps), -ACT_CLIP, ACT_CLIP))
-    }
-  }
-  return { cost: n ? cost / n : 1e9, coef }
-}
-
-function coefDims(coef) {
-  const base = basePids()
-  const out = []
-  for (let i = 0; i < grps.length; i++) {
-    if (!grpOk(i)) continue
-    const b = base[i]
-    out.push({
-      idx: i,
-      label: pairShort(i),
-      kp: b.kp * (coef[i * 3] ?? 1),
-      ki: b.ki * (coef[i * 3 + 1] ?? 1),
-      kd: b.kd * (coef[i * 3 + 2] ?? 1),
+    const b = bases[i]
+    const uRange = Math.max(spMax(lps[i].adjId) - spMin(lps[i].adjId), 1e-6)
+    dims.push({
+      adjId: lps[i].adjId, senId: lps[i].senId,
+      adjLabel: lps[i].adjLabel, senLabel: lps[i].senLabel,
+      du: Number((clamp(ep.actSum[0] / Math.max(1, ep.steps), -1, 1) * 0.15 * uRange).toFixed(4)),
+      kp: Number((b.kp * Math.exp(clamp(ep.actSum[1] / Math.max(1, ep.steps), -ACT_CLIP, ACT_CLIP))).toFixed(6)),
+      ki: Number((b.ki * Math.exp(clamp(ep.actSum[2] / Math.max(1, ep.steps), -ACT_CLIP, ACT_CLIP))).toFixed(6)),
+      kd: Number((b.kd * Math.exp(clamp(ep.actSum[3] / Math.max(1, ep.steps), -ACT_CLIP, ACT_CLIP))).toFixed(6)),
     })
   }
-  return out
+  return { cost: n ? cost / n : 1e9, dims }
 }
 
-function clearTrain() {
-  if (trainBusy.value) return
-  trainCurve.value = []
-  trainBest.value = null
-  genN.value = 0
+// ==================== 模型版本 ====================
+const VER_KEY = 'nengtan.agc.models.v2'
+const versions = ref([])
+const activeVer = ref('')
+const activeVerObj = computed(() => versions.value.find((v) => v.id === activeVer.value) || null)
+
+function loadVers() {
+  try {
+    const raw = localStorage.getItem(VER_KEY)
+    const arr = raw ? JSON.parse(raw) : []
+    versions.value = Array.isArray(arr) ? arr : []
+  } catch (e) { versions.value = [] }
 }
-function stopTrain() {
-  trainStop.value = true
+function saveVers() {
+  try { localStorage.setItem(VER_KEY, JSON.stringify(versions.value.slice(0, 20))) } catch (e) { /* 忽略 */ }
 }
+function hasVer(id) { return versions.value.some((v) => v.id === id) }
+function applyVer(id) {
+  const v = versions.value.find((x) => x.id === id)
+  if (!v) return
+  let hit = 0
+  for (const d of v.dims) {
+    const lp = loopOfAdj(d.adjId)
+    if (!lp || lp.senId !== d.senId) continue
+    fixGain[lp.key] = { kp: d.kp, ki: d.ki, kd: d.kd }
+    hit++
+  }
+  if (!hit) { store.showToast(t('该版本与当前回路不匹配（可调设备或传感设备已变更）。'), 'warn'); return }
+  curVerId.value = v.id
+  store.showToast(t('已应用模型版本') + ' ' + v.name, 'success')
+}
+async function delVer(id) {
+  const ok = await store.confirm({ title: t('删除模型版本'), message: t('删除后不可恢复，确认删除该版本？'), danger: true })
+  if (!ok) return
+  versions.value = versions.value.filter((v) => v.id !== id)
+  if (activeVer.value === id) activeVer.value = versions.value.length ? versions.value[0].id : ''
+  saveVers()
+}
+let verSeq = 0
+
+// ==================== 训练主流程 ====================
+const trainStateTxt = computed(() => {
+  if (trainBusy.value) return `${t('训练中')} ${iterN.value}/${maxIter.value}`
+  if (!curve.value.length) return t('未训练')
+  return `${t('已完成')} ${iterN.value} ${t('轮')}`
+})
 
 async function startTrain() {
-  if (running.value || trainBusy.value || !validN.value) return
-  const base = basePids()
-  const D = grps.length * 3
-  // 先用在线实时数据辨识各回路过程模型（不足则退回先验估计）
-  const models = buildModels()
+  if (trainBusy.value || !canTrain.value) return
+  const lps = loops.value
+  syncRuns()
+  const bases = lps.map((lp) => gainOf(lp))
+  const models = lps.map((lp) => identify(lp) || priorModel(lp))
   const steps = simSteps(models)
-  identInfo.value = models
-    .map((m, i) => (m && grpOk(i) ? { idx: i, src: m.src, n: m.n, tau: m.tau, G: m.G } : null))
-    .filter(Boolean)
   trainBusy.value = true
   trainStop.value = false
-  trainCurve.value = []
-  trainBest.value = null
-  genN.value = 0
+  curve.value = []
+  iterN.value = 0
+  bestReward.value = null
 
-  const baseCost = evalCost(new Array(D).fill(1), base, models, steps)
-  let gBest = { coef: new Array(D).fill(1), cost: baseCost }
-  let gaPop = null, pso = null, rl = null
+  // 基线：零动作（K = K₀，无附加调节量）
+  let bCost = 0
+  for (let i = 0; i < lps.length; i++) {
+    bCost += rollout(null, models[i], steps, bases[i], lps[i], { zero: true }).meanCost
+  }
+  baseReward.value = -(bCost / Math.max(1, lps.length))
 
-  for (let gen = 1; gen <= maxGen.value && !trainStop.value; gen++) {
-    if (trainAlg.value === 'rl') {
-      // —— PPO：一轮 = 各回路采样轨迹 + GAE + 多次 epoch 更新 + 确定性评估 ——
-      if (!rl) {
-        rl = createPpoAgent({ sDim: 4, aDim: 3, hidden: 16, lr: ppoLr.value, sigma0: ppoSig.value })
+  const agent = createPpoAgent({ sDim: 4, aDim: 4, hidden: 16, lr: ppoLr.value, sigma0: ppoSig.value })
+  let best = { reward: -Infinity, dims: [] }
+
+  for (let it = 1; it <= maxIter.value && !trainStop.value; it++) {
+    const trans = []
+    for (let i = 0; i < lps.length; i++) {
+      for (let e = 0; e < ppoEps.value; e++) {
+        const ep = rollout(agent, models[i], steps, bases[i], lps[i], { perturb: true })
+        const { adv, ret } = computeGae(ep.rews, ep.vals, ep.lastVal, ppoGamma.value, ppoLam.value)
+        const advN = standardize(adv)
+        for (let k = 0; k < ep.s.length; k++) {
+          trans.push({ s: ep.s[k], a: ep.a[k], logp: ep.logp[k], adv: advN[k], ret: ret[k] })
+        }
       }
-      const it = ppoIterate(rl, models, steps, base)
-      if (it.cost < gBest.cost) gBest = { coef: it.coef.slice(), cost: it.cost }
-      genN.value = gen
-      trainCurve.value.push({ g: gen, best: it.cost, dims: coefDims(it.coef) })
-    } else {
-      let coefs = []
-      if (trainAlg.value === 'ga') {
-        if (!gaPop) gaPop = Array.from({ length: popSize.value }, () => randCoef(D))
-        coefs = gaPop
-      } else {
-        if (!pso) pso = initPso(D, popSize.value)
-        coefs = pso.xs.map((c) => c.slice())
-      }
-      const fits = coefs.map((c) => evalCost(c, base, models, steps))
-      let bi = 0
-      for (let k = 1; k < fits.length; k++) if (fits[k] < fits[bi]) bi = k
-      if (fits[bi] < gBest.cost) gBest = { coef: coefs[bi].slice(), cost: fits[bi] }
-      genN.value = gen
-      // 记录该代最优目标值及其对应的 PID 参数，供「优化目标变化」图在曲线上标注
-      trainCurve.value.push({ g: gen, best: fits[bi], dims: coefDims(coefs[bi]) })
-
-      if (trainAlg.value === 'ga') gaPop = gaNext(gaPop, fits, popSize.value)
-      else psoStep(pso, coefs, fits)
     }
-
-    await new Promise((r) => setTimeout(r, 0)) // 让出主线程，曲线逐代刷新
+    if (trans.length) {
+      agent.update(trans, {
+        clip: ppoClip.value, epochs: ppoK.value, entCoef: ppoEnt.value, vfCoef: 0.5, batchSize: 64,
+      })
+    }
+    const ev = evaluate(agent, models, lps, steps, bases)
+    const reward = -ev.cost
+    if (reward > best.reward) best = { reward, dims: ev.dims }
+    iterN.value = it
+    bestReward.value = best.reward
+    curve.value.push({ it, reward })
+    await new Promise((r) => setTimeout(r, 0))   // 让出主线程，逐轮刷新曲线
   }
 
   trainBusy.value = false
-  trainBest.value = { coef: gBest.coef.slice(), cost: gBest.cost, baseCost, dims: coefDims(gBest.coef) }
+  saveVersion(best, iterN.value)
+  scheduleNext()
 }
+function stopTrain() { trainStop.value = true }
 
-// 训练得到的最优 PID 参数写回各组回路，并立即运行演示
-function applyTrain() {
-  const b = trainBest.value
-  if (!b || running.value || trainBusy.value) return
-  for (const d of b.dims) {
-    const g = grps[d.idx]
-    if (!g) continue
-    g.kAuto = false
-    g.kp = Number(d.kp.toFixed(6))
-    g.ki = Number(d.ki.toFixed(6))
-    g.kd = Number(d.kd.toFixed(6))
+function saveVersion(best, iters) {
+  if (!best || !Number.isFinite(best.reward)) return
+  verSeq = versions.value.reduce((m, v) => Math.max(m, Number(String(v.name).replace(/\D/g, '')) || 0), 0) + 1
+  const v = {
+    id: 'm' + Date.now(),
+    name: 'v' + verSeq,
+    ts: Date.now(),
+    alg: 'PPO',
+    iters,
+    reward: Number(best.reward.toFixed(6)),
+    dims: best.dims,
   }
-  resetRun()
-  startRun()
+  versions.value = [v, ...versions.value].slice(0, 20)
+  activeVer.value = v.id
+  saveVers()
+  store.showToast(t('训练完成，已存为模型版本') + ' ' + v.name, 'success')
 }
 
-// ==================== 设备跟随与初始化 ====================
-function syncFromSelection() {
-  if (running.value) return
-  let changed = false
-  const cur = props.devices.find((d) => d.id === props.curId) || null
-  if (cur && grps.length) {
-    const g0 = grps[0]
-    if (cur.adjustable) { if (g0.adjId !== cur.id) { g0.adjId = cur.id; g0.touch = false; changed = true } }
-    else if (cur.id !== g0.obsId && allMetering.value.some((d) => d.id === cur.id)) {
-      g0.obsId = cur.id; g0.touch = false; changed = true
-    }
+// ==================== 奖励曲线 ====================
+const RW = { W: 360, H: 110, GRID: [0, 27.5, 55, 82.5, 110] }
+const rwScale = computed(() => {
+  const vals = curve.value.map((p) => p.reward)
+  if (baseReward.value != null) vals.push(baseReward.value)
+  if (!vals.length) return { lo: 0, hi: 1 }
+  let lo = Math.min(...vals), hi = Math.max(...vals)
+  const pad = (hi - lo) * 0.08 || 1e-6
+  return { lo: lo - pad, hi: hi + pad }
+})
+function rwY(v) {
+  const { lo, hi } = rwScale.value
+  return RW.H - ((Number(v) - lo) / ((hi - lo) || 1)) * RW.H
+}
+const rwPath = computed(() => {
+  const c = curve.value
+  if (c.length < 2) return ''
+  return c.map((p, i) => `${((i / (c.length - 1)) * RW.W).toFixed(1)},${rwY(p.reward).toFixed(1)}`).join(' ')
+})
+const baseY = computed(() => (baseReward.value == null ? null : rwY(baseReward.value)))
+
+// ==================== 自动训练 ====================
+const autoMode = ref('off')      // off | 1h | 6h | daily
+const autoAt = ref('02:00')
+const nextAuto = ref(0)
+const nowTs = ref(Date.now())
+let autoTimer = null
+
+function computeNext(from = Date.now()) {
+  if (autoMode.value === 'off') return 0
+  if (autoMode.value === 'daily') {
+    const [h, m] = String(autoAt.value || '02:00').split(':').map((x) => Number(x) || 0)
+    const d = new Date(from)
+    d.setHours(h, m, 0, 0)
+    if (d.getTime() <= from) d.setDate(d.getDate() + 1)
+    return d.getTime()
   }
-  if (!adjOptions.value.length || !grps.length) return
-  // 每组设备有效性校正
-  grps.forEach((g, i) => {
-    if (!g.adjId || !adjOptions.value.some((d) => d.id === g.adjId)) {
-      const d = defaultPair()
-      g.adjId = d.adjId; g.obsId = d.obsId; g.touch = false; changed = true
-    }
-    if (!g.obsId || !allMetering.value.some((d) => d.id === g.obsId)) {
-      const info = findInfo(g.adjId)
-      const pick = obsGroupsOf(info).primary[0] || (allMetering.value.length ? allMetering.value[0] : null)
-      if (pick && pick.id !== g.obsId) { g.obsId = pick.id; g.touch = false; changed = true }
-    }
-  })
-  if (changed) resetRun()
+  const hours = autoMode.value === '1h' ? 1 : 6
+  return from + hours * 3600 * 1000
 }
-watch(
-  [() => props.curId, () => props.devices.length, () => adjOptions.value.length, () => allMetering.value.length],
-  () => syncFromSelection(),
-  { immediate: true }
-)
-// 回路配置 / 目标变化 → 已训练结果失效（需基于新配置重训）
-watch(
-  () => grps.map((g) => `${g.adjId}|${g.obsId}|${g.sp}`).join(';'),
-  () => clearTrain()
-)
-// EKF 开关切换：重置滤波状态，避免曲线混用
-watch(ekfOn, () => { if (!running.value) resetRun() })
+function scheduleNext() { nextAuto.value = computeNext() }
+watch([autoMode, autoAt], () => scheduleNext())
+const nextAutoTxt = computed(() => {
+  if (autoMode.value === 'off') return t('未开启自动训练')
+  if (!nextAuto.value) return '—'
+  const diff = Math.max(0, nextAuto.value - nowTs.value)
+  const h = Math.floor(diff / 3600000)
+  const m = Math.floor((diff % 3600000) / 60000)
+  return `${t('下次训练')} ${shortTs(nextAuto.value)}（${h}h${String(m).padStart(2, '0')}m）`
+})
+function checkAuto() {
+  nowTs.value = Date.now()
+  if (autoMode.value === 'off' || trainBusy.value || !canTrain.value) return
+  if (nextAuto.value && nowTs.value >= nextAuto.value) {
+    nextAuto.value = computeNext()
+    startTrain()
+  }
+}
 
-// 初始化：默认一组回路
-if (!grps.length) pushGrp()
-resetRun()
+// ==================== 初始化 ====================
+// 首次拿到设备清单时给出合理默认：选第一台可调设备 + 同工序传感设备并自动绑定
+let inited = false
+function autoPick() {
+  if (inited) return
+  if (!adjList.value.length || !senList.value.length) return
+  inited = true
+  const a = adjList.value[0]
+  selAdj.value = [a.id]
+  const same = senList.value.filter((s) => s.unitId && a.unitId && String(s.unitId) === String(a.unitId))
+  const pool = same.length ? same : senList.value
+  selSen.value = pool.slice(0, 3).map((s) => s.id)
+  for (const s of selSen.value) bindOf[s] = a.id
+  syncRuns()
+}
+watch([() => adjList.value.length, () => senList.value.length], () => {
+  // 清理失效选择/绑定
+  const aids = adjList.value.map((d) => d.id)
+  const sids = senList.value.map((d) => d.id)
+  selAdj.value = selAdj.value.filter((id) => aids.includes(id))
+  selSen.value = selSen.value.filter((id) => sids.includes(id))
+  for (const k of Object.keys(bindOf)) {
+    if (!sids.includes(k) || (bindOf[k] && !aids.includes(bindOf[k]))) delete bindOf[k]
+  }
+  autoPick()
+  syncRuns()
+}, { immediate: true })
+
+onMounted(() => {
+  loadVers()
+  if (versions.value.length) activeVer.value = versions.value[0].id
+  scheduleNext()
+  autoTimer = setInterval(checkAuto, 15000)
+})
 onBeforeUnmount(() => {
   trainStop.value = true
-  stopRun()
+  stopSample()
+  if (autoTimer) clearInterval(autoTimer)
 })
 
-// 导出给外部
-defineExpose({ resetRun, isRunning: () => running.value })
+// ==================== 格式化 ====================
+function fmt(v, d) {
+  if (v == null || !Number.isFinite(Number(v))) return '—'
+  const n = Number(v)
+  const a = Math.abs(n)
+  const dg = a >= 1000 ? 0 : a >= 10 ? 1 : 2
+  return n.toLocaleString('zh-CN', { maximumFractionDigits: Math.max(d == null ? dg : d, dg) })
+}
+function fmtSmall(v) {
+  if (v == null || !Number.isFinite(Number(v))) return '—'
+  const n = Number(v)
+  const a = Math.abs(n)
+  if (a >= 100) return n.toFixed(1)
+  if (a >= 1) return n.toFixed(2)
+  return n.toFixed(4)
+}
+function p2(n) { return String(n).padStart(2, '0') }
+function shortTs(ts) {
+  const d = new Date(ts)
+  return `${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`
+}
+function fullTs(ts) {
+  const d = new Date(ts)
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`
+}
+
+defineExpose({ startSample, stopSample })
 </script>
 
 <style scoped>
-.pid-wrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-.pid-empty {
-  flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 10px; padding: 0 40px; text-align: center; color: var(--faint); font-size: 12px;
-}
-.pid-empty-ico { color: var(--muted); opacity: .6; }
-.pid-main { flex: 1 1 auto; min-height: 0; display: flex; gap: 12px; }
+.agc { flex: 1 1 auto; min-height: 0; display: flex; gap: 12px; }
 
-/* ==================== 左：设定 ==================== */
-.pid-set {
-  flex: 0 0 348px; width: 348px; min-width: 0;
-  display: flex; flex-direction: column; gap: 10px;
-  overflow-y: auto; padding: 0 4px 8px 0;
+/* ==================== 左栏 ==================== */
+.agc-aside {
+  flex: 0 0 336px; width: 336px; min-width: 0;
+  display: flex; flex-direction: column; gap: 8px;
+  overflow-y: auto; padding-right: 4px;
 }
-.pid-top { flex: 0 0 auto; display: flex; align-items: center; gap: 7px; }
-.pid-kbd { color: var(--accent-d); font-size: 12.5px; font-weight: 700; letter-spacing: .3px; }
-.pid-ttl { font-size: 12.5px; font-weight: 600; color: var(--text); }
-.pid-sub { font-size: 10px; color: var(--faint); }
-.pid-state { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted); }
-.pid-state .pid-dot { width: 7px; height: 7px; border-radius: 50%; }
-.pid-state.idle .pid-dot { background: #777; }
-.pid-state.ok .pid-dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
-.pid-state.ok { color: var(--green); }
-.pid-state.busy .pid-dot { background: var(--accent); animation: pid-pulse 1s infinite; }
-@keyframes pid-pulse { 50% { opacity: .35; } }
+.agc-hd { display: flex; align-items: center; gap: 6px; padding: 2px 0 4px; border-bottom: 1px solid var(--line); }
+.hd-ico { color: var(--accent-d); }
+.agc-hd b { font-size: 12.5px; color: var(--text); }
+.hd-sub { margin-left: auto; font-size: 10px; color: var(--faint); }
 
-.set-sec { flex: 0 0 auto; }
-.sec-head {
-  display: flex; align-items: center; gap: 6px; padding-bottom: 6px;
-  border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--text);
+.pnl { border: 1px solid var(--border); border-radius: 3px; background: var(--panel); }
+.pnl-hd {
+  display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+  background: var(--panel-2); border-bottom: 1px solid var(--border);
+  font-size: 11.5px; font-weight: 600; color: var(--text); cursor: pointer; user-select: none;
 }
-.sec-no {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 16px; height: 16px; padding: 0 5px; border-radius: 8px;
-  background: var(--bar); color: var(--accent-d); font-size: 10px; font-weight: 600; line-height: 1;
+.caret { font-style: normal; font-size: 9px; color: var(--faint); transition: transform .12s; display: inline-block; }
+.caret.on { transform: rotate(90deg); }
+.ph-t { letter-spacing: .2px; }
+.cnt { font-style: normal; font-size: 9.5px; color: var(--faint); }
+.hd-ops { margin-left: auto; display: inline-flex; gap: 6px; }
+.lk {
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font-size: 10px; color: var(--muted); font-family: inherit;
 }
-.mini-btn {
-  padding: 2px 8px; font-size: 10px; color: var(--accent2); background: transparent;
-  border: 1px solid var(--accent2); border-radius: 3px; cursor: pointer;
-}
-.mini-btn:hover:not(:disabled) { background: var(--accent2); color: #fff; }
-.mini-btn:disabled { opacity: .4; cursor: not-allowed; }
-.mini-btn.add { margin-left: auto; }
-.mini-btn.del { align-self: flex-end; color: #d57070; border-color: #d57070; padding: 1px 6px; }
-.mini-btn.del:hover:not(:disabled) { background: #d57070; color: #fff; }
+.lk:hover { color: var(--accent-d); text-decoration: underline; }
+.pnl-bd { padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 5px; }
+.emp { margin: 0; font-size: 10.5px; line-height: 1.6; color: var(--muted); }
+.emp.sm { font-size: 10px; color: var(--faint); }
 
-/* 数据源 */
-.data-line { display: flex; align-items: center; gap: 8px; padding-top: 8px; flex-wrap: wrap; }
-.seg { display: inline-flex; }
-.seg-btn {
-  padding: 3px 12px; font-size: 11px; color: var(--muted);
-  background: transparent; border: 1px solid var(--border); cursor: pointer;
+.dev { border: 1px solid transparent; border-radius: 3px; }
+.dev.on { background: var(--panel-2); border-color: var(--border); }
+.dev-hd { display: flex; align-items: center; gap: 6px; padding: 3px 4px; cursor: pointer; }
+.cbx {
+  flex: 0 0 auto; width: 12px; height: 12px; border: 1px solid var(--border); border-radius: 2px;
+  background: var(--panel); display: inline-flex; align-items: center; justify-content: center;
+  font-size: 9px; line-height: 1; color: #fff;
 }
-.seg:first-child .seg-btn { border-radius: 4px 0 0 4px; }
-.seg:last-child .seg-btn { border-radius: 0 4px 4px 0; }
-.seg-btn + .seg-btn { margin-left: -1px; }
-.seg-btn.on { color: #fff; background: var(--accent-d); border-color: transparent; font-weight: 500; }
-.seg-btn:disabled { opacity: .5; cursor: not-allowed; }
-.tau { display: inline-flex; align-items: center; gap: 3px; }
+.dev.on .cbx { background: var(--accent-d); border-color: var(--accent-d); }
+.dev-hd .nm { flex: 1 1 auto; min-width: 0; font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dev-hd .nm em { font-style: normal; font-size: 9.5px; color: var(--faint); margin-left: 5px; }
+.dev-hd .val { flex: 0 0 auto; font-size: 11px; color: var(--text); font-weight: 600; }
+.dev-hd .val i { font-style: normal; font-size: 9px; color: var(--faint); margin-left: 2px; }
+.tag {
+  flex: 0 0 auto; padding: 0 5px; border-radius: 8px; font-size: 9px; line-height: 14px;
+  background: var(--bar); color: var(--muted); border: 1px solid var(--border);
+}
+.tag.pid { color: var(--accent-d); border-color: var(--accent-d); background: var(--accent-l); }
+.tag.on { color: var(--green); border-color: var(--green); background: rgba(46,139,87,.10); }
 
-/* 回路卡片 */
-.grp-list { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; }
-.grp-row {
-  display: flex; flex-direction: column; gap: 4px; padding: 5px 6px;
-  border: 1px solid var(--border); border-radius: 5px; background: var(--panel); cursor: pointer;
-}
-.grp-row.on { border-color: var(--accent2); box-shadow: 0 0 0 1px var(--accent2); }
-.grp-l1 { display: flex; align-items: flex-end; gap: 4px; }
-.grp-no {
-  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
-  width: 18px; height: 18px; margin-bottom: 3px; border-radius: 50%;
-  font-size: 10px; font-weight: 600; color: var(--accent-d);
-  background: var(--bar); border: 1px solid var(--border);
-}
-.cell { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.cell em, .sp em, .kv em, .kv-g em, .tau em {
-  font-style: normal; font-size: 9.5px; color: var(--faint); white-space: nowrap;
-}
-.grp-arrow { flex: 0 0 auto; align-self: flex-end; margin-bottom: 4px; color: var(--accent); font-size: 13px; }
-.grp-l2 { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.sp { display: inline-flex; align-items: baseline; gap: 3px; }
-.sp .num { width: 76px; }
+.dev-bd { padding: 2px 4px 5px 22px; display: flex; flex-direction: column; gap: 4px; }
+.sp-row { display: flex; align-items: center; gap: 6px; }
+.rng { flex: 1 1 auto; min-width: 0; accent-color: var(--accent-d); height: 14px; }
+.rng:disabled { opacity: .5; }
+.sp-row .num { width: 66px; }
+.meta { display: flex; align-items: center; gap: 8px; font-size: 9.5px; color: var(--faint); flex-wrap: wrap; }
+.meta b { color: var(--muted); }
+.row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.row > em { font-style: normal; font-size: 10px; color: var(--muted); flex: 0 0 auto; }
+.row select { flex: 1 1 auto; min-width: 0; }
+.row .num { width: 72px; }
+.row.st { gap: 10px; }
+.row.rd b { font-size: 11px; color: var(--text); }
+.hintx { font-size: 9.5px; color: var(--faint); }
 .kv { display: inline-flex; align-items: baseline; gap: 3px; }
-.kv b { font-size: 10.5px; font-variant-numeric: tabular-nums; }
-.kv b.acc { color: var(--accent-d); }
-.kv b.dim { color: var(--accent2); }
-.badge-s {
-  margin-left: auto; padding: 0 5px; border-radius: 8px; font-size: 9.5px; line-height: 15px;
-  background: var(--bar); color: var(--muted);
+.kv em { font-style: normal; font-size: 9.5px; color: var(--faint); }
+.kv b { font-size: 10.5px; font-weight: 600; }
+.kv b.raw { color: #E07B39; }
+.kv b.ekf { color: #3AA655; }
+.badge { margin-left: auto; padding: 0 5px; border-radius: 8px; font-size: 9px; line-height: 14px; background: var(--bar); color: var(--muted); }
+.badge.ok { color: var(--green); background: rgba(46,139,87,.12); }
+.badge.busy { color: var(--accent-d); background: var(--accent-l); }
+.badge.na { color: var(--red); background: rgba(188,59,48,.10); }
+.badge.idle { color: var(--faint); }
+
+.io { display: flex; flex-direction: column; gap: 3px; padding: 2px 0 4px; }
+.io-row { display: flex; gap: 6px; font-size: 10px; color: var(--muted); }
+.io-row em { font-style: normal; flex: 0 0 auto; color: var(--faint); }
+.io-row .warnx { color: var(--red); }
+.io-row .okx { color: var(--green); }
+
+/* ==================== 右栏 ==================== */
+.agc-main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 4px; }
+.card { flex: 0 0 auto; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 3px; background: var(--panel); }
+.card.grow { flex: 1 1 auto; min-height: 190px; }
+.card-hd {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px;
+  background: var(--panel-2); border-bottom: 1px solid var(--border);
 }
-.badge-s.ok { color: var(--green); background: rgba(58,166,85,.12); }
-.badge-s.busy { color: var(--accent-d); background: rgba(0,94,148,.12); }
-.badge-s.na { color: #d57070; background: rgba(213,112,112,.12); }
-.grp-l3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 1px; }
-.kv-g { display: inline-flex; align-items: center; gap: 3px; }
-.kv-g .num { width: 64px; }
-.kv-g.h .num { width: 48px; }
-.kv-g .num.k { width: 56px; }
-.auto-cfg { font-size: 9.5px; color: var(--faint); }
+.ct { font-size: 11.5px; font-weight: 600; color: var(--text); }
+.cs { font-size: 10px; color: var(--faint); }
+.ch-ops { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+.ch-ops .rw { color: var(--accent-d); font-size: 11px; }
+.ch-ops .best { color: var(--green); font-size: 11px; }
+.ch-ops .dim { font-size: 10px; color: var(--faint); }
+.cempty { height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 0 24px; text-align: center; font-size: 10.5px; color: var(--faint); }
+.cempty.sm { height: 150px; }
+.cempty .t1 { font-size: 11px; color: var(--muted); }
+.cempty .t2 { font-size: 10px; max-width: 460px; }
 
-/* 滤波 */
-.flt-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 8px; }
-.hint { margin: 6px 0 0; font-size: 10px; line-height: 1.55; color: var(--muted); }
-
-/* 运行控制 */
-.run-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 8px; }
-.run-btn {
-  padding: 3px 12px; font-size: 11.5px; color: var(--muted); background: var(--panel);
-  border: 1px solid var(--border); border-radius: 3px; cursor: pointer;
+.btn {
+  padding: 2px 10px; font-size: 11px; font-family: inherit; color: var(--muted);
+  background: var(--panel); border: 1px solid var(--border); border-radius: 3px; cursor: pointer;
 }
-.run-btn:hover:not(:disabled) { border-color: var(--accent2); color: var(--accent-d); }
-.run-btn:disabled { opacity: .45; cursor: not-allowed; }
-.run-btn.primary { color: #fff; background: var(--accent-d); border-color: transparent; font-weight: 500; }
-.run-btn.primary:hover:not(:disabled) { filter: brightness(1.08); color: #fff; }
-.run-btn.go { color: var(--green); border-color: var(--green); }
-.run-btn.go:hover:not(:disabled) { background: var(--green); color: #fff; }
-.run-btn.stop { color: #d57070; border-color: #d57070; }
-.run-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 6px; font-size: 10px; color: var(--faint); }
-.run-meta .ok-n { color: var(--green); font-weight: 500; }
-.run-meta .mini-btn { margin-left: auto; }
-.freq { padding: 2px 4px; font-size: 10.5px; }
+.btn:hover:not(:disabled) { border-color: var(--accent2); color: var(--accent-d); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { color: #fff; background: var(--accent-d); border-color: transparent; font-weight: 500; }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); color: #fff; }
+.btn.stop { color: var(--red); border-color: var(--red); }
+.btn.ghost { background: transparent; }
+.btn.ghost:hover:not(:disabled) { background: var(--panel-2); }
 
-/* 通用控件 */
-select, .num {
-  padding: 2px 4px; font-size: 11px; color: var(--text);
+.bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 7px 8px; }
+.bar.mv { border-top: 1px dashed var(--line); gap: 8px; }
+.sep { width: 1px; height: 14px; background: var(--line); }
+.lb2 { font-style: normal; font-size: 10.5px; color: var(--muted); }
+.nx { font-size: 10px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.chk { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); cursor: pointer; }
+.chk input { accent-color: var(--accent-d); width: 12px; height: 12px; }
+.tstate { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted); }
+.tstate .dot { width: 7px; height: 7px; border-radius: 50%; background: #777; }
+.tstate.on { color: var(--accent-d); }
+.tstate.on .dot { background: var(--accent); animation: agc-pulse 1s infinite; }
+@keyframes agc-pulse { 50% { opacity: .35; } }
+
+.hp { padding: 2px 8px 8px; border-bottom: 1px dashed var(--line); display: flex; flex-direction: column; gap: 6px; }
+.hp-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.hp-row.obj { padding-top: 6px; border-top: 1px dotted var(--line); }
+.hp-row .lb { font-size: 10px; color: var(--muted); }
+.f { display: inline-flex; align-items: center; gap: 4px; }
+.f > em { font-style: normal; font-size: 9.5px; color: var(--faint); white-space: nowrap; }
+.num {
+  padding: 2px 4px; font-size: 11px; font-family: var(--mono); text-align: right; color: var(--text);
   background: var(--panel); border: 1px solid var(--border); border-radius: 3px; outline: none;
 }
-select { font-family: inherit; max-width: 100%; }
-.num { font-family: var(--mono); text-align: right; }
-.num.w48 { width: 48px; }
-select:focus, .num:focus { border-color: var(--accent2); }
-select:disabled, .num:disabled { opacity: .55; }
-.chk { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; color: var(--muted); cursor: pointer; white-space: nowrap; }
-.chk input { accent-color: var(--accent-d); width: 12px; height: 12px; }
-em.u, i.u { font-style: normal; font-size: 9.5px; color: var(--faint); }
+.num:focus { border-color: var(--accent2); }
+.num:disabled { opacity: .55; }
+.num.w56 { width: 56px; }
+.num.tm { width: 84px; text-align: center; }
+select, .sel {
+  padding: 2px 4px; font-size: 11px; font-family: inherit; color: var(--text);
+  background: var(--panel); border: 1px solid var(--border); border-radius: 3px; outline: none; max-width: 100%;
+}
+.sel.xs { font-size: 10.5px; }
+.grow { flex: 1 1 auto; }
+i.u { font-style: normal; font-size: 9.5px; color: var(--faint); }
 .mono { font-family: var(--mono); }
 
-/* ==================== 右：图 ==================== */
-.pid-charts {
-  flex: 1 1 auto; min-width: 0; min-height: 0;
-  display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 4px;
-}
-.ch-card {
-  flex: 0 0 auto; display: flex; flex-direction: column;
-  border: 1px solid var(--border); border-radius: 6px; background: var(--panel); padding: 2px 8px 4px;
-}
-.ch-head { display: flex; align-items: center; gap: 6px; padding: 4px 0 2px; }
-.ch-tag { color: var(--accent-d); font-size: 11px; font-weight: 700; }
-.ch-ttl { font-size: 12px; font-weight: 600; color: var(--text); }
-.ch-sub { font-size: 10px; color: var(--faint); margin-left: 4px; }
-.ch-right { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
-.vsel { font-size: 10.5px; max-width: 210px; }
-.ch-empty {
-  height: 130px; display: flex; align-items: center; justify-content: center;
-  font-size: 10.5px; color: var(--faint);
-}
-.ch-badge {
-  padding: 0 6px; border-radius: 8px; font-size: 9.5px; line-height: 15px;
-  background: rgba(0,94,148,.12); color: var(--accent-d);
-}
+/* 奖励曲线 */
+.rw-wrap { flex: 1 1 auto; min-height: 150px; display: flex; flex-direction: column; padding: 6px 8px 4px; }
+.rw-svg { width: 100%; flex: 1 1 auto; min-height: 110px; }
+.rw-svg .grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.rw-svg .base { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; opacity: .7; vector-effect: non-scaling-stroke; }
+.rw-svg .cv { fill: none; stroke: var(--accent-d); stroke-width: 1.8; vector-effect: non-scaling-stroke; }
+.rw-ax { display: flex; justify-content: space-between; font-size: 9.5px; color: var(--faint); padding-top: 2px; }
 
-/* 训练区（占右区大范围） */
-.train { flex: 1 1 auto; min-height: 300px; }
-.tr-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 4px 0 6px; border-bottom: 1px dashed var(--line); }
-.mini-btn.set.on { background: var(--accent2); color: #fff; }
-.tr-set { padding: 6px 0 5px; border-bottom: 1px dashed var(--line); display: flex; flex-direction: column; gap: 5px; }
-.tr-set-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.tr-set-row.obj { padding-top: 5px; border-top: 1px dotted var(--line); }
-.obj-lb { font-size: 10.5px; color: var(--muted); }
-.obj-it { font-size: 10px; color: var(--faint); }
-.obj-it b { margin-left: 3px; color: var(--text); font-family: var(--mono); }
-.tr-ident { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 5px 0 6px; border-bottom: 1px dashed var(--line); font-size: 10px; color: var(--faint); }
-.tr-ident .id-lb { color: var(--muted); }
-
-/* ② 滤波前后左右对比 */
-.cmp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-@media (max-width: 900px) { .cmp-grid { grid-template-columns: 1fr; } }
-.cmp-cell { min-width: 0; }
-.cmp-h { display: flex; align-items: center; gap: 5px; padding-bottom: 1px; font-size: 10.5px; color: var(--muted); }
-.lg-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.ch-empty.sm { height: 112px; font-size: 10px; }
-
-/* ④ 优化目标变化 · PID 参数轨迹 */
-.ov-wrap { position: relative; height: 132px; margin-top: 4px; }
-.ov-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.ov-svg .grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.ov-svg .cv { fill: none; stroke: var(--accent-d); stroke-width: 1.8; vector-effect: non-scaling-stroke; }
-.ov-dot {
-  position: absolute; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px;
-  border-radius: 50%; background: var(--accent-d);
-}
-.ov-dot.on { background: var(--green); box-shadow: 0 0 0 2px rgba(58,166,85,.22); }
-.ov-tag {
-  position: absolute; transform: translate(-50%, -100%); white-space: nowrap;
-  font-size: 9px; line-height: 1.35; pointer-events: none;
-}
-.ov-tag.below { transform: translate(-50%, 0); }
-.ov-tag .g { display: block; color: var(--faint); }
-.ov-tag .p { display: block; font-family: var(--mono); color: var(--text); }
-.ov-tag.on .p { color: var(--green); }
-.tr-state { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted); }
-.tr-state .dot { width: 7px; height: 7px; border-radius: 50%; background: #777; }
-.tr-state.on { color: var(--accent-d); }
-.tr-state.on .dot { background: var(--accent); animation: pid-pulse 1s infinite; }
-.tr-vis { flex: 1 1 auto; min-height: 120px; display: flex; flex-direction: column; padding-top: 6px; }
-.tr-svg { width: 100%; flex: 1 1 auto; min-height: 110px; }
-.tr-svg .grid { stroke: var(--line); stroke-width: 1; }
-.tr-svg .base { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; opacity: .7; }
-.tr-svg .cv { fill: none; stroke: var(--accent-d); stroke-width: 1.8; }
-.tr-empty { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 0 24px; text-align: center; }
-.tr-empty .t1 { font-size: 11px; color: var(--muted); }
-.tr-empty .t2 { font-size: 10px; color: var(--faint); }
-.tr-ax { display: flex; justify-content: space-between; font-size: 9.5px; color: var(--faint); padding-top: 2px; }
-.tr-best { flex: 0 0 auto; border-top: 1px dashed var(--line); margin-top: 4px; padding-top: 6px; }
-.tr-sum { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 10.5px; color: var(--muted); }
-.tr-sum b { color: var(--text); font-variant-numeric: tabular-nums; }
-.tr-sum .gain.ok { color: var(--green); }
-.tr-sum .gain.ok b { color: var(--green); }
-.tr-rows { display: flex; flex-direction: column; gap: 2px; padding-top: 5px; }
-.tr-row { display: flex; align-items: baseline; gap: 6px; font-size: 10.5px; color: var(--text); }
-.tr-row .rn {
+/* 版本表 */
+.vtb { display: flex; flex-direction: column; }
+.vtr { display: grid; grid-template-columns: 60px 1.4fr 70px 60px 90px 70px; gap: 6px; align-items: center; padding: 4px 8px; font-size: 10.5px; color: var(--text); cursor: pointer; }
+.vtr.hd { background: var(--panel-2); color: var(--faint); font-size: 9.5px; cursor: default; border-bottom: 1px solid var(--border); }
+.vtr:not(.hd):hover { background: var(--panel-2); }
+.vtr.on { background: var(--sel); }
+.vtr.cur .mono { color: var(--green); }
+.vtr .dim { color: var(--faint); }
+.vtr .rw { color: var(--accent-d); }
+.vempty { padding: 10px 8px; font-size: 10.5px; color: var(--faint); text-align: center; }
+.vdim { border-top: 1px dashed var(--line); padding: 6px 8px 8px; }
+.vdim-h { font-size: 10px; color: var(--muted); padding-bottom: 4px; }
+.vrow { display: flex; align-items: baseline; gap: 6px; font-size: 10.5px; padding: 1px 0; }
+.vrow .rn {
   flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%; text-align: center; line-height: 15px;
   font-size: 9px; color: var(--accent-d); background: var(--bar); border: 1px solid var(--border);
 }
-.tr-row .rl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
-.tr-row .rp { margin-left: auto; color: var(--accent-d); font-size: 10px; }
+.vrow .rl { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrow .rp { margin-left: auto; color: var(--accent-d); font-size: 10px; }
 </style>

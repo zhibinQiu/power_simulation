@@ -402,7 +402,7 @@ function onAttachClick(kind, it) {
     return
   }
   const att = store.addAttachToNode(sel.id, kind, it.type)
-  if (att) store.toast = t('已为工艺「{name}」绑定「{label}」：可在右侧属性面板调整其数值来源', { name: sel.name || sel.type, label: it.label })
+  if (att) store.toast = t('已为工艺「{name}」绑定「{label}」：可在右侧属性面板调整其数据源（固定值 / 随机模拟值 / 数据源管理中的传感器设备）', { name: sel.name || sel.type, label: it.label })
 }
 function onProcessClickFromType(type) {
   const t = PROCESS_MAP[type]

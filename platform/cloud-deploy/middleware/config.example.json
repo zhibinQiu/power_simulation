@@ -1,16 +1,12 @@
 {
-  "comment": "能碳数据中间件配置示例。两种形态：mode=external（推荐，与服务器云端 Broker 同机：不启内置 Broker，数据直发 output.broker 41883，平台经云端端点统一订阅）；mode=local（起内置 Broker 41884，平台单独订阅中间件端口）。server = 管理 API（平台在此注册/启停数据源）；adapters = 数据源（一般由平台经 API 写入，无需手工编辑）。模拟数据不是内置适配器类型：由独立服务 sim-source 生成后经 mqtt 适配器接入（平台与中间件自身都不产生模拟数据）",
+  "comment": "能碳数据中间件配置示例。只有一种输出形态：paho 直发 output.broker（服务器与云端 Broker 同机，默认 127.0.0.1:41883），与一体机上报同一 Broker、按前缀区分，平台经云端端点统一订阅。server = 管理 API（平台在此注册/启停数据源）；adapters = 数据源（一般由平台经 API 写入，无需手工编辑）。模拟数据不是内置适配器类型：由独立服务 sim-source 生成后经 mqtt 适配器接入（平台与中间件自身都不产生模拟数据）",
   "server": {
     "host": "0.0.0.0",
     "port": 42084,
-    "token": "",
-    "broker": {
-      "enabled": false
-    }
+    "token": ""
   },
   "output": {
-    "mode": "external",
-    "comment": "mode=external：paho 直发下方 broker（推荐：服务器云端 Broker 41883）；mode=local：进程内直投内置 Broker（需 server.broker.enabled=true）",
+    "comment": "paho 直发下方 broker（服务器即云端 Broker 41883）",
     "broker": {
       "host": "127.0.0.1",
       "port": 41883,

@@ -2,6 +2,7 @@
 // 碳市场实时行情视图：替换中间 3D 数字孪生场景，展示 CEA / CCER 实时行情、走势与预测。
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { api } from '../api/client.js'
+import { visiblePoll } from '../utils/poll.js'
 import { useSimStore } from '../stores/sim'
 
 const store = useSimStore()
@@ -13,7 +14,7 @@ const loading = ref(false)
 const error = ref('')
 const forecastOn = ref(true) // 预测叠加开关
 const lastTick = ref(0)      // 用于驱动闪烁动画的 tick
-let timer = null
+let stopPoll = null    // visiblePoll 返回的停止函数
 
 const POLL_MS = 15000
 const FORECAST_DAYS = 10
@@ -293,9 +294,10 @@ function formatTime(s) {
 
 onMounted(() => {
   loadAll()
-  timer = setInterval(loadAll, POLL_MS)
+  // 可见性感知：后台标签不拉行情（切回可见时立即补一轮）
+  stopPoll = visiblePoll(loadAll, POLL_MS)
 })
-onUnmounted(() => clearInterval(timer))
+onUnmounted(() => { if (stopPoll) { stopPoll(); stopPoll = null } })
 watch(instrument, () => reloadChart())
 
 // 暴露给视图工具栏（RibbonToolbar）：刷新行情 / 切换品种 / 预测开关 / 当前品种与预测状态

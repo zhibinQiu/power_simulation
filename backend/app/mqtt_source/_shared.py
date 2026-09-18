@@ -28,14 +28,13 @@ except Exception:  # pragma: no cover
     _PAHO_OK = False
 
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "config")
-CONFIG_PATH = os.path.join(CONFIG_DIR, "mqtt.yaml")          # 旧版手工配置文件（向后兼容）
 RUNTIME_CONFIG_PATH = os.path.join(CONFIG_DIR, "box_config.json")  # 前端配置持久化（运行时产物，无需手工编辑）
 LINKS_FILE = os.path.join(CONFIG_DIR, "links.json")   # 云端设备 <-> 仿真设备实例关联持久化
 BOX_DEVICES_FILE = os.path.join(CONFIG_DIR, "box_devices.json")  # 盒子设备配置（cloudDevice/name 反查用）
 
 from .. import cloud_agent  # noqa: F401 —— re-export：子模块经 _shared.cloud_agent 访问  # noqa: E402 云端 agent 推送（cloud/# 主题）解析，替代 SSH 数据通道
 
-# ------------------------- 配置加载（环境变量优先，回退 mqtt.yaml） -------------------------
+# ------------------------- 配置加载（环境变量 > box_config.json > 默认值） -------------------------
 DEFAULT_CFG: Dict[str, Any] = {
     "broker": {
         "host": "127.0.0.1",
@@ -52,22 +51,16 @@ DEFAULT_CFG: Dict[str, Any] = {
 
 
 def _load_config() -> Dict[str, Any]:
-    """配置来源优先级（高→低）：环境变量 > 前端运行时配置(box_config.json) > mqtt.yaml > 默认值。
+    """配置来源优先级（高→低）：环境变量 > 前端运行时配置(box_config.json) > 默认值。
 
-    box_config.json 由「能碳一体机管理」视图保存生成（运行时产物，无需手工编辑），
-    优先级高于旧版手工配置文件 mqtt.yaml（保留向后兼容）；环境变量仍可覆盖（与 collect_sensor_data.py 一致）。
+    box_config.json 由「能碳一体机管理」视图保存生成（运行时产物，无需手工编辑）；
+    环境变量仍可覆盖（与 collect_sensor_data.py 一致）。
+
+    旧版手工配置文件 mqtt.yaml 已删除：其实际内容与 DEFAULT_CFG 完全一致
+    （broker 127.0.0.1:41883 / topics '#' / mapping {}），留着只是多一次文件 IO
+    和一条空的 compat 分支，配置入口早已统一到 box_config.json。
     """
     cfg = json.loads(json.dumps(DEFAULT_CFG))  # 深拷贝默认值
-    try:
-        import yaml  # type: ignore
-
-        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-            loaded = yaml.safe_load(f) or {}
-        for key in ("broker", "topics", "mapping", "ignored_devices"):
-            if key in loaded:
-                cfg[key] = loaded[key]
-    except Exception:
-        pass  # 配置缺失/损坏时使用默认值（与参考项目环境变量默认一致）
     try:
         with open(RUNTIME_CONFIG_PATH, "r", encoding="utf-8") as f:
             saved = json.load(f) or {}
@@ -167,29 +160,22 @@ BOX_APP_EVENTS: Dict[str, List[Dict[str, Any]]] = {}  # box -> 最近部署/启�
 #   由 mqtt_source.ingest 在归类 external 消息时原地更新，_LOCK 保护）
 _EXT_STATS: Dict[str, Dict[str, Any]] = {}
 
-# 当前订阅客户端引用（供配置热更新时断开重连）。多 Broker 场景下此处保存
-# **云端（一体机）** 的客户端，中间件 Broker 的客户端见 _EP_CLIENTS。
+# 当前订阅客户端引用（供配置热更新时断开重连）
 _CLIENT = None
 
-# ------------------------- 多 Broker 订阅端点 -------------------------
-# 平台订阅两类数据入口（消息归属按前缀+src 自动区分，与入口无关）：
-#   cloud      云端 Broker（默认 41883）：能碳一体机盒子/云端 agent 推送（cloud/#、
-#              state/#、$SYS/#、data/#）——原有数据与统计来源；
-#              external 形态下外部数据源/模拟数据也直发本 Broker（data/ext-*/...）；
-#   middleware 中间件独立数据端口（仅 local 形态，默认 41884 可经 middleware.json
-#              subscribe=false 停用）：外部数据源（含独立模拟源），仅收数据主题
-#              （不订阅 $SYS，避免与云端 Broker 的统计互相污染）。
-# 两端共享同一条摄取管道（ingest._record_message），按 source 区分统计口径。
+# ------------------------- 订阅端点 -------------------------
+# 平台**只有一个**订阅入口：云端 Broker（默认 41883）。
+# 能碳一体机盒子/云端 agent 推送（cloud/#、state/#、$SYS/#、data/#）与中间件转投的
+# 外部数据（data/ext-*/...）都在同一个 Broker 上，消息归属按 box 前缀识别（见 ingest），
+# 与入口无关——历史上「另起一个中间件独立端口（41884）订阅」的端点已随中间件输出
+# 形态收敛而废弃（middleware.json 的 subscribe 开关已删除），不再保留。
 _ENDPOINTS: Dict[str, Dict[str, Any]] = {}
 _EP_STATE: Dict[str, Dict[str, Any]] = {}
 _EP_CLIENTS: Dict[str, Any] = {}
 
-# 中间件端点只订阅数据主题（中间件只发布 data/{box}/... ，不产生 cloud/state/$SYS）
-MW_TOPICS = ["data/#"]
-
 
 def _init_endpoints() -> None:
-    """初始化订阅端点（云端取自 Broker 配置，中间件取自 middleware_client 配置）。"""
+    """初始化订阅端点（云端 Broker 取自 box_config.json）。"""
     _ENDPOINTS["cloud"] = {
         "key": "cloud",
         "label": "云端 Broker（能碳一体机）",
@@ -198,53 +184,25 @@ def _init_endpoints() -> None:
         "sys": True,          # 采集 $SYS/broker/# 统计
         "enabled": True,      # 云端是主数据源，始终订阅
     }
-    _ENDPOINTS["middleware"] = {
-        "key": "middleware",
-        "label": "数据中间件（外部数据源）",
-        "broker": {"host": "127.0.0.1", "port": 41884, "username": "", "password": "",
-                   "client_id": "carbon-sim-mw", "keepalive": 60, "qos": 0},
-        "topics": list(MW_TOPICS),
-        "sys": False,
-        "enabled": True,
-    }
-    for key in ("cloud", "middleware"):
-        _EP_STATE.setdefault(key, {
-            "connected": False, "last_connect_rc": None, "last_error": "",
-            "enabled": True, "message_count": 0, "last_message_at": None,
-        })
+    _EP_STATE.setdefault("cloud", {
+        "connected": False, "last_connect_rc": None, "last_error": "",
+        "enabled": True, "message_count": 0, "last_message_at": None,
+    })
 
 
 _init_endpoints()
 
 
 def sync_endpoints() -> None:
-    """把最新配置同步到订阅端点（云端 Broker 配置/中间件配置热更新后调用）。"""
+    """把最新 Broker 配置同步到订阅端点（云端 Broker 配置热更新后调用）。"""
     cloud = _ENDPOINTS.get("cloud")
     if cloud is not None:
         cloud["broker"] = dict(_BROKER)
         cloud["topics"] = list(_TOPICS)
-    mw = _ENDPOINTS.get("middleware")
-    if mw is not None:
-        try:
-            from .. import middleware_client as _mwc
-            cfg = _mwc.load_config()
-            bkr = dict(cfg.get("broker") or {})
-            mw["broker"] = {
-                "host": str(bkr.get("host") or "127.0.0.1"),
-                "port": int(bkr.get("port") or 41884),
-                "username": str(bkr.get("username") or ""),
-                "password": str(bkr.get("password") or ""),
-                "client_id": "carbon-sim-mw", "keepalive": 60, "qos": 0,
-            }
-            # 端点订阅开关：subscribe=false（external 形态）时不再单独订阅中间件端口，
-            # 外部数据已直发云端 Broker，平台经云端端点（41883）统一取数
-            mw["enabled"] = bool(cfg.get("subscribe", True)) and bool(cfg.get("enabled", True))
-        except Exception:  # noqa: BLE001
-            pass
 
 
 def endpoint_states() -> Dict[str, Dict[str, Any]]:
-    """各订阅端点的连接状态快照（前端展示「同时订阅两个 Broker」的连通情况）。"""
+    """订阅端点连接状态快照（前端「系统连接图」展示云端 Broker 连通情况）。"""
     out: Dict[str, Dict[str, Any]] = {}
     for key, ep in _ENDPOINTS.items():
         st = dict(_EP_STATE.get(key) or {})

@@ -4,18 +4,14 @@
       "id": "box",
       "type": "box",
       "name": "能碳一体机",
-      "builtin": true,
       "enabled": true,
-      "config": {},
-      "label": "能碳一体机",
-      "desc": "能碳一体机云端（默认接入）：KubeEdge 盒子/传感器经云端 Broker 主动上报，平台订阅摄取后经关联驱动仿真"
+      "config": {}
     },
     {
       "id": "steel_sim",
       "type": "external",
       "name": "钢铁仿真数据源",
-      "builtin": false,
-      "enabled": true,
+      "enabled": false,
       "config": {
         "box": "ext-steel",
         "adapter": "mqtt",
@@ -26,8 +22,15 @@
             "username": "",
             "password": ""
           },
-          "topics": ["ext/steel/#"],
-          "deviceKeys": ["device", "deviceId", "sensor", "id"],
+          "topics": [
+            "ext/steel/#"
+          ],
+          "deviceKeys": [
+            "device",
+            "deviceId",
+            "sensor",
+            "id"
+          ],
           "qos": 0
         },
         "desc": "独立模拟数据源（sim-source）· 钢铁仿真：1#高炉、1#转炉、1#烧结机、自备电厂。上行空间 ext/steel/#（模拟一体机透传），经中间件 mqtt 适配器转换为标准数据 data/ext-steel/…"
@@ -37,8 +40,7 @@
       "id": "idc_sim",
       "type": "external",
       "name": "机房热控数据源",
-      "builtin": false,
-      "enabled": true,
+      "enabled": false,
       "config": {
         "box": "ext-idc",
         "adapter": "mqtt",
@@ -49,12 +51,20 @@
             "username": "",
             "password": ""
           },
-          "topics": ["ext/idc/#"],
-          "deviceKeys": ["device", "deviceId", "sensor", "id"],
+          "topics": [
+            "ext/idc/#"
+          ],
+          "deviceKeys": [
+            "device",
+            "deviceId",
+            "sensor",
+            "id"
+          ],
           "qos": 0
         },
         "desc": "独立模拟数据源（sim-source）· 机房热控：机房A、冷冻水系统、空调机组、室外环境。上行空间 ext/idc/#（模拟一体机透传），经中间件 mqtt 适配器转换为标准数据 data/ext-idc/…"
       }
     }
-  ]
+  ],
+  "removed_builtins": []
 }

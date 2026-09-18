@@ -164,17 +164,21 @@ export const api = {
   // 云端 Broker 配置（前端配置化：能碳一体机管理 -> 总览 -> 云端数据链路「配置」，免手工编辑 mqtt.yaml）
   boxConfig: () => jget('/box/config'),
   boxConfigSave: (payload) => jpost('/box/config', payload),
-  // ---- 统一数据源接入（能碳一体机 box / 外部数据源 external；模拟数据也是 external 的一种，
-  //      由数据中间件 adapter=sim 生成）----
+  // ---- 统一数据源接入（能碳一体机 box / 外部数据源 external；模拟数据由独立服务
+  //      sim-source 生成后经中间件 mqtt 适配器接入，与真实外部源同构）----
   dataSources: () => jget('/data-sources'),
+  // 可绑定信号目录：按数据源分组列出当前上报的设备及其全部数值（流程编排绑定实测值）
+  dataSourceSignals: () => jget('/data-sources/signals'),
   dataSourceToggle: (id, enabled) => jpost('/data-sources/toggle', { id, enabled }),
   dataSourceSave: (id, payload) => jpost('/data-sources/save', { id, ...payload }),
   dataSourceAdd: (payload) => jpost('/data-sources/add', payload),
+  // 删除数据源（内置源与外部源统一，无例外）
   dataSourceRemove: (id) => jpost('/data-sources/remove', { id }),
+  // 恢复被删除的平台内置数据源（当前仅 box 能碳一体机）
+  dataSourceRestore: (id) => jpost('/data-sources/restore', { id }),
   dataSourceTest: (payload) => jpost('/data-sources/test', payload),
-  dataSourceTypes: () => jget('/data-sources/types'),
-  // 数据中间件服务（外部数据采集与发布的独立进程；平台订阅其内置 Broker）
-  middlewareStatus: () => jget('/middleware/status'),
+  // 数据中间件服务（外部数据经一体机上行 ext/#，由中间件转换为标准 MQTT 直发云端 Broker）
+  // 注：中间件状态/配置初值随 GET /data-sources 的 middleware 字段一起返回，前端不再单独请求 /middleware/status
   middlewareConfig: (payload) => jpost('/middleware/config', payload),
   middlewareTest: (payload) => jpost('/middleware/test', payload),
   middlewareSync: () => jpost('/middleware/sync', {}),

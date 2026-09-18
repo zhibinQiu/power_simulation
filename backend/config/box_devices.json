@@ -1,40 +1,821 @@
 {
   "models": [
     {
-      "name": "weighing-indicator-model",
+      "name": "temp-rs50-model",
       "namespace": "default",
       "protocol": "modbus",
       "properties": [
         {
-          "name": "weight",
+          "name": "temperature",
           "type": "int",
           "accessMode": "r",
           "registerType": "holdingRegister",
           "register": 0,
-          "limit": 2,
-          "scale": 0.01,
-          "isRegisterSwap": true,
-          "unit": "kg",
-          "desc": "实时重量（32位有符号，低字在前）"
+          "limit": 1,
+          "scale": 0.1,
+          "unit": "℃",
+          "desc": "温度 实际值=读数/10"
         }
       ],
-      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: DeviceModel\nmetadata:\n  name: \"weighing-indicator-model\"\n  namespace: \"default\"\nspec:\n  properties:\n  - name: \"weight\"\n    description: \"实时重量（32位有符号，低字在前）\"\n    type: INT\n    accessMode: ReadOnly\n    unit: \"kg\"\n",
-      "created_at": 1788249061
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: DeviceModel\nmetadata:\n  name: \"temp-rs50-model\"\n  namespace: \"default\"\nspec:\n  properties:\n  - name: \"temperature\"\n    description: \"温度 实际值=读数/10\"\n    type: INT\n    accessMode: ReadOnly\n    unit: \"℃\"\n",
+      "created_at": 1789107765
+    },
+    {
+      "name": "power-supply-24v-model",
+      "namespace": "default",
+      "protocol": "modbus",
+      "properties": [
+        {
+          "name": "voltage",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 0,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "V",
+          "desc": "实际输出电压（输入寄存器0，分辨率0.01V，2400=24.00V）"
+        },
+        {
+          "name": "current",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 1,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "A",
+          "desc": "实际输出电流（输入寄存器1，分辨率0.01A，120=1.20A）"
+        },
+        {
+          "name": "power",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 3,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "W",
+          "desc": "实际输出功率（输入寄存器3，分辨率0.01W，1000=10.00W）"
+        },
+        {
+          "name": "pwm_duty",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 2,
+          "limit": 1,
+          "scale": "0.1",
+          "unit": "%",
+          "desc": "PWM占空比（输入寄存器2，分辨率0.1%）"
+        },
+        {
+          "name": "signal_source",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 5,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "控制信号源（1=通信控制 0=PWM）"
+        },
+        {
+          "name": "work_mode_actual",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 6,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "当前工作模式（0恒压 1恒流 2恒压恒流 3通讯选择）"
+        },
+        {
+          "name": "voltage_set",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 0,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "V",
+          "desc": "设定输出电压（保持寄存器0，0-2400 对应 0-24.00V；仅恒压/恒压恒流模式有效）",
+          "min": 0,
+          "max": 24
+        },
+        {
+          "name": "current_set",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 1,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "A",
+          "desc": "设定输出电流（保持寄存器1，0-500 对应 0-5.00A）",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "name": "volt_calib",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 2,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "回读电压校准系数（默认10000）",
+          "min": 0,
+          "max": 20000
+        },
+        {
+          "name": "curr_calib",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 3,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "回读电流校准系数（默认10000）",
+          "min": 0,
+          "max": 20000
+        },
+        {
+          "name": "power_on_voltage",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 4,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "V",
+          "desc": "上电自动输出电压（0-2400 对应 0-24.00V，掉电保持）",
+          "min": 0,
+          "max": 24
+        },
+        {
+          "name": "power_on_current",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 5,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "A",
+          "desc": "上电自动输出电流（0-500 对应 0-5.00A，掉电保持）",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "name": "work_mode",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 6,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "工作模式（仅通讯选择模式下有效：0恒压 1恒流 2恒压恒流）",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "name": "output_on",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "coil",
+          "register": 0,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "输出开关（1=打开电源输出 0=关闭；设完电压需置位才有输出）",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "calib_confirm",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "coil",
+          "register": 1,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "校准系数确认",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "power_on_auto",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "coil",
+          "register": 2,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "上电自动输出使能",
+          "min": 0,
+          "max": 1
+        }
+      ],
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: DeviceModel\nmetadata:\n  name: \"power-supply-24v-model\"\n  namespace: \"default\"\nspec:\n  properties:\n  - name: \"voltage\"\n    description: \"实际输出电压（输入寄存器0，分辨率0.01V，2400=24.00V）\"\n    type: INT\n    accessMode: ReadOnly\n    unit: \"V\"\n  - name: \"current\"\n    description: \"实际输出电流（输入寄存器1，分辨率0.01A，120=1.20A）\"\n    type: INT\n    accessMode: ReadOnly\n    unit: \"A\"\n  - name: \"power\"\n    description: \"实际输出功率（输入寄存器3，分辨率0.01W，1000=10.00W）\"\n    type: INT\n    accessMode: ReadOnly\n    unit: \"W\"\n  - name: \"pwm_duty\"\n    description: \"PWM占空比（输入寄存器2，分辨率0.1%）\"\n    type: INT\n    accessMode: ReadOnly\n    unit: \"%\"\n  - name: \"signal_source\"\n    description: \"控制信号源（1=通信控制 0=PWM）\"\n    type: INT\n    accessMode: ReadOnly\n    unit: \"\"\n  - name: \"work_mode_actual\"\n    description: \"当前工作模式（0恒压 1恒流 2恒压恒流 3通讯选择）\"\n    type: INT\n    accessMode: ReadOnly\n    unit: \"\"\n  - name: \"voltage_set\"\n    description: \"设定输出电压（保持寄存器0，0-2400 对应 0-24.00V；仅恒压/恒压恒流模式有效）\"\n    type: INT\n    accessMode: ReadWrite\n    unit: \"V\"\n  - name: \"current_set\"\n    description: \"设定输出电流（保持寄存器1，0-500 对应 0-5.00A）\"\n    type: INT\n    accessMode: ReadWrite\n    unit: \"A\"\n  - name: \"volt_calib\"\n    description: \"回读电压校准系数（默认10000）\"\n    type: INT\n    accessMode: ReadWrite\n    unit: \"\"\n  - name: \"curr_calib\"\n    description: \"回读电流校准系数（默认10000）\"\n    type: INT\n    accessMode: ReadWrite\n    unit: \"\"\n  - name: \"power_on_voltage\"\n    description: \"上电自动输出电压（0-2400 对应 0-24.00V，掉电保持）\"\n    type: INT\n    accessMode: ReadWrite\n    unit: \"V\"\n  - name: \"power_on_current\"\n    description: \"上电自动输出电流（0-500 对应 0-5.00A，掉电保持）\"\n    type: INT\n    accessMode: ReadWrite\n    unit: \"A\"\n  - name: \"work_mode\"\n    description: \"工作模式（仅通讯选择模式下有效：0恒压 1恒流 2恒压恒流）\"\n    type: INT\n    accessMode: ReadWrite\n    unit: \"\"\n  - name: \"output_on\"\n    description: \"输出开关（1=打开电源输出 0=关闭；设完电压需置位才有输出）\"\n    type: INT\n    accessMode: ReadWrite\n    unit: \"\"\n  - name: \"calib_confirm\"\n    description: \"校准系数确认\"\n    type: INT\n    accessMode: ReadWrite\n    unit: \"\"\n  - name: \"power_on_auto\"\n    description: \"上电自动输出使能\"\n    type: INT\n    accessMode: ReadWrite\n    unit: \"\"\n",
+      "created_at": 1789720822
+    },
+    {
+      "name": "flow-meter-model",
+      "namespace": "default",
+      "protocol": "modbus",
+      "properties": [
+        {
+          "name": "flow_rate",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "holdingRegister",
+          "register": 9,
+          "limit": 2,
+          "scale": 0.01,
+          "unit": "L/min",
+          "desc": "瞬时流量 读数/100"
+        },
+        {
+          "name": "flow_total",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "holdingRegister",
+          "register": 12,
+          "limit": 2,
+          "scale": 0.01,
+          "unit": "L",
+          "desc": "累计流量 读数/100"
+        }
+      ],
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: DeviceModel\nmetadata:\n  name: \"flow-meter-model\"\n  namespace: \"default\"\nspec:\n  properties:\n  - name: \"flow_rate\"\n    description: \"瞬时流量 读数/100\"\n    type: INT\n    accessMode: ReadOnly\n    unit: \"L/min\"\n  - name: \"flow_total\"\n    description: \"累计流量 读数/100\"\n    type: INT\n    accessMode: ReadOnly\n    unit: \"L\"\n",
+      "created_at": 1788854917
+    },
+    {
+      "name": "lora-temp-model",
+      "namespace": "default",
+      "protocol": "lora",
+      "properties": [
+        {
+          "name": "temperature",
+          "type": "int",
+          "accessMode": "r",
+          "scale": 0.1,
+          "unit": "℃",
+          "desc": "LoRaWAN DR206 透传 DTU 温度：值=寄存器×0.1；数据源=LoRa 网管 ChirpStack(nt001 一体机内), mapper 上行解码实时上报"
+        }
+      ],
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: DeviceModel\nmetadata:\n  name: \"lora-temp-model\"\n  namespace: \"default\"\nspec:\n  properties:\n  - name: \"temperature\"\n    description: \"LoRaWAN DR206 透传 DTU 温度：值=寄存器×0.1；数据源=LoRa 网管 ChirpStack(nt001 一体机内), mapper 上行解码实时上报\"\n    type: INT\n    accessMode: ReadOnly\n    unit: \"℃\"\n",
+      "created_at": 1789370111
     }
   ],
   "devices": [
     {
-      "name": "chengzhong",
+      "name": "flow-meter",
       "namespace": "default",
-      "model": "weighing-indicator-model",
+      "model": "flow-meter-model",
       "node": "nt001",
       "protocol": "modbus",
-      "collectCycle": 1000,
-      "cloudDevice": "202603041423",
+      "collectCycle": 2000,
+      "cloudDevice": "",
+      "origName": "",
+      "comm": {
+        "commType": "serial",
+        "serialPort": "/dev/ttyRS485",
+        "baudRate": 9600,
+        "dataBits": 8,
+        "parity": "none",
+        "stopBits": 1,
+        "slaveID": 6
+      },
+      "opcua": {},
+      "bluetooth": {},
+      "lora": {},
+      "cellular": {},
+      "properties": [
+        {
+          "name": "flow_rate",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "holdingRegister",
+          "register": 9,
+          "limit": 2,
+          "scale": 0.01,
+          "unit": "L/min",
+          "desc": "瞬时流量 读数/100"
+        },
+        {
+          "name": "flow_total",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "holdingRegister",
+          "register": 12,
+          "limit": 2,
+          "scale": 0.01,
+          "unit": "L",
+          "desc": "累计流量 读数/100"
+        }
+      ],
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"flow-meter\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\nspec:\n  deviceModelRef:\n    name: \"flow-meter-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"flow_rate\"\n    collectCycle: 2000\n  - name: \"flow_total\"\n    collectCycle: 2000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        com:\n          commType: serial\n          serialPort: \"/dev/ttyRS485\"\n          baudRate: 9600\n          dataBits: 8\n          parity: \"none\"\n          stopBits: 1\n        slaveID: 6\n        visitors:\n        - propertyName: \"flow_rate\"\n          register: HoldingRegister\n          offset: 9\n          limit: 2\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"flow_total\"\n          register: HoldingRegister\n          offset: 12\n          limit: 2\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n",
+      "created_at": 1788854917,
+      "status": "reporting",
+      "enabled": true
+    },
+    {
+      "name": "shuitong-temp",
+      "namespace": "default",
+      "model": "lora-temp-model",
+      "node": "nt001",
+      "protocol": "lora",
+      "collectCycle": 5000,
+      "cloudDevice": "",
       "comm": {
         "commType": "serial",
         "slaveID": 1,
-        "serialPort": "/dev/ttyUSB-weigh",
+        "serialPort": "/dev/ttyS0",
+        "baudRate": 9600,
+        "parity": "none",
+        "tcpIP": "192.168.1.10",
+        "tcpPort": 502,
+        "dataBits": 8,
+        "stopBits": 1
+      },
+      "opcua": {
+        "url": "opc.tcp://127.0.0.1:4840",
+        "userName": "",
+        "password": ""
+      },
+      "bluetooth": {
+        "macAddress": "AA:BB:CC:DD:EE:FF"
+      },
+      "lora": {
+        "broker": "127.0.0.1",
+        "port": 41884,
+        "applicationID": "0ce81243-64fb-455c-a484-9b26acb42f65",
+        "devEUI": "0120560100000245",
+        "appKey": "",
+        "region": "CN470",
+        "dataRate": "SF7BW125",
+        "topic": "",
+        "payloadRoot": "",
+        "devEuiKey": "",
+        "username": "",
+        "password": "",
+        "maxAge": 30,
+        "decode": {
+          "scale": 1
+        },
+        "downlink": {
+          "enabled": true,
+          "mode": "poll",
+          "fPort": 10,
+          "hex": "",
+          "timeout": 5
+        },
+        "slaveId": 7
+      },
+      "cellular": {
+        "serialPort": "/dev/ttyUSB2",
+        "baudRate": 115200,
+        "apn": "cmnet",
+        "iface": "wwan0"
+      },
+      "properties": [
+        {
+          "name": "temperature",
+          "type": "int",
+          "accessMode": "r",
+          "scale": 0.1,
+          "unit": "℃",
+          "desc": "LoRaWAN DR206 透传 DTU 温度：值=寄存器×0.1；数据源=LoRa 网管 ChirpStack(nt001 一体机内), mapper 上行解码实时上报"
+        }
+      ],
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"shuitong-temp\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\nspec:\n  deviceModelRef:\n    name: \"lora-temp-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"temperature\"\n    collectCycle: 5000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        broker: \"127.0.0.1:41884\"\n        applicationID: \"0ce81243-64fb-455c-a484-9b26acb42f65\"\n        devEUI: \"0120560100000245\"\n        appKey: \"\"\n        region: \"CN470\"\n        dataRate: \"SF7BW125\"\n        topic: \"\"\n        payloadRoot: \"\"\n        devEuiKey: \"\"\n        username: \"\"\n        password: \"\"\n        visitors:\n        - propertyName: \"temperature\"\n          lora:\n            payloadKey: \"\"\n",
+      "created_at": 1789113115,
+      "status": "reporting"
+    },
+    {
+      "name": "env-temp",
+      "namespace": "default",
+      "model": "lora-temp-model",
+      "node": "nt001",
+      "protocol": "lora",
+      "collectCycle": 5000,
+      "cloudDevice": "",
+      "comm": {
+        "commType": "serial",
+        "slaveID": 1,
+        "serialPort": "/dev/ttyS0",
+        "baudRate": 9600,
+        "parity": "none",
+        "tcpIP": "192.168.1.10",
+        "tcpPort": 502,
+        "dataBits": 8,
+        "stopBits": 1
+      },
+      "opcua": {
+        "url": "opc.tcp://127.0.0.1:4840",
+        "userName": "",
+        "password": ""
+      },
+      "bluetooth": {
+        "macAddress": "AA:BB:CC:DD:EE:FF"
+      },
+      "lora": {
+        "broker": "127.0.0.1",
+        "port": 41884,
+        "applicationID": "0ce81243-64fb-455c-a484-9b26acb42f65",
+        "devEUI": "0120560100000245",
+        "appKey": "",
+        "region": "CN470",
+        "dataRate": "SF7BW125",
+        "topic": "",
+        "payloadRoot": "",
+        "devEuiKey": "",
+        "username": "",
+        "password": "",
+        "maxAge": 30,
+        "slaveId": 2,
+        "decode": {
+          "type": "",
+          "scale": 1
+        },
+        "downlink": {
+          "enabled": true,
+          "mode": "poll",
+          "fPort": 10,
+          "hex": "",
+          "timeout": 5
+        }
+      },
+      "cellular": {
+        "serialPort": "/dev/ttyUSB2",
+        "baudRate": 115200,
+        "apn": "cmnet",
+        "iface": "wwan0"
+      },
+      "properties": [
+        {
+          "name": "temperature",
+          "type": "int",
+          "accessMode": "r",
+          "scale": 0.1,
+          "unit": "℃",
+          "desc": "LoRaWAN DR206 透传 DTU 温度：值=寄存器×0.1；数据源=LoRa 网管 ChirpStack(nt001 一体机内), mapper 上行解码实时上报"
+        }
+      ],
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"env-temp\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\nspec:\n  deviceModelRef:\n    name: \"lora-temp-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"temperature\"\n    collectCycle: 5000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        broker: \"127.0.0.1:41884\"\n        applicationID: \"0ce81243-64fb-455c-a484-9b26acb42f65\"\n        devEUI: \"0120560100000245\"\n        appKey: \"\"\n        region: \"CN470\"\n        dataRate: \"SF7BW125\"\n        topic: \"\"\n        payloadRoot: \"\"\n        devEuiKey: \"\"\n        username: \"\"\n        password: \"\"\n        visitors:\n        - propertyName: \"temperature\"\n          lora:\n            payloadKey: \"\"\n",
+      "created_at": 1789373999,
+      "status": "reporting"
+    },
+    {
+      "name": "server-temp",
+      "namespace": "default",
+      "model": "lora-temp-model",
+      "node": "nt001",
+      "protocol": "lora",
+      "collectCycle": 5000,
+      "cloudDevice": "",
+      "comm": {
+        "commType": "serial",
+        "slaveID": 1,
+        "serialPort": "/dev/ttyS0",
+        "baudRate": 9600,
+        "parity": "none",
+        "tcpIP": "192.168.1.10",
+        "tcpPort": 502,
+        "dataBits": 8,
+        "stopBits": 1
+      },
+      "opcua": {
+        "url": "opc.tcp://127.0.0.1:4840",
+        "userName": "",
+        "password": ""
+      },
+      "bluetooth": {
+        "macAddress": "AA:BB:CC:DD:EE:FF"
+      },
+      "lora": {
+        "broker": "127.0.0.1",
+        "port": 41884,
+        "applicationID": "0ce81243-64fb-455c-a484-9b26acb42f65",
+        "devEUI": "0120560100000264",
+        "appKey": "",
+        "region": "CN470",
+        "dataRate": "SF7BW125",
+        "topic": "",
+        "payloadRoot": "",
+        "devEuiKey": "",
+        "username": "",
+        "password": "",
+        "maxAge": 30,
+        "slaveId": 8,
+        "decode": {
+          "type": "",
+          "scale": 1
+        },
+        "downlink": {
+          "enabled": true,
+          "mode": "poll",
+          "fPort": 10,
+          "hex": "0803000000018493",
+          "timeout": 5
+        }
+      },
+      "cellular": {
+        "serialPort": "/dev/ttyUSB2",
+        "baudRate": 115200,
+        "apn": "cmnet",
+        "iface": "wwan0"
+      },
+      "properties": [
+        {
+          "name": "temperature",
+          "type": "int",
+          "accessMode": "r",
+          "scale": 0.1,
+          "unit": "℃",
+          "desc": "LoRaWAN DR206 透传 DTU 温度：值=寄存器×0.1；数据源=LoRa 网管 ChirpStack(nt001 一体机内), mapper 上行解码实时上报"
+        }
+      ],
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"server-temp\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\nspec:\n  deviceModelRef:\n    name: \"lora-temp-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"temperature\"\n    collectCycle: 5000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        broker: \"127.0.0.1:41884\"\n        applicationID: \"0ce81243-64fb-455c-a484-9b26acb42f65\"\n        devEUI: \"0120560100000264\"\n        appKey: \"\"\n        region: \"CN470\"\n        dataRate: \"SF7BW125\"\n        topic: \"\"\n        payloadRoot: \"\"\n        devEuiKey: \"\"\n        username: \"\"\n        password: \"\"\n        visitors:\n        - propertyName: \"temperature\"\n          lora:\n            payloadKey: \"\"\n",
+      "created_at": 1789378418,
+      "status": "reporting",
+      "enabled": true
+    },
+    {
+      "name": "zhileng-power",
+      "namespace": "default",
+      "model": "power-supply-24v-model",
+      "node": "nt001",
+      "protocol": "modbus",
+      "collectCycle": 2000,
+      "cloudDevice": "",
+      "comm": {
+        "commType": "serial",
+        "serialPort": "/dev/ttyRS485",
+        "baudRate": 9600,
+        "dataBits": 8,
+        "parity": "none",
+        "stopBits": 1,
+        "slaveID": 1,
+        "tcpIP": "192.168.1.10",
+        "tcpPort": 502
+      },
+      "opcua": {
+        "url": "opc.tcp://127.0.0.1:4840",
+        "userName": "",
+        "password": ""
+      },
+      "bluetooth": {
+        "macAddress": "AA:BB:CC:DD:EE:FF"
+      },
+      "lora": {
+        "broker": "127.0.0.1",
+        "port": 41884,
+        "applicationID": "1",
+        "devEUI": "",
+        "appKey": "",
+        "region": "CN470",
+        "dataRate": "SF7BW125",
+        "maxAge": 30,
+        "decode": {
+          "scale": 1
+        },
+        "downlink": {
+          "enabled": false,
+          "mode": "poll",
+          "fPort": 10,
+          "hex": "",
+          "timeout": 5
+        }
+      },
+      "cellular": {
+        "serialPort": "/dev/ttyUSB2",
+        "baudRate": 115200,
+        "apn": "cmnet",
+        "iface": "wwan0"
+      },
+      "properties": [
+        {
+          "name": "voltage",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 0,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "V",
+          "desc": "实际输出电压（输入寄存器0，分辨率0.01V，2400=24.00V）"
+        },
+        {
+          "name": "current",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 1,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "A",
+          "desc": "实际输出电流（输入寄存器1，分辨率0.01A，120=1.20A）"
+        },
+        {
+          "name": "power",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 3,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "W",
+          "desc": "实际输出功率（输入寄存器3，分辨率0.01W，1000=10.00W）"
+        },
+        {
+          "name": "pwm_duty",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 2,
+          "limit": 1,
+          "scale": "0.1",
+          "unit": "%",
+          "desc": "PWM占空比（输入寄存器2，分辨率0.1%）"
+        },
+        {
+          "name": "signal_source",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 5,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "控制信号源（1=通信控制 0=PWM）"
+        },
+        {
+          "name": "work_mode_actual",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 6,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "当前工作模式（0恒压 1恒流 2恒压恒流 3通讯选择）"
+        },
+        {
+          "name": "voltage_set",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 0,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "V",
+          "desc": "设定输出电压（保持寄存器0，0-2400 对应 0-24.00V；仅恒压/恒压恒流模式有效）",
+          "min": 0,
+          "max": 24
+        },
+        {
+          "name": "current_set",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 1,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "A",
+          "desc": "设定输出电流（保持寄存器1，0-500 对应 0-5.00A）",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "name": "volt_calib",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 2,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "回读电压校准系数（默认10000）",
+          "min": 0,
+          "max": 20000
+        },
+        {
+          "name": "curr_calib",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 3,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "回读电流校准系数（默认10000）",
+          "min": 0,
+          "max": 20000
+        },
+        {
+          "name": "power_on_voltage",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 4,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "V",
+          "desc": "上电自动输出电压（0-2400 对应 0-24.00V，掉电保持）",
+          "min": 0,
+          "max": 24
+        },
+        {
+          "name": "power_on_current",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 5,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "A",
+          "desc": "上电自动输出电流（0-500 对应 0-5.00A，掉电保持）",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "name": "work_mode",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 6,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "工作模式（仅通讯选择模式下有效：0恒压 1恒流 2恒压恒流）",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "name": "output_on",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "coil",
+          "register": 0,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "输出开关（1=打开电源输出 0=关闭；设完电压需置位才有输出）",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "calib_confirm",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "coil",
+          "register": 1,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "校准系数确认",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "power_on_auto",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "coil",
+          "register": 2,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "上电自动输出使能",
+          "min": 0,
+          "max": 1
+        }
+      ],
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"zhileng-power\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\nspec:\n  deviceModelRef:\n    name: \"power-supply-24v-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"voltage\"\n    collectCycle: 2000\n  - name: \"current\"\n    collectCycle: 2000\n  - name: \"power\"\n    collectCycle: 2000\n  - name: \"pwm_duty\"\n    collectCycle: 2000\n  - name: \"signal_source\"\n    collectCycle: 2000\n  - name: \"work_mode_actual\"\n    collectCycle: 2000\n  - name: \"voltage_set\"\n    collectCycle: 2000\n  - name: \"current_set\"\n    collectCycle: 2000\n  - name: \"volt_calib\"\n    collectCycle: 2000\n  - name: \"curr_calib\"\n    collectCycle: 2000\n  - name: \"power_on_voltage\"\n    collectCycle: 2000\n  - name: \"power_on_current\"\n    collectCycle: 2000\n  - name: \"work_mode\"\n    collectCycle: 2000\n  - name: \"output_on\"\n    collectCycle: 2000\n  - name: \"calib_confirm\"\n    collectCycle: 2000\n  - name: \"power_on_auto\"\n    collectCycle: 2000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        com:\n          commType: serial\n          serialPort: \"/dev/ttyRS485\"\n          baudRate: 9600\n          dataBits: 8\n          parity: \"none\"\n          stopBits: 1\n        slaveID: 1\n        visitors:\n        - propertyName: \"voltage\"\n          register: InputRegister\n          offset: 0\n          limit: 1\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"current\"\n          register: InputRegister\n          offset: 1\n          limit: 1\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"power\"\n          register: InputRegister\n          offset: 3\n          limit: 1\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"pwm_duty\"\n          register: InputRegister\n          offset: 2\n          limit: 1\n          scale: 0.1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"signal_source\"\n          register: InputRegister\n          offset: 5\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"work_mode_actual\"\n          register: InputRegister\n          offset: 6\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"voltage_set\"\n          register: HoldingRegister\n          offset: 0\n          limit: 1\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"current_set\"\n          register: HoldingRegister\n          offset: 1\n          limit: 1\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"volt_calib\"\n          register: HoldingRegister\n          offset: 2\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"curr_calib\"\n          register: HoldingRegister\n          offset: 3\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"power_on_voltage\"\n          register: HoldingRegister\n          offset: 4\n          limit: 1\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"power_on_current\"\n          register: HoldingRegister\n          offset: 5\n          limit: 1\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"work_mode\"\n          register: HoldingRegister\n          offset: 6\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"output_on\"\n          register: CoilRegister\n          offset: 0\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"calib_confirm\"\n          register: CoilRegister\n          offset: 1\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"power_on_auto\"\n          register: CoilRegister\n          offset: 2\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n",
+      "created_at": 1789709453,
+      "status": "reporting",
+      "enabled": true
+    },
+    {
+      "name": "shuibeng-power",
+      "namespace": "default",
+      "model": "power-supply-24v-model",
+      "node": "nt001",
+      "protocol": "modbus",
+      "collectCycle": 1000,
+      "cloudDevice": "",
+      "comm": {
+        "commType": "serial",
+        "slaveID": 4,
+        "serialPort": "/dev/ttyRS485",
         "baudRate": 9600,
         "parity": "none",
         "tcpIP": "192.168.1.10",
@@ -65,20 +846,204 @@
       },
       "properties": [
         {
-          "name": "weight",
+          "name": "voltage",
           "type": "int",
           "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 0,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "V",
+          "desc": "实际输出电压（输入寄存器0，分辨率0.01V，2400=24.00V）"
+        },
+        {
+          "name": "current",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 1,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "A",
+          "desc": "实际输出电流（输入寄存器1，分辨率0.01A，120=1.20A）"
+        },
+        {
+          "name": "power",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 3,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "W",
+          "desc": "实际输出功率（输入寄存器3，分辨率0.01W，1000=10.00W）"
+        },
+        {
+          "name": "pwm_duty",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 2,
+          "limit": 1,
+          "scale": "0.1",
+          "unit": "%",
+          "desc": "PWM占空比（输入寄存器2，分辨率0.1%）"
+        },
+        {
+          "name": "signal_source",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 5,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "控制信号源（1=通信控制 0=PWM）"
+        },
+        {
+          "name": "work_mode_actual",
+          "type": "int",
+          "accessMode": "r",
+          "registerType": "inputRegister",
+          "register": 6,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "当前工作模式（0恒压 1恒流 2恒压恒流 3通讯选择）"
+        },
+        {
+          "name": "voltage_set",
+          "type": "int",
+          "accessMode": "rw",
           "registerType": "holdingRegister",
           "register": 0,
-          "limit": 2,
-          "scale": 0.01,
-          "isRegisterSwap": true,
-          "unit": "kg",
-          "desc": "实时重量（32位有符号，低字在前）"
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "V",
+          "desc": "设定输出电压（保持寄存器0，0-2400 对应 0-24.00V；仅恒压/恒压恒流模式有效）",
+          "min": 0,
+          "max": 24
+        },
+        {
+          "name": "current_set",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 1,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "A",
+          "desc": "设定输出电流（保持寄存器1，0-500 对应 0-5.00A）",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "name": "volt_calib",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 2,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "回读电压校准系数（默认10000）",
+          "min": 0,
+          "max": 20000
+        },
+        {
+          "name": "curr_calib",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 3,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "回读电流校准系数（默认10000）",
+          "min": 0,
+          "max": 20000
+        },
+        {
+          "name": "power_on_voltage",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 4,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "V",
+          "desc": "上电自动输出电压（0-2400 对应 0-24.00V，掉电保持）",
+          "min": 0,
+          "max": 24
+        },
+        {
+          "name": "power_on_current",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 5,
+          "limit": 1,
+          "scale": "0.01",
+          "unit": "A",
+          "desc": "上电自动输出电流（0-500 对应 0-5.00A，掉电保持）",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "name": "work_mode",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "holdingRegister",
+          "register": 6,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "工作模式（仅通讯选择模式下有效：0恒压 1恒流 2恒压恒流）",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "name": "output_on",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "coil",
+          "register": 0,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "输出开关（1=打开电源输出 0=关闭；设完电压需置位才有输出）",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "calib_confirm",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "coil",
+          "register": 1,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "校准系数确认",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "power_on_auto",
+          "type": "int",
+          "accessMode": "rw",
+          "registerType": "coil",
+          "register": 2,
+          "limit": 1,
+          "scale": "1",
+          "unit": "",
+          "desc": "上电自动输出使能",
+          "min": 0,
+          "max": 1
         }
       ],
-      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"chengzhong\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\nspec:\n  deviceModelRef:\n    name: \"weighing-indicator-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"weight\"\n    collectCycle: 1000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        com:\n          commType: serial\n          serialPort: \"/dev/ttyUSB-weigh\"\n          baudRate: 9600\n          dataBits: 8\n          parity: \"none\"\n          stopBits: 1\n        slaveID: 1\n        visitors:\n        - propertyName: \"weight\"\n          register: HoldingRegister\n          offset: 0\n          limit: 2\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: true\n",
-      "created_at": 1788249061,
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"shuibeng-power\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\nspec:\n  deviceModelRef:\n    name: \"power-supply-24v-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"voltage\"\n    collectCycle: 1000\n  - name: \"current\"\n    collectCycle: 1000\n  - name: \"power\"\n    collectCycle: 1000\n  - name: \"pwm_duty\"\n    collectCycle: 1000\n  - name: \"signal_source\"\n    collectCycle: 1000\n  - name: \"work_mode_actual\"\n    collectCycle: 1000\n  - name: \"voltage_set\"\n    collectCycle: 1000\n  - name: \"current_set\"\n    collectCycle: 1000\n  - name: \"volt_calib\"\n    collectCycle: 1000\n  - name: \"curr_calib\"\n    collectCycle: 1000\n  - name: \"power_on_voltage\"\n    collectCycle: 1000\n  - name: \"power_on_current\"\n    collectCycle: 1000\n  - name: \"work_mode\"\n    collectCycle: 1000\n  - name: \"output_on\"\n    collectCycle: 1000\n  - name: \"calib_confirm\"\n    collectCycle: 1000\n  - name: \"power_on_auto\"\n    collectCycle: 1000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        com:\n          commType: serial\n          serialPort: \"/dev/ttyRS485\"\n          baudRate: 9600\n          dataBits: 8\n          parity: \"none\"\n          stopBits: 1\n        slaveID: 4\n        visitors:\n        - propertyName: \"voltage\"\n          register: InputRegister\n          offset: 0\n          limit: 1\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"current\"\n          register: InputRegister\n          offset: 1\n          limit: 1\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"power\"\n          register: InputRegister\n          offset: 3\n          limit: 1\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"pwm_duty\"\n          register: InputRegister\n          offset: 2\n          limit: 1\n          scale: 0.1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"signal_source\"\n          register: InputRegister\n          offset: 5\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"work_mode_actual\"\n          register: InputRegister\n          offset: 6\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"voltage_set\"\n          register: HoldingRegister\n          offset: 0\n          limit: 1\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"current_set\"\n          register: HoldingRegister\n          offset: 1\n          limit: 1\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"volt_calib\"\n          register: HoldingRegister\n          offset: 2\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"curr_calib\"\n          register: HoldingRegister\n          offset: 3\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"power_on_voltage\"\n          register: HoldingRegister\n          offset: 4\n          limit: 1\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"power_on_current\"\n          register: HoldingRegister\n          offset: 5\n          limit: 1\n          scale: 0.01\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"work_mode\"\n          register: HoldingRegister\n          offset: 6\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"output_on\"\n          register: CoilRegister\n          offset: 0\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"calib_confirm\"\n          register: CoilRegister\n          offset: 1\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n        - propertyName: \"power_on_auto\"\n          register: CoilRegister\n          offset: 2\n          limit: 1\n          scale: 1\n          isSwap: false\n          isRegisterSwap: false\n",
+      "created_at": 1789719407,
       "status": "reporting"
     }
   ],
@@ -96,6 +1061,6 @@
     "key": ""
   },
   "box_aliases": {
-    "nt001": "能碳一体机（实验机）"
+    "nt001": "能碳智管终端"
   }
 }

@@ -110,6 +110,34 @@ class JsonRepository(Generic[T]):
                 self._cache = data
 
 
+def read_json_file(path: str, default: Any = None) -> Any:
+    """读取 JSON 文件；文件缺失 / 内容损坏时返回 ``default``（不抛异常）。"""
+    try:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return default if data is None else data
+    except Exception:  # noqa: BLE001 —— 损坏文件按缺失处理，不阻断业务
+        pass
+    return default
+
+
+def write_json_atomic(path: str, data: Any, *, pretty: bool = True) -> Any:
+    """原子写 JSON（先写 ``.tmp`` 再 ``os.replace``，避免半截文件）。
+
+    与 JsonRepository 的「失败静默」不同，本函数**向上抛出** OSError，
+    供需要向用户提示「配置写入失败」的调用方使用。
+    """
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    text = json.dumps(data, ensure_ascii=False, indent=2) if pretty else json.dumps(data, ensure_ascii=False)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.replace(tmp, path)
+
+
 def copy_file_to_trash(src: str, trash_name: str) -> None:
     """把文件移动到系统临时回收目录（而非 os.remove）。
 

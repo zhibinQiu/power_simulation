@@ -22,6 +22,7 @@ systemd: nengtan-collector.service
 from __future__ import annotations
 
 import base64
+import http.client
 import json
 import logging
 import os
@@ -29,7 +30,7 @@ import random
 import sys
 import threading
 import time
-import urllib.request
+import urllib.parse
 from collections import deque
 from datetime import datetime
 from pathlib import Path
@@ -86,6 +87,20 @@ def _esc(s: str) -> str:
     return str(s).replace("'", "''")
 
 
+def _subtable_name(box: str, device: str, instance: str, prop: str) -> str:
+    """时序子表名：**保留原名、不做任何折叠**，并用反引号引用。
+
+    为什么不能用 .replace('-', '_')：KubeEdge 会把设备名里的下划线规范化成中划线
+    （flow_meter → flow-meter），折叠后两者落到同一张子表；而 TDengine 对已存在的
+    子表会**静默忽略** USING 的 TAGS 子句（不报错），新数据写进旧 tag，平台按新设备名
+    查历史永远为空——数据其实一直在写，是最难查的一类故障。
+    TDengine 允许引用标识符含中划线，故一律反引号包裹；去反引号/换行防注入。
+    """
+    def clean(v: str) -> str:
+        return str(v).replace("`", "").replace("\n", "").replace("\r", "")
+    return "`t_{}_{}_{}_{}`".format(clean(box), clean(device), clean(instance), clean(prop))
+
+
 def _ts_record(topic: str, payload: bytes) -> None:
     """解析 data/{box}/{device}/{instance}/{property} 读数并入时序缓冲。
 
@@ -128,6 +143,49 @@ def _ts_record(topic: str, payload: bytes) -> None:
         _TS_BUF.append((box, device, instance, prop, value, ts_ms))
 
 
+# REST 连接复用：一轮 flush 有多条子表，逐条新建 TCP 连接会退化成「每轮 N 次握手」。
+# TDengine REST 无状态、支持 keep-alive，故维持一条长连接，出错即丢弃重建。
+_TSDB_HOST = urllib.parse.urlparse(TSDB_URL).hostname or "127.0.0.1"
+_TSDB_PORT = urllib.parse.urlparse(TSDB_URL).port or 6041
+_TSDB_AUTH = base64.b64encode(f"{TSDB_USER}:{TSDB_PASS}".encode()).decode()
+_tsdb_conn: "http.client.HTTPConnection | None" = None
+
+
+def _tsdb_post(sql: str) -> dict:
+    """POST 一条 SQL 到 TDengine REST，复用长连接（失败一次则重建连接重试）。
+
+    仅由 _ts_flush_worker 单线程调用，无需加锁。
+    """
+    global _tsdb_conn
+    body = sql.encode("utf-8")
+    headers = {
+        "Authorization": f"Basic {_TSDB_AUTH}",
+        "Content-Type": "text/plain",
+        "Content-Length": str(len(body)),
+        "Connection": "keep-alive",
+    }
+    last_err = None
+    for _ in range(2):
+        conn = _tsdb_conn
+        try:
+            if conn is None:
+                conn = http.client.HTTPConnection(_TSDB_HOST, _TSDB_PORT, timeout=5)
+                _tsdb_conn = conn
+            conn.request("POST", f"/rest/sql/{TSDB_DB}", body=body, headers=headers)
+            resp = conn.getresponse()
+            raw = resp.read()
+            return json.loads(raw.decode("utf-8", errors="replace"))
+        except Exception as e:  # noqa: BLE001 连接可能被服务端/超时关掉，重建重试一次
+            last_err = e
+            _tsdb_conn = None
+            try:
+                if conn is not None:
+                    conn.close()
+            except Exception:  # noqa: BLE001
+                pass
+    raise last_err  # type: ignore[misc]
+
+
 def _ts_flush() -> None:
     """把缓冲批量写入 TDengine（REST /rest/sql）。失败仅告警，原始数据有落盘兜底。"""
     if not TSDB_ENABLED:
@@ -142,18 +200,12 @@ def _ts_flush() -> None:
         groups.setdefault((box, device, instance, prop), []).append(
             f"({ts_ms},{value!r})")
     for (box, device, instance, prop), vals in groups.items():
-        subtable = f"t_{box}_{device}_{instance}_{prop}".replace("-", "_")
+        subtable = _subtable_name(box, device, instance, prop)
         sql = (f"INSERT INTO {subtable} USING {TSDB_STABLE} "
                f"TAGS('{box}','{device}','{instance}','{prop}') VALUES "
                + " ".join(vals))
-        auth = base64.b64encode(f"{TSDB_USER}:{TSDB_PASS}".encode()).decode()
-        req = urllib.request.Request(
-            f"{TSDB_URL}/rest/sql/{TSDB_DB}", data=sql.encode("utf-8"), method="POST",
-            headers={"Authorization": f"Basic {auth}", "Content-Type": "text/plain"},
-        )
         try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                data = json.loads(resp.read().decode("utf-8", errors="replace"))
+            data = _tsdb_post(sql)
             if data.get("code", 0) != 0:
                 log.warning("TDengine 写入失败: %s (%s)", data.get("desc"), sql[:160])
             else:

@@ -1,12 +1,9 @@
-"""data_sources 包：外部数据源（注册到数据中间件，平台订阅中间件取数）。
+"""data_sources 包：外部数据源（注册到数据中间件，转换后直发云端 Broker）。
 
 架构（用户诉求：外部数据接入 = 注册到中间件服务，由中间件转换后进入平台订阅通道）：
-- 平台不直接对接外部协议、不做协议转换；外部数据（含模拟数据）统一由独立
-  「数据中间件」（platform/cloud-deploy/middleware/）采集并转换为标准 MQTT，
-  发布到**云端 Broker**（external 形态），与一体机数据同 Broker 按前缀区分。
-- 平台自身与中间件**都不产生模拟数据**：模拟由独立服务
-  （platform/cloud-deploy/sim-source/）生成，经中间件 `mqtt` 适配器接入，
-  与真实外部源完全同构（停掉该服务即无模拟数据）。
+- 平台不直接对接外部协议、不做协议转换；外部数据统一由独立「数据中间件」
+  （platform/cloud-deploy/middleware/）采集并转换为标准 MQTT，直发**云端 Broker**，
+  与一体机数据同 Broker 按前缀区分——平台经唯一入口（云端 Broker 订阅）取数。
 - 平台 external 条目 = 一条「已注册到中间件的数据源」：
     config.box     发布前缀（平台按此前缀识别归属、启停过滤；中间件 adapter 同前缀）
     config.adapter 中间件适配器类型（当前：mqtt）
@@ -20,13 +17,13 @@
 """
 from __future__ import annotations
 
-import json
 import re
 import time
 from typing import Any, Dict, Optional
 
 from .. import middleware_client
 from ..mqtt_source import _shared as mqtt_shared
+from .config import ADAPTERS
 
 # box 前缀约定（与 mqtt_source 识别/盒子分组共用）：ext- 开头便于从盒子卡片区分
 _PREFIX_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,31}$")
@@ -35,14 +32,6 @@ RESERVED = ("box", "platform", "local", "data", "cloud", "state", "cmd", "$sys")
 
 # 外部源「活跃」判定窗口：最近收到消息距今超过该秒数视为静默（中间件可能未运行）
 ACTIVE_WINDOW = 60.0
-
-# 支持的适配器类型（前端表单下拉与后端校验共用，与中间件注册表保持一致）
-# 模拟数据不是适配器类型：由独立服务生成后经 mqtt 接入
-ADAPTERS = ("mqtt",)
-
-
-def prefix_label(box: str) -> str:
-    return f"ext-{box}" if box and not str(box).startswith("ext-") else str(box)
 
 
 def validate_external_config(cfg: Dict[str, Any], source_id: str = "",
@@ -57,7 +46,7 @@ def validate_external_config(cfg: Dict[str, Any], source_id: str = "",
         raise ValueError(f"前缀「{box}」为平台保留名，请用 ext- 开头的前缀（如 ext-weigh）")
     if not _PREFIX_RE.match(box):
         raise ValueError("前缀仅允许小写字母/数字/连字符（如 ext-weigh）")
-    adapter = str(cfg.get("adapter") or cfg.get("type") or "mqtt").strip().lower()
+    adapter = str(cfg.get("adapter") or "mqtt").strip().lower()
     if adapter not in ADAPTERS:
         raise ValueError(f"不支持的接入类型「{adapter}」（可用：{'、'.join(ADAPTERS)}）")
     params = cfg.get("params")
@@ -84,12 +73,10 @@ def normalize_external_config(cfg: Dict[str, Any], source_id: str,
         box = str(source_id).replace("_", "-")
     params = cfg.get("params")
     if not isinstance(params, dict):
-        # 兼容：早期调用方把参数平铺在 config 顶层（broker/topics/devices/interval…）
-        params = {k: v for k, v in cfg.items()
-                  if k not in ("box", "adapter", "type", "target", "desc", "params")}
+        params = {}
     base = {
         "box": box,
-        "adapter": str(cfg.get("adapter") or cfg.get("type") or "mqtt").strip().lower(),
+        "adapter": str(cfg.get("adapter") or "mqtt").strip().lower(),
         "params": params,
         "desc": str(cfg.get("desc") or "").strip()[:200],
     }
@@ -177,7 +164,7 @@ def status_of(source_id: str, mw_map: Optional[Dict[str, Any]] = None) -> Dict[s
     逐条 HTTP 请求）。
     """
     from . import config as _config  # 延迟避免循环
-    src = _config.find_source(source_id, force=False)
+    src = _config.entry(source_id)          # 只读查找（零拷贝）
     if src is None:
         return {"running": False, "connected": False, "received": 0,
                 "last_error": "未登记", "active": False,
@@ -194,27 +181,3 @@ def status_of(source_id: str, mw_map: Optional[Dict[str, Any]] = None) -> Dict[s
     st = _status_snapshot(prefix, enabled, mw)
     st["box"] = prefix
     return st
-
-
-def mw_sources_map() -> Dict[str, Any]:
-    """批量拉取中间件数据源（id → 条目）；中间件不可达返回空 dict。"""
-    try:
-        return {str(s.get("id")): s for s in middleware_client.list_sources()}
-    except Exception:  # noqa: BLE001
-        return {}
-
-
-# ---------------------------------------------------------------------------
-# 生命周期（执行方在中间件，平台侧仅转发；保留空实现以兼容旧调用）
-# ---------------------------------------------------------------------------
-
-def start_source(source: Dict[str, Any]) -> None:
-    """兼容占位：采集执行在中间件（注册/启用即启动）。"""
-
-
-def stop_source(source_id: str) -> None:
-    """兼容占位：停用即停止（由中间件执行）。"""
-
-
-def stop_all() -> None:
-    """兼容占位。"""

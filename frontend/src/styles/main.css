@@ -260,6 +260,16 @@ body.panel-dragging .app { transition: none; }
 .view-window .vw-pane.flow-pane {
   inset: 0; border: none; border-radius: 0; box-shadow: none; background: var(--bg);
 }
+/* 数据源管理 / AI群控：内容区与外侧（视图标签条 / 左右侧边栏）之间不留边距 ——
+   窗格零留白铺满舞台，去掉边框·圆角·投影（不再有悬浮窗口感），
+   并清掉视图首层容器的内边距，保证内容真正撑满到边 */
+.view-window .vw-pane.flush-pane {
+  inset: 0; border: none; border-radius: 0; box-shadow: none;
+}
+.view-window .vw-pane.flush-pane .cbx-page,
+.view-window .vw-pane.flush-pane .grp-view { padding: 0; }
+.view-window .vw-pane.flush-pane .agc-aside,
+.view-window .vw-pane.flush-pane .agc-main { padding-right: 0; }
 
 /* 全屏模式（3D 数字孪生 / HMI人机交互屏）：隐藏全部边栏（菜单栏/活动栏/侧栏/工具栏/检视器/命令行/状态栏/视图名标识栏），
    仅保留中间内容区占满全屏；视图切换与退出全屏入口由内容区自身浮动提供 */
@@ -1300,6 +1310,10 @@ input[type="range"] { accent-color: var(--accent-d); cursor: pointer; }
 
 /* 高频 3D 视图区域：独立渲染层，避免布局抖动影响周边（性能） */
 .stage { contain: layout paint; }
+/* 3D canvas 的显示尺寸由 CSS 决定（覆盖 three.js setSize 写下的内联 px 尺寸）。
+   好处：面板开合动画期间容器宽度每帧变化，画布只是被 CSS 拉伸、不必每帧重建 WebGL 绘制
+   缓冲（每帧 setSize 会让开合侧栏明显掉帧），动画结束后补一次精确 resize 即恢复清晰。 */
+.scene-host > canvas { display: block; width: 100% !important; height: 100% !important; }
 /* 按钮统一过渡（减少无效动画，只过渡颜色类属性，提升响应速度） */
 button, .rbtn, .tbtn, .mi, .act-btn, .tiny-btn { transition-timing-function: ease; will-change: auto; }
 

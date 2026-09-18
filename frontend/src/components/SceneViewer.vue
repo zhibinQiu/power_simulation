@@ -141,7 +141,23 @@ onMounted(() => {
 })
 
 let resizeRaf = null
+let resizeTimer = null
+// 面板开合动画期间（body.panel-animating，见 App.vue）：中间舞台宽度每帧变化，
+// 若每帧都 scene.resize() → renderer.setSize 每帧重建一次 WebGL 绘制缓冲（真实硬件上
+// 一次就是几毫秒 + 驱动同步），开合侧栏必然掉帧。
+// 画面不会错位：three.js 的 setSize 已改为不写内联样式，canvas 由 CSS 100% 拉伸填充
+// （见 main.css 的 .scene-host > canvas），动画期间只是把上一帧画面按新宽度拉伸，
+// 动画结束后补一次精确 resize 即恢复清晰。
+const PANEL_ANIM_MS = 300
 function onResize() {
+  if (document.body.classList.contains('panel-animating')) {
+    clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(() => {
+      resizeTimer = null
+      scene && scene.resize()
+    }, PANEL_ANIM_MS)
+    return
+  }
   if (resizeRaf) return
   resizeRaf = requestAnimationFrame(() => {
     scene && scene.resize()
@@ -239,6 +255,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVis)
   document.removeEventListener('click', onBrightDocClick)
   window.removeEventListener('resize', onResize)
+  if (resizeTimer) { clearTimeout(resizeTimer); resizeTimer = null }
   if (ro) { ro.disconnect(); ro = null }
   if (scene) scene.dispose()
 })

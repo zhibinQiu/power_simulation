@@ -1012,7 +1012,7 @@ curl -fsSL <同上> | bash -s -- -i 36.151.146.71 -n my-box-01 -t <token>
 curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/platform/bs-deploy/update.sh | bash -s -- server -d /opt/carbon-platform
 \`\`\`
 
-- 更新必须走 \`update.sh\`（不要直接 \`git reset --hard\` 拉源码）：源码仓库**跟踪**了 \`backend/config/\` 下的 \`box_config.json\` / \`box_devices.json\`（设备 CRD）/ \`links.json\`（设备关联）/ \`mqtt.yaml\`（云端 MQTT）与 \`backend/data/\`（碳合规、历史报告），直接 \`git reset --hard\` 会把这些**现场数据覆盖丢失**；update.sh 更新前自动备份到 \`<安装目录>/.update-backup-<时间戳>\`、更新后自动恢复，全程不丢数据。
+- 更新必须走 \`update.sh\`（不要直接 \`git reset --hard\` 拉源码）：源码仓库**跟踪**了 \`backend/config/\` 下的 \`box_config.json\` / \`box_devices.json\`（设备 CRD）/ \`links.json\`（设备关联）与 \`backend/data/\`（碳合规、历史报告），直接 \`git reset --hard\` 会把这些**现场数据覆盖丢失**；update.sh 更新前自动备份到 \`<安装目录>/.update-backup-<时间戳>\`、更新后自动恢复，全程不丢数据。
 - \`platform_config.json\` / \`strategies.json\` / \`.env\` / \`github_config.json\` 已被 gitignore，常规更新不受影响（备份逻辑同样覆盖，双保险）。
 - \`deploy.sh\` 检测到已部署实例时会导向 \`update.sh\`，不会自行覆盖。
 - 盒子侧更新：重新执行 \`platform/box-deploy/box.sh\` 即可（幂等——edgecore 运行中跳过 join、\`/opt/weight-bridge/config.json\` 现场配置保留，仅更新 box-deploy 程序）。

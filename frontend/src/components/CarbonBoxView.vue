@@ -1,5 +1,5 @@
 <template>
-  <!-- ============ 能碳一体机管理视图（云端 K3s/KubeEdge 管理、设备 CRUD、盒子接入） ============ -->
+  <!-- ============ 数据源管理视图（能碳一体机 + 外部数据源统一接入；云端 K3s/KubeEdge 管理、设备 CRUD、盒子接入） ============ -->
   <div class="cbx-view">
     <!-- ============ VSCode 风格工作台 ============ -->
     <!-- 视图名标识栏（标题 + 云端状态）已上移到 App.vue 的 Ribbon 工具栏之上（与 TopBar 风格统一），此处仅承载工作区主体 -->
@@ -70,7 +70,12 @@
           <section class="cbx-page">
         <!-- 0 运行状态总览：面向非技术人员的“一眼式”健康摘要；下方所有专业区块功能均保留 -->
         <section class="cbx-hero">
-          <div class="cbx-hero-main">
+          <div class="cbx-sec-head">
+            <button class="cbx-caret" @click="toggleSec('overview')" :title="secFold.overview ? t('收起') : t('展开')">{{ secFold.overview ? '▾' : '▸' }}</button>
+            <b class="cbx-sec-toggle" @click="toggleSec('overview')">{{ t('运行状态总览') }}</b>
+            <span class="cbx-sec-sub">{{ t('一眼式健康摘要：全绿即一切正常') }}</span>
+          </div>
+          <div v-if="secFold.overview" class="cbx-hero-main">
             <div class="cbx-hero-verdict" :class="'tone-' + hero.tone">
               <span class="cbx-hero-ic">{{ hero.icon }}</span>
               <div class="cbx-hero-tt">
@@ -96,7 +101,7 @@
             </div>
           </div>
           <!-- 使用指引：首次进入自动展开，点“知道了”后记住不再打扰 -->
-          <div v-if="guideOpen" class="cbx-guide">
+          <div v-if="secFold.overview && guideOpen" class="cbx-guide">
             <div class="cbx-guide-title">
               <b>{{ t('快速使用指引') }}</b>
               <span class="cbx-guide-sub">{{ t('面向非技术人员的快速使用说明') }}</span>
@@ -108,7 +113,7 @@
               <li>{{ t('日常只需看顶部「运行状态」：全部为绿色说明一切正常，无需任何操作。') }}</li>
               <li>{{ t('查看某台设备的最新读数：点击左侧「设备导航」或下方「采集设备」卡片中的设备名，即可打开实时曲线。') }}</li>
               <li>{{ t('添加一台新设备：点击「＋ 设备」按提示填写即可；接入新盒子：点击「盒子接入」。') }}</li>
-              <li>{{ t('下方「证书与密钥到期 / 实时日志 / 发测试消息」等区块仅供专业维护人员排查问题，日常可忽略。') }}</li>
+              <li>{{ t('「证书与密钥 / 命令执行」等区块仅供专业维护排查，日常可忽略。') }}</li>
             </ol>
             <button class="cbx-op cbx-xs" style="margin-top:8px" @click="closeGuide">{{ t('知道了，不再显示') }}</button>
           </div>
@@ -128,7 +133,8 @@
              前缀区分，共用同一条摄取管道（平台与中间件自身都不产生模拟数据） -->
         <section id="cbx-sec-sources" class="cbx-sec cbx-sec-sources">
           <div class="cbx-sec-head">
-            <b>🔌 {{ t('数据源接入') }}</b>
+            <button class="cbx-caret" @click="toggleSec('sources')" :title="secFold.sources ? t('收起') : t('展开')">{{ secFold.sources ? '▾' : '▸' }}</button>
+            <b class="cbx-sec-toggle" @click="toggleSec('sources')">🔌 {{ t('数据源接入') }}</b>
             <span class="cbx-sec-sub">{{ t('能碳一体机（云端 Broker 订阅）与外部数据源（注册到数据中间件，含独立模拟源服务）统一在此接入；平台按 box 前缀自动区分一体机与外部源') }}</span>
             <span class="cbx-sec-spacer"></span>
             <span class="ds-mwbadge" :class="mwOnline ? 'ok' : (mwChecked ? 'err' : 'unk')"
@@ -139,8 +145,11 @@
                     :title="t('中间件服务连接地址 / Token / 数据输出形态')">{{ t('中间件配置') }}</button>
             <button class="cbx-op cbx-xs" :disabled="mwSyncing" @click="syncMw"
                     :title="t('本地已登记但中间件缺失的数据源补注册（中间件重建后恢复）')">{{ mwSyncing ? t('对账中…') : '⇄ ' + t('对账同步') }}</button>
+            <button class="cbx-op cbx-xs" :class="{ primary: signalsOpen }" @click="toggleSignals"
+                    :title="t('按数据源列出当前上报的设备及其全部数值，供流程编排绑定实测值')">⌁ {{ t('信号目录') }}</button>
             <button class="cbx-op primary cbx-xs" @click="openAddForm()">＋ {{ t('注册外部数据源') }}</button>
           </div>
+          <div v-if="secFold.sources">
 
           <!-- 中间件连接配置（抽屉式） -->
           <div v-if="mwPanelOpen" class="ds-mwpanel">
@@ -150,18 +159,10 @@
                      :placeholder="t('http://127.0.0.1:PORT，外部数据采集与发布服务')" />
               <label>{{ t('Token') }}</label>
               <input v-model="mwForm.token" class="cbx-input" style="width:150px"
-                     :placeholder="t('认证 Token（可空）')" />
+                     :placeholder="mwTokenSet ? t('已设置（留空保持不变）') : t('认证 Token（可空）')" />
             </div>
             <div class="cbx-form-row">
-              <label class="ds-switch" :title="mwForm.subscribe ? t('平台单独订阅中间件数据端口（local 形态）') : t('不勾选 = external 形态：转换数据直发云端 Broker，平台经云端端点订阅')">
-                <input type="checkbox" v-model="mwForm.subscribe" />
-                <i></i><span>{{ mwForm.subscribe ? t('订阅中间件端口') : t('直发云端 Broker') }}</span>
-              </label>
-              <label>{{ t('端口') }}</label>
-              <input v-model.number="mwForm.broker_port" type="number" class="cbx-input" style="width:150px"
-                     :disabled="!mwForm.subscribe"
-                     :placeholder="mwForm.subscribe ? t('平台订阅中间件的 MQTT 端口（>40000）') : t('数据输出目标端口')" />
-              <span v-if="!mwForm.subscribe" class="cbx-sec-sub">{{ t('external 形态：数据直发云端 Broker(41883)，与一体机数据同 Broker 按前缀区分') }}</span>
+              <span class="cbx-sec-sub">{{ t('中间件只有一种输出形态：采集后转换为标准 MQTT 直发云端 Broker（41883），与一体机数据同 Broker 按前缀区分；平台唯一订阅入口即云端 Broker，无需配置中间件端口') }}</span>
             </div>
             <div class="cbx-form-row">
               <button class="cbx-op" :disabled="mwTestBusy" @click="testMw(false)">{{ mwTestBusy ? t('测试中…') : t('测试连通') }}</button>
@@ -173,7 +174,7 @@
           <!-- 卡片网格：能碳一体机（默认来源）+ 各外部数据源 -->
           <div class="ds-grid">
             <!-- 能碳一体机：云端 Broker 订阅通道（平台无独立运行线程，enabled 控制是否采纳盒子数据） -->
-            <div class="ds-card" :class="{ off: !boxSrc.enabled }">
+            <div v-if="boxEntry" class="ds-card" :class="{ off: !boxSrc.enabled }">
               <div class="ds-card-hd">
                 <b>{{ boxSrc.name }}</b>
                 <span class="ds-tag builtin">内置</span>
@@ -213,7 +214,18 @@
                         :title="t('配置云端 Broker 地址/账号，保存后自动热更新重连')">⚙ {{ t('云端配置') }}</button>
                 <button class="cbx-op cbx-xs" @click="scrollToSec('box')"
                         :title="t('跳转到盒子列表')">{{ t('盒子列表') }}</button>
+                <span class="cbx-sec-spacer"></span>
+                <button class="cbx-op cbx-xs danger" @click="removeSource(boxSrc)"
+                        :title="t('删除后平台立即停止采纳盒子上报数据，可随时恢复')">🗑 {{ t('删除') }}</button>
               </div>
+            </div>
+
+            <!-- 内置源被删除后的恢复入口（内置源与外部源统一管理：可删、可恢复） -->
+            <div v-else class="ds-card ds-empty" @click="restoreBox">
+              <div class="ds-empty-ic">☁</div>
+              <b>{{ t('能碳一体机（内置数据源）已删除') }}</b>
+              <p>{{ t('删除后平台不再采纳盒子上报数据（重启也不会自动补建）。点击此处恢复该内置数据源并重新启用。') }}</p>
+              <button class="cbx-op cbx-xs">＋ {{ t('恢复内置数据源') }}</button>
             </div>
 
             <!-- 外部数据源（含独立模拟源）：注册到中间件，转换后经平台订阅通道按前缀识别 -->
@@ -261,6 +273,29 @@
               <b>{{ t('尚无外部数据源') }}</b>
               <p>{{ t('外部 MQTT / 数据中台 / 模拟数据源（独立服务 sim-source）等先接入能碳一体机，由一体机上行到云端 ext/#，再经云端数据中间件转换为 data/ext-* 进入平台订阅通道。点击此处注册第一条（外部 MQTT 类型）。') }}</p>
               <button class="cbx-op cbx-xs">＋ {{ t('注册外部数据源') }}</button>
+            </div>
+          </div>
+
+          <!-- 可绑定信号目录：按数据源分组列出当前上报的设备及其全部数值（流程编排绑定实测值） -->
+          <div v-if="signalsOpen" class="ds-signals">
+            <div class="cbx-form-row">
+              <span class="cbx-sec-sub">{{ t('按数据源列出当前上报的设备及其全部数值；每条数值给出稳定 key（box/device/field），流程编排按 key 绑定实测值') }}</span>
+              <span class="cbx-sec-spacer"></span>
+              <button class="cbx-op cbx-xs" :disabled="signalsLoading" @click="loadSignals">{{ signalsLoading ? t('刷新中…') : '↻ ' + t('刷新') }}</button>
+            </div>
+            <div v-if="!signalsResp.sources.length" class="cbx-sec-sub">{{ t('暂无可绑定信号：数据源均未上报数据') }}</div>
+            <div v-for="g in signalsResp.sources" :key="g.id" class="ds-sig-group">
+              <div class="ds-sig-hd">
+                <b>{{ g.name }}</b>
+                <span class="ds-tag">{{ g.type === 'box' ? t('内置') : t('外部') }}</span>
+                <span class="cbx-sec-sub">{{ (g.devices || []).length }} {{ t('台设备') }}</span>
+              </div>
+              <div v-for="d in (g.devices || [])" :key="d.id" class="ds-sig-dev">
+                <span class="ds-sig-name mono">{{ d.device }}</span>
+                <span v-for="v in (d.values || [])" :key="v.key" class="ds-sig-val mono" :class="{ bad: v.invalid }"
+                      :title="v.key">{{ v.field }}=<b>{{ v.value }}</b></span>
+              </div>
+              <div v-if="!(g.devices || []).length" class="cbx-sec-sub">{{ t('该数据源暂无上报数据') }}</div>
             </div>
           </div>
 
@@ -317,18 +352,21 @@
               <button class="cbx-op" @click="closeForm()">{{ t('取消') }}</button>
             </div>
           </div>
+          </div>
         </section>
 
         <!-- ② 通信拓扑图：以「设备」为单位（平台服务器 / 云端服务器 / 能碳一体机 / 现场设备 / 外部数据系统），
              服务运行在设备内部，连线只表示设备之间的通道 -->
         <section class="cbx-sec">
           <div class="cbx-sec-head">
-            <b>{{ t('系统连接图') }}</b>
+            <button class="cbx-caret" @click="toggleSec('topo')" :title="secFold.topo ? t('收起') : t('展开')">{{ secFold.topo ? '▾' : '▸' }}</button>
+            <b class="cbx-sec-toggle" @click="toggleSec('topo')">{{ t('系统连接图') }}</b>
             <span class="cbx-sec-sub">{{ t('按设备划分：每张卡片是一台设备（服务器 / 一体机 / 传感器 / 外部系统），卡内列出该设备上运行的服务；连线表示设备之间的数据通道') }}</span>
             <span class="cbx-sec-hint">{{ t('拖动设备卡片可自定义布局，连线自动跟随') }}</span>
             <span class="cbx-sec-spacer"></span>
             <button class="cbx-op cbx-xs" @click="autoLayoutTopo()" :title="t('恢复自动布局，清除所有模块的手动拖拽位置')">{{ t('自动布局') }}</button>
           </div>
+          <div v-if="secFold.topo">
           <!-- 链路说明：能碳一体机是现场唯一接入点（下接传感器/仪表、后接外部数据系统），
                一体机把收到的数据统一上报云端服务器；外部数据在云端经中间件（云端服务器内部服务）转换后交给平台 -->
           <div class="cbx-topo-legend">
@@ -368,7 +406,7 @@
                     </div>
                   </div>
                   <div class="cbx-topo-mod-ops">
-                    <button class="cbx-op cbx-xs" @click="refreshAll()" :title="t('刷新全部数据')">⟳ {{ t('刷新') }}</button>
+                    <button class="cbx-op cbx-xs" @click="refreshAll(true)" :title="t('刷新全部数据')">⟳ {{ t('刷新') }}</button>
                   </div>
                 </div>
               </div>
@@ -570,14 +608,16 @@
               </defs>
             </svg>
           </div>
+          </div>
         </section>
         <!-- ② 资源列表：盒子 / 模型 / 设备（三列并排总览，点击行可快速跳转编辑/实时） -->
         <section class="cbx-sec">
           <div class="cbx-sec-head">
-            <b>{{ t('资源列表') }}</b>
+            <button class="cbx-caret" @click="toggleSec('reslist')" :title="secFold.reslist ? t('收起') : t('展开')">{{ secFold.reslist ? '▾' : '▸' }}</button>
+            <b class="cbx-sec-toggle" @click="toggleSec('reslist')">{{ t('资源列表') }}</b>
             <span class="cbx-sec-hint">{{ topoBoxes.length }} {{ t('盒') }} · {{ mergedModels.length }} {{ t('模型') }} · {{ mergedDevices.length }} {{ t('设备') }}</span>
           </div>
-          <div class="cbx-reslist">
+          <div v-if="secFold.reslist" class="cbx-reslist">
             <!-- 盒子列表 -->
             <div id="cbx-res-box" class="cbx-rescol">
               <div class="cbx-rescol-head">{{ t('盒子列表') }}<span class="cbx-rescol-n">{{ topoBoxes.length }}</span></div>
@@ -630,11 +670,12 @@
         <!-- ③ 证书与 Token 有效期（独立区块：云端 agent 实时采集云端 CA/服务证书与共享 token） -->
         <section class="cbx-sec" v-if="(overview.certs || []).length || overview.token">
           <div class="cbx-sec-head">
-            <b>{{ t('证书与密钥到期提醒') }}</b>
+            <button class="cbx-caret" @click="toggleSec('certs')" :title="secFold.certs ? t('收起') : t('展开')">{{ secFold.certs ? '▾' : '▸' }}</button>
+            <b class="cbx-sec-toggle" @click="toggleSec('certs')">{{ t('证书与密钥到期提醒') }}</b>
             <span class="cbx-sec-sub">{{ t('仅专业维护人员查看') }}</span>
             <span class="cbx-sec-hint">{{ t('剩余不足 30 天标红提醒') }}</span>
           </div>
-          <div class="cbx-certlist">
+          <div v-if="secFold.certs" class="cbx-certlist">
             <div v-for="c in overview.certs || []" :key="c.cn" class="cbx-certrow">
               <code>{{ c.cn }}</code>
               <span class="cbx-cert-exp">{{ c.expires }}</span>
@@ -647,13 +688,15 @@
             </div>
           </div>
         </section>
-        <!-- ③ 实时消息流（云端 Broker → 本平台） -->
+
+        <!-- ④-2 实时消息流（云端 Broker → 本平台；默认折叠，排查链路时再展开） -->
         <section class="cbx-sec">
           <div class="cbx-sec-head">
-            <b>{{ t('实时消息流') }}</b>
+            <button class="cbx-caret" @click="toggleSec('msglog')" :title="secFold.msglog ? t('收起') : t('展开')">{{ secFold.msglog ? '▾' : '▸' }}</button>
+            <b class="cbx-sec-toggle" @click="toggleSec('msglog')">{{ t('实时消息流') }}</b>
             <span class="cbx-sec-sub">{{ t('最近') }} {{ messages.length }} {{ t('条') }}</span>
           </div>
-          <div ref="msgLogRef" class="cbx-msglog">
+          <div v-if="secFold.msglog" ref="msgLogRef" class="cbx-msglog">
             <div v-for="(m, i) in messages" :key="i" class="cbx-msgrow">
               <span class="cbx-msgtime">{{ fmtTime(m.t) }}</span>
               <code class="cbx-msg-topic">{{ m.topic }}</code>
@@ -663,39 +706,138 @@
           </div>
         </section>
 
-        <!-- ④-1 云端实时日志（agent MQTT cloud/logs 推送 → 平台 WS /api/ws/cloud 实时转发） -->
-        <section class="cbx-sec">
+        <!-- ④ 命令执行：向一体机下发设备读/写/LoRaWAN 下行；原「发送指令」保留为「原始消息」子模式 -->
+        <section id="cbx-sec-cmd" class="cbx-sec">
           <div class="cbx-sec-head">
-            <b>{{ t('云端实时日志') }}</b>
-            <span class="cbx-sec-sub" :class="{ warn: cloudWsState !== 'open' }">{{ cloudWsState === 'open' ? t('WebSocket 实时推送中') : t('推送未连接（轮询兜底）') }}</span>
-            <span v-if="cloudLogs.cloudcore" class="cbx-sec-sub">
-              {{ cloudLogs.cloudcore.name }} · {{ cloudLogs.cloudcore.ready ? t('就绪') : t('未就绪') }} · {{ cloudLogs.cloudcore.phase }} · {{ t('重启') }} {{ cloudLogs.cloudcore.restarts }} {{ t('次') }} · {{ t('最近') }} {{ (cloudLogs.lines || []).length }} {{ t('行') }}
-            </span>
-            <span v-else-if="cloudLogs.error" class="cbx-sec-sub warn">{{ cloudLogs.error }}</span>
-            <span v-else class="cbx-sec-sub">{{ t('采集器启动中…') }}</span>
+            <button class="cbx-caret" @click="toggleSec('cmd')" :title="secFold.cmd ? t('收起') : t('展开')">{{ secFold.cmd ? '▾' : '▸' }}</button>
+            <b class="cbx-sec-toggle" @click="toggleSec('cmd')">{{ t('命令执行') }}</b>
+            <span class="cbx-sec-sub"
+                  :title="t('仅供专业维护：向一体机下发读/写寄存器或 LoRaWAN 下行（如新接入传感器改从站地址/量程标定），执行结果等盒子回报')"
+            >{{ t('专业维护：下发读/写寄存器或 LoRaWAN 下行，结果等盒子回报') }}</span>
             <span class="cbx-sec-spacer"></span>
-            <button class="cbx-op cbx-xs" :disabled="!!restartingKey" @click="restartCloudcore"
-                    :title="agentStatusOk ? t('重启云端 cloudcore 工作负载（kubectl rollout restart）') : t('需先配置并连通云端 Agent')">
-              {{ restartingKey === 'deployment:cloudcore' ? t('重启中…') : t('重启 CloudCore') }}
-            </button>
+            <span class="cbx-tabs">
+              <button v-for="m in cmdModes" :key="m.k" class="cbx-tab" :class="{ active: cmdMode === m.k }" @click="switchCmdMode(m.k)">{{ t(m.l) }}</button>
+            </span>
           </div>
-          <div ref="cloudLogRef" class="cbx-msglog cbx-cloudlog">
-            <div v-for="(l, i) in cloudLogs.lines || []" :key="i" class="cbx-msgrow">
-              <span class="cbx-msgtime">{{ fmtTime(l.t) }}</span>
-              <code class="cbx-cloudline">{{ l.line }}</code>
-            </div>
-            <div v-if="!(cloudLogs.lines || []).length" class="cbx-empty">{{ t('暂无日志。') }}</div>
-          </div>
-        </section>
 
-        <!-- ④ 发测试消息（向云端 Broker 发布，一体机链路自检；与独立模拟源服务 sim-source 无关） -->
-        <section class="cbx-sec">
-          <div class="cbx-sec-head"><b>{{ t('发测试消息') }}</b><span class="cbx-sec-sub">{{ t('仅供专业维护：向云端 Broker 发一条测试读数自检一体机链路（模拟数据由独立服务 sim-source 生成，见上方「数据源接入」）') }}</span></div>
-          <div class="cbx-form">
+          <!-- 设备命令模式：选 盒子→设备→读/写 → 自动生成载荷 -->
+          <div v-if="secFold.cmd && cmdMode === 'dev'" class="cbx-form">
             <div class="cbx-form-row">
-              <label>{{ t('主题') }}</label><input v-model="pubForm.topic" class="cbx-input" style="width:260px" placeholder="data/box-001/device-1"/>
-              <label>{{ t('载荷') }}</label><input v-model="pubForm.payload" class="cbx-input" style="flex:1" placeholder='{"device":"device-1","value":88.8}'/>
+              <label>{{ t('盒子') }}</label>
+              <select v-model="cmdForm.box" class="cbx-input cbx-sm" @change="onCmdBoxChange">
+                <option value="" disabled>{{ t('请选择盒子') }}</option>
+                <option v-for="b in cmdBoxes" :key="b" :value="b">{{ boxName({ name: b }) }}</option>
+              </select>
+              <label>{{ t('设备') }}</label>
+              <select v-model="cmdForm.device" class="cbx-input cbx-md" @change="onCmdDeviceChange">
+                <option value="" disabled>{{ t('请选择设备') }}</option>
+                <option v-for="d in cmdDevices" :key="d.name" :value="d.name">{{ d.name }}<template v-if="d.src">（{{ d.src }}<template v-if="d.proto"> · {{ d.proto }}</template>）</template></option>
+              </select>
+              <label>{{ t('操作') }}</label>
+              <select v-model="cmdForm.op" class="cbx-input cbx-sm" @change="onCmdOpChange">
+                <option v-for="o in cmdOpOptions" :key="o.k" :value="o.k">{{ t(o.l) }}</option>
+              </select>
+              <span v-if="cmdDevMeta && !cmdDevMeta.isLora && !cmdDevMeta.isModbus" class="cbx-sec-hint">{{ t('仅支持 Modbus / LoRaWAN 设备，其余协议请用「原始消息」直接调 MQTT') }}</span>
+            </div>
+
+            <!-- LoRaWAN：读=主动取数，写=自定义下行 -->
+            <template v-if="cmdDevMeta && cmdDevMeta.isLora">
+              <div class="cbx-form-row">
+                <label>{{ t('下行内容') }}</label>
+                <select v-model="cmdForm.loraKind" class="cbx-input cbx-sm" :disabled="cmdForm.op === 'read'">
+                  <option value="hex">hex</option>
+                  <option value="text">text</option>
+                  <option value="object">object</option>
+                </select>
+                <input v-if="cmdForm.op === 'write'" v-model="cmdForm.loraData" class="cbx-input cbx-grow"
+                       :placeholder="cmdForm.loraKind === 'hex' ? t('十六进制下行帧，如 0103020001') : (cmdForm.loraKind === 'text' ? t('文本内容') : t('JSON 对象，如 fan:1（勿带引号）'))"/>
+                <template v-if="cmdForm.op === 'write'">
+                  <label>{{ t('端口') }}</label><input v-model="cmdForm.fPort" class="cbx-input cbx-num" placeholder="2"/>
+                </template>
+                <span class="cbx-sec-hint" v-if="cmdForm.op === 'read'">{{ t('读 = 下行取数一拍（设备需填了从站号才会下行轮询）并等终端回传') }}</span>
+              </div>
+            </template>
+
+            <!-- Modbus：值来源 = 已配置点位 / 任意寄存器 -->
+            <template v-if="cmdDevMeta && cmdDevMeta.isModbus">
+              <div class="cbx-form-row">
+                <label>{{ t('寄存器') }}</label>
+                <select v-model="cmdForm.refMode" class="cbx-input cbx-sm" @change="onCmdRefModeChange">
+                  <option value="prop">{{ cmdForm.op === 'write' ? t('可写点') : t('采集点位') }}</option>
+                  <option value="reg">{{ t('任意寄存器') }}</option>
+                </select>
+                <template v-if="cmdForm.refMode === 'prop' && (cmdForm.op === 'read' ? cmdDevMeta.props.length : cmdDevMeta.writes.length)">
+                  <label>{{ cmdForm.op === 'read' ? t('点位') : t('可写点') }}</label>
+                  <select v-model="cmdForm.prop" class="cbx-input cbx-grow" :title="cmdForm.op === 'write' ? (cmdDevMeta.writes.find((w) => w.property === cmdForm.prop) ? writePointTitle(cmdDevMeta.writes.find((w) => w.property === cmdForm.prop)) : t('选择要写入的可写点位')) : t('选择要读取的采集点位')">
+                    <option v-if="cmdForm.op === 'write'" v-for="w in cmdDevMeta.writes" :key="w.property" :value="w.property" :title="writePointTitle(w)">{{ writePointLabel(w) }}</option>
+                    <option v-else v-for="p in cmdDevMeta.props" :key="p.name" :value="p.name" :title="p.desc || p.name">{{ (p.desc || p.name) }}（{{ p.name }}）</option>
+                  </select>
+                </template>
+                <template v-else-if="cmdForm.refMode === 'reg'">
+                  <label>{{ t('寄存器') }}</label><input v-model="cmdForm.addr" class="cbx-input cbx-num" placeholder="0"/>
+                  <template v-if="cmdForm.op === 'read'">
+                    <label>{{ t('类型') }}</label>
+                    <select v-model="cmdForm.dtype" class="cbx-input cbx-sm">
+                      <option value="int16">int16</option><option value="uint16">uint16</option><option value="int32">int32</option><option value="uint32">uint32</option><option value="int64">int64</option><option value="uint64">uint64</option><option value="float32">float32</option>
+                    </select>
+                    <label>{{ t('功能码') }}</label>
+                    <select v-model="cmdForm.fc" class="cbx-input cbx-mid">
+                      <option value="3">3 · 保持寄存器</option><option value="4">4 · 输入寄存器</option>
+                    </select>
+                    <label>{{ t('倍率') }}</label><input v-model="cmdForm.scale" class="cbx-input cbx-num" :placeholder="cmdDevMeta.props[0] && cmdDevMeta.props[0].scale != null ? String(cmdDevMeta.props[0].scale) : '1'"/>
+                  </template>
+                  <template v-else>
+                    <label>{{ t('类型') }}</label>
+                    <select v-model="cmdForm.wKind" class="cbx-input cbx-sm">
+                      <option value="holding">保持寄存器</option><option value="coil">线圈</option>
+                    </select>
+                  </template>
+                </template>
+                <!-- 从站号属于设备配置：命令里不另行指定（盒子按配置里配的站号下发） -->
+                <span class="cbx-sec-hint">{{ t('从站号') }} {{ cmdDevMeta.slave != null && cmdDevMeta.slave !== '' ? cmdDevMeta.slave : 1 }}（{{ t('来自设备配置') }}）</span>
+              </div>
+
+              <div v-if="cmdForm.op === 'write'" class="cbx-form-row">
+                <label>{{ t('写入值') }}</label>
+                <input v-model="cmdForm.value" class="cbx-input cbx-mid"
+                       :placeholder="cmdValuePlaceholder()"/>
+                <template v-if="cmdForm.refMode === 'prop'">
+                  <span v-if="writePropHint(cmdDevMeta)" class="cbx-sec-hint">{{ writePropHint(cmdDevMeta) }}</span>
+                </template>
+                <!-- 裸写的安全范围只来自设备配置（可写点位 / 可写属性的 min·max），
+                     命令里不再填写本次上下限：未配置范围时平台拒绝下发，此处给出提示 -->
+                <template v-else>
+                  <span v-if="addrRangeHint()" class="cbx-sec-hint">{{ addrRangeHint() }}</span>
+                  <span v-else class="cbx-sec-hint">{{ t('未配置安全范围：请先到设备配置（可写点位 / 可写属性）中设置上下限，平台拒绝无范围的设备写入') }}</span>
+                </template>
+              </div>
+              <div v-if="cmdForm.op === 'read' && cmdForm.refMode === 'reg'" class="cbx-form-row">
+                <span class="cbx-sec-hint">{{ t('读任意寄存器不依赖点位配置：适合写设定前先确认传感器寄存器内容/默认从站。') }}</span>
+              </div>
+            </template>
+
+            <div class="cbx-form-row" v-if="cmdDevMeta">
+              <label>{{ t('将发送') }}</label>
+              <pre class="cbx-cmd-json" :title="t('自动生成载荷，可直接复制到「原始消息」手动微调')">{{ cmdPayloadText }}</pre>
+              <button class="cbx-op primary" :disabled="cmdSending" @click="execCmd">{{ cmdSending ? t('发送中…') : (cmdPending ? t('等待回报…') : t('执行')) }}</button>
+            </div>
+
+            <div class="cbx-cmd-result" v-if="cmdResult" :class="{ ok: cmdResult.ok, err: cmdResult.ok === false, wait: cmdResult.ok === null }">
+              <template v-if="cmdResult.ts">{{ fmtTime(cmdResult.ts) }} · </template>
+              <b>{{ cmdResult.message }}</b>
+              <pre v-if="cmdResult.detailText" class="cbx-cmd-json slim">{{ cmdResult.detailText }}</pre>
+            </div>
+          </div>
+
+          <!-- 原始消息模式（原「发送指令」）：直接向云端 Broker 发布任意主题 -->
+          <div v-else-if="secFold.cmd" class="cbx-form">
+            <div class="cbx-form-row">
+              <label>{{ t('主题') }}</label><input v-model="pubForm.topic" class="cbx-input cbx-md" placeholder="data/box-001/device-1"/>
+              <label>{{ t('载荷') }}</label><input v-model="pubForm.payload" class="cbx-input cbx-grow" placeholder='{"device":"device-1","value":88.8}'/>
               <button class="cbx-op primary" @click="doPublish">{{ t('发布') }}</button>
+            </div>
+            <div class="cbx-form-row">
+              <span class="cbx-sec-hint">{{ t('data/# 发布可自检一体机上报链路并在「实时消息流」看到回显；cmd/{box}/# 为盒子命令主题（盒子 mapper 需支持对应命令）') }}</span>
             </div>
           </div>
         </section>
@@ -729,6 +871,9 @@
                 <input v-model="ingestForm.property" class="cbx-input" style="width:140px" placeholder="weight"/>
                 <label>{{ t('值') }}</label>
                 <input v-model="ingestForm.value" class="cbx-input" style="width:140px" placeholder="12.5"/>
+              </div>
+              <div class="cbx-form-row" v-if="ingestRangeHint()">
+                <span class="cbx-sec-hint">{{ ingestRangeHint() }}</span>
               </div>
               <div class="cbx-form-row" style="margin-top:10px">
                 <button class="cbx-op primary" @click="doIngest" :disabled="ingesting">{{ ingesting ? t('上报中…') : t('上报') }}</button>
@@ -870,6 +1015,17 @@
               </template>
 
               </template>
+              <!-- 属性点位：设备已绑定模型时点位由模型承载；仅模型本体或未绑模型的设备在此编辑 -->
+              <template v-if="editTarget !== 'model' && editForm.modelName">
+                <div class="cbx-sec-head" style="margin-top:8px">
+                  <b>{{ t('属性点位') }}</b>
+                  <span class="cbx-sec-sub">{{ t('已绑定模型，点位由模型承载，请在「模型」卡片中修改') }}</span>
+                </div>
+                <div class="cbx-form-row">
+                  <span class="cbx-sec-hint"><code>{{ editForm.modelName }}</code>：{{ modelPropNames(pickedEditModelProps) || t('该模型暂无点位') }}</span>
+                </div>
+              </template>
+              <template v-else>
               <!-- 属性点位 -->
               <div class="cbx-sec-head" style="margin-top:8px">
                 <b>{{ t('属性点位') }}</b>
@@ -908,6 +1064,7 @@
                 <input v-model="p.unit" class="cbx-input" style="width:60px" :placeholder="t('单位')"/>
                 <button class="x-btn danger" @click="editForm.properties.splice(i, 1)" :title="t('删除属性')">✕</button>
               </div>
+              </template>
 
               <div class="cbx-form-row" style="margin-top:10px">
                 <button class="cbx-op primary" @click="applyEditDev" :disabled="editSaving || applying" :title="t('保存到本地并立即下发云端 K3s（无需单独保存）')">{{ editSaving || applying ? t('下发中…') : t('保存并下发') }}</button>
@@ -1208,6 +1365,17 @@
                 </div>
               </template>
 
+              <!-- 属性点位：已绑定模型时点位由模型承载，此处不再提供编辑 -->
+              <template v-if="form.modelName">
+                <div class="cbx-sec-head" style="margin-top:8px">
+                  <b>{{ t('属性点位') }}</b>
+                  <span class="cbx-sec-sub">{{ t('已绑定模型，点位由模型承载，请在「模型」卡片中修改') }}</span>
+                </div>
+                <div class="cbx-form-row">
+                  <span class="cbx-sec-hint"><code>{{ form.modelName }}</code>：{{ modelPropNames(pickedModelProps) || t('该模型暂无点位') }}</span>
+                </div>
+              </template>
+              <template v-else>
               <!-- 属性点位 -->
               <div class="cbx-sec-head" style="margin-top:8px">
                 <b>{{ t('属性点位') }}</b>
@@ -1246,6 +1414,7 @@
                 <input v-model="p.unit" class="cbx-input" style="width:60px" :placeholder="t('单位')"/>
                 <button class="x-btn danger" @click="form.properties.splice(i, 1)" :title="t('删除属性')">✕</button>
               </div>
+              </template>
 
               <div class="cbx-form-row" style="margin-top:10px">
                 <button class="cbx-op primary" @click="dryRun()">{{ t('生成 YAML 预览') }}</button>
@@ -1460,6 +1629,7 @@ import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, react
 import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
 import { t } from '../i18n'
+import { visiblePoll } from '../utils/poll'
 // 云端时序历史查询弹窗（TDengine）：异步分包，点开才加载
 const CloudHistoryDialog = defineAsyncComponent(() => import('./CloudHistoryDialog.vue'))
 
@@ -1483,13 +1653,24 @@ const mwSyncing = ref(false)
 const mwNote = ref('')
 const mwNoteErr = ref(false)
 const mwPanelOpen = ref(false)
+const signalsOpen = ref(false)           // 可绑定信号目录面板
+// 各区块折叠态（true=展开）：默认只展开常用区块，折叠区块不渲染 DOM（首屏更快）
+const secFold = ref({ overview: true, sources: false, topo: false, reslist: true,
+  certs: false, msglog: false, cmd: true })
+function toggleSec(k) {
+  secFold.value = { ...secFold.value, [k]: !secFold.value[k] }
+}
+const signalsLoading = ref(false)
+const signalsResp = reactive({ sources: [] })
 const mwSaving = ref(false)
 const mwTestBusy = ref(false)
-const mwForm = reactive({ base_url: '', token: '', broker_port: 0, subscribe: true })
+const mwForm = reactive({ base_url: '', token: '' })
+const mwTokenSet = ref(false)     // 后端已保存 token（服务端不回传明文）
 
 const middleware = computed(() => sourcesResp.middleware || {})
 const mwOnline = computed(() => !!middleware.value.online)
-const boxSrc = computed(() => (sourcesResp.sources || []).find(s => s.type === 'box')
+const boxEntry = computed(() => (sourcesResp.sources || []).find(s => s.type === 'box') || null)
+const boxSrc = computed(() => boxEntry.value
   || { id: 'box', name: t('能碳一体机'), type: 'box', enabled: true, status: {} })
 const boxSt = computed(() => boxSrc.value.status || {})
 const boxLastMsg = computed(() => { const m = boxSt.value.last_msg; return m ? (m.topic || '') : '' })
@@ -1502,11 +1683,27 @@ async function loadSources() {
     sourcesResp.sources = (r && r.sources) || []
     sourcesResp.middleware = (r && r.middleware) || {}
     mwChecked.value = true
+    syncMwForm()   // 配置面板初值随列表一起到，无需再请求 /middleware/status
   } catch (e) {
     mwChecked.value = true
     sourcesResp.middleware = { online: false, error: e.message || t('无法获取数据源状态') }
   } finally { sourcesLoading.value = false }
 }
+// ---- 可绑定信号目录（GET /api/data-sources/signals）----
+async function loadSignals() {
+  signalsLoading.value = true
+  try {
+    const r = await api.dataSourceSignals()
+    signalsResp.sources = (r && r.sources) || []
+  } catch (e) {
+    signalsResp.sources = []
+  } finally { signalsLoading.value = false }
+}
+function toggleSignals() {
+  signalsOpen.value = !signalsOpen.value
+  if (signalsOpen.value) loadSignals()
+}
+
 // 最近一条消息时间（external 状态里为 epoch 秒）→ 「X 分钟前」
 function agoText(sec) {
   if (!sec) return ''
@@ -1681,13 +1878,25 @@ async function toggleSource(s, ev) {
   } catch (e) { s.enabled = prev; store.showToast(t('操作失败') + '：' + (e.message || e), 'error') }
 }
 async function removeSource(s) {
-  if (!confirm(t('删除外部数据源「{name}」？中间件将同步注销采集。', { name: s.name }))) return
+  // 内置源与外部源统一管理、无例外：内置源删除后立即停止采纳数据，可经 restore 加回
+  const msg = s.type === 'box'
+    ? t('删除内置数据源「{name}」？平台将立即停止采纳盒子上报数据，可在列表中恢复。', { name: s.name })
+    : t('删除外部数据源「{name}」？中间件将同步注销采集。', { name: s.name })
+  if (!confirm(msg)) return
   try {
     const r = await api.dataSourceRemove(s.id)
     if (!r.ok) { store.showToast(r.error || t('删除失败'), 'error'); return }
     store.showToast(r.note || t('已删除'), 'success')
     await loadSources()
   } catch (e) { store.showToast(t('删除失败') + '：' + (e.message || e), 'error') }
+}
+async function restoreBox() {
+  try {
+    const r = await api.dataSourceRestore('box')
+    if (!r.ok) { store.showToast(r.error || t('恢复失败'), 'error'); return }
+    store.showToast(r.note || t('已恢复内置数据源'), 'success')
+    await loadSources()
+  } catch (e) { store.showToast(t('恢复失败') + '：' + (e.message || e), 'error') }
 }
 // 测试（表单 → 探测；卡片 → 按已保存配置探测）
 async function testForm() {
@@ -1711,30 +1920,27 @@ async function testSource(s) {
 }
 
 // ---- 中间件服务：状态 / 配置 / 对账 ----
-async function loadMwCfg() {
-  try {
-    const r = await api.middlewareStatus()
-    const c = (r && r.config) || {}
-    mwForm.base_url = c.base_url || ''
-    mwForm.token = c.token || ''
-    mwForm.broker_port = (c.broker && c.broker.port) || 0
-    mwForm.subscribe = c.subscribe !== false
-    mwNote.value = ''; mwNoteErr.value = false
-  } catch (e) { /* 忽略：中间件状态由 loadSources 呈现 */ }
+// 配置面板初值取自 loadSources 已拉到的中间件快照（含 token_set），不再单独请求
+// /middleware/status——省掉一次中间件 HTTP（原先每次开页面多打一次 /api/health）。
+function syncMwForm () {
+  const m = sourcesResp.middleware || {}
+  mwForm.base_url = m.base_url || mwForm.base_url || ''
+  mwTokenSet.value = !!m.token_set
+  mwNote.value = ''; mwNoteErr.value = false
 }
 async function saveMw() {
   mwSaving.value = true; mwNoteErr.value = false
   try {
-    const r = await api.middlewareConfig({
-      enabled: true,
-      subscribe: !!mwForm.subscribe,
-      base_url: String(mwForm.base_url || '').trim(),
-      token: String(mwForm.token || '').trim(),
-      broker: { port: Number(mwForm.broker_port) || 0 },
-    })
+    // 中间件唯一输出形态（直发云端 Broker），配置只有 地址/Token 两项。
+    // Token 留空表示「保持已保存的值」——服务端不回传明文，若照原样回传空串会把
+    // 已配置的 token 清掉。
+    const payload = { enabled: true, base_url: String(mwForm.base_url || '').trim() }
+    const tok = String(mwForm.token || '').trim()
+    if (tok) payload.token = tok
+    const r = await api.middlewareConfig(payload)
     mwNote.value = (r.ok ? (r.note || t('中间件配置已保存')) : (r.error || t('保存失败')))
     mwNoteErr.value = !r.ok
-    if (r.ok) await loadSources()
+    if (r.ok) { mwForm.token = ''; await loadSources() }
   } catch (e) { mwNote.value = t('保存失败：') + (e.message || e); mwNoteErr.value = true }
   finally { mwSaving.value = false }
 }
@@ -1744,7 +1950,7 @@ async function testMw() {
     const r = await api.middlewareTest({ base_url: mwForm.base_url, token: mwForm.token })
     mwNote.value = (r.ok ? (r.note || t('中间件可达')) : (r.error || r.note || t('中间件不可达')))
     mwNoteErr.value = !r.ok
-    if (r.ok) { await loadSources(); await loadMwCfg() }
+    if (r.ok) { await loadSources() }
   } catch (e) { mwNote.value = t('测试失败：') + (e.message || e); mwNoteErr.value = true }
   finally { mwTestBusy.value = false }
 }
@@ -1762,30 +1968,42 @@ async function syncMw() {
 // ---- 轮询定时器 ----
 // 快慢拆分：数据概览（链路状态/实时读数/消息流）3s，设备配置列表 30s；数据源状态并入快轮询由
 // 后端聚合返回（一次 /api/data-sources 同时给出目录 + 中间件服务 + 各源运行状态），每 6s 拉一次。
-let fastTimer = null
-let slowTimer = null
-let sourcesTimer = null
+// 一律走 visiblePoll：页面切到后台（别的标签/最小化）时整轮跳过，回来立即补一轮。
+let stopFastPoll = null
+let stopSlowPoll = null
+let stopSourcesPoll = null
 const startPolling = () => {
   stopPolling()
-  fastTimer = setInterval(refreshFast, 3000)
-  slowTimer = setInterval(refreshSlow, 30000)
-  sourcesTimer = setInterval(loadSources, 6000)
+  stopFastPoll = visiblePoll(refreshFast, 3000)
+  stopSlowPoll = visiblePoll(refreshSlow, 30000)
+  // 数据源状态 10s 一次；区块折叠时跳过（折叠意味着用户不看，展开时补拉）
+  stopSourcesPoll = visiblePoll(() => { if (secFold.value.sources) loadSources() }, 10000)
 }
+// 展开区块时立刻补拉其数据，避免「展开后要等下一个轮询周期才有内容」
+watch(() => ({ ...secFold.value }), (now, prev) => {
+  if (now.sources && !prev.sources) loadSources()
+  if (now.msglog && !prev.msglog) loadMessages()
+})
 const stopPolling = () => {
-  if (fastTimer) { clearInterval(fastTimer); fastTimer = null }
-  if (slowTimer) { clearInterval(slowTimer); slowTimer = null }
-  if (sourcesTimer) { clearInterval(sourcesTimer); sourcesTimer = null }
+  if (stopFastPoll) { stopFastPoll(); stopFastPoll = null }
+  if (stopSlowPoll) { stopSlowPoll(); stopSlowPoll = null }
+  if (stopSourcesPoll) { stopSourcesPoll(); stopSourcesPoll = null }
 }
 onMounted(() => {
   restoreTopoPos()
-  refreshAll(); loadCloudCfg(); loadAgentStatus(); startPolling(); connectCloudFeed()
+  refreshAll(); loadCloudCfg(); loadAgentStatus(); startPolling()
   loadEdgeCfgSilent()
   setupTopoLinks()
   // 数据源接入：目录 + 中间件服务状态 + 接入类型 schema（含中间件连接配置初始值）
-  loadSources(); loadAdapterTypes(); loadMwCfg()
+  loadSources(); loadAdapterTypes()
+  // 云端 CRD 先渲染 MQTT 推送缓存（首屏不等 agent HTTP）；仅当缓存为空时才后台补拉一次，
+  // 避免开发机等 agent 不可达环境下每次进页面都同步等待 5s 超时。
+  setTimeout(() => {
+    if (!(cloudCrd.value.devices || []).length && !(cloudCrd.value.models || []).length) loadCloudCrd(true)
+  }, 800)
 })
 onUnmounted(() => {
-  stopPolling(); closeDevRealtime(); disconnectCloudFeed()
+  stopPolling(); closeDevRealtime()
   stopTopoLinks()
 })
 
@@ -1831,6 +2049,8 @@ function openCreate() {
   // 一键化：自动生成设备名与同名模型（模型留空即自动创建，无需先建模型）
   form.deviceName = 'box-dev-' + ((devices.value.devices || []).length + 1)
   form.modelName = ''
+  // 点位复位：避免上一次选过模型后残留的点位被写进新建的同名模型
+  form.properties.splice(0, form.properties.length, { name: 'value', type: 'float', accessMode: 'r', registerType: 'holdingRegister', register: 0, scale: 1, unit: '' })
   // 默认选中第一个 Ready 盒子，避免出现「未识别」选项
   const ready = (overview.value.nodes || []).find((n) => n.ready) || (overview.value.nodes || [])[0]
   if (ready) form.nodeName = ready.name
@@ -1838,6 +2058,27 @@ function openCreate() {
   createOpen.value = true
 }
 async function loadDevices() { try { devices.value = await api.boxDevices() } catch (e) {} }
+
+// ---- 点位归属：设备绑定模型后，属性点位由模型承载（新建/配置弹窗只做只读展示）----
+function modelByName(name) {
+  const k = (name || '').trim()
+  if (!k) return null
+  return (devices.value.models || []).find((m) => m.name === k) || null
+}
+function modelPropNames(props) { return (props || []).map((p) => p.name || '?').join('、') }
+// 新建/编辑表单当前所选模型的点位（getter 惰性求值：editForm/editTarget 在下方声明）
+const pickedModelProps = computed(() => (modelByName(form.modelName) || {}).properties || [])
+const pickedEditModelProps = computed(() => (editTarget.value === 'model' ? [] : (modelByName(editForm.modelName) || {}).properties || []))
+// 设备请求体：已绑定模型时以模型点位为准，避免把表单残留/空点位写回共享模型
+function devPayload(f, mode) {
+  const p = { ...f, mode }
+  const name = (f.modelName || '').trim()
+  if (!name) return p   // 未绑模型：点位由表单定义（保存时自动创建与设备同名的模型）
+  const m = modelByName(name)
+  if (!m) throw new Error(t('模型「{name}」不存在，请刷新页面后重试', { name }))
+  p.properties = (m.properties || []).map((x) => ({ ...x }))
+  return p
+}
 
 // ---- 绑定平台流程设备（关联制：云端识别设备 <-> 仿真设备实例，links.json 持久化）----
 // 平台仿真流程设备（store.allDevices：计量设备 + 可调设备），按工序分组供下拉选择
@@ -2054,7 +2295,7 @@ async function restartCloud(payload, label, confirmText) {
       store.showToast(t('已触发重启「') + label + t('」') + '：' + msg + (r.info ? ' ' + r.info : ''), 'success')
       await refreshFast()
       loadAgentStatus()
-      setTimeout(() => { loadCloudLogs(); loadAgentStatus() }, 8000)  // 重启完成后二次刷新
+      setTimeout(() => { loadAgentStatus() }, 8000)  // 重启完成后二次刷新
     } else {
       store.showToast(t('重启「') + label + t('」失败') + '：' + ((r && (r.stderr || r.error)) || t('未知错误')), 'error')
     }
@@ -2322,7 +2563,8 @@ async function dryRun() {
   formErr.value = ''
   try {
     // 模型留空 = 自动创建与设备同名的模型（一键化：无需先建模型）
-    const r = await api.boxCreateDevice({ ...form, modelName: form.modelName || form.deviceName, mode: 'dryRun' })
+    const base = { ...form, modelName: form.modelName || form.deviceName }
+    const r = await api.boxCreateDevice(devPayload(base, 'dryRun'))
     preview.value = r.yamls.model + '\n---\n' + r.yamls.device
   } catch (e) { formErr.value = e.message || e }
 }
@@ -2330,7 +2572,8 @@ async function applyDev() {
   formErr.value = ''
   try {
     // 模型留空 = 自动创建与设备同名的模型（一键化：无需先建模型）
-    const r = await api.boxCreateDevice({ ...form, modelName: form.modelName || form.deviceName, mode: 'apply' })
+    const base = { ...form, modelName: form.modelName || form.deviceName }
+    const r = await api.boxCreateDevice(devPayload(base, 'apply'))
     preview.value = r.yamls.model + '\n---\n' + r.yamls.device
     // 绑定流程设备：云端身份（cloudDevice || deviceName）<-> 所选流程设备（含读数换算系数）
     await syncBound(form.cloudDevice || form.deviceName, form.boundDevice, form.boundFactor != null ? form.boundFactor : 1)
@@ -2478,57 +2721,8 @@ function rtTsOf(d) {
   return max
 }
 const messages = ref([])
-const pubForm = reactive({ topic: '', payload: '' })
-// 云端实时日志：agent 每 3s 经 MQTT cloud/logs 推送 → 平台缓存 → WebSocket /api/ws/cloud 实时转发。
-// WS 未连接时回退 HTTP 轮询兜底（读内存缓存，毫秒级）。
-const cloudLogs = ref({ lines: [] })
-const cloudLogRef = ref(null)
 const msgLogRef = ref(null)
-const cloudWsState = ref('closed')
-let cloudWs = null
-let cloudWsRetry = 0
-// 日志总保持最新：监听 lines 引用（新日志追加 / WS 快照替换均触发），nextTick 确保 DOM 渲染后再滚到底部
-watch(() => cloudLogs.value?.lines, () => {
-  const el = cloudLogRef.value
-  if (el) nextTick(() => { el.scrollTop = el.scrollHeight })
-})
-async function loadCloudLogs() {
-  try {
-    cloudLogs.value = await api.boxCloudLogs()
-  } catch (e) {}
-}
-function connectCloudFeed() {
-  if (cloudWs) return
-  cloudWs = api.openCloudFeed((msg) => {
-    cloudWsRetry = 0
-    if (msg.kind === 'snapshot') {
-      const d = msg.data || {}
-      if (d.logs) cloudLogs.value = d.logs
-    } else if (msg.kind === 'logs') {
-      const d = msg.data || {}
-      const cur = cloudLogs.value || { lines: [] }
-      const seen = new Set((cur.lines || []).map(l => l.line))
-      const fresh = (d.lines || []).filter(l => l && !seen.has(l.line))
-      cloudLogs.value = {
-        ok: d.ok !== undefined ? d.ok : cur.ok,
-        cloudcore: d.cloudcore || cur.cloudcore,
-        error: d.error || '',
-        lines: [...(cur.lines || []), ...fresh].slice(-300),
-        time: d.ts || Date.now() / 1000,
-      }
-    }
-  }, (st) => {
-    cloudWsState.value = st
-    if (st === 'closed' || st === 'error') {
-      cloudWs = null
-      cloudWsRetry += 1
-      setTimeout(connectCloudFeed, Math.min(3000 * cloudWsRetry, 15000))  // 断线指数回退重连
-    }
-  })
-}
-function disconnectCloudFeed() {
-  if (cloudWs) { try { cloudWs.close() } catch (e) {} cloudWs = null }
-}
+const pubForm = reactive({ topic: '', payload: '' })
 async function loadRealtime() {
   try {
     const r = await api.boxDevicesRealtime()
@@ -2541,37 +2735,39 @@ async function loadMessages() {
     messages.value = r.messages || []
   } catch (e) {}
 }
-function scrollMsgLog() {
-  const el = msgLogRef.value
-  if (el) el.scrollTop = el.scrollHeight
-}
 async function doPublish() {
-  if (!pubForm.topic.trim()) { store.showToast(t('请先填写主题（建议 data/box-xxx/device-xxx 格式，发布后可在上方「实时消息流」看到回显，data/# 会同时刷新设备实时数据）'), 'warn'); return }
+  if (!pubForm.topic.trim()) { store.showToast(t('请先填写主题（建议 data/box-xxx/device-xxx 格式，发布后可在「实时消息流」看到回显，data/# 会同时刷新设备实时数据）'), 'warn'); return }
   try {
     const r = await api.boxPublish(pubForm.topic, pubForm.payload)
     store.showToast(r.ok
       ? (pubForm.topic.trim().startsWith('data/')
-          ? t('已发布到 {topic} → 见上方「实时消息流」，实时数据已刷新', { topic: r.topic })
-          : t('已发布到 {topic} → 见上方「实时消息流」', { topic: r.topic }))
+          ? t('已发布到 {topic} → 见「实时消息流」，实时数据已刷新', { topic: r.topic })
+          : t('已发布到 {topic} → 见「实时消息流」', { topic: r.topic }))
       : t('发布失败') + '：' + (r.error || ''), r.ok ? 'success' : 'error')
     await loadMessages()
     nextTick(scrollMsgLog)
   } catch (e) { store.showToast(t('发布失败') + '：' + (e.message || e), 'error') }
 }
 
-async function refreshAll() {
-  await Promise.allSettled([loadOverview(), loadDevices(), loadRealtime(), loadMessages(), loadCloudCrd(true)])
+async function refreshAll(force = false) {
+  // force=true 才会同步 HTTP 拉云端 agent（开发机 agent 不可达时该请求要等满 5s 超时）；
+  // 首屏一律走 MQTT 推送缓存，用户主动点「刷新」才强制实时拉取。
+  await Promise.allSettled([loadOverview(), loadDevices(), loadRealtime(), loadMessages(), loadCloudCrd(force)])
 }
 // 快速轮询（3s）：合并界面无页签切换，统一拉轻量数据；云端 CRD 由 30s 慢轮询承担
+// 快轮询只带「实时读数 + 链路状态」；设备定义列表（loadDevices，响应较大）移入慢轮询，
+// 折叠中的区块（消息流 / 云端日志）不再轮询其数据，展开时立即补拉一次
 async function refreshFast() {
-  await loadOverview(); await loadDevices(); await loadRealtime(); await loadMessages()
-  if (cloudWsState.value !== 'open') await loadCloudLogs()   // WS 未连上时轮询兜底
+  const jobs = [loadOverview(), loadRealtime()]
+  if (secFold.value.msglog) jobs.push(loadMessages())
+  await Promise.allSettled(jobs)
 }
-// 慢轮询（30s，与后端 CRD 缓存对齐）：云端 CRD + 拓扑盒子状态 + Agent 状态
+// 慢轮询（30s，与后端 CRD 缓存对齐）：云端 CRD + 拓扑盒子状态 + Agent 状态 + 设备定义列表
 async function refreshSlow() {
   await loadCloudCrd()
   loadOverview()
   loadAgentStatus()
+  loadDevices()
 }
 
 // ---- 模型/设备合并列表（本地与云端不再区分身份，同名去重为一条记录）----
@@ -2737,7 +2933,12 @@ function devCountOf(nodeName) {
 function protoOfDev(dev) {
   if (dev.protocol) return dev.protocol
   const local = (devices.value.devices || []).find((x) => x.name === dev.name || x.cloudDevice === dev.name)
-  return (local && local.protocol) || ''
+  if (local && local.protocol) return local.protocol
+  // 兜底：本地没有该设备定义时（如开发机只看到云端 CRD），按设备引用的模型反查采集协议，
+  // 避免协议识别为空被误判成「不支持设备命令」。
+  const mname = String(dev.model || (local && local.model) || '')
+  const m = (devices.value.models || []).find((x) => x.name === mname)
+  return (m && m.protocol) || ''
 }
 // CloudCore Pod 状态统一中文：kubectl 返回的 .status.phase / containerState 原值 → 中文
 const PHASE_ZH = {
@@ -3210,7 +3411,7 @@ async function dryRunEdit() {
       editPreviewMode.value = 'dryRun'
       editMsg.value = t('已生成模型 YAML 预览（未保存、未下发）')
     } else {
-      const r = await api.boxCreateDevice({ ...editForm, mode: 'dryRun' })
+      const r = await api.boxCreateDevice(devPayload(editForm, 'dryRun'))
       editPreview.value = r.yamls.model + '\n---\n' + r.yamls.device
       editPreviewMode.value = 'dryRun'
       editMsg.value = t('已生成预览（未保存、未下发）')
@@ -3237,7 +3438,7 @@ async function saveEditDev() {
   if (editTarget.value === 'model') return saveEditModel()
   editSaving.value = true; editErr.value = false; editMsg.value = t('保存中…')
   try {
-    const r = await api.boxCreateDevice({ ...editForm, mode: 'apply' })
+    const r = await api.boxCreateDevice(devPayload(editForm, 'apply'))
     const n = (r.synced_devices || []).filter((x) => x !== editForm.deviceName).length
     const renamedFrom = r.renamed_from || ''
     const cs = r.cloud_sync || {}
@@ -3275,7 +3476,7 @@ async function applyEditDev() {
   }
   editSaving.value = true; editErr.value = false; editMsg.value = t('保存并下发中…')
   try {
-    const r = await api.boxCreateDevice({ ...editForm, mode: 'apply' })
+    const r = await api.boxCreateDevice(devPayload(editForm, 'apply'))
     editPreview.value = ''
     const renamedFrom = r.renamed_from || ''
     const cs = r.cloud_sync || {}
@@ -3305,7 +3506,7 @@ const devRt = computed(() => rtDevices.value.find((x) => x.name === devRtName.va
 const rtSel = ref('')        // 当前选中的属性
 const rtHover = ref(-1)      // 悬停采样点 index
 const rtChartEl = ref(null)
-let rtTimer = null
+let stopRtPoll = null
 async function refreshDevRt() {
   try { rtDevices.value = (await api.boxDevicesRealtime()).devices || [] } catch (e) {}
 }
@@ -3315,14 +3516,14 @@ function openDevRealtime(d) {
   rtSel.value = ''
   rtHover.value = -1
   refreshDevRt()
-  if (rtTimer) clearInterval(rtTimer)
-  rtTimer = setInterval(refreshDevRt, 3000)
+  if (stopRtPoll) stopRtPoll()
+  stopRtPoll = visiblePoll(refreshDevRt, 3000)
 }
 function closeDevRealtime() {
   devRtOpen.value = false
   devRtName.value = ''
   rtHover.value = -1
-  if (rtTimer) { clearInterval(rtTimer); rtTimer = null }
+  if (stopRtPoll) { stopRtPoll(); stopRtPoll = null }
 }
 
 // ---- 折线图数据与坐标计算 ----
@@ -3443,10 +3644,19 @@ function closeGuide() {
   try { localStorage.setItem('cbx-guide-seen', '1') } catch (e) {}
 }
 // 指标卡点击 → 平滑滚动到对应列表（sources=数据源接入区块，box/dev=资源列表）
+function scrollMsgLog() {
+  const el = msgLogRef.value
+  if (el) el.scrollTop = el.scrollHeight
+}
 function scrollToSec(which) {
-  const el = document.getElementById(which === 'box' ? 'cbx-res-box'
-    : which === 'sources' ? 'cbx-sec-sources' : 'cbx-res-dev')
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // 目标区块若处于折叠态先展开，否则滚过去只看到标题
+  const foldKey = which === 'sources' ? 'sources' : 'reslist'
+  if (!secFold.value[foldKey]) secFold.value = { ...secFold.value, [foldKey]: true }
+  nextTick(() => {
+    const el = document.getElementById(which === 'box' ? 'cbx-res-box'
+      : which === 'sources' ? 'cbx-sec-sources' : 'cbx-res-dev')
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 
 // 云端连接（live/stale/degraded/unreachable → 通俗文案）
@@ -3497,10 +3707,434 @@ const close = () => store.toggleBoxManage()
 
 // 暴露给视图工具栏（RibbonToolbar）：刷新数据 / 盒子接入 / 设备接入 / 新建模型 / 关闭
 defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
+
+// ---- ④ 命令执行：向一体机下发设备读/写寄存器 / LoRaWAN 下行 ----
+const cmdMode = ref('dev')
+const cmdModes = [
+  { k: 'dev', l: '设备命令' },
+  { k: 'raw', l: '原始消息' },
+]
+// 目标字段：refMode=prop 走已配置点位/可写点；reg=任意寄存器（调试新传感器常用）
+const cmdForm = reactive({
+  box: '', device: '', op: 'read', refMode: 'prop', prop: '',
+  addr: '', dtype: 'uint16', fc: '3', scale: '',
+  wKind: 'holding', value: '',
+  loraKind: 'hex', loraData: '', fPort: '2',
+})
+const cmdSending = ref(false)
+const cmdPending = ref(null)   // { rid, box }
+const cmdResult = ref(null)    // { ok: true|false|null(超时), message, detailText, ts }
+let cmdTimer = null
+function stopCmdPoll() { if (cmdTimer) { clearTimeout(cmdTimer); cmdTimer = null } }
+function fmtCmdDetail(d) {
+  if (d == null) return ''
+  if (typeof d === 'string') return d
+  try { return JSON.stringify(d, null, 2) } catch (e) { return String(d) }
+}
+// 外部数据源前缀（ext-*）不是能碳一体机：它由一体机接入并上行云端，不能与一体机并列显示
+function isExternalBox(name) {
+  return String(name || '').trim().toLowerCase().startsWith('ext-')
+}
+const cmdBoxes = computed(() => {
+  const set = new Set()
+  for (const b of topoBoxes.value) if (b.name && !isExternalBox(b.name)) set.add(b.name)
+  for (const d of devices.value.devices || []) if (d.node && !isExternalBox(d.node)) set.add(d.node)
+  return [...set]
+})
+const cmdDevices = computed(() => {
+  const box = cmdForm.box
+  if (!box) return []
+  const map = new Map()
+  for (const d of devices.value.devices || []) {
+    if (String(d.node || '') !== box) continue
+    const srcs = new Set(map.has(d.name) ? map.get(d.name).src : [])
+    srcs.add('本地')
+    map.set(d.name, { name: d.name, src: [...srcs].join('/'), proto: d.protocol || '' })
+  }
+  const tb = topoBoxes.value.find((b) => b.name === box)
+  for (const c of (tb && tb.cloudDevices) || []) {
+    const srcs = new Set(map.has(c.name) ? map.get(c.name).src : [])
+    srcs.add('云端')
+    map.set(c.name, { name: c.name, src: [...srcs].join('/'), proto: protoOfDev(c) })
+  }
+  return [...map.values()]
+})
+const cmdDevMeta = computed(() => {
+  const name = cmdForm.device
+  if (!name) return null
+  const local = (devices.value.devices || []).find((d) => d.name === name) || null
+  const tb = topoBoxes.value.find((b) => b.name === cmdForm.box)
+  const cloud = tb ? (tb.cloudDevices.find((c) => c.name === name) || null) : null
+  const proto = String((local && local.protocol) || (cloud && protoOfDev(cloud)) || '').toLowerCase()
+  const isLora = ['lora', 'lorawan'].includes(proto)
+  const isModbus = ['modbus', 'modbus-rtu', 'rtu', 'modbus-tcp', 'tcp'].includes(proto)
+  const props = (local && Array.isArray(local.properties) ? local.properties : []).filter((x) => x && x.name)
+  // 可写点位 = 设备手工配置的 writes[] + 设备模型中标为可写（accessMode=rw）的属性
+  // （模型可写属性在下发盒子时会自动派生为可写点位，见后端 to_mapper_device）
+  const writes = writablePointsOf(local)
+  const slave = (local && local.comm && local.comm.slaveID) || ''
+  return { name, local, cloud, proto, isLora, isModbus, props, writes, slave }
+})
+const cmdOpOptions = computed(() => {
+  const m = cmdDevMeta.value
+  if (m && m.isLora) return [{ k: 'read', l: '读（下行取数）' }, { k: 'write', l: '写设定（下行）' }]
+  if (m && m.isModbus) return [{ k: 'read', l: '读寄存器' }, { k: 'write', l: '写设定' }]
+  return [{ k: 'read', l: '读' }, { k: 'write', l: '写设定' }]
+})
+// 设备可写点位：手工配置的 writes[] + 设备模型中具备可写能力（accessMode=rw）的属性。
+// 模型可写属性在下发给盒子时由后端自动派生为可写点位（含换算后的原始值范围）。
+function writablePointsOf(dev) {
+  const out = []
+  const seen = new Set()
+  const propOf = (n) => ((dev && Array.isArray(dev.properties) ? dev.properties : [])
+    .find((x) => x && String(x.name) === String(n)) || null)
+  for (const w of (dev && Array.isArray(dev.writes) ? dev.writes : [])) {
+    if (!w || !w.property) continue
+    seen.add(String(w.property))
+    const p = propOf(w.property)
+    // 补中文名/单位：手工 writes[] 通常只写 property 与地址，界面上光看英文属性名
+    // 认不出是"电压"还是"校准系数"，统一回落到同名属性（模型）的 desc/unit
+    out.push({ ...w, desc: w.desc || (p && p.desc) || '', unit: w.unit || (p && p.unit) || '' })
+  }
+  for (const p of (dev && Array.isArray(dev.properties) ? dev.properties : [])) {
+    if (!p || !p.name || p.accessMode !== 'rw' || seen.has(String(p.name))) continue
+    seen.add(String(p.name))
+    const coil = String(p.registerType || '').toLowerCase().includes('coil')
+    out.push({
+      property: p.name,
+      kind: coil ? 'coil' : 'holding',
+      registerAddr: Number(p.register) || 0,
+      coilAddr: Number(p.register) || 0,
+      scale: 1,                        // 平台写入值即工程值，无需换算
+      min: (p.min != null && p.min !== '') ? Number(p.min) : undefined,
+      max: (p.max != null && p.max !== '') ? Number(p.max) : undefined,
+      unit: p.unit || '',
+      desc: p.desc || '',
+      fromModel: true,
+    })
+  }
+  return out
+}
+// 可写下拉的显示文本 / 悬浮说明：显示中文点位名 + 寄存器类型地址，
+// 让用户能直接认出「设定输出电压（保持寄存器0）」而不是一串英文属性名
+function writePointAddr(w) {
+  const isCoil = String(w.kind || 'holding') === 'coil'
+  return isCoil ? (w.coilAddr ?? w.registerAddr ?? 0) : (w.registerAddr ?? 0)
+}
+function writePointLabel(w) {
+  const isCoil = String(w.kind || 'holding') === 'coil'
+  const name = w.desc || w.property
+  const unit = w.unit ? ' ' + w.unit : ''
+  return `${name}（${isCoil ? t('线圈') : t('保持寄存器')}${writePointAddr(w)}${unit}）`
+}
+function writePointTitle(w) {
+  const isCoil = String(w.kind || 'holding') === 'coil'
+  const r = cmdWriteRange(w.property)
+  const lines = [
+    `${t('属性名')}：${w.property}`,
+    `${isCoil ? t('线圈') : t('保持寄存器')} #${writePointAddr(w)}`,
+  ]
+  if (w.desc) lines.push(w.desc)
+  if (w.unit) lines.push(`${t('单位')}：${w.unit}`)
+  if (r) lines.push(`${t('允许范围')} ${fmtRange(r)}（${r.source}）`)
+  return lines.join('\n')
+}
+// 某设备某属性的可写数值范围（统一折算为工程值口径，供命令面板与上报弹窗共用）：
+// 可写点位优先（其 min/max 是寄存器原始值，按 scale 换算），其次设备/模型属性的
+// 工程值范围。返回 null 表示未配置范围（无限制）。
+function writeRangeOfDevice(deviceName, prop) {
+  // 必须读本地设备记录（含 properties / writes / model）
+  const dev = ((devices.value && devices.value.devices) || []).find((x) => x && x.name === deviceName)
+  if (!dev || !prop) return null
+  const w = (dev.writes || []).find((x) => String(x.property) === String(prop))
+  if (w) {
+    const sc = Number(w.scale) || 0
+    const conv = (v) => (v == null || v === '' ? null : (sc ? Number(v) / sc : Number(v)))
+    const lo = conv(w.min)
+    const hi = conv(w.max)
+    if (lo != null || hi != null) return { min: lo, max: hi, source: t('设备可写点位') }
+  }
+  const p = (dev.properties || []).find((x) => String(x.name) === String(prop))
+  if (p) {
+    const lo = (p.min != null && p.min !== '') ? Number(p.min) : null
+    const hi = (p.max != null && p.max !== '') ? Number(p.max) : null
+    if (lo != null || hi != null) return { min: lo, max: hi, source: t('设备模型属性') }
+  }
+  // 设备属性未配置范围时回退其引用模型的同名属性（与后端 write_guard.resolve_range
+  // 同口径：可写点位 > 设备属性 > 模型属性）
+  const mdl = ((devices.value && devices.value.models) || []).find((x) => x && x.name === dev.model)
+  const mp = mdl && (mdl.properties || []).find((x) => String(x.name) === String(prop))
+  if (mp) {
+    const lo = (mp.min != null && mp.min !== '') ? Number(mp.min) : null
+    const hi = (mp.max != null && mp.max !== '') ? Number(mp.max) : null
+    if (lo != null || hi != null) return { min: lo, max: hi, source: t('设备模型属性') }
+  }
+  return null
+}
+function cmdWriteRange(prop) {
+  const m = cmdDevMeta.value
+  if (!m || !prop) return null
+  return writeRangeOfDevice(m.name, prop)
+}
+// 手动上报弹窗：显示该属性配置的允许范围（超出会被平台拒绝）
+function ingestRangeHint() {
+  const r = writeRangeOfDevice(ingestForm.device, ingestForm.property)
+  if (!r) return ''
+  return `${t('允许范围')} ${fmtRange(r)}（${r.source}，${t('超出将被拒绝')}）`
+}
+function fmtRange(r) {
+  if (!r) return ''
+  const lo = r.min == null ? t('不限') : r.min
+  const hi = r.max == null ? t('不限') : r.max
+  return `${lo} ~ ${hi}`
+}
+// 裸写（任意寄存器/线圈）按地址解析配置中的安全范围（寄存器原始值口径）
+function addrWriteRange(addr, kind) {
+  const m = cmdDevMeta.value
+  if (!m || addr === '' || addr == null) return null
+  const a = Number(addr)
+  const coil = String(kind || 'holding').toLowerCase() === 'coil'
+  const w = (m.writes || []).find((x) => {
+    if ((String(x.kind || 'holding').toLowerCase() === 'coil') !== coil) return false
+    const wa = coil ? (x.coilAddr ?? x.registerAddr) : x.registerAddr
+    return wa != null && Number(wa) === a
+  })
+  if (!w || (w.min == null && w.max == null)) return null
+  return {
+    min: w.min == null ? null : Number(w.min),
+    max: w.max == null ? null : Number(w.max),
+    source: w.fromModel ? t('模型可写属性') : t('设备可写点位'),
+  }
+}
+// 裸写行的范围提示：只在设备配置里已配置该地址范围时显示，未配置则提示去设备配置中设置
+function addrRangeHint() {
+  const r = addrWriteRange(cmdForm.addr, cmdForm.wKind)
+  if (!r) return ''
+  return `${t('允许范围')} ${fmtRange(r)}（${r.source}，${t('超出将被拒绝')}）`
+}
+function writePropHint(meta) {
+  const w = (meta.writes || []).find((x) => x.property === cmdForm.prop)
+  if (!w) return ''
+  let s = t('工程值，盒子内部 ×scale 并校验 min/max')
+  if (w.unit) s += '（' + w.unit + '）'
+  const r = cmdWriteRange(cmdForm.prop)
+  if (r) s += `，${t('允许范围')} ${fmtRange(r)}（${r.source}，${t('超出将被拒绝')}）`
+  else s += `，${t('未配置上下限：可在设备配置中设置，当前不限制')}`
+  return s
+}
+// 写入值输入框占位提示：可写点显示其允许范围，便于按范围填写
+function cmdValuePlaceholder() {
+  if (cmdForm.refMode !== 'prop') return cmdForm.wKind === 'coil' ? '1/0/true/false' : t('0~65535（原始寄存器值）')
+  const r = cmdWriteRange(cmdForm.prop)
+  return r ? fmtRange(r) : t('工程值')
+}
+function onCmdBoxChange() {
+  cmdForm.device = ''
+  cmdForm.prop = ''
+  cmdResult.value = null
+}
+function onCmdDeviceChange() {
+  cmdResult.value = null
+  const m = cmdDevMeta.value
+  if (!m) return
+  if (cmdForm.op === 'read') cmdForm.refMode = m.props.length ? 'prop' : 'reg'
+  else cmdForm.refMode = m.writes.length ? 'prop' : 'reg'
+  cmdForm.prop = ''
+  cmdForm.addr = ''
+  cmdForm.value = ''
+}
+function onCmdOpChange() {
+  const m = cmdDevMeta.value
+  if (!m) return
+  if (cmdForm.op === 'read') {
+    cmdForm.refMode = m.props.length ? 'prop' : 'reg'
+    if (m.isLora) cmdForm.refMode = 'reg'
+  } else {
+    cmdForm.refMode = (m.writes.length && !m.isLora) ? 'prop' : 'reg'
+  }
+  cmdForm.prop = ''
+  cmdResult.value = null
+}
+function onCmdRefModeChange() {
+  cmdForm.prop = ''
+  cmdResult.value = null
+}
+function switchCmdMode(k) {
+  stopCmdPoll()
+  cmdPending.value = null
+  cmdResult.value = null
+  cmdMode.value = k
+}
+function composeCmdPayload() {
+  const box = cmdForm.box
+  const name = cmdForm.device
+  if (!box || !name) throw new Error(t('请先选择盒子与设备'))
+  const m = cmdDevMeta.value
+  if (!m || (!m.isLora && !m.isModbus)) throw new Error(t('该设备协议暂不支持设备命令（仅 Modbus / LoRaWAN），请用「原始消息」直发 MQTT'))
+  // 从站号（slaveId）不随命令下发：它属于设备配置，盒子按配置里的站号寻址，
+  // 避免命令临时指定站号把值写到同一总线上的另一台设备。
+  const base = { box, device: name }
+  if (m.isLora) {
+    if (cmdForm.op === 'read') return { ...base, cmd: 'read' }
+    const down = { ...base, cmd: 'down' }
+    if (cmdForm.fPort && cmdForm.fPort !== '') down.fPort = Number(cmdForm.fPort)
+    if (cmdForm.loraKind === 'hex') {
+      if (!cmdForm.loraData) throw new Error(t('请填写下行 hex（十六进制，空格自动去除）'))
+      down.hex = String(cmdForm.loraData).replace(/\s+/g, '')
+    } else if (cmdForm.loraKind === 'text') {
+      down.text = cmdForm.loraData
+    } else {
+      let obj
+      try { obj = JSON.parse(cmdForm.loraData || '{}') } catch (e) { throw new Error(t('object 需为合法 JSON')) }
+      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new Error(t('object 需为 JSON 对象（将由 ChirpStack codec 编码下行）'))
+      down.object = obj
+    }
+    return down
+  }
+  if (cmdForm.op === 'read') {
+    const p = { ...base, cmd: 'read' }
+    if (cmdForm.refMode === 'prop' && m.props.length && cmdForm.prop) {
+      p.property = cmdForm.prop
+    } else {
+      if (cmdForm.addr === '') throw new Error(t('请填寄存器地址（从 0 起）'))
+      p.addr = Number(cmdForm.addr)
+      p.type = cmdForm.dtype
+      p.fc = Number(cmdForm.fc)
+      if (cmdForm.scale && cmdForm.scale !== '') p.scale = Number(cmdForm.scale)
+    }
+    return p
+  }
+  // write（Modbus）
+  const p = { ...base, cmd: 'write' }
+  if (cmdForm.refMode === 'prop' && m.writes.length && cmdForm.prop) {
+    p.property = cmdForm.prop
+    if (cmdForm.value === '') throw new Error(t('请填写写入值'))
+    p.value = Number(cmdForm.value)
+    if (!Number.isFinite(p.value)) throw new Error(t('写入值需为数值'))
+    // 硬性限制（与后端同口径）：写入值必须落在模型/可写点位配置的数值范围内
+    const r = cmdWriteRange(cmdForm.prop)
+    if (r) {
+      if (r.min != null && p.value < r.min) {
+        throw new Error(t('写入值 {v} 低于下限 {min}（{src}「{p}」允许 {range}）',
+          { v: p.value, min: r.min, src: r.source, p: cmdForm.prop, range: fmtRange(r) }))
+      }
+      if (r.max != null && p.value > r.max) {
+        throw new Error(t('写入值 {v} 高于上限 {max}（{src}「{p}」允许 {range}）',
+          { v: p.value, max: r.max, src: r.source, p: cmdForm.prop, range: fmtRange(r) }))
+      }
+    }
+  } else {
+    if (cmdForm.addr === '') throw new Error(t('请填寄存器地址（从 0 起）'))
+    p.kind = cmdForm.wKind
+    p.addr = Number(cmdForm.addr)
+    if (cmdForm.wKind === 'coil') {
+      const v = String(cmdForm.value || '').trim().toLowerCase()
+      if (['1', 'true', 'on', 'yes'].includes(v)) p.value = 1
+      else if (['0', 'false', 'off', 'no'].includes(v)) p.value = 0
+      else throw new Error(t('线圈写入值需为 1/0/true/false'))
+    } else {
+      const v = Number(cmdForm.value)
+      if (!Number.isFinite(v)) throw new Error(t('写入值需为数值（原始寄存器值）'))
+      if (!Number.isInteger(v)) throw new Error(t('写保持寄存器需为整数原始值（浮点请先乘倍率取整，如 12.5V×10=125）'))
+      p.value = v
+      // 平台硬性限制（与后端同口径）：裸写的安全范围只认设备配置（同地址可写点位 /
+      // 可写属性的 min·max），命令本身不携带上下限；未配置范围一律拒绝
+      const r = addrWriteRange(cmdForm.addr, cmdForm.wKind)
+      if (!r) {
+        throw new Error(t('裸写寄存器缺少安全范围：请在设备配置中为该可写点位/属性设置上下限（平台拒绝无范围的设备写入，防止超限损伤设备）'))
+      }
+      if (r.min != null && v < r.min) throw new Error(t('写入值 {v} 低于下限 {min}（{src}）', { v, min: r.min, src: r.source }))
+      if (r.max != null && v > r.max) throw new Error(t('写入值 {v} 高于上限 {max}（{src}）', { v, max: r.max, src: r.source }))
+    }
+  }
+  return p
+}
+const cmdPayloadText = computed(() => {
+  try { return JSON.stringify(composeCmdPayload(), null, 2) }
+  catch (e) { return '// ' + (e.message || e) }
+})
+async function execCmd() {
+  if (cmdSending.value) return
+  const box = cmdForm.box
+  let payload
+  try { payload = composeCmdPayload() } catch (e) { store.showToast(String(e.message || e), 'warn'); return }
+  const rid = 'cmd-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+  payload.request_id = rid
+  payload.ts = Math.floor(Date.now() / 1000)
+  const topic = 'cmd/' + box + '/cmd'
+  stopCmdPoll()
+  cmdPending.value = { rid, box }
+  cmdResult.value = null
+  cmdSending.value = true
+  try {
+    const r = await api.boxPublish(topic, JSON.stringify(payload))
+    if (!r.ok) {
+      cmdPending.value = null
+      store.showToast(t('命令发送失败') + '：' + (r.error || r.note || ''), 'error')
+      return
+    }
+    store.showToast(t('已下发 {topic}，等待盒子回报…', { topic }), 'success')
+    pollCmdAck(rid, box)
+  } catch (e) {
+    cmdPending.value = null
+    store.showToast(t('命令发送失败') + '：' + (e.message || e), 'error')
+  } finally {
+    cmdSending.value = false
+  }
+}
+// 命令回报轮询：盒子经 state/{box}/cmd 回报带 request_id 的事件，平台 /box/apps 聚合返回
+function pollCmdAck(rid, box) {
+  const meta = cmdDevMeta.value
+  const deadline = (meta && meta.isLora) ? 20000 : 12000
+  const t0 = Date.now()
+  const tick = async () => {
+    if (!cmdPending.value || cmdPending.value.rid !== rid) return
+    try {
+      const r = await api.boxApps(box)
+      const ev = (r.events || []).find((e) => e.request_id === rid)
+      if (ev) {
+        cmdPending.value = null
+        cmdResult.value = {
+          ok: !!ev.ok,
+          message: ev.message || t('（盒子无文本回报）'),
+          detailText: fmtCmdDetail(ev.detail),
+          ts: ev.ts || Math.floor(Date.now() / 1000),
+        }
+        store.showToast(cmdResult.value.ok ? t('命令执行成功') : t('命令执行失败'), cmdResult.value.ok ? 'success' : 'error')
+        return
+      }
+    } catch (e) { /* 继续轮询 */ }
+    if (Date.now() - t0 > deadline) {
+      cmdPending.value = null
+      cmdResult.value = {
+        ok: null,
+        message: t('超时未收到盒子回报：请确认盒子在线，且 mapper 为支持读/写/LoRa 命令的新版本（旧版会回报「未知命令」失败）'),
+        detailText: '',
+        ts: Math.floor(Date.now() / 1000),
+      }
+      return
+    }
+    cmdTimer = setTimeout(tick, 800)
+  }
+  tick()
+}
+// 初始/数据刷新时自动带出首个可选盒子与设备（不打断用户手动选择）
+watch([cmdBoxes, cmdDevices], () => {
+  if (cmdMode.value !== 'dev') return
+  if (!cmdForm.box && cmdBoxes.value.length) cmdForm.box = cmdBoxes.value[0]
+  const list = cmdDevices.value
+  if (!cmdForm.box || !list.length) return
+  if (!cmdForm.device || !list.some((d) => d.name === cmdForm.device)) {
+    cmdForm.device = list[0].name
+    onCmdDeviceChange()
+  }
+})
+onUnmounted(stopCmdPoll)
+
 </script>
 
 <style scoped>
-/* ==================== 能碳一体机管理 · VSCode 风格统一 ==================== */
+/* ==================== 数据源管理（原「能碳一体机管理」） · VSCode 风格统一 ==================== */
 /* 设计令牌：所有颜色均取全局语义变量（浅色 MATLAB / 深色 sim-dark 主题自动适配），
    透明度统一用 color-mix() 生成，杜绝硬编码色值，保证两套主题观感一致。 */
 .cbx-view {
@@ -3647,6 +4281,12 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .cbx-sec { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; }
 .cbx-sec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 .cbx-sec-head b { font-size: 12px; font-weight: 600; flex: none; letter-spacing: .2px; }
+/* 区块折叠：三角按钮 + 标题本身都可点；折叠时内容不渲染（v-if），首屏更轻 */
+.cbx-caret { flex: none; width: 18px; height: 18px; padding: 0; line-height: 1; font-size: 11px;
+  color: var(--muted); background: transparent; border: none; border-radius: 4px; cursor: pointer; }
+.cbx-caret:hover { color: var(--fg, var(--text)); background: color-mix(in srgb, var(--muted) 14%, transparent); }
+.cbx-sec-toggle { cursor: pointer; user-select: none; }
+.cbx-sec-toggle:hover { color: var(--accent, var(--green)); }
 .cbx-sec-head .cbx-op { margin-left: auto; }
 .cbx-sec-head .cbx-tag { margin-left: auto; }
 .cbx-sec-sub { color: var(--muted); font-size: 10px; }
@@ -3674,7 +4314,27 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .cbx-select:focus { border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent); }
 .cbx-input.cbx-xs { width: 52px; }
 .cbx-input.cbx-sm { width: 110px; }
+.cbx-input.cbx-mid { width: 170px; }
 .cbx-input.cbx-md { width: 230px; }
+.cbx-input.cbx-grow { flex: 1 1 0; min-width: 120px; width: auto; }
+.cbx-input.cbx-num { width: 68px; text-align: right; }
+/* ---- 命令执行（区块④）---- */
+.cbx-cmd-json {
+  flex: 1; min-width: 0; max-height: 150px; overflow: auto; margin: 0;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 3px;
+  padding: 6px 9px; font-size: 11px; line-height: 1.55;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--text); white-space: pre-wrap; word-break: break-all;
+}
+.cbx-cmd-json.slim { max-height: 110px; }
+.cbx-cmd-result {
+  margin-top: 8px; padding: 8px 10px; border-radius: 3px; font-size: 11px; line-height: 1.6;
+  border: 1px solid var(--border); background: var(--panel-2);
+}
+.cbx-cmd-result.ok { color: var(--green); border-color: color-mix(in srgb, var(--green) 40%, transparent); background: color-mix(in srgb, var(--green) 8%, transparent); }
+.cbx-cmd-result.err { color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, transparent); background: color-mix(in srgb, var(--red) 8%, transparent); }
+.cbx-cmd-result.wait { color: var(--yellow); border-color: color-mix(in srgb, var(--yellow) 40%, transparent); background: color-mix(in srgb, var(--yellow) 6%, transparent); }
+.cbx-cmd-result pre { margin: 6px 0 0; }
 /* ---- YAML 预览（浮层展示，不撑高模块高度；深色代码区，VSCode 编辑器观感） ---- */
 .cbx-yaml-wrap {
   position: absolute; top: calc(100% + 8px); left: 0; right: 0; z-index: 30;
@@ -3933,11 +4593,6 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
   border: 1px solid rgba(122,184,255,.3); border-radius: 3px; padding: 0 5px;
 }
 .cbx-msg-payload { color: #cdd5df; opacity: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cbx-cloudlog { max-height: 300px; }
-.cbx-cloudline {
-  flex: 1; color: #e2e8f0; opacity: 1; font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
-  white-space: pre-wrap; word-break: break-all; overflow-wrap: anywhere;
-}
 /* ---- 接入指引 ---- */
 .cbx-guide-flow { display: flex; align-items: stretch; gap: 10px; margin: 8px 0; flex-wrap: wrap; }
 .cbx-flow-node {
@@ -4208,6 +4863,19 @@ defineExpose({ refreshAll, close, openOnboard, openCreate, openModelCreate })
 .ds-row b.err { color: var(--red); }
 .ds-row b.dim, .ds-row .dim, .ds-desc { color: var(--muted); }
 .ds-row b.note { color: #b58900; font-weight: 400; }
+/* 可绑定信号目录（按数据源分组：设备 → 全部数值） */
+.ds-signals { display: flex; flex-direction: column; gap: 8px;
+  border: 1px dashed var(--border); border-radius: 8px; padding: 8px 10px; }
+.ds-sig-group { display: flex; flex-direction: column; gap: 5px;
+  border-top: 1px solid var(--border); padding-top: 6px; }
+.ds-sig-group:first-of-type { border-top: none; padding-top: 0; }
+.ds-sig-hd { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.ds-sig-dev { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 12px; }
+.ds-sig-name { color: var(--accent, var(--green)); font-weight: 600; }
+.ds-sig-val { font-size: 11px; padding: 1px 6px; border-radius: 8px; color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 12%, transparent); cursor: help; }
+.ds-sig-val b { font-weight: 600; color: var(--fg, var(--text)); }
+.ds-sig-val.bad { color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
 .ds-endps { display: inline-flex; gap: 6px; }
 .ds-ep { font-size: 11px; padding: 1px 7px; border-radius: 9px; border: 1px solid var(--border); }
 .ds-ep.on { color: var(--green); border-color: color-mix(in srgb, var(--green) 55%, var(--border)); }

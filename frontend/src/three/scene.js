@@ -1020,6 +1020,11 @@ export class TwinScene {
     this._pr = pr
     this._dpr = window.devicePixelRatio || 1
     this.renderer.setPixelRatio(pr)
+    // 画布的**显示尺寸由 CSS 决定**（main.css 里 .scene-host > canvas 用 100% + !important
+    // 覆盖这里写下的内联尺寸）。于是面板开合动画期间可以只让画面按 CSS 拉伸、不重建绘制
+    // 缓冲，动画结束后再补一次精确 setSize（见 SceneViewer.onResize），避免每帧重建导致掉帧。
+    // 仍保留内联尺寸写入（updateStyle 默认 true）作为兜底：万一 CSS 规则未命中，画布尺寸
+    // 依然正确，只是动画期间不拉伸。
     this.renderer.setSize(w, h)
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     // 工业摄影风 - 略压高光 + 强对比，使金属/墙面更具写实质感（参考图风格）
@@ -4532,7 +4537,7 @@ export class TwinScene {
       this._pr = pr
       this.renderer.setPixelRatio(pr)
     }
-    this.renderer.setSize(w, h)
+    this.renderer.setSize(w, h)   // 显示尺寸由 CSS 决定（内联尺寸仅作兜底），见构造函数处说明
   }
 
   _clearModel() {

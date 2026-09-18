@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any, Dict, Optional
 
 from . import _shared
@@ -113,6 +114,9 @@ def _crd_twin_reading(cloud_id: str) -> Optional[float]:
     """兜底读数：云端 Device CRD twins 缓存（agent 5s 经 cloud/crds 主题推送）。
 
     MQTT data/# 链路（CLOUD_DEVICES）断连/无数据时，绑定同步仍可从 CRD twins 缓存取到读数。
+
+    **只认新鲜数据**：twin 的 timestamp 超出在线窗口（DATA_FRESH_SECONDS）视为设备已停报，
+    不再把冻结的旧值（如称重模块拔掉后仍残留的 41）当作实时读数同步给仿真/绑定。
     匹配 cloud_id 与云端设备名（name）；cloud_id 也可能是盒子设备配置的 cloudDevice 标识
     （如 202603041423），此时先从 box_devices.json 反查设备名再匹配。
     主读数属性（weight/value/...）优先，否则取 twins 中第一个有效 reported。
@@ -124,6 +128,11 @@ def _crd_twin_reading(cloud_id: str) -> Optional[float]:
         return None
     if not (crds or {}).get("ok"):
         return None
+    try:    # 延迟导入避免与 box_console 循环依赖
+        from ..box_console._shared import DATA_FRESH_SECONDS, parse_crd_ts
+    except Exception:  # noqa: BLE001
+        DATA_FRESH_SECONDS, parse_crd_ts = 120, (lambda v: None)
+    now = time.time()
     cid = str(cloud_id or "").strip()
     names = {cid}
     n = _box_device_name_of_cloud_id(cid)   # cloudDevice 标识 → 设备名（如 202603041423 → chengzhong）
@@ -132,7 +141,10 @@ def _crd_twin_reading(cloud_id: str) -> Optional[float]:
     for d in (crds.get("devices") or []):
         if str(d.get("name", "")).strip() not in names:
             continue
-        twins = d.get("twins") or []
+        twins = [t for t in (d.get("twins") or [])
+                 if _twin_recent(t, now, DATA_FRESH_SECONDS, parse_crd_ts)]
+        if not twins:
+            return None                       # 所有 twin 均已过期 → 无可用实时读数
         for pname in _PRIMARY_KEYS:
             for t in twins:
                 if str(t.get("propertyName", "")).lower() == pname:
@@ -150,6 +162,18 @@ def _crd_twin_reading(cloud_id: str) -> Optional[float]:
                 except (TypeError, ValueError):
                     return None
     return None
+
+
+def _twin_recent(t: Dict[str, Any], now: float, window: float, parse_ts) -> bool:
+    """twin 是否为窗口内的新鲜读数（无时间戳按保守策略视为新鲜）。"""
+    try:
+        ts = parse_ts(t.get("timestamp", ""))
+    except Exception:  # noqa: BLE001
+        return True
+    if not ts:
+        return True                            # 云端未给时间戳时沿用旧行为（不误杀）
+    age = now - float(ts)
+    return -60.0 <= age <= float(window)       # 下界防边缘时钟偏快导致「恒新鲜」
 
 
 def resolve_reading(device_id: str) -> Optional[float]:

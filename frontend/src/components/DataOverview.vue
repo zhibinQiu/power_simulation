@@ -282,6 +282,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
 import { t } from '../i18n'
+import { visiblePoll } from '../utils/poll'
 import Icon from './Icon.vue'
 
 const store = useSimStore()
@@ -294,9 +295,14 @@ const STALE_AFTER = 90
 const DEVIATION_SP = 0.15
 const DEVIATION_MED = 0.25
 
-// 当前时间（每秒刷新）
+// 当前时间（每秒刷新）：只驱动时钟与「数据新鲜度」这类真正需要秒级精度的展示。
 const now = ref(Date.now())
-let timer = null
+// 报警条目的时间戳：取「最近一次数据刷新时刻」而非每秒的 now。
+// 否则 alarms 这个含全部设备遍历的 computed 会随秒级 tick 每秒整体重算 + 重渲染
+// （本页最重的一块，每秒一次纯属浪费）。报警只在数据回来时变化，语义上也更准确。
+const lastRefresh = ref(Math.floor(Date.now() / 1000))
+let stopClockPoll = null
+let stopBoxPoll = null
 
 // 一体机云端数据（10s 轮询）
 const boxOverview = ref(null)
@@ -434,19 +440,20 @@ const alarms = computed(() => {
   }
   const ov = boxOverview.value
   const cs = cloudSource.value.key
-  if (cs === 'unreachable') push('high', t('能碳一体机'), cloudError.value || '云端不可达', now.value / 1000)
-  else if (cs === 'degraded') push('mid', t('能碳一体机'), '云端链路部分异常', now.value / 1000)
-  else if (cs === 'stale') push('low', t('能碳一体机'), '云端数据过期', now.value / 1000)
-  if (ov?.cloudcore && ov.cloudcore.available === false) push('high', t('能碳一体机'), 'CloudCore 异常', now.value / 1000)
-  if (ov?.broker && ov.broker.connected !== true) push('mid', t('能碳一体机'), 'MQTT Broker 未连接', now.value / 1000)
+  const stamp = lastRefresh.value
+  if (cs === 'unreachable') push('high', t('能碳一体机'), cloudError.value || '云端不可达', stamp)
+  else if (cs === 'degraded') push('mid', t('能碳一体机'), '云端链路部分异常', stamp)
+  else if (cs === 'stale') push('low', t('能碳一体机'), '云端数据过期', stamp)
+  if (ov?.cloudcore && ov.cloudcore.available === false) push('high', t('能碳一体机'), 'CloudCore 异常', stamp)
+  if (ov?.broker && ov.broker.connected !== true) push('mid', t('能碳一体机'), 'MQTT Broker 未连接', stamp)
   for (const n of boxNodes.value) {
     const s = nodeState(n).key
-    if (s === 'abnormal') push('high', `${t('盒子节点')} · ${n.name}`, '节点未就绪', now.value / 1000)
-    else if (s === 'stopped') push('low', `${t('盒子节点')} · ${n.name}`, '状态未知', now.value / 1000)
+    if (s === 'abnormal') push('high', `${t('盒子节点')} · ${n.name}`, '节点未就绪', stamp)
+    else if (s === 'stopped') push('low', `${t('盒子节点')} · ${n.name}`, '状态未知', stamp)
   }
   for (const d of boxDevices.value) {
     const s = devState(d).key
-    if (s === 'stopped') push('mid', `${t('传感器')} · ${d.name}`, (d.data_ts || d.last_seen) ? '长时间离线' : '未上报数据', now.value / 1000)
+    if (s === 'stopped') push('mid', `${t('传感器')} · ${d.name}`, (d.data_ts || d.last_seen) ? '长时间离线' : '未上报数据', stamp)
   }
   list.sort((a, b) => (b.ts || 0) - (a.ts || 0))
   return list
@@ -520,10 +527,9 @@ async function loadBox() {
     const [ov, dv] = await Promise.allSettled([api.boxOverview(), api.boxDevices()])
     if (ov.status === 'fulfilled') boxOverview.value = ov.value
     if (dv.status === 'fulfilled') boxDevicesData.value = dv.value?.devices || []
+    lastRefresh.value = Math.floor(Date.now() / 1000)
   } catch (e) { /* 忽略，保持上次数据 */ }
 }
-let boxTimer = null
-
 onMounted(() => {
   // 主题：优先用户记忆，否则跟随全局仿真模式（.app.sim-dark）
   let saved = null
@@ -531,12 +537,12 @@ onMounted(() => {
   if (saved === 'light' || saved === 'dark') theme.value = saved
   else theme.value = document.querySelector('.app')?.classList.contains('sim-dark') ? 'dark' : 'light'
   loadBox()
-  timer = setInterval(() => { now.value = Date.now() }, 1000)
-  boxTimer = setInterval(loadBox, 10000)
+  stopClockPoll = visiblePoll(() => { now.value = Date.now() }, 1000)
+  stopBoxPoll = visiblePoll(loadBox, 10000)
 })
 onBeforeUnmount(() => {
-  if (timer) clearInterval(timer)
-  if (boxTimer) clearInterval(boxTimer)
+  if (stopClockPoll) { stopClockPoll(); stopClockPoll = null }
+  if (stopBoxPoll) { stopBoxPoll(); stopBoxPoll = null }
 })
 
 // ---------- 数值自适应缩放（v-fit）：内容超出容器宽度时等比缩小字号，保证数字不溢出模块 ----------

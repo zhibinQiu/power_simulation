@@ -234,16 +234,25 @@
       <!-- ===== 附加传感 / 可变设备：绑定到本工序设备；数值来源支持下拉 ===== -->
       <CollapseSection :title="t('附加传感 / 可变设备')" tone="blue" :show-more="false">
       <div class="card">
-        <div class="pr-hint">{{ t('在编排模式中把传感器 / 可变设备绑定到具体的工艺设备（数据绑定方向：工序 ← 传感）。每个绑定可设「数值来源」：模拟数据 / 固定值 / 工艺参数。运行态出现在设备树与数据分析中。') }}</div>
+        <div class="pr-hint">{{ t('在编排模式中把传感器 / 可变设备绑定到具体的工艺设备（数据绑定方向：工序 ← 传感）。每个绑定的「数据源」可选：固定值 / 随机模拟值 / 数据源管理中已接入的传感器设备（按点位取实时读数）。运行态出现在设备树与数据分析中。') }}</div>
         <div v-for="ag in attachGroups" :key="ag.kind" class="ports-col">
           <span class="pc-t">{{ ag.label }}（已绑 {{ attachedOf(ag.kind).length }}）</span>
           <div v-for="att in attachedOf(ag.kind)" :key="att.uid" class="gio-row att-row">
-            <span class="att-lbl" :title="t('数值来源：') + srcTextOf(att)">{{ att.label }}</span>
+            <span class="att-lbl" :title="t('数据源：') + srcTextOf(att)">{{ att.label }}</span>
             <select class="att-src" :value="srcOf(att)" @change="onAttSrc(att, $event.target.value)">
-              <option value="sim">{{ t('模拟数据（缓变）') }}</option>
-              <option value="fixed">{{ t('固定值（模板默认）') }}</option>
-              <optgroup :label="t('工艺参数')">
-                <option v-for="o in paramOpts" :key="'p' + o.key" :value="'param::' + o.key">{{ o.label }}</option>
+              <option value="fixed">{{ t('固定值') }}</option>
+              <option value="sim">{{ t('随机模拟值') }}</option>
+              <!-- 数据源管理（能碳一体机）中已接入的传感器设备：每台设备一个分组，组内为其点位 -->
+              <optgroup v-for="g in boxSourceGroups" :key="g.name"
+                        :label="t('数据源设备') + ' · ' + g.name + (g.model ? '（' + g.model + '）' : '')">
+                <option v-for="p in g.props" :key="p.name" :value="'device::' + g.name + '::' + p.name">
+                  {{ p.name }}{{ p.unit ? '（' + p.unit + '）' : '' }}{{ p.value != null ? ' · ' + p.value : '' }}
+                </option>
+              </optgroup>
+              <option v-if="!boxSourceGroups.length" disabled>{{ t('暂无数据源设备') }}</option>
+              <!-- 兼容历史数据：已绑定工艺参数的实例保留回显与改回入口 -->
+              <optgroup v-if="att.src === 'param'" :label="t('工艺参数')">
+                <option v-for="o in paramOpts" :key="'p' + o.param" :value="'param::' + o.param">{{ o.label }}</option>
               </optgroup>
             </select>
             <button class="x-btn danger" :title="t('解除绑定')" @click="store.removeAttachFromNode(node.id, att.uid)">✕</button>
@@ -334,7 +343,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { MATERIALS, MATERIAL_MAP, PROCESS_MAP, DEVICE_MAP } from '../data/flowLibrary'
 import { ATTACH_GROUPS } from '../data/attachLibrary'
@@ -357,31 +366,50 @@ const attachGroups = ATTACH_GROUPS.map((g) => ({
   unitOf: (it) => (g.key === 'sensor' ? (it.measure ? it.measure.unit : '') : (it.setpoint ? it.setpoint.unit : '')),
 }))
 const attachedOf = (kind) => (node.value ? (node.value.attached || []).filter((a) => a.kind === kind) : [])
-// 数值来源选项（工艺参数部分来自 store 候选，label 带单位便于辨识）
+// 数据源下拉分组：数据源管理（能碳一体机）中已接入的传感器设备，组内为该设备的点位
+const boxSourceGroups = computed(() => store.boxSourceGroups)
+// 工艺参数候选（仅历史 param 绑定回显时使用）
 const paramOpts = computed(() => {
   if (!node.value) return []
   return store.attachSourceOptions(node.value.id).filter((o) => o.value === 'param')
 })
-const srcOf = (att) => (att.src === 'param' ? 'param::' + (att.param || '') : att.src || 'fixed')
+const srcOf = (att) => {
+  if (att.src === 'param') return 'param::' + (att.param || '')
+  if (att.src === 'device') return 'device::' + (att.device || '') + '::' + (att.prop || '')
+  return att.src || 'fixed'
+}
 function srcTextOf(att) {
   if (att.src === 'param') {
     const o = paramOpts.value.find((x) => x.param === att.param)
     return o ? o.label : att.param
   }
-  return t(att.src === 'sim' ? '模拟数据（缓变）' : '固定值（模板默认）')
+  if (att.src === 'device') return (att.device || '—') + (att.prop ? ' · ' + att.prop : '')
+  return t(att.src === 'sim' ? '随机模拟值' : '固定值')
 }
 // 添加：把模板实例绑定到当前工艺节点
 function onAddAttach(kind, type) {
   if (!type || !node.value) return
   const att = store.addAttachToNode(node.value.id, kind, type)
-  if (att) store.toast = t('已为工艺「{name}」绑定「{label}」：数值来源默认模拟数据，可下拉切换为工艺参数 / 固定值', { name: node.value.name, label: att.label })
+  if (att) store.toast = t('已为工艺「{name}」绑定「{label}」：数据源默认随机模拟值，可下拉切换为固定值 / 数据源管理中的传感器设备', { name: node.value.name, label: att.label })
 }
-// 下拉切换数值来源（param::key / sim / fixed）
+// 下拉切换数据源（固定值 / 随机模拟值 / device::设备名::点位 / param::key）
 function onAttSrc(att, v) {
   if (!node.value) return
-  if (v.indexOf('param::') === 0) store.setAttachSource(node.value.id, att.uid, { src: 'param', param: v.slice(7) })
-  else store.setAttachSource(node.value.id, att.uid, { src: v })
+  if (v.indexOf('device::') === 0) {
+    const rest = v.slice(8)
+    const i = rest.indexOf('::')
+    store.setAttachSource(node.value.id, att.uid, { src: 'device', device: rest.slice(0, i), prop: rest.slice(i + 2) })
+    return
+  }
+  if (v.indexOf('param::') === 0) {
+    store.setAttachSource(node.value.id, att.uid, { src: 'param', param: v.slice(7) })
+    return
+  }
+  store.setAttachSource(node.value.id, att.uid, { src: v })
 }
+// 面板可见期间持续刷新「数据源管理」设备列表（含实时读数），供数据源下拉与读数取用
+onMounted(() => store.startBoxSourcePolling())
+onBeforeUnmount(() => store.stopBoxSourcePolling())
 const groupMembers = computed(() => {
   if (!group.value) return []
   const ids = new Set(group.value.members || [])

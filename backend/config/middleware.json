@@ -1,13 +1,6 @@
 {
   "enabled": true,
-  "subscribe": false,
   "base_url": "http://127.0.0.1:42084",
   "token": "",
-  "broker": {
-    "host": "127.0.0.1",
-    "port": 41884,
-    "username": "",
-    "password": ""
-  },
   "timeout": 6.0
 }

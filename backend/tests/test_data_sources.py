@@ -197,8 +197,7 @@ def clean_state():
 
 def _reset_runtime():
     ds_config._current = None
-    ds_config._cache_ts = 0.0
-    ds_config._ext_map_ts = 0.0
+    data_sources.reset_cache()          # 目录视图 / 信号目录 / 中间件读缓存一并失效
     with mqtt_source._LOCK:
         mqtt_source.CLOUD_DEVICES.clear()
         mqtt_source.READINGS.clear()
@@ -229,7 +228,7 @@ class TestCatalog:
 
     def test_middleware_config_defaults(self):
         cfg = middleware_client.public_config()
-        assert cfg["base_url"] and cfg["broker"]["port"] >= 40000   # 端口规范：>40000
+        assert cfg["base_url"] and cfg["timeout"] >= 1.0   # 只保留服务地址/超时（中间件自身不跑 Broker）
 
 
 # ---------------------------------------------------------------------------
@@ -248,8 +247,6 @@ class TestListing:
                    if s["type"] == "box")
         assert "connected" in box["status"] and "message_count" in box["status"]
         assert "broker_host" in box["status"]
-        # 多 Broker 订阅：状态里给出云端与中间件两个端点
-        assert set(box["status"]["endpoints"]) >= {"cloud", "middleware"}
 
     def test_toggle_box_updates_catalog(self, fake_mw):
         data_sources.toggle("box", False)
@@ -370,9 +367,23 @@ class TestExternal:
         assert sid not in fake_mw.sources
         assert ds_config.find_source(sid, force=True) is None
 
-    def test_cannot_remove_builtin(self, fake_mw):
-        with pytest.raises(ValueError):
-            data_sources.remove("box")
+    def test_remove_builtin_and_restore(self, fake_mw):
+        """统一管理无例外：内置 box 同样可删除（删除即停止采纳数据），并可原样加回。"""
+        data_sources.remove("box")
+        assert ds_config.find_source("box", force=True) is None
+        assert "box" in ds_config.builtin_removed_ids()
+        assert ds_config.is_source_enabled("box", max_age=0) is False      # 删除后立即停止采纳
+        r = data_sources.restore_builtin("box")
+        assert r["ok"] is True and any(s["id"] == "box" for s in r["sources"])
+        assert ds_config.find_source("box", force=True) is not None
+        assert "box" not in ds_config.builtin_removed_ids()
+        assert ds_config.is_source_enabled("box", max_age=0) is True
+
+    def test_start_keeps_removed_builtin_out(self, fake_mw):
+        """start() 尊重用户删除：进程重启不会把已删除的内置 box 又补建回来。"""
+        data_sources.remove("box")
+        data_sources.start()
+        assert ds_config.find_source("box", force=True) is None
 
     def test_status_merges_middleware_runtime(self, fake_mw):
         """状态 = 中间件采集状态 + 平台摄取统计。"""
@@ -483,3 +494,99 @@ class TestSync:
         fake_mw.online = False
         res = data_sources.sync_with_middleware()
         assert res["ok"] is False and res["online"] is False
+
+
+# ---------------------------------------------------------------------------
+# 七、可绑定信号目录（signal_catalog：编排模式「附加传感/可变设备」绑定实测值）
+# ---------------------------------------------------------------------------
+class TestSignalCatalog:
+    """按数据源分组列出设备及其**全部数值**：一台设备多值须逐条列出。"""
+
+    @staticmethod
+    def _put(cloud_id, box, fields, last_seen=None):
+        with mqtt_source._LOCK:
+            mqtt_source.CLOUD_DEVICES[cloud_id] = {
+                "id": cloud_id, "box": box, "topic": f"data/{box}/{cloud_id}",
+                "last_seen": last_seen or time.time(), "fields": dict(fields),
+                "primary": list(fields.values())[0] if fields else None,
+            }
+
+    def test_empty_catalog_has_no_devices(self):
+        cat = data_sources.signal_catalog()
+        assert cat["ok"] is True
+        assert all(not s["devices"] for s in cat["sources"])
+
+    def test_multi_value_device_lists_every_field(self):
+        """一台设备上报多个值：每个值都要作为可绑定信号列出（key 唯一）。"""
+        self._put("chengzhong", "nt001", {"weight": 0.41, "temp": 36.5})
+        cat = data_sources.signal_catalog()
+        box_src = next(s for s in cat["sources"] if s["id"] == "box")
+        dev = next(d for d in box_src["devices"] if d["id"] == "chengzhong")
+        fields = [v["field"] for v in dev["values"]]
+        assert set(fields) == {"weight", "temp"}
+        # key 形如 box/device/field，前端凭 key 绑定并取实时读数
+        assert {v["key"] for v in dev["values"]} == {"nt001/chengzhong/weight",
+                                                     "nt001/chengzhong/temp"}
+        assert next(v for v in dev["values"] if v["field"] == "weight")["value"] == 0.41
+
+    def test_external_device_grouped_by_its_source(self, fake_mw):
+        """外部源设备按 box 前缀归属到自己的数据源条目，不混进「能碳一体机」。"""
+        # 前缀必须唯一：本机目录已登记 ext-steel/idc，测试用独立前缀
+        sid = _register_ext(name="外部信号源", box="ext-sigtest", enabled=True)
+        self._put("bf1", "ext-sigtest", {"temp": 1250.0})
+        cat = data_sources.signal_catalog()
+        ext = next(s for s in cat["sources"] if s["id"] == sid)
+        assert [d["id"] for d in ext["devices"]] == ["bf1"]
+        assert ext["devices"][0]["box"] == "ext-sigtest"
+        box_src = next(s for s in cat["sources"] if s["id"] == "box")
+        assert [d["id"] for d in box_src["devices"]] == []
+
+
+# ---------------------------------------------------------------------------
+# 八、性能护栏（轻量化）：一轮轮询只打一次中间件、写后即时失效、目录零拷贝只读
+# ---------------------------------------------------------------------------
+class TestReadCaching:
+    def test_one_middleware_http_per_listing(self, monkeypatch):
+        """一轮数据源列表查询只调用中间件一次（原先 list_sources + health 各一次）。"""
+        calls = {"n": 0}
+
+        def _list():
+            calls["n"] += 1
+            return [{"id": "x1", "name": "x", "status": {"running": True}}]
+
+        monkeypatch.setattr(middleware_client, "list_sources", _list)
+        data_sources.reset_cache()
+        for _ in range(3):                       # 模拟前端 6s 轮询连打三次
+            r = data_sources.list_sources()
+            assert r["middleware"]["online"] is True
+        assert calls["n"] == 1                   # 快照窗口内复用同一次 HTTP
+
+    def test_snapshot_force_refreshes(self, monkeypatch):
+        """force=True（写操作后）必须真正刷新，不吃缓存。"""
+        calls = {"n": 0}
+
+        def _list():
+            calls["n"] += 1
+            return []
+
+        monkeypatch.setattr(middleware_client, "list_sources", _list)
+        data_sources.reset_cache()
+        data_sources.list_sources()
+        data_sources.list_sources(force=True)
+        assert calls["n"] == 2
+
+    def test_write_invalidates_cache(self, fake_mw):
+        """写操作后缓存立即失效：增删启停后列表即时反映，无需等待 TTL。"""
+        data_sources.list_sources()                       # 先填充快照缓存
+        sid = _register_ext(name="缓存校验源", box="ext-cachetest", enabled=True)
+        assert sid in [s["id"] for s in data_sources.list_sources()["sources"]]
+        data_sources.remove(sid)
+        assert sid not in [s["id"] for s in data_sources.list_sources()["sources"]]
+
+    def test_entries_shared_public_sources_copied(self):
+        """目录契约：内部只读零拷贝（entries/entry），对外可改的走副本（public_sources）。"""
+        assert ds_config.entries() is ds_config.entries()
+        assert ds_config.entry("box") is ds_config.entry("box")
+        copy = ds_config.public_sources()
+        copy[0]["name"] = "被改坏的名字"
+        assert ds_config.entry("box")["name"] != "被改坏的名字"

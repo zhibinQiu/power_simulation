@@ -16,5 +16,5 @@ DATA_DIR = os.path.join(APP_DIR, "data")                                        
 
 
 def config_path(*parts: str) -> str:
-    """拼接 config 目录下的文件绝对路径：config_path("mqtt.yaml") -> backend/config/mqtt.yaml"""
+    """拼接 config 目录下的文件绝对路径：config_path("box_config.json") -> backend/config/box_config.json"""
     return os.path.join(CONFIG_DIR, *parts)

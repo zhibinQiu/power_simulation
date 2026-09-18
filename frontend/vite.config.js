@@ -4,48 +4,9 @@ import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-// 构建期扫描 public/2D-image/devices，把「实际存在的设备图名」固化成虚拟模块清单。
-// 原方案是运行时对每张候选图发 HEAD 探测：首帧只能先画矢量图元、探测回来再换图，
-// 有肉眼可见的「矢量 → 图片」跳变，且 dev server 重启/图片后放进去时会整屏回退矢量。
-// 改为构建期清单后：打开 2D 工艺图即直接上图，零探测请求、零跳变。
-// 新增/删除图片后：生产重新 build 即可；dev 下由 watcher 自动失效清单并刷新页面。
-const DEV_IMG_ABS = fileURLToPath(new URL('./public/2D-image/devices', import.meta.url))
-// 设备图「图形真实边界」清单（scripts/gen-devimg-meta.py 解析 PNG alpha 通道生成）。
-// 透明背景素材的设备本体并不铺满画布（热风炉仅占 46%、铁水预处理 50%…），前端必须按
-// 图形边界而非整张图定位，否则透明留白会把设备图形挤小、与连线端点脱开。
-const DEV_IMG_META = fileURLToPath(new URL('./src/data/deviceImgMeta.json', import.meta.url))
-const VID_DEV_IMG = 'virtual:device-images'
-const deviceImages = () => {
-  const read = () => {
-    try { return fs.readdirSync(DEV_IMG_ABS).filter((f) => /\.png$/i.test(f)).sort() } catch { return [] }
-  }
-  const readMeta = () => {
-    try { return JSON.parse(fs.readFileSync(DEV_IMG_META, 'utf8')) } catch { return {} }
-  }
-  let names = read()
-  const vid = '\0' + VID_DEV_IMG
-  return {
-    name: 'device-images',
-    resolveId(id) { return id === VID_DEV_IMG ? vid : null },
-    load(id) {
-      if (id !== vid) return null
-      return `export const names = ${JSON.stringify(names)}\nexport const meta = ${JSON.stringify(readMeta())}`
-    },
-    configureServer(server) {
-      server.watcher.add(DEV_IMG_ABS)
-      server.watcher.add(DEV_IMG_META)
-      const onChange = (f) => {
-        if (!String(f).includes('2D-image') && !String(f).includes('deviceImgMeta')) return
-        const next = read()
-        names = next
-        const mod = server.moduleGraph.getModuleById(vid)
-        if (mod) server.moduleGraph.invalidateModule(mod)
-        server.ws.send({ type: 'full-reload' })
-      }
-      server.watcher.on('add', onChange).on('unlink', onChange).on('change', onChange)
-    },
-  }
-}
+// 注：原 device-images 插件（构建期扫描 public/2D-image/devices 生成图片清单 + alpha 边界元数据）
+// 已于 2026-09-17 移除 —— 2D 工艺设备图改为**程序化 SVG 绘制**（src/data/twin2dFigures.js），
+// 不再有 41MB 的 PNG 素材，也不需要离线跑 scripts/gen-devimg-meta.py 标定边界坐标。
 
 // 构建前清理 dist 中上一次的旧产物（仅保留 public 复制内容与 index.html），
 // 避免产物无限累积导致 dist 膨胀（此前累积达 305MB/740 文件）。
@@ -64,7 +25,7 @@ export default defineConfig({
   //       对外入口收敛为 https://www.nengyousuan.com/sim/（门户 nginx 剥离 /sim 前缀后转发到 71:40014）。
   //       如需恢复直连 / 子域名整站代理，改回 '/' 重新构建即可。
   base: '/sim/',
-  plugins: [vue(), cleanDistOldAssets(), deviceImages()],
+  plugins: [vue(), cleanDistOldAssets()],
   server: {
     host: '127.0.0.1',
     port: 5173,
@@ -85,12 +46,18 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
     // 旧产物由 clean-dist-old-assets 插件在构建前清理（emptyOutDir 在本机被 safe-delete 拦截）
     emptyOutDir: false,
-    // 分包：vue/pinia 与 three 单独成 chunk，利于浏览器长缓存 + 并行加载，减少首屏 IO 等待
+    // 分包：把体积大且不常变的第三方库拆成「稳定的 vendor chunk」——
+    //   · 浏览器可并行下载多个文件（比一个大文件更快），静态资源已 gzip + immutable 强缓存；
+    //   · 业务代码发版变动时这些 vendor 的 hash 不变，老用户无需重复下载。
+    // three（3D 孪生）与 echarts/zrender（AI 对话图表）都是进入对应功能才加载，不占首屏关键路径。
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vue-vendor': ['vue', 'pinia'],
-          'three': ['three'],
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('/three/')) return 'three'
+          if (id.includes('/echarts/') || id.includes('/zrender/')) return 'echarts'
+          if (id.includes('/vue/') || id.includes('/@vue/') || id.includes('/pinia/')) return 'vue-vendor'
+          return undefined
         },
       },
     },

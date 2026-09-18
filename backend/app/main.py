@@ -29,6 +29,7 @@ from . import data_sources
 from . import mqtt_source
 from . import presets
 from . import realtime
+from .compression import CompressionMiddleware
 from .api.box_router import router as box_router
 from .api.carbon_assets_router import (router as carbon_assets_router,
                                        share_router as report_share_router)
@@ -56,10 +57,9 @@ async def _lifespan(app):
     # 启动实时数据源（MQTT 订阅，参照参考项目 yunduan1 数据链路）：
     # 后台线程连接云端 MQTT Broker 订阅主题（Broker 配置前端化：能碳一体机管理 -> 总览 -> 配置 Broker，
     # 保存后热更新重连并持久化到 box_config.json），设备读数一律来自该真实数据源。
-    # 启动实时数据源：**订阅两类数据入口**（见 mqtt_source.client）
-    #   cloud      ：云端 Broker（41883），能碳一体机盒子/云端 agent 推送；中间件
-    #                external 形态下外部数据源与模拟数据也直发本 Broker（按前缀区分）；
-    #   middleware ：中间件独立数据端口（仅 local 形态，external 形态随 subscribe=false 停用）。
+    # 启动实时数据源：**唯一订阅入口 = 云端 Broker**（见 mqtt_source.client）
+    #   cloud：云端 Broker（41883），能碳一体机盒子/云端 agent 推送；中间件把外部数据
+    #          转换后也直发本 Broker（ext/# 上行空间 → data/ext-*），按前缀区分。
     mqtt_source.start()
     # 统一数据源接入（box 能碳一体机 / external 经中间件接入的外部数据，见 app/data_sources/）：
     # 登记默认源、与中间件对账补注册。平台与中间件自身都不产生模拟数据。
@@ -89,6 +89,9 @@ app.add_middleware(
     allow_origins=["*"], allow_credentials=True,
     allow_methods=["*"], allow_headers=["*"],
 )
+# 响应压缩（gzip / brotli）：前端产物与 JSON 接口传输量直降 60~75%，
+# SSE 推理流与图片类自动跳过，详见 app/compression.py 说明。
+app.add_middleware(CompressionMiddleware)
 
 # 业务域路由（保持原有 /api 路径兼容）
 app.include_router(simulation_router)          # 核心仿真（预置/解析/仿真/策略/扫描/审计/聊天/AI 优化）
@@ -163,17 +166,42 @@ realtime.register_realtime(app)
 
 
 # ------------------------- 静态托管前端 -------------------------
+# 为什么要自定义挂载类：Starlette StaticFiles 只发 ETag/Last-Modified，浏览器每次都要往返
+# 校验（304），首屏十几个资源等于多一轮 RTT。这里按资源性质补 Cache-Control：
+#   · assets/*（文件名自带内容 hash）→ immutable 强缓存一年，二次访问零请求；
+#   · 其它静态文件（无 hash）→ 缓存一周并允许过期后续用；
+#   · index.html / 目录入口 → no-store，保证发版后刷新即生效。
+class CacheAwareStaticFiles(StaticFiles):
+    def file_response(self, *args, **kwargs):
+        resp = super().file_response(*args, **kwargs)
+        full_path = str(args[0]) if args else str(kwargs.get("full_path", ""))
+        try:
+            rel = os.path.relpath(full_path, self.directory).replace(os.sep, "/")
+        except Exception:  # pragma: no cover - 路径异常时不阻断响应
+            rel = ""
+        resp.headers["Cache-Control"] = _cache_control_for_static(rel)
+        return resp
+
+
+def _cache_control_for_static(rel: str) -> str:
+    if rel.startswith("assets/"):
+        return "public, max-age=31536000, immutable"
+    if rel.endswith(".html") or rel in ("", "."):
+        return "no-store"
+    return "public, max-age=604800, stale-while-revalidate=86400"
+
+
 # assets 子目录可能未构建（如仅 index.html 存在），逐个按存在性挂载，避免后端启动崩溃
 _assets_dir = os.path.join(FRONTEND_DIST, "assets")
 if os.path.isdir(_assets_dir):
-    app.mount("/assets", StaticFiles(directory=_assets_dir), name="assets")
+    app.mount("/assets", CacheAwareStaticFiles(directory=_assets_dir), name="assets")
 
 # base=/sim/ 双入口兼容：门户域名反代（www.nengyousuan.com/sim/，nginx 剥离 /sim 前缀后
 # 走上面的 /assets 或根路径）与 IP:40014 直连（浏览器资源引用为 /sim/*）均需可用。
 # 直连时后端须能按 /sim 前缀命中同一份 dist，故此处把 /sim 也挂载到 dist 根目录
 # （html=True：/sim/ 返回 index.html，/sim/assets/* 落盘命中）。注册在 SPA catch-all 之前。
 if os.path.isdir(FRONTEND_DIST):
-    app.mount("/sim", StaticFiles(directory=FRONTEND_DIST, html=True), name="sim-frontend")
+    app.mount("/sim", CacheAwareStaticFiles(directory=FRONTEND_DIST, html=True), name="sim-frontend")
 
 if os.path.isdir(FRONTEND_DIST):
     @app.get("/{full_path:path}")

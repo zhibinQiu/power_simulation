@@ -396,14 +396,23 @@ def collect_logs() -> Dict[str, Any]:
 # ------------------------- MQTT 推送（mosquitto_pub，零依赖） -------------------------
 
 def _pub(topic: str, payload: Dict[str, Any]) -> None:
-    """向云端本地 Broker publish 一条 JSON 消息（mosquitto_pub 短连接）。"""
+    """向云端本地 Broker publish 一条 JSON 消息（mosquitto_pub 短连接）。
+
+    agent 刻意不装 pip 包（见 install_agent.sh），故仍走 mosquitto_pub CLI；
+    但载荷改用 **stdin（-l）** 而非命令行参数（-m）：state/crds 这类大对象走
+    argv 会逼近 ARG_MAX（单参数 128KB 上限）且需要额外的转义/拷贝。
+    同时校验 returncode —— 否则 publish 失败会静默丢数据，平台侧只看到"无推送"。
+    """
     try:
         cmd = ["mosquitto_pub", "-h", str(_CFG.get("broker_host", "127.0.0.1")),
                "-p", str(_CFG.get("broker_port", 41883)), "-t", topic,
-               "-m", json.dumps(payload, ensure_ascii=False), "-q", "1"]
+               "-l", "-q", "1"]
         if _CFG.get("broker_username"):
             cmd += ["-u", str(_CFG["broker_username"]), "-P", str(_CFG.get("broker_password", ""))]
-        subprocess.run(cmd, capture_output=True, timeout=10)
+        proc = subprocess.run(cmd, input=json.dumps(payload, ensure_ascii=False),
+                              capture_output=True, text=True, timeout=15)
+        if proc.returncode != 0:
+            log(f"publish {topic} 失败 rc={proc.returncode}：{(proc.stderr or '').strip()[:200]}")
     except Exception as e:  # noqa: BLE001
         log(f"publish {topic} 失败：{e}")
 

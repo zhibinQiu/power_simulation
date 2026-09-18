@@ -1,9 +1,9 @@
 """中间件管理 API（HTTP JSON，零第三方依赖）。
 
 平台通过本 API 完成「外部数据源注册到中间件」的全部操作，并通过 /api/health
-判断中间件与内置 Broker 是否可用：
+判断中间件与输出桥（paho 直发 output.broker）是否可用：
 
-  GET    /api/health              中间件 + 内置 Broker + 输出桥状态
+  GET    /api/health              中间件 + 输出桥状态
   GET    /api/types               可用数据源类型与参数 schema（前端表单渲染）
   GET    /api/sources             数据源列表（含运行状态）
   POST   /api/sources             注册数据源
@@ -146,12 +146,11 @@ class ManagementApi(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
-    def __init__(self, registry: Any, broker: Any, bridge: Any,
+    def __init__(self, registry: Any, bridge: Any,
                  host: str = "0.0.0.0", port: int = 42084, token: str = "",
                  logger: Any = None):
         super().__init__((host, int(port)), _Handler)
         self.registry = registry
-        self.broker = broker
         self.bridge = bridge
         self.token = str(token or "")
         self.log = logger or (lambda *a: None)
@@ -168,22 +167,11 @@ class ManagementApi(ThreadingHTTPServer):
             raise ApiError(403, "Token 无效")
 
     def _health(self) -> Dict[str, Any]:
-        if self.broker is not None:
-            bkr = self.broker.status()
-        else:
-            # external 模式：未启内置 Broker，数据直发外部 Broker（如云端 41883）
-            bmode = "external"
-            if self.bridge is not None:
-                bmode = (self.bridge.status() or {}).get("mode") or bmode
-            bkr = {"running": False, "enabled": False, "mode": bmode,
-                   "note": "external 模式：转换后的数据直发外部 Broker（如云端 41883），"
-                           "无内置 Broker，平台经云端端点订阅即可取数"}
         return {
             "ok": True,
             "service": "carbon-middleware",
             "version": _MW_VERSION,
             "uptime": int(time.time() - self.started_at),
-            "broker": bkr,
             "bridge": self.bridge.status() if self.bridge else {},
             "sources": len(self.registry.list()),
             "types": [t["type"] for t in self.registry.types()],
