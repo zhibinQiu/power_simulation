@@ -1,6 +1,9 @@
 // 附加设备资源库（所有场景可用的通用资源树，供工艺节点在编排属性面板中添加）：
 //   「传感」= 工艺可附加的通用传感器 —— 每个传感器仅携带一个感知数值（measure 单感知量）；
-//   「调节」= 工艺可附加的可调设备 —— 设定值可调节（模拟运行工况，如变频器/变压器）。
+//            传感器是唯一的取数对象：读数可来自固定值 / 随机模拟 / 数据源管理的实测设备 / 随可变设备联动。
+//            其中「电功率传感器」（kW）是工序能碳核算的功率来源。
+//   「调节」= 工艺可附加的可调设备 —— 只有设定值、不取数（设定值只用于调节运行工况，如变频/调压）。
+//            它的实际功率不由自己给出：要核算功率就另外添加电功率传感器（数据源可设为随本设备联动）。
 // 绑定方式与「工艺类型 → 典型可调设备」一致，但挂在具体工艺节点（scheme node.attached[]）上：
 // 默认方案不含任何附加设备，因此钢铁企业默认传感设备保持不变；
 // 用户在某工艺节点上添加后，该工艺在场景菜单 / 资源管理器 / 数据分析中即出现相应设备。
@@ -23,6 +26,10 @@ export const SENSOR_TEMPLATES = [
     measure: { label: '水流量', unit: 'm³/h' }, range: { min: 0, max: 2000 }, def: 150,
     accuracy: '±0.5 %',
     desc: '电磁 / 超声波流量计，用于监测循环水、净环水等工艺水流量，仅一个感知数值（水流量）。' },
+  { type: 'water_speed_sensor', kind: 'sensor', label: '水流速传感器', unit: 'm/s',
+    measure: { label: '水流速', unit: 'm/s' }, range: { min: 0, max: 10 }, def: 2.2,
+    accuracy: '±0.1 m/s',
+    desc: '电磁 / 超声波流速计（或由流量计读数 ÷ 管截面换算），用于监测循环水、净环水管内流速；把数据源设为「随附加可调设备联动」后可随循环水泵变压器（或变频器）的设定值线性变化，是泵组调速效果最直接的观测量。' },
   { type: 'gas_flow_sensor', kind: 'sensor', label: '气体流量传感器', unit: 'm³/h',
     measure: { label: '气体流量', unit: 'm³/h' }, range: { min: 0, max: 100000 }, def: 8000,
     accuracy: '±1 %',
@@ -70,7 +77,7 @@ export const SENSOR_TEMPLATES = [
   { type: 'power_sensor', kind: 'sensor', label: '电功率传感器', unit: 'kW',
     measure: { label: '有功功率', unit: 'kW' }, range: { min: 0, max: 500000 }, def: 2600,
     accuracy: '±0.5 %',
-    desc: '功率变送器 / 智能电表模块，用于工序用电负荷监测（有功功率），仅一个感知数值。' },
+    desc: '功率变送器 / 智能电表模块，用于工序用电负荷监测（有功功率），仅一个感知数值。**功率型传感器是工序能碳核算的功率来源**：附加到某工序后，该传感器的读数（数据源管理设备的实测点位 / 模拟值 / 随可变设备联动）即取代包内功率参数参与折碳；工序要按实际功率核算，就在这里添加并设置数据源。' },
   { type: 'dust_sensor', kind: 'sensor', label: '粉尘浓度传感器', unit: 'mg/m³',
     measure: { label: '粉尘浓度', unit: 'mg/m³' }, range: { min: 0, max: 500 }, def: 15,
     accuracy: '±2 mg/m³',
@@ -84,6 +91,12 @@ export const ADJUSTABLE_TEMPLATES = [
   { type: 'frequency_converter', kind: 'adjustable', label: '变频器', unit: 'Hz',
     setpoint: { label: '输出频率', unit: 'Hz', min: 0, max: 60, step: 0.1, def: 40 },
     desc: '通用变频调速装置，调节电机 / 风机 / 泵的输出频率（0~60 Hz），设定值即当前运行工况。' },
+  // 循环水泵等泵组的专用变压器：只有一个量 —— 设定值 = 输出电压（V）。
+  // 可变设备的值只用于「设定运行工况」，不做取数、不参与折碳；该泵组的实际有功功率要在
+  // 「传感器」里添加电功率传感器并设置数据源（可设为随本设备联动），由传感器读数参与能碳核算。
+  { type: 'pump_transformer', kind: 'adjustable', label: '循环水泵变压器', unit: 'V',
+    setpoint: { label: '输出电压', unit: 'V', min: 0, max: 660, step: 5, def: 380 },
+    desc: '循环水泵（泵组）专用变压器，0~660 V 输出电压可调：电压↑ → 泵转速 / 流量↑、轴功率↑（泵类相似定律 P ∝ n³），是水系统降温强度与减排策略的作用对象。设定值只调运行工况，不直接参与折碳：本工序的实际有功功率请在「传感器」中添加电功率传感器（数据源可设为「随本设备联动」，电压↑ 则功率↑），核算以该传感器读数为依据。' },
   { type: 'rectifier', kind: 'adjustable', label: '整流器', unit: 'V',
     setpoint: { label: '直流输出电压', unit: 'V', min: 0, max: 1200, step: 10, def: 400 },
     desc: '可控硅整流装置，输出直流电压可调，用于直流传动等调节场景。' },
@@ -99,6 +112,9 @@ export const ADJUSTABLE_TEMPLATES = [
   { type: 'variable_psu', kind: 'adjustable', label: '可变电源', unit: 'V',
     setpoint: { label: '输出电压', unit: 'V', min: 0, max: 66000, step: 10, def: 10000 },
     desc: '可编程可变电源，输出电压档位可调，用于配电 / 电解等环节的可变工况模拟。' },
+  { type: 'tec_psu', kind: 'adjustable', label: '半导体制冷电源', unit: 'V',
+    setpoint: { label: '制冷片供电电压', unit: 'V', min: 0, max: 60, step: 1, def: 48 },
+    desc: '半导体制冷片（TEC）专用直流电源，输出电压 0~60 V 连续可调：电压↑ → 制冷功率↑（P ≈ U²/R）同时耗电与散热负荷↑，是机房温控降温强度与减排策略的作用对象。设定值只调运行工况，不直接参与折碳：本工序的实际有功功率请在「传感器」中添加电功率传感器（数据源可设为「随本设备联动」，电压↑ 则功率↑），核算以该传感器读数为依据。' },
 ]
 
 export const SENSOR_MAP = Object.fromEntries(SENSOR_TEMPLATES.map((x) => [x.type, x]))
@@ -122,4 +138,10 @@ export function attachDef(t) {
 }
 export function attachMeasureLabel(t) {
   return t.kind === 'sensor' ? t.measure.label : t.setpoint.label
+}
+// 功率型传感器（感知量单位为 kW，如电功率传感器的有功功率）：
+// 这类传感器附加到工序后，其读数即该工序能碳核算的功率来源（取代包内功率参数）。
+// 可变设备不参与取数——它的值只是设定值，只用于调节运行工况。
+export function attachPowerSensor(t) {
+  return !!(t && t.kind === 'sensor' && t.measure && t.measure.unit === 'kW')
 }

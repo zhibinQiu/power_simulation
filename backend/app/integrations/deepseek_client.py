@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
-from ..llm_strategy import chat_completion as _chat_completion_sync
+from app.domain.strategy.llm_strategy import chat_completion as _chat_completion_sync
 
 
 def is_configured() -> bool:

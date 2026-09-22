@@ -1,300 +1,379 @@
+<!-- ============ AI 群控（AGC）============
+     两级结构：
+       ① 模型库 —— 以卡片形式列出所有已设计的算法模型，支持新建（规则 / 强化学习 / 粒子群）
+       ② 编排   —— 进入某个模型后：左栏自上而下为「可调设备 → 传感设备」（可拖入画布），
+                   右栏为该算法自己的编排体，右上角「运行」即按编排的算法执行。
+     运行时不做整页的实时观测图表，改为点击左侧 / 画布 / 编排条上的任意模块查看它的实时值。
+     规则：可调（橙）· 传感（青）· 条件（紫），只有可调模块可以设定数值。 -->
 <template>
-  <!-- ============ AI 群控（重新设计） ============
-       左栏：① 可调设备（勾选后直接调设定值）② 传感设备（可绑定到可调设备 → 自动生成 PID 回路；
-             未绑定的只显示读数）③ 算法（下拉，默认强化学习）
-       右栏：① 实时观测（滤波前 / 滤波后同一张图）② 训练控制台（开始训练 · 是否滤波 · 是否调控 PID ·
-             超参数 · 模型版本 · 自动训练时间）③ 训练奖励变化 ④ 模型版本列表
-       滤波/PID 的内部参数不再暴露到界面：界面只保留「是否滤波」「是否调控 PID」两个开关。 -->
   <div class="agc">
-    <!-- ══════════════ 左：设备与算法 ══════════════ -->
-    <aside class="agc-aside">
-      <div class="agc-hd">
-        <svg class="hd-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg>
-        <b>{{ t('AI 群控') }}</b>
-        <span class="hd-sub mono">{{ loops.length }} {{ t('回路') }} · {{ selAdj.length }}{{ t('可调') }} · {{ selSen.length }}{{ t('传感') }}</span>
+    <!-- ══════════ ① 模型库 ══════════ -->
+    <section v-if="page === 'lib'" class="agc-lib">
+      <p class="lib-tip">{{ t('每个模型是一套独立的群控算法：新建后进入编排，编排完成点右上角「运行」即按该算法执行；运行中点击任意模块可查看实时值。') }}</p>
+
+      <div class="lib-grid">
+        <article v-for="m in designs" :key="m.id" class="mcard" :class="['alg-' + m.alg, { live: isRunning(m.id) }]" @click="enter(m)">
+          <div class="mc-top">
+            <span class="mc-ic">{{ algIco(m.alg) }}</span>
+            <span class="mc-nm">{{ m.name }}</span>
+            <span class="mc-tg" :class="m.alg">{{ algLabel(m.alg) }}</span>
+          </div>
+          <div class="mc-bd">
+            <div v-for="s in statOf(m)" :key="s.k" class="mc-st"><em>{{ s.k }}</em><b class="mono">{{ s.v }}</b></div>
+          </div>
+          <div class="mc-ft">
+            <span class="mono dim">{{ shortTs(m.ts) }}</span>
+            <span class="mc-ops">
+              <button class="lk" @click.stop="renameModel(m)">{{ t('重命名') }}</button>
+              <button class="lk" @click.stop="dupModel(m)">{{ t('复制') }}</button>
+              <button class="lk danger" @click.stop="delModel(m)">{{ t('删除') }}</button>
+            </span>
+          </div>
+          <i v-if="isRunning(m.id)" class="mc-live">{{ t('运行中') }}</i>
+        </article>
+
+        <button class="mcard new" @click="openNew">
+          <span class="plus">+</span>
+          <span class="nt">{{ t('新建模型') }}</span>
+          <span class="nd">{{ t('规则 / 强化学习 / 粒子群') }}</span>
+        </button>
       </div>
 
-      <!-- ① 可调设备 -->
-      <section class="pnl">
-        <div class="pnl-hd" @click="fold.adj = !fold.adj">
-          <i class="caret" :class="{ on: !fold.adj }">▸</i>
-          <span class="ph-t">{{ t('① 可调设备') }}</span>
-          <em class="cnt mono">{{ selAdj.length }}/{{ adjList.length }}</em>
-          <span class="hd-ops">
-            <button class="lk" @click.stop="pickAllAdj">{{ t('全选') }}</button>
-            <button class="lk" @click.stop="selAdj = []">{{ t('清空') }}</button>
-          </span>
-        </div>
-        <div v-show="!fold.adj" class="pnl-bd">
-          <p v-if="!adjList.length" class="emp">{{ t('当前场景没有可调设备（可调设备才能作为被控对象）。') }}</p>
-          <div v-for="d in adjList" :key="d.id" class="dev" :class="{ on: has(selAdj, d.id) }">
-            <div class="dev-hd" @click="toggle(selAdj, d.id)">
-              <span class="cbx"><i v-if="has(selAdj, d.id)">✓</i></span>
-              <span class="nm">{{ d.label }}<em>{{ d.unitName }}</em></span>
-              <b class="mono val">{{ fmt(curSp(d.id)) }}<i>{{ spUnit(d.id) }}</i></b>
-              <span v-if="boundSensors(d.id).length" class="tag pid" :title="t('已绑定传感设备，由 PID 自动调控')">PID</span>
-            </div>
-            <!-- 选中后直接调整设定值 -->
-            <div v-if="has(selAdj, d.id)" class="dev-bd">
-              <div class="sp-row">
-                <input class="rng" type="range" :min="spMin(d.id)" :max="spMax(d.id)" :step="spStepV(d.id)"
-                       :value="curSp(d.id)" :disabled="autoCtl(d.id)" @input="onSpSlide(d.id, $event)" />
-                <input class="num" type="number" :value="curSp(d.id)" :step="spStepV(d.id)"
-                       :disabled="autoCtl(d.id)" @change="onSpNum(d.id, $event)" />
-                <i class="u">{{ spUnit(d.id) }}</i>
-              </div>
-              <div class="meta">
-                <span>{{ t('量程') }} <b class="mono">{{ fmt(spMin(d.id)) }} ~ {{ fmt(spMax(d.id)) }}</b></span>
-                <span v-if="autoCtl(d.id)" class="tag on">{{ t('PID 自动调控中') }}</span>
-                <span v-else class="tag">{{ t('手动设定') }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <div v-if="!designs.length" class="lib-empty">
+        <p class="t1">{{ t('还没有算法模型') }}</p>
+        <p class="t2">{{ t('点击「+ 新建模型」，选择规则 / 强化学习 / 粒子群，即可进入编排。') }}</p>
+      </div>
+    </section>
 
-      <!-- ② 传感设备 -->
-      <section class="pnl">
-        <div class="pnl-hd" @click="fold.sen = !fold.sen">
-          <i class="caret" :class="{ on: !fold.sen }">▸</i>
-          <span class="ph-t">{{ t('② 传感设备') }}</span>
-          <em class="cnt mono">{{ selSen.length }}/{{ senList.length }}</em>
-          <span class="hd-ops">
-            <button class="lk" @click.stop="pickAllSen">{{ t('全选') }}</button>
-            <button class="lk" @click.stop="selSen = []">{{ t('清空') }}</button>
-          </span>
-        </div>
-        <div v-show="!fold.sen" class="pnl-bd">
-          <p v-if="!senList.length" class="emp">{{ t('当前场景没有传感设备。') }}</p>
-          <div v-for="s in senList" :key="s.id" class="dev" :class="{ on: has(selSen, s.id) }">
-            <div class="dev-hd" @click="toggle(selSen, s.id)">
-              <span class="cbx"><i v-if="has(selSen, s.id)">✓</i></span>
-              <span class="nm">{{ s.label }}<em>{{ s.unitName }}</em></span>
-              <b class="mono val">{{ fmt(liveOf(s.id)) }}<i>{{ s.unit || '' }}</i></b>
+    <!-- ══════════ ② 编排 ══════════ -->
+    <div v-else-if="cur" class="agc-edit">
+      <div class="ed-top">
+        <button class="btn ghost" @click="back">{{ '← ' + t('模型库') }}</button>
+        <b class="ed-nm">{{ cur.name }}</b>
+        <span class="mc-tg" :class="cur.alg">{{ algLabel(cur.alg) }}</span>
+        <span class="hd-sp"></span>
+        <span class="ed-st" :class="{ on: running }"><i class="dot"></i>{{ runStateTxt }}</span>
+        <template v-if="cur.alg === 'rule'">
+          <em class="lb2">{{ t('周期') }}</em>
+          <select v-model.number="cur.period" class="sel xs" :disabled="running">
+            <option :value="1">1s</option>
+            <option :value="2">2s</option>
+            <option :value="5">5s</option>
+            <option :value="10">10s</option>
+          </select>
+        </template>
+        <button class="btn" :class="running ? 'stop' : 'primary'" :disabled="!canRun" :title="runTip" @click="toggleRun">
+          {{ running ? t('停止') : t('运行') }}
+        </button>
+      </div>
+
+      <div class="ed-bd">
+        <!-- ─────── 左栏 ─────── -->
+        <aside class="agc-aside">
+          <div class="agc-hd">
+            <span class="hd-sub mono">{{ selAdj.length }}{{ t('可调') }} · {{ selSen.length }}{{ t('传感') }}</span>
+            <span class="hd-sp"></span>
+            <span class="hd-sub">{{ t('勾选即在右侧编排画布生成模块') }}</span>
+          </div>
+
+          <!-- ① 可调设备 -->
+          <section class="pnl">
+            <div class="pnl-hd" @click="fold.adj = !fold.adj">
+              <i class="caret" :class="{ on: !fold.adj }">▸</i>
+              <span class="ph-t">{{ t('① 可调设备') }}</span>
+              <em class="cnt mono">{{ selAdj.length }}/{{ adjList.length }}</em>
+              <span class="hd-ops">
+                <button class="lk" @click.stop="pickAllAdj">{{ t('全选') }}</button>
+                <button class="lk" @click.stop="clearAdj">{{ t('清空') }}</button>
+              </span>
             </div>
-            <div v-if="has(selSen, s.id)" class="dev-bd">
-              <div class="row">
-                <em>{{ t('绑定可调设备') }}</em>
-                <select :value="bindOf[s.id] || ''" @change="setBind(s.id, $event.target.value)">
-                  <option value="">{{ t('未绑定（只显示读数）') }}</option>
-                  <option v-for="a in adjList" :key="a.id" :value="a.id">{{ a.label }} · {{ a.unitName }}</option>
+            <div v-show="!fold.adj" class="pnl-bd">
+              <p v-if="isRule" class="emp drag-tip">{{ t('规则控制：勾选即在右侧规则画布生成模块（可调可设定数值）。') }}</p>
+              <p v-if="!adjList.length" class="emp">{{ t('当前场景没有可调设备（可调设备才能作为被控对象）。') }}</p>
+              <div v-for="d in adjList" :key="d.id" class="dev" :class="{ on: has(selAdj, d.id) }">
+                <div class="dev-hd" @click="toggle(selAdj, d.id)">
+                  <span class="cbx"><i v-if="has(selAdj, d.id)">✓</i></span>
+                  <span class="nm">{{ d.label }}<em>{{ d.unitName }}</em></span>
+                  <b class="mono val">{{ fmt(curSp(d.id)) }}<i>{{ spUnit(d.id) }}</i></b>
+                  <span v-if="boundSensors(d.id).length" class="tag pid" :title="t('已绑定传感设备，由 PID 自动调控')">PID</span>
+                </div>
+                <div v-if="has(selAdj, d.id)" class="dev-bd">
+                  <div class="sp-row">
+                    <input class="rng" type="range" :min="spMin(d.id)" :max="spMax(d.id)" :step="spStepV(d.id)"
+                           :value="curSp(d.id)" :disabled="autoCtl(d.id)" @input="onSpSlide(d.id, $event)" />
+                    <input class="num" type="number" :value="curSp(d.id)" :step="spStepV(d.id)"
+                           :disabled="autoCtl(d.id)" @change="onSpNum(d.id, $event)" />
+                    <i class="u">{{ spUnit(d.id) }}</i>
+                  </div>
+                  <div class="meta">
+                    <span>{{ t('量程') }} <b class="mono">{{ fmt(spMin(d.id)) }} ~ {{ fmt(spMax(d.id)) }}</b></span>
+                    <span v-if="autoCtl(d.id)" class="tag on">{{ t('PID 自动调控中') }}</span>
+                    <span v-else class="tag">{{ t('手动设定') }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ② 传感设备 -->
+          <section class="pnl">
+            <div class="pnl-hd" @click="fold.sen = !fold.sen">
+              <i class="caret" :class="{ on: !fold.sen }">▸</i>
+              <span class="ph-t">{{ t('② 传感设备') }}</span>
+              <em class="cnt mono">{{ selSen.length }}/{{ senList.length }}</em>
+              <span class="hd-ops">
+                <button class="lk" @click.stop="pickAllSen">{{ t('全选') }}</button>
+                <button class="lk" @click.stop="clearSen">{{ t('清空') }}</button>
+              </span>
+            </div>
+            <div v-show="!fold.sen" class="pnl-bd">
+              <p v-if="isRule" class="emp drag-tip">{{ t('规则控制：勾选即在右侧规则画布生成传感模块，作为条件判定的输入。') }}</p>
+              <p v-if="!senList.length" class="emp">{{ t('当前场景没有传感设备。') }}</p>
+              <div v-for="s in senList" :key="s.id" class="dev" :class="{ on: has(selSen, s.id) }">
+                <div class="dev-hd" @click="toggle(selSen, s.id)">
+                  <span class="cbx"><i v-if="has(selSen, s.id)">✓</i></span>
+                  <span class="nm">{{ s.label }}<em>{{ s.unitName }}</em></span>
+                  <b class="mono val">{{ fmt(liveOf(s.id)) }}<i>{{ s.unit || '' }}</i></b>
+                </div>
+                <div v-if="has(selSen, s.id)" class="dev-bd">
+                  <div class="row">
+                    <em>{{ t('绑定可调设备') }}</em>
+                    <select :value="bindOf[s.id] || ''" @change="setBind(s.id, $event.target.value)">
+                      <option value="">{{ t('未绑定（只显示读数）') }}</option>
+                      <option v-for="a in adjList" :key="a.id" :value="a.id">{{ a.label }} · {{ a.unitName }}</option>
+                    </select>
+                  </div>
+                  <template v-if="bindOf[s.id] && isLoopSensor(s.id)">
+                    <div class="row">
+                      <em>{{ t('目标值') }}</em>
+                      <input class="num" type="number" :value="targetOf(s.id)" :step="spStepS(s.id)" @change="setTarget(s.id, $event.target.value)" />
+                      <i class="u">{{ s.unit || '' }}</i>
+                    </div>
+                    <div class="row st">
+                      <span class="kv"><em>{{ t('观测') }}</em><b class="mono raw">{{ fmt(lastRawOf(s.id)) }}</b></span>
+                      <span class="kv"><em>{{ t('滤波后') }}</em><b class="mono ekf">{{ fmt(lastEkfOf(s.id)) }}</b></span>
+                      <span class="badge" :class="badgeCls(s.id)">{{ badgeTxt(s.id) }}</span>
+                    </div>
+                  </template>
+                  <div v-else-if="bindOf[s.id]" class="row rd">
+                    <em>{{ t('实时读数') }}</em>
+                    <b class="mono">{{ fmt(liveOf(s.id)) }}</b><i class="u">{{ s.unit || '' }}</i>
+                    <span class="hintx">{{ t('辅助观测（该可调设备已有主控传感设备）') }}</span>
+                  </div>
+                  <div v-else class="row rd">
+                    <em>{{ t('实时读数') }}</em>
+                    <b class="mono">{{ fmt(liveOf(s.id)) }}</b><i class="u">{{ s.unit || '' }}</i>
+                    <span class="hintx">{{ t('未绑定：仅显示实时读数') }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </aside>
+
+        <!-- ─────── 右栏：该算法的编排体 ─────── -->
+        <main class="agc-main">
+          <!-- 规则：可编排画布（点选画布卡片，实时值直接显示在卡片下方） -->
+          <section v-if="isRule" class="card rg">
+            <div class="card-hd">
+              <span class="ct">{{ t('规则编排') }}</span>
+              <span class="cs">{{ t('可调 / 传感 → if-elif-else → 下游模块设置') }}</span>
+              <span class="ch-ops mono">
+                <span class="lg-i adj">■ {{ t('可调') }}</span>
+                <span class="lg-i sen">■ {{ t('传感') }}</span>
+                <span class="lg-i ifn">■ {{ t('条件') }}</span>
+              </span>
+            </div>
+            <RuleFlowEditor :key="cur.id" class="rf-fill" :graph="cur.graph" :running="running" :period="cur.period"
+                            @canvas-change="syncSelFromGraph" />
+          </section>
+
+          <!-- 强化学习：训练控制台 + 奖励 + 版本 -->
+          <template v-else-if="cur.alg === 'rl'">
+            <section class="card">
+              <div class="card-hd">
+                <span class="ct">{{ t('训练控制台') }}</span>
+                <span class="cs mono">{{ loops.length }} {{ t('回路') }} · {{ t('决策维度') }} {{ loops.length * 4 }}</span>
+                <span class="ch-ops">
+                  <select v-model.number="runHz" class="sel xs" :disabled="sampling">
+                    <option :value="1">1s</option>
+                    <option :value="0.5">2s</option>
+                    <option :value="0.2">5s</option>
+                  </select>
+                  <button class="btn" :class="{ primary: !sampling, stop: sampling }" @click="toggleSample">
+                    {{ sampling ? t('停止采集') : t('开始采集') }}
+                  </button>
+                  <span class="tstate" :class="{ on: trainBusy }"><i class="dot"></i>{{ trainStateTxt }}</span>
+                </span>
+              </div>
+              <div class="bar">
+                <button class="btn primary" :disabled="trainBusy || !canTrain" @click="startTrain">{{ t('开始训练') }}</button>
+                <button class="btn stop" :disabled="!trainBusy" @click="stopTrain">{{ t('停止') }}</button>
+                <label class="chk" :title="t('对观测做滤波后再作为控制/训练输入')">
+                  <input type="checkbox" v-model="useFilter" />{{ t('滤波') }}
+                </label>
+                <label class="chk" :title="t('由 PID 自动调节可调设备设定值（关闭则保持手动设定）')">
+                  <input type="checkbox" v-model="ctlOn" />{{ t('调控 PID') }}
+                </label>
+                <button class="btn ghost" @click="fold.hp = !fold.hp">{{ t('超参数') }}{{ fold.hp ? ' ▸' : ' ▾' }}</button>
+              </div>
+              <div class="hp" v-show="!fold.hp">
+                <div class="hp-row">
+                  <label class="f"><em>{{ t('迭代轮次') }}</em><input class="num w56" type="number" min="5" max="300" step="5" v-model.number="maxIter" :disabled="trainBusy" /></label>
+                  <label class="f"><em>{{ t('学习率') }} lr</em><input class="num w56" type="number" step="0.001" min="0" v-model.number="ppoLr" :disabled="trainBusy" /></label>
+                  <label class="f"><em>{{ t('裁剪') }} ε</em><input class="num w56" type="number" step="0.05" min="0" max="1" v-model.number="ppoClip" :disabled="trainBusy" /></label>
+                  <label class="f"><em>{{ t('折扣') }} γ</em><input class="num w56" type="number" step="0.01" min="0" max="1" v-model.number="ppoGamma" :disabled="trainBusy" /></label>
+                  <label class="f"><em>GAE λ</em><input class="num w56" type="number" step="0.01" min="0" max="1" v-model.number="ppoLam" :disabled="trainBusy" /></label>
+                  <label class="f"><em>{{ t('熵系数') }}</em><input class="num w56" type="number" step="0.005" min="0" v-model.number="ppoEnt" :disabled="trainBusy" /></label>
+                  <label class="f"><em>{{ t('更新轮次') }} K</em><input class="num w56" type="number" step="1" min="1" v-model.number="ppoK" :disabled="trainBusy" /></label>
+                  <label class="f"><em>{{ t('每轮轨迹') }}</em><input class="num w56" type="number" step="1" min="1" v-model.number="ppoEps" :disabled="trainBusy" /></label>
+                  <label class="f"><em>{{ t('探索') }} σ₀</em><input class="num w56" type="number" step="0.05" min="0" v-model.number="ppoSig" :disabled="trainBusy" /></label>
+                  <label class="f"><em>{{ t('环境扰动') }} d</em><input class="num w56" type="number" step="0.5" min="0" v-model.number="distPct" :disabled="trainBusy" /><i class="u">%</i></label>
+                  <label class="f" :title="t('训练时对辨识出的模型参数施加随机扰动，避免策略过拟合模型误差')"><em>{{ t('模型不确定度') }}</em><input class="num w56" type="number" step="1" min="0" max="50" v-model.number="modelPct" :disabled="trainBusy" /><i class="u">%</i></label>
+                  <label class="f" :title="t('无足够数据时使用的保守纯滞后估计（秒），现场可按经验填写')"><em>{{ t('先验滞后') }} θ₀</em><input class="num w56" type="number" step="1" min="0" max="600" v-model.number="priTheta" :disabled="trainBusy" /><i class="u">s</i></label>
+                </div>
+                <div class="hp-row obj">
+                  <span class="lb">{{ t('奖励') }} r = −( w₁|e| + w₂|Δe| + w₃·{{ t('超调') }} + w₄·{{ t('功耗') }} )</span>
+                  <label class="f"><em>w₁ {{ t('误差') }}</em><input class="num w56" type="number" step="0.1" min="0" v-model.number="rwErr" :disabled="trainBusy" /></label>
+                  <label class="f"><em>w₂ {{ t('波动') }}</em><input class="num w56" type="number" step="0.05" min="0" v-model.number="rwDe" :disabled="trainBusy" /></label>
+                  <label class="f"><em>w₃ {{ t('超调') }}</em><input class="num w56" type="number" step="0.1" min="0" v-model.number="rwOv" :disabled="trainBusy" /></label>
+                  <label class="f"><em>w₄ {{ t('功耗') }}</em><input class="num w56" type="number" step="0.1" min="0" v-model.number="rwPow" :disabled="trainBusy" /></label>
+                </div>
+              </div>
+              <div class="bar mv">
+                <em class="lb2">{{ t('模型版本') }}</em>
+                <select v-model="activeVer" class="sel" :disabled="!versions.length">
+                  <option v-for="v in versions" :key="v.id" :value="v.id">{{ v.name }} · {{ shortTs(v.ts) }} · r {{ fmtSmall(v.reward) }}</option>
                 </select>
+                <button class="btn" :disabled="!activeVer || !hasVer(activeVer)" @click="applyVer(activeVer)">{{ t('应用版本') }}</button>
+                <button class="btn ghost" :disabled="!activeVer || !hasVer(activeVer)" @click="delVer(activeVer)">{{ t('删除') }}</button>
+                <span class="sep"></span>
+                <em class="lb2">{{ t('自动训练') }}</em>
+                <select v-model="autoMode" class="sel xs">
+                  <option value="off">{{ t('关闭') }}</option>
+                  <option value="1h">{{ t('每 1 小时') }}</option>
+                  <option value="6h">{{ t('每 6 小时') }}</option>
+                  <option value="daily">{{ t('每天') }}</option>
+                </select>
+                <input v-if="autoMode === 'daily'" class="num tm" type="time" v-model="autoAt" />
+                <span class="nx">{{ nextAutoTxt }}</span>
               </div>
-              <template v-if="bindOf[s.id] && isLoopSensor(s.id)">
-                <div class="row">
-                  <em>{{ t('目标值') }}</em>
-                  <input class="num" type="number" :value="targetOf(s.id)" :step="spStepS(s.id)" @change="setTarget(s.id, $event.target.value)" />
-                  <i class="u">{{ s.unit || '' }}</i>
-                </div>
-                <div class="row st">
-                  <span class="kv"><em>{{ t('观测') }}</em><b class="mono raw">{{ fmt(lastRawOf(s.id)) }}</b></span>
-                  <span class="kv"><em>{{ t('滤波后') }}</em><b class="mono ekf">{{ fmt(lastEkfOf(s.id)) }}</b></span>
-                  <span class="badge" :class="badgeCls(s.id)">{{ badgeTxt(s.id) }}</span>
-                </div>
-              </template>
-              <div v-else-if="bindOf[s.id]" class="row rd">
-                <em>{{ t('实时读数') }}</em>
-                <b class="mono">{{ fmt(liveOf(s.id)) }}</b><i class="u">{{ s.unit || '' }}</i>
-                <span class="hintx">{{ t('辅助观测（该可调设备已有主控传感设备）') }}</span>
-              </div>
-              <div v-else class="row rd">
-                <em>{{ t('实时读数') }}</em>
-                <b class="mono">{{ fmt(liveOf(s.id)) }}</b><i class="u">{{ s.unit || '' }}</i>
-                <span class="hintx">{{ t('未绑定：仅显示实时读数') }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+            </section>
 
-      <!-- ③ 算法 -->
-      <section class="pnl">
-        <div class="pnl-hd" @click="fold.alg = !fold.alg">
-          <i class="caret" :class="{ on: !fold.alg }">▸</i>
-          <span class="ph-t">{{ t('③ 控制算法') }}</span>
-        </div>
-        <div v-show="!fold.alg" class="pnl-bd">
-          <div class="row">
-            <em>{{ t('算法') }}</em>
-            <select v-model="alg" class="grow">
-              <option v-for="a in ALGS" :key="a.id" :value="a.id" :disabled="!a.ready">
-                {{ a.label }}{{ a.ready ? '' : '（' + t('未实现') + '）' }}
-              </option>
-            </select>
-          </div>
-          <div class="io">
-            <div class="io-row"><em>{{ t('输入') }}</em><span>{{ t('观测值（滤波后）') }} + {{ t('隐藏状态（滤波估计的扰动）') }}</span></div>
-            <div class="io-row"><em>{{ t('输出') }}</em><span>{{ t('动作：可调设备调节量 + PID 参数 Kp/Ki/Kd') }}</span></div>
-          </div>
-          <div class="io" v-if="modelInfo">
-            <div class="io-row"><em>{{ t('过程模型') }}</em><span :class="modelInfo.ok ? 'okx' : 'warnx'">{{ modelInfo.txt }}</span></div>
-            <div class="io-row"><em>{{ t('含义') }}</em><span>τ {{ t('惯性时间常数') }} · θ {{ t('纯滞后') }} · K {{ t('静态增益') }} · n {{ t('样本数') }}</span></div>
-          </div>
-          <p class="emp sm">{{ t('当前仅实现强化学习（PPO）：策略网络直接输出每拍的调节量与 PID 增益倍率，在由实时数据辨识出的过程模型上离线训练，不影响正在运行的回路。') }}</p>
-        </div>
-      </section>
-    </aside>
+            <section class="card grow">
+              <div class="card-hd">
+                <span class="ct">{{ t('训练奖励') }}</span>
+                <span class="cs">{{ t('每轮迭代的平均回合奖励（越大越好）') }}</span>
+                <span class="ch-ops mono">
+                  <b class="rw">{{ fmtSmall(lastReward) }}</b>
+                  <span class="dim">/ {{ t('最佳') }} <b class="best">{{ fmtSmall(bestReward) }}</b></span>
+                  <span v-if="baseReward != null" class="dim">· {{ t('基线') }} {{ fmtSmall(baseReward) }}</span>
+                </span>
+              </div>
+              <div class="rw-wrap">
+                <svg v-if="rwPath" class="rw-svg" :viewBox="`0 0 ${RW.W} ${RW.H}`" preserveAspectRatio="none">
+                  <line v-for="y in RW.GRID" :key="'g' + y" class="grid" :x1="0" :x2="RW.W" :y1="y" :y2="y" />
+                  <line v-if="baseY != null" class="base" :x1="0" :x2="RW.W" :y1="baseY" :y2="baseY" />
+                  <polyline class="cv" :points="rwPath" />
+                </svg>
+                <div v-else class="cempty sm">
+                  <p class="t1">{{ t('尚未训练') }}</p>
+                  <p class="t2">{{ t('绑定传感设备与可调设备形成回路后，点击「运行」，这里显示奖励随迭代的变化。') }}</p>
+                </div>
+                <div class="rw-ax" v-if="rwPath">
+                  <span>1</span><span>{{ t('迭代') }} {{ curve.length }}</span>
+                </div>
+              </div>
+            </section>
 
-    <!-- ══════════════ 右：实时曲线 · 训练 ══════════════ -->
-    <main class="agc-main">
-      <!-- ① 实时观测：滤波前 / 滤波后同图 -->
-      <section class="card">
-        <div class="card-hd">
-          <span class="ct">{{ t('实时观测') }}</span>
-          <span class="cs">{{ t('滤波前 / 滤波后同一坐标系对比') }}</span>
-          <span class="ch-ops">
-            <select v-model="curSenId" class="sel" :disabled="!chartSensors.length">
-              <option v-for="s in chartSensors" :key="s.id" :value="s.id">{{ s.label }}</option>
-            </select>
-            <select v-model.number="runHz" class="sel xs" :disabled="sampling">
-              <option :value="1">1s</option>
-              <option :value="0.5">2s</option>
-              <option :value="0.2">5s</option>
-            </select>
-            <button class="btn" :class="{ primary: !sampling, stop: sampling }" @click="toggleSample">
-              {{ sampling ? t('停止采集') : t('开始采集') }}
+            <section class="card">
+              <div class="card-hd">
+                <span class="ct">{{ t('模型版本') }}</span>
+                <span class="cs">{{ t('每轮训练自动存为新版本，可随时回退应用') }}</span>
+              </div>
+              <div class="vtb">
+                <div class="vtr hd">
+                  <span>{{ t('版本') }}</span><span>{{ t('时间') }}</span><span>{{ t('算法') }}</span>
+                  <span>{{ t('迭代') }}</span><span>{{ t('奖励') }}</span><span>{{ t('状态') }}</span>
+                </div>
+                <div v-if="!versions.length" class="vempty">{{ t('暂无模型版本') }}</div>
+                <div v-for="v in versions" :key="v.id" class="vtr" :class="{ on: v.id === activeVer, cur: v.id === curVerId }"
+                     @click="activeVer = v.id">
+                  <span class="mono">{{ v.name }}</span>
+                  <span class="mono dim">{{ fullTs(v.ts) }}</span>
+                  <span>{{ v.alg }}</span>
+                  <span class="mono">{{ v.iters }}</span>
+                  <span class="mono rw">{{ fmtSmall(v.reward) }}</span>
+                  <span v-if="v.id === curVerId" class="tag on">{{ t('已应用') }}</span>
+                  <span v-else class="tag">{{ t('历史') }}</span>
+                </div>
+              </div>
+              <div class="vdim" v-if="activeVerObj">
+                <div class="vdim-h">{{ t('版本') }} {{ activeVerObj.name }} · {{ t('输出（动作）') }}</div>
+                <div class="vrow" v-for="(d, i) in activeVerObj.dims" :key="i">
+                  <span class="rn">{{ i + 1 }}</span>
+                  <span class="rl">{{ d.adjLabel }} ← {{ d.senLabel }}</span>
+                  <span class="rp mono">Δu {{ fmtSmall(d.du) }} · Kp {{ fmtSmall(d.kp) }} · Ki {{ fmtSmall(d.ki) }} · Kd {{ fmtSmall(d.kd) }}</span>
+                </div>
+              </div>
+            </section>
+          </template>
+
+          <!-- 粒子群：在线寻优 -->
+          <template v-else>
+            <section class="card">
+              <div class="card-hd">
+                <span class="ct">{{ t('粒子群编排') }}</span>
+                <span class="cs">{{ t('优化变量（可调设备）→ 目标（传感设备趋近目标值）') }}</span>
+              </div>
+              <PsoTuner :cfg="cur.pso" :running="running" @update:running="onPsoRun" />
+            </section>
+          </template>
+
+        </main>
+      </div>
+    </div>
+
+    <!-- ══════════ 新建模型 ══════════ -->
+    <div v-if="newOpen" class="mk-mask">
+      <div class="mk-dlg">
+        <div class="mk-hd">
+          <b>{{ t('新建模型') }}</b>
+          <button class="mk-x" @click="newOpen = false">✕</button>
+        </div>
+        <div class="mk-bd">
+          <label class="mk-f">
+            <em>{{ t('模型名称') }}</em>
+            <input class="mk-in" v-model.trim="newName" :placeholder="t('例如：冷却水分段调控')" @keyup.enter="createModel" />
+          </label>
+          <div class="mk-t">{{ t('算法类型') }}</div>
+          <div class="mk-types">
+            <button v-for="a in ALG_TYPES" :key="a.id" class="mk-tp" :class="[a.id, { on: newAlg === a.id }]" @click="newAlg = a.id">
+              <i class="tp-ic">{{ a.ico }}</i>
+              <b>{{ a.label }}</b>
+              <span>{{ a.desc }}</span>
             </button>
-          </span>
-        </div>
-        <MultiTrendChart v-if="chartSeries.length" :series="chartSeries" mode="raw" :height="150" :axis="true" />
-        <div v-else class="cempty">{{ t('勾选传感设备并点击「开始采集」，这里显示滤波前后的实时曲线') }}</div>
-      </section>
-
-      <!-- ② 训练控制台 -->
-      <section class="card">
-        <div class="card-hd">
-          <span class="ct">{{ t('训练控制台') }}</span>
-          <span class="cs mono">{{ loops.length }} {{ t('回路') }} · {{ t('决策维度') }} {{ loops.length * 4 }}</span>
-          <span class="ch-ops">
-            <span class="tstate" :class="{ on: trainBusy }"><i class="dot"></i>{{ trainStateTxt }}</span>
-          </span>
-        </div>
-        <div class="bar">
-          <button class="btn primary" :disabled="trainBusy || !canTrain" @click="startTrain">{{ t('开始训练') }}</button>
-          <button class="btn stop" :disabled="!trainBusy" @click="stopTrain">{{ t('停止') }}</button>
-          <label class="chk" :title="t('对观测做滤波后再作为控制/训练输入')">
-            <input type="checkbox" v-model="useFilter" />{{ t('滤波') }}
-          </label>
-          <label class="chk" :title="t('由 PID 自动调节可调设备设定值（关闭则保持手动设定）')">
-            <input type="checkbox" v-model="ctlOn" />{{ t('调控 PID') }}
-          </label>
-          <button class="btn ghost" @click="fold.hp = !fold.hp">{{ t('超参数') }}{{ fold.hp ? ' ▸' : ' ▾' }}</button>
-        </div>
-        <!-- 超参数 -->
-        <div class="hp" v-show="!fold.hp">
-          <div class="hp-row">
-            <label class="f"><em>{{ t('迭代轮次') }}</em><input class="num w56" type="number" min="5" max="300" step="5" v-model.number="maxIter" :disabled="trainBusy" /></label>
-            <label class="f"><em>{{ t('学习率') }} lr</em><input class="num w56" type="number" step="0.001" min="0" v-model.number="ppoLr" :disabled="trainBusy" /></label>
-            <label class="f"><em>{{ t('裁剪') }} ε</em><input class="num w56" type="number" step="0.05" min="0" max="1" v-model.number="ppoClip" :disabled="trainBusy" /></label>
-            <label class="f"><em>{{ t('折扣') }} γ</em><input class="num w56" type="number" step="0.01" min="0" max="1" v-model.number="ppoGamma" :disabled="trainBusy" /></label>
-            <label class="f"><em>GAE λ</em><input class="num w56" type="number" step="0.01" min="0" max="1" v-model.number="ppoLam" :disabled="trainBusy" /></label>
-            <label class="f"><em>{{ t('熵系数') }}</em><input class="num w56" type="number" step="0.005" min="0" v-model.number="ppoEnt" :disabled="trainBusy" /></label>
-            <label class="f"><em>{{ t('更新轮次') }} K</em><input class="num w56" type="number" step="1" min="1" v-model.number="ppoK" :disabled="trainBusy" /></label>
-            <label class="f"><em>{{ t('每轮轨迹') }}</em><input class="num w56" type="number" step="1" min="1" v-model.number="ppoEps" :disabled="trainBusy" /></label>
-            <label class="f"><em>{{ t('探索') }} σ₀</em><input class="num w56" type="number" step="0.05" min="0" v-model.number="ppoSig" :disabled="trainBusy" /></label>
-            <label class="f"><em>{{ t('环境扰动') }} d</em><input class="num w56" type="number" step="0.5" min="0" v-model.number="distPct" :disabled="trainBusy" /><i class="u">%</i></label>
-            <label class="f" :title="t('训练时对辨识出的模型参数施加随机扰动，避免策略过拟合模型误差')"><em>{{ t('模型不确定度') }}</em><input class="num w56" type="number" step="1" min="0" max="50" v-model.number="modelPct" :disabled="trainBusy" /><i class="u">%</i></label>
-            <label class="f" :title="t('无足够数据时使用的保守纯滞后估计（秒），现场可按经验填写')"><em>{{ t('先验滞后') }} θ₀</em><input class="num w56" type="number" step="1" min="0" max="600" v-model.number="priTheta" :disabled="trainBusy" /><i class="u">s</i></label>
-          </div>
-          <div class="hp-row obj">
-            <span class="lb">{{ t('奖励') }} r = −( w₁|e| + w₂|Δe| + w₃·{{ t('超调') }} + w₄·{{ t('功耗') }} )</span>
-            <label class="f"><em>w₁ {{ t('误差') }}</em><input class="num w56" type="number" step="0.1" min="0" v-model.number="rwErr" :disabled="trainBusy" /></label>
-            <label class="f"><em>w₂ {{ t('波动') }}</em><input class="num w56" type="number" step="0.05" min="0" v-model.number="rwDe" :disabled="trainBusy" /></label>
-            <label class="f"><em>w₃ {{ t('超调') }}</em><input class="num w56" type="number" step="0.1" min="0" v-model.number="rwOv" :disabled="trainBusy" /></label>
-            <label class="f"><em>w₄ {{ t('功耗') }}</em><input class="num w56" type="number" step="0.1" min="0" v-model.number="rwPow" :disabled="trainBusy" /></label>
           </div>
         </div>
-        <!-- 模型版本 / 自动训练 -->
-        <div class="bar mv">
-          <em class="lb2">{{ t('模型版本') }}</em>
-          <select v-model="activeVer" class="sel" :disabled="!versions.length">
-            <option v-for="v in versions" :key="v.id" :value="v.id">{{ v.name }} · {{ shortTs(v.ts) }} · r {{ fmtSmall(v.reward) }}</option>
-          </select>
-          <button class="btn" :disabled="!activeVer || !hasVer(activeVer)" @click="applyVer(activeVer)">{{ t('应用版本') }}</button>
-          <button class="btn ghost" :disabled="!activeVer || !hasVer(activeVer)" @click="delVer(activeVer)">{{ t('删除') }}</button>
-          <span class="sep"></span>
-          <em class="lb2">{{ t('自动训练') }}</em>
-          <select v-model="autoMode" class="sel xs">
-            <option value="off">{{ t('关闭') }}</option>
-            <option value="1h">{{ t('每 1 小时') }}</option>
-            <option value="6h">{{ t('每 6 小时') }}</option>
-            <option value="daily">{{ t('每天') }}</option>
-          </select>
-          <input v-if="autoMode === 'daily'" class="num tm" type="time" v-model="autoAt" />
-          <span class="nx">{{ nextAutoTxt }}</span>
+        <div class="mk-ft">
+          <button class="btn ghost" @click="newOpen = false">{{ t('取消') }}</button>
+          <button class="btn primary" @click="createModel">{{ t('新建并进入编排') }}</button>
         </div>
-      </section>
-
-      <!-- ③ 训练奖励变化 -->
-      <section class="card grow">
-        <div class="card-hd">
-          <span class="ct">{{ t('训练奖励') }}</span>
-          <span class="cs">{{ t('每轮迭代的平均回合奖励（越大越好）') }}</span>
-          <span class="ch-ops mono">
-            <b class="rw">{{ fmtSmall(lastReward) }}</b>
-            <span class="dim">/ {{ t('最佳') }} <b class="best">{{ fmtSmall(bestReward) }}</b></span>
-            <span v-if="baseReward != null" class="dim">· {{ t('基线') }} {{ fmtSmall(baseReward) }}</span>
-          </span>
-        </div>
-        <div class="rw-wrap">
-          <svg v-if="rwPath" class="rw-svg" :viewBox="`0 0 ${RW.W} ${RW.H}`" preserveAspectRatio="none">
-            <line v-for="y in RW.GRID" :key="'g' + y" class="grid" :x1="0" :x2="RW.W" :y1="y" :y2="y" />
-            <line v-if="baseY != null" class="base" :x1="0" :x2="RW.W" :y1="baseY" :y2="baseY" />
-            <polyline class="cv" :points="rwPath" />
-          </svg>
-          <div v-else class="cempty sm">
-            <p class="t1">{{ t('尚未训练') }}</p>
-            <p class="t2">{{ t('绑定传感设备与可调设备形成回路后，点击「开始训练」，这里显示奖励随迭代的变化。') }}</p>
-          </div>
-          <div class="rw-ax" v-if="rwPath">
-            <span>1</span><span>{{ t('迭代') }} {{ curve.length }}</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- ④ 模型版本 -->
-      <section class="card">
-        <div class="card-hd">
-          <span class="ct">{{ t('模型版本') }}</span>
-          <span class="cs">{{ t('每轮训练自动存为新版本，可随时回退应用') }}</span>
-        </div>
-        <div class="vtb">
-          <div class="vtr hd">
-            <span>{{ t('版本') }}</span><span>{{ t('时间') }}</span><span>{{ t('算法') }}</span>
-            <span>{{ t('迭代') }}</span><span>{{ t('奖励') }}</span><span>{{ t('状态') }}</span>
-          </div>
-          <div v-if="!versions.length" class="vempty">{{ t('暂无模型版本') }}</div>
-          <div v-for="v in versions" :key="v.id" class="vtr" :class="{ on: v.id === activeVer, cur: v.id === curVerId }"
-               @click="activeVer = v.id">
-            <span class="mono">{{ v.name }}</span>
-            <span class="mono dim">{{ fullTs(v.ts) }}</span>
-            <span>{{ v.alg }}</span>
-            <span class="mono">{{ v.iters }}</span>
-            <span class="mono rw">{{ fmtSmall(v.reward) }}</span>
-            <span v-if="v.id === curVerId" class="tag on">{{ t('已应用') }}</span>
-            <span v-else class="tag">{{ t('历史') }}</span>
-          </div>
-        </div>
-        <div class="vdim" v-if="activeVerObj">
-          <div class="vdim-h">{{ t('版本') }} {{ activeVerObj.name }} · {{ t('输出（动作）') }}</div>
-          <div class="vrow" v-for="(d, i) in activeVerObj.dims" :key="i">
-            <span class="rn">{{ i + 1 }}</span>
-            <span class="rl">{{ d.adjLabel }} ← {{ d.senLabel }}</span>
-            <span class="rp mono">Δu {{ fmtSmall(d.du) }} · Kp {{ fmtSmall(d.kp) }} · Ki {{ fmtSmall(d.ki) }} · Kd {{ fmtSmall(d.kd) }}</span>
-          </div>
-        </div>
-      </section>
-    </main>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useSimStore } from '../stores/sim'
-import MultiTrendChart from './MultiTrendChart.vue'
 import { createPid, createEkf2 } from '../utils/control'
 import { createPpoAgent, computeGae, standardize, randn } from '../utils/rl'
 import { DEVICE_MAP } from '../data/flowLibrary'
+// 附加可调设备（变频器 / 半导体制冷电源…）不在工艺可调设备表内，量程兜底取通用附加设备库
+import { ADJUSTABLE_MAP } from '../data/attachLibrary'
+import RuleFlowEditor from './RuleFlowEditor.vue'
+import PsoTuner from './PsoTuner.vue'
 import { t } from '../i18n'
 
 const store = useSimStore()
@@ -318,12 +397,14 @@ function findDev(id) {
   const i = findInfo(id)
   return i ? i.device : null
 }
-/** 设定值量程（来自设备模板） */
+/** 设定值量程（来自设备模板）；附加可调设备（ext::…）取通用附加设备库 */
 function spCfg(id) {
   const d = findDev(id)
   if (!d) return null
   const tmpl = d.type ? DEVICE_MAP[d.type] : null
-  return (tmpl && tmpl.setpoint) || null
+  if (tmpl && tmpl.setpoint) return tmpl.setpoint
+  const at = d.type ? ADJUSTABLE_MAP[d.type] : null
+  return (at && at.setpoint) || null
 }
 function spMin(id) { const c = spCfg(id); return c ? Number(c.min) : 0 }
 function spMax(id) { const c = spCfg(id); return c ? Number(c.max) : 100 }
@@ -354,7 +435,8 @@ function curSp(id) {
 function setSp(id, v) {
   const n = Number(v)
   if (!Number.isFinite(n)) return
-  store.setDeviceSetpoint(id, Math.min(spMax(id), Math.max(spMin(id), n)))
+  // 统一入口：本地设定；编排中已绑定数据源设备可写点位的可变设备会自动下发写入
+  store.setExtSetpoint(id, Math.min(spMax(id), Math.max(spMin(id), n)))
 }
 /** 滑杆 / 数字框直调设定值（PID 自动调控时控件已禁用） */
 function onSpSlide(id, e) { setSp(id, e.target.value) }
@@ -385,9 +467,78 @@ function toggle(arr, id) {
   const i = arr.indexOf(id)
   if (i >= 0) arr.splice(i, 1)
   else arr.push(id)
+  applySelToGraph()   // 勾选变化 → 编排画布同步生成 / 移除模块
 }
-function pickAllAdj() { selAdj.value = adjList.value.map((d) => d.id) }
-function pickAllSen() { selSen.value = senList.value.map((d) => d.id) }
+function pickAllAdj() { selAdj.value = adjList.value.map((d) => d.id); applySelToGraph() }
+function clearAdj() { selAdj.value = []; applySelToGraph() }
+function pickAllSen() { selSen.value = senList.value.map((d) => d.id); applySelToGraph() }
+function clearSen() { selSen.value = []; applySelToGraph() }
+
+// ─────────── 左栏勾选 ⇄ 规则画布模块 ───────────
+// 规则编排不再靠拖拽：左栏勾选的设备自动成为画布上的模块，取消勾选即移除（含其连线）。
+// 反向：画布里新增（工具条 / 复制粘贴）或删除模块时，画布上报 canvas-change，左栏勾选随之同步。
+function mkDevNode(kind, devId) {
+  const d = findDev(devId) || {}
+  const ns = (cur.value && cur.value.graph && cur.value.graph.nodes) || []
+  const y0 = 40
+  let y = y0
+  for (const n of ns) if (n.kind === kind) y = Math.max(y, (Number(n.y) || 0) + 108)
+  if (y > 1500) y = y0 + (ns.filter((n) => n.kind === kind).length % 12) * 108
+  return {
+    id: kind + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+    kind,
+    devId,
+    label: d.label || devName(devId),
+    unit: kind === 'adj' ? (spUnit(devId) || d.unit || '') : (d.unit || ''),
+    unitName: d.unitName || '',
+    value: kind === 'adj' ? Number(curSp(devId) != null ? curSp(devId) : 0) : null,
+    x: kind === 'sen' ? 48 : 600,
+    y,
+  }
+}
+/** 勾选 → 画布：补齐缺失模块，移除未勾选的模块 */
+function applySelToGraph() {
+  const m = cur.value
+  if (!m || m.alg !== 'rule') return
+  const g = m.graph
+  if (!g.nodes) g.nodes = []
+  if (!g.edges) g.edges = []
+  for (const id of selAdj.value) {
+    if (!g.nodes.some((n) => n.devId === id)) g.nodes.push(mkDevNode('adj', id))
+  }
+  for (const id of selSen.value) {
+    if (!g.nodes.some((n) => n.devId === id)) g.nodes.push(mkDevNode('sen', id))
+  }
+  for (let i = g.nodes.length - 1; i >= 0; i--) {
+    const n = g.nodes[i]
+    if (n.kind !== 'adj' && n.kind !== 'sen') continue
+    const set = n.kind === 'adj' ? selAdj.value : selSen.value
+    if (set.includes(n.devId)) continue
+    g.nodes.splice(i, 1)
+    for (let k = g.edges.length - 1; k >= 0; k--) {
+      if (g.edges[k].from === n.id || g.edges[k].to === n.id) g.edges.splice(k, 1)
+    }
+    for (const x of g.nodes) {
+      if (x.kind !== 'if') continue
+      for (const b of (x.branches || [])) if (b.src === n.id) b.src = ''
+    }
+  }
+}
+/** 画布 → 勾选：画布上增删模块（含撤销/重做）后，左栏勾选状态跟随 */
+function syncSelFromGraph() {
+  const m = cur.value
+  if (!m || m.alg !== 'rule') return
+  const ns = (m.graph && m.graph.nodes) || []
+  const a = []
+  const s = []
+  for (const n of ns) {
+    if (!n || !n.devId || !findDev(n.devId)) continue
+    if (n.kind === 'adj') { if (!a.includes(n.devId)) a.push(n.devId) }
+    else if (n.kind === 'sen') { if (!s.includes(n.devId)) s.push(n.devId) }
+  }
+  selAdj.value = a
+  selSen.value = s
+}
 function boundSensors(adjId) {
   return selSen.value.filter((s) => bindOf[s] === adjId)
 }
@@ -397,7 +548,7 @@ function setBind(senId, adjId) {
   if (adjId) {
     const lv = liveOf(senId)
     if (spOf[senId] == null && lv != null) spOf[senId] = Number((Math.abs(lv) * 1.05).toFixed(4))
-    if (!has(selAdj, adjId)) selAdj.value.push(adjId)
+    if (!has(selAdj, adjId)) { selAdj.value.push(adjId); applySelToGraph() }
   }
   syncRuns()
 }
@@ -571,44 +722,7 @@ function tick() {
   }
 }
 
-// ==================== 展示：实时曲线 ====================
-const curSenId = ref('')
-const chartSensors = computed(() => {
-  const ids = []
-  for (const lp of loops.value) {
-    ids.push(lp.senId)
-    for (const a of lp.aux) ids.push(a)
-  }
-  for (const s of selSen.value) if (!ids.includes(s)) ids.push(s)
-  return ids.map((id) => ({ id, label: devName(id) }))
-})
-watch(chartSensors, (v) => {
-  if (!v.some((s) => s.id === curSenId.value)) curSenId.value = v.length ? v[0].id : ''
-}, { immediate: true })
-
-const curRun = computed(() => {
-  const lp = loopOfSen(curSenId.value)
-  return lp ? rt.map[lp.key] : null
-})
-const C_RAW = '#E07B39'
-const C_EKF = '#3AA655'
-const C_SP = '#9BB8CE'
-const chartSeries = computed(() => {
-  const r = curRun.value
-  if (!r || !r.ptsRaw.length) return []
-  const lp = loopOfSen(curSenId.value)
-  const sen = findDev(curSenId.value)
-  const unit = (sen && (sen.unit || sen.unitName)) || ''
-  const out = [{ id: 'raw', label: t('滤波前'), color: C_RAW, unit, pts: r.ptsRaw }]
-  if (useFilter.value) out.push({ id: 'ekf', label: t('滤波后'), color: C_EKF, unit, pts: r.ptsEkf })
-  if (lp) {
-    const sp = Number(targetOf(lp.senId)) || 0
-    out.push({ id: 'sp', label: t('目标值'), color: C_SP, unit, pts: [
-      { t: r.ptsRaw[0].t, v: sp }, { t: r.ptsRaw[r.ptsRaw.length - 1].t, v: sp },
-    ] })
-  }
-  return out
-})
+// ==================== 观测读数（运行中按模块查看） ====================
 function lastRawOf(senId) {
   const lp = loopOfSen(senId)
   const r = lp ? rt.map[lp.key] : null
@@ -638,19 +752,6 @@ function autoCtl(adjId) {
   const lp = loopOfAdj(adjId)
   return !!(lp && ctlOn.value && sampling.value)
 }
-
-/** 当前回路的过程模型诊断（FOPDT 参数 + 辨识是否可用） */
-const modelInfo = computed(() => {
-  const lp = loopOfSen(curSenId.value) || loops.value[0] || null
-  if (!lp) return null
-  const m = identOf[lp.key]
-  const dg = identDiag[lp.key]
-  if (m && dg && dg.ok) {
-    const rmse = Number.isFinite(dg.rmsePct) ? ` · RMSE ${fmt(dg.rmsePct, 1)}%` : ''
-    return { ok: true, txt: `τ ${fmt(m.tau, 1)}s · θ ${fmt(m.theta, 1)}s（${m.delay}） · K ${fmtSmall(m.G)} · n ${m.n}${rmse}` }
-  }
-  return { ok: false, txt: (dg && dg.msg) || t('尚在辨识：需 ≥12 点样本且设定值有明显调节') }
-})
 
 // ==================== 过程模型：由在线实时数据辨识 ====================
 // FOPDT（First Order Plus Dead Time，一阶惯性 + 纯滞后）离散模型：
@@ -792,14 +893,6 @@ function simSteps(models) {
   }
   return Math.min(300, Math.max(40, Math.ceil(span / dt)))
 }
-
-// ==================== 算法 ====================
-const ALGS = [
-  { id: 'ppo', label: t('强化学习 · PPO'), ready: true },
-  { id: 'ga', label: t('遗传算法'), ready: false },
-  { id: 'pso', label: t('粒子群'), ready: false },
-]
-const alg = ref('ppo')
 
 // ==================== 训练（PPO） ====================
 // 状态 s = [ŷ, e, Δe, d̂]：ŷ 为滤波后观测，d̂ 为滤波估计出的隐藏状态（传感器测不到的扰动）
@@ -1118,8 +1211,9 @@ function checkAuto() {
 // ==================== 初始化 ====================
 // 首次拿到设备清单时给出合理默认：选第一台可调设备 + 同工序传感设备并自动绑定
 let inited = false
-function autoPick() {
-  if (inited) return
+/** 默认回路：取第一台可调设备 + 同工序传感设备并自动绑定（force = 进入新模型时重新给默认值） */
+function autoPick(force) {
+  if (inited && !force) return
   if (!adjList.value.length || !senList.value.length) return
   inited = true
   const a = adjList.value[0]
@@ -1145,14 +1239,17 @@ watch([() => adjList.value.length, () => senList.value.length], () => {
 
 onMounted(() => {
   loadVers()
+  loadDesigns()
   if (versions.value.length) activeVer.value = versions.value[0].id
   scheduleNext()
   autoTimer = setInterval(checkAuto, 15000)
 })
 onBeforeUnmount(() => {
   trainStop.value = true
+  runId.value = ''
   stopSample()
   if (autoTimer) clearInterval(autoTimer)
+  if (saveTimer) clearTimeout(saveTimer)
 })
 
 // ==================== 格式化 ====================
@@ -1181,11 +1278,392 @@ function fullTs(ts) {
   return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`
 }
 
-defineExpose({ startSample, stopSample })
+// ==================== ① 模型库（算法模型清单） ====================
+// 一个模型 = 一套独立的群控算法（规则 / 强化学习 / 粒子群），各自保存自己的编排与设备选择。
+const DESIGNS_KEY = 'nengtan.agc.designs.v1'
+const ALG_TYPES = [
+  { id: 'rule', ico: '⌥', label: t('规则'), desc: t('if-elif-else 阈值编排，直观可控') },
+  { id: 'rl', ico: '◈', label: t('强化学习'), desc: t('PPO 在线辨识 + 策略寻优') },
+  { id: 'pso', ico: '⁂', label: t('粒子群'), desc: t('在线寻优，让观测值逼近目标') },
+]
+function algMeta(id) { return ALG_TYPES.find((a) => a.id === id) || ALG_TYPES[0] }
+function algIco(id) { return algMeta(id).ico }
+function algLabel(id) { return algMeta(id).label }
+
+const page = ref('lib')            // lib = 模型库；edit = 编排
+const designs = ref([])
+const cur = ref(null)              // 当前编排中的模型
+const newOpen = ref(false)
+const newName = ref('')
+const newAlg = ref('rule')
+const runId = ref('')              // 正在运行的模型 id
+
+const isRule = computed(() => !!cur.value && cur.value.alg === 'rule')
+/** 运行状态由父级（编排页右上角「运行」）统一下发，编排体自身不再各带开关 */
+const running = computed(() => !!cur.value && runId.value === cur.value.id)
+function isRunning(id) { return !!id && runId.value === id }
+
+function blankPso() {
+  return { vars: [], senId: '', target: 0, pNum: 12, iters: 20, w: 0.7, c1: 1.5, c2: 1.5, waitMs: 3000 }
+}
+function normalizeModel(m) {
+  const mm = m || {}
+  return {
+    id: mm.id,
+    name: mm.name || t('未命名模型'),
+    alg: ALG_TYPES.some((a) => a.id === mm.alg) ? mm.alg : 'rule',
+    ts: Number(mm.ts) || Date.now(),
+    period: Number(mm.period) || 2,
+    graph: {
+      nodes: Array.isArray(mm.graph && mm.graph.nodes) ? mm.graph.nodes : [],
+      edges: Array.isArray(mm.graph && mm.graph.edges) ? mm.graph.edges : [],
+    },
+    pso: { ...blankPso(), ...(mm.pso || {}) },
+    selAdj: Array.isArray(mm.selAdj) ? mm.selAdj : [],
+    selSen: Array.isArray(mm.selSen) ? mm.selSen : [],
+    bindOf: mm.bindOf && typeof mm.bindOf === 'object' ? { ...mm.bindOf } : {},
+    spOf: mm.spOf && typeof mm.spOf === 'object' ? { ...mm.spOf } : {},
+  }
+}
+let saveTimer = null
+function persist() {
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    try { localStorage.setItem(DESIGNS_KEY, JSON.stringify(designs.value.slice(0, 50))) } catch (e) { /* 忽略 */ }
+  }, 200)
+}
+function loadDesigns() {
+  try {
+    const raw = localStorage.getItem(DESIGNS_KEY)
+    const arr = raw ? JSON.parse(raw) : []
+    designs.value = Array.isArray(arr) ? arr.filter((m) => m && m.id).map(normalizeModel) : []
+  } catch (e) { designs.value = [] }
+  seedDcExample()
+}
+
+// ==================== 内置示例：机房温控「机柜超温 → 降泵压」 ====================
+// 首次在机房热控场景打开本视图时自动给出一个可直接运行的示例编排（只种一次，
+// 用户删除后不再出现；场景未装载完成时跳过，下次打开视图再试）。
+const DC_EXAMPLE_FLAG = 'nengtan.agc.seed.dc'
+function seedDcExample() {
+  if ((store.sceneId || '') !== 'dc-thermal') return
+  try { if (localStorage.getItem(DC_EXAMPLE_FLAG) === '1') return } catch (e) { /* 忽略 */ }
+  const senId = 'ext::n_dc_it::att_dc_it_temp'      // 机柜温度传感器
+  const adjId = 'ext::n_dc_cw::att_dc_cw_pump'      // 循环水泵变压器
+  if (!findDev(senId) || !findDev(adjId)) return
+  if (designs.value.some((m) => m.id === 'dc_cool_rule_50c')) {
+    try { localStorage.setItem(DC_EXAMPLE_FLAG, '1') } catch (e) { /* 忽略 */ }
+    return
+  }
+  const m = normalizeModel({
+    id: 'dc_cool_rule_50c',
+    name: '示例 · 机柜超 50℃ → 循环水泵变压器 24V',
+    alg: 'rule',
+    ts: Date.now(),
+    period: 2,
+    graph: {
+      nodes: [
+        { id: 'sen_rack', kind: 'sen', devId: senId, label: '机柜温度传感器', unit: '℃', unitName: '算力设备', value: null, x: 80, y: 130 },
+        { id: 'if_temp', kind: 'if', x: 330, y: 100, branches: [
+          { id: 'b1', type: 'if', src: 'sen_rack', op: '>=', val: 50 },
+          { id: 'b2', type: 'else', src: '', op: '>', val: 0 },
+        ] },
+        { id: 'adj_pump', kind: 'adj', devId: adjId, label: '循环水泵变压器', unit: 'V', unitName: '冷却水', value: 24, x: 620, y: 60 },
+      ],
+      edges: [
+        { id: 'e_s2if', from: 'sen_rack', port: 'out', to: 'if_temp' },
+        { id: 'e_if2adj', from: 'if_temp', port: 'b1', to: 'adj_pump' },
+      ],
+    },
+    selAdj: [adjId],
+    selSen: [senId],
+  })
+  designs.value = [m, ...designs.value]
+  try { localStorage.setItem(DC_EXAMPLE_FLAG, '1') } catch (e) { /* 忽略 */ }
+  persist()
+}
+
+// —— 进入 / 退出编排：设备选择与绑定随模型存取 ——
+function loadSel(m) {
+  const kept = (m.selAdj && m.selAdj.length) || (m.selSen && m.selSen.length) || Object.keys(m.bindOf || {}).length
+  selAdj.value = (m.selAdj || []).slice()
+  selSen.value = (m.selSen || []).slice()
+  for (const k of Object.keys(bindOf)) delete bindOf[k]
+  for (const k of Object.keys(spOf)) delete spOf[k]
+  Object.assign(bindOf, m.bindOf || {})
+  Object.assign(spOf, m.spOf || {})
+  if (!kept) autoPick(true)
+  // 规则模型：勾选 ⇄ 画布模块对齐（画布已有模块但没勾选时，以画布为准回勾，避免误删模块）
+  if (m.alg === 'rule') {
+    const hasDevNode = (m.graph && m.graph.nodes || []).some((n) => n && (n.kind === 'adj' || n.kind === 'sen'))
+    if (hasDevNode && !selAdj.value.length && !selSen.value.length) syncSelFromGraph()
+    else applySelToGraph()
+  }
+  syncRuns()
+}
+watch([selAdj, selSen, bindOf, spOf], () => {
+  if (!cur.value) return
+  cur.value.selAdj = selAdj.value.slice()
+  cur.value.selSen = selSen.value.slice()
+  cur.value.bindOf = { ...bindOf }
+  cur.value.spOf = { ...spOf }
+}, { deep: true })
+// 模型的编排内容（规则图 / 粒子群参数 / 周期 / 名称）变更即落盘
+watch(() => cur.value, (m) => { if (m) persist() }, { deep: true })
+
+function enter(m) {
+  if (!m) return
+  // 只允许一个模型在运行：切到别的模型即停掉上一个（编排体卸载后定时器也随之失效）
+  if (runId.value && runId.value !== m.id) runId.value = ''
+  cur.value = m
+  page.value = 'edit'
+  loadSel(m)
+}
+function back() {
+  stopRun()
+  cur.value = null
+  page.value = 'lib'
+}
+function openNew() {
+  newName.value = ''
+  newAlg.value = 'rule'
+  newOpen.value = true
+}
+function createModel() {
+  const nm = String(newName.value || '').trim()
+  const m = normalizeModel({
+    id: 'm' + Date.now() + Math.random().toString(36).slice(2, 6),
+    name: nm || `${algLabel(newAlg.value)}${t('模型')}${designs.value.length + 1}`,
+    alg: newAlg.value,
+    ts: Date.now(),
+  })
+  designs.value = [m, ...designs.value]
+  newOpen.value = false
+  newName.value = ''
+  persist()
+  enter(m)
+}
+function renameModel(m) {
+  const v = window.prompt(t('模型名称'), m.name)
+  if (v == null) return
+  const nm = String(v).trim()
+  if (!nm) return
+  m.name = nm
+  persist()
+}
+function dupModel(m) {
+  const i = designs.value.findIndex((x) => x.id === m.id)
+  const copy = normalizeModel({
+    ...JSON.parse(JSON.stringify(m)),
+    id: 'm' + Date.now() + Math.random().toString(36).slice(2, 6),
+    name: `${m.name} · ${t('副本')}`,
+    ts: Date.now(),
+  })
+  designs.value.splice(i < 0 ? designs.value.length : i + 1, 0, copy)
+  persist()
+}
+async function delModel(m) {
+  const ok = await store.confirm({ title: t('删除模型'), message: t('删除后该模型的编排配置不可恢复，确认删除？'), danger: true })
+  if (!ok) return
+  if (runId.value === m.id) runId.value = ''
+  designs.value = designs.value.filter((x) => x.id !== m.id)
+  persist()
+}
+
+/** 模型卡片的摘要指标 */
+function statOf(m) {
+  if (!m) return []
+  if (m.alg === 'rule') {
+    return [
+      { k: t('模块'), v: (m.graph.nodes || []).length },
+      { k: t('连线'), v: (m.graph.edges || []).length },
+      { k: t('周期'), v: `${m.period || 2}s` },
+    ]
+  }
+  if (m.alg === 'pso') {
+    return [
+      { k: t('优化变量'), v: (m.pso.vars || []).length },
+      { k: t('目标值'), v: fmt(m.pso.target) },
+      { k: t('粒子数'), v: m.pso.pNum },
+    ]
+  }
+  return [
+    { k: t('可调'), v: (m.selAdj || []).length },
+    { k: t('传感'), v: (m.selSen || []).length },
+    { k: t('模型版本'), v: versions.value.length },
+  ]
+}
+
+// ==================== ② 运行（编排页右上角「运行」） ====================
+const canRun = computed(() => {
+  const m = cur.value
+  if (!m) return false
+  if (m.alg === 'rule') return (m.graph.nodes || []).length > 0
+  if (m.alg === 'pso') return (m.pso.vars || []).length > 0 && !!m.pso.senId
+  return loops.value.length > 0
+})
+const runTip = computed(() => {
+  const m = cur.value
+  if (!m) return ''
+  if (canRun.value) return t('按当前编排运行；再点一次停止')
+  if (m.alg === 'rule') return t('请先把可调 / 传感设备拖入规则画布')
+  if (m.alg === 'pso') return t('请先选择优化变量（可调设备）与优化目标（传感设备）')
+  return t('请先在左栏绑定可调设备与传感设备，形成控制回路')
+})
+const runStateTxt = computed(() => {
+  const m = cur.value
+  if (!m) return ''
+  if (m.alg === 'rule') {
+    if (running.value) return t('规则运行中')
+    return canRun.value ? t('就绪') : t('未编排')
+  }
+  if (m.alg === 'pso') return running.value ? t('寻优中') : t('待运行')
+  if (trainBusy.value) return `${t('训练中')} ${iterN.value}/${maxIter.value}`
+  if (sampling.value) return t('采集中')
+  if (curve.value.length) return `${t('已完成')} ${iterN.value} ${t('轮')}`
+  return t('待运行')
+})
+function toggleRun() {
+  const m = cur.value
+  if (!m) return
+  if (running.value) { stopRun(); return }
+  if (!canRun.value) return
+  runId.value = m.id
+  if (m.alg === 'rl') {
+    syncRuns()
+    startSample()
+    if (canTrain.value) startTrain()
+  }
+}
+function stopRun() {
+  const m = cur.value
+  if (!m) return
+  if (m.alg === 'rl') { stopTrain(); stopSample() }
+  runId.value = ''
+}
+/** 粒子群寻优结束（或被中断）由子面板回报 */
+function onPsoRun(v) { if (!v) runId.value = '' }
+
+defineExpose({ startSample, stopSample, enter, back })
 </script>
 
 <style scoped>
-.agc { flex: 1 1 auto; min-height: 0; display: flex; gap: 12px; }
+.agc { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.hd-sp { flex: 1 1 auto; }
+
+/* ==================== ① 模型库 ==================== */
+.agc-lib { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 4px; }
+.lib-tip { margin: 0; font-size: 10.5px; line-height: 1.7; color: var(--muted); }
+.lib-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+  gap: 10px; align-content: start;
+  /* 卡片不贴左侧边缘：留出与右侧滚动条对称的呼吸位 */
+  padding-left: 6px;
+}
+.mcard {
+  position: relative; display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 10px 7px; text-align: left; font-family: inherit; cursor: pointer;
+  border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: 3px;
+  background: var(--panel); transition: border-color .12s, box-shadow .12s;
+}
+.mcard:hover { border-color: var(--accent2); box-shadow: 0 1px 6px rgba(0, 0, 0, .08); }
+.mcard.alg-rule { border-left-color: #D97A21; }
+.mcard.alg-rl { border-left-color: #7A5AA8; }
+.mcard.alg-pso { border-left-color: #17957F; }
+.mcard.live { box-shadow: 0 0 0 1px var(--accent-d) inset; }
+.mc-top { display: flex; align-items: center; gap: 6px; }
+.mc-ic { font-size: 13px; color: var(--accent-d); font-style: normal; }
+.mc-nm {
+  flex: 1 1 auto; min-width: 0; font-size: 11.5px; font-weight: 600; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mc-tg {
+  flex: 0 0 auto; padding: 0 5px; border-radius: 8px; font-size: 9px; line-height: 14px;
+  background: var(--bar); color: var(--muted); border: 1px solid var(--border);
+}
+.mc-tg.rule { color: #D97A21; border-color: rgba(217, 122, 33, .5); background: rgba(217, 122, 33, .10); }
+.mc-tg.rl { color: #7A5AA8; border-color: rgba(122, 90, 168, .5); background: rgba(122, 90, 168, .10); }
+.mc-tg.pso { color: #17957F; border-color: rgba(23, 149, 127, .5); background: rgba(23, 149, 127, .10); }
+.mc-bd { display: flex; flex-direction: column; gap: 2px; }
+.mc-st { display: flex; align-items: baseline; justify-content: space-between; font-size: 10px; }
+.mc-st em { font-style: normal; color: var(--faint); }
+.mc-st b { font-size: 10.5px; color: var(--muted); font-weight: 600; }
+.mc-ft { display: flex; align-items: center; gap: 6px; padding-top: 3px; border-top: 1px dashed var(--line); }
+.mc-ft .dim { font-size: 9.5px; color: var(--faint); }
+.mc-ops { margin-left: auto; display: inline-flex; gap: 7px; }
+.mc-ops .lk.danger:hover { color: var(--red); }
+.mc-live {
+  position: absolute; top: 6px; right: 8px; font-style: normal; font-size: 9px;
+  color: var(--green); background: rgba(46, 139, 87, .12); border-radius: 8px; padding: 0 5px;
+}
+.mcard.new {
+  align-items: center; justify-content: center; gap: 3px; min-height: 112px;
+  border-style: dashed; color: var(--muted); background: transparent;
+}
+.mcard.new .plus { font-size: 20px; line-height: 1; color: var(--accent-d); }
+.mcard.new .nt { font-size: 11.5px; font-weight: 600; color: var(--text); }
+.mcard.new .nd { font-size: 9.5px; color: var(--faint); }
+.lib-empty { padding: 26px 0; text-align: center; }
+.lib-empty .t1 { margin: 0 0 4px; font-size: 12px; color: var(--muted); }
+.lib-empty .t2 { margin: 0; font-size: 10.5px; color: var(--faint); }
+
+/* ==================== ② 编排 ==================== */
+.agc-edit { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.ed-top {
+  display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
+  padding: 5px 8px; border: 1px solid var(--border); border-radius: 3px; background: var(--panel);
+}
+.ed-nm { font-size: 12.5px; color: var(--text); }
+.ed-st { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--muted); }
+.ed-st .dot { width: 7px; height: 7px; border-radius: 50%; background: #888; }
+.ed-st.on { color: var(--accent-d); }
+.ed-st.on .dot { background: var(--accent); animation: agc-pulse 1s infinite; }
+.ed-bd { flex: 1 1 auto; min-height: 0; display: flex; gap: 12px; }
+
+/* ==================== 新建模型 ==================== */
+.mk-mask {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, .38);
+}
+.mk-dlg {
+  width: 460px; max-width: calc(100vw - 40px); max-height: 88vh; overflow: auto;
+  display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 4px;
+  background: var(--panel); box-shadow: 0 8px 30px rgba(0, 0, 0, .25);
+}
+.mk-hd {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  border-bottom: 1px solid var(--border); background: var(--panel-2);
+}
+.mk-hd b { font-size: 12.5px; color: var(--text); }
+.mk-x {
+  margin-left: auto; padding: 0 4px; border: 0; background: none; cursor: pointer;
+  font-family: inherit; font-size: 12px; color: var(--faint);
+}
+.mk-x:hover { color: var(--red); }
+.mk-bd { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.mk-f { display: flex; align-items: center; gap: 8px; }
+.mk-f em { font-style: normal; flex: 0 0 auto; font-size: 10.5px; color: var(--muted); }
+.mk-in {
+  flex: 1 1 auto; min-width: 0; padding: 3px 6px; font-size: 11.5px; font-family: inherit; color: var(--text);
+  background: var(--panel); border: 1px solid var(--border); border-radius: 3px; outline: none;
+}
+.mk-in:focus { border-color: var(--accent2); }
+.mk-t { font-size: 10.5px; color: var(--muted); }
+.mk-types { display: flex; flex-direction: column; gap: 6px; }
+.mk-tp {
+  display: grid; grid-template-columns: 24px 1fr; grid-template-rows: auto auto; gap: 0 8px;
+  padding: 6px 8px; text-align: left; cursor: pointer; font-family: inherit;
+  border: 1px solid var(--border); border-radius: 3px; background: var(--panel);
+}
+.mk-tp:hover { border-color: var(--accent2); }
+.mk-tp.on { border-color: var(--accent-d); background: var(--accent-l); }
+.mk-tp .tp-ic { grid-row: 1 / 3; align-self: center; font-style: normal; font-size: 15px; color: var(--accent-d); text-align: center; }
+.mk-tp b { font-size: 11.5px; color: var(--text); }
+.mk-tp span { font-size: 9.5px; color: var(--faint); }
+.mk-tp.rule .tp-ic { color: #D97A21; }
+.mk-tp.rl .tp-ic { color: #7A5AA8; }
+.mk-tp.pso .tp-ic { color: #17957F; }
+.mk-ft { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); }
 
 /* ==================== 左栏 ==================== */
 .agc-aside {
@@ -1194,7 +1672,6 @@ defineExpose({ startSample, stopSample })
   overflow-y: auto; padding-right: 4px;
 }
 .agc-hd { display: flex; align-items: center; gap: 6px; padding: 2px 0 4px; border-bottom: 1px solid var(--line); }
-.hd-ico { color: var(--accent-d); }
 .agc-hd b { font-size: 12.5px; color: var(--text); }
 .hd-sub { margin-left: auto; font-size: 10px; color: var(--faint); }
 
@@ -1271,6 +1748,17 @@ defineExpose({ startSample, stopSample })
 
 /* ==================== 右栏 ==================== */
 .agc-main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 4px; }
+
+/* 规则控制：编排画布占据右栏主体 */
+.card.rg { flex: 1 1 auto; min-height: 560px; }
+.rf-fill { flex: 1 1 auto; min-height: 0; }
+.rg .lg-i { font-size: 9.5px; margin-left: 6px; }
+.rg .lg-i.adj { color: #D97A21; }
+.rg .lg-i.sen { color: #17957F; }
+.rg .lg-i.ifn { color: #7A5AA8; }
+.drag-tip { color: var(--accent-d); border-left: 2px solid var(--accent-l); padding-left: 6px; }
+.rg-st { padding-top: 2px; }
+.rg-st .mono { font-size: 10px; color: var(--muted); }
 .card { flex: 0 0 auto; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 3px; background: var(--panel); }
 .card.grow { flex: 1 1 auto; min-height: 190px; }
 .card-hd {

@@ -13,7 +13,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.models import ProcessModel, Unit  # noqa: E402
-from app.optimizers import OPTIMIZERS, get_optimizer  # noqa: E402
+from app.domain.sim.optimizers import OPTIMIZERS, get_optimizer
 from app.realtime import DEVICE_HISTORY, DEVICE_META  # noqa: E402
 
 # 含 kind='optim' 参数的最小流程模型（风量 / 热风温度 / 富氧率）

@@ -3,8 +3,8 @@
     <div ref="host" v-show="!view2D" class="scene-host"></div>
     <Twin2DView v-if="view2D" class="scene-host"/>
 
-    <!-- 左上角工具组（图标按钮）：2D/3D 切换 / 亮度 / 刷新视角 / 自动环视 -->
-    <div v-if="!store.flowEditing" class="twin-left-tools" :style="{ top: store.scheme.activeGroupId ? '58px' : '12px' }">
+    <!-- 底部中央工具组（图标按钮横排）：2D/3D 切换 / 亮度 / 刷新视角 / 自动环视 -->
+    <div v-if="!store.flowEditing" class="twin-left-tools">
       <button type="button" class="twin-tool-btn" :class="{ on: view2D }" @click="toggleView2D()" :title="view2D ? t('切换到 3D 数字孪生视图') : t('切换到 2D 工艺流程图（ISA-101 人机界面）')">
         <Icon :name="view2D ? 'scene3d' : 'front'"/>
       </button>
@@ -103,6 +103,18 @@ function rebuildScene() {
   }
 }
 
+// 重建合并：首屏 store.ready / sceneRev / 场景恢复会在同一轮里连着触发多次，
+// 每次 buildModel 都要先销毁整棵树再重建全部几何与标签纹理（单次可达数百毫秒），
+// 连做 2~3 次就等于首页加载时肉眼可见的长时间卡顿。合并到同一帧只建最后一次。
+let rebuildRaf = null
+function scheduleRebuild() {
+  if (rebuildRaf) return
+  rebuildRaf = requestAnimationFrame(() => {
+    rebuildRaf = null
+    rebuildScene()
+  })
+}
+
 function initScene() {
   try {
     scene = new TwinScene(host.value, { envMode: store.envMode })
@@ -165,9 +177,9 @@ function onResize() {
   })
 }
 
-watch(() => store.ready, () => { if (store.ready) rebuildScene() })
+watch(() => store.ready, () => { if (store.ready) scheduleRebuild() })
 // 编辑态下 canvas 隐藏，避免在 0x0 尺寸下重建导致相机投影矩阵 NaN；退出编辑态由 editMode watch 统一重建
-watch(() => store.sceneRev, () => { if (!store.flowEditing) rebuildScene() })
+watch(() => store.sceneRev, () => { if (!store.flowEditing) scheduleRebuild() })
 // 切换场景：sceneId / sceneVersion 变化后，等左右面板按新 key 重建、容器尺寸稳定再重建 3D，
 // 避免沿用旧场景模型或 canvas 0x0 导致相机投影矩阵 NaN（与 openScene 的 nextTick 配合）
 watch(() => [store.sceneId, store.sceneVersion], async () => {
@@ -175,7 +187,7 @@ watch(() => [store.sceneId, store.sceneVersion], async () => {
   await nextTick()
   if (!scene) return
   scene.resize()
-  rebuildScene()
+  scheduleRebuild()
 })
 
 // 3D 小组子场景：进入/退出时同步视角（进入适配小组布局，返回播放全景动画）
@@ -255,6 +267,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVis)
   document.removeEventListener('click', onBrightDocClick)
   window.removeEventListener('resize', onResize)
+  if (rebuildRaf) { cancelAnimationFrame(rebuildRaf); rebuildRaf = null }
   if (resizeTimer) { clearTimeout(resizeTimer); resizeTimer = null }
   if (ro) { ro.disconnect(); ro = null }
   if (scene) scene.dispose()
@@ -274,10 +287,10 @@ onMounted(() => document.addEventListener('click', onBrightDocClick))
 /* 3D 场景占满剩余空间，对比面板按内容自适应高度 */
 .scene-host { position: relative; flex: 1 1 0; min-height: 0; }
 
-/* 左上角工具组 · 图标按钮竖排（亮度 / 刷新视角 / 自动环视） */
+/* 底部中央工具组 · 图标按钮横排（2D/3D / 亮度 / 刷新视角 / 自动环视） */
 .twin-left-tools {
-  position: absolute; left: 12px; z-index: 6; transition: top .15s;
-  display: flex; flex-direction: column; gap: 6px;
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 6;
+  display: flex; flex-direction: row; gap: 6px;
 }
 .twin-tool-btn {
   display: flex; align-items: center; justify-content: center;
@@ -290,15 +303,13 @@ onMounted(() => document.addEventListener('click', onBrightDocClick))
   transition: background .12s, color .12s, transform .12s;
 }
 /* UI 规则：hover/选中态背景非白色，不再绘制边框（border 透明保留占位） */
-.twin-tool-btn:hover { background: var(--panel-2); color: var(--accent-d); border-color: transparent; }
+.twin-tool-btn:hover { background: var(--panel-3); color: var(--accent-d); border-color: transparent; }
 .twin-tool-btn:active { transform: translateY(0); }
-.twin-tool-btn.on { background: var(--accent); color: #fff; border-color: transparent; }
-.twin-tool-btn.on:hover { background: var(--accent-d); color: #fff; }
-.app.sim-dark .twin-tool-btn { background: var(--panel); border-color: var(--border); color: var(--text); box-shadow: var(--shadow); }
-.app.sim-dark .twin-tool-btn:hover { background: var(--panel-3); color: #fff; border-color: transparent; }
-.app.sim-dark .twin-tool-btn.on { background: var(--accent); color: #fff; border-color: transparent; }
+.twin-tool-btn.on { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+.twin-tool-btn.on:hover { background: var(--accent-h); color: var(--on-accent); }
+/* 亮度弹层：从底部工具组向上弹出 */
 .twin-bright-pop {
-  position: absolute; top: 0; left: calc(100% + 8px); min-width: 190px; z-index: 90;
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); min-width: 190px; z-index: 90;
   background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: var(--shadow); padding: 9px 11px;
 }
@@ -307,10 +318,10 @@ onMounted(() => document.addEventListener('click', onBrightDocClick))
 .twin-bright-pop .twin-bp-range { flex: 1; min-width: 0; height: 4px; margin: 0; cursor: pointer; accent-color: var(--accent-d); }
 .twin-bright-pop .twin-bp-label { font-size: 9px; color: var(--faint); flex: 0 0 auto; }
 .twin-bright-pop .twin-bp-val { font-size: 10px; color: var(--muted); min-width: 30px; text-align: right; }
-.app.sim-dark .twin-bright-pop { background: rgba(30, 33, 30, 0.95); border-color: rgba(255, 255, 255, 0.12); }
-.app.sim-dark .twin-bright-pop .twin-bp-title { color: #A6A49C; }
-.app.sim-dark .twin-bright-pop .twin-bp-label { color: #75746C; }
-.app.sim-dark .twin-bright-pop .twin-bp-val { color: #C6C4BC; }
+.app.sim-dark .twin-bright-pop { background: var(--panel); border-color: var(--border); }
+.app.sim-dark .twin-bright-pop .twin-bp-title { color: var(--muted); }
+.app.sim-dark .twin-bright-pop .twin-bp-label { color: var(--faint); }
+.app.sim-dark .twin-bright-pop .twin-bp-val { color: var(--text); }
 
 /* 3D 小组子场景 · 左上角返回顶层浮层（工具栏在场景外部独立成行，不再遮挡，恢复默认左上角位置） */
 .group-scene-bar { position: absolute; top: 12px; left: 12px; z-index: 6; display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 10px; box-shadow: var(--shadow); }

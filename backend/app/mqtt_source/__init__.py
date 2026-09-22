@@ -31,7 +31,7 @@ from ._shared import (BOX_APP_EVENTS, BOX_DEVICES_FILE, BOX_SERVICES,
                       _STATE, _TOPICS, _config, _last_gc_ts, endpoint_states,
                       mqtt, sync_endpoints)
 
-from .. import cloud_agent  # noqa: E402 兼容旧模块属性（mqtt_source.cloud_agent）
+from ..integrations import cloud_agent  # noqa: E402 兼容旧模块属性（mqtt_source.cloud_agent）
 
 # 解析
 from .parsing import (  # noqa: E402

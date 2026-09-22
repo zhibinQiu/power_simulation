@@ -41,12 +41,11 @@ services:
       - "40014:8010"               # 主机 40014 -> 容器 8010
     environment:
       - PYTHONUNBUFFERED=1
-      # Broker 连接地址：box_config.json 默认指向新云端公网 IP（本地开发直连用）；
-      # 容器内通过 docker 网关回环宿主（172.18.0.1）更快更稳，故此处覆盖。
-      - BROKER_HOST=172.18.0.1
-      # 数据中间件管理 API：容器经 docker 网关回环宿主（与 BROKER_HOST 同理）；
-      # 仓库 config/middleware.json 保持本地默认 http://127.0.0.1:42084 互不覆盖。
-      - CARBON_MIDDLEWARE_URL=http://172.18.0.1:42084
+      # 说明：Broker（box_config.json broker.host）与数据中间件（config/middleware.json
+      # base_url）一律在配置文件里写**可移植的公网/域名地址**，不在此处覆盖局域网地址。
+      # 容器访问同机宿主服务（Broker 41883 / agent 42083 / 中间件 42084）需要的 docker 网关
+      # 由后端运行时自动推导（app/core/netinfo.gateway_host 读 /proc/net/route 默认路由），
+      # 连不上公网回环时自动回退到网关，开发机（mac 本地起后端）则直接用公网地址。
       # 文档站反代目标：平台后端把 /docs/* 保留前缀转发到本 compose 网络的 docs-site
       # 服务（40183），对外统一走平台 40014，文档站 40184 不再要求开放（云安全组免配）。
       - DOCS_PROXY_TARGET=http://docs-site:40183

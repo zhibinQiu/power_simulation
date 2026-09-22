@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..core import config_events
 from ..core.storage import JsonRepository
 
 # __file__ = backend/app/box_console/_shared.py
@@ -31,15 +32,27 @@ _TWIN_HISTORY: Dict[str, List[Dict[str, Any]]] = {}
 _TWIN_HISTORY_MAX = 120
 
 # 设备/模型/云端配置统一仓储（原子写盘 + 内存缓存，替代手工 json 读写）
+# 配置只在服务端这一份（backend/config/box_devices.json）；read() 以文件指纹失效缓存，
+# 多 worker 进程 / 运维手工改文件都能读到最新，无需重启。
 _devices_repo = JsonRepository(str(DEVICES_FILE), default={"models": [], "devices": []})
+
+# 配置变更作用域：采集设备定义（设备 + 模型）。前端按 scope 决定刷新哪些接口。
+DEVICES_SCOPE = "devices"
 
 
 def _load_devices() -> Dict[str, List[Dict[str, Any]]]:
     return _devices_repo.read()
 
 
+def devices_rev() -> int:
+    """采集设备配置当前版本号（文件 mtime_ns）：前端据此判断是否需要重新拉取。"""
+    return config_events.rev_of(str(DEVICES_FILE))
+
+
 def _save_devices(data: Dict[str, List[Dict[str, Any]]]) -> None:
     _devices_repo.write(data)
+    # 广播给所有已连接的客户端：任一客户端改了配置，其它客户端自动同步显示
+    config_events.publish(DEVICES_SCOPE, devices_rev(), source="api")
 
 
 # ------------------------- 设备「数据在线」统一判定 -------------------------

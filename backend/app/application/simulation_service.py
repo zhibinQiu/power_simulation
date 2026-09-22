@@ -8,14 +8,14 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
-from ..carbon_engine import cached_simulate, conservation_audit, sim_cache_stats
-from ..devices import library_payload
-from ..factors import default_factors
-from ..llm_strategy import chat_completion, chat_completion_stream, llm_parse
+from app.domain.sim.carbon_engine import cached_simulate, conservation_audit, sim_cache_stats
+from app.domain.sim.device_readings import library_payload
+from app.domain.sim.factors import default_factors
+from app.domain.strategy.llm_strategy import chat_completion, chat_completion_stream, llm_parse
 from ..models import ParseResult, ParsedOp, ProcessModel, SimulateRequest, SimulateResponse
-from ..nl_parser import apply_ops, parse_strategy
-from ..param_schema import PARAM_SCHEMA, TECHS_INFO, UNIT_TYPES_INFO
-from .. import presets
+from app.domain.strategy.nl_parser import apply_ops, parse_strategy
+from app.domain.sim.param_schema import PARAM_SCHEMA, TECHS_INFO, UNIT_TYPES_INFO
+from ..domain.sim import presets
 
 # 各模式系统提示词（与前端 CMD_MODES 保持一致）
 CHAT_MODE_PROMPTS = {

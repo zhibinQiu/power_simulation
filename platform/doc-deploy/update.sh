@@ -22,35 +22,15 @@
 # ============================================================================
 set -euo pipefail
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$SELF_DIR/../.." && pwd)"
+# 公共库（platform/lib.sh）：仓库根 ROOT / servers.conf / ssh_run / rsync_run / 标准排除列表
+. "$SELF_DIR/../lib.sh"
 cd "$ROOT"
-CONF="$ROOT/platform/servers.conf"      # 服务器地址集中配置（platform/servers.conf）
-[ -f "$CONF" ] && . "$CONF" || true
 
 SERVER="${DOC_SERVER:-${PLATFORM_SSH:-root@36.151.146.71}}"   # 文档站随平台同机（servers.conf PLATFORM_SSH）
 SERVER_DIR="${PLATFORM_DIR:-/root/qzb/jianpai}"                # 服务器仓库根（servers.conf PLATFORM_DIR）
 BS_DIR="platform/bs-deploy"                   # 服务器构建编排目录（相对仓库根）
 DOC_SITE="platform/doc-deploy/docs-site"
 DOC_DIR="platform/doc-deploy"
-
-SSH_OPTS="-o StrictHostKeyChecking=no"
-[ -z "${QZB_SSH_PASS:-}" ] || SSH_OPTS="$SSH_OPTS -o BatchMode=no"
-ssh_run() { # 免密优先；QZB_SSH_PASS 时经 sshpass 传密码
-  if [ -n "${QZB_SSH_PASS:-}" ]; then
-    sshpass -p "$QZB_SSH_PASS" ssh $SSH_OPTS "$@"
-  else
-    ssh $SSH_OPTS -o BatchMode=yes "$@"
-  fi
-}
-rsync_run() { # 与 ssh_run 配套的 rsync 传输
-  local rsh
-  if [ -n "${QZB_SSH_PASS:-}" ]; then
-    rsh="sshpass -p '$QZB_SSH_PASS' ssh $SSH_OPTS"
-  else
-    rsh="ssh $SSH_OPTS -o BatchMode=yes"
-  fi
-  rsync -az -e "$rsh" "$@"
-}
 
 command -v rsync >/dev/null 2>&1 || { echo "❌ 缺少 rsync" >&2; exit 1; }
 [ -f "$DOC_SITE/package.json" ] || { echo "❌ 未找到文档站源码（应在 platform/doc-deploy/docs-site/）" >&2; exit 1; }

@@ -33,7 +33,7 @@ from . import config as _config
 from . import external as _external
 from . import signals as _signals
 from . import status as _status
-from .. import middleware_client
+from ..integrations import middleware_client
 
 TYPE_LABELS = _config.TYPE_LABELS
 TYPE_DESC = _status.TYPE_DESC

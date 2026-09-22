@@ -13,6 +13,7 @@ import _buildCylinder from './Cylinder.js'
 import _buildCaster from './Caster.js'
 import buildRollers from './Rollers.js'
 import { buildAuxiliary } from './Auxiliary.js'
+import { buildDataCenter } from './DataCenter.js'
 
 /** unitId → builder 函数映射表 */
 export const builderMap = {
@@ -64,4 +65,8 @@ export const builderMap = {
   oxy_plant: (m, a) => buildAuxiliary('oxy_plant', m, a),
   oxy_supply: (m, a) => buildAuxiliary('oxy_plant', m, a), // 全厂供氧系统：复用空分制氧塔造型（规模更大）
   power_supply: (m, a) => buildAuxiliary('power_supply', m, a), // 全厂供电系统：主变电站造型
+  // 机房温控（数据中心）：冷却水 / 制冷风机（半导体制冷+风扇） / 算力设备（机柜列）
+  dc_chiller: (m, a) => buildDataCenter('dc_chiller', m, a),
+  dc_fan_cool: (m, a) => buildDataCenter('dc_fan_cool', m, a),
+  dc_it: (m, a) => buildDataCenter('dc_it', m, a),
 }

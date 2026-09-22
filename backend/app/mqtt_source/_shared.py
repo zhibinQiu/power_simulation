@@ -32,7 +32,7 @@ RUNTIME_CONFIG_PATH = os.path.join(CONFIG_DIR, "box_config.json")  # 前端配�
 LINKS_FILE = os.path.join(CONFIG_DIR, "links.json")   # 云端设备 <-> 仿真设备实例关联持久化
 BOX_DEVICES_FILE = os.path.join(CONFIG_DIR, "box_devices.json")  # 盒子设备配置（cloudDevice/name 反查用）
 
-from .. import cloud_agent  # noqa: F401 —— re-export：子模块经 _shared.cloud_agent 访问  # noqa: E402 云端 agent 推送（cloud/# 主题）解析，替代 SSH 数据通道
+from ..integrations import cloud_agent  # noqa: F401 —— re-export：子模块经 _shared.cloud_agent 访问  # noqa: E402 云端 agent 推送（cloud/# 主题）解析，替代 SSH 数据通道
 
 # ------------------------- 配置加载（环境变量 > box_config.json > 默认值） -------------------------
 DEFAULT_CFG: Dict[str, Any] = {

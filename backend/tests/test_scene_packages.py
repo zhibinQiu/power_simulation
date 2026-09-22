@@ -20,7 +20,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import scene_registry  # noqa: E402
+from app.domain.scene import scene_registry  # noqa: E402
 
 
 def _make_ec_bytes(scene_id, version, ready=True, extra_files=None):

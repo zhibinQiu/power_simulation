@@ -10,6 +10,14 @@ from .device_yaml import (
     ModbusDeviceYamlRenderer,
     OpcuaDeviceYamlRenderer,
 )
+from .hwid import (
+    HWID_LABEL,
+    backfill_hwids,
+    ensure_hwid,
+    hwid_of,
+    new_hwid,
+    slug,
+)
 
 __all__ = [
     "DeviceYamlRenderer",
@@ -17,4 +25,10 @@ __all__ = [
     "OpcuaDeviceYamlRenderer",
     "BluetoothDeviceYamlRenderer",
     "DeviceYamlFactory",
+    "HWID_LABEL",
+    "hwid_of",
+    "new_hwid",
+    "ensure_hwid",
+    "backfill_hwids",
+    "slug",
 ]

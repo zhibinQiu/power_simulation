@@ -6,10 +6,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from ..carbon_engine import cached_simulate
+from app.domain.sim.carbon_engine import cached_simulate
 from ..models import ParsedOp, ProcessModel, Strategy
-from ..nl_parser import apply_ops
-from ..store import store
+from app.domain.strategy.nl_parser import apply_ops
+from app.domain.strategy.store import store
 
 
 class StrategyService:

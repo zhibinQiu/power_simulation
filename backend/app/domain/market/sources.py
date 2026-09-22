@@ -43,13 +43,13 @@ class RemoteQuoteSource(QuoteSource):
 
     @staticmethod
     def _default_fetch_cea() -> Optional[Dict[str, Any]]:
-        from ...carbon_market import fetch_cea_series  # 延迟导入，避免与碳市场服务循环依赖
+        from app.domain.market.carbon_market import fetch_cea_series
 
         return fetch_cea_series()
 
     @staticmethod
     def _default_fetch_ccer() -> Optional[Dict[str, Any]]:
-        from ...carbon_market import fetch_ccer_quote  # 延迟导入，避免与碳市场服务循环依赖
+        from app.domain.market.carbon_market import fetch_ccer_quote
 
         return fetch_ccer_quote()
 

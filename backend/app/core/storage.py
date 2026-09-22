@@ -5,7 +5,9 @@
 
 - 读写分离：read() 走内存缓存，write() 原子写盘（tmp + os.replace）；
 - mutate()：在锁内完成「读 → 变更 → 写」，保证并发安全；
-- 文件缺失 / 损坏时优雅回退到默认值，不抛异常。
+- 文件缺失 / 损坏时优雅回退到默认值，不抛异常；
+- 缓存以文件指纹（mtime_ns + size）失效：**磁盘文件是唯一真相**，本进程或别的进程 /
+  运维手工改动过文件，下一次 read() 自动重新读盘（多 worker 部署同样一致）。
 
 用法示例：
     repo = JsonRepository(path="/data/links.json", default={})
@@ -50,12 +52,26 @@ class JsonRepository(Generic[T]):
         self._lock = threading.Lock()
         self._cache: Optional[Any] = None
         self._cache_enabled = cache
+        self._fp: Optional[tuple] = None   # 缓存内容对应的文件指纹（mtime_ns, size）
 
     # ------------------------- 读取 -------------------------
 
+    def fingerprint(self) -> Optional[tuple]:
+        """当前磁盘文件指纹（mtime_ns, size）；文件不存在返回 None。
+
+        用于判断「文件是否被别人改过」：多 worker 进程各自持有内存缓存，
+        只看缓存会导致 A 进程写入后 B 进程仍返回旧值；也用于运维直接编辑
+        json 文件的场景（此前必须重启才能生效）。
+        """
+        try:
+            st = os.stat(self.path)
+            return (st.st_mtime_ns, st.st_size)
+        except OSError:
+            return None
+
     def read(self) -> Any:
-        """读取当前数据：优先内存缓存，其次读盘；文件缺失/损坏回退默认值。"""
-        if self._cache_enabled and self._cache is not None:
+        """读取当前数据：缓存命中且文件指纹未变则直接返回，否则重新读盘。"""
+        if self._cache_enabled and self._cache is not None and self.fingerprint() == self._fp:
             return self._cache
         data = self.default
         try:
@@ -68,6 +84,7 @@ class JsonRepository(Generic[T]):
             pass
         if self._cache_enabled:
             self._cache = data
+            self._fp = self.fingerprint()
         return data
 
     # ------------------------- 写入 -------------------------
@@ -108,6 +125,7 @@ class JsonRepository(Generic[T]):
         finally:
             if self._cache_enabled:
                 self._cache = data
+                self._fp = self.fingerprint()
 
 
 def read_json_file(path: str, default: Any = None) -> Any:

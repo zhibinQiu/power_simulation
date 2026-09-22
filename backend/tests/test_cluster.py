@@ -11,7 +11,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.cluster import extract_features, kmeans, silhouette, cluster_devices  # noqa: E402
+from app.domain.sim.cluster import extract_features, kmeans, silhouette, cluster_devices
 from app.api import simulation_router  # noqa: E402
 
 

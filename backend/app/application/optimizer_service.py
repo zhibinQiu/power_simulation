@@ -13,7 +13,7 @@ import time
 from typing import Any, Dict, Optional
 
 from ..models import ProcessModel
-from .. import optimizers
+from ..domain.sim import optimizers
 
 
 class OptimizerService:

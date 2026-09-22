@@ -42,7 +42,25 @@
                class="num" :title="t('当前 {val} {unit}', { val: f(extraVal(es.key)), unit: es.unit })" />
         <div class="pr-hint">{{ t('参考范围') }} {{ f(es.min) }} – {{ f(es.max) }} {{ es.unit }}</div>
       </div>
-      <div class="note">{{ t('输入框中的数值即为当前设定值（工况值），仿真计算以此为准；调节后经碳引擎折算为运行电耗 / 间接排放，估算随之更新。') }}</div>
+      <!-- 附加的可变设备：设定值只调工况、不参与取数；原话术（设定值直接折算电耗）仅适用于流程内可调设备 -->
+      <div class="note">{{ dev.ext
+        ? t('该数值为设定值：只用于调节运行工况（如电压↑ → 泵速 / 制冷量↑），不参与取数也不直接参与折碳；本工序的实际功率请在「传感器」中添加电功率传感器设置（其数据源可设为随本设备联动）。')
+        : t('输入框中的数值即为当前设定值（工况值），仿真计算以此为准；调节后经碳引擎折算为运行电耗 / 间接排放，估算随之更新。') }}</div>
+    </div>
+
+    <!-- 功率型传感器（电功率传感器 kW）：其读数是所属工序能碳核算的功率来源。
+         可变设备不在此列——它的值只是设定值（只调工况、不参与取数与折碳），
+         实际功率一律由本工序附加的电功率传感器承载。 -->
+    <div class="card adj-card" v-if="dev.metering && dev.powerReading">
+      <div class="pr-top">
+        <span>{{ dev.readingLabel || t('有功功率') }}</span>
+        <b>{{ f(liveReading) }} <span class="u">{{ dev.readingUnit || '' }}</span></b>
+      </div>
+      <div class="chips">
+        <div class="chip2"><span>{{ t('数据来源') }}</span><b>{{ rtSrcText }}</b></div>
+        <div class="chip2"><span>{{ t('折算碳排') }}</span><b>{{ rtCarbonText }}</b></div>
+      </div>
+      <div class="note">{{ rtNote }}</div>
     </div>
     </CollapseSection>
 
@@ -146,6 +164,8 @@ const CalibrationWizard = defineAsyncComponent(() => import('./CalibrationWizard
 // 避免动态 import 偶发失败时弹窗静默打不开
 const TftAnalysisDialog = lazyDialog(() => import('./TftAnalysisDialog.vue'))
 import { getCoupling, deriveProcessOpParams, paramLabel, PROCESS_MAP, DEVICE_MAP } from '../data/flowLibrary'
+// 附加可调设备的设定范围兜底：类型取自通用附加设备库（如变频器 / 半导体制冷电源）
+import { ADJUSTABLE_MAP } from '../data/attachLibrary'
 import { buildRealtimeTftParams } from '../utils/tft'
 
 const store = useSimStore()
@@ -156,10 +176,16 @@ const meta = computed(() => (dev.value ? (lib.value[dev.value.type] || {}) : {})
 const metaLabel = computed(() => meta.value.label || (dev.value ? dev.value.type : ''))
 // 说明：优先后端设备库，其次设备自带 desc（可调设备由 _adjDevice 补全），再兜底
 const metaDesc = computed(() => meta.value.desc || (dev.value && dev.value.desc) || '—')
-// 设定范围/单位：前端 DEVICE_MAP 模板对可调/计量设备均有 setpoint；后端库缺失时仍可用
+// 设定范围/单位：前端 DEVICE_MAP 模板对可调/计量设备均有 setpoint；后端库缺失时仍可用。
+// 附加可调设备（ext::节点id::attUid，如机房温控的 循环水泵变压器 / 半导体制冷电源）类型来自
+// 通用附加设备库，既不在工艺可调设备表也不在后端设备库内 —— 缺此兜底则 sp 为 null，
+// 下方「设定调节」卡片整体不渲染，可调设备会变成只能看不能调。
 const sp = computed(() => {
   const t = dev.value && DEVICE_MAP[dev.value.type]
-  return (t && t.setpoint) || meta.value.setpoint || null
+  if (t && t.setpoint) return t.setpoint
+  if (meta.value.setpoint) return meta.value.setpoint
+  const at = dev.value && ADJUSTABLE_MAP[dev.value.type]
+  return (at && at.setpoint) || null
 })
 // 喂给碳核算引擎的活动数据说明：优先设备自带，其次由耦合目标推断（可调设备无后端 feeds 字段）
 const feedsText = computed(() => {
@@ -175,6 +201,8 @@ const unitTypeLabel = computed(() => (info.value && info.value.unitType
 const setpointVal = computed(() => {
   const id = dev.value && dev.value.id
   if (id != null && store.deviceSetpoints[id] != null) return store.deviceSetpoints[id]
+  // 附加可调设备的初始值来自方案里的 att.def（dev.setpoint），优先于模板默认值
+  if (dev.value && dev.value.setpoint != null) return dev.value.setpoint
   return sp.value ? sp.value.def : 0
 })
 function onSetpoint(e) { if (dev.value) store.setDeviceSetpoint(dev.value.id, e.target.value) }
@@ -183,6 +211,8 @@ function onSetpoint(e) { if (dev.value) store.setDeviceSetpoint(dev.value.id, e.
 const spLabel = computed(() => {
   const tpl = dev.value && DEVICE_MAP[dev.value.type]
   if (tpl && tpl.setpoint && tpl.setpoint.label) return tpl.setpoint.label
+  const spTxt = sp.value && sp.value.label
+  if (spTxt) return spTxt
   if (dev.value && dev.value.measures) return dev.value.measures
   return t('设定值')
 })
@@ -283,6 +313,37 @@ function pct(v, base) {
 
 const history = computed(() => store.deviceHistoryOf(info.value ? info.value.device.id : ''))
 const live = computed(() => (info.value ? store.deviceLiveOf(info.value.device.id) : null))
+// 传感器读数（功率型传感器即实测有功功率 kW）：live（仿真推送）优先，其次合成读数
+const liveReading = computed(() => {
+  if (live.value != null) return live.value
+  return dev.value ? dev.value.reading : null
+})
+// 读数的来源（决定该读数是否进入折碳：数据源管理设备 = 实测）
+const rtSrcText = computed(() => {
+  const d = dev.value
+  if (!d) return '—'
+  if (d.src === 'device') return (d.device || t('数据源管理设备')) + (d.prop ? ' · ' + d.prop : '')
+  if (d.src === 'sim') return t('随机模拟值')
+  if (d.src === 'param') return t('工艺参数') + '：' + (d.param || '—')
+  if (d.src === 'attach') return t('随附加可调设备联动')
+  return t('固定值')
+})
+// 该读数按电网因子折算的范围二碳排（kgCO₂/h）；读数缺失时按工序功率参数估算
+const rtCarbonText = computed(() => {
+  if (!dev.value || !dev.value.powerReading) return '—'
+  const kw = Number(liveReading.value)
+  if (!isFinite(kw)) return t('未接入实测（按工序功率参数估算）')
+  return (kw * store._gridFactorKg()).toFixed(1) + ' kgCO₂/h'
+})
+const rtNote = computed(() => {
+  const d = dev.value
+  if (!d) return ''
+  // 功率型传感器即本工序的核算功率来源；可变设备的设定值只调工况、不参与折碳
+  const base = t('本传感器量测有功功率（kW），其读数即所属工序能碳核算的功率来源：可变设备（如变压器 / 变频电源）的设定值只调运行工况，不作为核算数据。')
+  return base + (d.src === 'device'
+    ? t('已绑定数据源管理设备「{name}」，实测功率进入所属工序的能碳核算（范围二折碳）。', { name: (d.device || '—') + (d.prop ? ' · ' + d.prop : '') })
+    : t('当前未接入实测（来源：{src}），折碳按该传感器读数计算；把数据源设为「数据源管理设备」并绑定有功功率点位后即为实测功率。', { src: rtSrcText.value }))
+})
 const latest = computed(() => (history.value.length ? history.value[history.value.length - 1].v : (live.value != null ? live.value : (dev.value ? dev.value.reading : 0))))
 const avg = computed(() => {
   const h = history.value; if (!h.length) return live.value != null ? live.value : (dev.value ? dev.value.reading : 0)

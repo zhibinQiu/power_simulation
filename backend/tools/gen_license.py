@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import sys
 
-from app import license as license_mod
+from app.settings import license as license_mod
 
 
 def main() -> int:

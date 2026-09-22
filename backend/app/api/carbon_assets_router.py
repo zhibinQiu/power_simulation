@@ -18,12 +18,12 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from ..carbon_market import fetch_chart, fetch_quotes, forecast_series
-from ..market_news import fetch_news
+from app.domain.market.carbon_market import fetch_chart, fetch_quotes, forecast_series
+from app.domain.market.market_news import fetch_news
 from ..models import ParsedOp, SimResult
-from ..report import generate_report
-from .. import report_store
-from ..md_render import render_report_page
+from app.domain.reporting.report import generate_report
+from ..domain.reporting import report_store
+from app.domain.reporting.md_render import render_report_page
 from .carbon_assistant import router as carbon_assistant_router
 
 router = APIRouter(prefix="/api", tags=["carbon-assets"])

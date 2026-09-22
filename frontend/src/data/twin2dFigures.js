@@ -93,6 +93,28 @@ const roll = (cx, cy, r, fill = 'url(#g-roll)') => [
   { tag: 'circle', cx: cx - r * 0.3, cy: cy - r * 0.32, r: r * 0.42, fill: '#ffffff', opacity: 0.42, stroke: 'none' },
 ]
 
+/** 风扇叶轮（弯掠桨叶）：叶根收窄、外缘沿圆周扫掠并带桨距角，n=5 即一台风扇/风机叶轮。
+ *  与 roll 同为一组构件（返回元素数组），供机房温控「制冷风机」等需要「仿真风扇」造型的设备复用。 */
+function fanBlades(cx, cy, r, n = 5) {
+  const q = (v) => Math.round(v * 100) / 100
+  const out = []
+  for (let i = 0; i < n; i++) {
+    const t = (i / n) * Math.PI * 2
+    const at = (rad, ang) => [q(cx + Math.cos(ang) * rad), q(cy + Math.sin(ang) * rad)]
+    const [x0, y0] = at(r * 0.3, t)              // 叶根
+    const [xm, ym] = at(r * 0.74, t + 0.1)       // 前缘控制点（前掠）
+    const [x1, y1] = at(r, t + 0.44)             // 叶尖前缘
+    const [x2, y2] = at(r, t + 0.98)             // 叶尖后缘
+    const [xm2, ym2] = at(r * 0.46, t + 0.8)     // 后缘控制点
+    out.push({
+      tag: 'path',
+      d: `M${x0} ${y0} Q${xm} ${ym} ${x1} ${y1} A${q(r)} ${q(r)} 0 0 1 ${x2} ${y2} Q${xm2} ${ym2} ${x0} ${y0} Z`,
+      fill: 'url(#g-cyl)', stroke: EDGE, sw: 0.55, opacity: 0.95,
+    })
+  }
+  return out
+}
+
 /** 三电极（电弧炉 / 钢包精炼）：立柱 + 横臂 + 电极 + 弧光 */
 function electrodes(xs, yTop, yBottom, opt = {}) {
   const out = []
@@ -458,6 +480,56 @@ export const T2D_FIGURES = {
     { tag: 'path', d: 'M9 4.4 V1.8', fill: 'none', stroke: '#7ec1ec', sw: 1.2 },
     ...[7.6, 11, 14].map((y) => ({ tag: 'path', d: `M5.8 ${y} H12.2`, fill: 'none', stroke: '#6c7a88', sw: 0.6, opacity: 0.8 })),
     rect(4.4, 16.2, 9.2, 1.6, F.box),
+  ),
+
+  // —— 机房温控①：冷却水（循环水系统：水箱 + 循环水泵，暖色层表示回水温度上升） ——
+  dc_chiller: fig(18, 15,
+    ground(9, 14.5, 5.8),
+    rect(1.6, 12.4, 15.0, 1.6, F.box),                                    // 设备底座
+    cyl(12.0, 3.0, 12.2, 2.9, 1.0),                                       // 循环水箱
+    { tag: 'path', d: 'M9.5 4.5 H14.5', fill: 'none', stroke: '#d4803a', sw: 0.9, opacity: 0.6 },   // 上层回水（吸热后偏热）
+    { tag: 'path', d: 'M9.5 6.6 H14.5 M9.5 9.4 H14.5', fill: 'none', stroke: '#7ec1ec', sw: 0.6, opacity: 0.7 },
+    rect(1.8, 9.6, 4.4, 2.6, F.box),                                      // 泵底座
+    circ(3.9, 8.2, 2.5, F.cyl),                                           // 循环水泵
+    circ(3.9, 8.2, 0.95, F.dark, { sw: 0.6 }),                            // 泵轮毂
+    rect(6.6, 7.0, 2.2, 2.6, F.box),                                      // 电机
+    { tag: 'path', d: 'M9.1 10.6 H3.9', fill: 'none', stroke: '#7ec1ec', sw: 1.1 },                 // 泵 → 水箱
+    { tag: 'path', d: 'M13.6 3.0 V0.7', fill: 'none', stroke: '#3b9ee0', sw: 1.3 },                 // 冷却水供水（去制冷风机）
+    { tag: 'path', d: 'M10.4 3.0 V0.7', fill: 'none', stroke: '#d4803a', sw: 1.3 },                 // 冷却水回水（来自制冷风机）
+  ),
+
+  // —— 机房温控②：制冷风机（半导体制冷片 + 风扇：风筒 + 5 片桨叶 + 水冷头散热） ——
+  dc_fan_cool: fig(18, 17,
+    ground(9, 16.4, 6.2),
+    rect(2.2, 14.4, 13.6, 1.7, F.box),                                    // 底座
+    rect(7.4, 12.0, 3.2, 2.5, F.box),                                     // 支腿
+    circ(9, 8.0, 5.6, F.cyl),                                             // 风筒外框
+    circ(9, 8.0, 4.7, '#2b3540', { sw: 0.7 }),                            // 风道内腔（暗）
+    ...fanBlades(9, 8.0, 4.4),                                            // 5 片弯掠桨叶
+    circ(9, 8.0, 1.25, F.dark, { sw: 0.7 }),                              // 叶轮轮毂
+    circ(9, 8.0, 5.15, 'none', { stroke: '#a9b8c4', sw: 0.5, opacity: 0.5 }),   // 护网外圈
+    circ(9, 8.0, 3.05, 'none', { stroke: '#a9b8c4', sw: 0.45, opacity: 0.4 }),  // 护网内圈
+    { tag: 'path', d: 'M4.0 8 H14 M9 3.1 V13', fill: 'none', stroke: '#a9b8c4', sw: 0.4, opacity: 0.35 },
+    rect(3.4, 0.7, 3.4, 2.1, F.box),                                      // 水冷头（接制冷片热端）
+    rect(7.2, 1.1, 3.6, 1.5, '#d6dbe1', { sw: 0.8 }),                     // 半导体制冷片
+    ...[7.9, 8.7, 9.5, 10.3].map((x) => ({ tag: 'path', d: `M${x} 2.6 V3.4`, fill: 'none', stroke: '#8b98a6', sw: 0.4, opacity: 0.9 })),
+    { tag: 'path', d: 'M6.8 1.75 H7.2', fill: 'none', stroke: '#5b6875', sw: 1.1 },
+    { tag: 'path', d: 'M3.4 1.5 H0.5', fill: 'none', stroke: '#3b9ee0', sw: 1.3 },     // 冷却水供水
+    { tag: 'path', d: 'M3.4 2.5 H0.8', fill: 'none', stroke: '#d4803a', sw: 1.3 },     // 冷却水回水
+  ),
+
+  // —— 机房温控③：算力设备（机柜列：服务器插槽 + 指示灯） ——
+  dc_it: fig(16, 18,
+    ground(8, 17.4, 5.4),
+    rect(0.9, 16.8, 14.2, 1.4, F.box),                                    // 底座
+    rect(2.0, 1.2, 12.0, 15.6, F.box),                                    // 机柜柜体
+    rect(2.8, 2.0, 10.4, 14.0, '#2b3540', { sw: 0.7 }),                   // 前面板（暗）
+    ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => rect(3.3, 2.7 + i * 1.7, 8.2, 1.15, F.cyl)),   // 服务器插槽
+    ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({
+      tag: 'circle', cx: 12.2, cy: 3.25 + i * 1.7, r: 0.22,
+      fill: i % 3 === 0 ? '#5fe08a' : '#4bb6e8', stroke: 'none',
+    })),                                                                  // 运行指示灯
+    { tag: 'path', d: 'M9.8 1.2 H13.4', fill: 'none', stroke: '#6c7a88', sw: 0.5, opacity: 0.8 },
   ),
 
   // —— 兜底：通用罐体（未覆盖的设备类型不至于变成空白） ——

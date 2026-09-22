@@ -6,7 +6,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import license as lic  # noqa: E402
+from app.settings import license as lic  # noqa: E402
 
 
 def _isolate(monkeypatch, tmp_path):

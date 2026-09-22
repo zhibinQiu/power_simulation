@@ -28,7 +28,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import scene_loader  # noqa: E402
+from app.domain.scene import scene_loader  # noqa: E402
 
 
 def main() -> None:

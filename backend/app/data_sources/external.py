@@ -21,7 +21,7 @@ import re
 import time
 from typing import Any, Dict, Optional
 
-from .. import middleware_client
+from ..integrations import middleware_client
 from ..mqtt_source import _shared as mqtt_shared
 from .config import ADAPTERS
 

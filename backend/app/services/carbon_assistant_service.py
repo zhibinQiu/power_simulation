@@ -18,7 +18,7 @@ from datetime import datetime
 from types import SimpleNamespace
 from typing import Dict, List, Optional
 
-from .. import report_store
+from ..domain.reporting import report_store
 from .carbon_compliance.compliance_analysis_report import run_compliance_analysis_report
 
 DEFAULT_USER_ID = "default"

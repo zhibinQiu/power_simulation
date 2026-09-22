@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from ..application.optimizer_service import optimizer_service
 from ..application.simulation_service import simulation_service
 from ..application.strategy_service import strategy_service
-from ..cluster import cluster_devices
+from app.domain.sim.cluster import cluster_devices
 from ..models import (ParseRequest, ParseResult, ParsedOp, ProcessModel,
                       SimulateRequest, SimulateResponse, Strategy)
 

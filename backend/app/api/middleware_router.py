@@ -12,7 +12,7 @@ from typing import Any, Dict
 
 from fastapi import APIRouter
 
-from .. import middleware_client
+from ..integrations import middleware_client
 from .rest import json_api
 
 router = APIRouter(prefix="/api/middleware", tags=["数据中间件服务"])

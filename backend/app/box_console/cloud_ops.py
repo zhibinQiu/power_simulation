@@ -5,9 +5,9 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from .. import cloud_agent
+from ..integrations import cloud_agent
 from .. import mqtt_source
 from ._shared import _load_devices, _save_devices
 from .edge import check_edge_reachable, edge_config
@@ -148,11 +148,70 @@ def apply_devices_to_cloud(device_name: Optional[str] = None, dry_run: bool = Fa
     }
 
 
-def _auto_sync_cloud(device_name: str, namespace: str = "default", renamed_from: str = "") -> Dict[str, Any]:
+def _k8s_name_equal(a: str, b: str) -> bool:
+    """判断两个名字在 K8s 里是否指向同一对象（大小写/下划线 ↔ 连字符 归一化后相同）。
+
+    kubectl delete 与 apply 都按对象名定位，若改名只是「shuitong_temp → shuitong-temp」这类
+    等价写法，删除旧名会把刚下发的设备一起删掉，改名后设备凭空消失。
+    """
+    def _norm(v: str) -> str:
+        return (v or "").strip().lower().replace("_", "-").replace(".", "-")
+    return bool(_norm(a)) and _norm(a) == _norm(b)
+
+
+def _applied_device_confirmed(res: Dict[str, Any], device_name: str) -> bool:
+    """从 kubectl apply 输出确认目标 Device 文档确实被应用（created/configured/unchanged）。"""
+    out = "\n".join([str(res.get("stdout") or ""), str(res.get("stderr") or "")])
+    token = f"device.devices.kubeedge.io/{device_name}"
+    for line in out.splitlines():
+        line = line.strip()
+        if token in line and any(k in line for k in ("created", "configured", "unchanged", "serverside-applied")):
+            return True
+    return False
+
+
+def _cloud_device_exists(name: str, namespace: str = "default") -> bool:
+    """查询云端 CRD 列表确认该 Device 已存在（force 拉取，30s 节流）。"""
+    try:
+        crds = cloud_agent.crds(force=True)
+    except Exception:  # noqa: BLE001
+        return False
+    if not crds.get("ok"):
+        return False
+    for d in crds.get("devices") or []:
+        if str(d.get("name") or "") == name:
+            return True
+    return False
+
+
+def _old_name_still_used(old: str, exclude: str = "") -> bool:
+    """旧设备名是否仍被本地其它设备占用（设备名或云端绑定标识）。
+
+    读不到配置时保守返回 True（不删除），避免误删仍在使用的云端设备。
+    """
+    try:
+        data = _load_devices()
+    except Exception:  # noqa: BLE001
+        return True
+    for d in data.get("devices") or []:
+        name = str(d.get("name") or "")
+        if exclude and name == exclude:
+            continue
+        if name == old or str(d.get("cloudDevice") or "").strip() == old:
+            return True
+    return False
+
+
+def _auto_sync_cloud(device_name: str, namespace: str = "default", renamed_from: str = "",
+                     extra_devices: "Optional[List[str]]" = None) -> Dict[str, Any]:
     """本地保存配置后自动同步云端（保存即下发，云端及时同步）。
 
-    - 下发该设备（含其模型文档）到云端 K3s（kubectl apply）
-    - 改名场景（renamed_from 非空且 != device_name）：联动删除云端旧名 CRD，避免残留旧设备
+    - 下发该设备（含其模型文档）到云端 K3s（kubectl apply）；
+    - extra_devices：本次被连带重刷 YAML 的其它设备（模型点位变更会重刷同模型所有设备），
+      一并发下，避免「本地 YAML 已变、云端仍是旧配置」的一致性漂移；
+    - 改名场景（renamed_from 非空且 != device_name）：**先确认新设备已在云端生效**再联动删除
+      云端旧名 CRD。确认不到就保留旧设备（宁可残留，不可让设备云端身份丢失导致实时数据断链）。
+
     云端不可达/下发失败时本地配置不受影响，仅返回失败信息供前端提示。
     """
     try:
@@ -164,12 +223,39 @@ def _auto_sync_cloud(device_name: str, namespace: str = "default", renamed_from:
             "ok": False,
             "error": (res.get("error") or res.get("stderr") or res.get("stdout") or "云端同步失败").strip(),
         }
-    sync: Dict[str, Any] = {"ok": True, "applied": res.get("applied", [])}
+    sync: Dict[str, Any] = {"ok": True, "applied": list(res.get("applied") or [])}
+    # 连带设备（同模型被重刷 YAML 的其它设备）一并发下，保证本地/云端一致
+    for extra in [x for x in (extra_devices or []) if x and x != device_name]:
+        try:
+            er = apply_devices_to_cloud(device_name=extra)
+        except Exception as e:  # noqa: BLE001
+            sync.setdefault("extra_errors", {})[extra] = f"云端同步异常：{e}"
+            continue
+        if er.get("ok"):
+            sync["applied"].extend(er.get("applied") or [])
+        else:
+            sync.setdefault("extra_errors", {})[extra] = (
+                er.get("error") or er.get("stderr") or er.get("stdout") or "云端同步失败").strip()
     if renamed_from and renamed_from != device_name:
-        del_r = _cloud_delete_crds("device", renamed_from, namespace)
-        sync["old_crd_removed"] = bool(del_r.get("ok"))
-        if not del_r.get("ok"):
-            sync["old_crd_error"] = del_r.get("error") or del_r.get("stderr") or "旧 CRD 删除失败"
+        if _k8s_name_equal(renamed_from, device_name):
+            sync["old_crd_removed"] = False
+            sync["old_crd_kept"] = renamed_from
+            sync["old_crd_reason"] = "新旧名称在 K8s 中是同一对象，已跳过删除（避免把刚下发的设备删掉）"
+        elif not (_applied_device_confirmed(res, device_name) or _cloud_device_exists(device_name, namespace)):
+            sync["old_crd_removed"] = False
+            sync["old_crd_kept"] = renamed_from
+            sync["old_crd_reason"] = (
+                f"云端未确认新设备「{device_name}」已生效，已保留旧设备「{renamed_from}」"
+                "（避免改名后设备丢失）")
+        elif _old_name_still_used(renamed_from, exclude=device_name):
+            sync["old_crd_removed"] = False
+            sync["old_crd_kept"] = renamed_from
+            sync["old_crd_reason"] = f"旧名称「{renamed_from}」仍被其它设备引用，已保留其云端设备"
+        else:
+            del_r = _cloud_delete_crds("device", renamed_from, namespace)
+            sync["old_crd_removed"] = bool(del_r.get("ok"))
+            if not del_r.get("ok"):
+                sync["old_crd_error"] = del_r.get("error") or del_r.get("stderr") or "旧 CRD 删除失败"
     return sync
 
 

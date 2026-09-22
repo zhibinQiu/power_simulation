@@ -231,15 +231,39 @@
       </div>
       </CollapseSection>
 
-      <!-- ===== 附加传感 / 可变设备：绑定到本工序设备；数值来源支持下拉 ===== -->
+      <!-- ===== 附加传感 / 可变设备：传感器负责取数，可变设备只做设定 ===== -->
       <CollapseSection :title="t('附加传感 / 可变设备')" tone="blue" :show-more="false">
       <div class="card">
-        <div class="pr-hint">{{ t('在编排模式中把传感器 / 可变设备绑定到具体的工艺设备（数据绑定方向：工序 ← 传感）。每个绑定的「数据源」可选：固定值 / 随机模拟值 / 数据源管理中已接入的传感器设备（按点位取实时读数）。运行态出现在设备树与数据分析中。') }}</div>
+        <div class="pr-hint">{{ t('绑定方向：工序 ← 传感。传感器负责取数，数据源可选：固定值 / 随机模拟值 / 数据源管理中已接入的传感器设备（按点位取实时读数）/ 随本工序可变设备联动（读数随其设定值线性变化）；其中的电功率传感器（kW）即本工序能碳核算的功率来源。可变设备只有设定值，仅用于调节运行工况、不参与取数——其实际功率请在「传感器」中添加电功率传感器设置。') }}</div>
         <div v-for="ag in attachGroups" :key="ag.kind" class="ports-col">
           <span class="pc-t">{{ ag.label }}（已绑 {{ attachedOf(ag.kind).length }}）</span>
           <div v-for="att in attachedOf(ag.kind)" :key="att.uid" class="gio-row att-row">
-            <span class="att-lbl" :title="t('数据源：') + srcTextOf(att)">{{ att.label }}</span>
-            <select class="att-src" :value="srcOf(att)" @change="onAttSrc(att, $event.target.value)">
+            <span class="att-lbl" :title="att.kind === 'sensor' ? (t('数据源：') + srcTextOf(att)) : t('设定值：只调运行工况，不参与取数')">{{ att.label }}</span>
+            <!-- 传感器：当前读数 + 功率型标记（功率型 = 本工序折碳的功率来源） -->
+            <span v-if="att.kind === 'sensor'" class="att-rd" :title="t('当前读数（数据源：{src}）', { src: srcTextOf(att) })">
+              <b>{{ fmt(sensorValOf(att)) }}</b> {{ attUnitOf(att) }}
+            </span>
+            <span v-if="att.kind === 'sensor' && isPowerAtt(att)" class="att-kw"
+                  :title="t('功率型传感器（kW）：其读数即本工序能碳核算的功率来源')">{{ t('折碳') }}</span>
+            <!-- 可变设备：只有设定值（调工况用），不再有数据源下拉 -->
+            <template v-if="att.kind === 'adjustable'">
+              <input class="att-sp" type="number" :min="spOf(att).min" :max="spOf(att).max" :step="spOf(att).step || 1"
+                     :value="spShow(att)" @input="onAttSpInput(att, $event.target.value)" @change="onAttSetpoint(att, $event.target.value)"
+                     :title="t('设定值（{label}）：只用于调节运行工况，不参与取数；本工序实际功率请在「传感器」中添加电功率传感器', { label: spOf(att).label })" />
+              <span class="u">{{ spOf(att).unit }}</span>
+              <input class="att-fx" type="number" step="0.01" :value="fxShow(att)" @input="onAttFxInput(att, $event.target.value)" @change="onAttFactor(att, $event.target.value)"
+                     :title="t('换算系数：读数 = 源值 × 系数（系统单位与设备实际度量不一致时换算用，默认 1，最多两位小数）')" />
+              <select class="att-src" :value="writeSrcOf(att)" @change="onAttWriteSrc(att, $event.target.value)"
+                      :title="t('绑定数据源设备的可写点位：修改设定值时自动下发写入（仅列出具有可写权限的点位）')">
+                <option value="">{{ t('不绑定写点位') }}</option>
+                <optgroup v-for="g in boxWritableGroups" :key="g.name" :label="t('数据源设备') + ' · ' + g.name">
+                  <option v-for="w in g.writes" :key="w.property" :value="'device::' + g.name + '::' + w.property">
+                    {{ w.property }}{{ w.unit ? '（' + w.unit + '）' : '' }}
+                  </option>
+                </optgroup>
+              </select>
+            </template>
+            <select v-if="att.kind === 'sensor'" class="att-src" :value="srcOf(att)" @change="onAttSrc(att, $event.target.value)">
               <option value="fixed">{{ t('固定值') }}</option>
               <option value="sim">{{ t('随机模拟值') }}</option>
               <!-- 数据源管理（能碳一体机）中已接入的传感器设备：每台设备一个分组，组内为其点位 -->
@@ -250,19 +274,40 @@
                 </option>
               </optgroup>
               <option v-if="!boxSourceGroups.length" disabled>{{ t('暂无数据源设备') }}</option>
+              <!-- 传感器可随同工序的附加可调设备联动：读数按线性换算跟设定值变化
+                   （如循环水泵变压器输出电压 → 冷却水流速，泵类相似定律 Q ∝ n） -->
+              <optgroup v-if="att.kind === 'sensor' && attachedOf('adjustable').length"
+                        :label="t('随附加可调设备联动')">
+                <option v-for="rk in attachedOf('adjustable')" :key="'lk' + rk.uid" :value="'attach::' + rk.uid">
+                  {{ t('随「{name}」变化', { name: rk.label }) }}
+                </option>
+              </optgroup>
               <!-- 兼容历史数据：已绑定工艺参数的实例保留回显与改回入口 -->
               <optgroup v-if="att.src === 'param'" :label="t('工艺参数')">
                 <option v-for="o in paramOpts" :key="'p' + o.param" :value="'param::' + o.param">{{ o.label }}</option>
               </optgroup>
             </select>
+            <input v-if="att.kind === 'sensor'" class="att-fx" type="number" step="0.01" :value="fxShow(att)" @input="onAttFxInput(att, $event.target.value)" @change="onAttFactor(att, $event.target.value)"
+                   :title="t('换算系数：读数 = 源值 × 系数（系统单位与传感器实际度量不一致时换算用，默认 1，最多两位小数）')" />
+            <span v-if="att.src === 'attach'" class="u" :title="t('联动换算：读数 = 设定值 × 读数锚点 / 设定值锚点，绑定瞬间读数保持不变')">{{ linkTextOf(att) }}</span>
+            <button v-if="att.src === 'attach'" class="x-btn" :title="t('按当前设定值 / 读数重新标定联动锚点')"
+                    @click="store.setAttachLinkScale(node.id, att.uid, linkRefSpOf(att), att.def)">⟲</button>
             <button class="x-btn danger" :title="t('解除绑定')" @click="store.removeAttachFromNode(node.id, att.uid)">✕</button>
           </div>
-          <div v-if="!attachedOf(ag.kind).length" class="pr-hint att-empty">{{ t('未绑定：下方选择模板添加，或在左侧资源管理「传感器 / 可变设备」目录中点击条目直接绑定') }}</div>
+          <div v-if="!attachedOf(ag.kind).length" class="pr-hint att-empty">{{ t('未绑定：点下方按钮添加，或在左侧资源管理「传感器 / 可变设备」目录中点击条目直接绑定') }}</div>
+          <!-- 添加：按钮展开模板清单（语义明确，不用「未选择即为空」的下拉） -->
           <div class="att-add-row">
-            <select class="att-add" :value="''" @change="onAddAttach(ag.kind, $event.target.value)">
-              <option value="" disabled>＋ {{ t('添加') }} {{ ag.label }}…</option>
-              <option v-for="it in ag.items" :key="it.type" :value="it.type">{{ it.label }}（{{ ag.unitOf(it) }}）</option>
-            </select>
+            <button class="att-add-btn" :class="{ on: addOpen === ag.kind }" @click="toggleAdd(ag.kind)">
+              ＋ {{ ag.kind === 'sensor' ? t('添加传感') : t('添加可变设备') }}
+            </button>
+          </div>
+          <div v-if="addOpen === ag.kind" class="att-pick">
+            <div class="att-pick-hd">{{ t('选择{label}类型', { label: ag.label }) }}</div>
+            <button v-for="it in ag.items" :key="it.type" class="att-pick-item" :title="it.desc"
+                    @click="pickAttach(ag.kind, it.type)">
+              <span class="api-tt">{{ it.label }}</span>
+              <span class="api-u">{{ ag.unitOf(it) }}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -343,10 +388,10 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onBeforeUnmount } from 'vue'
+import { computed, reactive, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { MATERIALS, MATERIAL_MAP, PROCESS_MAP, DEVICE_MAP } from '../data/flowLibrary'
-import { ATTACH_GROUPS } from '../data/attachLibrary'
+import { ATTACH_GROUPS, ATTACH_MAP, attachUnit, attachPowerSensor } from '../data/attachLibrary'
 import { EDITABLE_PARAMS } from '../data/processMeta'
 import CollapseSection from './CollapseSection.vue'
 import OtherFlowPanel from './OtherFlowPanel.vue'
@@ -376,23 +421,129 @@ const paramOpts = computed(() => {
 const srcOf = (att) => {
   if (att.src === 'param') return 'param::' + (att.param || '')
   if (att.src === 'device') return 'device::' + (att.device || '') + '::' + (att.prop || '')
+  if (att.src === 'attach') return 'attach::' + (att.devRef || '')
   return att.src || 'fixed'
 }
+// 联动源（同工序的附加可调设备）
+const linkRefOf = (att) => attachedOf('adjustable').find((a) => a.uid === att.devRef) || null
+// 联动锚点：设定值锚点（默认取该可调设备当前设定值，取不到时退回模板默认）
+function linkRefSpOf(att) {
+  const ref = linkRefOf(att)
+  if (!ref) return 0
+  const id = 'ext::' + node.value.id + '::' + ref.uid
+  if (store.deviceSetpoints[id] != null) return Number(store.deviceSetpoints[id])
+  const rt = ref.kind ? ATTACH_MAP[ref.kind] && ATTACH_MAP[ref.kind][ref.type] : null
+  return Number(ref.def != null ? ref.def : (rt && rt.setpoint ? rt.setpoint.def : 0))
+}
+// 联动说明文本：设定值锚点 → 读数锚点
+function linkTextOf(att) {
+  const ref = linkRefOf(att)
+  const s = att.scale || {}
+  const ru = ref ? attUnitOf(ref) : ''
+  return t('随「{name}」联动', { name: ref ? ref.label : '—' }) + '：' + (s.from != null ? s.from : '—') + ' ' + ru
+    + ' → ' + (s.to != null ? s.to : '—') + ' ' + attUnitOf(att)
+}
+const attUnitOf = (att) => {
+  const tpl = (ATTACH_MAP[att.kind] || {})[att.type]
+  return tpl ? attachUnit(tpl) : ''
+}
+const attTplOf = (att) => (ATTACH_MAP[att.kind] || {})[att.type] || null
+// 功率型传感器（kW）：其读数是本工序能碳核算的功率来源
+const isPowerAtt = (att) => attachPowerSensor(attTplOf(att))
+// 传感器当前读数：取自 allDevices 中合成的附加设备（id = ext::节点::attUid），与设备树 / 详情面板同源
+function sensorValOf(att) {
+  if (!att || !node.value) return null
+  const id = 'ext::' + node.value.id + '::' + att.uid
+  const d = (store.allDevices || []).find((x) => x.id === id)
+  if (!d) return att.def != null ? att.def : null
+  return d.live != null ? d.live : d.reading
+}
+// 可变设备的设定值（只调工况，不取数）：store 设定优先，其次实例 def / 模板默认
+const spOf = (att) => {
+  const tpl = attTplOf(att)
+  return (tpl && tpl.setpoint) ? tpl.setpoint : { label: t('设定值'), unit: '', min: 0, max: 100, step: 1, def: 0 }
+}
+function spValOf(att) {
+  const id = node.value ? 'ext::' + node.value.id + '::' + att.uid : ''
+  if (id && store.deviceSetpoints[id] != null) return Number(store.deviceSetpoints[id])
+  const tpl = attTplOf(att)
+  return Number(att.def != null ? att.def : (tpl && tpl.setpoint ? tpl.setpoint.def : 0))
+}
+// 数字输入草稿：编辑期间显示草稿值，避免遥测刷新（读数 1Hz）触发重渲染把正在输入/删除的内容
+// 回冲成 store 值（表现为无法编辑删除）。@input 只更新草稿 + 本地预览（不写设备、不进历史），
+// @change（失焦/回车）才正式提交：设定值此时才下发写点位，系数此时才进撤销历史。
+const spDraft = reactive({})
+const fxDraft = reactive({})
+const spShow = (att) => (spDraft[att.uid] != null ? spDraft[att.uid] : spValOf(att))
+function onAttSpInput(att, v) {
+  if (!node.value) return
+  spDraft[att.uid] = v
+  const n = Number(v)
+  if (v !== '' && isFinite(n)) store.setDeviceSetpoint('ext::' + node.value.id + '::' + att.uid, n)
+}
+function onAttSetpoint(att, v) {
+  if (!node.value) return
+  delete spDraft[att.uid]
+  const n = Number(v)
+  if (!isFinite(n)) return
+  // 统一入口：本地设定；已绑定数据源设备可写点位时自动下发写入
+  store.setExtSetpoint('ext::' + node.value.id + '::' + att.uid, n)
+}
+// 可变设备绑定数据源设备的可写点位（只列可写）：修改设定值时自动下发写设定
+const boxWritableGroups = computed(() => store.boxWritableGroups)
+const writeSrcOf = (att) => (att.src === 'device' && att.device ? 'device::' + att.device + '::' + (att.prop || '') : '')
+function onAttWriteSrc(att, v) {
+  if (!node.value) return
+  if (v.indexOf('device::') === 0) {
+    const rest = v.slice(8)
+    const i = rest.indexOf('::')
+    store.setAttachSource(node.value.id, att.uid, { src: 'device', device: rest.slice(0, i), prop: rest.slice(i + 2) })
+  } else {
+    store.setAttachSource(node.value.id, att.uid, { src: 'fixed', device: '', prop: '' })
+  }
+}
+// 换算系数（默认 1）：读数 = 源值 × 系数，系统单位与设备实际度量不一致时换算用
+const factorOf = (att) => (att.factor != null && isFinite(Number(att.factor)) ? Number(att.factor) : 1)
+const fxShow = (att) => (fxDraft[att.uid] != null ? fxDraft[att.uid] : factorOf(att))
+function onAttFxInput(att, v) {
+  if (!node.value) return
+  fxDraft[att.uid] = v
+  const n = Number(v)
+  if (v !== '' && isFinite(n)) store.setAttachFactor(node.value.id, att.uid, n, true)
+}
+function onAttFactor(att, v) {
+  if (!node.value) return
+  delete fxDraft[att.uid]
+  store.setAttachFactor(node.value.id, att.uid, v)
+}
+// 添加面板：按钮展开 / 收起（切换工序节点时收起，避免残留展开态）
+const addOpen = ref('')
+function toggleAdd(kind) { addOpen.value = addOpen.value === kind ? '' : kind }
+watch(node, () => { addOpen.value = '' })
 function srcTextOf(att) {
   if (att.src === 'param') {
     const o = paramOpts.value.find((x) => x.param === att.param)
     return o ? o.label : att.param
   }
   if (att.src === 'device') return (att.device || '—') + (att.prop ? ' · ' + att.prop : '')
+  if (att.src === 'attach') return linkTextOf(att)
   return t(att.src === 'sim' ? '随机模拟值' : '固定值')
 }
 // 添加：把模板实例绑定到当前工艺节点
 function onAddAttach(kind, type) {
   if (!type || !node.value) return
   const att = store.addAttachToNode(node.value.id, kind, type)
-  if (att) store.toast = t('已为工艺「{name}」绑定「{label}」：数据源默认随机模拟值，可下拉切换为固定值 / 数据源管理中的传感器设备', { name: node.value.name, label: att.label })
+  if (!att) return
+  store.toast = kind === 'sensor'
+    ? t('已为工艺「{name}」添加传感「{label}」：数据源默认随机模拟值，可切换为固定值 / 数据源管理中的传感器设备 / 随可变设备联动', { name: node.value.name, label: att.label })
+    : t('已为工艺「{name}」添加可变设备「{label}」：其数值为设定值（只调工况、不参与取数）；实际功率请在「传感器」中添加电功率传感器', { name: node.value.name, label: att.label })
 }
-// 下拉切换数据源（固定值 / 随机模拟值 / device::设备名::点位 / param::key）
+// 从展开的模板清单中添加
+function pickAttach(kind, type) {
+  onAddAttach(kind, type)
+  addOpen.value = ''
+}
+// 下拉切换数据源（固定值 / 随机模拟值 / device::设备名::点位 / param::key / attach::附加设备uid）
 function onAttSrc(att, v) {
   if (!node.value) return
   if (v.indexOf('device::') === 0) {
@@ -403,6 +554,10 @@ function onAttSrc(att, v) {
   }
   if (v.indexOf('param::') === 0) {
     store.setAttachSource(node.value.id, att.uid, { src: 'param', param: v.slice(7) })
+    return
+  }
+  if (v.indexOf('attach::') === 0) {
+    store.setAttachSource(node.value.id, att.uid, { src: 'attach', devRef: v.slice(8) })
     return
   }
   store.setAttachSource(node.value.id, att.uid, { src: v })
@@ -618,9 +773,26 @@ function bindToProcess(pid) {
 .spec-sel { width: 100%; }
 /* 附加传感 / 可变设备绑定行 */
 .att-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-.att-lbl { flex: 1; min-width: 0; font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.att-src, .att-add { flex: 1; min-width: 0; font-size: 11px; padding: 3px 4px; border: 1px solid var(--border); border-radius: 2px; background: var(--panel); color: var(--text); }
+.att-lbl { flex: 1 1 56px; min-width: 0; font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att-rd { flex: 0 0 auto; font-size: 10px; color: var(--accent-d); white-space: nowrap; }
+.att-rd b { font-weight: 400; font-variant-numeric: tabular-nums; }
+.att-kw { flex: 0 0 auto; font-size: 9.5px; color: #b26a00; border: 1px solid rgba(178,106,0,.45); border-radius: 2px; padding: 0 3px; }
+.att-src { flex: 1 1 92px; min-width: 66px; font-size: 11px; padding: 3px 4px; border: 1px solid var(--border); border-radius: 2px; background: var(--panel); color: var(--text); }
+.att-sp { flex: 0 0 auto; width: 64px; font-size: 11px; padding: 3px 4px; border: 1px solid var(--border); border-radius: 2px; background: var(--panel); color: var(--text); }
+.att-fx { flex: 0 0 auto; width: 48px; font-size: 11px; padding: 3px 4px; border: 1px dashed var(--border); border-radius: 2px; background: var(--panel); color: var(--text); }
 .att-add-row { display: flex; margin-top: 2px; }
+/* 添加按钮 + 模板清单（替代原「未选择即为空」的下拉，语义明确：先点按钮再选型） */
+.att-add-btn { flex: 1; font-size: 11px; padding: 4px 6px; cursor: pointer; color: var(--accent2);
+  border: 1px dashed var(--accent2); background: transparent; border-radius: 2px; }
+.att-add-btn:hover { background: rgba(95,130,148,.10); }
+.att-add-btn.on { border-style: solid; background: rgba(95,130,148,.14); }
+.att-pick { margin-top: 4px; border: 1px solid var(--border); border-radius: 2px; background: var(--panel-3); max-height: 190px; overflow: auto; }
+.att-pick-hd { font-size: 10px; color: var(--muted); padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.att-pick-item { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%;
+  font-size: 11px; padding: 4px 6px; cursor: pointer; color: var(--text); background: transparent; border: 0; text-align: left; }
+.att-pick-item + .att-pick-item { border-top: 1px solid var(--line); }
+.att-pick-item:hover { background: rgba(95,130,148,.14); color: var(--accent-d); }
+.att-pick-item .api-u { font-size: 10px; color: var(--muted); }
 .att-empty { color: var(--muted); }
 .recipe-row { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
 .recipe-row select, .bind-row select { flex: 1; }

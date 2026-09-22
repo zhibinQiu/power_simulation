@@ -13,7 +13,7 @@ import tarfile
 from datetime import datetime
 from typing import Any, Dict, List
 
-from .. import cloud_agent
+from ..integrations import cloud_agent
 from . import overview
 from ._shared import (BOX_DEPLOY_DIR, EDGECORE_TEMPLATE, GENERATED_DIR,
                       ONBOARD_SCRIPT_PATH)

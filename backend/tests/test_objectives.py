@@ -18,7 +18,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.models import ProcessModel, Unit  # noqa: E402
-from app.optimizers import (  # noqa: E402
+from app.domain.sim.optimizers import (  # noqa: E402
     UNIT_METRIC_OPTIONS,
     _objective_options,
     _objective_unit,

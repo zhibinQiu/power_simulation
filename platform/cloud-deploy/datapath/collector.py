@@ -113,6 +113,7 @@ def _ts_record(topic: str, payload: bytes) -> None:
         return
     raw = payload.decode("utf-8", errors="replace").strip()
     value = None
+    parsed: dict = {}          # JSON payload 解析结果（取 hwId 用）
     try:
         value = float(raw)
     except (ValueError, TypeError):
@@ -123,6 +124,7 @@ def _ts_record(topic: str, payload: bytes) -> None:
         try:
             obj = json.loads(raw)
             if isinstance(obj, dict):
+                parsed = obj
                 prop = parts[4] if len(parts) == 5 else ""
                 keys = (["price", "close", "val", "value", "weight", "reading", "data"]
                         if not prop else [prop, "price", "close", "val", "value", "weight",
@@ -139,8 +141,11 @@ def _ts_record(topic: str, payload: bytes) -> None:
         return
     ts_ms = int(time.time() * 1000)
     box, device, instance, prop = (_esc(parts[1]), _esc(parts[2]), _esc(parts[3]), _esc(parts[4]))
+    # 时序身份键优先取 payload 里的 hwId（硬件唯一 ID）：设备改名只改显示名、hwId 不变，
+    # 故子表名与 device tag 保持稳定 → 改名后历史曲线不断链。旧设备无 hwId 时退回主题里的设备名。
+    hwid = _esc(str(parsed.get("hwId") or "").strip()) if parsed else ""
     with _TS_LOCK:
-        _TS_BUF.append((box, device, instance, prop, value, ts_ms))
+        _TS_BUF.append((box, hwid or device, instance, prop, value, ts_ms))
 
 
 # REST 连接复用：一轮 flush 有多条子表，逐条新建 TCP 连接会退化成「每轮 N 次握手」。

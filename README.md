@@ -174,7 +174,7 @@ npx vite build         # 产物输出至 dist/，由后端 Catch-all 路由托�
 | **box / 盒子** | 边缘一体机采集（mapper + mosquitto + EdgeCore） | `box-deploy/box.sh`（在线）/ `deploy_box.sh`（离线） | 盒子 root |
 | docs / portal | 文档站 / 门户官网更新 | `doc-deploy/update.sh`、`portal-deploy/update.sh` | 开发机 |
 
-> 架构上云端与平台可同机（现网 36.151.146.71 即同机：平台容器以 `BROKER_HOST=172.18.0.1` 回环宿主直连本机 Broker），也可分两台服务器。
+> 架构上云端与平台可同机（现网 36.151.146.71 即同机），也可分两台服务器。配置里的服务地址一律写**可移植的公网/域名**（`config/box_config.json` broker.host、`config/box_devices.json` cloud.host、`config/middleware.json` base_url），容器访问同机宿主服务所需的 docker 网关由后端运行时推导（`app/core/netinfo.gateway_host` 读默认路由），不写进配置。
 
 ### 全新服务器部署（云端 + 完整平台，单机全栈）
 
@@ -197,7 +197,7 @@ docker compose up -d --build
 #    访问：平台 http://1.2.3.4:40014 · 文档站 http://1.2.3.4:40184
 
 # ⑤ 平台对接云端：总览 → 云端 Broker 配置 → 一键导入（粘贴 ③ 的 JSON）
-#    单机架构无需改 broker 配置（compose 环境变量 BROKER_HOST=172.18.0.1 优先级最高，自动回环宿主）
+#    单机架构无需改 broker 配置（容器内若公网回环未放行，会自动回退到宿主 docker 网关）
 
 # ⑥ 盒子接入（如需切机）：平台「盒子管理 → 接入新盒子」→ 盒子执行 onboard_box.sh / curl | bash
 ```

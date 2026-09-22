@@ -17,7 +17,9 @@
 # ============================================================================
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# ---- 公共库（platform/lib.sh）：仓库根 ROOT / servers.conf / ssh_run / rsync_run / 标准排除列表 ----
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SELF_DIR/../lib.sh"
 cd "$ROOT"
 
 # ---- push 子命令：把本地改动提交并推送到 GitHub（调用仓库根 push.sh，与协作者同源） ----
@@ -26,32 +28,11 @@ if [ "${1:-}" = "push" ]; then
   exec bash "$ROOT/push.sh" "$@"
 fi
 
-CONF="$ROOT/platform/servers.conf"    # 服务器地址集中配置（platform/servers.conf）
-[ -f "$CONF" ] && . "$CONF" || true
 CLOUD_MAIN="${CLOUD_MAIN:-${PLATFORM_SSH:-root@36.151.146.71}}"   # 默认目标（现 71）
 SERVER="$CLOUD_MAIN"
 SERVER_DIR="${PLATFORM_DIR:-/root/qzb/jianpai}"                   # 服务器仓库根
 BS_DIR="$SERVER_DIR/platform/bs-deploy"
 IMAGE_NAME="ghcr.io/zhibinqiu/power_simulation:latest"
-
-SSH_OPTS="-o StrictHostKeyChecking=no"
-[ -z "${QZB_SSH_PASS:-}" ] || SSH_OPTS="$SSH_OPTS -o BatchMode=no"
-ssh_run() { # 免密优先；QZB_SSH_PASS 时经 sshpass 传密码
-  if [ -n "${QZB_SSH_PASS:-}" ]; then
-    sshpass -p "$QZB_SSH_PASS" ssh $SSH_OPTS "$@"
-  else
-    ssh $SSH_OPTS -o BatchMode=yes "$@"
-  fi
-}
-rsync_run() { # 与 ssh_run 配套的 rsync 传输
-  local rsh
-  if [ -n "${QZB_SSH_PASS:-}" ]; then
-    rsh="sshpass -p '$QZB_SSH_PASS' ssh $SSH_OPTS"
-  else
-    rsh="ssh $SSH_OPTS -o BatchMode=yes"
-  fi
-  rsync -az -e "$rsh" "$@"
-}
 
 # ---- 解析参数 ----
 RUN_BUILD=1
@@ -81,17 +62,27 @@ fi
 # ---- [2/3] rsync 源码到服务器（排除运行时数据/本机环境） ----
 # 注：backend/data/scenes 为平台内置/安装的企业资源包目录（不入 git、须随部署同步），
 # 其余 backend/data 运行时数据仍排除；include 须先于排除规则。
-# 注：backend/config/data_sources.json = 数据源目录（运行环境状态，服务器与开发机各自的
-#     登记/启停可能不同，如开发机登记模拟源而服务器不登记），不随代码同步，避免互相覆盖。
-EXCLUDES="--include=backend/data/scenes/ --include=backend/data/scenes/***
-  --exclude=.git --exclude=.venv --exclude=venv --exclude=node_modules --exclude=__pycache__
-  --exclude=*.pyc --exclude=.DS_Store --exclude=.env --exclude=*.log
-  --exclude=platform/doc-deploy/docs-site/node_modules
+# 注：backend/config/data_sources.json = 数据源目录，**随代码同步**（本地为真相源，
+#     生产侧的数据源登记/启停一律在平台界面操作后回填本地），同步前会自动备份服务器现有文件。
+# 注：backend/config/box_devices.json = 采集设备/模型定义，**随代码同步**（本地为真相源，
+#     生产侧设备增删改一律在平台界面保存后回填本地），同步前会自动备份服务器现有文件。
+# 平台专属排除（通用项与运行期状态文件由 lib.sh 的 LIB_EXCLUDE_COMMON / LIB_EXCLUDE_STATE 提供）
+EXTRA_EXCLUDES="--exclude=platform/doc-deploy/docs-site/node_modules
   --exclude=outputs --exclude=generated-images --exclude=.playwright-cli --exclude=chrome_*
-  --exclude=backend/data/* --exclude=backend/knowledge
-  --exclude=backend/config/data_sources.json"
+  --exclude=backend/data/* --exclude=backend/knowledge"
+# 设备定义与数据源目录随本次同步以本地版本覆盖到服务器——**覆盖前**先备份服务器现有文件，便于回滚。
+CFG_BACKUP_FILES="backend/config/box_devices.json backend/config/data_sources.json"
+BK_TS="$(date +%Y%m%d%H%M%S)"
+if ssh_run "$SERVER" "cd '$SERVER_DIR' && mkdir -p .devcfg-backup && for f in $CFG_BACKUP_FILES; do if [ -f \"\$f\" ]; then cp -a \"\$f\" \".devcfg-backup/\$(basename \"\$f\").${BK_TS}\"; fi; done" 2>/dev/null; then
+  echo "    ✓ 服务器现有配置文件已备份到 ${SERVER_DIR}/.devcfg-backup/*.${BK_TS}"
+else
+  echo "    ⚠ 服务器尚无配置可备份（全新部署，本次直接同步本地版本）"
+fi
+
 echo "==> [2/3] rsync 源码 + 配置 + 前端产物到服务器..."
-rsync_run $EXCLUDES ./ "$SERVER:$SERVER_DIR/"
+rsync_run --include=backend/data/scenes/ --include=backend/data/scenes/*** \
+  "${LIB_EXCLUDE_COMMON[@]}" "${LIB_EXCLUDE_STATE[@]}" $EXTRA_EXCLUDES \
+  ./ "$SERVER:$SERVER_DIR/"
 
 # ---- [3/3] 服务器部署：构建输入变更才重建镜像，否则容器内 reload 自动生效 ----
 # 构建输入 = Dockerfile / compose / .dockerignore / requirements

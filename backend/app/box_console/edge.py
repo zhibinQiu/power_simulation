@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from .. import cloud_agent
+from ..integrations import cloud_agent
 from .. import mqtt_source
 from ._shared import _LOCK, _load_devices, _save_devices
 

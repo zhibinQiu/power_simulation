@@ -23,8 +23,7 @@
 # ============================================================================
 set -euo pipefail
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONF="$(cd "$SELF_DIR/.." && pwd)/servers.conf"   # 服务器地址集中配置（platform/servers.conf）
-[ -f "$CONF" ] && . "$CONF" || true
+. "$SELF_DIR/../lib.sh"                                       # 公共库：servers.conf / ssh_run / rsync_run
 SERVER="${HOME_SERVER:-${WEB_SSH:-root@43.161.194.75}}"      # 官网服务器（servers.conf WEB_SSH）
 REMOTE_DIR="${HOME_DIR:-${WEB_DIR:-/var/www/nengyousuan}}"   # 官网静态目录（servers.conf WEB_DIR）
 
@@ -45,25 +44,6 @@ done
 
 cd "$SELF_DIR"
 [ -f index.html ] || { echo "[error] 未找到 index.html（应在 platform/portal-deploy/ 下）" >&2; exit 1; }
-
-SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=10"
-[ -z "${QZB_SSH_PASS:-}" ] || SSH_OPTS="$SSH_OPTS -o BatchMode=no"
-ssh_run() { # 免密优先；QZB_SSH_PASS 时经 sshpass 传密码
-  if [ -n "${QZB_SSH_PASS:-}" ]; then
-    sshpass -p "$QZB_SSH_PASS" ssh $SSH_OPTS "$@"
-  else
-    ssh $SSH_OPTS -o BatchMode=yes "$@"
-  fi
-}
-rsync_run() { # 与 ssh_run 配套的 rsync 传输
-  local rsh
-  if [ -n "${QZB_SSH_PASS:-}" ]; then
-    rsh="sshpass -p '$QZB_SSH_PASS' ssh $SSH_OPTS"
-  else
-    rsh="ssh $SSH_OPTS -o BatchMode=yes"
-  fi
-  rsync -az -e "$rsh" "$@"
-}
 
 echo "==> 门户官网内容更新: $SELF_DIR/ → $SERVER:$REMOTE_DIR"
 # 排除脚本/本地服务文件；--delete 同步清理远端多余文件

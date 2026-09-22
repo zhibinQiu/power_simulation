@@ -17,7 +17,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import box_console  # noqa: E402
-from app import github_deploy  # noqa: E402
+from app.integrations import github_deploy  # noqa: E402
 
 TOKEN = "a1b2c3.header.payload.sig"
 CLOUD_IP = "36.151.146.71"

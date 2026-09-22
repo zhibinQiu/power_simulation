@@ -8,6 +8,7 @@
 - POST  /api/data-sources/remove    删除数据源 {id}（内置源与外部源统一，无例外）
 - POST  /api/data-sources/restore   恢复被删除的平台内置数据源 {id}（默认 box 能碳一体机）
 - POST  /api/data-sources/test      测试接入配置连通性 {config}（不落盘）
+GET   /api/data-sources/integration  数据服务接口清单（历史/实时查询 + 指令下发，自描述）
 
 可用接入类型见 /api/middleware/types（中间件适配器注册表，单一来源，不在此重复暴露）。
 
@@ -20,9 +21,10 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from .. import data_sources
+from ..data_sources.api_catalog import catalog as _api_catalog
 from .rest import json_api as _json_api
 
 router = APIRouter(prefix="/api/data-sources", tags=["数据源接入"])
@@ -40,6 +42,14 @@ def _id(payload: Dict[str, Any], default: str = "") -> str:
 def data_sources_list():
     """统一数据源列表（一体机/外部源并列，含配置、运行状态与中间件服务状态）。"""
     return data_sources.list_sources(force=False)
+
+
+@router.get("/integration")
+def data_sources_integration(request: Request):
+    """数据服务接口清单：历史/实时数据查询与指令下发的全部对外接口（含调用示例）。
+
+    地址按本次请求的 base_url 现场拼接，清单自身不落任何配置。"""
+    return _api_catalog(str(request.base_url).rstrip("/"))
 
 
 @router.get("/signals")

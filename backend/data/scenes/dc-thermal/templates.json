@@ -1,111 +1,153 @@
 [
   {
     "id": "cool",
-    "label": "制冷主回路模板",
-    "desc": "机房温控制冷工艺流程：按主要耗能设备划分（机柜算力负载 → 冷源 → 输配 → 排热）。运行仿真实时折碳：节点功率由孪生引擎实时注入，经电网因子换算范围二碳排。",
+    "label": "机房温控流程模板",
+    "desc": "机房温控三部分流程（简化）：冷却水 → 制冷风机 → 算力设备。冷却水循环给半导体制冷片热端散热（侧带温度传感器、冷却水流速传感器、可调循环水泵变压器与电功率传感器；流速与泵组功率均随变压器输出电压联动），制冷风机把冷量以机房冷风送给算力设备（带半导体制冷电源与电功率传感器），吸热后的空气由机房排风外排（风侧开式，无回风回路），冷却水回水回到冷却水系统重新降温。运行仿真实时折碳：能碳核算的功率来源是本工序附加的电功率传感器（kW 有功功率）——绑定数据源管理中的采集设备后按实测功率折碳，未接入时按传感器数据源（模拟 / 联动）读数折碳；可变设备（循环水泵变压器 / 半导体制冷电源）的设定值只调运行工况，不直接参与折碳。",
     "icon": "flow",
     "route": "cool",
     "scheme": {
       "nodes": [
         {
-          "id": "n_dc_ch",
+          "id": "n_dc_cw",
           "kind": "process",
           "type": "dc_chiller",
-          "name": "冷水机组·冷源",
-          "x": -560,
+          "name": "冷却水",
+          "x": -360,
           "y": 40,
           "count": 1,
           "spec": "",
           "params": {
-            "power": 0.35
+            "power": 0.12
           },
           "recipe": [],
           "ports": {
             "in": [
               {
-                "id": "in_ch_ret",
-                "material": "return_water"
+                "id": "in_cw_ret",
+                "material": "cool_water_return"
               }
             ],
             "out": [
               {
-                "id": "out_ch_sup",
-                "material": "supply_water"
-              },
-              {
-                "id": "out_ch_cond",
-                "material": "cond_heat"
+                "id": "out_cw_sup",
+                "material": "cool_water_supply"
               }
             ]
           },
           "deviceBindings": [],
           "attached": [
             {
-              "uid": "att_dc_ch_temp",
+              "uid": "att_dc_cw_temp",
               "kind": "sensor",
               "type": "temp_sensor",
-              "label": "冷水温度传感器",
+              "label": "冷却水温度传感器",
               "src": "sim",
               "param": null,
-              "def": 10
+              "def": 28
+            },
+            {
+              "uid": "att_dc_cw_pump",
+              "kind": "adjustable",
+              "type": "pump_transformer",
+              "label": "循环水泵变压器",
+              "src": "fixed",
+              "param": null,
+              "def": 380
+            },
+            {
+              "uid": "att_dc_cw_flow",
+              "kind": "sensor",
+              "type": "water_speed_sensor",
+              "label": "冷却水流速传感器",
+              "src": "attach",
+              "devRef": "att_dc_cw_pump",
+              "scale": {
+                "from": 380,
+                "to": 2.2
+              },
+              "param": null,
+              "def": 2.2
+            },
+            {
+              "uid": "att_dc_cw_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "循环水泵电功率传感器",
+              "src": "attach",
+              "devRef": "att_dc_cw_pump",
+              "scale": {
+                "from": 380,
+                "to": 120
+              },
+              "param": null,
+              "def": 120
             }
           ]
         },
         {
-          "id": "n_dc_pump",
+          "id": "n_dc_fan",
           "kind": "process",
-          "type": "dc_pump_fc",
-          "name": "循环水泵·输配",
-          "x": -300,
-          "y": 40,
+          "type": "dc_fan_cool",
+          "name": "制冷风机",
+          "x": -160,
+          "y": -140,
           "count": 1,
           "spec": "",
           "params": {
-            "power": 0.09
+            "power": 0.44
           },
           "recipe": [],
           "ports": {
             "in": [
               {
-                "id": "in_pump_sup",
-                "material": "supply_water"
+                "id": "in_fan_sup",
+                "material": "cool_water_supply"
               }
             ],
             "out": [
               {
-                "id": "out_pump_sup",
-                "material": "supply_water"
+                "id": "out_fan_ret",
+                "material": "cool_water_return"
+              },
+              {
+                "id": "out_fan_air",
+                "material": "cold_air"
               }
             ]
           },
           "deviceBindings": [],
           "attached": [
             {
-              "uid": "att_dc_pump_psu",
+              "uid": "att_dc_fan_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "制冷片温度传感器",
+              "src": "sim",
+              "param": null,
+              "def": 6
+            },
+            {
+              "uid": "att_dc_fan_psu",
               "kind": "adjustable",
-              "type": "variable_psu",
-              "label": "泵直流调速电源",
+              "type": "tec_psu",
+              "label": "半导体制冷电源",
               "src": "fixed",
               "param": null,
-              "def": 36
+              "def": 48
             },
             {
-              "uid": "att_dc_pump_power",
+              "uid": "att_dc_fan_power",
               "kind": "sensor",
               "type": "power_sensor",
-              "label": "水泵功率传感器",
-              "src": "sim",
+              "label": "制冷片电功率传感器",
+              "src": "attach",
+              "devRef": "att_dc_fan_psu",
+              "scale": {
+                "from": 48,
+                "to": 440
+              },
               "param": null,
-              "def": 90
-            },
-            {
-              "uid": "att_dc_pump_flow",
-              "kind": "sensor",
-              "type": "water_flow_sensor",
-              "label": "水泵流量计",
-              "src": "sim",
-              "param": null,
-              "def": 150
+              "def": 440
             }
           ]
         },
@@ -113,8 +155,8 @@
           "id": "n_dc_it",
           "kind": "process",
           "type": "dc_it",
-          "name": "机柜·算力负载",
-          "x": -40,
+          "name": "算力设备",
+          "x": 40,
           "y": 40,
           "count": 1,
           "spec": "",
@@ -125,16 +167,11 @@
           "ports": {
             "in": [
               {
-                "id": "in_it_sup",
-                "material": "supply_water"
+                "id": "in_it_air",
+                "material": "cold_air"
               }
             ],
-            "out": [
-              {
-                "id": "out_it_ret",
-                "material": "return_water"
-              }
-            ]
+            "out": []
           },
           "deviceBindings": [],
           "attached": [
@@ -146,41 +183,15 @@
               "src": "sim",
               "param": null,
               "def": 32
-            }
-          ]
-        },
-        {
-          "id": "n_dc_fan",
-          "kind": "process",
-          "type": "dc_fan_cool",
-          "name": "风冷末端·排热",
-          "x": -560,
-          "y": -180,
-          "count": 1,
-          "spec": "",
-          "params": {
-            "power": 0.12
-          },
-          "recipe": [],
-          "ports": {
-            "in": [
-              {
-                "id": "in_fan_cond",
-                "material": "cond_heat"
-              }
-            ],
-            "out": []
-          },
-          "deviceBindings": [],
-          "attached": [
+            },
             {
-              "uid": "att_dc_fan_psu",
-              "kind": "adjustable",
-              "type": "variable_psu",
-              "label": "风扇直流调速电源",
-              "src": "fixed",
+              "uid": "att_dc_it_env",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "机房环境温度传感器",
+              "src": "sim",
               "param": null,
-              "def": 48
+              "def": 24
             }
           ]
         }
@@ -188,38 +199,29 @@
       "connections": [
         {
           "id": "c_dc_1",
-          "from": "n_dc_ch",
-          "fromPort": "out_ch_sup",
-          "to": "n_dc_pump",
-          "toPort": "in_pump_sup",
-          "material": "supply_water",
+          "from": "n_dc_cw",
+          "fromPort": "out_cw_sup",
+          "to": "n_dc_fan",
+          "toPort": "in_fan_sup",
+          "material": "cool_water_supply",
           "feedback": false
         },
         {
           "id": "c_dc_2",
-          "from": "n_dc_pump",
-          "fromPort": "out_pump_sup",
-          "to": "n_dc_it",
-          "toPort": "in_it_sup",
-          "material": "supply_water",
-          "feedback": false
+          "from": "n_dc_fan",
+          "fromPort": "out_fan_ret",
+          "to": "n_dc_cw",
+          "toPort": "in_cw_ret",
+          "material": "cool_water_return",
+          "feedback": true
         },
         {
           "id": "c_dc_3",
-          "from": "n_dc_it",
-          "fromPort": "out_it_ret",
-          "to": "n_dc_ch",
-          "toPort": "in_ch_ret",
-          "material": "return_water",
-          "feedback": false
-        },
-        {
-          "id": "c_dc_4",
-          "from": "n_dc_ch",
-          "fromPort": "out_ch_cond",
-          "to": "n_dc_fan",
-          "toPort": "in_fan_cond",
-          "material": "cond_heat",
+          "from": "n_dc_fan",
+          "fromPort": "out_fan_air",
+          "to": "n_dc_it",
+          "toPort": "in_it_air",
+          "material": "cold_air",
           "feedback": false
         }
       ],

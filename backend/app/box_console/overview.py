@@ -10,7 +10,7 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List
 
-from .. import cloud_agent
+from ..integrations import cloud_agent
 from .. import mqtt_source
 
 

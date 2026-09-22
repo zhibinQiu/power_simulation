@@ -3,13 +3,13 @@ import { watch, nextTick } from 'vue'
 import { t } from '../i18n'
 import { visiblePoll } from '../utils/poll'
 import { api, openFeed } from '../api/client'
-import { buildScheme, makeProcessNode, makeDeviceNode, makeMaterialNode, PROCESS_MAP, MATERIAL_MAP, PROCESS_ADJUSTABLE, DEVICE_MAP, DEVICE_COUPLE_REGISTRY, deriveProcessOpParams, materialFamily, loadCalibrations, NODE_NW, NODE_HEADER, NODE_PORT_Y0, NODE_GAP, nodeHeight, PROCESS_TEMPLATES, applySetpointResponse, migrateLegacyDevices, treeLayoutNodes } from '../data/flowLibrary'
+import { buildScheme, makeProcessNode, makeDeviceNode, makeMaterialNode, PROCESS_MAP, MATERIAL_MAP, PROCESS_ADJUSTABLE, DEVICE_MAP, DEVICE_COUPLE_REGISTRY, deriveProcessOpParams, materialFamily, loadCalibrations, registerSceneMaterials, NODE_NW, NODE_HEADER, NODE_PORT_Y0, NODE_GAP, nodeHeight, PROCESS_TEMPLATES, applySetpointResponse, migrateLegacyDevices, treeLayoutNodes } from '../data/flowLibrary'
 import { computeScheme } from '../flow/compute'
 import { PARK } from '../data/park'
 // 通用附加设备库（传感器 / 可变设备，所有场景可用）：
 // 与「工艺类型 → 典型可调设备」不同，附加设备是用户在某工艺节点上按需添加的，
 // 存于工艺节点 node.attached[]，运行态由 store 合成 ext::节点id::attUid 设备。
-import { SENSOR_MAP, ADJUSTABLE_MAP, ATTACH_MAP, attachUnit, attachDef, attachMeasureLabel } from '../data/attachLibrary'
+import { SENSOR_MAP, ADJUSTABLE_MAP, ATTACH_MAP, attachUnit, attachDef, attachMeasureLabel, attachPowerSensor } from '../data/attachLibrary'
 // 工艺静态业务数据：集中维护于独立数据模块 src/data/processMeta.js
 // （业务数据与代码逻辑分离），本 store 只负责仿真状态与交互逻辑；
 // 下方 re-export 保持既有组件 `import { ... } from '../stores/sim'` 兼容。
@@ -79,41 +79,102 @@ function _boxSrcMap(s) {
   }
   return m
 }
-// 附加设备当前读数：按「数值来源」解析
-//  src = fixed → att.def（模板默认）；param → 绑定工艺节点的某数值参数；
-//  sim → 以默认值为基准的随机模拟；device → 数据源管理中某传感器设备的实时读数
-function _attachReading(att, unit, now, srcMap) {
+// 附加设备当前读数：按「数值来源」解析（只有传感器取数；可变设备的值就是其设定值，不参与取数）
+//  可调设备（kind=adjustable）→ 直接返回当前设定值（deviceSetpoints 优先，其次 att.def / 模板默认），
+//           与其 src 无关：可变设备只用于设定运行工况，不产生读数。
+//  传感器 src = fixed → att.def（模板默认）；param → 绑定工艺节点的某数值参数；
+//  sim → 以默认值为基准的随机模拟；device → 数据源管理中某传感器设备的实时读数；
+//  attach → 随同一节点上某附加可调设备的设定值联动（线性过原点：读数 = 设定值 × scale.to / scale.from）。
+//           典型如循环水泵变压器输出电压 → 冷却水流速 / 泵组功率：电压降则泵速↓、流速与轴功率↓，
+//           传感器读数随之变化，用于观察调速调节的实际效果（能碳核算以功率型传感器的读数为依据）。
+// 换算系数：源值 → 系统读数（读数 = 源值 × 系数，默认 1）。
+// 系统模板的单位度量与绑定传感器/采集设备的实际度量可能不一致（如 m³/h vs L/s、W vs kW），
+// 用户在编排面板按源设置系数换算；对传感器各数据源与可变设备设定值统一生效。
+function _attFactor(att) {
+  const f = att && att.factor != null ? Number(att.factor) : 1
+  // 系数最多两位小数（超出按四舍五入取整）
+  return isFinite(f) ? Math.round(f * 100) / 100 : 1
+}
+function _fx(v, att) {
+  return v == null ? null : Math.round(Number(v) * _attFactor(att) * 1000) / 1000
+}
+function _attachReading(att, unit, now, srcMap, node, setpoints) {
   if (!att) return null
   const tpl = _attachTpl(att.kind, att.type)
   const def = att.def != null ? att.def
     : (tpl ? (tpl.kind === 'sensor' ? tpl.def : (tpl.setpoint && tpl.setpoint.def)) : 0)
-  if (!att.src || att.src === 'fixed') return def
+  // 可变设备（可调设备）：值即设定值本身，不做任何取数解析
+  if (tpl && tpl.kind === 'adjustable') {
+    const extId = node ? `ext::${node.id}::${att.uid}` : ''
+    const sp = extId && setpoints && setpoints[extId] != null ? Number(setpoints[extId]) : null
+    return _fx(sp != null && isFinite(sp) ? sp : Number(def), att)
+  }
+  if (!att.src || att.src === 'fixed') return _fx(def, att)
   if (att.src === 'param') {
     if (!unit || !unit.params || !att.param) return null
     const v = Number(unit.params[att.param])
-    return isNaN(v) ? null : v
+    return isNaN(v) ? null : _fx(v, att)
   }
   if (att.src === 'sim') {
-    const base = def || 0
+    // 功率型传感器（kW）未给默认值时，以工序功率参数（MW → kW）为模拟基准
+    const base = (attachPowerSensor(tpl) && !def)
+      ? (Number((unit && unit.params && unit.params.power) || 0) * 1000)
+      : (def || 0)
     const phase = String(att.uid || att.type || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
     const w = ((now || Date.now()) / 1200) + phase
-    return Math.round(base * (1 + 0.08 * Math.sin(w)) * 1000) / 1000
+    return _fx(Math.round(base * (1 + 0.08 * Math.sin(w)) * 1000) / 1000, att)
   }
   if (att.src === 'device') {
     if (!att.device) return null
     const hit = (srcMap || {})[`${att.device}::${att.prop || ''}`]
-    return hit && hit.v != null ? hit.v : null
+    return hit && hit.v != null ? _fx(hit.v, att) : null
+  }
+  if (att.src === 'attach') {
+    const ref = _attachRef(node, att)
+    if (!ref) return null
+    const refTpl = _attachTpl(ref.kind, ref.type)
+    const refId = `ext::${node.id}::${ref.uid}`
+    const sp = (setpoints && setpoints[refId] != null)
+      ? Number(setpoints[refId])
+      : Number(ref.def != null ? ref.def : (refTpl && refTpl.setpoint ? refTpl.setpoint.def : 0))
+    if (!isFinite(sp)) return null
+    const from = att.scale && Number(att.scale.from) ? Number(att.scale.from) : 0
+    const to = att.scale && att.scale.to != null ? Number(att.scale.to) : def
+    const v = from ? Math.round(sp * (to / from) * 1000) / 1000 : 0
+    const r = tpl && tpl.range
+    return _fx(r ? Math.min(r.max, Math.max(r.min, v)) : v, att)
   }
   return null
 }
+// 联动源：同一工艺节点上被联动的附加可调设备（att.devRef = 其 uid）
+function _attachRef(node, att) {
+  if (!node || !att || !att.devRef) return null
+  return ((node.attached) || []).find((a) => a && a.uid === att.devRef) || null
+}
 // 工艺节点 → 附加设备合成（结构对齐计量/可调设备，详情面板可打开）
-function _extDevice(node, unit, att, now, srcMap) {
+function _extDevice(node, unit, att, now, srcMap, setpoints) {
   const tpl = _attachTpl(att.kind, att.type)
   if (!tpl) return null
   const extId = `ext::${node.id}::${att.uid}`
   const isSensor = tpl.kind === 'sensor'
   const mUnit = isSensor ? tpl.measure.unit : tpl.setpoint.unit
-  const reading = _attachReading(att, unit, now, srcMap)
+  const reading = _attachReading(att, unit, now, srcMap, node, setpoints)
+  const ref = att.src === 'attach' ? _attachRef(node, att) : null
+  const srcNote = att.src === 'param' && att.param
+    ? '　读数来源：绑定工艺参数「' + att.param + '」。'
+    : (att.src === 'device' && att.device
+      ? '　读数来源：数据源管理设备「' + att.device + (att.prop ? ' · ' + att.prop : '') + '」实时读数。'
+      : (ref
+        ? '　读数来源：随附加可变设备「' + (ref.label || ref.type) + '」设定值联动（'
+          + (att.scale && att.scale.from != null ? att.scale.from : '—') + ' → '
+          + (att.scale && att.scale.to != null ? att.scale.to : '—') + ' ' + mUnit + '，线性换算）。'
+        : ''))
+  // 取数口径：只有传感器取数（读数可来自实测设备 / 模拟 / 联动）；
+  // 可变设备不取数 —— 其数值就是设定值，只用于调节运行工况，
+  // 本工序的实际功率由附加的功率型传感器（电功率传感器 kW）承载并参与能碳核算。
+  const rdNote = isSensor && attachPowerSensor(tpl)
+    ? '　本传感器为功率量测（kW）：其读数即所属工序能碳核算的功率来源（接入数据源管理的采集设备点位即为实测功率）。'
+    : (isSensor ? '' : '　设定值只调运行工况；本工序实际功率请在「传感器」中添加电功率传感器设置。')
   return {
     id: extId,
     type: att.type,
@@ -122,6 +183,11 @@ function _extDevice(node, unit, att, now, srcMap) {
     measures: [{ key: 'val', label: isSensor ? tpl.measure.label : tpl.setpoint.label, unit: mUnit }],
     measured: reading,
     reading,
+    // 读数标签 / 单位（仅传感器有读数；可变设备只有设定值）
+    readingLabel: isSensor ? tpl.measure.label : null,
+    readingUnit: isSensor ? tpl.measure.unit : null,
+    // 功率型传感器（kW）：其读数是所属工序能碳核算的功率来源
+    powerReading: isSensor && attachPowerSensor(tpl),
     metering: isSensor,
     adjustable: !isSensor,
     setpoint: !isSensor ? (att.def != null ? att.def : tpl.setpoint.def) : null,
@@ -129,10 +195,69 @@ function _extDevice(node, unit, att, now, srcMap) {
     attachKind: att.kind,
     src: att.src || 'fixed',
     param: att.param || null,
-    desc: `${tpl.label}（${isSensor ? '传感器' : '可变设备'}）：${tpl.desc || ''}${att.src === 'param' && att.param ? '　读数来源：绑定工艺参数「' + att.param + '」。' : ''}${att.src === 'device' && att.device ? '　读数来源：数据源管理设备「' + att.device + (att.prop ? ' · ' + att.prop : '') + '」实时读数。' : ''}`,
+    device: att.device || null,
+    prop: att.prop || null,
+    devRef: att.devRef || null,
+    desc: `${tpl.label}（${isSensor ? '传感器' : '可变设备'}）：${tpl.desc || ''}${rdNote}${srcNote}`,
     unitId: node.id,
     unitName: (unit && unit.name) || node.name || node.type,
     unitType: (unit && unit.type) || node.type,
+  }
+}
+
+// 工序的「实测功率」（kW）：取自该工序附加的**功率型传感器**（如电功率传感器的有功功率 kW），
+// 读数来自「数据源管理设备」绑定的采集设备点位（或随机模拟 / 固定值 / 随可变设备联动）。
+// 可变设备不参与取数——它的值只是设定值（如变压器输出电压 V），只用于调节运行工况，
+// 实际功率必须由传感器承载：这就是「能碳核算的数据来源为传感器的值」的口径。
+// 只要解析出数值就参与所属工序的能碳核算（范围二折碳），无功率传感器（读数 null）时返回 null，
+// 由调用方回落包内工序功率参数（出厂设定）。返回 { kW, sources, measured, simulated }。
+function _attachedSensorPower(u, srcMap, now, setpoints) {
+  const node = u || {}
+  const atts = Array.isArray(node.attached) ? node.attached : []
+  let kW = 0
+  const sources = []
+  for (const att of atts) {
+    if (!att) continue
+    const tpl = _attachTpl(att.kind, att.type)
+    if (!tpl || tpl.kind !== 'sensor' || !attachPowerSensor(tpl)) continue
+    const v = _attachReading(att, node, now, srcMap, node, setpoints)
+    if (v == null) continue
+    const n = Number(v)
+    if (!isFinite(n)) continue
+    kW += n
+    sources.push({
+      id: `ext::${node.id}::${att.uid}`,
+      type: att.type,
+      label: att.label || tpl.label,
+      unit: 'kW',
+      measured: n,
+      src: att.src || 'fixed',
+      device: att.device || null,
+      prop: att.prop || null,
+    })
+  }
+  if (!sources.length) return null
+  return {
+    kW,
+    sources,
+    measured: sources.some((s) => s.src === 'device'),            // 真机实测（数据源管理采集设备）
+    simulated: sources.some((s) => s.src === 'sim' || s.src === 'fixed' || s.src === 'attach'),
+  }
+}
+
+// 非钢场景的单位级能碳字段：同时给出两套口径，避免"侧边栏有数、孪生标签没数"。
+// ① 碳引擎口径（与钢场景后端下发一致，3D 数字孪生标签 / 小组汇总标签 / 2D 视图 KPI / 排放占比着色都用它）：
+//    co2_total 单位 tCO₂/h、energy_total 单位 GJ/h（1 kWh = 3.6 MJ = 0.0036 GJ）；
+// ② 本场景口径（属性面板 / 编排面板用）：carbon 单位 kgCO₂/h、energy 单位 kWh/h。
+function _otherUnitMetrics(powerKW, carbonKg) {
+  return {
+    carbon: carbonKg,                 // kgCO₂/h（本场景口径）
+    energy: powerKW,                  // kWh/h
+    prod: 1,
+    unitCarbon: carbonKg,
+    co2_total: carbonKg / 1000,       // tCO₂/h（孪生标签 / 折碳汇总口径）
+    energy_total: powerKW * 0.0036,   // GJ/h
+    powerKW,                          // 实际参与折碳的功率
   }
 }
 
@@ -509,7 +634,7 @@ export const useSimStore = defineStore('sim', {
         const att = node && (node.attached || []).find((a) => a.uid === auid)
         if (!att) return null
         const u = ((s.baseline && s.baseline.units) || []).find((x) => x.id === nid)
-        const dev = _extDevice(node, u, att, Date.now(), _boxSrcMap(s))
+        const dev = _extDevice(node, u, att, Date.now(), _boxSrcMap(s), s.deviceSetpoints)
         if (!dev) return null
         return { device: dev, unitId: nid, unitName: (u && u.name) || node.name, unitType: (u && u.type) || node.type }
       }
@@ -644,7 +769,7 @@ export const useSimStore = defineStore('sim', {
       for (const n of (s.scheme && s.scheme.nodes) || []) {
         for (const att of (n.attached || [])) {
           const u = ((s.baseline && s.baseline.units) || []).find((x) => x.id === n.id)
-          const dev = _extDevice(n, u, att, nowMs, srcMap)
+          const dev = _extDevice(n, u, att, nowMs, srcMap, s.deviceSetpoints)
           if (!dev) continue
           out.push({
             ...dev,
@@ -666,6 +791,10 @@ export const useSimStore = defineStore('sim', {
       state: d.state,
       props: d.props || [],
     })),
+    // 具有可写点位（writes[] / accessMode=rw）的数据源设备——编排可变设备绑定「写设定」目标下拉用
+    boxWritableGroups: (s) => (s.boxSourceDevices || [])
+      .filter((d) => (d.writes || []).length)
+      .map((d) => ({ name: d.name, node: d.node, state: d.state, writes: d.writes })),
     // 某工艺节点可绑定的「数值来源」候选：工艺自身数值参数 + 固定值 + 模拟（供附加设备绑定下拉）
     attachSourceOptions: (s) => (nodeId) => {
       const node = ((s.scheme && s.scheme.nodes) || []).find((n) => n.id === nodeId)
@@ -1783,6 +1912,9 @@ export const useSimStore = defineStore('sim', {
         this.scenario = isSteel ? 'steel' : 'other'
         const res = pkg.resources || {}
         this.sceneCtx = res.dictionary || res.config || null
+        // 包内物料（非钢场景：机房温控的 冷却水供水/回水、机房冷风…）并入运行时物料表，
+        // 供 2D/3D 管线着色与标签、编排端口、物料下拉统一解析（不覆盖钢包既有条目）。
+        registerSceneMaterials(this.sceneCtx)
         this.sceneTemplates = Array.isArray(res.templates) ? res.templates : []
         if (res.factors) { this.factors = res.factors; this.factorsDefault = res.factors }
         if (res.paramSchema) this.paramSchema = res.paramSchema
@@ -1794,6 +1926,9 @@ export const useSimStore = defineStore('sim', {
         this.processRoute = isSteel ? ((saved && saved.route) || 'short') : (defaultRoute || 'cool')
         this.scheme = (saved && saved.scheme) ? saved.scheme : this._buildSceneScheme(this.processRoute)
         if (!this.scheme.groups) this.scheme.groups = []
+        // 非钢场景模板方案没有 devices 字段，补齐为数组——否则 setDeviceSetpoint 等
+        // 一律按 scheme.devices.find 访问会抛 TypeError，导致设定值写入后 _saveScheme/refresh 中断
+        if (!this.scheme.devices) this.scheme.devices = []
         // 子编排态不跨场景继承：否则新场景 3D 会沿用旧小组 id 走 groupScene 分支，渲染出空子场景
         this.scheme.activeGroupId = null
         // 清空跨场景会话状态（避免脏数据串场）
@@ -1888,29 +2023,39 @@ export const useSimStore = defineStore('sim', {
       if (!tpl || !tpl.scheme) return { nodes: [], connections: [], devices: [], groups: [], activeGroupId: null }
       const s = JSON.parse(JSON.stringify(tpl.scheme))
       if (!s.groups) s.groups = []
+      if (!s.devices) s.devices = []
       if (s.activeGroupId == null) s.activeGroupId = null
       return s
     },
     // 非钢场景本地静态刷新：耗能设备功率（MW）× 电网排放因子 → 范围二折碳（kgCO₂/h）。
+    // 功率口径：本工序附加的**功率型传感器**读数（如有功功率 kW，可来自数据源管理实测设备 /
+    // 模拟值 / 随可变设备联动）优先；未添加功率传感器时回落包内工序功率参数（出厂设定）。
+    // 可变设备的设定值只调工况，不参与折碳。
     // 不请求后端碳引擎（steel-carbon 仅识别标准工艺类型），供孪生/KPI/属性面板展示。
     _otherSceneRefresh() {
       this.compileSchemeToModel()
       const gridKg = this._gridFactorKg()
       const date = new Date().toISOString()
+      const srcMap = _boxSrcMap(this)
+      const now = Date.now()
       const totals0 = {}
       const prevT = (this.baseline && this.baseline.totals) || {}
       for (const k of Object.keys(prevT)) totals0[k] = 0
       const units = (this.model.units || []).map((u) => {
-        const powerMW = Number((u.params && u.params.power != null) ? u.params.power : 0) || 0   // 包模板功率以 MW 计
-        const powerKW = powerMW * 1000
+        const packKW = (Number((u.params && u.params.power != null) ? u.params.power : 0) || 0) * 1000   // 包模板功率以 MW 计
+        const meas = _attachedSensorPower(u, srcMap, now, this.deviceSetpoints)
+        const powerKW = meas ? meas.kW : packKW
         const carbonKg = powerKW * gridKg       // kgCO₂/h（范围二）
         return {
           ...u,
+          // 注意：不把功率来源传感器塞进 u.devices —— 这些附加设备已由 allDevices 的
+          // attached[] 分支合成为设备（id 相同），重复列出会造成设备树重复与详情定位歧义。
           devices: [],
-          carbon: carbonKg,
-          energy: powerKW,      // kWh/h
-          prod: 1,
-          unitCarbon: carbonKg,
+          ..._otherUnitMetrics(powerKW, carbonKg),
+          packPowerKW: packKW,  // 包内功率参数（出厂设定）
+          powerMeasured: !!(meas && meas.measured),    // 实测功率（数据源绑定的采集设备）
+          powerSimulated: !!(meas && meas.simulated),  // 模拟/固定值来源
+          powerSources: meas ? meas.sources : [],
         }
       })
       const carbonTotal = units.reduce((a, u) => a + (u.carbon || 0), 0)
@@ -1918,12 +2063,64 @@ export const useSimStore = defineStore('sim', {
       this.baseline = {
         units,
         flows: this.model.flows,
-        totals: { ...totals0, carbon: carbonTotal, energy: energyTotal },
+        totals: {
+          ...totals0,
+          carbon: carbonTotal,                  // kgCO₂/h（本场景口径）
+          energy: energyTotal,                  // kWh/h
+          // 碳引擎口径（全厂总览 KPI）：非钢场景用电全部为外购电 → 只有范围二
+          co2_total: carbonTotal / 1000,        // tCO₂/h
+          co2_direct: 0,                        // 无直接排放
+          co2_indirect: carbonTotal / 1000,     // 外购电（范围二）
+          energy_total: energyTotal * 0.0036,   // GJ/h
+          elec: energyTotal / 1000,             // MWh/h
+        },
         date,
         meta: {},
       }
       this.strategy = null
       this.delta = null
+    },
+    // 实时折碳轻量重算：不重编译模型、不清策略库，仅用当前实时读数（含附加功率型传感器的实测功率）
+    // 刷新 baseline.units 的功率 / 碳排与总量。由遥测馈送（1 Hz）在非钢场景调用，
+    // 使「实测功率」一旦有值就能在孪生 / KPI / 属性面板的折碳上即时体现（口径与 _otherSceneRefresh 一致）。
+    _otherSceneRecarbon() {
+      if (this.sceneMode === 'steel' || this.sceneId === 'steel') return
+      if (!this.baseline || !Array.isArray(this.baseline.units) || !this.model || !Array.isArray(this.model.units)) return
+      const gridKg = this._gridFactorKg()
+      const srcMap = _boxSrcMap(this)
+      const now = Date.now()
+      const prevMap = new Map(this.baseline.units.map((u) => [u.id, u]))
+      const units = this.model.units.map((mu) => {
+        const prev = prevMap.get(mu.id) || {}
+        const packKW = (Number((mu.params && mu.params.power != null) ? mu.params.power : 0) || 0) * 1000
+        const meas = _attachedSensorPower(mu, srcMap, now, this.deviceSetpoints)
+        const powerKW = meas ? meas.kW : packKW
+        const carbonKg = powerKW * gridKg
+        return {
+          ...prev,
+          ..._otherUnitMetrics(powerKW, carbonKg),
+          packPowerKW: packKW,
+          powerMeasured: !!(meas && meas.measured),
+          powerSimulated: !!(meas && meas.simulated),
+          powerSources: meas ? meas.sources : [],
+        }
+      })
+      const carbonTotal = units.reduce((a, u) => a + (u.carbon || 0), 0)
+      const energyTotal = units.reduce((a, u) => a + (u.energy || 0), 0)
+      this.baseline = {
+        ...this.baseline,
+        units,
+        totals: {
+          ...(this.baseline.totals || {}),
+          carbon: carbonTotal,
+          energy: energyTotal,
+          co2_total: carbonTotal / 1000,
+          co2_direct: 0,
+          co2_indirect: carbonTotal / 1000,
+          energy_total: energyTotal * 0.0036,
+          elec: energyTotal / 1000,
+        },
+      }
     },
     // 电网排放因子（kgCO₂/kWh）：兼容钢包 factors.electricity.grid 与通用资源包 factors.grid_ef / factors.grid（tCO₂/MWh，数值上与 kgCO₂/kWh 同量）
     _gridFactorKg() {
@@ -2326,6 +2523,36 @@ export const useSimStore = defineStore('sim', {
         // 编排方案随场景包隔离：只恢复与当前打开场景匹配的存档（旧版无 sceneId 视为钢包存档）
         const sid = this.sceneId || 'steel'
         if (d.sceneId && d.sceneId !== sid) return null
+        // 机房温控包 2026-09-21 口径变更（水侧 + 风侧开式，无机房回风；变频器 → 变压器）：
+        // 存档里若出现不在新口径内的工序类型或物料（含已删除的「机房回风」hot_air 介质与回风回路）、
+        // 旧的可调设备类型，说明是旧版编排方案 —— 丢弃存档改按新模板重建，否则刷新后仍看到旧流程，
+        // 误以为资源包没更新。
+        if (sid === 'dc-thermal') {
+          const DC_TYPES = ['dc_chiller', 'dc_fan_cool', 'dc_it']
+          const DC_MATS = ['cool_water_supply', 'cool_water_return', 'cold_air']
+          const badNode = d.scheme.nodes.some((n) => {
+            if (!n || DC_TYPES.indexOf(n.type) < 0) return true
+            const ports = (n.ports && n.ports.in ? n.ports.in : []).concat(n.ports && n.ports.out ? n.ports.out : [])
+            return ports.some((p) => p && DC_MATS.indexOf(p.material) < 0)
+          })
+          const badConn = (d.scheme.connections || []).some((c) => c && DC_MATS.indexOf(c.material) < 0)
+          // 附加设备口径三次变更：① 制冷风机的「半导体制冷电源」由通用可变电源（variable_psu，
+          // 0~66000 V / 步长 10）改为专用 TEC 电源（tec_psu，0~60 V）；② 冷却水的「循环水泵变频器」
+          // （frequency_converter，Hz）改为「循环水泵变压器」（pump_transformer，设定值=输出电压 V）；
+          // ③ 折碳功率口径改为「传感器承载」——可变设备只留设定值、不再声明实时数据（有功功率），
+          // 实际功率由本工序附加的电功率传感器（power_sensor，kW）给出（可绑定数据源实测、
+          // 也可随可变设备联动）。旧存档沿用旧类型会让详情面板量程/默认值与折碳口径都对不上，按旧存档丢弃重建。
+          const OLD_ATT = ['variable_psu', 'frequency_converter']
+          const someAtt = (fn) => d.scheme.nodes.some((n) => ((n && n.attached) || []).some(fn))
+          const badAtt = someAtt((a) => a && OLD_ATT.indexOf(a.type) >= 0)
+          // 冷却水侧「冷却水流速传感器」（随循环水泵变压器设定值联动）与「循环水泵变压器」、
+          // 以及水侧 / 风侧各一个「电功率传感器」（折碳功率来源）缺一即视为旧存档，
+          // 保证刷新后直接看到「变压器调工况 → 功率传感器随动 → 实测值进入折碳」的完整链路。
+          const missFlow = !someAtt((a) => a && a.type === 'water_speed_sensor')
+          const missPump = !someAtt((a) => a && a.type === 'pump_transformer')
+          const missPower = !someAtt((a) => a && a.type === 'power_sensor')
+          if (badNode || badConn || badAtt || missFlow || missPump || missPower) return null
+        }
         return d
       } catch (e) { return null }
     },
@@ -2395,7 +2622,9 @@ export const useSimStore = defineStore('sim', {
         kind,
         type,
         label: tpl.label,
-        src: 'sim',        // 默认数值来源：随机模拟值（可在属性面板切换为固定值 / 数据源设备 / 工艺参数）
+        // 传感器默认数值来源「随机模拟值」（可在属性面板切换为固定值 / 数据源设备 / 工艺参数 / 随可变设备联动）；
+        // 可变设备不取数 —— 其数值就是设定值（只调运行工况），故固定为 'fixed' 且不显示数据源下拉。
+        src: tpl.kind === 'sensor' ? 'sim' : 'fixed',
         param: null,       // src=param 时绑定的工艺数值参数 key
         device: null,      // src=device 时绑定的数据源管理设备名
         prop: null,        // src=device 时绑定的设备点位名
@@ -2423,6 +2652,7 @@ export const useSimStore = defineStore('sim', {
     //   { src: 'sim' }                        随机模拟值
     //   { src: 'param', param }               工艺参数
     //   { src: 'device', device, prop }       数据源管理中的传感器设备点位实时读数
+    //   { src: 'attach', devRef }             随同节点某附加可调设备的设定值联动（读数 = 设定值 × scale.to/scale.from）
     setAttachSource(nodeId, uidToSet, patch) {
       const node = this.scheme.nodes.find((n) => n.id === nodeId)
       const att = node && Array.isArray(node.attached) ? node.attached.find((a) => a.uid === uidToSet) : null
@@ -2431,9 +2661,101 @@ export const useSimStore = defineStore('sim', {
       if (patch && 'param' in patch) att.param = patch.param
       if (patch && 'device' in patch) att.device = patch.device
       if (patch && 'prop' in patch) att.prop = patch.prop
+      if (patch && 'devRef' in patch) { att.devRef = patch.devRef; att.scale = null }
+      if (patch && patch.scale) att.scale = patch.scale
       if (patch && 'def' in patch) att.def = patch.def
+      // 首次切到「随附加可调设备联动」时按当下「设定值 → 读数」定标：绑定瞬间读数不变，之后随设定值线性变化
+      if (att.src === 'attach' && (!att.scale || !Number(att.scale.from))) {
+        const ref = _attachRef(node, att)
+        const refTpl = ref ? _attachTpl(ref.kind, ref.type) : null
+        const refId = ref ? `ext::${nodeId}::${ref.uid}` : null
+        const refSp = ref
+          ? Number(this.deviceSetpoints[refId] != null ? this.deviceSetpoints[refId]
+            : (ref.def != null ? ref.def : (refTpl && refTpl.setpoint ? refTpl.setpoint.def : 0)))
+          : 0
+        const tpl = _attachTpl(att.kind, att.type)
+        const toVal = att.def != null ? att.def : (tpl ? tpl.def : 0)
+        att.scale = { from: Number.isFinite(refSp) && refSp ? refSp : 1, to: Number(toVal) || 0 }
+      }
       this._histCapture('src_' + nodeId + uid('h'))
       this._saveScheme()
+      // 绑定变更立即生效：清掉该附加设备的陈旧遥测，让各界面 liveOf 落到现算读数
+      // （否则 deviceLive 里绑定前按 sim/fixed 合成的旧值会永久遮蔽新绑定）
+      const extId = `ext::${nodeId}::${uidToSet}`
+      delete this.deviceLive[extId]
+      delete this.deviceHistory[extId]
+      this._sampleAttachedDevices(Date.now() / 1000)
+    },
+    // 切换「随附加可调设备联动」的定标基准（设定值锚点 → 读数锚点）：便于按额定工况重新标定
+    setAttachLinkScale(nodeId, uidToSet, from, to) {
+      const node = this.scheme.nodes.find((n) => n.id === nodeId)
+      const att = node && Array.isArray(node.attached) ? node.attached.find((a) => a.uid === uidToSet) : null
+      if (!att) return
+      const f = Number(from)
+      const v = Number(to)
+      att.scale = { from: Number.isFinite(f) && f ? f : 1, to: Number.isFinite(v) ? v : 0 }
+      this._histCapture('sc_' + nodeId + uid('h'))
+      this._saveScheme()
+    },
+    // 设置附加设备换算系数：读数 = 源值 × 系数（默认 1），
+    // 用于系统模板单位与绑定传感器/采集设备实际度量不一致时的换算
+    setAttachFactor(nodeId, uidToSet, factor, silent) {
+      const node = this.scheme.nodes.find((n) => n.id === nodeId)
+      const att = node && Array.isArray(node.attached) ? node.attached.find((a) => a.uid === uidToSet) : null
+      if (!att) return
+      const f = Number(factor)
+      // 最多支持小数点后两位
+      att.factor = isFinite(f) ? Math.round(f * 100) / 100 : 1
+      // silent=输入过程实时预览：不记撤销历史（避免每个按键一条），失焦提交时才记
+      if (!silent) this._histCapture('fx_' + nodeId + uid('h'))
+      this._saveScheme()
+      this._sampleAttachedDevices(Date.now() / 1000)
+    },
+    // 按 extId（ext::节点id::attUid）反查附加设备与其节点
+    _attachByExtId(extId) {
+      const m = /^ext::(.+)::([^:]+)$/.exec(extId || '')
+      if (!m) return null
+      const node = (this.scheme.nodes || []).find((n) => n.id === m[1])
+      const att = node && Array.isArray(node.attached) ? node.attached.find((a) => a.uid === m[2]) : null
+      return att ? { node, att } : null
+    },
+    // 可变设备已绑定数据源设备的可写点位时，把设定值经 cmd/{box}/cmd 下发写入
+    async writeAttachBound(extId, value) {
+      const hit = this._attachByExtId(extId)
+      if (!hit) return { ok: false, error: 'attach not found' }
+      const { att } = hit
+      if (att.src !== 'device' || !att.device || !att.prop) return { ok: false, error: 'unbound' }
+      const v = Number(value)
+      if (!isFinite(v)) return { ok: false, error: t('写入值需为数值') }
+      const dev = (this.boxSourceDevices || []).find((d) => d.name === att.device)
+      const box = dev && dev.node
+      if (!box) return { ok: false, error: t('数据源设备无归属盒子') }
+      const payload = {
+        box, device: att.device, cmd: 'write', property: att.prop, value: v,
+        request_id: 'att-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        ts: Math.floor(Date.now() / 1000),
+      }
+      try {
+        const r = await api.boxPublish('cmd/' + box + '/cmd', JSON.stringify(payload))
+        return r && r.ok ? { ok: true } : { ok: false, error: (r && (r.error || r.note)) || t('命令发送失败') }
+      } catch (e) {
+        return { ok: false, error: String((e && e.message) || e) }
+      }
+    },
+    // 可变设备设定值统一入口（编排面板 / AI 群控共用）：
+    // 先本地设定，若已绑定数据源设备的可写点位则自动下发写入（失败只提示，不回滚本地设定）
+    setExtSetpoint(extId, value) {
+      this.setDeviceSetpoint(extId, value)
+      const hit = this._attachByExtId(extId)
+      if (!hit || hit.att.src !== 'device' || !hit.att.device || !hit.att.prop) return
+      const { att } = hit
+      this.writeAttachBound(extId, value).then((r) => {
+        if (r && r.ok) {
+          this.showToast(t('已下发写点位 {dev} · {prop} = {v}', { dev: att.device, prop: att.prop, v: value }), 'success')
+        } else {
+          this.showToast(t('写点位下发失败') + '：' + ((r && r.error) || ''), 'error')
+        }
+      })
     },
     // 加载「数据源管理」中的传感器设备（设备定义 + 实时读数），供附加设备绑定真实数据源
     async loadBoxSourceDevices() {
@@ -2477,6 +2799,26 @@ export const useSimStore = defineStore('sim', {
             const pv = Number(d.primary)
             props = [{ name: 'primary', unit: '', value: isNaN(pv) ? null : pv, ts: null, invalid: false }]
           }
+          // 可写点位 = 设备手工配置的 writes[] + 点位定义中具备可写能力（accessMode=rw）的属性
+          // （与数据源管理命令面板同口径；供编排可变设备绑定「写设定」目标）
+          const wseen = new Set()
+          const writes = []
+          for (const w of (d.writes || [])) {
+            if (!w || !w.property || wseen.has(String(w.property))) continue
+            wseen.add(String(w.property))
+            const pd = propDefs.find((p) => p && String(p.name) === String(w.property)) || {}
+            writes.push({
+              property: w.property,
+              unit: w.unit || pd.unit || '',
+              min: w.min != null ? w.min : (pd.min != null ? pd.min : null),
+              max: w.max != null ? w.max : (pd.max != null ? pd.max : null),
+            })
+          }
+          for (const p of propDefs) {
+            if (!p || !p.name || p.accessMode !== 'rw' || wseen.has(String(p.name))) continue
+            wseen.add(String(p.name))
+            writes.push({ property: p.name, unit: p.unit || '', min: p.min != null ? p.min : null, max: p.max != null ? p.max : null })
+          }
           return {
             name: d.name,
             model: d.model || '',
@@ -2484,12 +2826,21 @@ export const useSimStore = defineStore('sim', {
             protocol: d.protocol || '',
             state: r.state || 'offline',
             props,
+            writes,
           }
         })
       } catch (e) {
         // 后端不可达时保留上一次结果，不打断编排交互
       } finally {
         _boxSrcBusy = false
+        // 读数刷新后立即补采样附加设备：AI 群控等界面读 deviceLive，
+        // 绑定采集设备的传感器无需等下一帧遥测即可生效
+        try { this._sampleAttachedDevices(Date.now() / 1000) } catch (e) { /* 编排未就绪时忽略 */ }
+        // 非钢场景：读数刷新后按「实测功率」重算折碳（工序附加的电功率传感器绑定的
+        // 采集设备有功功率随之进入能碳计算，10s 一轮与数据源刷新同步）。
+        if (this.sceneMode !== 'steel') {
+          try { this._otherSceneRefresh() } catch (e) { /* 编排未就绪时忽略 */ }
+        }
       }
     },
     // 常驻轮询：数据源管理设备列表与其读数（10s），保证附加设备绑定的真实读数持续更新
@@ -3308,6 +3659,36 @@ export const useSimStore = defineStore('sim', {
           this.deviceLive[did] = sp
           const buf = this.deviceHistory[did] || (this.deviceHistory[did] = [])
           buf.push({ t: now, v: sp })
+          if (buf.length > 900) buf.splice(0, buf.length - 600)
+        }
+      }
+      // 附加设备（挂 node.attached[] 上的传感器 / 可变设备）同样由前端合成、后端不推送读数：
+      // 一并补采样。「随附加可调设备联动」的传感器（如冷却水流速随循环水泵变压器输出电压变化）
+      // 读数会随时间进入历史，数据分析 / 趋势曲线里就能直接看出「调压 → 流速」的变化过程。
+      this._sampleAttachedDevices(now)
+      // 非钢场景：附加可调设备的实时数据（实测功率 kW）参与折碳 → 随遥测刷新基线碳排（轻量重算，钢场景自动跳过）
+      this._otherSceneRecarbon()
+    },
+    // 附加设备（挂 node.attached[] 上的传感器 / 可变设备）由前端合成、后端不推送读数：
+    // 统一在此补采样进 deviceLive/deviceHistory。遥测帧与「数据源管理」10s 轮询都会调用，
+    // 读数缺失（采集设备离线/点位暂无值）时删除陈旧键，避免旧值遮蔽现算兜底。
+    _sampleAttachedDevices(now) {
+      const baseUnits = (this.baseline && this.baseline.units) || []
+      const setpoints = this.deviceSetpoints || {}
+      const srcMap = _boxSrcMap(this)
+      const ms = Date.now()
+      for (const n of (this.scheme.nodes || [])) {
+        const u = baseUnits.find((x) => x.id === n.id)
+        for (const att of (n.attached || [])) {
+          const dev = _extDevice(n, u, att, ms, srcMap, setpoints)
+          if (!dev) continue
+          if (dev.reading == null) {
+            delete this.deviceLive[dev.id]
+            continue
+          }
+          this.deviceLive[dev.id] = dev.reading
+          const buf = this.deviceHistory[dev.id] || (this.deviceHistory[dev.id] = [])
+          buf.push({ t: now, v: dev.reading })
           if (buf.length > 900) buf.splice(0, buf.length - 600)
         }
       }

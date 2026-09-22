@@ -458,11 +458,11 @@ useGlobalShortcuts({
 })
 
 onMounted(async () => {
-  // 3D 场景懒加载：默认视图即数字孪生，待首屏 UI（顶栏/侧栏/控制台）渲染完成、
-  // 浏览器空闲后立即加载场景 chunk；加载后常驻挂载，切换视图速度不受影响
+  // 3D 场景懒加载：默认视图即数字孪生。挂载时机刻意放在**首屏数据就绪之后**——
+  // 此前在 onMounted 开头就挂载，TwinScene 的构造（渲染器/环境/地表）与 store.init、waitReady、
+  // 首屏 Vue 渲染抢同一条主线程，模型刚建好又要跟着 ready/sceneRev/场景恢复连做 2~3 次全量重建，
+  // 首页加载那几秒正是掉帧最明显的时候。延后挂载后场景一次成型，重建次数也降到最少。
   const mountScene = () => { sceneMounted.value = true }
-  if (window.requestIdleCallback) window.requestIdleCallback(mountScene, { timeout: 1500 })
-  else setTimeout(mountScene, 300)
   store.init()
   // 启动提示不再推入命令行（底部命令只保留用户输入交互与直接反馈，少即是多）
   // 无宣传页：初始化完成后直接进入主界面（保留已保存方案，不重建覆盖）
@@ -475,6 +475,9 @@ onMounted(async () => {
     store.refresh()
     store.sceneRev++
   }
+  // 首屏数据与 UI 都已就绪，等浏览器空闲再加载 3D 场景 chunk（加载后常驻，切换视图不受影响）
+  if (window.requestIdleCallback) window.requestIdleCallback(mountScene, { timeout: 1500 })
+  else setTimeout(mountScene, 300)
   // 首屏渲染完成且浏览器空闲后，预取常用视图 chunk：兼顾首屏轻量与后续视图切换的响应速度
   // （defineAsyncComponent 的 loader 拉取模块后即被缓存，再次打开无需重新请求）
   const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 4000))

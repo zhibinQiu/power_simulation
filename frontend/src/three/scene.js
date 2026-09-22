@@ -155,8 +155,14 @@ const GROUP_LABEL_H = 92        // 小组聚合标签逻辑高（四行：名称
 const LABEL_SS = 4              // 超采样倍率（清晰度关键：4x 保证远处放大 5.2x 后文字仍锐利）
 const LABEL_PARENT_REF = 4.6    // 工艺标签世界尺寸基准：工艺模型父级缩放代表值，所有标签以此为统一大小
 const LABEL_AUX_GAIN = 0.72     // 工辅/小组标签相对工艺标签的小一号系数（0.85→0.72 再小一号）
-const LABEL_SCALE = 2.8         // 世界坐标下的铭牌宽度：工序标签与管道/轨道连接标签统一尺寸（紧凑铭牌：整体收敛避免过高遮挡）
+const LABEL_SCALE = 2.2         // 世界坐标下的铭牌宽度：工序标签与管道/轨道连接标签统一尺寸（紧凑铭牌：整体收敛避免过高遮挡）
 const LABEL_ASPECT = LABEL_H / LABEL_W
+// 标签悬停间隙（父级局部单位）：卡底缘与模型实际最高点之间的固定留白。
+// 注意卡片尺寸会随视距动态放大（_updateLabelScales，最大 MAX_FACTOR 倍），
+// 因此纵向摆位必须每帧按「当前卡高」重算，不能只在创建时摆一次。
+const LABEL_HOVER_GAP = 2.2         // 工序 / 工辅标签
+const GROUP_LABEL_HOVER_GAP = 6.0   // 小组聚合标签（组内含高装置，留更大间隙）
+const LABEL_CLEARANCE_RATIO = 0.5   // 远视距下卡底缘与模型最高点的间隙 ≥ 半张卡高（随卡片同比放大）
 const LABEL_PAD = 13            // 竖卡左右内边距（文字绘制区宽度 = LABEL_W - LABEL_PAD*2）
 const LABEL_BODY_W = LABEL_W - LABEL_PAD * 2   // 可用正文宽度
 const LABEL_FOCUS_GAIN = 1.2    // 聚焦时的放大倍率
@@ -937,6 +943,7 @@ export class TwinScene {
     this.container = container
     this.envMode = opts.envMode || 'void'
     this.unitGroups = new Map()
+    this._framedLayout = null          // 上次自动取景时的布局指纹（用于判断布局是否变化）
     this.groupModels = new Map()   // 小组 gid → 小组聚合模型（供 focusGroup 直接定位，不依赖成员 id）
     this.deviceMap = new Map()
     this._edgeMaterials = []   // 各工艺外壳描边材质（随场景明暗切换颜色）
@@ -961,6 +968,13 @@ export class TwinScene {
     this._waveAmp = 0.5
     this._raf = null
     this._lastFrame = null
+    // 画质自适应状态（_init 内会先按满档建渲染器，因此需要在此先初始化，避免 _pickPixelRatio 读到 undefined）
+    this._qLevel = 2          // 2=满档 1=中 0=省电
+    this._qBad = 0
+    this._qGood = 0
+    this._frame = 0
+    this._warmupFrames = 90   // 首屏预热期：模型刚建好、纹理与 shader 首次上传，先用 1× 像素比
+    this._warmupDone = false
     this._init()
   }
 
@@ -992,15 +1006,21 @@ export class TwinScene {
   //   若每次都重算会让 pixel ratio 在 1.5 ↔ 2.0 之间反复跳变（canvas 物理尺寸突变、
   //   重建绘制缓冲），肉眼可见闪烁。因此同屏下仅当目标与当前档位差 ≥0.6（即档位
   //   真正变化）才切换；跨屏拖动（devicePixelRatio 变化）时立即跟随新档位。
-  _pickPixelRatio() {
+  _pickPixelRatio(force = false) {
     const dpr = window.devicePixelRatio || 1
     const w = this.container.clientWidth || window.innerWidth
     const h = this.container.clientHeight || window.innerHeight
-    const target = (w * h * dpr * dpr > 5e6) ? Math.min(dpr, 1.5) : Math.min(dpr, 2)
+    let target = (w * h * dpr * dpr > 5e6) ? Math.min(dpr, 1.5) : Math.min(dpr, 2)
+    // 画质档位限制：掉帧时逐级下调像素比（填充率是高分屏上最直接的开销）
+    if (this._qLevel === 1) target = Math.min(target, 1.25)
+    else if (this._qLevel === 0) target = Math.min(target, 1)
+    // 首屏预热期：强制 1×，等模型/纹理/shader 上传完成后由 _updateQuality 恢复到目标档
+    if (this._frame < this._warmupFrames) target = Math.min(target, 1)
     // 跨屏拖动（DPR 变化）：直接采用新档位
     if (this._dpr !== dpr) return target
-    // 同屏窗口拖动：档位差 < 0.6 时维持当前值，消除阈值边界抖动
-    if (this._pr !== undefined && Math.abs(target - this._pr) < 0.6) return this._pr
+    // 同屏窗口拖动：档位差 < 0.6 时维持当前值，消除阈值边界抖动。
+    // 切画质档时传 force=true 跳过该抑制，否则小幅降档（如 1.5→1.25）会被判定为抖动而不生效。
+    if (!force && this._pr !== undefined && Math.abs(target - this._pr) < 0.6) return this._pr
     return target
   }
 
@@ -1033,6 +1053,12 @@ export class TwinScene {
     this.renderer.shadowMap.enabled = true
     // 柔和阴影：PCFSoftShadowMap 多采样，阴影边缘平滑无颗粒感（现代 GPU 开销可忽略）
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    // 阴影按需刷新（关键性能项）：主光源与厂区主体（地坪/平台/工艺本体）都是静态的，
+    // 默认 autoUpdate 会**每帧重绘一遍全场景深度图**，等于把 draw call 直接翻倍——
+    // 这是首页加载与静止观看时掉帧的最大单项开销。改为：构建/环境切换/切档后强制刷新一次，
+    // 运行期按 _SHADOW_REFRESH_FRAMES 低频刷新（运动部件的阴影最多滞后几百毫秒，柔和阴影下不可察觉）。
+    this.renderer.shadowMap.autoUpdate = false
+    this.renderer.shadowMap.needsUpdate = true
     this.container.appendChild(this.renderer.domElement)
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
@@ -1385,6 +1411,7 @@ export class TwinScene {
     // 虚空模式：不建远郊地表/装饰，仅设置深空背景+暗雾+粒子场
     if (mode === 'void') {
       this._applyVoidStage()
+      this.renderer.shadowMap.needsUpdate = true
       return
     }
 
@@ -1395,6 +1422,8 @@ export class TwinScene {
     this._buildDeco(mode)
     this._applyAtmosphere(mode)
     this.scene.add(this.environment)
+    // 环境（地表/装饰/水面）重建后刷新阴影（autoUpdate 已关闭）
+    this.renderer.shadowMap.needsUpdate = true
   }
 
   // 按场景切换平台地坪、灯光与设备描边配色：
@@ -1999,10 +2028,21 @@ export class TwinScene {
       this._applyThemeColors(this.envMode)
     }
 
-    if (!this._firstFramed) {
-      this._firstFramed = true
-      this.resetView()
+    // 默认镜头随布局自动取景：首次建模、或布局发生实质变化（切场景 / 增删工艺 / 自动布局重排）
+    // 时重新适配机位；仅结果刷新、工艺参数修改不改变布局，不会打扰用户已经调好的视角。
+    // 小组子场景的取景由 SceneViewer 的 activeGroupId watch 统一处理（focusScene / resetView），此处跳过。
+    if (!isGS) {
+      const sig = this._layoutSig()
+      const changed = this._layoutChanged(sig)
+      this._framedLayout = sig
+      if (changed) this.resetView()
     }
+    // 模型（重新）构建完毕：主动刷新一次阴影贴图（autoUpdate 已关闭，见 _init）
+    this.renderer.shadowMap.needsUpdate = true
+    // 预编译 shader：首帧若要现编译整套材质（数十个 program），会出现一次 100~500ms 的长帧，
+    // 恰好落在「首页加载完、动画刚起步」的时刻，观感就是明显卡一下。建完模型先编译，
+    // 把这块耗时挪到动画尚未起步的空档（失败也不影响后续正常渲染）。
+    try { this.renderer.compile(this.scene, this.camera) } catch (e) { /* noop */ }
   }
 
   /** 工艺自动布局（仅顶层模式）：按「工艺树」结构排版 —— 先左后右、工艺为树干。
@@ -2639,8 +2679,14 @@ export class TwinScene {
         if (Number.isFinite(_topLocal)) labelAnchorTop = Math.max(labelAnchorTop, _topLocal)
       }
     }
-    const LABEL_Y_LIFT = LABEL_SCALE * (UNIT_LABEL_H / LABEL_W) / 2 + 2.2
+    // 工序/工辅标签：卡底缘 = 模型最高点 + LABEL_HOVER_GAP。
+    // 实测：卡片按视距最多放大 MAX_FACTOR(5.2)×，而此处的半高是按基准尺寸（factor=1）算的，
+    // 因此这里只作为初始摆位；真正的纵向位置由 _updateLabelScales 每帧按当前卡高重算，
+    // 否则远视距下卡片会向下膨胀盖住模型（矮小模型的标签几乎整块压在模型上）。
+    const LABEL_Y_LIFT = LABEL_SCALE * (UNIT_LABEL_H / LABEL_W) / 2 + LABEL_HOVER_GAP
     label.position.set(0, labelAnchorTop + LABEL_Y_LIFT, 0)
+    label.userData.labelObj.anchorTop = labelAnchorTop
+    label.userData.labelObj.anchorGap = LABEL_HOVER_GAP
     label.userData.unitId = unit.id
     label.userData.kind = 'unit'   // 可由 3D 标签直接点击聚焦（替代点击工艺本体）
     label.userData.labelObj.main = isMain
@@ -2747,9 +2793,8 @@ export class TwinScene {
     const co2 = reses.reduce((s, r) => s + (r ? r.co2_total || 0 : 0), 0)
     const en = reses.reduce((s, r) => s + (r ? r.energy_total || 0 : 0), 0)
     const label = this._makeGroupLabel(gname, n, reses.some((r) => r) ? co2 : null, reses.some((r) => r) ? en : null)
-    // 组标签同样悬浮在组模型顶上方：明确留出大间隙（卡半高 + 6.0 局部间隙 ≈ 世界 20+）。
-    // 远视距下标签会按 _updateLabelScales 动态放大（MAX_FACTOR），卡片会向下扩展，
-    // 因此间隙必须足够大，保证任何视距下卡底缘都明显高于模型实际最高点、不压住/盖住模型。
+    // 组标签同样悬浮在组模型顶上方：卡底缘 = 组模型最高点 + GROUP_LABEL_HOVER_GAP。
+    // 此处亦为初始摆位，纵向位置同样交由 _updateLabelScales 每帧按当前卡高重算。
     let groupAnchorTop = built.topY
     {
       group.updateMatrixWorld(true)
@@ -2759,8 +2804,10 @@ export class TwinScene {
         if (Number.isFinite(_t)) groupAnchorTop = Math.max(groupAnchorTop, _t)
       }
     }
-    const GROUP_LABEL_LIFT = LABEL_SCALE * (GROUP_LABEL_H / LABEL_W) / 2 + 6.0
+    const GROUP_LABEL_LIFT = LABEL_SCALE * (GROUP_LABEL_H / LABEL_W) / 2 + GROUP_LABEL_HOVER_GAP
     label.position.set(0, groupAnchorTop + GROUP_LABEL_LIFT, 0)
+    label.userData.labelObj.anchorTop = groupAnchorTop
+    label.userData.labelObj.anchorGap = GROUP_LABEL_HOVER_GAP
     label.userData.kind = 'unit'
     label.userData.groupId = gid
     // _makeGroupLabel 已自行完成绘制；标注为组标签，便于实时刷新时走 _drawGroupLabel
@@ -3661,71 +3708,134 @@ export class TwinScene {
 
   resetView() { this.playResetOrbit() }
 
-  // 计算「俯瞰全厂」相机机位与视点：基于实际工序包围盒（而非固定厂界）
+  // 当前布局的实际内容包围盒（世界坐标）：所有工序 / 小组聚合「本体」包围盒的并集。
+  // —— 默认镜头随布局自适应的唯一依据：钢铁长流程横向铺开会算出大跨度而自动拉远，
+  //    短流程 / 机房热控布局紧凑会自动拉近，全程不再依赖写死的园区尺寸与机位。
+  _contentBox() {
+    const box = new THREE.Box3()
+    const tmp = new THREE.Box3()
+    const done = new Set()
+    for (const g of this.unitGroups.values()) {
+      if (!g || done.has(g)) continue   // 小组成员共用同一个聚合模型，去重只统计一次
+      done.add(g)
+      const src = g.body || g.group
+      if (!src) continue
+      g.group.updateWorldMatrix(true, true)
+      tmp.setFromObject(src)
+      if (!tmp.isEmpty()) box.union(tmp)
+    }
+    if (!box.isEmpty()) return box
+    // 兜底：尚未建模（或本体包围盒不可用）时按布局坐标估算，含单工序典型占位半径
+    const R = 70
+    const H = this.groupScene ? 170 : 76
+    const us = this._unitWorld || []
+    if (!us.length) {
+      box.min.set(-PARK.halfX, 0, -PARK.halfZ)
+      box.max.set(PARK.halfX, H, PARK.halfZ)
+      return box
+    }
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
+    for (const u of us) {
+      if (u.x < minX) minX = u.x
+      if (u.x > maxX) maxX = u.x
+      if (u.z < minZ) minZ = u.z
+      if (u.z > maxZ) maxZ = u.z
+    }
+    box.min.set(minX - R, 0, minZ - R)
+    box.max.set(maxX + R, H, maxZ + R)
+    return box
+  }
+
+  // 布局指纹（只用工序坐标，开销极低）：判断默认镜头是否需要重新取景
+  _layoutSig() {
+    const us = this._unitWorld || []
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
+    for (const u of us) {
+      if (u.x < minX) minX = u.x
+      if (u.x > maxX) maxX = u.x
+      if (u.z < minZ) minZ = u.z
+      if (u.z > maxZ) maxZ = u.z
+    }
+    if (!us.length) { minX = -PARK.halfX; maxX = PARK.halfX; minZ = -PARK.halfZ; maxZ = PARK.halfZ }
+    return { minX, maxX, minZ, maxZ, n: us.length }
+  }
+
+  // 布局是否发生实质变化：切换场景 / 增删或移动工序会命中；
+  // 仅结果刷新、工艺参数修改不改变布局，不会打扰用户已经调好的视角
+  _layoutChanged(sig) {
+    const p = this._framedLayout
+    if (!p) return true
+    if (p.n !== sig.n) return true
+    const span = Math.max(p.maxX - p.minX, p.maxZ - p.minZ, 1)
+    if (Math.abs((p.minX + p.maxX) / 2 - (sig.minX + sig.maxX) / 2) > span * 0.06) return true
+    if (Math.abs((p.minZ + p.maxZ) / 2 - (sig.minZ + sig.maxZ) / 2) > span * 0.06) return true
+    if (Math.abs((p.maxX - p.minX) - (sig.maxX - sig.minX)) > span * 0.12) return true
+    if (Math.abs((p.maxZ - p.minZ) - (sig.maxZ - sig.minZ)) > span * 0.12) return true
+    return false
+  }
+
+  // 计算「俯瞰全厂」相机机位与视点：按当前布局的实际包围盒精确求解。
+  // 距离 = 让包围盒 8 个角全部落进视锥的最小距离（横竖两个方向的视场角都计入），
+  // 因此横向跨度大的长流程自动拉远、布局紧凑的短流程/机房热控自动拉近，且任何场景都不会被裁切。
   _frameAll() {
     const cam = this.camera
     const gs = !!this.groupScene
-    // 小组子场景：成员放大后更高（最高约 170），取景留白更小、高度上限更高
-    let minX = -PARK.halfX, maxX = PARK.halfX, minZ = -PARK.halfZ, maxZ = PARK.halfZ, maxY = gs ? 170 : 60
-    const us = this._unitWorld
-    if (us && us.length) {
-      minX = Infinity; maxX = -Infinity; minZ = Infinity; maxZ = -Infinity
-      for (const u of us) {
-        minX = Math.min(minX, u.x); maxX = Math.max(maxX, u.x)
-        minZ = Math.min(minZ, u.z); maxZ = Math.max(maxZ, u.z)
-      }
-      const padX = gs ? 34 : 72, padZ = gs ? 28 : 58
-      minX -= padX; maxX += padX; minZ -= padZ; maxZ += padZ
-      maxY = gs ? 170 : 76
-    }
-    const cx = (minX + maxX) / 2
-    const cz = (minZ + maxZ) / 2
-    const extX = (maxX - minX) / 2
-    const extZ = (maxZ - minZ) / 2
+    const box = this._contentBox()
+    const min = box.min.clone(), max = box.max.clone()
+    // 工序铭牌悬浮在本体之上（远视距下为恒定屏占比），顶部留出净空避免铭牌压边框
+    max.y += gs ? 34 : 52
+    const tgt = new THREE.Vector3((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2)
+
+    // 俯视倾角随布局形态自适应：布局越方正越接近标准俯瞰（看清平面排布与间隔），
+    // 越狭长（如长/短流程沿流程方向的单排展开）越压低视平线（看清设备立面与前后关系）。
+    const spanX = Math.max(max.x - min.x, 1)
+    const spanZ = Math.max(max.z - min.z, 1)
+    const squareness = Math.min(spanX, spanZ) / Math.max(spanX, spanZ)
+    const t = THREE.MathUtils.clamp((squareness - 0.3) / 0.55, 0, 1)
+    // 狭长布局（长/短流程）约 3°，与调试定版的长流程视角一致；方正布局逐步升到 32° 标准俯瞰
+    const elev = THREE.MathUtils.degToRad(2 + 30 * Math.pow(t, 2.6))
+    // 水平方位沿用调试定版的「左后侧斜视」机位（钢铁长流程定版视角），不随场景改变
+    const hd = new THREE.Vector2(-0.625, 0.78).normalize()
+    const dir = new THREE.Vector3(hd.x * Math.cos(elev), Math.sin(elev), hd.y * Math.cos(elev)).normalize()
+
     const vfov = (cam.fov || 48) * Math.PI / 180
     const aspect = cam.aspect || (16 / 9)
-    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect)
-    const fit = (half, fov) => (half / Math.tan(fov / 2)) * 1.28
-    let dist = Math.max(fit(extX, hfov), fit(extZ, vfov), fit(maxY * 0.42, vfov))
-    dist = Math.max(dist, gs ? 120 : 250)
-    const elev = THREE.MathUtils.degToRad(34)
-    const dir = new THREE.Vector3(0, Math.sin(elev), Math.cos(elev)).normalize()
-    const tgt = new THREE.Vector3(cx, maxY * 0.12, cz)
+    const tanV = Math.tan(vfov / 2)
+    const tanH = tanV * aspect
+    const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), dir).normalize()
+    const up = new THREE.Vector3().crossVectors(dir, right).normalize()
+    let dist = 0
+    const p = new THREE.Vector3()
+    for (let i = 0; i < 8; i++) {
+      p.set(i & 1 ? max.x : min.x, i & 2 ? max.y : min.y, i & 4 ? max.z : min.z).sub(tgt)
+      const along = p.dot(dir)
+      dist = Math.max(dist, Math.abs(p.dot(right)) / tanH - along, Math.abs(p.dot(up)) / tanV - along)
+    }
+    dist = Math.max(dist * (gs ? 1.04 : 1.08), gs ? 110 : 170)
     const pos = tgt.clone().add(dir.multiplyScalar(dist))
     return { pos, tgt, dist }
   }
 
-  // 重置视角：不绕厂区旋转一周，直接平滑过渡到最终俯瞰机位
+  // 重置视角：平滑过渡到「按当前布局取景」的俯瞰机位（不再使用写死的固定坐标）
   playResetOrbit() {
     this._focus = null
     this._intro = null
     const f = this._frameAll()
     const center = f.tgt.clone()
     const gs = !!this.groupScene
-
-    // 最终机位：使用经调试确定的固定相机参数（用户手动调整到满意视角）。
-    // 顶层场景直接用该组坐标；小组子场景仍用角度计算避免错位。
-    let resetTgt, resetPos
-    if (!gs) {
-      // 调试确定的合适机位：左后方、低位、俯视流程
-      resetPos = new THREE.Vector3(-1317.7, 176.1, 743.9)
-      resetTgt = new THREE.Vector3(-360.1, 130.3, -451.0)
-    } else {
-      // 小组子场景：沿用角度计算
-      const elev = THREE.MathUtils.degToRad(30)
-      const azim = THREE.MathUtils.degToRad(75)
-      const resetDist = Math.max(f.dist * 0.6, 70)
-      const dir45 = new THREE.Vector3(
-        -Math.cos(azim) * Math.cos(elev),
-        Math.sin(elev),
-        Math.cos(azim) * Math.cos(elev),
-      ).normalize()
-      const bMaxY = 170
-      resetTgt = new THREE.Vector3(center.x, bMaxY * 0.3, center.z)
-      resetPos = resetTgt.clone().add(dir45.multiplyScalar(resetDist))
-    }
-
-    this._tweenCamera(resetPos, resetTgt, 1.2)
+    if (!gs) { this._tweenCamera(f.pos, f.tgt, 1.2); return }
+    // 小组子场景沿用原有取景参数（近距离侧向俯视），避免改动已有观感
+    const elev = THREE.MathUtils.degToRad(30)
+    const azim = THREE.MathUtils.degToRad(75)
+    const resetDist = Math.max(f.dist * 0.6, 70)
+    const dir = new THREE.Vector3(
+      -Math.cos(azim) * Math.cos(elev),
+      Math.sin(elev),
+      Math.cos(azim) * Math.cos(elev),
+    ).normalize()
+    const tgt = new THREE.Vector3(center.x, 51, center.z)
+    const pos = tgt.clone().add(dir.multiplyScalar(resetDist))
+    this._tweenCamera(pos, tgt, 1.2)
   }
 
   // 镜头从园区高空斜俯视逐步推入「全景俯瞰」视角
@@ -3951,9 +4061,12 @@ export class TwinScene {
     const elapsed = now - this._lastFrame
     // 拖拽/聚焦/漫游/入场动画期间全帧率（≈60fps）保证画面流畅锐利；静止时 30fps 降低功耗
     const active = this._interacting || this._intro || this._focus
-    if (elapsed < (active ? 16 : 33)) return
+    if (elapsed < (active ? 16 : this._idleFrameMs())) return
     const dt = Math.min(0.05, elapsed / 1000)
     this._lastFrame = now
+    this._frame++
+    // 画质自适应：以「实际帧间隔」为唯一判据（掉帧的直接体现），持续偏慢则逐级降档
+    this._updateQuality(elapsed, active)
     const t = now / 1000
 
     this.unitGroups.forEach((g) => {
@@ -4347,12 +4460,14 @@ export class TwinScene {
         arr[i + 1] = Math.sin(bx * 0.02 + t * 0.9) * amp + Math.cos(bz * 0.025 + t * 0.7) * amp
       }
       this.water.geometry.attributes.position.needsUpdate = true
-      this.water.geometry.computeVertexNormals()
+      // 法线重算要遍历全部三角形（48×48 网格 ≈ 4600 面），是这段动画里最贵的一步；
+      // 波面平缓、光照变化细微，降频到每 3 帧一次，视觉无差别而 CPU 直接省 2/3
+      if (this._frame % 3 === 0) this.water.geometry.computeVertexNormals()
     }
     // 海岸水面轻缓波动（隔帧更新：低频正弦动画 15fps 与 30fps 视觉几乎无差别，CPU 减半）
     if (this._coastWater && this._coastWater.geometry) {
       this._waveFrame = (this._waveFrame || 0) + 1
-      if (this._waveFrame % 2 === 0) {
+      if (this._waveFrame % 3 === 0) {
         const arr = this._coastWater.geometry.attributes.position.array
         for (let i = 0; i < arr.length; i += 3) {
           const bx = arr[i], bz = arr[i + 2]
@@ -4412,7 +4527,72 @@ export class TwinScene {
     }
     this._clampCamera()
     this._updateLabelScales()
+    // 阴影贴图低频刷新：静态光源 + 静态厂区，阴影几乎不变，没必要每帧重绘整张深度图
+    if (this._shadowEvery > 0 && this._frame % this._shadowEvery === 0) this.renderer.shadowMap.needsUpdate = true
     this.renderer.render(this.scene, this.camera)
+  }
+
+  // 静止时的目标帧间隔（ms）：满档 30fps；省电档再降一档，优先保证不掉帧
+  _idleFrameMs() { return this._qLevel === 0 ? 44 : 33 }
+
+  // 阴影刷新间隔（帧）：满档每 20 帧（≈0.6s）一次；中档每 45 帧；省电档关闭阴影（0 = 不刷新）
+  get _shadowEvery() { return this._qLevel === 2 ? 20 : (this._qLevel === 1 ? 45 : 0) }
+
+  /**
+   * 画质自适应：以实测帧间隔判断「是否掉帧」，持续偏慢则逐级降档，长时间流畅则逐级回升。
+   * - 判据用帧间隔而不是 CPU 耗时：GPU 侧开销（填充率 / draw call）对 JS 计时不可见，
+   *   但最终都会体现在 rAF 间隔上，这正是用户看到的「卡」。
+   * - 交互期（拖拽/聚焦/入场）目标 60fps，静止期目标 30fps（受 _idleFrameMs 节流），
+   *   因此两档的「慢 / 快」阈值分开取，避免把正常的静止节流误判为掉帧。
+   * - 降档快（30 帧 ≈ 0.5s 见效）、升档慢（600 帧 ≈ 15~20s 稳定后才回升），避免档位抖动。
+   */
+  _updateQuality(elapsed, active) {
+    // 静止期的正常帧间隔就是 _idleFrameMs（各档不同），阈值基于它取，否则省电档会被永远判为「不流畅」而无法回升
+    const idle = this._idleFrameMs()
+    const slow = active ? elapsed > 26 : elapsed > idle + 18
+    const fast = active ? elapsed < 19 : elapsed < idle + 10
+    if (slow) { this._qBad++; this._qGood = 0 }
+    else if (fast) { this._qGood++; this._qBad = 0 }
+    // 首屏预热期结束：从 1× 像素比恢复到当前档位的目标值（用 done 标记，避免被降档 return 跳过而永久停在 1×）
+    if (!this._warmupDone && this._frame >= this._warmupFrames) {
+      this._warmupDone = true
+      this._applyQuality()
+      return
+    }
+    if (this._qBad >= 30 && this._qLevel > 0) {
+      this._qLevel--
+      this._qBad = 0
+      this._applyQuality()
+      return
+    }
+    if (this._qGood >= 600 && this._qLevel < 2) {
+      this._qLevel++
+      this._qGood = 0
+      this._applyQuality()
+    }
+  }
+
+  // 应用当前画质档位：像素比 + 阴影开关（切档会重建绘制缓冲，因此只在档位真正变化时调用）
+  _applyQuality() {
+    if (!this.renderer) return
+    const pr = this._pickPixelRatio(true)
+    if (pr !== this._pr) {
+      this._pr = pr
+      this.renderer.setPixelRatio(pr)
+      this.renderer.setSize(this._cw || this.container.clientWidth, this._ch || this.container.clientHeight)
+    }
+    // 省电档：彻底关闭主光源阴影（不再有 shadow pass）；恢复档位时重新打开并立即刷新一次
+    const wantShadow = this._qLevel > 0
+    if (this._keySE && this._keySE.castShadow !== wantShadow) {
+      this._keySE.castShadow = wantShadow
+      // 光源投射标志参与 shader program 编译，切换后必须让材质重新编译，否则阴影残留/消失
+      this.scene.traverse((o) => {
+        if (!o.material) return
+        const ms = Array.isArray(o.material) ? o.material : [o.material]
+        for (const m of ms) m.needsUpdate = true
+      })
+    }
+    this.renderer.shadowMap.needsUpdate = true
   }
 
   _clampCamera() {
@@ -4444,7 +4624,18 @@ export class TwinScene {
       const base = sf * LABEL_PARENT_REF * (lo.isGroup || lo.main !== true ? LABEL_AUX_GAIN : 1)
       // 高宽比按标签类型取：工艺/工辅卡 UNIT_LABEL_H，小组聚合卡 GROUP_LABEL_H
       const lh = (lo.isGroup ? GROUP_LABEL_H : UNIT_LABEL_H) / LABEL_W
-      lo.sprite.scale.set(base / ps.x, (base * lh) / ps.y, 1)
+      const ly = (base * lh) / ps.y
+      lo.sprite.scale.set(base / ps.x, ly, 1)
+      // 纵向摆位：卡底缘 = 模型最高点 + 悬停间隙（父级局部单位，每帧重算）。
+      // 卡片为保持屏幕尺寸会随视距放大（factor 最大 5.2×），若只在创建时按基准半高摆一次，
+      // 远视距下膨胀的卡片会把间隙吃回去、卡底缘沉到模型顶以下 —— 矮小装置（机房温控的冷却水 /
+      // 制冷风机 / 算力设备）的铭牌几乎整块压在模型上。这里按当前卡高每帧重算，间隙取
+      // 「模板间隙」与「半张卡高」的较大者：近处保持原有观感，远处自动让开模型正上方。
+      if (lo.anchorTop != null) {
+        const half = ly / 2
+        const gap = Math.max(lo.anchorGap != null ? lo.anchorGap : LABEL_HOVER_GAP, half * LABEL_CLEARANCE_RATIO)
+        lo.sprite.position.y = lo.anchorTop + half + gap
+      }
     })
 
     // 工艺间连接线标签

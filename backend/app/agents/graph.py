@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Optional, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from app.llm_strategy import chat_completion, chat_completion_tools
+from app.domain.strategy.llm_strategy import chat_completion, chat_completion_tools
 from app.ontology.reason import get_reasoner
 from app.skills.registry import get_registry
 

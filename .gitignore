@@ -60,3 +60,8 @@ backend/config/github_config.json
 !frontend/public/**/*.png
 !icon.png
 !platform/icon.ico
+
+# Agent 工具与运行产物（不入版本库）
+.pytest_cache/
+.codebuddy/
+**/.vite/

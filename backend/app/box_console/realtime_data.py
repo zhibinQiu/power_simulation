@@ -9,14 +9,13 @@ CloudCore 日志由 agent 每 3s 经 MQTT cloud/logs 推送。全程无 SSH、�
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from .. import cloud_agent
+from ..integrations import cloud_agent
 from .. import mqtt_source
 from ._shared import (_TWIN_HISTORY, _TWIN_HISTORY_MAX, _load_devices,
                       DATA_FRESH_SECONDS, data_fresh, last_data_ts,
                       parse_crd_ts as _parse_crd_ts)
-from .cloud_ops import _K8S_NAME_RE
 from .devices import _device_fingerprint, _match_cloud_device
 
 
@@ -196,27 +195,6 @@ def cloud_crds(force: bool = False) -> Dict[str, Any]:
     out = dict(data)
     out["devices"] = devs
     return out
-
-
-def ingest_device_value(p: Dict[str, Any]) -> Dict[str, Any]:
-    """边缘桥接脚本/手动上报单点实时值：调云端 agent 本地 get→merge→patch 回写 Device.status.twins。
-
-    对应云端管理台 POST /api/devices/realtime/ingest（demo_simulator 的「回写 twins」能力）。
-    agent 端先读取设备当前 twins 合并（避免覆盖其他属性），再全量 patch status.state=online + lastOnlineTime + twins。
-    """
-    name = str(p.get("device") or "").strip()
-    ns = str(p.get("namespace") or "default").strip()
-    prop = str(p.get("property") or "").strip()
-    value = p.get("value")
-    if not name or not _K8S_NAME_RE.fullmatch(name):
-        return {"ok": False, "error": f"device 不合法（k8s 对象名：小写字母/数字/中划线/点）：{name}"}
-    if not ns or not _K8S_NAME_RE.fullmatch(ns):
-        return {"ok": False, "error": f"namespace 不合法：{ns}"}
-    if not prop:
-        return {"ok": False, "error": "property 不能为空"}
-    if value is None:
-        return {"ok": False, "error": "value 不能为空"}
-    return cloud_agent.ingest(name, ns, prop, value)
 
 
 def broker_stats() -> Dict[str, Any]:

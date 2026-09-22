@@ -22,7 +22,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
-from .. import kb_settings
+from ..settings import kb_settings
 
 # 非法文件名字符（跨平台：Windows 保留字符 + 控制字符）
 _INVALID = re.compile(r'[\\/:*?"<>|\x00-\x1f]')

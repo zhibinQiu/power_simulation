@@ -97,6 +97,13 @@ export const PIPE_RATE_RULES = {
   electricity: [{ para: 'power', unit: 'MW' }, { at: 'from', dev: 'power_meter' }],
   self_power: [{ at: 'from', dev: 'power_meter' }],
   feeder_flow: [{ para: 'rate', unit: 't/h' }, { para: 'throughput', unit: 't/h' }],
+
+  // —— 示例机房温控（dc-thermal）：冷却水侧装有水流速计，供水 / 回水两条水管道直读该流速计。
+  //    流速传感器的数据源默认设为「随循环水泵变压器联动」，因此管道标注会随变压器输出电压（设定值）变化，
+  //    是水泵调压调速效果最直观的观测量。——
+  //    回水管道的量测点在去向工序（冷却水）上，故取 at:'to'。
+  cool_water_supply: [{ at: 'from', dev: 'water_speed_sensor' }],
+  cool_water_return: [{ at: 'to', dev: 'water_speed_sensor' }],
 }
 
 // 单条规则的求值。命中返回速率对象，未命中返回 null（交由下一条规则继续尝试）。

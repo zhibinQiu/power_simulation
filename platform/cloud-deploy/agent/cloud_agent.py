@@ -6,7 +6,7 @@
 - 读：agent 定时本地采集（kubectl / openssl / ss / 证书路径）→ 通过本地 mosquitto
   publish 到 cloud/state、cloud/crds、cloud/logs 三个主题；平台已长连云端 Broker
   订阅 #，毫秒级收到推送，全程无轮询、无 SSH。
-- 写：平台 HTTP POST 到 agent（/api/apply /api/delete /api/ingest /api/restart），agent 本地
+- 写：平台 HTTP POST 到 agent（/api/apply /api/delete /api/restart），agent 本地
   执行 kubectl apply/delete/patch/rollout（无需 SSH、不暴露 root 凭据）。
 - 重启：/api/restart 支持 kind=deployment/pod（kubectl 重启云端工作负载）、
   kind=systemd（systemctl 重启云端服务，如 cloud-agent / nengtan-cloud-broker）、
@@ -507,7 +507,7 @@ class _Handler(BaseHTTPRequestHandler):
                 start=g("start"), end=g("end"), points=pts))
         self._json(404, {"ok": False, "error": "not found"})
 
-    # ---- 写（kubectl apply / delete / ingest / 盒子远程一键） ----
+    # ---- 写（kubectl apply / delete / 盒子远程一键） ----
     def do_POST(self):  # noqa: N802
         if not self._auth_ok():
             return self._denied()
@@ -542,8 +542,6 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": ok, "rc": 0 if ok else 1,
                                     "stdout": stdout.strip(), "stderr": stderr.strip(),
                                     "deleted": kinds})
-        if path == "/api/ingest":
-            return self._json(200, _ingest(body))
         if path == "/api/restart":
             return self._json(200, _restart(body))
         if path == "/api/edge/config":
@@ -555,6 +553,30 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/edge/upload":
             return self._json(200, _edge_upload(body))
         self._json(404, {"ok": False, "error": "not found"})
+
+
+def _name_variants(v: str) -> List[str]:
+    """名称的等价写法（去重）：原样 + '-'↔'_' 互换 + 逗号分隔的多个别名。
+
+    为什么需要：K8s 资源名会把下划线规范成中划线（flow_meter → flow-meter），而 MQTT
+    主题里用的是原始设备名，于是时序库里同一个设备可能同时存在 `flow_meter`、`flow-meter`
+    两种 tag（子表名同理），只按一种写 SQL 会**静默查不到**历史。逗号分隔多值用于设备
+    改名后拼接历史（如 env-temp,DR206-temp-1：同一台 LoRa 终端先后用了两个设备名）。
+    """
+    out: List[str] = []
+    for part in str(v).split(","):
+        part = part.strip()
+        if not part:
+            continue
+        for cand in (part, part.replace("-", "_"), part.replace("_", "-")):
+            if cand and cand not in out:
+                out.append(cand)
+    return out
+
+
+def _sql_list(vals: List[str]) -> str:
+    """字符串列表 → SQL 单引号列表（转义单引号，防注入）。"""
+    return ", ".join("'" + str(v).replace("'", "''") + "'" for v in vals)
 
 
 def _parse_ms(s: str) -> int:
@@ -629,10 +651,20 @@ def _tsdb_history(box: str = "", device: str = "", instance: str = "", prop: str
     else:
         interval = f"{interval_s // 3600}h"
 
-    cond = f"box='{box.replace(chr(39), chr(39) * 2)}'"
-    for name, val in (("device", device), ("instance", instance), ("property", prop)):
-        if val:
-            cond += f" AND {name}='{val.replace(chr(39), chr(39) * 2)}'"
+    # 名称匹配：box/device/instance/property 一律按「等价写法」匹配（见 _name_variants），
+    # 兼容库里同时存在的 flow_meter / flow-meter 两种 tag 与逗号分隔的多别名（设备改名拼接历史）。
+    variants = {k: _name_variants(v) for k, v in
+                (("box", box), ("device", device), ("instance", instance), ("property", prop)) if v}
+    # device 特殊：hwId 时代子表的 device tag 存硬件 ID、instance tag 存显示名，
+    # 故按名字查询时二者任一命中即算该设备（否则按显示名查会查不到 hwId 子表）。
+    conds = []
+    for k, v in variants.items():
+        if k == "device":
+            lst = _sql_list(v)
+            conds.append(f"(device IN ({lst}) OR instance IN ({lst}))")
+        else:
+            conds.append(f"{k} IN ({_sql_list(v)})")
+    cond = " AND ".join(conds)
     sql = (f"SELECT _wstart AS t, AVG(val) AS v FROM {db}.readings "
            f"WHERE {cond} AND ts>={start_ms} AND ts<={end_ms} "
            f"INTERVAL({interval}) FILL(NULL) ORDER BY t ASC")
@@ -651,55 +683,11 @@ def _tsdb_history(box: str = "", device: str = "", instance: str = "", prop: str
     series = [{"t": _td_ts_ms(row[0]), "v": row[1]} for row in (data.get("data") or []) if row and row[1] is not None]
     return {"ok": True, "box": box, "device": device, "instance": instance, "property": prop,
             "start": start_ms, "end": end_ms, "interval": interval, "count": len(series),
-            "series": series}
+            # matched：本次实际参与匹配的名称等价写法（诊断「设备改名/下划线」类查不到问题）
+            "matched": variants, "series": series}
 
 
-def _ingest(body: Dict[str, Any]) -> Dict[str, Any]:
-    """回写单点 twins：本地 get 当前 twins → 合并 → patch（与平台旧 SSH 逻辑等价）。"""
-    name = str(body.get("device") or "").strip()
-    ns = str(body.get("namespace") or "default").strip()
-    prop = str(body.get("property") or "").strip()
-    value = body.get("value")
-    if not name or not _K8S_NAME_RE.fullmatch(name):
-        return {"ok": False, "error": f"device 不合法：{name}"}
-    if not ns or not _K8S_NAME_RE.fullmatch(ns):
-        return {"ok": False, "error": f"namespace 不合法：{ns}"}
-    if not prop:
-        return {"ok": False, "error": "property 不能为空"}
-    if value is None:
-        return {"ok": False, "error": "value 不能为空"}
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    ok, stdout, stderr = _run(
-        f"kubectl get device {name} -n {ns} -o jsonpath='{{.status.twins}}' 2>/dev/null"
-    )
-    if not ok:
-        return {"ok": False, "error": f"云端读取设备失败（可能未下发）：{stderr or stdout or 'rc!=0'}"}
-    try:
-        twins = json.loads(stdout.strip()) if stdout.strip() else []
-        if not isinstance(twins, list):
-            twins = []
-    except Exception:  # noqa: BLE001
-        twins = []
-    twin = {
-        "propertyName": prop,
-        "reported": {"value": str(value), "metadata": {"timestamp": now}},
-        "observedDesired": {"value": str(value)},
-    }
-    for i, t in enumerate(twins):
-        if t.get("propertyName") == prop:
-            twins[i] = twin
-            break
-    else:
-        twins.append(twin)
-    patch = json.dumps({"status": {"state": "online", "lastOnlineTime": now, "twins": twins}},
-                       ensure_ascii=False)
-    ok, stdout, stderr = _run(
-        f"kubectl patch device {name} -n {ns} --type=merge -p \"$(cat)\"",
-        stdin_data=patch, timeout=90,
-    )
-    return {"ok": ok, "rc": 0 if ok else 1, "stdout": stdout.strip(), "stderr": stderr.strip(),
-            "device": name, "namespace": ns, "property": prop,
-            "reported": str(value), "timestamp": now}
+
 
 
 def _update_edge_config(body: Dict[str, Any]) -> Dict[str, Any]:

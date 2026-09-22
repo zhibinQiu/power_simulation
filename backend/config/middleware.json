@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "base_url": "http://127.0.0.1:42084",
+  "base_url": "http://36.151.146.71:42084",
   "token": "",
   "timeout": 6.0
 }

@@ -16,8 +16,8 @@ from ..models.carbon_report import (
     CarbonReportTask,
 )
 from ..services import carbon_assistant_service
-from .. import report_store
-from ..md_render import render_report_page
+from ..domain.reporting import report_store
+from app.domain.reporting.md_render import render_report_page
 from .carbon_compliance import router as compliance_router
 
 router = APIRouter(prefix="/carbon-assistant", tags=["carbon-assistant"])

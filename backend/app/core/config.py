@@ -10,7 +10,8 @@ import os
 
 # ------------------------- 目录路径 -------------------------
 
-APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))          # backend/
+# backend/ —— core/config.py 位于 backend/app/core/，需上溯三层到仓库中的 backend 根目录
+APP_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CONFIG_DIR = os.path.join(APP_DIR, "config")                                    # backend/config/
 DATA_DIR = os.path.join(APP_DIR, "data")                                        # backend/data/
 

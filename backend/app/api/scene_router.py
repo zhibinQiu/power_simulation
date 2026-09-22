@@ -19,7 +19,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import Response
 
-from .. import scene_loader, scene_registry
+from ..domain.scene import scene_loader, scene_registry
 
 router = APIRouter()
 

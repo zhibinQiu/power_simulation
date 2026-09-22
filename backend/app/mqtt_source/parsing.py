@@ -191,8 +191,13 @@ def resolve_reading(device_id: str) -> Optional[float]:
     读数换算：若该关联配置了换算系数 factor（如传感器原始单位 kg/min → 流程设备 t/h），
     返回值为 原始读数 × factor。
 
-    读数来源优先级：① MQTT data/# 实时链路（CLOUD_DEVICES.primary）② READINGS 字段直读
-    ③ 云端 CRD twins 缓存兜底（MQTT 链路断连时仍可同步真实读数）。
+    读数来源（**唯一真源 = MQTT data/# 实时链路**）：① CLOUD_DEVICES.primary ② READINGS 字段直读。
+
+    为什么不再用 CRD twins 兜底：twins 由盒子经 DMI 上报、更新节奏与 data/# 不同步，两者
+    混用会让读数在两个来源间来回跳（MQTT 断一会儿就显示 twin 旧值、恢复又跳回实时值），
+    而且「有没有读数」被兜底掩盖，与 data_online 判定口径不一致。P3 起读数只认 data/#：
+    停报就是没有读数，由 data_online / last_online 统一表达（前端显示「—」+ 停报时长）。
+    twins 仍用于在线与停报判定（_crd_twin_reading 保留该用途），不再混入读数链路。
     """
     with _LOCK:
         cloud_id = _shared._LINKS_REV.get(device_id)
@@ -206,8 +211,6 @@ def resolve_reading(device_id: str) -> Optional[float]:
             r = READINGS.get(cloud_id)          # 兼容静态映射字段名直读
             if r is not None:
                 v = r["v"]
-        if v is None:
-            v = _crd_twin_reading(cloud_id)     # MQTT data/# 链路无数据时读 CRD twins 缓存
         if v is None:
             return None
         factor = _shared._LINKS_FACTOR.get(cloud_id, 1.0)

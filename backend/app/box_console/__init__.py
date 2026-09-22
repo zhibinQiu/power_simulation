@@ -17,9 +17,10 @@ onboard → overview；均单向，无循环导入。
 from __future__ import annotations
 
 # 共享内部状态（锁 / twins 趋势缓冲 / 统一仓储 / 路径常量）
-from ._shared import (BOX_DEPLOY_DIR, CONFIG_DIR, DEVICES_FILE, EDGECORE_TEMPLATE,
-                      GENERATED_DIR, ONBOARD_SCRIPT_PATH, _LOCK, _TWIN_HISTORY,
-                      _TWIN_HISTORY_MAX, _load_devices, _save_devices)
+from ._shared import (BOX_DEPLOY_DIR, CONFIG_DIR, DEVICES_FILE, DEVICES_SCOPE,
+                      EDGECORE_TEMPLATE, GENERATED_DIR, ONBOARD_SCRIPT_PATH, _LOCK,
+                      _TWIN_HISTORY, _TWIN_HISTORY_MAX, _load_devices, _save_devices,
+                      devices_rev)
 
 # 概览
 from .overview import _fetch_cloud_k8s, _merge_nodes, _mqtt_boxes, box_overview
@@ -38,9 +39,13 @@ from .cloud_ops import (_EDGE_UNIT_ALLOW, _K8S_NAME_RE, _SYSTEMD_ALLOW,
 from .edge import (_resolve_box_id, box_app_cmd, box_app_list, check_edge_reachable,
                    edge_config, update_edge_config)
 
+# LoRa 透传 DTU 多从站问帧（从站号 -> 盒子 lora.polls，经 cmd/{box}/config 下发）
+from .lora_dtu import (build_patches, build_read_frame, fetch_box_devices, lora_plan,
+                       lora_sync, push_lora_config)
+
 # 实时数据
 from .realtime_data import (_cloud_twins_map, _parse_crd_ts, broker_stats, cloud_crds,
-                            cloud_logs, ingest_device_value, publish_test,
+                            cloud_logs, publish_test,
                             realtime_devices, recent_messages)
 
 # 盒子接入
@@ -48,7 +53,8 @@ from .onboard import (_generate_onboard, _pack_box_deploy, _render_onboard_scrip
                       box_onboard_remote, onboard_node, onboard_script_download)
 
 # 外部依赖模块引用（tests 等通过 box_console.cloud_agent / mqtt_source 访问）
-from .. import cloud_agent, mqtt_source  # noqa: F401,E402
+from .. import mqtt_source
+from ..integrations import cloud_agent  # noqa: F401,E402
 
 # Broker 配置（读/存，由 mqtt_source 统一热更新；直接 re-export 避免多余透传层）
 from ..mqtt_source import get_config, update_config  # noqa: E402
@@ -58,6 +64,7 @@ __all__ = [
     "BOX_DEPLOY_DIR", "CONFIG_DIR", "DEVICES_FILE", "EDGECORE_TEMPLATE",
     "GENERATED_DIR", "ONBOARD_SCRIPT_PATH", "_LOCK", "_TWIN_HISTORY",
     "_TWIN_HISTORY_MAX", "_load_devices", "_save_devices",
+    "DEVICES_SCOPE", "devices_rev",
     # 概览
     "_fetch_cloud_k8s", "_merge_nodes", "_mqtt_boxes", "box_overview",
     # 设备 CRUD
@@ -70,9 +77,12 @@ __all__ = [
     # 盒子连接
     "_resolve_box_id", "box_app_cmd", "box_app_list", "check_edge_reachable",
     "edge_config", "update_edge_config",
+    # LoRa 多从站问帧
+    "build_patches", "build_read_frame", "fetch_box_devices", "lora_plan", "lora_sync",
+    "push_lora_config",
     # 实时数据
     "_cloud_twins_map", "_parse_crd_ts", "broker_stats", "cloud_crds", "cloud_logs",
-    "ingest_device_value", "publish_test", "realtime_devices", "recent_messages",
+    "publish_test", "realtime_devices", "recent_messages",
     # 盒子接入
     "_generate_onboard", "_pack_box_deploy", "_render_onboard_script",
     "box_onboard_remote", "onboard_node", "onboard_script_download",

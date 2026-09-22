@@ -19,7 +19,7 @@ from typing import Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from .. import kb_settings, llm_settings
+from ..settings import kb_settings, llm_settings
 
 router = APIRouter()
 

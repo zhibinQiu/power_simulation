@@ -76,7 +76,7 @@ def _crd_field_map(now: float) -> Dict[str, Dict[str, float]]:
     主链路 Mapper→DMI→edgecore→CloudHub→Device CRD→agent 缓存；MQTT 未上报但 CRD
     有新鲜值的设备也应在目录里可见。
     """
-    from .. import cloud_agent
+    from ..integrations import cloud_agent
     from ..mqtt_source.parsing import _twin_recent
 
     cr = cloud_agent.crds()

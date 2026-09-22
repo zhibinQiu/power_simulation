@@ -33,10 +33,10 @@ function close(id) { store.closeViewById(id) }
 </script>
 
 <style scoped>
-/* 标签条：占用工具栏行（grid-area: toolbar），与 Ribbon 同高（35px），风格统一 */
+/* 标签条：占用工具栏行（grid-area: toolbar），与 Ribbon 同高（28px），风格统一 */
 .vw-tabs {
   grid-area: toolbar;
-  display: flex; align-items: stretch; height: 35px;
+  display: flex; align-items: stretch; height: 28px;
   background: var(--panel); border-bottom: 1px solid var(--border);
   border-left: 1px solid var(--border); border-right: 1px solid var(--border);
   overflow-x: auto; overflow-y: hidden; user-select: none;
@@ -51,9 +51,6 @@ function close(id) { store.closeViewById(id) }
 }
 .vw-tab:hover { color: var(--text); background: var(--panel-3); }
 .vw-tab.on { color: var(--text); background: var(--panel-2); }
-.vw-tab.on::before {
-  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--accent);
-}
 .vw-t { overflow: hidden; text-overflow: ellipsis; }
 .vw-x {
   display: inline-flex; align-items: center; justify-content: center;

@@ -27,7 +27,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import data_sources
 from . import mqtt_source
-from . import presets
+from .domain.sim import presets
 from . import realtime
 from .compression import CompressionMiddleware
 from .api.box_router import router as box_router
@@ -143,8 +143,8 @@ def _docs_client_get() -> httpx.AsyncClient:
 
 
 # 必须声明在下方 SPA catch-all（/{full_path:path}）之前，否则 /docs/* 会被吞进前端回退
-@app.api_route("/docs", methods=["GET", "HEAD"])
-@app.api_route("/docs/{doc_path:path}", methods=["GET", "HEAD"])
+@app.api_route("/docs", methods=["GET", "HEAD"], operation_id="docs_site_proxy_root")
+@app.api_route("/docs/{doc_path:path}", methods=["GET", "HEAD"], operation_id="docs_site_proxy_path")
 async def docs_site_proxy(doc_path: str = ""):
     """把 /docs/{doc_path} 请求转发到独立文档站，作为平台同源入口。
 

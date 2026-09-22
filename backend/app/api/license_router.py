@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from .. import license as license_mod
+from ..settings import license as license_mod
 
 router = APIRouter(prefix="/api/license", tags=["license"])
 

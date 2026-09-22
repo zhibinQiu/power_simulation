@@ -178,7 +178,7 @@ function fmtTime(t) {
 }
 .chd-panel {
   width: min(720px, 92vw); max-height: 86vh; overflow: auto;
-  background: var(--panel-1); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
   padding: 14px 16px; box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
 }
 .chd-head { display: flex; align-items: center; justify-content: space-between; }

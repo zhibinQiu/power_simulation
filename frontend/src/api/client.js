@@ -141,8 +141,6 @@ export const api = {
   },
   boxDevicesRealtime: () => jget('/box/devices/realtime'),
   boxCloudCrd: (force = false) => jget('/box/devices/cloud' + (force ? '?force=true' : '')),
-  boxIngestDeviceValue: (device, namespace, property, value) =>
-    jpost('/box/devices/realtime/ingest', { device, namespace, property, value }),
   boxOnboard: (hostname, cloudIP, boxIP) =>
     jpost('/box/nodes/onboard', { hostname, cloudIP, boxIP }),
   // 一键接入：下载自解压脚本（base64）/ 远程一键接入（云端 agent SSH 推送执行）
@@ -161,14 +159,17 @@ export const api = {
   boxEdgeCheck: (host, port = 22) => jpost('/box/edge/check', { host, port }),
   boxAppCmd: (payload) => jpost('/box/apps/cmd', payload),
   boxApps: (box = 'nt001') => jget('/box/apps?box=' + encodeURIComponent(box)),
+  // LoRa 透传 DTU 多从站问帧：平台从站号 -> 盒子 lora.polls（改完从站号下发即生效）
+  boxLoraPlan: () => jget('/box/lora/plan'),
+  boxLoraSync: (payload) => jpost('/box/lora/sync', payload),
   // 云端 Broker 配置（前端配置化：能碳一体机管理 -> 总览 -> 云端数据链路「配置」，免手工编辑 mqtt.yaml）
   boxConfig: () => jget('/box/config'),
   boxConfigSave: (payload) => jpost('/box/config', payload),
   // ---- 统一数据源接入（能碳一体机 box / 外部数据源 external；模拟数据由独立服务
   //      sim-source 生成后经中间件 mqtt 适配器接入，与真实外部源同构）----
   dataSources: () => jget('/data-sources'),
-  // 可绑定信号目录：按数据源分组列出当前上报的设备及其全部数值（流程编排绑定实测值）
-  dataSourceSignals: () => jget('/data-sources/signals'),
+  // 数据服务接口清单：历史/实时查询与指令下发的对外接口（自描述，含调用示例）
+  dataSourceCatalog: () => jget('/data-sources/integration'),
   dataSourceToggle: (id, enabled) => jpost('/data-sources/toggle', { id, enabled }),
   dataSourceSave: (id, payload) => jpost('/data-sources/save', { id, ...payload }),
   dataSourceAdd: (payload) => jpost('/data-sources/add', payload),
@@ -185,6 +186,8 @@ export const api = {
   middlewareTypes: () => jget('/middleware/types'),
   // 云端实时推送 WebSocket（/api/ws/cloud）：云端 agent 经 MQTT cloud/# 推送的概览/CRD/日志，平台后端实时转发
   openCloudFeed,
+  // 配置变更推送 WebSocket（/api/ws/config）：配置只在服务端一份，任一客户端改动后广播，其它客户端自动同步
+  openConfigFeed,
   // 知识库（LLM-WIKI 式：多级文件夹 + 文档上传解析，无需权限）
   kbTree: () => jget('/knowledge/tree'),
   kbCreateFolder: (name, parent = '') => jpost('/knowledge/folder', { name, parent }),
@@ -216,6 +219,21 @@ export function openFeed(onMessage, onStatus, url) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
   const target = url || `${proto}://${location.host}/api/ws/feed`
   const ws = new WebSocket(target)
+  ws.onopen = () => onStatus && onStatus('open')
+  ws.onclose = () => onStatus && onStatus('closed')
+  ws.onerror = () => onStatus && onStatus('error')
+  ws.onmessage = (e) => {
+    try { onMessage(JSON.parse(e.data)) } catch (_) {}
+  }
+  return ws
+}
+
+// 配置变更推送 WebSocket（/api/ws/config）：配置只在服务端保存一份，任一客户端改动
+// 后由后端广播 {kind:'config', scope:'devices', rev}，其它客户端收到即重新拉取，
+// 无需手动刷新即可看到一致结果。连接后先收 snapshot（当前 rev）。
+export function openConfigFeed(onMessage, onStatus) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+  const ws = new WebSocket(`${proto}://${location.host}/api/ws/config`)
   ws.onopen = () => onStatus && onStatus('open')
   ws.onclose = () => onStatus && onStatus('closed')
   ws.onerror = () => onStatus && onStatus('error')

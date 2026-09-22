@@ -115,7 +115,7 @@ class LlmReportEngine(ReportEngine):
 
     @staticmethod
     def _default_chat(messages, timeout=90.0, max_tokens=None):
-        from ...llm_strategy import chat_completion  # 懒加载，避免包级循环依赖
+        from app.domain.strategy.llm_strategy import chat_completion
 
         return chat_completion(messages, timeout=timeout, max_tokens=max_tokens)
 

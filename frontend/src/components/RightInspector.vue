@@ -66,7 +66,7 @@
                 <div class="sec"><i class="dot d-prod"></i>{{ t('产品') }}</div>
                 <div class="chips">
                   <div class="chip2"><span>{{ t('产量') }}</span><b>{{ fmt(period.steel) }}</b><i>{{ period.u.steel }}</i></div>
-                  <div class="chip2 tog" :class="{ open: revOpen }" role="button" :title="t('点击展开产品收益计算：产量 × 销售单价（物料属性可调）')" @click="revOpen = !revOpen">
+                  <div class="chip2 tog" :class="{ open: revOpen }" role="button" @click="revOpen = !revOpen">
                     <span>{{ t('产品收益') }} <em class="caret">{{ revOpen ? '▾' : '▸' }}</em></span>
                     <b>{{ fmt(period.rev) }}</b><i>{{ period.u.rev }}</i>
                   </div>
@@ -74,25 +74,25 @@
               </template>
               <div class="sec"><i class="dot d-ene"></i>{{ t('能源') }}</div>
               <div class="chips">
-                <div class="chip2 tog" :class="{ open: energyOpen }" role="button" :title="t('点击展开综合能耗计算方式与同比/环比')" @click="energyOpen = !energyOpen">
+                <div class="chip2 tog" :class="{ open: energyOpen }" role="button" @click="energyOpen = !energyOpen">
                   <span>{{ t('综合能耗') }} <em class="caret">{{ energyOpen ? '▾' : '▸' }}</em></span>
                   <b>{{ fmt(period.energy) }}</b><i>{{ period.u.energy }}</i>
                 </div>
                 <div class="chip2"><span>{{ t('电耗') }}</span><b>{{ fmt(period.elec) }}</b><i>{{ period.u.elec }}</i></div>
                 <div class="chip2"><span>{{ t('单位能耗') }}</span><b>{{ fmt(plantEnergy.intensity / 1000) }}</b><i>tce/t</i></div>
-                <div class="chip2 tog" :class="{ open: costOpen }" role="button" :title="t('点击展开能源成本构成（外购用量 × 单价）')" @click="costOpen = !costOpen">
+                <div class="chip2 tog" :class="{ open: costOpen }" role="button" @click="costOpen = !costOpen">
                   <span>{{ t('能源成本') }} <em class="caret">{{ costOpen ? '▾' : '▸' }}</em></span>
                   <b>{{ fmt(period.cost) }}</b><i>{{ period.u.cost }}</i>
                 </div>
               </div>
               <div class="sec"><i class="dot d-co2"></i>{{ t('碳排') }}</div>
               <div class="chips">
-                <div class="chip2 tog" :class="{ open: emiOpen }" role="button" :title="t('点击展开总排放（直接排放范围一 · 全国碳市场口径）计算方式、同比/环比与碳配额结余')" @click="emiOpen = !emiOpen">
+                <div class="chip2 tog" :class="{ open: emiOpen }" role="button" @click="emiOpen = !emiOpen">
                   <span>{{ t('总排放') }} <em class="caret">{{ emiOpen ? '▾' : '▸' }}</em></span>
                   <b :style="{color:co2Color}">{{ fmt(period.direct) }}</b><i>{{ period.u.co2 }}</i>
                 </div>
                 <div class="chip2"><span>{{ t('吨钢排放') }}</span><b :style="{color:co2Color}">{{ fmt(totals.intensity / 1000) }}</b><i>tCO₂/t</i></div>
-                <div class="chip2 tog" :class="{ open: carbOpen }" role="button" :title="t('点击查看预估碳成本计算：(年配额 n − 到年底排放 m) × 实时碳价 p')" @click="carbOpen = !carbOpen">
+                <div class="chip2 tog" :class="{ open: carbOpen }" role="button" @click="carbOpen = !carbOpen">
                   <span>{{ t('预估碳成本') }} <em class="caret">{{ carbOpen ? '▾' : '▸' }}</em></span>
                   <b :class="carbEst.cls">{{ carbEst.text }}</b><i>万元/年</i>
                 </div>

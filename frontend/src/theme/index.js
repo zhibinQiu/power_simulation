@@ -32,8 +32,8 @@ export function setAccent(id) {
 const MODE_KEY = 'carbon-sim.theme-mode'
 const savedMode = localStorage.getItem(MODE_KEY)
 
-/** 界面主题模式：'light'（白天，顶栏/底栏亮色）| 'dark'（夜间，深色界面） */
-export const themeMode = ref(savedMode === 'dark' ? 'dark' : 'light')
+/** 界面主题模式：'light'（白天，亮色面板）| 'dark'（夜间，VSCode 工业金属深色，默认） */
+export const themeMode = ref(savedMode === 'light' ? 'light' : 'dark')
 
 export function setThemeMode(mode) {
   if (mode !== 'light' && mode !== 'dark') return

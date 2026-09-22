@@ -74,8 +74,8 @@ def _device_status(value: Optional[float], range_str: Optional[str]) -> str:
 def _query_realtime_devices(args: Dict[str, Any]) -> Dict[str, Any]:
     """查询所有设备的实时读数（来自云端 MQTT）与全厂汇总，并给出每台设备健康状态。"""
     from app import mqtt_source
-    from app.carbon_engine import cached_simulate
-    from app.presets import default_model
+    from app.domain.sim.carbon_engine import cached_simulate
+    from app.domain.sim.presets import default_model
 
     sim = cached_simulate(default_model())
     devices: List[Dict[str, Any]] = []
@@ -132,8 +132,8 @@ def _query_device_history(args: Dict[str, Any]) -> Dict[str, Any]:
 
 def _run_simulation(args: Dict[str, Any]) -> Dict[str, Any]:
     """运行当前工艺流程模型仿真，返回各工序能耗/碳/占比与全厂汇总。"""
-    from app.carbon_engine import cached_simulate
-    from app.presets import default_model
+    from app.domain.sim.carbon_engine import cached_simulate
+    from app.domain.sim.presets import default_model
 
     sim = cached_simulate(default_model())
     total_co2 = float(sim.totals.co2_total) or 1.0
@@ -170,7 +170,7 @@ def _run_simulation(args: Dict[str, Any]) -> Dict[str, Any]:
 
 def _get_carbon_market_quote(args: Dict[str, Any]) -> Dict[str, Any]:
     """查询碳市场最新行情（CEA/CCER 最新价、涨跌幅、月聚合）。"""
-    from app.carbon_market import fetch_quotes
+    from app.domain.market.carbon_market import fetch_quotes
 
     quotes = fetch_quotes()
     return {"quotes": quotes}
@@ -178,7 +178,7 @@ def _get_carbon_market_quote(args: Dict[str, Any]) -> Dict[str, Any]:
 
 def _get_carbon_forecast(args: Dict[str, Any]) -> Dict[str, Any]:
     """碳价预测。args: {instrument?: cea|ccer, days?: 默认10, method?: linear|moving_average}。"""
-    from app.carbon_market import forecast_series
+    from app.domain.market.carbon_market import forecast_series
 
     instrument = (args.get("instrument") or "cea").strip() or "cea"
     if instrument not in ("cea", "ccer"):
@@ -196,7 +196,7 @@ def _get_carbon_forecast(args: Dict[str, Any]) -> Dict[str, Any]:
 
 def _get_emission_factors(args: Dict[str, Any]) -> Dict[str, Any]:
     """查询当前排放因子表（各燃料/电力的 CO2 排放因子）。"""
-    from app.factors import default_factors
+    from app.domain.sim.factors import default_factors
 
     return {"factors": default_factors()}
 
@@ -237,8 +237,8 @@ def _query_knowledge(args: Dict[str, Any]) -> Dict[str, Any]:
 
 def _summarize_plant_emissions(args: Dict[str, Any]) -> Dict[str, Any]:
     """估算今年以来全厂累计 CO2 排放、能源消耗与钢产量（仿真速率 × 运行时长）。"""
-    from app.carbon_engine import cached_simulate
-    from app.presets import default_model
+    from app.domain.sim.carbon_engine import cached_simulate
+    from app.domain.sim.presets import default_model
 
     sim = cached_simulate(default_model())
     totals = sim.totals

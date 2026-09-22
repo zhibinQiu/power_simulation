@@ -4,7 +4,7 @@
 - ModbusDeviceYamlRenderer：    Modbus RTU/TCP（寄存器映射）；
 - OpcuaDeviceYamlRenderer：     OPC-UA（节点浏览）；
 - BluetoothDeviceYamlRenderer： BLE（特征 UUID）；
-- LoraDeviceYamlRenderer：      LoRaWAN（网关桥接，DevEUI/AppKey + 上行 payloadKey）；
+- LoraDeviceYamlRenderer：      LoRaWAN（网关桥接，DevEUI/AppKey + 从站问帧轮询）；
 - CellularDeviceYamlRenderer：  5G/4G 模块自监控（AT 命令信号/ICCID/速率）。
 
 新增协议：继承 DeviceYamlRenderer 并实现 render_config_data（及可选 render_visitor），
@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict
+
+from .hwid import HWID_LABEL
 
 # ---------------------------------------------------------------------------
 # v1beta1 常量（属性类型 / 寄存器类型 / 访问模式）
@@ -105,6 +107,12 @@ spec:
             props_lines.append(f"    collectCycle: {collect_cycle}")
         props_txt2 = "\n".join(props_lines) if props_lines else "  - name: \"value\"\n    collectCycle: 1000"
 
+        # hwId：设备硬件唯一 ID，写进 label 供云端/盒子/时序库识别同一台硬件。
+        # 改名只改 metadata.name，本 label 不变 —— 历史数据因此不断链。
+        hwid = _yaml_esc(p.get("hwId") or "")
+        labels_txt = f"    description: \"{desc}\""
+        if hwid:
+            labels_txt += f"\n    {HWID_LABEL}: \"{hwid}\""
         protocol_cfg = self.render_config_data(p, visitors_txt)
         device_yaml = f"""apiVersion: devices.kubeedge.io/v1beta1
 kind: Device
@@ -112,7 +120,7 @@ metadata:
   name: "{device_name}"
   namespace: "{namespace}"
   labels:
-    description: \"{desc}\"
+{labels_txt}
 spec:
   deviceModelRef:
     name: "{model_name}"
@@ -244,21 +252,19 @@ class BluetoothDeviceYamlRenderer(DeviceYamlRenderer):
 
 
 class LoraDeviceYamlRenderer(DeviceYamlRenderer):
-    """LoRaWAN：盒子侧 LoRa 网关（SX1302 + ChirpStack）桥接，上行 JSON payloadKey 映射。
+    """LoRaWAN：盒子侧 LoRa 网关（SX1302 + ChirpStack）桥接，由 mapper 轮询问帧取数。
 
-    链路：LoRa 传感器 → LoRaWAN 无线 → 盒子 LoRa 网关 → 本地 mosquitto
-          (application/+/device/+/event/up) → box_mapper LoraReader 解析 → DMI twins。
+    链路：box_mapper LoraReader 逐站下发 Modbus 问帧 → LoRaWAN 无线 → DTU 转 485
+          → 传感器应答 → 盒子 LoRa 网关 → 本地 mosquitto
+          (application/+/device/+/event/up) → LoraReader 按站号路由解码 → DMI twins。
+
+    从站问帧（lora.polls）在设备级 configData 下发，visitor 层没有 LoRa 专属字段。
     """
 
     protocol = "lora"
 
     def render_visitor(self, p: Dict[str, Any]) -> str:
-        lines = [
-            f"        - propertyName: \"{_yaml_esc(p.get('name', 'prop'))}\"",
-            "          lora:",
-            f"            payloadKey: \"{_yaml_esc(p.get('payloadKey', ''))}\"",
-        ]
-        return "\n".join(lines)
+        return f"        - propertyName: \"{_yaml_esc(p.get('name', 'prop'))}\""
 
     def render_config_data(self, p: Dict[str, Any], visitors_txt: str) -> str:
         lora = p.get("lora", {})
@@ -273,6 +279,8 @@ class LoraDeviceYamlRenderer(DeviceYamlRenderer):
             f"        broker: \"{_yaml_esc(broker)}\"\n"
             f"        applicationID: \"{_yaml_esc(lora.get('applicationID', ''))}\"\n"
             f"        devEUI: \"{_yaml_esc(lora.get('devEUI', ''))}\"\n"
+            # 从站号：同一台 LoRa 透传 DTU 下挂多台 485 传感器时，靠它区分设备（>0 才按站号拼问帧）
+            f"        slaveId: {int(lora.get('slaveId', 0) or 0)}\n"
             f"        appKey: \"{_yaml_esc(lora.get('appKey', ''))}\"\n"
             f"        region: \"{_yaml_esc(lora.get('region', 'CN470'))}\"\n"
             f"        dataRate: \"{_yaml_esc(lora.get('dataRate', 'SF7BW125'))}\"\n"

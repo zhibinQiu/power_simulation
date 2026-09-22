@@ -20,9 +20,10 @@ from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconn
 from pydantic import BaseModel, Field
 
 from .. import box_console
-from .. import cloud_agent
-from .. import github_deploy
+from ..integrations import cloud_agent
+from ..integrations import github_deploy
 from .. import mqtt_source
+from ..core import config_events
 
 router = APIRouter(prefix="/api", tags=["box-console"])
 
@@ -104,12 +105,6 @@ class BoxDeleteRequest(BaseModel):
     local: bool = True     # 同时移除本地 box_devices.json 配置（local=False+cloud=True 仅删云端）
 
 
-class BoxIngestRequest(BaseModel):
-    """边缘桥接脚本上报单点实时值：云端 agent 本地 get→merge→patch 回写云端 Device.status.twins。"""
-    device: str
-    namespace: str = "default"
-    property: str = "value"
-    value: Any = None
 
 
 class BoxOnboardRequest(BaseModel):
@@ -144,6 +139,18 @@ class GitHubConfigRequest(BaseModel):
 
 class GitHubPushRequest(BaseModel):
     cloudIP: str = ""
+
+
+class BoxLoraSyncRequest(BaseModel):
+    """LoRa 多从站问帧下发（平台从站号 -> 盒子 lora.polls）。
+
+    - box：目标盒子（留空取第一台设备的 node）
+    - dry_run：true 只返回将要下发的条目，不实际发布
+    - timeout：等盒子 config_get 回执的秒数（取不到就以平台定义生成条目）
+    """
+    box: str = ""
+    dry_run: bool = False
+    timeout: float = 8.0
 
 
 class BoxPublishRequest(BaseModel):
@@ -377,6 +384,27 @@ def box_apps(box: str = "box-nt001"):
     return box_console.box_app_list(box)
 
 
+@router.get("/box/lora/plan")
+def box_lora_plan():
+    """预览 LoRa 多从站问帧：按 devEUI 分组，把每台设备的从站号拼成盒子的 lora.polls。
+
+    只算不下发，用于核对「平台从站号 → 下行问帧 hex」是否与现场 NS 上能通的帧一致。"""
+    return box_console.lora_plan()
+
+
+@router.post("/box/lora/sync")
+def box_lora_sync(req: BoxLoraSyncRequest):
+    """把平台里的 LoRa 从站号翻译成盒子的多从站问帧并下发（cmd/{box}/config）。
+
+    盒子 mapper 收到后写盘并立即在运行期生效（同名设备按整条覆盖，因此下发前先经
+    cmd/config_get 取回盒子当前配置做底稿，只改 lora.polls/downlink 与 enabled）。
+    组内主设备采集、其余从设备停采集，由主设备按站号路由上报 —— 改从站号后点这里即生效。"""
+    try:
+        return box_console.lora_sync(box=req.box, dry_run=req.dry_run, timeout=req.timeout)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.websocket("/ws/cloud")
 async def ws_cloud(websocket: WebSocket):
     """云端实时推送：agent 经 MQTT cloud/# 推送的概览/CRD/日志，经此 WebSocket 实时转发给前端。
@@ -408,6 +436,50 @@ async def ws_cloud(websocket: WebSocket):
         pass
     finally:
         cloud_agent.unsubscribe(q)
+        task.cancel()
+
+
+@router.websocket("/ws/config")
+async def ws_config(websocket: WebSocket):
+    """采集设备配置变更推送（多客户端同步）。
+
+    配置只在服务端保存一份（backend/config/box_devices.json）：任一客户端经
+    /api/box/devices、/api/box/models 改动后，后端写盘即广播 {kind:'config',
+    scope:'devices', rev}，所有已连接的客户端收到后重新拉取列表，无需手动刷新。
+
+    跨进程 / 手工编辑兜底：配置也可能在别的进程被改（uvicorn 多 worker）或被运维
+    直接编辑文件，此时本进程没有写盘调用，由 config_events 的文件指纹监听（2s）补发。
+    """
+    await websocket.accept()
+    q: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue(maxsize=100)
+    config_events.subscribe(q)
+    path = str(box_console.DEVICES_FILE)
+    scope = box_console.DEVICES_SCOPE
+    try:
+        await websocket.send_json({
+            "kind": "snapshot",
+            "scope": scope,
+            "rev": box_console.devices_rev(),
+            "ts": time.time(),
+        })
+    except Exception:  # noqa: BLE001 —— 握手后连接已断开时忽略
+        pass
+
+    async def _send_loop() -> None:
+        while True:
+            msg = await q.get()
+            await websocket.send_json(msg)
+
+    task = asyncio.create_task(_send_loop())
+    config_events.acquire_watch(path, scope, 2.0)
+    try:
+        while True:
+            await websocket.receive_text()   # 忽略客户端消息（心跳保活）
+    except WebSocketDisconnect:
+        pass
+    finally:
+        config_events.release_watch(path, scope)
+        config_events.unsubscribe(q)
         task.cancel()
 
 
@@ -448,12 +520,6 @@ def box_devices_apply(req: BoxApplyRequest):
 def box_devices_realtime():
     """实时数据：Device.status.twins 上报值（云端 K3s CRD 主链路 + MQTT 兜底）+ 趋势历史。"""
     return box_console.realtime_devices()
-
-
-@router.post("/box/devices/realtime/ingest")
-def box_ingest(req: BoxIngestRequest):
-    """手动上报单点值：云端 agent 本地 get→merge→patch 回写云端 Device.status.twins（HTTP POST /api/ingest）。"""
-    return box_console.ingest_device_value(req.model_dump())
 
 
 @router.post("/box/nodes/onboard")

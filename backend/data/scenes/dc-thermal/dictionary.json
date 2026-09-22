@@ -3,75 +3,67 @@
   "scene": "dc-thermal",
   "materials": [
     {
-      "id": "supply_water",
-      "name": "冷冻供水",
+      "id": "cool_water_supply",
+      "name": "冷却水供水",
       "cat": "冷媒",
       "unit": "t/h",
-      "desc": "冷源（冷水机组）产出的低温冷冻水，送往机柜侧带走算力热量。"
+      "color": "#3b9ee0",
+      "desc": "循环冷却水（低温）：由冷却水系统的循环水泵加压送往制冷风机，给半导体制冷片的热端散热。"
     },
     {
-      "id": "return_water",
-      "name": "冷冻回水",
+      "id": "cool_water_return",
+      "name": "冷却水回水",
       "cat": "冷媒",
       "unit": "t/h",
-      "desc": "机柜换热后的高温回水，回到冷源重新降温。"
+      "color": "#d4803a",
+      "desc": "在制冷风机吸收半导体制冷片热端热量后的循环水：运行一段时间后水温上升，回到冷却水系统重新降温（水箱/冷却塔）。"
     },
     {
-      "id": "cond_heat",
-      "name": "冷凝排热",
-      "cat": "废热",
-      "unit": "GJ/h",
-      "desc": "冷机冷凝侧排出热量，由风冷末端/冷却塔散至环境。"
+      "id": "cold_air",
+      "name": "机房冷风",
+      "cat": "介质",
+      "unit": "kNm³/h",
+      "color": "#5bb8e0",
+      "desc": "半导体制冷片冷端产生的低温空气，由制冷风机送入机房为算力设备降温；吸热后由机房排风外排（本流程风侧为开式，不建模机房回风）。"
     }
   ],
   "processes": [
     {
       "type": "dc_chiller",
-      "name": "冷水机组",
-      "desc": "冷源主设备：制冷主回路产冷冻水带走机柜热量，同时冷凝侧排热；本机为机房耗能大头之一。",
-      "inputs": ["return_water"],
-      "outputs": ["supply_water", "cond_heat"],
-      "mainOut": "supply_water",
+      "name": "冷却水",
+      "desc": "第一部分·循环冷却水：水箱 + 循环水泵，把低温冷却水送往制冷风机给半导体制冷片的热端散热；吸热后水温上升，回水回到这里重新降温。循环水泵由专用变压器调压（设定值=输出电压 V，可调水泵转速/流量），其有功功率可由数据源管理中的采集设备接入后参与折碳。",
+      "inputs": ["cool_water_return"],
+      "outputs": ["cool_water_supply"],
+      "mainOut": "cool_water_supply",
       "params": [
-        { "key": "power", "label": "额定制冷功率", "unit": "MW", "min": 0, "max": 2, "step": 0.01, "def": 0.35 }
-      ]
-    },
-    {
-      "type": "dc_pump_fc",
-      "name": "循环水泵",
-      "desc": "输配设备：驱动冷冻水在冷源与机柜之间循环。",
-      "inputs": ["supply_water"],
-      "outputs": ["supply_water"],
-      "mainOut": "supply_water",
-      "params": [
-        { "key": "power", "label": "额定泵功率", "unit": "MW", "min": 0, "max": 1, "step": 0.01, "def": 0.09 }
-      ]
-    },
-    {
-      "type": "dc_it",
-      "name": "机柜算力负载",
-      "desc": "机房热源主体：IT 设备耗电转化为热负荷，由制冷回路带走；其功耗决定冷源/输配/排热的运行工况。",
-      "inputs": ["supply_water"],
-      "outputs": ["return_water"],
-      "mainOut": "return_water",
-      "params": [
-        { "key": "power", "label": "算力负荷功率", "unit": "MW", "min": 0, "max": 3, "step": 0.01, "def": 0.8 }
+        { "key": "power", "label": "循环水泵功率", "unit": "MW", "min": 0, "max": 1, "step": 0.01, "def": 0.12 }
       ]
     },
     {
       "type": "dc_fan_cool",
-      "name": "风冷末端",
-      "desc": "排热设备：把冷机冷凝侧热量通过风冷/冷却塔散至环境。",
-      "inputs": ["cond_heat"],
+      "name": "制冷风机",
+      "desc": "第二部分·末端制冷：半导体制冷片（TEC）冷端产生低温，由风机以机房冷风送往算力设备；热端热量由循环冷却水带走。半导体制冷电源（设定值=制冷片供电电压 V，0~60 V）可调，其有功功率可由采集设备接入后参与折碳。",
+      "inputs": ["cool_water_supply"],
+      "outputs": ["cool_water_return", "cold_air"],
+      "mainOut": "cold_air",
+      "params": [
+        { "key": "power", "label": "半导体制冷功率", "unit": "MW", "min": 0, "max": 2, "step": 0.01, "def": 0.44 }
+      ]
+    },
+    {
+      "type": "dc_it",
+      "name": "算力设备",
+      "desc": "第三部分·热源：机柜内 IT 算力设备耗电转化为热负荷，由机房冷风带走后经机房排风外排（风侧开式，无机房回风回路）；负载功率给定、不可调，仅监测机柜温度与机房环境温度。",
+      "inputs": ["cold_air"],
       "outputs": [],
       "mainOut": null,
       "params": [
-        { "key": "power", "label": "末端风机功率", "unit": "MW", "min": 0, "max": 1, "step": 0.01, "def": 0.12 }
+        { "key": "power", "label": "算力负荷功率", "unit": "MW", "min": 0, "max": 3, "step": 0.01, "def": 0.8 }
       ]
     }
   ],
   "method": {
     "name": "耗能设备功率 × 电网排放因子（范围二）",
-    "note": "实时碳排 ≈ 功率 (kW) × 电网排放因子 (kgCO₂/kWh)；默认取包内参数出厂值静态核算，接入平台数据源后可映射实测功率实时联动。"
+    "note": "实时碳排 ≈ 功率 (kW) × 电网排放因子 (kgCO₂/kWh)；按 冷却水（循环水泵变压器）/ 制冷风机（半导体制冷电源）/ 算力设备 三部分分别核算。循环水泵变压器与半导体制冷电源的实时数据为有功功率（kW），可用数据源管理中的采集设备绑定其功率点位：接入实测后优先按实测功率折碳，未接入时按包内参数（MW）出厂值估算。"
   }
 }

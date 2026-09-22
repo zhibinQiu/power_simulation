@@ -9,13 +9,18 @@
       </div>
     </div>
 
-    <!-- 运行指标 · 静态核算（功率 × 电网因子） -->
+    <!-- 运行指标 · 静态核算（功率 × 电网因子）：功率口径与实时折碳一致（实测功率优先） -->
     <CollapseSection :title="t('运行指标 · 折碳核算')" tone="blue" :open="true">
       <div class="chips">
         <div class="chip2"><span>{{ t('实时功耗') }}</span><b>{{ fmt(powerKW) }}</b><i>kW</i></div>
         <div class="chip2"><span>{{ t('实时碳排') }}</span><b>{{ fmt(carbonKgH, 3) }}</b><i>kgCO₂/h</i></div>
       </div>
       <div class="kv2c">
+        <div class="kv2-row"><span class="k">{{ t('功率口径') }}</span><span class="v"><b>{{ powerSrcText }}</b></span></div>
+        <div v-for="s in powerSources" :key="s.id" class="kv2-row">
+          <span class="k">{{ s.label }}<i class="u">{{ s.device ? ' · ' + s.device + (s.prop ? ' · ' + s.prop : '') : '' }}</i></span>
+          <span class="v"><b>{{ fmt(s.measured) }}</b> <span class="u">kW</span></span>
+        </div>
         <div class="kv2-row"><span class="k">{{ t('电耗速率') }}</span><span class="v"><b>{{ fmt(energyKH) }}</b> <span class="u">kWh/h</span></span></div>
         <div class="kv2-row"><span class="k">{{ t('折碳总量（tCO₂/h）') }}</span><span class="v"><b>{{ fmt(tCO2H, 4) }}</b> <span class="u">tCO₂/h</span></span></div>
       </div>
@@ -83,7 +88,21 @@ const procDesc = computed(() => procDef.value?.desc || '')
 const blu = computed(() => store.selectedResult || null)
 
 const powerMW = computed(() => node.value?.params?.power ?? unit.value?.params?.power ?? 0)
-const powerKW = computed(() => (Number(powerMW.value) || 0) * 1000)
+// 包内功率参数（MW → kW）：未接入实测时的估算口径
+const packKW = computed(() => (Number(powerMW.value) || 0) * 1000)
+// 实际参与折碳的功率（kW）：本工序附加的功率型传感器（电功率传感器 kW）读数优先；
+// 可变设备的设定值只调工况、不参与折碳。
+const powerKW = computed(() => {
+  const v = blu.value?.powerKW
+  return (v != null && isFinite(v)) ? Number(v) : packKW.value
+})
+const powerSources = computed(() => (blu.value && Array.isArray(blu.value.powerSources)) ? blu.value.powerSources : [])
+const powerSrcText = computed(() => {
+  const b = blu.value
+  if (b && b.powerMeasured) return t('实测功率（数据源管理采集设备）')
+  if (b && b.powerSimulated) return t('传感器读数（模拟 / 联动 / 固定来源，未接入实测）')
+  return t('包内功率参数（未添加功率传感器）')
+})
 // baseline 静态核算单位：energy=kWh/h，carbon=kgCO₂/h；缺失时按功率×排放因子回退
 const energyKH = computed(() => {
   const e = blu.value?.energy

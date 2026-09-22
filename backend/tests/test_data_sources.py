@@ -25,7 +25,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app import data_sources, mqtt_source  # noqa: E402
-from app import middleware_client  # noqa: E402
+from app.integrations import middleware_client  # noqa: E402
 from app.data_sources import config as ds_config  # noqa: E402
 from app.data_sources import external as ext_mod  # noqa: E402
 from app.mqtt_source.ingest import _record_message  # noqa: E402

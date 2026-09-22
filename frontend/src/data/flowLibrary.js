@@ -65,6 +65,35 @@ export const MATERIALS = [
   { id: 'oxy_supply', name: '供氧', cat: '能源', unit: 'kNm³/h', color: '#5b83c8', carbon: 0 },
 ]
 export const MATERIAL_MAP = Object.fromEntries(MATERIALS.map((m) => [m.id, m]))
+// ---------- 资源包物料登记（非钢场景） ----------
+// 包内 dictionary.materials（如机房温控的 冷却水供水/回水、机房冷风）不在钢铁物料表内，
+// 而 2D/3D 管线着色与标签、编排端口、物料下拉都只查这张表，故在不覆盖既有条目的前提下
+// 把包内物料并入 MATERIALS / MATERIAL_MAP；切换场景时先移除上次并入的条目（避免串场景）。
+let _sceneMatIds = []
+export function registerSceneMaterials(dict) {
+  _sceneMatIds.forEach((id) => {
+    const i = MATERIALS.findIndex((m) => m.id === id)
+    if (i >= 0) MATERIALS.splice(i, 1)
+    delete MATERIAL_MAP[id]
+  })
+  _sceneMatIds = []
+  const list = dict && Array.isArray(dict.materials) ? dict.materials : []
+  list.forEach((m) => {
+    if (!m || !m.id || MATERIAL_MAP[m.id]) return
+    const item = {
+      id: m.id,
+      name: m.name || m.id,
+      cat: m.cat || '物料',
+      unit: m.unit || '',
+      color: m.color || '#7f8c8d',
+      carbon: Number(m.carbon) || 0,
+      price: Number(m.price) || 0,
+    }
+    MATERIALS.push(item)
+    MATERIAL_MAP[m.id] = item
+    _sceneMatIds.push(m.id)
+  })
+}
 // 驱动介质族：把成对的"工辅输出口"与"被服务工艺输入口"归并到同一族，
 // 保证连线时可匹配（输出 draft → 输入 draft 同 id 自然匹配；此处补充跨写法别名）。
 export const MATERIAL_FAMILY = {
