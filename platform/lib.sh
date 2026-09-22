@@ -52,8 +52,9 @@ LIB_EXCLUDE_COMMON=(
   --exclude=.env --exclude='*.log'
 )
 # 运行期状态：服务器自有一份真源的开发机产物（避免被 rsync 抹成开发机状态）。
-# 注：backend/config/box_devices.json（采集设备定义）与 backend/config/data_sources.json
-#     （数据源目录）**均不排除** —— 按「本地配置为准、同步到服务器」的口径随代码一起同步，
+# 注：backend/config/（平台运行配置：设备定义 box_devices.json、数据源目录 data_sources.json、
+#     box_config / middleware / llm / links / mcp / .env 等）**整个目录都不排除** ——
+#     按「本地配置为准、每次推送都同步到服务器」的口径随代码一起同步，
 #     保证多端清单一致（用户明确要求不排除）。前提是开发机那份必须是真源：
 #     服务器上单独改设备/数据源会被下一次 update.sh 覆盖，生产侧增删改一律在平台界面
 #     保存后回填开发机；update.sh 覆盖前会先把服务器现有文件备份到 <仓库根>/.devcfg-backup/。

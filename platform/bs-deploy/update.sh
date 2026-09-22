@@ -5,8 +5,9 @@
 # 用途（开发机执行，日常更新唯一通道）：
 #   本地构建前端/文档站产物 → rsync 源码到服务器 → 容器按需重建/热生效 → 健康检查
 #
-# 用法：bash platform/bs-deploy/update.sh [--server root@<主机>] [--skip-build]
+# 用法：bash platform/bs-deploy/update.sh [--server root@<主机>] [--skip-build] [--skip-config]
 #       （或统一入口：bash platform/update.sh bs，二者等价）
+#       --skip-config：本次**不**用本地 backend/config 覆盖服务器（默认每次都覆盖，见 [2/3]）
 #       bash platform/bs-deploy/update.sh push ["提交信息" [--tag v1.0.0]]  # 推送代码到 GitHub（调仓库根 ./push.sh）
 #   默认目标：71（root@36.151.146.71:/root/qzb/jianpai，Docker 源码卷挂载 + uvicorn --reload）
 #   说明：同步本地工作区（含未提交改动），改完即可上线；代码入库推送走本脚本 push 子命令，
@@ -36,9 +37,11 @@ IMAGE_NAME="ghcr.io/zhibinqiu/power_simulation:latest"
 
 # ---- 解析参数 ----
 RUN_BUILD=1
+SYNC_CONFIG=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --skip-build) RUN_BUILD=0 ;;
+    --skip-config|--no-config) SYNC_CONFIG=0 ;;
     --server|--target) SERVER="${2:-$CLOUD_MAIN}"; shift 2 ;;
     *) echo "[error] 未知参数：${1}（-h 查看头部注释）" >&2; exit 1 ;;
   esac
@@ -59,30 +62,55 @@ else
   echo "==> [1/3] 跳过本地构建（--skip-build）"
 fi
 
-# ---- [2/3] rsync 源码到服务器（排除运行时数据/本机环境） ----
+# ---- [2/3] 配置同步（本地为准）+ rsync 源码到服务器（排除运行时数据/本机环境） ----
+# 配置口径（用户要求：**每次推送都把本地配置文件推到服务器**，本地为唯一真源）：
+#   backend/config/ 整个目录随每次同步覆盖服务器——含 box_devices.json（采集设备/模型定义）、
+#   data_sources.json（数据源目录）、box_config.json / middleware.json / links.json / llm*.json /
+#   mcp_*.json / strategies.json，以及 gitignore 的本地覆盖项 .env 等。
+#   生产侧的增删改一律在平台界面操作后回填开发机，否则会被下一次 update.sh 覆盖。
+#   ① 覆盖前先把服务器整目录备份到 <仓库根>/.devcfg-backup/config.<时间戳>（便于回滚）；
+#   ② 显式 --include=backend/config/*** 且置于所有排除规则之前，后续新增宽泛排除不会误伤配置；
+#   ③ *.bak.* 备份件不同步（本地/服务器的历史备份不上传，避免目录堆积）；
+#   ④ 配置确有变更时重启后端容器使其生效（uvicorn --reload 只监听 .py，不监听配置文件）。
 # 注：backend/data/scenes 为平台内置/安装的企业资源包目录（不入 git、须随部署同步），
 # 其余 backend/data 运行时数据仍排除；include 须先于排除规则。
-# 注：backend/config/data_sources.json = 数据源目录，**随代码同步**（本地为真相源，
-#     生产侧的数据源登记/启停一律在平台界面操作后回填本地），同步前会自动备份服务器现有文件。
-# 注：backend/config/box_devices.json = 采集设备/模型定义，**随代码同步**（本地为真相源，
-#     生产侧设备增删改一律在平台界面保存后回填本地），同步前会自动备份服务器现有文件。
 # 平台专属排除（通用项与运行期状态文件由 lib.sh 的 LIB_EXCLUDE_COMMON / LIB_EXCLUDE_STATE 提供）
 EXTRA_EXCLUDES="--exclude=platform/doc-deploy/docs-site/node_modules
   --exclude=outputs --exclude=generated-images --exclude=.playwright-cli --exclude=chrome_*
   --exclude=backend/data/* --exclude=backend/knowledge"
-# 设备定义与数据源目录随本次同步以本地版本覆盖到服务器——**覆盖前**先备份服务器现有文件，便于回滚。
-CFG_BACKUP_FILES="backend/config/box_devices.json backend/config/data_sources.json"
+CFG_BACKUP_DIR=".devcfg-backup"
 BK_TS="$(date +%Y%m%d%H%M%S)"
-if ssh_run "$SERVER" "cd '$SERVER_DIR' && mkdir -p .devcfg-backup && for f in $CFG_BACKUP_FILES; do if [ -f \"\$f\" ]; then cp -a \"\$f\" \".devcfg-backup/\$(basename \"\$f\").${BK_TS}\"; fi; done" 2>/dev/null; then
-  echo "    ✓ 服务器现有配置文件已备份到 ${SERVER_DIR}/.devcfg-backup/*.${BK_TS}"
+if [ "$SYNC_CONFIG" = "1" ]; then
+  # 配置目录：先排除备份件、再整体 include（rsync「先匹配者生效」，顺序不可颠倒）
+  CFG_INCLUDES="--include=backend/config/ --exclude=backend/config/*.bak.* --include=backend/config/***"
+  if ssh_run "$SERVER" "cd '$SERVER_DIR' && mkdir -p '$CFG_BACKUP_DIR' && [ -d backend/config ] && cp -a backend/config '$CFG_BACKUP_DIR/config.${BK_TS}'" 2>/dev/null; then
+    echo "    ✓ 服务器现有 backend/config 已整目录备份到 ${SERVER_DIR}/${CFG_BACKUP_DIR}/config.${BK_TS}"
+  else
+    echo "    ⚠ 服务器尚无 backend/config 可备份（全新部署，本次直接同步本地版本）"
+  fi
 else
-  echo "    ⚠ 服务器尚无配置可备份（全新部署，本次直接同步本地版本）"
+  CFG_INCLUDES="--exclude=backend/config/***"
+  echo "    · 本次跳过配置同步（--skip-config），服务器 backend/config 保持原样"
 fi
 
 echo "==> [2/3] rsync 源码 + 配置 + 前端产物到服务器..."
+RSYNC_LOG="${TMPDIR:-/tmp}/nengtan-rsync-${BK_TS}.log"
 rsync_run --include=backend/data/scenes/ --include=backend/data/scenes/*** \
-  "${LIB_EXCLUDE_COMMON[@]}" "${LIB_EXCLUDE_STATE[@]}" $EXTRA_EXCLUDES \
-  ./ "$SERVER:$SERVER_DIR/"
+  $CFG_INCLUDES \
+  "${LIB_EXCLUDE_COMMON[@]}" "${LIB_EXCLUDE_STATE[@]}" $EXTRA_EXCLUDES --itemize-changes \
+  ./ "$SERVER:$SERVER_DIR/" | tee "$RSYNC_LOG"
+# 从传输清单挑出本次真正变更的配置文件（>f 开头 = 文件有内容传输）；--skip-config 时列表恒空
+CFG_CHANGED="$(awk '$1 ~ /^>f/ { print $2 }' "$RSYNC_LOG" 2>/dev/null | grep '^backend/config/' || true)"
+rm -f "$RSYNC_LOG"
+if [ -n "$CFG_CHANGED" ]; then
+  echo "    ↪ 配置已随本次推送更新到服务器："
+  echo "$CFG_CHANGED" | sed 's/^/       - /'
+  echo "    ↳ 重启后端容器使新配置生效（uvicorn --reload 只监听 .py，不监听配置文件）"
+  ssh_run "$SERVER" "cd $BS_DIR && docker compose restart steel-twin" >/dev/null 2>&1 \
+    || echo "    ⚠ 后端容器重启失败，请手动执行：ssh $SERVER 'cd $BS_DIR && docker compose restart steel-twin'" >&2
+else
+  echo "    ✓ 配置无变更（服务器 backend/config 与本地一致）"
+fi
 
 # ---- [3/3] 服务器部署：构建输入变更才重建镜像，否则容器内 reload 自动生效 ----
 # 构建输入 = Dockerfile / compose / .dockerignore / requirements

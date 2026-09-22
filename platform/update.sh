@@ -41,7 +41,7 @@ shift
 
 case "$TARGET" in
   update|bs|platform)
-    echo "==> 平台更新：本地构建 + 推送代码到平台机（开发机执行 → ${PLATFORM_SSH:-root@36.151.146.71} 容器 reload 生效）"
+    echo "==> 平台更新：本地构建 + 推送代码与本地配置到平台机（开发机执行 → ${PLATFORM_SSH:-root@36.151.146.71} 容器 reload 生效）"
     exec bash "$DIR/bs-deploy/update.sh" "$@"
     ;;
   middleware|mw)

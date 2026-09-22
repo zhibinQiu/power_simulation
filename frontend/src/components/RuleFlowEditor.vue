@@ -190,6 +190,9 @@ const store = useSimStore()
 // ─────────── 几何常量 ───────────
 const CV_W = 4200
 const CV_H = 3000
+// 原点余量：把世界原点 (0,0) 向右下推 ORIGIN 像素渲染，于是 -ORIGIN ~ 0 的负坐标仍在画布内可见。
+// 模块才能往左 / 往上自由拖动布局（否则坐标只能 ≥ 0 = 死死贴在画布左上角，往上拖完全没反应）。
+const ORIGIN = 400
 const DEV_W = 208
 const DEV_H = 84
 const IF_W = 300
@@ -252,7 +255,8 @@ function isMissing(n) { return n.kind !== 'if' && !findDev(n.devId) }
 // ─────────── 视图（平移 / 缩放） ───────────
 const view = reactive({ x: 0, y: 0, z: 1 })
 const vpStyle = computed(() => ({
-  transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`,
+  // +ORIGIN：让负坐标区域（画布左上方）也落在可视范围内，见 ORIGIN 注释
+  transform: `translate(${view.x + ORIGIN}px, ${view.y + ORIGIN}px) scale(${view.z})`,
 }))
 const cvEl = ref(null)
 const selNode = ref('')
@@ -262,8 +266,9 @@ function onWheel(e) {
   const el = cvEl.value
   if (!el) return
   const r = el.getBoundingClientRect()
-  const mx = e.clientX - r.left
-  const my = e.clientY - r.top
+  // 换算到「未平移前的世界坐标」基准（与 toWorld 一致），保证以光标为锚点缩放
+  const mx = e.clientX - r.left - ORIGIN
+  const my = e.clientY - r.top - ORIGIN
   const nz = Math.min(1.8, Math.max(0.35, view.z * (e.deltaY < 0 ? 1.1 : 1 / 1.1)))
   view.x = mx - ((mx - view.x) * nz) / view.z
   view.y = my - ((my - view.y) * nz) / view.z
@@ -271,7 +276,7 @@ function onWheel(e) {
 }
 function toWorld(cx, cy) {
   const r = cvEl.value ? cvEl.value.getBoundingClientRect() : { left: 0, top: 0 }
-  return { x: (cx - r.left - view.x) / view.z, y: (cy - r.top - view.y) / view.z }
+  return { x: (cx - r.left - view.x - ORIGIN) / view.z, y: (cy - r.top - view.y - ORIGIN) / view.z }
 }
 
 // ─────────── 鼠标交互（移动 / 平移 / 连线） ───────────
@@ -300,16 +305,51 @@ function startLink(n, port) {
   link.value = { node: n, port, x: p.x, y: p.y }
   drag = { kind: 'link' }
 }
+/** 把卡片落到光标下（世界坐标），并按画布范围夹取：
+ *  下界 -ORIGIN（可拖到画布左 / 上方可见区），上界 画布尺寸 - 卡片尺寸（不越出右 / 下边界）。 */
+function moveNodeTo(cx, cy) {
+  if (!drag || drag.kind !== 'node') return
+  const n = nodes.value.find((x) => x.id === drag.id)
+  if (!n) return
+  const clampX = (v) => Math.round(Math.min(CV_W - nodeW(n), Math.max(-ORIGIN, v)))
+  const clampY = (v) => Math.round(Math.min(CV_H - nodeH(n), Math.max(-ORIGIN, v)))
+  n.x = clampX(drag.ox + (cx - drag.sx) / view.z)
+  n.y = clampY(drag.oy + (cy - drag.sy) / view.z)
+}
+// 拖到画布边缘时自动平移视图：卡片才能继续往上 / 左（或下 / 右）拖出可视区，而不是卡在边上
+const EDGE = 30, PAN_STEP = 14
+let panRaf = 0
+let lastPt = { x: 0, y: 0 }
+function stopAutoPan() { if (panRaf) { cancelAnimationFrame(panRaf); panRaf = 0 } }
+function autoPanTick() {
+  panRaf = 0
+  if (!drag || drag.kind !== 'node' || !cvEl.value) return
+  const el = cvEl.value
+  const r = el.getBoundingClientRect()
+  // 只有光标真的越出画布边界才平移（否则在画布内部靠近边缘也算，容易误触发）
+  let dx = 0, dy = 0
+  if (lastPt.x < r.left) dx = PAN_STEP
+  else if (lastPt.x > r.right) dx = -PAN_STEP
+  if (lastPt.y < r.top) dy = PAN_STEP
+  else if (lastPt.y > r.bottom) dy = -PAN_STEP
+  if (!dx && !dy) return
+  view.x += dx
+  view.y += dy
+  // 视图平移后光标对应的世界坐标变了：补偿拖拽起点，让卡片始终黏在光标下而不是跟着画布跑
+  drag.ox -= dx / view.z
+  drag.oy -= dy / view.z
+  moveNodeTo(lastPt.x, lastPt.y)
+  panRaf = requestAnimationFrame(autoPanTick)
+}
 function onWinMove(e) {
   if (!drag) return
   if (drag.kind === 'pan') {
     view.x = drag.ox + (e.clientX - drag.sx)
     view.y = drag.oy + (e.clientY - drag.sy)
   } else if (drag.kind === 'node') {
-    const n = nodes.value.find((x) => x.id === drag.id)
-    if (!n) return
-    n.x = Math.max(0, Math.round(drag.ox + (e.clientX - drag.sx) / view.z))
-    n.y = Math.max(0, Math.round(drag.oy + (e.clientY - drag.sy) / view.z))
+    lastPt = { x: e.clientX, y: e.clientY }
+    moveNodeTo(e.clientX, e.clientY)
+    if (!panRaf) panRaf = requestAnimationFrame(autoPanTick)
   } else if (drag.kind === 'link' && link.value) {
     const w = toWorld(e.clientX, e.clientY)
     link.value.x = w.x
@@ -323,6 +363,7 @@ function onWinUp(e) {
     if (host) finishLink(host.getAttribute('data-nid'))
   }
   histCommit()   // 节点拖拽结束，位置变化合并入历史
+  stopAutoPan()
   drag = null
   link.value = null
 }
@@ -743,8 +784,9 @@ function fitView() {
   const h = cvEl.value.clientHeight
   const z = Math.min(1.4, Math.max(0.35, Math.min((w - pad * 2) / (x1 - x0), (h - pad * 2) / (y1 - y0))))
   view.z = z
-  view.x = (w - (x1 - x0) * z) / 2 - x0 * z
-  view.y = (h - (y1 - y0) * z) / 2 - y0 * z
+  // -ORIGIN：抵消渲染时的原点余量（见 ORIGIN 注释），否则适应视图后整体偏右 / 下
+  view.x = (w - (x1 - x0) * z) / 2 - x0 * z - ORIGIN
+  view.y = (h - (y1 - y0) * z) / 2 - y0 * z - ORIGIN
 }
 
 // ─────────── 格式化 ───────────
@@ -767,7 +809,7 @@ const selDev = computed(() => {
 })
 /** 检查器贴在被点选卡片的正下方（画布世界坐标，随缩放平移一起动） */
 function inspStyle(n) {
-  return { left: Math.max(4, n.x) + 'px', top: (n.y + nodeH(n) + 8) + 'px' }
+  return { left: Math.max(-ORIGIN + 4, n.x) + 'px', top: (n.y + nodeH(n) + 8) + 'px' }
 }
 /** 当前设定值（store 覆盖 → 设备实例 → 模板默认） */
 function curSp(id) {
@@ -817,6 +859,7 @@ onMounted(() => {
   if (nodes.value.length) setTimeout(fitView, 0)
 })
 onBeforeUnmount(() => {
+  stopAutoPan()
   stopTimer()
   window.removeEventListener('mousemove', onWinMove)
   window.removeEventListener('mouseup', onWinUp)
