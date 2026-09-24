@@ -36,6 +36,7 @@ from .api.carbon_assets_router import (router as carbon_assets_router,
 from .api.ai_admin_router import router as ai_admin_router
 from .api.chat_session_router import router as chat_session_router
 from .api.data_sources_router import router as data_sources_router
+from .api.design_router import router as design_router
 from .api.middleware_router import router as middleware_router
 from .api.help_router import router as help_router
 from .api.knowledge_router import router as knowledge_router
@@ -106,6 +107,7 @@ app.include_router(knowledge_router)           # 知识库（LLM-WIKI 式多级�
 app.include_router(license_router)             # 平台激活（激活码校验 / 激活状态）
 app.include_router(settings_router)            # 系统设置（LLM 配置等）
 app.include_router(scene_router)               # 场景资源包（.ec 打开/卸载/导出，/api/scenes 注册表）
+app.include_router(design_router)              # 编排方案持久化（流程编排 / AI 群控编排，服务端文件存档）
 app.include_router(report_share_router)        # 报告分享页 /report/{rid}
 
 

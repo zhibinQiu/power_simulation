@@ -358,6 +358,7 @@ const cloneScheme = (scheme) => JSON.parse(JSON.stringify(scheme))
 let _refreshTimer = null   // 刷新防抖定时器（模块级，避免进入响应式 state）
 let _refreshSeq = 0       // 刷新序号：丢弃过期响应，避免旧请求覆盖新状态
 let _simSnapshot = null   // 仿真模式进入时的全量快照（模块级，避免进入响应式 state）
+let _schemePushTimer = null  // 编排方案同步到服务端的防抖定时器（模块级，避免进入响应式 state）
 let _simParamSnapshot = null  // 仿真进入时的参数快照（「仿真前 → 当前」变化展示用，模块级）
 const _snapParams = (model) => {  // 提取各工序参数：{ unitId: { key: val } }
   const out = {}
@@ -478,7 +479,7 @@ export const useSimStore = defineStore('sim', {
     // MQTT 实时数据源状态（来自 /api/realtime/source）
     mqttSource: null,
     // ---- 左侧活动栏（VS Code 式）与多数据源管理 ----
-    activityView: 'explorer',   // 活动面板：'explorer' 资源 | 'search' 搜索 | 'scene' 场景（AI 群控为独立视图，不占用活动面板）
+    activityView: 'scene',      // 活动面板：'explorer' 资源 | 'search' 搜索 | 'scene' 场景（默认打开「场景」；AI 群控为独立视图，不占用活动面板）
     dataSources: [],            // 多数据源列表，每个含 { id,type,url,interval,name,enabled,mapping }
     activeDataSourceId: 'sim',  // 当前活动数据源 id（状态栏/指令区使用的活动源）
     sourceStatus: {},           // 各数据源连接状态：sourceId -> 'init'|'open'|'closed'|'error'
@@ -878,8 +879,9 @@ export const useSimStore = defineStore('sim', {
         ])
         this.model = m
         // 优先恢复上次保存的编排方案（exitEdit/loadTemplate 等已持久化）；
-        // 若存在则直接恢复并编译（含设备设定值），否则按上次流程路线构建默认方案，避免刷新后回退
-        const saved = this._loadScheme()
+        // 若存在则直接恢复并编译（含设备设定值），否则按上次流程路线构建默认方案，避免刷新后回退。
+        // 服务端存档优先（跨端真源，随代码同步），本地 localStorage 作为离线兜底 / 较新者胜出。
+        const saved = (await this._pullScheme(this.sceneId || 'steel')) || this._loadScheme()
         if (saved) {
           this.scheme = saved.scheme
           // 旧版本持久化方案可能缺少小组容器字段，补齐避免访问报错
@@ -1921,8 +1923,8 @@ export const useSimStore = defineStore('sim', {
         if (res.devices) this.deviceLibrary = res.devices
         const routes = Array.isArray(pkg.meta.routes) && pkg.meta.routes.length ? pkg.meta.routes : null
         const defaultRoute = pkg.meta.defaultRoute || (routes && routes[0]) || null
-        // 编排方案：优先恢复本场景本地存档，否则按包模板构建
-        const saved = this._loadScheme()
+        // 编排方案：优先恢复本场景存档（服务端跨端真源 → 本地 localStorage 兜底），否则按包模板构建
+        const saved = (await this._pullScheme(sceneId)) || this._loadScheme()
         this.processRoute = isSteel ? ((saved && saved.route) || 'short') : (defaultRoute || 'cool')
         this.scheme = (saved && saved.scheme) ? saved.scheme : this._buildSceneScheme(this.processRoute)
         if (!this.scheme.groups) this.scheme.groups = []
@@ -2504,25 +2506,63 @@ export const useSimStore = defineStore('sim', {
     // 使刷新后保持最后一次编排结果，而不是回退到默认流程。
     _saveScheme() {
       if (this.simMode) return   // 仿真模式：一切编辑不持久化
+      const payload = {
+        sceneId: this.sceneId || 'steel',   // 编排方案所属场景包：切场景不串档
+        route: this.processRoute,
+        scheme: this.scheme,
+        materialOverrides: this.materialOverrides,
+        _ovUnitV: 1,   // 价格口径标记：v1 起 price/salePrice 统一为「万元/单位」（旧版存的是元/单位）
+        updatedAt: Date.now(),   // 存档时间戳：服务端/本地两份冲突时取较新的一份
+      }
+      try { localStorage.setItem('sim.scheme', JSON.stringify(payload)) } catch (e) { /* localStorage 不可用时静默忽略 */ }
+      this._pushScheme(payload)
+    },
+    // 编排方案同步到服务端（防抖 800ms）：服务端存档 backend/data/designs/flow.json 是跨端真源，
+    // 随 platform/bs-deploy/update.sh 同步到服务器；接口不可用时静默降级为「仅本地存档」。
+    _pushScheme(payload) {
       try {
-        localStorage.setItem('sim.scheme', JSON.stringify({
-          sceneId: this.sceneId || 'steel',   // 编排方案所属场景包：切场景不串档
+        const data = payload || {
+          sceneId: this.sceneId || 'steel',
           route: this.processRoute,
           scheme: this.scheme,
           materialOverrides: this.materialOverrides,
-          _ovUnitV: 1,   // 价格口径标记：v1 起 price/salePrice 统一为「万元/单位」（旧版存的是元/单位）
-        }))
-      } catch (e) { /* localStorage 不可用时静默忽略 */ }
+          _ovUnitV: 1,
+          updatedAt: Date.now(),
+        }
+        clearTimeout(_schemePushTimer)
+        _schemePushTimer = setTimeout(() => {
+          api.designSave('flow', data.sceneId, data).catch(() => { /* 服务端不可用时保留 localStorage 兜底 */ })
+        }, 800)
+      } catch (e) { /* 忽略 */ }
+    },
+    // 从服务端取回本场景的编排存档：与本地 localStorage 冲突时以**较新**的一份为准，
+    // 使「开发机编排 → 文件同步 → 服务器打开」与「离线编辑后重新联网」两种场景都不丢改动。
+    async _pullScheme(sceneId) {
+      try {
+        const sid = sceneId || this.sceneId || 'steel'
+        const r = await api.designBucket('flow')
+        const remote = (r && r.data) ? r.data[sid] : null
+        if (!remote || !this._schemeAccepted(remote, sid)) return null
+        const local = this._loadScheme()
+        if (local && local.updatedAt && remote.updatedAt && local.updatedAt > remote.updatedAt) return null
+        return remote
+      } catch (e) { return null }
     },
     _loadScheme() {
       try {
         const raw = localStorage.getItem('sim.scheme')
         if (!raw) return null
         const d = JSON.parse(raw)
-        if (!d || !d.scheme || !Array.isArray(d.scheme.nodes) || d.scheme.nodes.length === 0) return null
+        return this._schemeAccepted(d, this.sceneId || 'steel') ? d : null
+      } catch (e) { return null }
+    },
+    // 编排存档可用性校验：结构完整性 + 场景隔离 + 旧口径存档（机房热控 2026-09-21 改版）丢弃。
+    _schemeAccepted(d, sceneId) {
+      try {
+        if (!d || !d.scheme || !Array.isArray(d.scheme.nodes) || d.scheme.nodes.length === 0) return false
         // 编排方案随场景包隔离：只恢复与当前打开场景匹配的存档（旧版无 sceneId 视为钢包存档）
-        const sid = this.sceneId || 'steel'
-        if (d.sceneId && d.sceneId !== sid) return null
+        const sid = sceneId || this.sceneId || 'steel'
+        if (d.sceneId && d.sceneId !== sid) return false
         // 机房温控包 2026-09-21 口径变更（水侧 + 风侧开式，无机房回风；变频器 → 变压器）：
         // 存档里若出现不在新口径内的工序类型或物料（含已删除的「机房回风」hot_air 介质与回风回路）、
         // 旧的可调设备类型，说明是旧版编排方案 —— 丢弃存档改按新模板重建，否则刷新后仍看到旧流程，
@@ -2551,10 +2591,10 @@ export const useSimStore = defineStore('sim', {
           const missFlow = !someAtt((a) => a && a.type === 'water_speed_sensor')
           const missPump = !someAtt((a) => a && a.type === 'pump_transformer')
           const missPower = !someAtt((a) => a && a.type === 'power_sensor')
-          if (badNode || badConn || badAtt || missFlow || missPump || missPower) return null
+          if (badNode || badConn || badAtt || missFlow || missPump || missPower) return false
         }
-        return d
-      } catch (e) { return null }
+        return true
+      } catch (e) { return false }
     },
     // 以指定流程示例方案直接编译为 3D 模型（含工辅连线 + 统一布局），
     // 用于首屏默认流程（短流程）。与 exitEdit 的「完成编排」走同一套编译/布局逻辑，保证两模式一致。

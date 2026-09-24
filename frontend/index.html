@@ -7,8 +7,8 @@
     <link rel="apple-touch-icon" href="/favicon.png" />
     <title>工业能碳智控平台</title>
     <script>
-      /* 首屏占位主题：与 src/theme/index.js 默认值（深色）保持一致，避免深色用户启动闪白 */
-      try { if (localStorage.getItem('carbon-sim.theme-mode') !== 'light') document.documentElement.classList.add('boot-dark') } catch (e) {}
+      /* 首屏占位主题：与 src/theme/index.js 默认值（白天）保持一致，仅用户显式选过夜间模式才预置深色 */
+      try { if (localStorage.getItem('carbon-sim.theme-mode') === 'dark') document.documentElement.classList.add('boot-dark') } catch (e) {}
     </script>
     <style>
       /* 首屏占位：主包下载 + 解析期间先给出可见反馈，避免长时间纯白屏。

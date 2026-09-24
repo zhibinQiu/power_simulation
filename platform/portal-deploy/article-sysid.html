@@ -1,0 +1,1768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工业具身智能的第一步：数据建模、系统辨识与控制策略 | 能优算</title>
+<meta name="description" content="工业流水线零侵入节能减碳改造全流程技术文档：为什么这样能节能——不等式工艺约束被 PID 当等式跟踪、冗余配置的隐性浪费、驱动势的边际代价递增；以及 Hammerstein (FOPDT) 系统辨识、PRBS 激励设计、PE 检验、NLS 参数估计、模型验证诊断、MPC 上层监督优化、软投切与节能量核算（M&V），附 TEC 制冷小样真实实验数据。" />
+<meta name="keywords" content="系统辨识,Hammerstein,FOPDT,PRBS,MPC,模型预测控制,节能减碳,零侵入改造,持续激励,NLS,工业节能,能优算" />
+<meta name="author" content="能优算" />
+<meta name="robots" content="index, follow" />
+<meta name="theme-color" content="#0069c0" />
+<!-- 内容更新后强制浏览器取最新版，避免看到缓存的旧页面 -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<link rel="canonical" href="http://36.151.146.71:40200/article-sysid.html" />
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="能优算 | 工业能碳智控平台" />
+<meta property="og:title" content="工业具身智能的第一步：数据建模、系统辨识与控制策略" />
+<meta property="og:description" content="底层 PID 为什么永远不会省电？——不等式约束、冗余浪费与边际代价递增的完整原理 + Hammerstein (FOPDT) 系统辨识与上层监督优化全流程，附 TEC 制冷小样真实实验数据。" />
+<meta property="og:url" content="http://36.151.146.71:40200/article-sysid.html" />
+<meta property="og:image" content="http://36.151.146.71:40200/assets/article-fig1-prbs-response.png" />
+<meta property="og:locale" content="zh_CN" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "工业具身智能的第一步：数据建模、系统辨识与控制策略",
+  "description": "Hammerstein (FOPDT) 系统辨识、PRBS 激励设计、PE 检验、NLS 参数估计、模型验证诊断、MPC 上层监督优化、软投切与节能量核算（M&V）。",
+  "inLanguage": "zh-CN",
+  "datePublished": "2026-09-23",
+  "dateModified": "2026-09-23",
+  "image": "http://36.151.146.71:40200/assets/article-fig1-prbs-response.png",
+  "author": { "@type": "Organization", "name": "能优算", "url": "http://36.151.146.71:40200/" },
+  "publisher": { "@type": "Organization", "name": "能优算", "url": "http://36.151.146.71:40200/" },
+  "mainEntityOfPage": "http://36.151.146.71:40200/article-sysid.html"
+}
+</script>
+<link rel="icon" href="assets/网页角标.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --accent:#0069c0; --accent-hover:#00519a; --steel:#2f3e55; --ink:#1b2333;
+  --body:#4a5568; --line:#dfe3ea; --gray:#f4f6f9;
+  --f-head:'Montserrat','PingFang SC','Microsoft YaHei',sans-serif;
+  --f-body:'Montserrat','PingFang SC','Microsoft YaHei',sans-serif;
+  --hh:8rem;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;font-size:calc(100vw / 151.2)}
+body{font-family:var(--f-body);color:var(--ink);background:#fff;line-height:1.8;-webkit-font-smoothing:antialiased}
+a{text-decoration:none;color:var(--accent)}
+img{max-width:100%;display:block}
+.wrap{width:min(calc(100% - 6.4rem),110rem);margin:0 auto}
+
+/* 页眉 */
+body{padding-top:var(--hh)}
+header.site{background:#fff;height:var(--hh);display:flex;align-items:center;position:fixed;top:0;left:0;right:0;z-index:100;border-bottom:0.1rem solid var(--line)}
+header.site .wrap{width:min(calc(100% - 3.2rem),124rem);display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:1.4rem}
+.brand img{width:4.4rem;height:4.4rem}
+.brand .wm{color:var(--ink);font-family:var(--f-head);font-weight:800;font-size:2rem;line-height:1.2}
+.brand .wm small{display:block;font-weight:600;font-size:1.05rem;color:var(--accent);letter-spacing:.28em}
+.back-home{font-family:var(--f-head);font-size:1.5rem;font-weight:700;color:var(--ink);border:0.15rem solid var(--line);padding:.7em 1.6em;transition:.15s}
+.back-home:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* 文章头 */
+.art-hero{background:repeating-linear-gradient(90deg,rgba(47,62,85,.03) 0 1px,transparent 1px 3px),linear-gradient(160deg,#f5f6f8 0%,#e8ebef 55%,#d9dde3 100%);border-bottom:0.1rem solid var(--line);padding:6.4rem 0 4.8rem}
+.art-hero .cat{font-family:var(--f-head);font-size:1.3rem;font-weight:700;color:var(--accent);letter-spacing:.14em;margin-bottom:1.4rem}
+.art-hero h1{font-size:3.6rem;font-weight:800;letter-spacing:-.02em;line-height:1.28;max-width:96rem;margin:0 0 2.8rem}
+.art-hero .art-meta{margin-top:.4rem}
+.art-meta{display:flex;flex-wrap:wrap;gap:1rem 2.8rem;font-size:1.35rem;color:#8a8a8a}
+.art-meta b{color:var(--steel);font-weight:600}
+
+/* 目录 */
+.toc{background:var(--gray);border-left:0.3rem solid var(--accent);padding:2.2rem 2.6rem;margin:4rem 0}
+.toc b{display:block;font-family:var(--f-head);font-size:1.5rem;font-weight:800;letter-spacing:.1em;color:var(--steel);margin-bottom:1rem}
+.toc ol{columns:2;column-gap:4rem;list-style:decimal;padding-left:2.6rem}
+.toc li{font-size:1.4rem;line-height:2;break-inside:avoid}
+.toc li::marker{color:var(--accent);font-weight:700}
+.toc a{color:var(--ink)}
+.toc a:hover{color:var(--accent);text-decoration:underline}
+
+/* 正文 */
+article .wrap{max-width:96rem}
+.art-body{padding-bottom:6rem}
+.art-body h2{font-size:2.6rem;font-weight:800;margin:6.4rem 0 2.8rem;padding-top:2rem;border-top:0.1rem solid var(--line);letter-spacing:-.01em;line-height:1.35}
+.art-body h2 .no{color:var(--accent);margin-right:.6rem}
+.art-body h3{font-size:1.9rem;font-weight:800;margin:3.8rem 0 1.8rem;color:var(--steel);line-height:1.4}
+.art-body p{font-size:1.5rem;color:var(--body);margin:1.4rem 0}
+.art-body ul,.art-body ol{margin:1.4rem 0 1.8rem}
+.art-body .note,.art-body pre{margin:1.8rem 0 2.2rem}
+.art-body ul,.art-body ol{margin:1.2rem 0 1.2rem 2.2rem}
+.art-body li{font-size:1.5rem;color:var(--body);margin:.6rem 0;list-style:disc}
+.art-body ol li{list-style:decimal}
+.art-body strong{color:var(--ink)}
+
+/* 提示框 */
+.note{background:var(--gray);border-left:0.3rem solid var(--accent);padding:1.6rem 2rem;margin:1.8rem 0}
+.note p{margin:.4rem 0}
+.note.warn{border-left-color:#c05600;background:#fdf6ee}
+.note.plain{border-left-color:var(--steel)}
+.note .tag{display:inline-block;font-family:var(--f-head);font-weight:800;font-size:1.2rem;letter-spacing:.08em;color:var(--accent);margin-right:.6rem}
+.note.warn .tag{color:#c05600}
+
+/* 表格 */
+.tbl-wrap{overflow-x:auto;margin:1.8rem 0}
+table{border-collapse:collapse;width:100%;font-size:1.35rem}
+th,td{border:0.1rem solid var(--line);padding:.9rem 1.2rem;text-align:left;vertical-align:top;color:var(--body)}
+th{background:var(--gray);font-family:var(--f-head);font-weight:700;color:var(--ink);white-space:nowrap}
+td b{color:var(--ink)}
+
+/* 图与图注 */
+figure{margin:2.4rem 0}
+figure img{border:0.1rem solid var(--line);background:#fff}
+figcaption{font-size:1.25rem;color:#8a8a8a;margin-top:.8rem;text-align:center}
+
+/* ASCII 图与代码 */
+pre.diagram,pre.code{background:#1b2333;color:#dfe6f2;padding:1.8rem 2.2rem;overflow-x:auto;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:1.25rem;line-height:1.65;margin:1.8rem 0;white-space:pre}
+pre.code{background:#0f1622;color:#c8d6ee}
+pre .c{color:#7a8aa5}
+
+/* 公式 */
+.formula{background:var(--gray);border-left:0.3rem solid var(--accent);padding:1.4rem 2.2rem;margin:1.6rem 0;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:1.5rem;color:var(--ink);overflow-x:auto;white-space:pre-wrap;line-height:1.75}
+
+/* 修订清单表紧凑 */
+.rev-table td:first-child{white-space:nowrap;font-weight:700;color:var(--accent)}
+
+/* 返回顶部/底部 CTA */
+.art-foot{border-top:0.1rem solid var(--line);padding:3.2rem 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1.6rem}
+.art-foot .tlink{font-family:var(--f-head);font-size:1.5rem;font-weight:700}
+.art-foot .tlink:hover{text-decoration:underline}
+
+footer{background:var(--gray);border-top:0.1rem solid var(--line);padding:2.4rem 0;font-size:1.3rem;color:#8a8a8a}
+@media (max-width:900px){
+  html{font-size:calc(100vw / 100)}
+  .toc ol{columns:1}
+  .art-hero h1{font-size:3rem}
+}
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="index.html">
+      <img src="assets/工业能碳智控平台应用图标.svg" alt="工业能碳智控平台">
+      <span class="wm">能优算<small>工业能碳智控平台</small></span>
+    </a>
+    <a class="back-home" href="index.html#res-root">← 返回资源与活动</a>
+  </div>
+</header>
+
+<section class="art-hero">
+  <div class="wrap">
+    <div class="cat">技术文章 · TECH ARTICLE</div>
+    <h1>工业具身智能的第一步：数据建模、系统辨识与控制策略</h1>
+    <div class="art-meta">
+      <span>版本 <b>V2.2</b></span>
+      <span>发布日期 <b>2026-09-23</b></span>
+      <span>模型体系 <b>Hammerstein (FOPDT) · 上层监督优化 · 零侵入改造</b></span>
+    </div>
+  </div>
+</section>
+
+<article class="art-body">
+<div class="wrap">
+
+<div class="note">
+  <p><span class="tag">核心关键词：零侵入改造</span>不改动原有设备硬件、不破坏原有安全联锁、不中断产线；利用现有传感器 + 少量新增测点、低扰动激励辨识（尽可能不扰动生产）、基于模型的优化控制叠加在原有控制器之上（上层监督控制 / 设定值优化，<strong>不替代原有底层控制</strong>）。</p>
+  <p><span class="tag">模型选型</span>推荐 <strong>Hammerstein 模型，线性子系统采用 FOPDT（一阶惯性 + 纯滞后）结构</strong>——静态非线性块描述执行器非线性，FOPDT 捕捉惯性与滞后；不是两个独立模型拼接。</p>
+</div>
+
+<nav class="toc">
+  <b>目录 CONTENTS</b>
+  <ol>
+    <li><a href="#s0">开篇必读：工业具身智能落地的三道现实坎</a></li>
+    <li><a href="#s1">为什么能节能：不等式约束 · 冗余浪费 · 上层寻优（1.1~1.8）</a></li>
+    <li><a href="#s2">适用边界与约束条件</a></li>
+    <li><a href="#s3">术语与缩写对照表（含大白话解释）</a></li>
+    <li><a href="#s4">系统辨识整体方法论框架</a></li>
+    <li><a href="#s5">现场调研、变量筛选与测点规划</a></li>
+    <li><a href="#s6">实验设计与激励信号设计</a></li>
+    <li><a href="#s7">数据采集、预处理与质量诊断</a></li>
+    <li><a href="#s8">持续激励 PE 检验</a></li>
+    <li><a href="#s9">模型结构选择 Hammerstein (FOPDT)</a></li>
+    <li><a href="#s10">参数估计（NLS 非线性最小二乘）</a></li>
+    <li><a href="#s11">模型验证、残差检验与择优</a></li>
+    <li><a href="#s12">模型诊断与不确定性评估</a></li>
+    <li><a href="#s13">控制策略设计、MPC 工程实现与智能寻优（PSO / 强化学习）</a></li>
+    <li><a href="#s14">部署、软投切与在线监测</a></li>
+    <li><a href="#s15">工程落地风险与安全保障</a></li>
+    <li><a href="#s16">模型验收指标清单</a></li>
+    <li><a href="#s17">节能量与碳减排核算（M&amp;V）</a></li>
+    <li><a href="#s18">故障处置预案</a></li>
+    <li><a href="#s19">案例：TEC 制冷系统小样验证（真实数据）</a></li>
+    <li><a href="#s20">文档总结与参考文献</a></li>
+  </ol>
+</nav>
+
+<h2 id="s0"><span class="no">0</span>开篇必读：工业具身智能落地的三道现实坎</h2>
+
+<p>在进入技术细节之前，先把三件最容易被忽略、也最常让项目中途夭折的事摆在前面。工业具身智能——把具备感知、决策、执行能力的智能体真正装到产线上——<strong>最大的困难通常不在算法本身</strong>，而在下面三件事。本章不谈算法，只谈立项前必须准备什么；后面第 1~18 章的方法论，全部是在承认这三道坎的前提下设计的。</p>
+
+<h3 id="s0-1">0.1 坎一：仿真到真实（sim2real）的差距——沙盒里考满分，真机上不一定及格</h3>
+
+<p>智能策略（无论是强化学习还是 MPC 的最优轨迹）都是在「辨识模型沙盒」里算出来的，而模型与真实装置之间永远有差距：</p>
+
+<div class="tbl-wrap"><table>
+  <tr><th>差距来源</th><th>具体表现</th><th>对策略的影响</th></tr>
+  <tr><td><b>未建模动态</b></td><td>FOPDT 只是一阶近似；管路分布式热容、阀门死区/迟滞、二阶效应未建模</td><td>长时间尺度上预测偏差累积，策略误判「还能再降温」</td></tr>
+  <tr><td><b>参数漂移</b></td><td>换热器结垢、滤网堵塞、润滑油老化、大修后特性改变</td><td>半年前的「好策略」现在已次优，甚至不安全</td></tr>
+  <tr><td><b>工况分布漂移</b></td><td>训练用夏季工况、部署在冬季；原料批次 / 产品规格变化</td><td>状态跑进未训练区域（OOD），策略输出不可信动作</td></tr>
+  <tr><td><b>传感器 / 执行器偏差</b></td><td>漂移、卡涩、量化误差、通信丢包</td><td>策略依据被污染的观测量做决策</td></tr>
+  <tr><td><b>人机 / 规程耦合</b></td><td>操作员手动干预、班制切换、非计划停机</td><td>环境非平稳，奖励归因困难，训练难收敛</td></tr>
+</table></div>
+
+<p><strong>后果</strong>：沙盒里节能 8% 的策略，上真机可能只有 3%，且偶发在训练中从未出现过的越界动作。</p>
+
+<p><strong>工程对策（按重要性排序）</strong></p>
+
+<ol>
+  <li><strong>Domain Randomization（域随机化）</strong>：训练 / 求解时随机扰动模型参数（±10~20%）、噪声水平、滞后拍数，逼策略对「一族环境」鲁棒，而不是对单个模型过拟合；</li>
+  <li><strong>残差 / 不确定性在线监测</strong>：记录模型预测误差，实时估计可信度；可信度低时降权或冻结优化（与 §12 工况包络监测联动）；</li>
+  <li><strong>保守策略</strong>：目标函数中加入 CV 越界概率约束或风险厌恶项（CVaR）；强化学习侧直接采用<strong>离线 RL</strong>（只从已有历史数据学策略，不做在线试错）；</li>
+  <li><strong>小步长 + 安全屏蔽</strong>：动作限制在 CV 量程的 ±(2~5%)，任何动作都必须过安全层（RL 见 <code>safe_action()</code>，MPC 见 §13.2.3 约束软化）与 §15 四道闸门；</li>
+  <li><strong>低频在线更新</strong>：真机数据回流后按周 / 月级重辨识并复算策略，而不是每分钟在线学习；</li>
+  <li><strong>反馈兜底永不撤销</strong>：上层只输出设定值建议，底层 PID 闭环与安全联锁永远在位。</li>
+</ol>
+
+<div class="note">
+  <p>💡 一句话：<strong>sim2real 的差距无法被消除，只能被「辨识 + 随机化 + 保守动作 + 反馈兜底」层层压住。</strong></p>
+</div>
+
+<h3 id="s0-2">0.2 坎二：仿真平台并不是总存在的——这是比 sim2real 更前置的困难</h3>
+
+<p>学术论文常常默认「有一个高保真仿真器可直接用」。工业现场的现实恰恰相反：</p>
+
+<ul>
+  <li><strong>没有现成数字孪生</strong>：老产线往往只有一张工艺流程图和几块电表，设备图纸、物性参数、阀门特性曲线缺失；</li>
+  <li><strong>机理仿真成本极高</strong>：搭建可信的机理-数据混合模型需要工艺、设备、控制三方长期投入，往往比算法本身贵得多，且换一台设备就要重建；</li>
+  <li><strong>每条产线都是定制</strong>：钢铁、水泥、化工各工序差异巨大，一个厂的孪生很难直接复用到下一个厂，边际成本高；</li>
+  <li><strong>数据基础薄弱</strong>：没有历史数据，或数据质量差（量程错、单位错、时间戳错位、缺测严重）——连数据驱动辨识都做不了，更谈不上训练环境。</li>
+</ul>
+
+<div class="note">
+  <p><span class="tag">关键结论</span>这正是本方案把「系统辨识」放在第一步的原因：智能算法需要的那个仿真平台不是凭空存在的，<strong>必须靠数据建模把它造出来</strong>。第 9~12 章的 Hammerstein (FOPDT) 辨识，产出的就是一个<strong>最小可行的动态沙盒</strong>——它不追求替代高保真孪生，但足以支撑稳态寻优与保守序贯决策。</p>
+</div>
+
+<p><strong>没有仿真条件时的渐进路线</strong>（按投入产出排序）</p>
+
+<ol>
+  <li><strong>先补测点与数据</strong>：按 §5 做零侵入测点规划，按 §6 做低扰动 PRBS 激励实验——这一步同时解决「没孪生」和「没数据」；</li>
+  <li><strong>先解静态子问题</strong>：负荷分配、台数启停、供水温度这类<strong>静态</strong>优化，用 §13.3.2 的 PSO 就足够，只需要静态效率曲线（短期实验即可测得），<strong>不需要完整动态仿真</strong>；</li>
+  <li><strong>先单点、后全局</strong>：先给最关键的一台设备建「单点沙盒」，验证闭环再向上扩展，避免一上来就要建全厂孪生；</li>
+  <li><strong>先用监督优化 / MPC，再考虑 RL</strong>：数据不足、模型不敢轻信的阶段，优先用 §13 方案 2/3（增益调度 PID、MPC），它们对模型误差容忍度更高、行为更易解释；等模型质量足以支撑大量离线回放，再引入 RL。</li>
+</ol>
+
+<h3 id="s0-3">0.3 坎三：效果验证闭环——生产线上不允许「对照组」</h3>
+
+<p>学术界可以做 A/B 实验，工厂里通常不行：同一条产线不能一半时间开优化、一半时间不开（产量与安全责任不允许随意切换），而「如果不上系统本会用多少电」是<strong>测不到的</strong>。</p>
+
+<p>对策就是第 17 章的 <strong>M&amp;V 反事实基线</strong>：用投运前冻结的「工况 → 能耗」回归模型推算基准能耗，再与实测对比；配合影子模式（策略在线运行但只记录不下发）积累同工况下的对照数据，作为补充证据。</p>
+
+<div class="note">
+  <p>✅ <strong>结论</strong>：工业具身智能的落地路径不是「先训练、后部署」，而是 <strong>辨识 → 沙盒 → 保守部署 → 数据回流 → 再辨识</strong> 的持续闭环（呼应 §4 迭代闭环图）。<strong>能不能跑通这个闭环，比选用哪个算法重要得多。</strong></p>
+  <p>🧭 带着这三道坎往下读：第 1 章回答「为什么这样能节能」，第 4~12 章回答「模型从哪来」，第 13~18 章回答「怎么安全地把它装上去、并证明它真的省了电」。</p>
+</div>
+
+<h2 id="s1"><span class="no">1</span>项目概述：零侵入节能减碳改造</h2>
+
+<p>传统节能改造往往涉及硬件更换、管路改造、PLC 程序修改，存在停机风险、安全风险、验收周期长。</p>
+
+<div class="note">
+  <p><span class="tag">零侵入思路（一句话版）</span>不动设备、不动程序、不停产线；只「听」数据、建模型、算最优，然后把「更省能耗的设定值」<strong>建议</strong>给原有控制系统，原有系统随时可以一键切回。</p>
+</div>
+
+<p>具体做法：在不侵入原有设备控制逻辑前提下，通过只读采集现有传感器数据，必要时少量外挂低成本传感器；采用低扰动开环辨识，建立被控对象输入-输出动态模型；基于辨识模型做<strong>上层设定值优化</strong>，寻找满足工艺约束前提下能耗最小的工作点；将最优设定值推荐下发到底层原有控制器，底层原有 PID 保持闭环、保留原联锁保护，随时可以切回原始模式。</p>
+
+<p><strong>两层控制架构（全文最重要的图）：</strong></p>
+<pre class="diagram">┌─────────────────────────────────────────────────────────────┐
+│  上层优化层（本次新增 · 零侵入 · 可随时切除）                    │
+│                                                              │
+│   只读采集数据 → 辨识模型 → 滚动优化 → 输出「CV 设定值建议」     │
+│        ▲                                      │              │
+│        │ 只读                                 ▼ 只写设定值     │
+├────────┼──────────────────────────────────────┼──────────────┤
+│  底层控制层（原有 PLC/PID · 完全不改动）          │              │
+│                                                              │
+│   接收设定值 → PID 闭环运算 → 驱动执行器（阀/泵/电源）           │
+│   安全联锁、报警、急停 —— 全部保留在原系统内                     │
+├─────────────────────────────────────────────────────────────┤
+│  现场设备层：传感器（温度/压力/流量） + 执行器                   │
+└─────────────────────────────────────────────────────────────┘</pre>
+
+<div class="note plain">
+  <p>🎯 <strong>项目目标</strong>：在满足全部工艺质量约束的前提下最小化能耗，降低碳排放；<strong>不是</strong>单纯追求温度/压力的快速跟踪。</p>
+  <p>📚 <strong>核心技术栈</strong>：系统辨识（Hammerstein (FOPDT)）+ 上层监督优化（MPC 优先，增益调度 PID 作为轻量备选）。</p>
+</div>
+
+<p><strong>为什么这样能节能？</strong>本章是全篇的理论基点——后面所有的辨识、建模、优化工作，都是为了回答这一个问题服务。</p>
+
+<h3 id="s1-1">1.1 一句话答案</h3>
+<div class="note">
+  <p><span class="tag">核心结论</span>多数工业设备的底层 PID 只负责「把温度/压力控制在设定值」，从不回答「用多少电达成这个目标」。而满足同一工艺要求（比如水温 ≤ 30℃）的运行点往往有无穷多个，其能耗差异可达 <strong>10%~30%</strong>。在这无穷多个可行工作点里，持续捡出「刚好守住工艺红线、能耗最低」的那一个——这就是上层优化层做的事，也是底层 PID 从结构上永远不会主动去做的事。</p>
+</div>
+
+<p>这 10%~30% 不是某个神奇算法凭空变出来的，它本来就摆在那里，来自四个相互独立的来源。判断是否值得做改造，就是看这四条在对象上命中了几条。</p>
+
+<h3 id="s1-2">1.2 来源一：为了「不出事」而层层加码的冗余 ⭐</h3>
+<p>这是现场最常见、量级最大的一类浪费。为了避免出问题，企业的习惯做法是在每一个环节都多给一点：容量选型按最大工况再乘系数、并联设备常年全开互为备用、设定值留足温度余量、冷与热同时备着。<strong>冗余本身没有错——安全必须有冗余。真正的问题在于：冗余一旦加进去就变成「常态」，从此再没有人回头区分「备用能力」和「日常投放量」。</strong></p>
+
+<div class="tbl-wrap"><table>
+  <tr><th>冗余类型</th><th>现场典型做法</th><th>隐藏的能耗代价</th><th>本方案的处理方式</th></tr>
+  <tr><td><b>容量冗余</b></td><td>「大马拉小车」：泵、风机、冷机按最不利工况选型，再留 10%~20% 余量，常年运行在 40%~60% 负荷</td><td>长期偏离高效区；多余的扬程/压头再用阀门、挡板节流泄掉——<strong>节流是把电能直接变成噪声和热量</strong></td><td>工艺真正需要的只是流量与压差；用重设 + 变频把「投放量」降到刚好，装机容量照旧保留</td></tr>
+  <tr><td><b>台数冗余</b></td><td>并联两台泵/两台冷机常年同开，各带一半负荷，怕一台出问题没人顶</td><td>两台都落在低效区；同样流量下「一台满出」往往比「两台各半」省 5%~15%</td><td>台数优化 + 负荷分配：算当前负荷下的最优开机组合；备用设备维持热备状态（阀门预置、随时可启），不参与日常出力</td></tr>
+  <tr><td><b>设定值冗余</b></td><td>温度/压力设定值层层加码：设计余量 + 运行余量 +「冬天也按夏天设」</td><td>制冷侧每多压 1℃，冷机能耗约 +2%~3%，而且是全年无休地付</td><td>由模型反算「刚好守住工艺红线」的最小必要设定值，安全裕度 δ 显式建模（见 §13.1）</td></tr>
+  <tr><td><b>运行策略冗余</b></td><td>同时投入冷与热（再热、旁通）、冷却塔全开、低负荷/夜间不降载、备用设备空转</td><td>纯粹的内部抵消与空转损耗，可占总能耗 5%~15%</td><td>全局目标函数同时计入所有能耗项，这类冲突会被自动优化掉（单回路 PID 看不见）</td></tr>
+</table></div>
+
+<div class="note warn">
+  <p>🔑 <strong>关键区分：备用能力必须保留，日常投放量可以压缩。</strong>装机容量、冗余泵、工艺余量，是可靠性和安全性的本钱，一个都不能削减；要动的是「今天这一天，我们究竟投放了多少」。零侵入优化恰恰只改后者——不引入事故隐患、不削弱任何备用能力，只是把长期在线出力的冗余<strong>恢复成「随时候命」</strong>。这也是它能被工厂接受的原因。</p>
+  <p>💡 <strong>顺便纠正一个常见误解</strong>：企业并非不知道存在浪费，而是<strong>没人敢承担放松之后的风险</strong>。所以这套系统的真正价值不只是省电，而是把「大胆一点」变成可量化的命题——凭模型回答：在当前环境温度、当前产量、当前设备状态下，设定值上抬 1.5℃ 之后，工艺变量尚余 X℃ 余量、未来 30 min 预测轨迹不会越限。<strong>「凭经验拍脑袋留余量」换成「按模型算出的最小必要余量」，这才是能耗下降的根源。</strong></p>
+</div>
+
+<h3 id="s1-3">1.3 来源二：把「不等式约束」当成「等式」去跟踪</h3>
+<p>这是上一节在控制层面的机理。工艺的真实要求是一条不等式，而 PID 天生只能解等式：</p>
+<pre class="diagram">工艺的真实要求（不等式，可行解有无穷多个）：
+  y ≤ 30.0 ℃          ← 30.0、27.5、24.0、22.0 ... 全都合格
+
+底层 PID 实际在解的（等式，解唯一）：
+  y = r               ← r 是人工给定的常数，例如 24.0 ℃
+
+差出来的那一段： r 与 30.0 之间的余量
+              = 每天 24 小时、每年 8760 小时一直在支付的溢价</pre>
+<p>而 r 这个常数，是多层保守叠加的产物，每一层单独看都很合理：</p>
+<div class="formula">设计院推荐值 25.0 ℃  −(工艺安全余量 3 ℃)→  运行规程再留 2 ℃  →  冬季沿用夏季值  →  实际按 22 ℃ 常年锁定</div>
+<p>关键在于：<strong>没有人定期复核这个数</strong>。它一旦写进设定值就永久固化，直到设备报废。上层优化做的正是把这条不等式重新请回来当作不等式处理——最优解永远落在边界上，而不是落在边界内侧几度的某个「保险」位置上。</p>
+
+<h3 id="s1-4">1.4 来源三：驱动势的边际代价递增（物理层面的根）</h3>
+<p>再往下追一层，为什么「多留一点余量」会贵得不成比例？因为制冷、输送、换热这些环节的能耗，对推动过程是<strong>超线性</strong>的：</p>
+<div class="formula">制冷机（逆卡诺上限）：   COP = T_c / (T_h − T_c)      温差每拉大一点，能效比掉一大截
+泵与风机（相似定律）：   P ∝ Q³   （ ∵ Δp ∝ Q²， P = Q·Δp/η ）
+半导体 / TEC：           COP = (αI·T_c − ½I²R − K·ΔT) / (αI·ΔT + I²R)     对电流先升后降
+换热基本式：             Q = U·A·ΔT                    要更多换热量，就得付更大温差</div>
+
+<div class="tbl-wrap"><table>
+  <tr><th>物理环节</th><th>驱动势</th><th>工程经验值</th></tr>
+  <tr><td><b>制冷</b></td><td>蒸发/冷凝温差</td><td>冷冻水供水温度每提高 1℃，冷机能耗降约 2%~3%</td></tr>
+  <tr><td><b>流体输送</b></td><td>流量 / 扬程</td><td>流量降到 80%：变频后功率约降至 51%；用阀门节流则几乎不降</td></tr>
+  <tr><td><b>半导体 / TEC</b></td><td>工作电流</td><td>存在唯一最优电流；过流会因焦耳热反噬制冷量，「猛加电流」恰恰是最贵的工作点</td></tr>
+  <tr><td><b>换热</b></td><td>传热温差 ΔT</td><td>ΔT 加倍意味着换热面积或流速同步加大，代价线性以上增长</td></tr>
+</table></div>
+
+<div class="note">
+  <p><span class="tag">共性与推论</span>能耗对「过度满足」是超线性惩罚，对「刚好满足」最省，而「欠一点」会违反工艺——三者合起来的必然结论是：<strong>最优工作点一定落在约束边界上</strong>（或边界内侧一条受控的最小安全带内）。这条安全带就是 §13.1 里的 δ（动态安全裕度），它可以显式建模、按需给，而不是靠拍脑袋拍出来的整数。</p>
+</div>
+
+<h3 id="s1-5">1.5 来源四：多设备耦合，单回路 PID 看不见</h3>
+<ul>
+  <li>并联机组的出力组合：同样总流量，「两台 50%」与「一台 100%」效率差异显著；</li>
+  <li>跨设备负耦合：冷冻水供水温度 ↑ 省了冷机，却使末端流量必须 ↑ 费了泵——<strong>系统最优解不在任何单回路的最优解上</strong>；</li>
+  <li>内部抵消：制冷的同时再加热、加湿的同时除湿，两笔能耗互相报销；</li>
+  <li>首尾耦合：冷却塔出水温度与冷机冷凝温度互相制约。</li>
+</ul>
+<p>这不是 PID 的缺陷，而是单回路结构的固有边界：每个回路的反馈信息只有自己的那一个偏差，它<strong>在原理上就看不到</strong>「自己多压这一度」与「隔壁设备多耗那几度电」之间的关联。</p>
+
+<h3 id="s1-6">1.6 为什么底层 PID 永远不会主动去做</h3>
+<ol>
+  <li><strong>设定值是人给的</strong>，而人的设定值就是 §1.2 那串保守叠加的结果——PID 对此无从质疑，它只会忠实执行；</li>
+  <li><strong>PID 没有目标函数，只有误差</strong>。它的世界只有 e = r − y，不知道「这一度是花了多少电买来的」；</li>
+  <li><strong>PID 没有约束处理能力</strong>。在多约束下求极值是 MPC / RTO 的专长，PID 只能靠输出限幅、抗积分饱和被动应对；</li>
+  <li><strong>积分项会把工作点牢牢钉死在设定值上</strong>——这本身就是「不愿放松」的机制。</li>
+</ol>
+<div class="note plain">
+  <p>🧭 一句话总结：PID 并不差，它只是<strong>被问错了问题</strong>。它被问的是「你追上设定值了吗」，而省电需要回答的是「你用最少的电守住工艺了吗」。这两个问题必须由两层结构分工回答。</p>
+</div>
+
+<h3 id="s1-7">1.7 上层优化层实际在做什么</h3>
+<pre class="diagram">上层优化层（分钟级 · 本次新增）                      底层控制层（毫秒~秒级 · 原有 PID）
+  读当前工况 DV（气温 / 产量 / 来料）                   接收上层给出的 CV 设定值
+  + 辨识模型 ĝ(u, d) 与能耗模型 P(u)                    闭环运算 → 驱动阀 / 泵 / 电源
+  求解   min P(u)   s.t.  y ∈ [y_low + δ, y_high − δ]   抑制扰动、处理全部动态与安全联锁
+    ↓                                                          ▲
+  输出「最优 CV 设定值」 ────────── 只写设定值 ─────────────────┘</pre>
+<ul>
+  <li>它输出的是<strong>设定值，不是阀门开度</strong>。这一点决定了它的安全性：底层设备、程序、联锁一行不改；上层失效或失准，只要把设定值撤回到原值，系统立刻回到原来的运行方式（§15 硬旁路）；</li>
+  <li>数学模型——在一个被工艺约束围成的<strong>可行域</strong>内寻找能耗最低点（完整形式见 §13.1）：
+    <div class="formula">min<sub>u</sub> P(u) &nbsp;&nbsp; s.t. &nbsp;&nbsp; y<sub>ss</sub> = g(u, d) ∈ [y<sub>low</sub> + δ, y<sub>high</sub> − δ] , &nbsp;&nbsp; u ∈ [u<sub>min</sub>, u<sub>max</sub>]</div>
+    由于可行域随环境温度、产量等 DV 实时移动，最优点也必须滚动地重算；</li>
+  <li>所需模型 g(u, d) 与 P(u) 从哪来？<strong>正是本文后半段的全部内容</strong>：低扰动 PRBS 激励 → Hammerstein (FOPDT) 辨识 → 残差验证，得到的就是 §13.1 能耗目标函数里那两个函数。没有模型，就只能写「温度 ≥ 50℃ 就开泵」这类靠人拍阈值的规则；有了模型，才能连续寻优。</li>
+</ul>
+
+<h3 id="s1-8">1.8 节能率的量级、适用边界与核算陷阱</h3>
+<p>前面那个 10%~30% 就是下表几项的叠加（不等于简单相加，多项往往同源）：</p>
+<div class="tbl-wrap"><table>
+  <tr><th>节能来源</th><th>典型幅度</th><th>成立前提</th></tr>
+  <tr><td>收回设定值裕度</td><td>2%~6%</td><td>存在可量化的工艺余量，对象可建模</td></tr>
+  <tr><td>压差 / 温度重设 + 变频替代节流</td><td>10%~25%</td><td>泵与风机在系统能耗中占比高</td></tr>
+  <tr><td>台数优化与负荷分配</td><td>3%~8%</td><td>有并联机组，且常年负荷偏低</td></tr>
+  <tr><td>消除冷热抵消 / 再热</td><td>可达 10%+</td><td>原系统确实存在同时冷热投入</td></tr>
+</table></div>
+<p><strong>什么时候不成立，必须如实告知客户：</strong></p>
+<ul>
+  <li>设备已在额定高效区附近运行，或负荷率本就极低/极高，没有压缩空间；</li>
+  <li>负荷波动<strong>快于优化周期</strong>——上层跟不上反而引起设定值振荡，比不优化更费电；</li>
+  <li>工艺约束其实是<strong>等式</strong>（必须精确控温的工段），此时没有松弛可榨，只能靠更换高效设备本身；</li>
+  <li><strong>计量陷阱</strong>：节能率必须建立在同工况、同产量、同气象的可比基线上，否则极易把「今年夏天凉快」记成「我优化了」。这部分单独成章，见 §17 节能量核算（M&amp;V）。</li>
+</ul>
+
+<h2 id="s2"><span class="no">2</span>适用边界与约束条件</h2>
+
+<h3>✅ 适合本方案</h3>
+<ul>
+  <li>热工类对象（冷却、加热、恒温，空压机冷却水、工艺水冷、热风烘干等），存在惯性 + 纯滞后，执行器存在非线性；</li>
+  <li>工艺允许小幅度、短时间扰动（可做低幅值 PRBS 激励）；</li>
+  <li>有可观测被控变量（温度、压力等工艺指标）；</li>
+  <li>可采集操纵变量（阀位、频率、电流、功率），以及可测扰动（环境温度、进水温度、流量）；</li>
+  <li><strong>存在明显「过供给」痕迹</strong>（投入产出比最高的一类对象，见 §1.2）：设定值层层加裕度、多台并联设备常年同开、主要靠阀门/挡板节流调节、存在再热与冷热抵消、低负荷或夜间不降载。冗余越多，可压缩空间越大。</li>
+</ul>
+
+<h3>❌ 不适用</h3>
+<ul>
+  <li>工艺完全不允许任何扰动，无法开展激励实验，只能使用历史闭环数据（需要闭环辨识，本方案不作为首选）；</li>
+  <li>强耦合 MIMO、多变量强交互，单回路 FOPDT 假设失效；</li>
+  <li>频繁启停、间歇批次生产，工况持续跳变，系统强时变；</li>
+  <li>安全联锁和工艺不允许外部设定值写入。</li>
+</ul>
+
+<div class="note">
+  <p><span class="tag">大白话</span>TEC、变频泵这类设备，「给多少电」和「产生多少冷量/流量」之间不是简单的倍数关系（加倍电流得不到加倍冷量），这是一道<strong>静态的非线性变换</strong>；而冷量传到水温又需要时间、有惯性，这是一段<strong>动态的延迟过程</strong>。Hammerstein 模型就是把这两件事串起来：先过「非线性换算」，再过「惯性延迟」。</p>
+  <p><strong>备选模型</strong>：① 弱非线性工况直接 FOPDT；② 传感器非线性为主选 Wiener；③ 两端都强非线性选 Hammerstein-Wiener（参数多、易过拟合，工程慎用）。</p>
+</div>
+
+<h2 id="s3"><span class="no">3</span>术语与缩写对照表（含大白话解释）</h2>
+
+<div class="tbl-wrap"><table>
+  <tr><th>缩写</th><th>全称</th><th>说明</th><th>大白话</th></tr>
+  <tr><td><b>MV</b></td><td>Manipulated Variable</td><td>操纵变量，上层可以调整的输入</td><td>「能拧的阀门」</td></tr>
+  <tr><td><b>CV</b></td><td>Controlled Variable</td><td>被控变量，工艺需要控制的指标</td><td>「要守住的红线指标」</td></tr>
+  <tr><td><b>DV</b></td><td>Disturbance Variable</td><td>可测扰动变量，不受控但可观测</td><td>「管不了但看得见的影响因素」，如气温</td></tr>
+  <tr><td><b>FOPDT</b></td><td>First Order Plus Dead Time</td><td>一阶惯性加纯滞后模型</td><td>「烧水惯性 + 传热延迟」两个参数就说清</td></tr>
+  <tr><td><b>PRBS</b></td><td>Pseudo-Random Binary Sequence</td><td>伪随机二进制序列；本文用多电平扩展</td><td>「按随机谱换挡踩电门」，把系统各频段都敲一遍</td></tr>
+  <tr><td><b>PE</b></td><td>Persistently Exciting</td><td>持续激励，辨识输入的必要条件</td><td>「考题覆盖面」：考题不全，成绩（模型）不可信</td></tr>
+  <tr><td><b>NLS</b></td><td>Nonlinear Least Squares</td><td>非线性最小二乘，参数辨识算法</td><td>「调旋钮让预测曲线尽量贴合实测曲线」</td></tr>
+  <tr><td><b>LM</b></td><td>Levenberg–Marquardt</td><td>求解 NLS 的经典优化算法</td><td>NLS 的「下山找谷底」导航算法</td></tr>
+  <tr><td><b>ACF</b></td><td>Auto-Correlation Function</td><td>自相关函数，残差白噪声检验</td><td>「检查预测误差是不是纯粹的随机噪声」</td></tr>
+  <tr><td><b>CCF</b></td><td>Cross-Correlation Function</td><td>互相关函数，残差与输入相关性检验</td><td>「检查误差里是否还藏着没用上的输入信息」</td></tr>
+  <tr><td><b>AIC</b></td><td>Akaike Information Criterion</td><td>赤池信息准则，模型选择</td><td>「既要拟合好、又要参数少」的打分器</td></tr>
+  <tr><td><b>BIC</b></td><td>Bayesian Information Criterion</td><td>贝叶斯信息准则，惩罚参数更强</td><td>更严格的 AIC，工程优先</td></tr>
+  <tr><td><b>MPC</b></td><td>Model Predictive Control</td><td>模型预测控制，滚动时域优化</td><td>「像导航一样滚动规划」：看前方一段路，只走一步，再看再规划</td></tr>
+  <tr><td><b>SSTO</b></td><td>Steady-State Target Optimization</td><td>稳态目标优化</td><td>上层只算「最省电的稳态目标」，动态交给底层 PID</td></tr>
+  <tr><td><b>LTI</b></td><td>Linear Time-Invariant</td><td>线性时不变系统假设</td><td>「设备特性不随时间变」的理想假设</td></tr>
+  <tr><td><b>EIV</b></td><td>Errors-In-Variables</td><td>输入输出都带噪声的模型</td><td>「连尺子本身也有误差」的情形</td></tr>
+  <tr><td><b>NRMSE</b></td><td>Normalized RMSE</td><td>归一化均方根误差</td><td>「平均预测偏差占量程的百分比」</td></tr>
+  <tr><td><b>M&amp;V</b></td><td>Measurement &amp; Verification</td><td>测量与验证（节能量核算）</td><td>「节能收益的对账方法」</td></tr>
+  <tr><td><b>影子模式</b></td><td>Shadow Mode</td><td>只预测不下发的并行试运行</td><td>「新司机坐副驾先观摩，不碰方向盘」</td></tr>
+</table></div>
+
+<h2 id="s4"><span class="no">4</span>系统辨识整体方法论框架（迭代闭环流程）</h2>
+
+<pre class="diagram">现场调研与变量筛选 → 测点规划（零侵入，只读采集）
+→ 激励方案设计（低扰动 PRBS，控制扰动幅度，保障生产）
+→ 时序数据采集 → 数据预处理 → PE 检验（不通过 → 返回激励设计）
+→ 参数辨识 NLS，Hammerstein (FOPDT)
+→ 模型验证（拟合指标，ACF 残差，CCF 输入-残差交叉相关，AIC/BIC 择优）
+→ 模型诊断（参数共线性，置信区间，插值/外推边界评估，假设校验）
+→ 控制策略设计：MPC / 增益调度 PID / 模型辅助 PID 整定
+→ 离线仿真验证（数字孪生，先在模型上跑闭环，评估超调、约束、能耗）
+→ 软投切：影子模式 → 手动推荐 → 半自动 → 自动设定值下发（保留随时切回）
+→ 在线模型监测，模型漂移告警 → 必要时重新激励、重新辨识，迭代更新模型</pre>
+
+<div class="note">
+  <p>💡 <strong>核心</strong>：辨识是迭代闭环，不是一次性拟合；模型只用于预测和优化；底层反馈永远保留作为安全兜底。</p>
+  <p><span class="tag">大白话</span>整个流程像「考驾照」——先体检（调研）、再练车（激励实验）、模拟考（离线仿真）、副驾驶观摩（影子模式）、陪同驾驶（手动/半自动）、最后独立上路（全自动），而且任何时候教练都能踩刹车（硬旁路切回）。</p>
+</div>
+
+<h2 id="s5"><span class="no">5</span>现场调研、变量筛选与测点规划（零侵入测点选型）</h2>
+
+<div class="note">
+  <p>零侵入核心：优先读取现有 SCADA/PLC 的已存测点，<strong>只读，不写回原 PLC</strong>；缺失测点才外挂传感器。外挂传感器旁路安装，不改动原有管路、接线和安全回路。</p>
+</div>
+
+<h3>5.1 变量分类</h3>
+<ol>
+  <li><strong>操纵变量 MV</strong>：上层优化可以推荐调整的变量，如制冷机电流、泵频率、阀位；</li>
+  <li><strong>被控变量 CV</strong>：工艺约束指标（温度、压力，必须落在工艺上下限）；</li>
+  <li><strong>可测扰动 DV</strong>：不受控制，但可观测，影响 CV；环境温度、进水温度、来料温度。</li>
+</ol>
+
+<div class="note">
+  <p>✅ 筛选原则：MV → CV 因果关系明确；优先剔除高度共线的变量（两个变量变化趋势几乎一样的只留一个），减少模型病态。</p>
+  <p><span class="tag">大白话</span>共线变量就像「两个人同时喊口令」，模型分不清该听谁的，会给出生理上不可能的组合参数。</p>
+</div>
+
+<h3>5.2 测点规范</h3>
+<ul>
+  <li><strong>时间同步</strong>：全部测点统一时间戳（NTP 对时，误差 &lt; 1 个采样周期）；不同源的采集程序必须打「源时间戳」，防止用「到达时间」冒充「测量时间」——无线/总线传感器（如 LoRa）的真实测量时刻可能比平台收到时刻早十几秒，直接用接收时间等于给系统人为加了一段随机滞后，辨识出的动态必然失真（本文 TEC 案例就踩过此坑，见 §19.6）；</li>
+  <li><strong>采样周期</strong>：推荐 1~10s，按对象带宽确定。<strong>工程经验：采样周期取主导时间常数的 1/4 ~ 1/10</strong>。例如冷却水系统时间常数约 10 min，采样 30~60s 足够；风口级快响应约 1 min，采样 5~15s。「高于系统带宽 2 倍」只是奈奎斯特不混叠的理论下限，按它采样只能保证「不走样」，远不足以「看清动态形状」；</li>
+  <li><strong>采集模式</strong>：旁路采集，只读；原系统不受采集程序影响；</li>
+  <li><strong>记录元数据</strong>：设备状态（运行/停机）、事件日志（清洗、检修、批次切换），用于后续标记异常段。</li>
+</ul>
+
+<p>📌 输出成果：变量清单，测点映射，采样周期，工艺安全上下限。</p>
+
+<h2 id="s6"><span class="no">6</span>实验设计，激励信号设计（最小扰动激励，兼顾生产安全）</h2>
+
+<div class="note warn">
+  <p>工业场景不能像实验室小样那样大范围扫电流；<strong>零侵入激励原则：小幅度多电平 PRBS，扰动控制在工艺允许的波动带宽内，不能触发工艺报警</strong>。</p>
+</div>
+
+<h3>6.1 什么是 PRBS？为什么要用它？</h3>
+<div class="note">
+  <p><span class="tag">大白话</span>辨识模型的原理是「看输入怎么动、输出怎么跟」。如果输入一直不动（恒功率运行），输出也静止，什么都学不到——就像想知道车的动力如何，不能一直定速巡航，得<strong>变换着踩油门</strong>。但乱踩会晕车（扰动生产），PRBS 就是一份「精心设计的换挡谱」：在几个安全档位之间按伪随机规律切换，既把系统各频段都「敲」了一遍，又把每次扰动控制在工艺可接受的范围。</p>
+</div>
+
+<p>激励信号设计要点（多电平 PRBS，不是传统 2 电平）：</p>
+<ol>
+  <li><strong>激励幅值</strong>：在当前稳态点 ±Δ 范围，Δ 由工艺工程师确认，保证不越工艺阈值。<strong>同时有下限</strong>：输出响应的峰峰值应 ≥ 3~5 倍传感器噪声标准差，否则响应淹没在噪声里，实验白做。设计方法：先做 1~2 次小幅「试探性阶跃」，测出响应幅度与噪声水平，再定正式幅值；</li>
+  <li><strong>电平数量</strong>：一般取 3~5 电平；电平越多激励越丰富，对非线性辨识越有利，但扰动变大；</li>
+  <li><strong>保持时间（驻留时间）</strong>：取<strong>主导时间常数的 1/3 ~ 1 倍</strong>。热工对象时间常数常达 10 min 以上，若要求「驻留大于时间常数」，一次实验要跑数天，且驻留过长会使激励能量全堆在低频、丧失中高频信息；驻留太短（远小于时间常数）则响应起不来。1/3~1 倍是兼顾两者的工程折中；</li>
+  <li><strong>实验总时长</strong>：<strong>≥ 10~20 倍主导时间常数</strong>。时间常数 10 min 的系统，单次实验至少 2~3 小时。数据不够是辨识失败最常见的隐性原因；</li>
+  <li><strong>激励独立性</strong>：激励序列预先生成，不根据 CV 实时反馈调整。</li>
+</ol>
+
+<h3>6.2 重要澄清：「开环辨识」在工业现场的准确含义</h3>
+<p>工业语境下常说「开环激励 = 底层 PID 仍维持闭环，设定值由外部激励序列给出」。严格地说，<strong>这属于「闭环操作下的设定点激励」</strong>，不是教科书意义的开环辨识——回路并没有断开，底层 PID 还在工作。必须澄清两点，否则评审与落地都会出问题：</p>
+<ol>
+  <li><strong>为什么这样做仍然有效</strong>：闭环辨识产生偏差的根源是「输入与噪声通过反馈相关联」。而当激励是<strong>外部注入的设定值序列</strong>、且与过程噪声统计独立时，只要激励功率足够盖过噪声经反馈引起的输入分量，预测误差类方法（NLS/ARX）的偏差可以忽略。前提：① 激励序列离线生成、与扰动独立；② 激励幅值满足 §6.1 的信噪比下限；</li>
+  <li><strong>必须用实测 MV，不能用激励设定序列</strong>：底层 PID 会「抵抗」设定值激励（它要维持原 CV，会反向调节 MV），导致<strong>实际 MV 曲线 ≠ 激励序列</strong>。辨识的输入必须取执行器上<strong>实际测到的</strong> MV（电流/阀位/频率实测值），否则模型增益会系统性偏小。本文 TEC 案例即按此执行（实测电流作为 MV，见 §19）。</li>
+</ol>
+
+<div class="note">
+  <p>🔒 安全约束：设置硬限幅，超限自动终止激励实验，切回原有设定值。</p>
+  <p>✅ 推荐：至少 2 条独立激励序列（用不同随机种子生成），一条用于辨识，一条用于后续独立轨迹交叉验证。</p>
+  <p>备注：如果工艺完全不允许任何激励，只能采用历史运行数据，此时属于闭环辨识，不能直接套用本 Hammerstein (FOPDT)+NLS 流程，存在参数有偏风险。</p>
+</div>
+
+<h2 id="s7"><span class="no">7</span>时序数据采集、数据预处理与数据质量诊断</h2>
+
+<p><strong>处理顺序（注意：先划分、后归一化）：</strong></p>
+<pre class="diagram">异常标记 → 坏点剔除 → 缺失处理 → 稳态/非稳态分段 → 数据集划分（先划分！）
+→ 去趋势，构造偏差变量 → 归一化（只用训练集统计量！）→ 输出辨识数据包</pre>
+
+<ol>
+  <li><strong>异常点</strong>：传感器尖峰、通信丢包、设备启停、人工干预事件；直接标记，优先剔除。连续多点缺失，直接舍弃片段，禁止长段插值（短缺口 ≤ 3 个采样点可线性插值并打标记）；</li>
+  <li><strong>稳态/非稳态分段</strong>：<strong>实验初始段若系统未达稳态必须剔除</strong>——初始段的大幅自然趋势会淹没激励响应、主导参数估计（TEC 案例实测：水杯初始 41.9℃ 自然降温的前 16 min 混入后，测试段 R² 从 0.95 掉到 0.91，见 §19.6）；</li>
+  <li><strong>数据集划分（时序切分，禁止打乱时序）——必须先于归一化</strong>：训练集 70%，验证集 20%，测试集 10%，仅作为插值初步评估；黄金验证：独立第二条激励轨迹作为外测试集，评估泛化能力；</li>
+  <li><strong>去趋势</strong>：把所有变量转为相对于稳态工作点的增量，消除稳态偏移，适配动态辨识；</li>
+  <li><strong>归一化</strong>：不同量纲（℃，A，kW，Hz）映射至统一区间，改善 NLS 优化收敛；预测输出后执行反归一化。</li>
+</ol>
+
+<div class="note warn">
+  <p><span class="tag">数据泄漏风险</span>归一化的均值/标准差<strong>只能用训练集计算</strong>，再把同一组统计量套用到验证/测试集。若先对全数据归一化再划分，等于「偷看了考题答案的分布」，验收指标会虚高，模型上线后表现出现落差。</p>
+  <p><strong>时间轴还原</strong>：无线/总线传感器（LoRa、无线 Hart 等）若存在随机传输滞后，必须先用「采样时刻 − 读数年龄（age）」还原真实测量时刻，再重采样对齐，禁止直接用到达时刻。</p>
+</div>
+
+<div class="note plain">
+  <p>🧾 <strong>数据质量诊断项</strong>：</p>
+  <ul>
+    <li>采样丢包率：要求 &lt; 1%（无线链路可放宽至 5%，但需插值标记）；</li>
+    <li>传感器噪声水平：静态稳态下的标准差 σ（它是 §6.1 激励幅值下限的依据）；</li>
+    <li>变量相关性矩阵，识别强共线变量；</li>
+    <li>检查是否存在饱和、限幅（执行器饱和会破坏辨识的线性性假设，饱和段必须剔除）。</li>
+  </ul>
+  <p><strong>参考实现（numpy，可直接复用）</strong>：上述处理流程的四个核心动作。</p>
+</div>
+
+<pre class="code">import numpy as np
+
+def reject_outliers(x, k=5.0):
+    """稳健剔尖峰：MAD 判据 |x-median| &gt; k*1.4826*MAD → NaN。
+    为什么不用 3σ：尖峰会同时抬高 σ 本身，导致漏检；MAD 对尖峰不敏感。"""
+    x = np.asarray(x, float).copy()
+    mad = np.nanmedian(np.abs(x - np.nanmedian(x)))
+    if mad &gt; 0:
+        bad = np.abs(x - np.nanmedian(x)) &gt; k * 1.4826 * mad
+        x[bad] = np.nan                      <span class="c"># 统一用 NaN 标记，后续统一处理</span>
+    return x
+
+def fill_short_gaps(x, max_gap=3):
+    """短缺口线性插值（≤3 点）；长缺口保持 NaN——禁止长段插值伪造动态。"""
+    x = np.asarray(x, float).copy()
+    for i in range(len(x)):
+        if np.isnan(x[i]):
+            j = i
+            while j &lt; len(x) and np.isnan(x[j]):
+                j += 1
+            if 0 &lt; i and j &lt; len(x) and (j - i) &lt;= max_gap:   <span class="c"># 两端有真值且缺口短</span>
+                x[i:j] = np.interp(np.arange(i, j), [i - 1, j], [x[i - 1], x[j]])
+    return x
+
+def resample_align(t_arrive, x, age, dt):
+    """时间轴还原 + 等间隔重采样（无线/总线测点必做）。
+    t_true = t_arrive - age（age = 读数年龄），禁止直接用到达时刻。"""
+    t_true = np.asarray(t_arrive, float) - np.asarray(age, float)
+    grid = np.arange(t_true[0], t_true[-1], dt)
+    return grid, np.interp(grid, t_true, x)
+
+def split_then_scale(data, ratios=(0.7, 0.2, 0.1)):
+    """先切分、后归一化——归一化统计量只来自训练集（防数据泄漏）。"""
+    n = len(data)
+    n_tr, n_va = int(n * ratios[0]), int(n * ratios[1])
+    train, val, test = data[:n_tr], data[n_tr:n_tr + n_va], data[n_tr + n_va:]
+    mu, sd = train.mean(0), train.std(0) + 1e-12
+    return [(d - mu) / sd for d in (train, val, test)], (mu, sd)</pre>
+
+<div class="note warn">
+  <p>⚠️ 顺序不能乱：<strong>剔异常 → 补短缺口 → 时间轴还原 / 重采样 → 切分 → 去趋势 / 归一化</strong>。先归一化再切分，会把测试集的分布信息泄漏进训练过程，验收指标虚高。</p>
+</div>
+
+<h2 id="s8"><span class="no">8</span>持续激励 PE 检验（辨识准入关卡）</h2>
+
+<div class="note warn">
+  <p>🚨 前置准入检查：<strong>不通过 PE 检验，禁止进入参数辨识</strong>。</p>
+  <p><span class="tag">大白话</span>考题覆盖面检查。如果激励实验只「考」了系统的一部分特性（比如电流只在小范围抖动），那么没考到的部分模型就是蒙的——平时测验（训练集拟合）成绩再好，大考（外推工况）必然露馅。</p>
+</div>
+
+<h3>8.1 检验对象（Hammerstein 特别注意）</h3>
+<p>PE 检验不是只检验原始 MV；而是检验<strong>经过静态非线性映射后的隐变量 z</strong>。就算输入电流是 PRBS，如果一直落在 TEC 非线性曲线的平坦区域，隐变量 z 几乎不变，此时内部 FOPDT 子系统不可辨识，参数多解，拟合看着好看，但外推预测完全失效。</p>
+
+<h3>8.2 检验方法（具体构造）</h3>
+<ol>
+  <li>取滞后阶数 n（n ≥ 待辨识模型的滞后参数个数，工程上取 10 左右）；</li>
+  <li>构造回归向量 φ(k) = [u(k-1), u(k-2), ..., u(k-n)]<sup>T</sup>，<strong>去均值</strong>后计算信息矩阵：</li>
+</ol>
+<div class="formula">R = (1/N) · Σ φ(k)φ(k)<sup>T</sup></div>
+<ol start="3">
+  <li>判定（两条同时满足）：<strong>满秩</strong> rank(R) = n，说明输入是 n 阶持续激励；<strong>条件数有界</strong> κ(R) = λmax/λmin 小于阈值。阈值是<strong>经验值</strong>：设计良好的 m 序列 κ 通常在 10 以内；κ &gt; 10³ 判定病态、激励不足。注意：含常数项（不去均值）的条件数会被信号均值放大，<strong>判据必须用去均值后的条件数</strong>；</li>
+  <li>对 Hammerstein：用预估计的静态非线性得到隐变量 ẑ，对 ẑ 重复上述检验。</li>
+</ol>
+
+<p>参考实现（采集脚本内置的 PE 自检）：</p>
+<pre class="code">def check_pe(u, order=10, cond_limit=1000.0):
+    <span class="c"># 持续激励检验：回归向量 φ=[u(k-1)..u(k-order)] 去均值后的信息矩阵条件数</span>
+    n = len(u)
+    rows = [[u[k - i] for i in range(1, order + 1)] for k in range(order, n)]
+    mean = [sum(r[j] for r in rows) / len(rows) for j in range(order)]
+    R = [[sum((r[i]-mean[i]) * (r[j]-mean[j]) for r in rows) / len(rows)
+          for j in range(order)] for i in range(order)]
+    return cond_number(R) &lt; cond_limit   <span class="c"># cond_number：幂迭代求 λmax/λmin</span></pre>
+
+<div class="note">
+  <p>对策：在工艺允许前提下，适度扩大激励幅值，增加电平，延长序列。</p>
+  <p>💡 提醒：高条件数场景下，哪怕 NRMSE、R² 指标很好，模型也不可信。<strong>拟合指标不能替代 PE 检验。</strong></p>
+</div>
+
+<h2 id="s9"><span class="no">9</span>模型结构选择：Hammerstein (FOPDT) 模型定义、备选模型对比</h2>
+
+<h3>9.1 模型定义</h3>
+<p>Hammerstein 结构（静态非线性块在前）：</p>
+<div class="formula">z(k) = f(u(k), P(k))</div>
+<p>f(・) 是静态非线性映射（多项式/样条，系数待辨识），输入操纵变量（可辅以功率），输出等效热驱动隐变量 z(k)。</p>
+<p>FOPDT 连续传递函数：</p>
+<div class="formula">G(s) = K / (T·s + 1) · e<sup>(−τ·s)</sup></div>
+<p>K 增益，T 时间常数，τ 纯滞后；离散化到采样周期 Ts，叠加扰动项：</p>
+<div class="formula">Δy(k+1) = a·Δy(k) + b·z(k−τ<sub>d</sub>) + Σ c<sub>i</sub>·Δd<sub>i</sub>(k)</div>
+<p>τ<sub>d</sub> 是离散滞后采样点数；Δd<sub>i</sub>(k) 为可测扰动增量。</p>
+
+<p><strong>结构示意：</strong></p>
+<pre class="diagram"> 电流/阀位 u ──►┌──────────────┐  隐变量 z  ┌───────────────┐
+                │ 静态非线性 f  │ ─────────► │ FOPDT 线性动态 │ ──┐
+ 功率 P ───────►│ (多项式/样条) │            │ K/(Ts+1)·e^-τs │   │
+                └──────────────┘            └───────────────┘   ▼
+ 环境温度等 DV ─────────────────────────────────────────────► ( + ) ──► 输出 y（温度）</pre>
+
+<h3>9.2 ⚠️ 增益不可辨识性（教科书级的坑）</h3>
+<p>Hammerstein 模型有一个必须处理的问题：静态块 f 乘以任意常数 α、同时线性块增益 K 除以 α，输入-输出行为<strong>完全不变</strong>。也就是说 f 与 K 的增益分配是任意的，NLS 会遇到无穷多组等价解，表现为：参数置信区间巨大、不同初值收敛到看似不同但预测相同的参数、优化病态。</p>
+<div class="note">
+  <p><strong>工程解法（增益归一化约定，必须写进实现）</strong>：固定静态块的尺度——例如强制 f 在激励范围内的平均增益为 1（或固定 f 的某一个系数为 1），把全部静态增益归入线性块的 K。这样参数唯一可辨识，K 的物理意义也完整。</p>
+</div>
+
+<h3>9.3 备选模型对比</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>模型</th><th>结构</th><th>适用场景</th><th>缺点</th></tr>
+  <tr><td><b>FOPDT</b></td><td>线性，一阶惯性 + 纯滞后</td><td>弱非线性对象</td><td>强非线性工况下拟合差，外推失效</td></tr>
+  <tr><td><b>Hammerstein(FOPDT)</b></td><td>静态非线性 → FOPDT 线性动态</td><td>执行器非线性，热工/制冷、TEC、阀非线性</td><td>非线性块参数增加，非凸优化，需要多初值搜索；需注意增益归一化</td></tr>
+  <tr><td><b>Wiener(FOPDT)</b></td><td>FOPDT 线性动态 → 静态非线性</td><td>传感器非线性为主</td><td>不适合执行器非线性场景</td></tr>
+  <tr><td><b>Hammerstein-Wiener</b></td><td>非线性 - FOPDT - 非线性</td><td>两端都存在非线性</td><td>参数爆炸，极易过拟合，工程慎用</td></tr>
+</table></div>
+
+<p>✅ 阶次扫描原则：如果 FOPDT 的残差 CCF 显著不为 0，说明一阶假设不足，可以升级到高阶线性模型；优先保持 FOPDT，一阶模型可解释性强，更适合工程落地。</p>
+
+<h2 id="s10"><span class="no">10</span>参数估计（NLS 非线性最小二乘）</h2>
+
+<p>损失函数：最小化模型<strong>自由仿真</strong>输出与实测被控变量的残差平方和：</p>
+<div class="formula">θ̂ = argmin<sub>θ</sub> Σ<sub>k</sub> [ ŷ<sub>k</sub><sup>sim</sup>(θ) − y<sub>meas,k</sub> ]²</div>
+<p>θ 包含：静态非线性 f 的系数（已做增益归一化）、FOPDT 参数 K, T、扰动增益、离散滞后 τ<sub>d</sub>。</p>
+
+<div class="note">
+  <p><strong>为什么用「自由仿真误差」而不是「一步预测误差」做准则</strong>：一步预测每次都用真实测量值「重置」状态，误差不会累积，拟合指标天然好看；而模型部署后是做长时域开环预测的，必须用自由仿真（模型输出回馈自身）评估才等于部署指标。TEC 案例实测对比：同一组参数，一步预测 NRMSE 6.5%，自由仿真 13.3%（见 §19.6）。实践中常用线性 ARX（一步准则，凸问题、秒解）快速扫滞后与阶次、产出初值，再用 NLS 仿真误差准则精修。</p>
+</div>
+
+<h3>10.1 ⚠️ 离散滞后的处理</h3>
+<p>「θ 包含离散滞后 τ<sub>d</sub>，用 LM 求解」这句话有一个算法陷阱：<strong>τ<sub>d</sub> 是整数参数，损失函数对它不连续、不可导</strong>，LM 等梯度类算法无法直接优化，会卡在最近邻的整数上。</p>
+<p><strong>正确做法——双层优化</strong>：</p>
+<pre class="diagram">外层：枚举 τ_d ∈ {0, 1, 2, ..., τ_max}      ← 网格/枚举（τ_max 按物理先验，如 滞后上限/Ts）
+  内层：固定 τ_d，用 LM 优化连续参数 {f 系数, K, T, 扰动增益}   ← 可导，正常 NLS
+取外层损失最小的组合</pre>
+
+<p>参考骨架：</p>
+<pre class="code">best = None
+for tau_d in range(0, tau_max + 1):            <span class="c"># 外层：枚举整数滞后</span>
+    for seed in range(N_INIT):                 <span class="c"># 多初值防局部极小</span>
+        theta0 = random_init(physical_bounds)
+        theta, loss = levenberg_marquardt(loss_fn, theta0, fixed_tau_d=tau_d)
+        if best is None or loss &lt; best.loss:
+            best = (tau_d, theta, loss)</pre>
+
+<h3>10.2 工程要点</h3>
+<ol>
+  <li><strong>多初值随机搜索</strong>：NLS 是非凸优化，极易卡在局部极小；多组随机初值 + 物理边界约束，筛选最优解；</li>
+  <li><strong>参数硬约束</strong>：物理约束，例如时间常数 T &gt; 0、滞后 ≥ 0、静态块单调性（TEC 电流增大冷量必须单调不减），拒绝无物理意义参数；</li>
+  <li><strong>优化器推荐</strong>：Levenberg–Marquardt（LM），中小规模问题收敛快；大规模可用信赖域（trust-region）；</li>
+  <li><strong>模型假设</strong>：NLS 默认输入测量无噪声，输出为加性白噪声。</li>
+</ol>
+
+<div class="note warn">
+  <p>⚠️ EIV 风险：如果 MV 传感器噪声不可忽略（输入也带噪声），NLS 估计会存在渐近偏差；备选方案：工具变量 IV、ARMAX、极大似然 MLE；噪声方差随工况变化（异方差）可采用 WLS 加权最小二乘。</p>
+</div>
+
+<h2 id="s11"><span class="no">11</span>模型验证、残差检验、模型择优（AIC/BIC，ACF+CCF）</h2>
+
+<p>❗ 不能只看拟合曲线，必须全套验证：</p>
+<ol>
+  <li><strong>时域量化指标</strong>：NRMSE、R²（在独立测试段 / 黄金验证轨迹上计算）：</li>
+</ol>
+<div class="formula">NRMSE = sqrt( (1/N)·Σ(ŷ(k)−y(k))² ) / ( max(y) − min(y) )</div>
+<div class="note">
+  <p>注意 NRMSE 对分母敏感：小幅度激励下输出变化范围（max−min）小，同样的绝对误差会显得 NRMSE 偏大，解读时需结合绝对误差（℃）一起看（见 §19.6 实测）。</p>
+</div>
+<ol start="2">
+  <li><strong>残差检验（核心）</strong>，残差 ε(k) = y(k) − ŷ(k)：</li>
+</ol>
+<div class="note">
+  <p>✅ <strong>ACF 残差自相关</strong>：检验残差是否趋近白噪声；存在显著自相关 = 还有未建模动态（比如一阶假设不够）。</p>
+  <p>✅ <strong>CCF 残差与历史输入互相关</strong>：<strong>如果 CCF 显著不为 0，说明模型结构存在根本性偏差（结构错了或阶次不够），不是单纯噪声问题。</strong></p>
+  <p><span class="tag">大白话</span>好的模型应该把输入里的信息「榨干」，剩下的误差应该是纯粹的、前后不相关的随机噪声。如果误差还有规律可循，说明模型还有没学到的东西。</p>
+</div>
+<ol start="3">
+  <li><strong>AIC/BIC 信息准则</strong>，多个候选模型择优：</li>
+</ol>
+<div class="formula">AIC = N·ln(SSE/N) + 2·n<sub>p</sub> ，  BIC = N·ln(SSE/N) + n<sub>p</sub>·ln(N)</div>
+<p>n<sub>p</sub>：参数数量；BIC 对参数数量惩罚更强，工程优先使用；AIC/BIC 数值越小越好。</p>
+<p>✅ 判定原则：AIC/BIC 不能单独作为判定依据，<strong>必须配合 ACF+CCF 残差检验一起评估</strong>。</p>
+
+<p><strong>参考实现（numpy）：验证指标与三项残差检验</strong></p>
+
+<pre class="code">def nrmse(y, yhat):
+    """归一化均方根误差：&lt;5% 优，5~10% 可接受，&gt;15% 不可用"""
+    return 100.0 * np.sqrt(np.mean((y - yhat) ** 2)) / (y.max() - y.min())
+
+def r2_score(y, yhat):
+    return 1.0 - np.sum((y - yhat) ** 2) / np.sum((y - y.mean()) ** 2)
+
+def acf(e, lags=20):
+    """残差自相关（去均值后归一化）。95% 置信带 ≈ ±1.96/√N，
+    显著超出说明还有未建模动态（如一阶假设不够、缺滞后）。"""
+    e = np.asarray(e) - np.mean(e)
+    denom = np.dot(e, e)
+    return np.array([np.dot(e[:-l], e[l:]) / denom for l in range(1, lags + 1)])
+
+def ccf(e, u, lags=20):
+    """残差与历史输入互相关：显著不为 0 ⇒ 结构性偏差（不是噪声问题，需改模型结构）"""
+    e = np.asarray(e) - np.mean(e); u = np.asarray(u) - np.mean(u)
+    return np.array([np.dot(e[l:], u[:-l]) / np.sqrt(np.dot(e, e) * np.dot(u, u))
+                     for l in range(lags)])
+
+def ljung_box_q(e, lags=20):
+    """Ljung-Box 白噪声整体检验统计量：Q = N(N+2)·Σ r_k²/(N-k)。
+    自由度 = lags − 模型参数个数；Q 超过卡方临界值（scipy.stats.chi2.ppf(0.95, dof)）
+    ⇒ 残差非白噪声，模型结构还需改进。"""
+    n = len(e); r = acf(e, lags)
+    return float(n * (n + 2) * np.sum(r ** 2 / (n - np.arange(1, lags + 1))))
+
+def aic_bic(sse, n, n_p):
+    """修正后的信息准则（含除以 N，见上文公式）"""
+    aic = n * np.log(sse / n) + 2 * n_p
+    bic = n * np.log(sse / n) + n_p * np.log(n)
+    return aic, bic</pre>
+
+<div class="note">
+  <p>✅ <strong>验收判定（需同时满足）</strong>：① NRMSE 达标；② <strong>独立测试段</strong>（而非训练集）R² 达标；③ ACF 基本落在 ±1.96/√N 带内；④ CCF 无显著峰值；⑤ 多个候选模型中 AIC/BIC 更优。任一不满足，回到第 9 章改结构或第 10 章重估计。</p>
+</div>
+
+<h2 id="s12"><span class="no">12</span>模型诊断、假设校验、不确定性评估与风险清单</h2>
+
+<ol>
+  <li><strong>参数可辨识性 &amp; 参数共线性</strong>：热工模型中时间常数 T、增益 K、滞后 τ 经常强耦合。如果目标只是<strong>预测 / 上层 MPC 优化</strong>：参数共线性可以容忍，只要预测不确定性低；如果目标是<strong>提取物理热阻热容</strong>：共线性是致命问题，需要 Fisher 信息矩阵计算 95% 置信区间；置信区间跨 0 → 参数不可辨识，删减模型项。</li>
+  <li><strong>插值验证 vs 外推验证</strong>：插值是测试点落在训练多维工况凸包之内；外推是工况超出训练包络，Hammerstein 非线性模型外推风险很高。部署时做工况包络监测，<strong>轻度越界先降权+告警</strong>（预测可信度标记为低、优化动作冻结），<strong>持续越界或越界幅度大才切回</strong>原有控制逻辑，并设迟滞区间防止边界上反复横跳；</li>
+  <li><strong>LTI 线性时不变假设检验</strong>：模型假设参数固定；使用滑动窗口分段辨识，持续监测参数随时间漂移（设备结垢、老化）。区分两个现象——非线性：参数随<strong>工况点</strong>变化（Hammerstein 模型就是用来描述这类）；时变：参数随<strong>时间</strong>缓慢漂移，和当前工况无关。漂移显著 → 模型失效，触发告警，评估是否需要重新辨识；</li>
+  <li><strong>采样混叠、时变滞后</strong>：采样周期按 §5.2 的 1/4~1/10 时间常数经验选取；FOPDT 模型假设滞后固定；很多热工系统滞后会随工况改变（如流量变、传输延迟变），这是模型本身的固有局限，必要时分工况辨识多组参数。</li>
+</ol>
+
+<div class="note warn">
+  <p>📋 <strong>模型风险清单</strong>：激励区间外预测不可信；设备老化结垢模型随时间漂移；扰动超出训练集范围预测误差急剧上升；执行器饱和/卡死模型假设失效；传感器漂移导致输入数据错误、模型输出错误。</p>
+</div>
+
+<h2 id="s13"><span class="no">13</span>控制策略设计，方案对比与智能寻优（PSO / 强化学习）</h2>
+
+<div class="note warn">
+  <p>⚠️ 重点：零侵入改造下，<strong>上层优化不接管底层执行器</strong>；底层原有 PID 持续运行，底层闭环保留，安全联锁不动。上层只输出 CV 设定值推荐。</p>
+</div>
+
+<h3>方案 1：模型辅助 PID 整定（最轻量）</h3>
+<p>用辨识得到 Hammerstein (FOPDT) 模型，在稳态工作点局部线性化，得到 FOPDT 传递函数；基于 FOPDT，用 Ziegler-Nichols/Cohen-Coon 计算 PID 初始参数。</p>
+<p>✅ 适用场景：产线不想新增复杂优化器；仅优化底层 PID 参数；❌ 局限：固定参数 PID 只在该工作点附近效果好；<strong>PID 只消除误差，不会自动寻找能耗最优工作点</strong>。</p>
+
+<h3>方案 2：增益调度 PID（折中方案，推荐中小规模）</h3>
+<ol>
+  <li>在多个稳态工作点，对 Hammerstein (FOPDT) 局部线性化，得到多组 FOPDT；</li>
+  <li>每组 FOPDT 对应一组 PID 参数；</li>
+  <li>在线运行时，基于当前工况（MV、DV）查表插值切换 PID 参数。</li>
+</ol>
+<p>底层 PID 仍然是 PLC 原生 PID；上层只维护一张调度参数表，<strong>不做在线滚动优化</strong>；算力需求低，边缘设备轻松部署。❌ 局限：调度表是离线预先计算；只能逼近最优，<strong>不是显式能耗约束优化</strong>。</p>
+
+<h3>方案 3：非线性 MPC 上层监督优化（节能减碳首选，主推方案）</h3>
+
+<h3>13.1 决策变量的澄清</h3>
+<p>零侵入约束下，<strong>上层根本没有权限直接写 MV</strong>（阀位/电流是底层 PID 的输出），所以上层的决策变量<strong>不能是 MV，而必须直接是 CV 设定值</strong>。因此实际架构是分层的<strong>稳态目标优化（SSTO）</strong>：</p>
+<pre class="diagram">上层 SSTO（每 1~5 min 执行一次）：
+  输入：当前 DV（环境温度、来料温度）、工艺约束、能耗模型（Hammerstein 静态块 + 功率模型）
+  求解：min  稳态能耗 P(u)                     ← 目标：省电
+        s.t. 稳态 CV = y_ss(u, d) ∈ [CV_low + δ, CV_high − δ]   ← 守住工艺红线（δ 为动态安全裕度）
+             u ∈ [u_min, u_max]
+  输出：最优稳态对应的 CV 设定值 → 下发给底层 PID
+底层 PID（原有，毫秒~秒级）：跟踪设定值，处理全部动态与扰动</pre>
+
+<p>能耗目标函数的完整定义：</p>
+<div class="formula">J = Σ<sub>j=1..H</sub> [ P(u<sub>k+j</sub>)·Δt + ρ·(Δu<sub>k+j</sub>)² ]</div>
+<ul>
+  <li>第一项：预测时域 H 内的累计能耗（功率 P 由静态非线性块给出，TEC 案例中 P = 1.05·I² + 4.25·I，见 §19.4）；</li>
+  <li>第二项：MV 变化惩罚（ρ &gt; 0），防止设定值频繁抖动冲击工艺与设备寿命；</li>
+  <li>约束：MV 上下限、MV 变化速率限、CV 工艺约束（含安全裕度 δ）。</li>
+</ul>
+
+<h3>13.2 MPC 的原理、滚动时域逻辑与工程实现</h3>
+<div class="note">
+  <p><span class="tag">大白话</span>MPC 像开车导航——每次都「往前看一段路」（用模型预测未来 H 步），规划出最优路线（最优设定值序列），但<strong>只执行第一步</strong>；下一个时刻重新测量、重新看路、重新规划。这样即使模型有小误差，也会被每一步的实测反馈不断修正，不会一路错到底。</p>
+  <p>✅ 优势：显式能耗目标，天然处理可测扰动，能考虑系统滞后动态；⚠️ 局限：算力要求更高（每次求解一个小型非线性规划，秒级，边缘盒可承载）；必须配套软投切逻辑，随时切回原始设定。</p>
+</div>
+
+<p>§13.1 给出了「算什么」，§13.2 回答「怎么算、怎么调、算不出来怎么办」。下面七节是一份可直接照着实现的 MPC 工程手册，全部基于第 9~12 章辨识出来的 Hammerstein (FOPDT) 模型。</p>
+
+<h3>13.2.1 预测模型：Hammerstein (FOPDT) 的离散化与多步预测</h3>
+
+<p>MPC 的全部本事都建立在「能预测未来」上。把连续 FOPDT 按上层采样周期 T<sub>s</sub> 离散化，得到工程上唯一需要递推的一条式子：</p>
+
+<div class="formula">连续：  τ·ẏ(t) = −y(t) + y<sub>free</sub>(d) + K·z(t−θ)           z = f(u) 为 Hammerstein 静态非线性块
+离散：  y[k+1] = a·y[k] + (1−a)·( y<sub>free</sub>(d[k]) + K·z[k−n<sub>k</sub>] )
+        a = exp(−T<sub>s</sub>/τ) ， n<sub>k</sub> = round(θ/T<sub>s</sub>) ， K = b/(1−a)</div>
+
+<ul>
+  <li><strong>a 是「记忆系数」</strong>：a 越接近 1（τ ≫ T<sub>s</sub>），系统越慢，当前值对未来影响越大；</li>
+  <li><strong>静态非线性只在输入端出现一次</strong>（Hammerstein 的定义）：先把 MV 过静态块得到隐变量 z，再进线性动态。TEC 案例中 z = f(u) = u/(1+0.12u)（降温饱和），功率 P(u) = 1.05u² + 4.25u（§19.4）——<strong>同一组静态块同时给出「能省多少」和「花多少电」</strong>；</li>
+  <li><strong>DV 前馈是白送的</strong>：可测扰动 d（气温、进水温度、产量）直接写进预测式，MPC 能在扰动真正影响到 CV <em>之前</em>就提前动作；PID 只能在偏差出现之后被动纠正。这是 MPC 相对 PID 最实打实的一项优势；</li>
+  <li><strong>多步预测 = 把上一步的预测值喂回自己</strong>（自由仿真，与 §10 同口径）：y<sub>k+1</sub> 用实测 y[k]，y<sub>k+2</sub> 用 ŷ<sub>k+1</sub>，依此类推，得到 H 步轨迹；</li>
+  <li><strong>纯滞后用「队列」实现</strong>：维护最近 n<sub>k</sub> 拍已下发的输入，预测第 j 步时取队首（即 n<sub>k</sub> 拍前那个）。θ/T<sub>s</sub> 非整数时<strong>向上取整</strong>——宁可多算一拍滞后（保守），也不要低估滞后。</li>
+</ul>
+
+<div class="note warn">
+  <p>⚠️ <strong>采样周期 T<sub>s</sub> 的三个约束</strong>：① <strong>T<sub>s</sub> ≈ τ/10 ~ τ/20</strong>（太粗则动态失真，太细则 H 步数暴涨、算力浪费）；② <strong>T<sub>s</sub> ≥ 5~10 倍底层 PID 周期</strong>（上下层时间尺度必须分离，否则两层互相「追尾」引起振荡）；③ <strong>T<sub>s</sub> 必须 ≥ 一次优化求解耗时</strong>，否则谈不上滚动。</p>
+</div>
+
+<h3>13.2.2 代价函数：把「省电」写成可执行的目标</h3>
+
+<div class="formula">J(u) = Σ<sub>j=1..H</sub> P(u<sub>k+j</sub>)·Δt &nbsp;+&nbsp; w<sub>Δu</sub>·Σ<sub>j=1..M</sub> (Δu<sub>k+j</sub>)² &nbsp;+&nbsp; w<sub>v</sub>·Σ<sub>j=1..H</sub> (ε<sub>j</sub><sup>hi</sup>² + ε<sub>j</sub><sup>lo</sup>²)</div>
+
+<div class="tbl-wrap"><table>
+  <tr><th>项</th><th>含义</th><th>工程取值要点</th></tr>
+  <tr><td><b>能耗项</b>（主角）</td><td>预测时域内累计能耗；P(·) 直接取 §9 静态非线性块标定的功率模型（如 TEC 的 1.05u²+4.25u），<strong>不需要另建能耗模型</strong></td><td>单位必须统一（建议统一成 Wh 或 kWh）；这一项的数量级决定了其它权重的标定基准</td></tr>
+  <tr><td><b>移动惩罚 w<sub>Δu</sub></b></td><td>压制设定值/电流的频繁大幅变动</td><td>先取「能耗项典型值的 1%~10%」再调；调大 → 稳但迟钝，调小 → 灵敏但抖</td></tr>
+  <tr><td><b>约束软化 w<sub>v</sub></b></td><td>松弛变量 ε 的惩罚，见 §13.2.3</td><td>要比能耗项高 <strong>1~2 个数量级</strong>：宁可不省电，也绝不允许越工艺红线</td></tr>
+  <tr><td><b>（可选）终端项</b></td><td>惩罚预测末端的状态偏离，提高稳定性</td><td>预测时域较短（H·T<sub>s</sub> &lt; τ）时建议加；H·T<sub>s</sub> ≥ 2τ 时可省略</td></tr>
+</table></div>
+
+<h3>13.2.3 约束：硬约束、软约束与安全裕度 δ（不可省）</h3>
+
+<div class="tbl-wrap"><table>
+  <tr><th>约束类型</th><th>写法</th><th>是否允许软化</th></tr>
+  <tr><td><b>MV 幅值</b></td><td>u ∈ [u<sub>min</sub>, u<sub>max</sub>]</td><td>❌ 硬约束（设备物理能力，直接裁剪即可）</td></tr>
+  <tr><td><b>MV 速率</b></td><td>|Δu| ≤ Δu<sub>max</sub></td><td>❌ 硬约束（保护执行器与工艺，也是零侵入的「不打扰」承诺）</td></tr>
+  <tr><td><b>CV 工艺区间</b></td><td>y ∈ [y<sub>low</sub> + δ, y<sub>high</sub> − δ]</td><td>✅ <strong>必须软化</strong>：写成 y − (y<sub>high</sub>−δ) ≤ ε<sup>hi</sup>，ε ≥ 0，代价里加 w<sub>v</sub>·ε²</td></tr>
+</table></div>
+
+<ul>
+  <li><strong>为什么 CV 约束必须软化</strong>：模型必有误差、扰动必未测全、执行器可能暂时到不了位。若写成硬约束，一旦某拍「无可行解」，求解器要么报错停机、要么输出跳变的伪解——这两种行为上真机都是事故。软化后即使不可行，优化器也会给出「越界最小的那个折中解」，同时 ε &gt; 0 本身就是一条现成的告警信号；</li>
+  <li><strong>δ（动态安全裕度）怎么取</strong>：δ ≥ 3σ<sub>model</sub>，其中 σ<sub>model</sub> = 模型自由仿真 NRMSE × CV 量程（§16 验收指标已给出 NRMSE）；再叠加底层 PID 可能的动态超调量。TEC 案例中量程约 2 ℃、NRMSE 6.5% → σ ≈ 0.13 ℃，取 δ = 0.3 ℃（约 2.3σ）并配合 §15 硬旁路；</li>
+  <li><strong>零侵入特有的一条</strong>：上层下发的是<strong>设定值</strong>而非 MV，因此 CV 约束实际约束的是「给底层的设定值区间」，必须把底层 PID 跟踪过程中的超调量也算进 δ，否则底层一超调就顶到工艺红线。</li>
+</ul>
+
+<h3>13.2.4 求解：零侵入下的两层分解，与完整 MPC</h3>
+
+<div class="note">
+  <p><span class="tag">先分清两种形态</span>零侵入改造下上层常常<strong>没有 MV 写权限</strong>（阀位/电流是底层 PID 的输出），此时 MPC 退化为 <strong>SSTO（稳态目标优化）+ 设定值斜坡</strong>；只有在允许上层直接写 MV（变频频率、电源电流等）的场景，才做完整的多步 MPC。两者共用同一个模型与同一套约束，只是决策变量不同。</p>
+</div>
+
+<pre class="diagram">形态 A｜SSTO（零侵入默认，推荐先上）
+  每个优化周期：读 DV → 求 min P(u) s.t. y_ss(u,d) ∈ [y_low+δ, y_high−δ]
+              → 得到 (u*, y*) → 把 CV 设定值 = y* 下发给底层 PID（按速率限做斜坡）
+  动态交给底层 PID；上层只负责「把目标定在最省电的边界上」
+
+形态 B｜完整 MPC（需 MV 写权限）
+  每个优化周期：读当前 y → 用模型做 H 步自由预测 → 优化 M 步输入序列 U = {u_k..u_{k+M-1}}
+              → 只下发 u_k → 下一周期重新测量、重新预测、重新优化（滚动时域）</pre>
+
+<p><strong>求解器怎么选</strong>（按维数递增）</p>
+
+<ol>
+  <li><strong>一维 / 二维单调问题</strong>（最常见：单台设备的电流或供水温度）：直接用<strong>二分 / 黄金分割</strong>求「刚好守住约束」的最小 u——稳态模型单调时这是全局最优且毫秒级，不需要任何优化库（见 §13.2.6 的 <code>ssto()</code>）；</li>
+  <li><strong>多维凸、可求导</strong>：SQP（SciPy <code>minimize</code> / OSQP）或投影梯度；CV 约束写成惩罚项时，投影梯度十几行就够用；</li>
+  <li><strong>多维、非凸、含启停组合</strong>（导数不存在）：转 §13.3.2 的 PSO，或「PSO 定台数组合 + 连续量用梯度」的两层法；</li>
+  <li><strong>求解失败 / 超时</strong>：<strong>保持上一拍输出并告警</strong>——绝不空发、绝不发未收敛的中间解。这条要写进代码的第一行，而不是靠人记住。</li>
+</ol>
+
+<h3>13.2.5 参数整定清单（工程起点值）</h3>
+
+<div class="tbl-wrap"><table>
+  <tr><th>参数</th><th>推荐起点</th><th>调大 / 调小的后果</th></tr>
+  <tr><td><b>采样周期 T<sub>s</sub></b></td><td>τ/10 ~ τ/20，且 ≥ 5~10 倍底层 PID 周期</td><td>过大 → 动态失真、滞后量化误差大；过小 → 算力浪费、上下层追尾振荡</td></tr>
+  <tr><td><b>预测时域 H</b></td><td>H·T<sub>s</sub> ≈ 2τ ~ 3τ（覆盖主要动态）</td><td>过短 → 看不到滞后后果，会「先欠后补」甚至越界；过长 → 误差累积、算力上升，收益递减</td></tr>
+  <tr><td><b>控制时域 M</b></td><td>M ≈ H/3 ~ H/6，之后保持末值</td><td>过大 → 解不稳、抖动；过小 → 过于保守</td></tr>
+  <tr><td><b>安全裕度 δ</b></td><td>≥ 3σ<sub>model</sub>（NRMSE × 量程）+ 底层超调量</td><td>过大 → 白扔节能空间；过小 → 频繁触碰工艺红线</td></tr>
+  <tr><td><b>移动惩罚 w<sub>Δu</sub></b></td><td>能耗项典型值的 1%~10%</td><td>调大 → 稳但迟钝；调小 → 灵敏但设备疲劳、操作员反感</td></tr>
+  <tr><td><b>约束权重 w<sub>v</sub></b></td><td>能耗项的 10~100 倍</td><td>过小 → 敢越界换节能（危险）；过大 → 等价于硬约束，可能无解</td></tr>
+  <tr><td><b>优化周期</b></td><td>1~5 min（慢对象可取 5~15 min）</td><td>快于扰动变化才有意义；快于模型可信度则纯属自扰</td></tr>
+</table></div>
+
+<h3>13.2.6 参考实现（纯 numpy，可直接运行）</h3>
+
+<p>用 §19 辨识出的 TEC 模型（τ = 909 s、θ = 20 s、K = −0.98 ℃/A、静态块含饱和、功率 P = 1.05u² + 4.25u）跑一个 2 小时闭环：第 30 min 冷却水温度阶跃 +1 ℃，对比「操作员把水温死守在 26.0 ℃」与「MPC 顶住 26.2 ℃ 约束边界」两种做法。</p>
+
+<pre class="code">import numpy as np
+
+<span class="c"># ===== 辨识得到的模型（§19.4 静态块 + §19.5 慢通道）=====</span>
+TAU, THETA, TS = 909.0, 20.0, 60.0        <span class="c"># 时间常数 s、纯滞后 s、上层优化周期 s</span>
+K      = -0.98                            <span class="c"># 静态增益 ℃/A（电流↑ → 水温↓）</span>
+NK     = max(1, int(round(THETA / TS)))   <span class="c"># 离散滞后拍数（滞后量化到整数拍）</span>
+A      = float(np.exp(-TS / TAU))         <span class="c"># 离散 FOPDT 系数 a</span>
+D_GAIN, Y_FREE = 0.85, 27.2               <span class="c"># 扰动增益、完全不制冷时水温（DV=22 ℃ 实测）</span>
+U_MIN, U_MAX = 0.0, 5.0
+
+static_block = lambda u: u / (1 + 0.12 * u)       <span class="c"># Hammerstein 静态非线性（饱和）</span>
+power        = lambda u: 1.05 * u**2 + 4.25 * u   <span class="c"># §19.4 实测功率模型 W</span>
+y_free       = lambda d: Y_FREE + D_GAIN * (d - 22.0)
+
+
+def rollout(y0, u_past, u_plan, d_plan):
+    <span class="c">"""用 Hammerstein (FOPDT) 模型做 H 步自由预测（含纯滞后队列）"""</span>
+    H = len(d_plan)
+    u_full = list(u_plan) + [u_plan[-1]] * (H - len(u_plan))   <span class="c"># 控制时域之后保持末值</span>
+    y, out = y0, []
+    q = list(u_past[-NK:]) + u_full                   <span class="c"># 队首是 nk 拍前已下发的输入</span>
+    for k in range(H):
+        y = A * y + (1 - A) * (y_free(d_plan[k]) + K * static_block(q[k]))
+        out.append(y)
+    return np.array(out)
+
+
+def cost(u_plan, y0, u_past, d_plan, u_prev, y_lo, y_hi, delta, w_du=0.5, w_v=1e3):
+    y = rollout(y0, u_past, u_plan, d_plan)
+    e_hi = np.maximum(0.0, y - (y_hi - delta))        <span class="c"># 松弛变量：越界量（软约束）</span>
+    e_lo = np.maximum(0.0, (y_lo + delta) - y)
+    du = np.diff(np.concatenate([[u_prev], u_plan]))  <span class="c"># 移动惩罚：防止设定值抖动</span>
+    return (np.sum(power(u_plan)) * TS / 3600.0       <span class="c"># 预测时域内累计能耗 Wh</span>
+            + w_du * float(np.sum(du ** 2))
+            + w_v * float(np.sum(e_hi ** 2 + e_lo ** 2)))
+
+
+def mpc_solve(y0, u_past, u_prev, d_plan, y_lo, y_hi, delta, M=5, iters=60, lr=0.15):
+    <span class="c">"""滚动时域优化：规划 H 步，只返回序列第一步"""</span>
+    u = np.clip(np.full(M, u_prev), U_MIN, U_MAX)
+    for _ in range(iters):
+        J0 = cost(u, y0, u_past, d_plan, u_prev, y_lo, y_hi, delta)
+        g = np.zeros(M)
+        for j in range(M):                            <span class="c"># 数值梯度（M 很小，代价可忽略）</span>
+            up = u.copy(); up[j] += 1e-4
+            g[j] = (cost(up, y0, u_past, d_plan, u_prev, y_lo, y_hi, delta) - J0) / 1e-4
+        u = np.clip(u - lr * g / (np.linalg.norm(g) + 1e-9), U_MIN, U_MAX)
+    return float(np.clip(u[0], U_MIN, U_MAX))         <span class="c"># 只执行第一步</span>
+
+
+def ssto(d, y_hi, delta):
+    <span class="c">"""稳态目标优化 SSTO：二分求「刚好守住工艺红线」的最小电流"""</span>
+    lo, hi = U_MIN, U_MAX
+    for _ in range(60):
+        mid = 0.5 * (lo + hi)
+        if y_free(d) + K * static_block(mid) &lt;= y_hi - delta:
+            hi = mid                                  <span class="c"># 满足约束 → 继续往下压</span>
+        else:
+            lo = mid
+    return hi
+
+
+def hold_setpoint(sp, d):
+    <span class="c">"""底层 PID 的理想跟踪：求把 CV 稳到 sp 所需的电流（逆稳态模型）"""</span>
+    lo, hi = U_MIN, U_MAX
+    for _ in range(60):
+        mid = 0.5 * (lo + hi)
+        if y_free(d) + K * static_block(mid) &gt; sp:    <span class="c"># 还不够冷 → 加大电流</span>
+            lo = mid
+        else:
+            hi = mid
+    return hi
+
+
+def run(mode, n=120, y0=26.0):
+    <span class="c">"""2 小时闭环仿真：n 步 × 60 s"""</span>
+    d_seq = np.full(n, 22.0)
+    d_seq[30:] += 1.0                                 <span class="c"># 第 30 min 冷却水温度阶跃 +1 ℃（DV）</span>
+    y, u_prev, u_hist, e_sum, over = y0, 0.0, [0.0] * NK, 0.0, -9.9
+    Y_LO, Y_HI, DELTA, SP_FIX = 20.0, 26.5, 0.3, 26.0
+    for k in range(n):
+        d_plan = np.full(30, d_seq[k])                <span class="c"># 预测时域 H=30 步（30 min ≈ 2τ）</span>
+        if mode == "fix":                             <span class="c"># 现状：操作员把水温死守在 26.0 ℃</span>
+            u = hold_setpoint(SP_FIX, d_seq[k])
+        else:                                         <span class="c"># MPC：滚动求最优，只执行第一步</span>
+            u = mpc_solve(y, u_hist, u_prev, d_plan, Y_LO, Y_HI, DELTA)
+        y = A * y + (1 - A) * (y_free(d_seq[k]) + K * static_block(u_hist[-NK]))
+        u_hist.append(u); u_prev = u
+        e_sum += power(u) * TS / 3600.0
+        over = max(over, y - Y_HI)                    <span class="c"># CV 相对工艺红线（26.5 ℃）的最大越界</span>
+    return e_sum, over, y
+
+
+d0 = 22.0
+u_opt = ssto(d0, 26.5, 0.3)
+print("SSTO 最优工作点: 电流 %.3f A → 稳态水温 %.2f ℃（顶住 26.2 ℃ 约束边界）  功率 %.2f W"
+      % (u_opt, y_free(d0) + K * static_block(u_opt), power(u_opt)))
+u_fix = hold_setpoint(26.0, d0)
+print("现状死守 26.0 ℃: 电流 %.3f A   功率 %.2f W  → 稳态节能率 %.1f%%"
+      % (u_fix, power(u_fix), 100 * (power(u_fix) - power(u_opt)) / power(u_fix)))
+for m in ("fix", "mpc"):
+    wh, over, yend = run(m)
+    print("%-4s 模式: 2h 累计能耗 %.2f Wh   末态水温 %.2f ℃   CV 相对工艺红线最大越界 %+.2f ℃"
+          % (m, wh, yend, over))</pre>
+
+<p><strong>实际运行结果</strong>（本仓库 numpy 环境实测）：</p>
+
+<pre class="diagram">SSTO 最优工作点: 电流 1.163 A → 稳态水温 26.20 ℃（顶住 26.2 ℃ 约束边界）  功率 6.36 W
+现状死守 26.0 ℃: 电流 1.435 A   功率 8.26 W  → 稳态节能率 23.0%
+fix  模式: 2h 累计能耗 34.22 Wh   末态水温 26.00 ℃   CV 相对工艺红线最大越界 -0.42 ℃
+mpc  模式: 2h 累计能耗 28.14 Wh   末态水温 26.20 ℃   CV 相对工艺红线最大越界 -0.25 ℃
+→ 2 小时累计节能 17.8%，且 CV 全过程未触碰工艺红线（26.5 ℃）</pre>
+
+<div class="note">
+  <p><span class="tag">结果解读</span>两种做法都守住了工艺，差别只有一件事：MPC 把水温「放在约束边界 26.2 ℃」，现状做法「死守在 26.0 ℃」——<strong>这 0.2 ℃ 的差别，换来 17.8% 的能耗下降</strong>。原因正是 §1.4 的边际代价递增：TEC 功率随电流二次增长，越靠近要求的上限，每多压 0.1 ℃ 越贵。</p>
+  <p>⚠️ <strong>不要把 17.8% 当成工业现场的普遍数字</strong>：TEC 是小样、非线性极强（0.2 ℃ ≈ 18%），工业现场的泵/冷机同样超线性但裕度通常更大，对应 §1.8 的量级（设定值裕度回收 2%~6%，重设 + 变频 10%~25%）。<strong>方法与代码可直接迁移，数字必须现场重算。</strong></p>
+  <p>✅ <strong>工程提醒</strong>：示例为了可读性用了数值梯度；变量更多、约束更硬的场景请换成 SQP/OSQP 或 §13.3.2 的 PSO，并把「求解失败保持上一拍」写进代码。</p>
+</div>
+
+<h3>13.2.7 常见失效模式与对策（上线前逐条自查）</h3>
+
+<div class="tbl-wrap"><table>
+  <tr><th>失效模式</th><th>现场表现</th><th>对策</th></tr>
+  <tr><td><b>模型失配</b></td><td>预测轨迹整体偏移，CV 慢慢贴到红线上，ε 持续 &gt; 0</td><td>δ 取 ≥ 3σ<sub>model</sub>；在线监测残差，超阈值降权/冻结优化并告警（§12、§14）</td></tr>
+  <tr><td><b>约束不可行</b></td><td>扰动过大，MV 顶到限幅仍守不住 CV</td><td>靠软约束给出「越界最小解」；同时触发 §18 预案：退出优化、切回原始设定并告警</td></tr>
+  <tr><td><b>设定值抖动</b></td><td>每个周期输出都在小幅来回跳，底层 PID 跟着抖</td><td>加大 w<sub>Δu</sub>；加设定值速率限与死区（变化小于死区不下发）；必要时降低优化频率</td></tr>
+  <tr><td><b>与底层积分饱和冲突</b></td><td>上层频繁改设定，底层积分项反复累积，出现大超调</td><td>两层时间尺度分离（T<sub>s</sub> ≥ 5~10 倍底层周期）；设定值走斜坡而非阶跃；必要时请仪表工程师确认底层抗积分饱和已启用</td></tr>
+  <tr><td><b>采样/时间戳不同步</b></td><td>模型滞后参数失效，预测永远慢半拍</td><td>NTP 对时 + 源时间戳（§7）；无线测点必须按 age 还原真实测量时刻（§19.6 教训三）</td></tr>
+  <tr><td><b>DV 未测 / 测点坏了</b></td><td>预测忽然整体偏移，且找不到原因</td><td>关键 DV 冗余或做坏点检测；DV 失效即退出自动优化（§18 第 4 条）</td></tr>
+  <tr><td><b>通信丢包 / 超时</b></td><td>上层拿不到新数据，仍在用旧状态优化</td><td>看门狗超时即停止下发并切回原生设定（§18 第 1 条）；恢复后默认停在影子模式</td></tr>
+</table></div>
+
+<h3>13.3 模型之上的智能寻优：粒子群（PSO）与强化学习（RL）</h3>
+
+<div class="note">
+  <p><span class="tag">定位</span>第 9~12 章得到的 Hammerstein (FOPDT) 模型，不只是「预测器」，更是<strong>零风险的沙盒</strong>——在模型上任意试错都不会影响真实产线。有了这个沙盒，才能安全地用智能算法去搜索「更省电的设定值」。本节给出两条可落地的工程路线。</p>
+</div>
+
+<h3>13.3.1 为什么模型建好后还需要智能算法？</h3>
+
+<p>§13.1 的 SSTO/MPC 求解的是一个带约束的非线性规划。当目标具备下列特征时，梯度类求解器会吃力甚至失效：</p>
+
+<ol>
+  <li><strong>目标非凸、不连续</strong>：存在设备启停组合、档位切换、查表型工艺曲线（导数不存在）；</li>
+  <li><strong>变量多、耦合强</strong>：多台冷机负荷分配、多泵并联变频组合，可行组合数爆炸；</li>
+  <li><strong>含难以写成解析式的经验规则</strong>：老师傅的「这条线夏天不能低于 xx℃」这类约束。</li>
+</ol>
+
+<p>此时有两条补充（或替代）路线：<strong>PSO 做慢周期静态寻优</strong>，<strong>强化学习做快周期序贯决策</strong>。两者的共同前提是——<strong>用辨识模型当沙盒评估</strong>，绝不允许在真机上「试着调一调看看」。</p>
+
+<h3>13.3.2 路线 A：粒子群优化（PSO）——黑箱目标也能搜</h3>
+
+<div class="note">
+  <p><span class="tag">大白话</span>PSO 像一群鸟找最肥的草地：每只鸟记住「自己去过最好的地方」，全群还共享「大家去过最好的地方」，一边飞一边互相通气，很快聚到最优附近。它<strong>不要求目标函数可导、光滑</strong>，只要能算出一个分数（能耗）就能搜——这正是工程黑箱目标最需要的性质。</p>
+</div>
+
+<p><strong>典型适用场景</strong></p>
+
+<div class="tbl-wrap"><table>
+  <tr><th>场景</th><th>优化变量 x</th><th>目标 J</th><th>重算周期</th></tr>
+  <tr><td><b>多台冷机 / 泵组负荷分配</b></td><td>各设备负荷率或频率</td><td>总功率最小 + 满足总冷量/流量需求</td><td>15~60 min</td></tr>
+  <tr><td><b>冷冻水 / 冷却水供水温度设定</b></td><td>供水温度设定值</td><td>主机 + 水泵 + 冷却塔总功率最小</td><td>30~60 min</td></tr>
+  <tr><td><b>PID 参数离线整定</b></td><td>Kp, Ki, Kd（多回路）</td><td>累计误差 / 能耗最小 + 超调惩罚</td><td>每季度或工况变更时</td></tr>
+  <tr><td><b>多时段生产排程（粗粒度）</b></td><td>各时段产量 / 启停组合</td><td>分时电价下电费最小</td><td>每天</td></tr>
+</table></div>
+
+<p><strong>标准 PSO 步骤</strong>：① 初始化 NP 个粒子（位置 = 待优化变量，速度 = 随机小值，均限制在上下限内）；② 用<strong>辨识模型仿真</strong>评估每个粒子的适应度 J(x)（含约束惩罚）；③ 更新个体最优 pbest 与全局最优 gbest；④ 更新速度与位置：</p>
+
+<div class="formula">v<sub>i</sub> ← w·v<sub>i</sub> + c₁·r₁·(pbest<sub>i</sub> − x<sub>i</sub>) + c₂·r₂·(gbest − x<sub>i</sub>) ， x<sub>i</sub> ← clip(x<sub>i</sub> + v<sub>i</sub>, x<sub>min</sub>, x<sub>max</sub>)</div>
+
+<p>⑤ 迭代至收敛或达到上限，输出 gbest，<strong>经 §15 安全闸门后才允许下发</strong>。</p>
+
+<p><strong>工程推荐参数</strong>（默认起点，按现场微调）</p>
+
+<ul>
+  <li>粒子数 NP = 5~10 × 变量维度，典型 20~40；</li>
+  <li>惯性权重 w 由 0.9 <strong>线性递减</strong>至 0.4（先广搜后精搜）；学习因子 c₁ = c₂ ≈ 1.5~2.0；</li>
+  <li>迭代 50~200 代；收敛判据：gbest 连续 20 代改善 &lt; 0.1% 即停止；</li>
+  <li>边界处理：<strong>截断 + 速度反向</strong>（比随机重置更稳定）；约束用<strong>惩罚项</strong>，CV 越界的惩罚系数要比能耗项高 1~2 个数量级（宁可不省电，也不能出工艺事故）；</li>
+  <li>每代评估要跑多工况 / 多扰动场景，避免「过拟合到单一工况的最优解」。</li>
+</ul>
+
+<p><strong>参考实现（纯 numpy，可直接运行）</strong>：两台冷机负荷分配——满足总冷量需求的前提下最小化总功率。</p>
+
+<pre class="code">import numpy as np
+
+<span class="c"># 两台冷机功率模型（凸二次，可由 §9 静态非线性块标定得到）</span>
+<span class="c"># P_i(u_i) = a_i*u_i^2 + b_i*u_i + c_i   u_i ∈ [u_min, 1]（负荷率）</span>
+A = np.array([120.0, 150.0])      <span class="c"># 二次项系数 kW</span>
+B = np.array([180.0, 160.0])      <span class="c"># 一次项系数 kW</span>
+C = np.array([ 15.0,  18.0])      <span class="c"># 空载功率 kW</span>
+CAP = np.array([500.0, 650.0])    <span class="c"># 满负荷冷量 kW</span>
+
+U_MIN, U_MAX = 0.2, 1.0           <span class="c"># 负荷率上下限（低于 0.2 效率骤降/喘振）</span>
+DEMAND = 800.0                    <span class="c"># 当前冷量需求 kW</span>
+LAMBDA = 1e5                      <span class="c"># 需求不满足的惩罚系数（远大于功率尺度）</span>
+
+def power(u):
+    <span class="c">"""总功率 kW"""</span>
+    return np.sum(A * u**2 + B * u + C)
+
+def objective(u):
+    <span class="c">"""目标函数：功率 + 需求缺口惩罚（PSO 只需能算分数，不要求可导）"""</span>
+    gap = max(0.0, DEMAND - np.sum(CAP * u))
+    return power(u) + LAMBDA * gap
+
+def pso(obj, n_dim, lb, ub, np_=30, iters=120, w0=0.9, w1=0.4, c1=1.7, c2=1.7, seed=0):
+    rng = np.random.default_rng(seed)
+    lb, ub = np.full(n_dim, lb), np.full(n_dim, ub)
+    x = rng.uniform(lb, ub, (np_, n_dim))
+    v = rng.uniform(-(ub - lb) * 0.1, (ub - lb) * 0.1, (np_, n_dim))
+    pbest_x, pbest_f = x.copy(), np.array([obj(p) for p in x])
+    gi = int(np.argmin(pbest_f)); gbest_x, gbest_f = pbest_x[gi].copy(), pbest_f[gi]
+    for k in range(iters):
+        w = w0 - (w0 - w1) * k / iters                      <span class="c"># 惯性权重线性递减</span>
+        r1, r2 = rng.random((np_, n_dim)), rng.random((np_, n_dim))
+        v = w * v + c1 * r1 * (pbest_x - x) + c2 * r2 * (gbest_x - x)
+        x = np.clip(x + v, lb, ub)
+        v = np.where((x &lt;= lb) | (x &gt;= ub), -0.5 * v, v)    <span class="c"># 触边界：截断 + 速度反向</span>
+        f = np.array([obj(p) for p in x])
+        improved = f &lt; pbest_f
+        pbest_x[improved], pbest_f[improved] = x[improved], f[improved]
+        gi = int(np.argmin(pbest_f))
+        if pbest_f[gi] &lt; gbest_f:
+            gbest_x, gbest_f = pbest_x[gi].copy(), pbest_f[gi]
+    return gbest_x, gbest_f
+
+u_opt, j_opt = pso(objective, n_dim=2, lb=U_MIN, ub=U_MAX)
+print("最优负荷率:", np.round(u_opt, 3), " 总功率 kW:", round(power(u_opt), 1),
+      " 供冷 kW:", round(float(np.sum(CAP * u_opt)), 1))
+
+<span class="c"># 对比：平均分配的能耗（工程上最常见的现状做法）</span>
+u_avg = np.full(2, DEMAND / CAP.sum())
+save = 100 * (power(u_avg) - power(u_opt)) / power(u_avg)
+print("平均分配:", np.round(u_avg, 3), " 总功率 kW:", round(power(u_avg), 1),
+      " → 优化后节能率: %.2f%%" % save)</pre>
+
+<p><strong>实际运行结果</strong>（本仓库 numpy 环境实测）：</p>
+
+<pre class="diagram">最优负荷率: [0.545 0.811]  总功率 kW: 395.4  供冷 kW: 800.0
+平均分配: [0.696 0.696]  总功率 kW: 400.2  → 优化后节能率: 1.20%</pre>
+
+<div class="note">
+  <p><span class="tag">结果解读</span>PSO 把更多负荷分给了效率更高的 1 号机（负荷率看似「不均匀」，但两机容量不同：0.545×500 + 0.811×650 ≈ 800 kW，恰好满足需求），同等供冷下总功率低 1.2%。<strong>这就是零侵入改造最容易先拿到的一块收益：不改硬件，只改分配方式。</strong>看起来只有 1.2%，但它是一天 24 小时、一年 365 天持续生效的收益，且几乎零投资。</p>
+  <p>✅ 工程提醒：每个粒子的一次评估 = 用 Hammerstein 模型仿真一段（含 DV 扰动），因此<strong>评估耗时决定了粒子数与迭代上限</strong>，建议单次评估控制在秒级以内，超出则改用代理模型或先降维。</p>
+</div>
+
+<h3>13.3.3 路线 B：强化学习（RL）——把序贯决策学成一张策略网</h3>
+
+<div class="note">
+  <p><span class="tag">大白话</span>PSO 每次都要「重算一遍最优」，适合慢周期；但如果工况每分钟都在变、而且今天的动作会影响明天的状态（大滞后热系统就是这样），我们希望得到一张「看到当前状态就直接给出动作」的策略网——训练时在模型沙盒里慢慢试错，上线时一次前向计算出结果，毫秒级、边缘盒子就能跑。这就是强化学习。</p>
+</div>
+
+<p><strong>三要素设计</strong>（以冷冻站 / TEC 类对象为例）</p>
+
+<div class="tbl-wrap"><table>
+  <tr><th>要素</th><th>设计建议</th><th>理由</th></tr>
+  <tr><td><b>状态 s</b></td><td>CV 与设定偏差、过去 5~10 步 CV/MV 序列、DV（环境温度、负荷需求）、模型预测误差指标</td><td>大滞后对象必须给历史序列，否则状态不满足马尔可夫性</td></tr>
+  <tr><td><b>动作 a</b></td><td><strong>设定值增量 ΔSP</strong>（而非绝对值），归一化到 −1~1 再乘最大步长</td><td>增量输出天然满足速率限幅，避免训练初期的大幅乱动</td></tr>
+  <tr><td><b>奖励 r</b></td><td>r = −(c<sub>elec</sub> + λ·EF)·P·Δt − β₁·越界惩罚 − β₂·(ΔSP)²</td><td>把电价与碳价<strong>直接写进目标函数</strong>；没有抖动惩罚项，RL 会学会疯狂小幅震荡刷分</td></tr>
+</table></div>
+
+<p>其中：c<sub>elec</sub> 为分时电价（元/kWh）；EF 为电力排放因子（见 §17.3）；λ 为碳价（元/kg CO₂），可先取 0 或按碳市场价做敏感性分析；越界惩罚必须「一票否决」级（CV 触碰工艺红线即给大额负奖励并终止回合）。</p>
+
+<p><strong>算法选型</strong></p>
+
+<div class="tbl-wrap"><table>
+  <tr><th>场景</th><th>推荐算法</th><th>说明</th></tr>
+  <tr><td><b>连续动作（设定值、频率）</b></td><td>SAC / TD3（首选 SAC：自动调温度，样本效率好）</td><td>样本效率显著优于 DDPG</td></tr>
+  <tr><td><b>离散动作（台数启停、档位）</b></td><td>DQN / Double DQN</td><td>与穷举 / PSO 组合做「台数 + 负荷」两层优化</td></tr>
+  <tr><td><b>想要稳、易调</b></td><td>PPO</td><td>保守起步之选，超参数鲁棒性好</td></tr>
+</table></div>
+
+<p><strong>训练环境 = 辨识模型沙盒</strong></p>
+
+<pre class="code">class SandboxEnv:
+    """用 Hammerstein (FOPDT) 模型做 RL 训练环境（真机零风险）"""
+    def __init__(self, model, dv_traj, dt=60.0, sp0=25.0, horizon=288):
+        """
+        model   : Hammerstein(FOPDT) 模型，predict(sp, dv) -&gt; 下一时刻 CV
+        dv_traj : 历史 DV 轨迹（环境温度/负荷），训练时回放真实工况波动
+        horizon : 单回合步数（如 288 步 × 1 min）
+        """
+        self.model, self.dv, self.dt = model, dv_traj, dt
+        self.sp0, self.horizon = sp0, horizon
+
+    def reset(self):
+        self.t, self.sp, self.cv = 0, self.sp0, self.model.steady_state(self.sp0)
+        return self._obs(self.cv)
+
+    def _obs(self, cv):
+        return np.array([cv, self.sp, cv - self.sp, self.dv[self.t % len(self.dv)]])
+
+    def step(self, sp_delta):
+        self.sp = self.sp + sp_delta
+        cv_next = self.model.predict(self.sp, dv=self.dv[self.t % len(self.dv)])
+        r = self._reward(cv_next)
+        self.cv, self.t = cv_next, self.t + 1
+        done = self.t &gt;= self.horizon or bool(self._violate(cv_next))
+        return self._obs(cv_next), r, done
+
+    def _reward(self, cv):
+        elec = 0.68                       <span class="c"># 分时电价 元/kWh（示例）</span>
+        ef, carbon_price = 0.5366, 0.08   <span class="c"># 排放因子 kg/kWh、碳价 元/kg（见 §17.3）</span>
+        p = self.model.power(self.sp)     <span class="c"># 由静态非线性块给出功率 kW</span>
+        cost = (elec + carbon_price * ef) * p * self.dt / 3600.0
+        jitter = 0.5 * (self.sp - self.sp0) ** 2
+        return -(cost + 20.0 * self._violate(cv) + jitter)
+
+    def _violate(self, cv):
+        return 1.0 if (cv &gt; self.cv_hi or cv &lt; self.cv_lo) else 0.0   <span class="c"># 工艺红线</span></pre>
+
+<p><strong>零侵入安全封装（上线强制）</strong></p>
+
+<pre class="code">def safe_action(sp_curr, a_raw, sp_range, max_step, predict_fn, cv_bounds, horizon=10):
+    """
+    动作安全层：任何 RL 输出都必须经此函数才允许下发（对应 §15 的安全闸门）
+    ① 增量限幅 ② 速率限幅 ③ 模型前瞻屏蔽（预测越界则回退）
+    """
+    sp_new = np.clip(sp_curr + np.clip(a_raw, -max_step, max_step), *sp_range)
+    <span class="c"># 前瞻校验：用模型预测未来 horizon 步，若触碰工艺边界则拒绝下发</span>
+    if predict_violates(predict_fn, sp_new, cv_bounds, horizon):
+        return sp_curr, False          <span class="c"># 拒绝下发，返回 False 触发告警</span>
+    return sp_new, True</pre>
+
+<p><strong>训练与部署流程（工程顺序不能颠倒）</strong></p>
+
+<ol>
+  <li><strong>离线预训练</strong>：在模型沙盒中用历史 DV 轨迹回放训练，配合 <strong>Domain Randomization</strong>（辨识参数随机扰动 ±10~20%、加大噪声），逼策略对模型误差鲁棒；</li>
+  <li><strong>影子模式（Shadow Mode）</strong>：策略在线运行但<strong>只算不下发</strong>，与现行设定值并行对比 2~4 周，验证指标稳定优于现状；</li>
+  <li><strong>建议模式</strong>：推送给操作员确认后执行（建议先跑满一个完整工况周期，如冬夏各一轮）；</li>
+  <li><strong>自动模式</strong>：在 §15 四道安全闸门（旁路、速率限幅、工艺硬约束、看门狗）全部就位后才允许开启；在线更新频率受限（如每天一次），更新后先回影子模式复评；</li>
+  <li><strong>永不绕过</strong>：任何时候安全机制优先级都<strong>高于</strong> RL 输出；通信中断 / 模型失配立即旁路回归原始设定。</li>
+</ol>
+
+<div class="note warn">
+  <p>⚠️ 风险提醒（写给管理层）：RL 的价值在于把序贯决策学成快速策略，代价是<strong>可解释性弱</strong>。必须做到：① 全程在模型沙盒训练，禁止真机试错；② 影子模式指标不达标不上线；③ 动作永远经过安全层；④ 每一步下发留审计日志（时间、原值、新值、策略版本）。</p>
+</div>
+
+<h3>13.3.4 两条路线怎么选？（含与 MPC 的关系）</h3>
+
+<div class="tbl-wrap"><table>
+  <tr><th>项目</th><th>PSO 周期寻优</th><th>强化学习 RL</th><th>MPC 滚动优化</th></tr>
+  <tr><td><b>求解对象</b></td><td>静态 / 慢周期最优工作点</td><td>序贯决策策略（状态→动作）</td><td>有限时域最优序列</td></tr>
+  <tr><td><b>是否需要梯度</b></td><td>不需要</td><td>不需要（需可仿真环境）</td><td>需要（或需数值优化器）</td></tr>
+  <tr><td><b>在线算力</b></td><td>中（分钟级一次）</td><td>极低（毫秒级前向推理）</td><td>中高（每次求解优化问题）</td></tr>
+  <tr><td><b>数据 / 模型依赖</b></td><td>依赖辨识模型做评估</td><td>依赖辨识模型做环境 + 大量交互样本</td><td>依赖辨识模型做预测</td></tr>
+  <tr><td><b>处理滞后 / 时变</b></td><td>弱（静态视角）</td><td>强（显式建模时序）</td><td>强（滚动时域）</td></tr>
+  <tr><td><b>可解释性</b></td><td>强（每次输出可追溯）</td><td>弱（黑箱），需配指标看板</td><td>中（约束与目标显式）</td></tr>
+  <tr><td><b>典型节奏</b></td><td>15~60 min 重算</td><td>秒~分钟级持续决策</td><td>1~5 min 滚动</td></tr>
+</table></div>
+
+<div class="note">
+  <p>💡 <strong>组合建议</strong>（工程最实用）：<strong>PSO / 稳态优化定「今天该怎么跑」（小时级），RL 或 MPC 管「此刻该怎么调」（分钟级）</strong>；两者输出都汇入同一条 §15 安全通道，由旁路开关统一兜底。</p>
+  <p>💡 <strong>何时不要上 RL</strong>：工艺边界极窄、样本极贵、产量与安全责任无法承受黑箱决策的场景——先用电价感知的 PSO 稳态优化 + §13 方案 2 增益调度 PID，收益更稳、推行阻力更小。</p>
+</div>
+
+<h3>13.3.5 算法之外的三道现实坎（见开篇 §0）</h3>
+
+<div class="note warn">
+  <p>⚠️ <strong>此处不重复展开</strong>：工业具身智能落地真正的三道坎——① 仿真到真实（sim2real）差距；② 仿真平台常常并不存在；③ 生产线上不允许做对照实验——已<strong>前移至开篇第 0 章</strong>。立项前请先读完第 0 章，再回来看算法选型。</p>
+  <p>它们对本章的工程约束是硬性的：策略必须在辨识模型沙盒里训练 / 求解（禁止真机试错）；任何输出都必须过安全层（RL 走 <code>safe_action()</code>，MPC 走 §13.2.3 约束软化）；收益必须用 §17 的反事实基线核算，不能拿「今年夏天凉快」当节能率。</p>
+</div>
+
+<h3>三种方案对比</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>项目</th><th>模型辅助 PID 整定</th><th>增益调度 PID</th><th>非线性 MPC 上层监督优化</th></tr>
+  <tr><td><b>底层控制器</b></td><td>原有 PLC PID</td><td>原有 PLC PID</td><td>原有 PLC PID（不改动）</td></tr>
+  <tr><td><b>运行时是否需要模型</b></td><td>不需要（仅离线整定）</td><td>不需要（离线生成调度表）</td><td>在线调用 Hammerstein (FOPDT) 模型滚动优化</td></tr>
+  <tr><td><b>非线性处理能力</b></td><td>弱（单点局部线性）</td><td>中等（分段线性插值）</td><td>强，直接使用 Hammerstein 非线性预测</td></tr>
+  <tr><td><b>能耗优化</b></td><td>无显式能耗目标，只调动态响应</td><td>近似最优，离线预计算</td><td><b>显式最小化能耗（本方案核心目标）</b></td></tr>
+  <tr><td><b>算力</b></td><td>极低</td><td>低</td><td>中高，边缘盒/边缘网关可承载</td></tr>
+  <tr><td><b>零侵入适配性</b></td><td>✅ 优秀</td><td>✅ 优秀</td><td>✅ 优秀，推荐节能改造场景</td></tr>
+</table></div>
+
+<div class="note">
+  <p>💡 安全原则：无论选择哪一种策略，底层反馈闭环永久保留；模型失配、通信故障，自动切回原始设定，不影响生产。<strong>模型是预测优化工具；反馈是安全兜底。</strong></p>
+</div>
+
+<h2 id="s14"><span class="no">14</span>模型部署、软投切、在线监测、模型维护与迭代更新</h2>
+
+<div class="note warn">
+  <p>⚠️ 零侵入改造，投运必须分阶段，严禁一次性直接打开自动下发！</p>
+  <p><span class="tag">大白话</span>新系统上线像新司机上路，先观摩、再陪同、后独立，每一步都有「教练刹车」。</p>
+</div>
+
+<pre class="diagram">阶段1 影子模式     阶段2 手动推荐      阶段3 半自动        阶段4 全自动监督
+(只预测不下发) → (推荐给操作员) → (推荐+一键确认) → (自动下发+硬旁路)
+  ≥1~2 周          ≥1 周              ≥2 周             长期，随时可切回</pre>
+
+<ol>
+  <li><strong>阶段 1：影子模式（Shadow mode）</strong>——模型并行跑，<strong>只做预测，不输出设定值</strong>。对比模型预测值和真实 CV，持续计算预测误差，评估模型失配。建议运行 ≥ 1~2 周，覆盖足够工况变化；</li>
+  <li><strong>阶段 2：手动推荐模式</strong>——上层算出最优设定，展示给操作员，操作员确认后手动写入 PLC；系统不下发指令；</li>
+  <li><strong>阶段 3：半自动模式</strong>——自动生成推荐设定，下发前等待操作员一键确认；一旦超限，自动禁止下发；</li>
+  <li><strong>阶段 4：全自动监督下发</strong>——自动下发设定；硬旁路开关永久保留，一键切回原系统。</li>
+</ol>
+
+<div class="note plain">
+  <p>📡 <strong>模型健康监测（长期运维）</strong></p>
+  <ul>
+    <li>实时跟踪预测误差；误差超过阈值，触发模型漂移告警；</li>
+    <li>工况包络监测：轻度越界降权告警，持续越界切回（§12 的软降级逻辑）；</li>
+    <li>按需重辨识：不需要固定周期跑激励；只有漂移告警、评估确认模型老化后，在工艺许可条件下，重新执行低扰动 PRBS 激励，更新模型版本。</li>
+  </ul>
+  <p>📒 <strong>运维台账</strong>：记录激励实验、模型版本、投运时间、告警事件、参数变更，做好版本管理（模型版本与训练数据、激励序列、验收指标绑定存档）。</p>
+</div>
+
+<h2 id="s15"><span class="no">15</span>工程落地风险与安全保障（零侵入重点章节）</h2>
+
+<div class="note warn">
+  <p>⚠️ 零侵入 ≠ 零风险；主要风险点：通信中断、模型失配、扰动突变、激励实验越限。</p>
+</div>
+
+<ol>
+  <li><strong>独立硬旁路</strong>：一键切回原始设定值，切换逻辑不依赖上层软件运行状态（物理开关或 PLC 内部独立回路实现，上层系统断电/死机也能切）；</li>
+  <li><strong>速率限幅</strong>：设定值单次最大变化量限制，防止设定值跳变冲击工艺。推荐值：<strong>单次变化 ≤ CV 量程的 2%~5%</strong>，且 ≤ 工艺工程师确认的单步安全步长；温度类对象典型值 0.5~1.0℃/次；</li>
+  <li><strong>工艺上下限硬约束</strong>：CV 触碰工艺边界（含预警裕度），立刻停止优化计算，切回原设定；禁止继续下发；</li>
+  <li><strong>通信看门狗</strong>：上层网关和 PLC 通信中断，看门狗超时自动退出优化，恢复原始设定；告警推送运维。推荐值：<strong>超时取设定值刷新周期的 3 倍</strong>（如刷新周期 60s，则看门狗 180s）；PLC 侧在超时后自动保持或回落到最后一个「原生安全设定值」，而非保持上层最后下发值不变；</li>
+  <li><strong>激励实验审批</strong>：激励实验前工艺、设备、安全三方确认，现场专人值守；激励程序自带紧急停止逻辑（一键急停 + 超限自停）；</li>
+  <li><strong>权限隔离</strong>：上层网关对 PLC 默认只读；写设定权限单独管控；所有写操作留存审计日志（时间、原值、新值、操作人/模块）；禁止修改 PLC 联锁、报警逻辑。</li>
+</ol>
+
+<p>看门狗参考逻辑（伪代码）：</p>
+<pre class="code">def watchdog_loop():
+    while True:
+        if now() - last_plc_heartbeat() &gt; 3 * SETPOINT_PERIOD:
+            <span class="c"># 通信中断：停发设定、通知 PLC 回落、告警</span>
+            plc.fallback_to_native_setpoint()
+            alarm("上层-PLC 通信中断，已切回原始设定")
+            require_manual_rearm()          <span class="c"># 恢复后须人工确认才能重新投运</span>
+        sleep(1)</pre>
+
+<div class="note">
+  <p>重点强调：零侵入改造只是叠加上层推荐优化。<strong>原有安全保护、联锁逻辑全部保留在原生 PLC 内，不受新增系统干预。</strong></p>
+</div>
+
+<h2 id="s16"><span class="no">16</span>模型验收指标清单</h2>
+
+<p>验收在影子模式采集独立测试数据，<strong>全部指标达标，才允许进入半自动投运</strong>：</p>
+
+<div class="tbl-wrap"><table>
+  <tr><th>指标</th><th>验收阈值</th><th>备注</th></tr>
+  <tr><td><b>测试集 NRMSE</b></td><td>&lt; 5%（自由仿真准则）</td><td>独立激励轨迹（黄金验证集）；需同时报告绝对误差</td></tr>
+  <tr><td><b>R²</b></td><td>≥ 0.90</td><td>动态响应区间，稳态段不计入（稳态段方差趋零，R² 无意义）</td></tr>
+  <tr><td><b>残差 ACF</b></td><td>95% 置信区间内无显著自相关</td><td>滞后阶数取 1~20</td></tr>
+  <tr><td><b>残差与输入 CCF</b></td><td>无显著相关性</td><td>证明无未建模动态</td></tr>
+  <tr><td><b>持续激励条件数 κ</b></td><td>&lt; 1000（去均值信息矩阵）</td><td>隐变量 z 的条件数（§8.2 构造方法）</td></tr>
+  <tr><td><b>采集链路丢包率</b></td><td>&lt; 1%（有线）/ &lt; 5%（无线，需插值标记）</td><td>采集链路</td></tr>
+  <tr><td><b>工况覆盖</b></td><td>覆盖日常主要稳态工况点</td><td>模型凸包覆盖正常运行区间</td></tr>
+  <tr><td><b>能耗核算准备</b></td><td>基线窗口数据完整</td><td>见第 17 章 M&amp;V 要求</td></tr>
+</table></div>
+
+<p>备注：指标为推荐工程阈值；可根据工艺要求协商调整。若部分指标不达标，返回激励/数据采集阶段重新开展实验。</p>
+
+<h2 id="s17"><span class="no">17</span>节能量与碳减排核算（M&amp;V）</h2>
+
+<p>节能改造没有可审计的收益证明，就无法验收、无法结算、也无法说服管理层。本章给出核算框架（参考 IPMVP《国际节能效果测量与验证规程》的「选项 C：整体设施/反事实基线」思路）。</p>
+
+<h3>17.1 核心思想：反事实基线</h3>
+<div class="note">
+  <p><span class="tag">大白话</span>节能量的本质是「如果不上优化系统，本来要用多少电」减去「上了优化系统实际用了多少电」。难点在于「本来要用多少」是测不到的（时间不能倒流），必须用模型推算——这就是「反事实基线」。</p>
+</div>
+<div class="formula">节能量 = E<sub>baseline</sub> − E<sub>actual</sub></div>
+<ul>
+  <li>E<sub>actual</sub>：投运后实测能耗（电表直读）；</li>
+  <li>E<sub>baseline</sub>：基线模型推算的「若不投运，在当前工况（产量、气温、来料）下应有的能耗」。</li>
+</ul>
+
+<h3>17.2 基线模型建立</h3>
+<ol>
+  <li><strong>投运前基线窗口</strong>：采集 ≥ 2~4 周的原始运行数据（能耗 + 工况变量），覆盖典型工况波动；</li>
+  <li><strong>回归建模</strong>：建立「工况 → 能耗」的基线回归模型 E<sub>baseline</sub> = g(产量, 气温, 来料温度, …)，可以用简单的多元线性回归/分箱平均，不必复杂——<strong>基线模型必须在投运前冻结存档</strong>，防止事后「调基线凑节能率」；</li>
+  <li><strong>非例行调整</strong>：产线改造、产品切换、设备大修后，基线需要重新标定并留档。</li>
+</ol>
+
+<h3>17.3 碳减排换算</h3>
+<div class="formula">碳减排量 (kg CO₂) = 节电量 (kWh) × 电力排放因子 (kg CO₂/kWh)</div>
+<ul>
+  <li>电力排放因子以生态环境部最新发布的<strong>全国电力平均二氧化碳排放因子</strong>为准（2021 年度为 0.5568 kg CO₂/kWh，2022 年度为 0.5366 kg CO₂/kWh；区域电网因子另见当年发布值）；</li>
+  <li>天然气、蒸汽等其他能源按对应排放因子折算后加总。</li>
+</ul>
+
+<p><strong>参考实现（numpy）：基线回归 + 反事实推算 + 碳减排换算</strong></p>
+
+<pre class="code">import numpy as np
+
+def fit_baseline(X, y):
+    """基线回归：y ≈ X·θ（X 含常数列）。y=能耗 kWh，X 列=产量/气温/来料温度等工况。"""
+    X = np.column_stack([np.ones(len(X)), X])           <span class="c"># 加截距</span>
+    theta, *_ = np.linalg.lstsq(X, y, rcond=None)
+    resid = y - X @ theta
+    r2 = 1 - resid @ resid / ((y - y.mean()) @ (y - y.mean()))
+    return theta, r2                                     <span class="c"># ⚠️ 要求 R² ≥ 0.7，否则换变量/分箱</span>
+
+def mv_report(X_now, E_actual, theta, ef=0.5366, price=0.68, carbon_price=0.08):
+    """M&amp;V 核算：反事实基线 vs 实测能耗 → 节能量/节能率/碳减排/经济效益"""
+    X_now = np.column_stack([np.ones(len(X_now)), X_now])
+    E_base = X_now @ theta                               <span class="c"># 若不投运应有的能耗 kWh</span>
+    save_kwh = float(np.sum(E_base - E_actual))          <span class="c"># 节能量 kWh</span>
+    rate = 100.0 * save_kwh / float(np.sum(E_base))      <span class="c"># 节能率 %</span>
+    co2 = save_kwh * ef                                  <span class="c"># 碳减排 kg CO₂</span>
+    money = save_kwh * price + co2 * carbon_price        <span class="c"># 电费节省 + 碳资产收益 元</span>
+    return dict(E_baseline=float(np.sum(E_base)), E_actual=float(np.sum(E_actual)),
+                save_kwh=save_kwh, save_rate=rate, co2_kg=co2, benefit_yuan=money)</pre>
+
+<div class="note warn">
+  <p>⚠️ <strong>两条硬规矩</strong>：① 基线 θ 必须<strong>投运前冻结存档</strong>，投运后不允许再调；② 报告中必须同时给出<strong>总量节能量</strong>与<strong>单耗（单位产品能耗）节能率</strong>——只看总量会被产量波动掩盖或夸大（产量翻倍而总能耗不变，单耗其实降了一半）。</p>
+</div>
+
+<h3>17.4 核算报告要求</h3>
+<ul>
+  <li>报告周期：月度/季度；</li>
+  <li>必须同时披露：基线模型及其冻结版本、工况数据完整性、天气/产量修正说明、异常时段剔除理由；</li>
+  <li>节能率口径必须注明是「单耗（单位产品能耗）」还是「总量」，避免产量变化掩盖或夸大节能效果。</li>
+</ul>
+
+<h2 id="s18"><span class="no">18</span>故障处置预案</h2>
+
+<ol>
+  <li><strong>通信中断（上层网关 ↔ PLC）</strong>：看门狗超时，自动停止下发设定，PLC 侧回落到原生安全设定；产生告警，推送到运维。通信恢复后，默认停留在影子模式，需要人工确认再开启自动下发。</li>
+  <li><strong>模型漂移告警（预测误差超限）</strong>：维持当前运行，不立即切回；告警通知工程师；评估是否需要重新激励辨识；如果误差持续恶化，自动退出自动优化。</li>
+  <li><strong>被控变量 CV 触碰工艺边界</strong>：立刻停止优化计算，切回原设定；记录事件日志；禁止继续下发新设定，直到人工确认工艺恢复。</li>
+  <li><strong>传感器故障（测点卡死/跳变）</strong>：标记该测点无效；如果 DV/CV 为关键测点，直接退出自动优化，切回原始设定。</li>
+  <li><strong>激励实验紧急事件</strong>：程序内置紧急停止，一旦越限，立即终止激励序列，恢复实验前原始设定；保存本次采集数据（异常段数据对事后分析同样有价值）。</li>
+</ol>
+
+<p>✅ 预案演练：投运前离线仿真演练全部故障场景，验证逻辑有效性。</p>
+
+<h2 id="s19"><span class="no">19</span>案例：Hammerstein (FOPDT) 模型小样验证 ——TEC 制冷系统（真实实验数据）</h2>
+
+<div class="note">
+  <p>📌 说明：本章节是实验室小样验证案例，用于验证整套辨识方法论；<strong>不属于工业流水线改造本身</strong>。数据全部来自在能碳一体机 nt001 上的真实采集（815 点 × 5s ≈ 67.8 min）。</p>
+</div>
+
+<h3>19.1 小样场景</h3>
+<p>固定风扇转速；通过调节 TEC 电流（0~5A）改变制冷量；采集测点：时间戳、设定电流、实测电流、实时功率、输出电压、冷却水温度、环境室温、冷风风口温度；被控输出：水杯水温。</p>
+<ul>
+  <li><strong>MV</strong>：TEC 实测电流（注意：用实测值，不是设定序列，见 §6.2）；</li>
+  <li><strong>DV</strong>：冷却水温度、室温、风口温度；</li>
+  <li><strong>CV</strong>：水杯水温；</li>
+  <li><strong>额外观测</strong>：实时功率、输出电压。</li>
+</ul>
+<p>🎯 建模目标：辨识 Hammerstein (FOPDT) 模型，找到满足水温设定值前提下最小 TEC 功率，作为算法验证载体。</p>
+<p>激励方案：5 电平 PRBS（GF(5) m 序列，电平 0 / 1.25 / 2.5 / 3.75 / 5 A），采样周期 5s，每电平最少驻留 25s；开环激励（预先生成电流序列，水温不反馈修改输入）；输出保存 CSV 时序数据。</p>
+
+<h3>19.2 实验原始数据总览</h3>
+<figure>
+  <img src="assets/article-fig1-prbs-response.png?v=20260923" alt="TEC 小样 5 电平 PRBS 开环激励实验：设定/实测电流与四路温度响应曲线">
+  <figcaption>图 1 ｜ TEC 小样 5 电平 PRBS 开环激励实验（真实采集，815 点 × 5s）</figcaption>
+</figure>
+<p><strong>读图要点</strong>：</p>
+<ul>
+  <li>上图：设定电流（蓝）按 5 电平 PRBS 切换，实测电流（橙）紧密跟随（恒流电源跟踪误差 &lt; 1.5%，8s 内到位）；</li>
+  <li>下图：冷端风口温度（绿）对电流切换响应灵敏（电流大→风口冷，增益为负）；水杯水温（红）变化缓慢平滑——这就是典型的「大惯性 + 滞后」对象；</li>
+  <li>橙色阴影：<strong>初始 16.7 min 系统未达稳态</strong>（水杯从 41.9℃ 自然降温），这段数据必须剔除（见 19.6 教训一）。</li>
+</ul>
+
+<h3>19.3 数据质量诊断（实测）</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>诊断项</th><th>实测结果</th><th>判定</th></tr>
+  <tr><td>样本数 / 时长</td><td>815 点 / 67.8 min</td><td>✅</td></tr>
+  <tr><td>温度通道丢包率（LoRa 链路）</td><td>最严重通道缺测 41 点 = <b>5.0%</b></td><td>⚠️ 超有线 1% 标准，按无线通道插值标记处理</td></tr>
+  <tr><td>电流/功率丢包率</td><td>17 点 = 2.1%</td><td>⚠️ 同链路，插值标记</td></tr>
+  <tr><td>实测电流跟随设定</td><td>偏差 &lt; 1.5%</td><td>✅</td></tr>
+  <tr><td>温度测量滞后</td><td>LoRa 更新周期 15s，读数 age 0~15s 随机</td><td>已用 (t − age) 还原真实时刻（§7）</td></tr>
+</table></div>
+
+<h3>19.4 静态非线性辨识（Hammerstein 前级）</h3>
+<figure>
+  <img src="assets/article-fig2-static-nonlinearity.png?v=20260923" alt="静态非线性：TEC 功率随电流超线性增长；冷端降温幅度随电流趋于饱和">
+  <figcaption>图 2 ｜ 静态非线性：功率-电流（左，二次拟合 P = 1.05·I² + 4.25·I）与冷端降温-电流（右）</figcaption>
+</figure>
+<ul>
+  <li>左图：<strong>功率-电流关系</strong>，二次拟合 P = 1.05·I² + 4.25·I（W）。功率随电流<strong>超线性</strong>增长（5A 时 48 W，是 2.5A 时 16 W 的 3 倍）——这正是 TEC 内阻焦耳热的体现，也是「为什么不能只用线性 FOPDT」的直接证据；</li>
+  <li>右图：<strong>冷端降温幅度-电流关系</strong>。降温效果并非电流的线性放大（存在饱和趋势），静态非线性块必不可少。</li>
+</ul>
+
+<p>把这两条曲线写成公式，就是 Hammerstein 模型的<strong>前级静态块</strong>（它同时给出「能省多少」与「花多少电」）：</p>
+
+<div class="formula">隐变量（降温能力，带饱和）：  z = f(u) = u / (1 + β·u)        β ≥ 0 为饱和系数，β→0 退化为线性
+稳态模型：                    y_ss = y_free − |K|·z
+能耗模型（本例实测）：        P(u) = P₀ + a·u² + b·u          P₀ 为与电流无关的空载功率
+边际代价：                    dP/du = 2a·u + b  随 u 线性上升 ⇒ 越往深处压越贵（§1.4）</div>
+
+<p>其中 β 由右图的饱和程度回归得到（本例量级 β ≈ 0.12，见 §13.2.6 的 <code>static_block</code>）；K 是后级线性动态的静态增益，由 §19.5 辨识给出。<strong>静态块负责「非线性」，FOPDT 负责「动态」</strong>，两者串联即 §9 的 Hammerstein 结构。</p>
+
+<div class="tbl-wrap"><table>
+  <tr><th>电流 (A)</th><th>功率 (W)</th><th>风口温度 (℃)</th><th>水杯水温 (℃)</th></tr>
+  <tr><td>0.00</td><td>4.6</td><td>22.15</td><td>27.41</td></tr>
+  <tr><td>1.25</td><td>9.1</td><td>22.23</td><td>26.96</td></tr>
+  <tr><td>2.50</td><td>16.2</td><td>21.83</td><td>27.20</td></tr>
+  <tr><td>3.75</td><td>30.0</td><td>22.38</td><td>26.47</td></tr>
+  <tr><td>5.00</td><td>48.1</td><td>21.81</td><td>27.19</td></tr>
+</table></div>
+
+<p><strong>参考实现（numpy）：静态块拟合 + 边际代价递增验证</strong></p>
+
+<pre class="code">import numpy as np
+
+I = np.array([0.00, 1.25, 2.50, 3.75, 5.00])   <span class="c"># 实测电流 A（5 电平 PRBS）</span>
+P = np.array([ 4.6,  9.1, 16.2, 30.0, 48.1])   <span class="c"># 实测功率 W（§19.4 表）</span>
+P0 = P[0]                                      <span class="c"># 空载功率：风扇+控制板，与电流无关</span>
+A = np.column_stack([I ** 2, I])               <span class="c"># 过原点二次型：P − P0 = a·I² + b·I</span>
+(a, b), *_ = np.linalg.lstsq(A, P - P0, rcond=None)
+fit = P0 + a * I ** 2 + b * I
+r2 = 1 - np.sum((P - fit) ** 2) / np.sum((P - P.mean()) ** 2)
+print("空载功率 %.2f W   二次项 a=%.3f  一次项 b=%.3f   R²=%.4f" % (P0, a, b, r2))
+print("边际功率代价 dP/dI (W/A):", np.round(2 * a * I + b, 2))   <span class="c"># 每多要 1 A 多付多少瓦</span></pre>
+
+<p><strong>运行结果</strong>：</p>
+
+<pre class="diagram">空载功率 4.60 W   二次项 a=1.523  一次项 b=1.067   R²=0.9992
+边际功率代价 dP/dI (W/A): [ 1.07  4.87  8.68  12.49  16.29]</pre>
+
+<div class="note">
+  <p><span class="tag">怎么读这两行</span>① 拟合优度 R² = 0.9992 说明「二次型 + 空载常数」足以描述功率-电流关系，<strong>不需要更高阶</strong>；② <strong>边际代价从 1.07 W/A 一路涨到 16.29 W/A（约 15 倍）</strong>——这就是 §1.4「驱动势的边际代价递增」在这台设备上的实测形态，也是上层优化必须顶着约束边界跑、而不是死守某个保守设定值的根本原因。</p>
+  <p>📌 口径说明：上表 5 个点是<strong>各电平区间的均值</strong>（样本极少），复算系数与文中全量 815 点拟合结果（P = 1.05·I² + 4.25·I）会有差异，但「二次超线性」的结论一致；把 <code>I</code>、<code>P</code> 换成全量实测列即复现文中系数。</p>
+</div>
+
+<h3>19.5 动态辨识结果（FOPDT 线性子系统）</h3>
+
+<p>先说清「辨识到底在估什么」——估的是 Hammerstein 模型的<strong>后级线性动态</strong>（前级静态块已在 §19.4 标定）：电流 u 先过静态块得到隐变量 z = f(u)，再进一阶惯性 + 纯滞后环节。</p>
+
+<div class="formula">模型结构：
+  u[k] ──►[ 静态块 f(·) ]──► z[k] ──►[ FOPDT 线性动态 ]──► y[k]
+                                            ▲
+                                     可测扰动 d[k]（DV 前馈，直接进预测式）
+
+连续形式：  τ·ẏ(t) = −( y(t) − y_free(d) ) + K·z(t−θ)
+传递函数：  G(s) = Y(s)/Z(s) = K·e^(−θ·s) / (τ·s + 1)
+
+离散形式（采样 T_s，零阶保持 + 滞后量化到整数拍）：
+  y[k+1] = a·y[k] + (1−a)·y_free(d[k]) + b·z[k−n_k]
+  a = exp(−T_s/τ) ， b = K·(1−a) ， n_k = round(θ/T_s)
+
+参数反解（回归出 a、b、c 后换算回物理参数）：
+  τ = −T_s / ln(a) ， K = b / (1−a) ， y_free = c / (1−a)      （c 为回归截距）
+
+阶跃响应（输入阶跃 Δu，t ≥ θ）：
+  y(t) = y₀ + K·Δu·(1 − e^(−(t−θ)/τ))    63.2% 响应发生在 t = θ + τ</div>
+
+<p>工程上真正回归的只有三个未知数——<code>y[k+1] = a·y[k] + b·u[k−n<sub>k</sub>] + c</code>，一次最小二乘解出；再用上面三行反解出 τ / K / y<sub>free</sub>。这就是下表那三个数字的全部来源（n<sub>k</sub> 靠外层枚举 0~12 拍、取残差平方和最小者）。</p>
+
+<p>把辨识结果代回去，两条通道<strong>可直接落地的模型</strong>就是下面这两行（T<sub>s</sub> = 5 s）：</p>
+
+<div class="formula">快通道（电流 → 风口温度）：
+  y[k+1] = 0.9363·y[k] + 1.4103 − 0.0688·u[k−4]
+  其中 a = 0.9363、b = −0.0688、c = (1−a)·22.15 = 1.4103 ⇒ τ = 76 s，θ = 20 s(4 拍)，K = −1.08 ℃/A
+  稳态：y_ss = 22.15 − 1.08·u      （u = 5 A 时风口温度 ≈ 16.8 ℃）
+
+慢通道（电流 → 水杯水温，含 DV）：
+  y[k+1] = 0.99451·y[k] + 0.1492 − 0.00538·u[k−4]
+  其中 a = 0.99451、b = −0.00538、c = (1−a)·27.2 ⇒ τ = 909 s，θ = 20 s(4 拍)，K = −0.98 ℃/A
+  稳态：y_ss = y_free(d) − 0.98·u，  y_free(d) = y_free|_d₀ + g_d·(d − d₀)
+        （y_free|_d₀ ≈ 27.2~27.4 ℃，即 0 A 实测水温；g_d 为 DV 稳态增益，§13.2.6 示例取 0.85 ℃/℃）</div>
+
+<div class="note">
+  <p><span class="tag">两行数字怎么读</span>a 越接近 1 越慢：快通道 a = 0.9363（每拍衰减 6.4%，约 15 拍走完一个时间常数），慢通道 a = 0.99451（每拍只衰减 0.55%，要 180 拍 = 15 min 才走完）——<strong>时间常数差 12 倍，正是同一台设备上「风道热容小 / 水杯热容大」的量化体现</strong>。增益为负表示电流越大越冷；|b| 极小不代表影响小，要看 K = b/(1−a)：慢通道 1 A 电流最终仍能把水温压低约 1 ℃，只是需要约 3τ ≈ 45 min 才到位。</p>
+  <p>⚠️ 因此慢通道<strong>绝不能用 PID 的「看偏差就动」直觉去调</strong>：滞后 20 s 相对 909 s 可忽略，但惯性极长，任何阶跃式调整在十几分钟内都看不到完整效果——这正是 §13.2.1 说的「预测模型比反馈更值钱」的场景。</p>
+</div>
+
+<p>按 §10.1 双层优化（外层枚举滞后 0~12 拍，内层最小二乘）+ 训练/测试 8:2 时序切分，得到的辨识结果：</p>
+<div class="tbl-wrap"><table>
+  <tr><th>通道</th><th>离散滞后</th><th>时间常数 τ</th><th>静态增益 K</th><th>测试段 NRMSE</th><th>测试段 R²</th></tr>
+  <tr><td><b>快通道：电流 → 风口温度</b></td><td>4 拍（20 s）</td><td><b>76 s</b></td><td>−1.08 ℃/A</td><td>6.0%</td><td><b>0.968</b></td></tr>
+  <tr><td><b>慢通道：电流 → 水杯水温（含 DV）</b></td><td>4 拍（20 s）</td><td><b>909 s（≈15 min）</b></td><td>−0.98 ℃/A</td><td>6.5%</td><td><b>0.950</b></td></tr>
+</table></div>
+<p><strong>解读</strong>：</p>
+<ul>
+  <li>两条通道都是<strong>负增益</strong>（电流越大越冷），快通道 76 s（风道热容小）、慢通道 909 s（水杯热容大），与物理直觉一致；</li>
+  <li>增益的物理意义：每加 1 A 电流，稳态下风口再降约 1.1 ℃、水杯再降约 1.0 ℃；</li>
+  <li>NRMSE 略高于 §16 的 5% 验收线，但注意分母效应：水杯全程只波动约 2 ℃，6.5% 对应的绝对误差仅 ±0.13 ℃，与温度传感器分辨率（0.1 ℃）同量级——模型已逼近测量极限。这也是 §11 提醒「NRMSE 要结合绝对误差解读」的实例。</li>
+</ul>
+
+<p><strong>参考实现（numpy，可脱离数据一键跑通）：PRBS 生成 → 滞后枚举辨识 → 一步/自由仿真验证</strong></p>
+
+<p>下面这份代码完整走一遍 §10.1 的「外层枚举滞后 + 内层最小二乘」，并把 §19.6 的两条教训做成可复算的对照实验。示例取<strong>快通道（电流 → 风口温度，τ = 76 s、θ = 20 s、K = −1.08 ℃/A）</strong>；把 <code>synth()</code> 换成读 CSV（<code>u, y = np.loadtxt("prbs_run.csv", delimiter=",", unpack=True)</code>）、再把通道参数换成慢通道，即复现 §19.5 表中的慢通道结果。</p>
+
+<pre class="code">import numpy as np
+
+TS = 5.0                       <span class="c"># 采样周期 s（§19.1：815 点 × 5 s）</span>
+
+
+def prbs5(n, c=(1, 2, 4), seed=(1, 0, 3)):
+    <span class="c">"""GF(5) m 序列：x[k] = (c0·x[k-1] + c1·x[k-2] + c2·x[k-3]) mod 5，周期 5³−1 = 124"""</span>
+    x = list(seed)
+    while len(x) &lt; n:
+        x.append((c[0] * x[-1] + c[1] * x[-2] + c[2] * x[-3]) % 5)
+    return np.array(x[:n])
+
+
+def synth(n=815, tau=76.0, theta=20.0, K=-1.08, y_free=22.15, sigma=0.18, seed=7):
+    <span class="c">"""合成数据（无 CSV 时一键跑通）：5 电平 PRBS + 每电平驻留 25 s + FOPDT 快通道 + 噪声"""</span>
+    rng = np.random.default_rng(seed)
+    u = np.repeat(1.25 * prbs5(n), 5)[:n]                  <span class="c"># 0 / 1.25 / 2.5 / 3.75 / 5 A</span>
+    nk = int(round(theta / TS))
+    a, b = np.exp(-TS / tau), K * (1 - np.exp(-TS / tau))  <span class="c"># 离散 FOPDT 系数（§13.2.1）</span>
+    yc = np.zeros(n); yc[0] = y_free + K * u[:50].mean()   <span class="c"># 从稳态起步的「干净」轨迹</span>
+    for k in range(n - 1):
+        u_eff = u[k - nk] if k &gt;= nk else 0.0              <span class="c"># 纯滞后：取 nk 拍前的输入</span>
+        yc[k + 1] = a * yc[k] + (1 - a) * y_free + b * u_eff + rng.normal(0, sigma)
+    <span class="c"># 开机未稳态：叠加一段「另一时间常数」(200 s) 的自然降温，起点 30.0 ℃</span>
+    y = yc + (30.0 - yc[0]) * np.exp(-np.arange(n) * TS / 200.0)
+    return u, y + rng.normal(0, 0.05, n)                   <span class="c"># 叠加测量噪声</span>
+
+
+def fit_fopdt(u, y, nk_grid=range(0, 13)):
+    <span class="c">"""滞后枚举 + 内层最小二乘：y[k+1] = a·y[k] + b·u[k−nk] + c"""</span>
+    best = None
+    for nk in nk_grid:
+        Y = y[nk + 1:]
+        X = np.column_stack([y[nk:-1], u[:len(Y)], np.ones(len(Y))])
+        th, *_ = np.linalg.lstsq(X, Y, rcond=None)
+        r = Y - X @ th
+        if best is None or r @ r &lt; best[0]:
+            best = (float(r @ r), nk, th)
+    sse, nk, (a, b, c) = best
+    return dict(nk=nk, tau=-TS / np.log(a), K=b / (1 - a), steady=c / (1 - a), a=a, b=b, c=c)
+
+
+def simulate(u, y, p, free=False, n0=0):
+    <span class="c">"""一步预测（喂真实 y） vs 自由仿真（模型输出回馈自身，对应部署形态）"""</span>
+    out = np.zeros(len(y)); out[n0] = y[n0]
+    for k in range(n0, len(y) - 1):
+        yk = out[k] if free else y[k]                      <span class="c"># ← 唯一的差别，结果差 3 倍</span>
+        u_eff = u[k - p["nk"]] if k &gt;= p["nk"] else 0.0
+        out[k + 1] = p["a"] * yk + p["b"] * u_eff + p["c"]
+    return out
+
+
+def score(y, yhat, n0):
+    e = y[n0:] - yhat[n0:]
+    rng = float(np.max(y[n0:]) - np.min(y[n0:]))
+    rmse = float(np.sqrt(np.mean(e ** 2)))
+    return rmse, 100 * rmse / rng, 1 - float(e @ e) / float(((y[n0:] - y[n0:].mean()) ** 2).sum())
+
+
+u, y = synth()
+WARM = int(16.7 * 60 / TS)                    <span class="c"># 待剔除的初始非稳态段（§19.6 教训一）</span>
+n_tr = WARM + int(0.8 * (len(y) - WARM))      <span class="c"># 训练 / 测试 8:2 时序切分</span>
+
+for tag, seg in (("含初始非稳态段", slice(0, n_tr)), ("剔除后（正确做法）", slice(WARM, n_tr))):
+    p = fit_fopdt(u[seg], y[seg])
+    o = score(y, simulate(u, y, p, n0=n_tr), n_tr)         <span class="c"># 一步预测（指标看不出差别！）</span>
+    print("%s → 滞后 %2d 拍  τ=%4.0f s  K=%.2f ℃/A | 一步预测 NRMSE %.1f%%  R² %.3f"
+          % (tag, p["nk"], p["tau"], p["K"], o[1], o[2]))
+
+p = fit_fopdt(u[WARM:n_tr], y[WARM:n_tr])
+print("最终模型：滞后 %d 拍（%.0f s）  τ = %.0f s   K = %.2f ℃/A（真实值 76 s / −1.08 ℃/A）"
+      % (p["nk"], p["nk"] * TS, p["tau"], p["K"]))
+for tag, free in (("一步预测", False), ("自由仿真", True)):
+    rmse, nrmse, r2 = score(y, simulate(u, y, p, free=free, n0=n_tr), n_tr)
+    print("%s（测试段）：RMSE %.3f ℃   NRMSE %.1f%%   R² %.3f" % (tag, rmse, nrmse, r2))</pre>
+
+<p><strong>运行结果</strong>（本仓库 numpy 环境实测）：</p>
+
+<pre class="diagram">含初始非稳态段 → 滞后  4 拍  τ= 135 s  K=-1.78 ℃/A | 一步预测 NRMSE 4.9%  R² 0.955
+剔除后（正确做法） → 滞后  4 拍  τ=  71 s  K=-0.92 ℃/A | 一步预测 NRMSE 4.9%  R² 0.955
+最终模型：滞后 4 拍（20 s）  τ = 71 s   K = -0.92 ℃/A（真实值 76 s / −1.08 ℃/A）
+一步预测（测试段）：RMSE 0.198 ℃   NRMSE 4.9%   R² 0.955
+自由仿真（测试段）：RMSE 0.586 ℃   NRMSE 14.6%   R² 0.607</pre>
+
+<div class="note">
+  <p><span class="tag">三行结果各说明一件事</span>① <strong>滞后枚举有效</strong>：4 拍（20 s）与真值一致，τ = 71 s / K = −0.92 ℃/A 也落在真值（76 s / −1.08 ℃/A）附近，误差来自噪声下的最小二乘衰减（EIV，§12）；② <strong>教训一最阴险的地方</strong>：含初始非稳态段时 τ = 135 s、K = −1.78 ℃/A 已被明显带偏，可一步预测指标（NRMSE 4.9%、R² 0.955）<strong>完全看不出来</strong>——因为这个指标每拍都拿真实 y 重置，把参数错误掩盖了；③ <strong>教训二可复算</strong>：同一组参数，一步预测 NRMSE 4.9%，自由仿真 14.6%，差约 3 倍，与 §19.5 慢通道实测（6.5% → 13.3%）同量级。</p>
+  <p>✅ 工程提醒：验收与部署前<strong>只用自由仿真指标</strong>（<code>free=True</code>）判断模型能不能用；一步预测只用于扫滞后与阶次、产初值。</p>
+</div>
+
+<h3>19.6 三个真实踩坑教训（本章最有价值的部分）</h3>
+<ol>
+  <li><strong>教训一：初始非稳态段必须剔除。</strong>本次实验开跑时水杯 41.9℃（未预热/预冷到稳态），前 16.7 min 的自然降温与 PRBS 响应混在一起。对比试验：含初始段辨识 → 测试段 R² = 0.913；剔除后 → R² = 0.950。→ 对应 §7 第 2 条；采集脚本虽有 warmup 参数，但本次未用足，代价是 1/4 数据作废。</li>
+  <li><strong>教训二：一步预测好看 ≠ 自由仿真可用。</strong>同一组参数：一步预测 NRMSE 6.5%，自由仿真（模型输出回馈自身，不开任何「答案」）NRMSE 13.3%，直接翻倍。→ 一步拟合准则会让误差被每拍的真实测量「掩盖」，部署形态是长时域开环预测，<strong>正式模型必须用仿真误差准则（NLS）精修</strong>（§10）；线性最小二乘只适合扫滞后/阶次与产初值。</li>
+  <li><strong>教训三：无线传感器的随机测量滞后必须还原时间轴。</strong>四路温度走 LoRa（15s 更新），平台返回的是「最近一次上行值」，真实测量时刻比名义采样时刻早 0~15s 且随机抖动。直接当本拍值用，等于给输出通道加了随机纯滞后，辨识出的滞后参数必然有偏。→ 采集时已记录每拍 age，按「采样时刻 − age」还原真实时刻（§7）；age &gt; 45s 的陈旧读数按缺测丢弃（绝不把几分钟前的旧值当新值写库）。</li>
+</ol>
+
+<p><strong>时间轴还原的参考实现</strong>（教训三，插在辨识之前）：</p>
+
+<pre class="code"><span class="c"># t_arrive: 平台收到时刻；age_s: 读数自带的上行时延（LoRa 15 s 更新下 0~15 s 随机抖动）</span>
+t_true = t_arrive - age_s                          <span class="c"># 还原真实测量时刻</span>
+valid  = age_s &lt;= 45.0                             <span class="c"># 陈旧读数按缺测丢弃，绝不把旧值当新值写库</span>
+t_uni  = np.arange(t_true[valid][0], t_true[valid][-1], TS)
+y_uni  = np.interp(t_uni, t_true[valid], y[valid]) <span class="c"># 重采样到等间隔时间轴后再送进 fit_fopdt()</span></pre>
+
+<h3>19.7 模型验证图</h3>
+<figure>
+  <img src="assets/article-fig3-model-validation.png?v=20260923" alt="模型验证：实测 vs 一步预测曲线、预测残差、残差自相关 ACF 检验">
+  <figcaption>图 3 ｜ 模型验证：实测 vs 一步预测（上）、预测残差（中）、残差 ACF 检验（下）</figcaption>
+</figure>
+<ul>
+  <li>上图：实测水杯水温（红）vs 模型一步预测（蓝），测试段（虚线右侧）贴合良好；</li>
+  <li>中图：预测残差，零均值、无趋势，幅度 ±0.2 ℃ 以内（与传感器分辨率同量级）；</li>
+  <li>下图：残差 ACF，滞后 1~20 阶全部落在 95% 置信界内 → 残差接近白噪声，一阶结构对本对象充分，无需升阶（§9.3 阶次扫描原则的实例）。</li>
+</ul>
+
+<h3>19.8 案例小结</h3>
+<p>小样完整走通了「采集 → 预处理 → PE 检验 → 辨识 → 残差诊断 → 插值验证」全流程，得到两个可直接用于 MPC 能耗优化的模型（快/慢通道），功率静态模型 P = 1.05I² + 4.25I 即为 §13.1 能耗目标函数中 P(u) 的真实形态。算法验证完成后，迁移到工业流水线零侵入节能改造时，必须同时配套全部工业安全机制（§14~§18）。</p>
+<div class="note warn">
+  <p>⚠️ 风险说明：小样无工业生产约束，激励幅值可以拉满（0~5A 全量程）；工业现场激励幅值必须压低，不能触发工艺报警（§6.1）。</p>
+</div>
+
+<h2 id="s20"><span class="no">20</span>文档总结与参考文献</h2>
+
+<p>零侵入节能减碳改造，核心不是硬件改造，而是<strong>数据 + 辨识 + 上层监督优化</strong>。推荐模型结构：Hammerstein (FOPDT)，静态非线性块描述 TEC/执行器非线性特性，FOPDT 捕捉热惯性与传输滞后动态。整套工作流是迭代闭环：调研 → 激励 → 采集 → PE 准入 → 辨识 → 模型验证诊断 → 离线仿真 → 影子模式 → 分阶段软投切 → 在线监测迭代更新 → 节能量核算（M&amp;V）闭环收益。</p>
+
+<div class="note">
+  <p>✅ <strong>核心原则</strong>：原有底层控制系统和安全联锁不动；新增系统只做上层设定推荐；模型仅用于预测优化；反馈闭环永远作为安全兜底；节能收益用冻结基线核算，可审计、可追溯。</p>
+</div>
+
+<h3>参考文献</h3>
+<ol>
+  <li>Ljung L. <i>System Identification: Theory for the User</i>, 2nd ed. Prentice Hall, 1999.（系统辨识经典教材：PE 条件、预测误差方法、模型验证）</li>
+  <li>Nelles O. <i>Nonlinear System Identification</i>. Springer, 2001.（Hammerstein/Wiener 结构辨识、增益归一化、局部线性化）</li>
+  <li>Ogata K. <i>Modern Control Engineering</i>, 5th ed. Prentice Hall, 2010.（FOPDT、PID 整定基础）</li>
+  <li>Qin S J, Badgwell T A. "A survey of industrial model predictive control technology." <i>Control Engineering Practice</i>, 2003.（工业 MPC 综述，SSTO 分层结构）</li>
+  <li>EVO (Efficiency Valuation Organization). <i>International Performance Measurement and Verification Protocol (IPMVP)</i>.（节能量测量与验证国际规程，第 17 章框架来源）</li>
+  <li>生态环境部、国家统计局：《关于发布 2022 年电力二氧化碳排放因子的公告》，2024.（电力排放因子官方来源）</li>
+</ol>
+
+<div class="note plain">
+  <p><strong>文档约定｜零侵入定义（重申）</strong>：① 不修改原有 PLC 底层逻辑、安全联锁；② 不更换原有控制器；③ 不做产线停机改造；④ 新增测点采用外挂传感器、旁路采集，旁路信号不写入原系统（只读采集）；⑤ 优化输出为设定值推荐/上层监督调参，原有底层 PID 保持闭环运行，可随时切回纯原生模式。</p>
+</div>
+
+<div class="art-foot">
+  <a class="tlink" href="index.html#res-root">← 返回资源与活动</a>
+  <a class="tlink" href="index.html#cta">预约产品演示，咨询落地方案 →</a>
+</div>
+
+</div>
+</article>
+
+<footer>
+  <div class="wrap">© 2026 能优算 · 工业能碳智控平台 ｜ 技术文章《数据建模、系统辨识与控制策略》</div>
+</footer>
+
+</body>
+</html>

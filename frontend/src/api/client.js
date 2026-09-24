@@ -97,6 +97,14 @@ export const api = {
     const m = disp.match(/filename="?([^";]+)"?/)
     return { blob: await r.blob(), filename: m ? m[1] : null }
   },
+  // ---- 编排方案服务端存档（流程编排 flow / AI 群控编排 agc）----
+  // 此前编排只存浏览器 localStorage，换实例即丢失；现落到后端 backend/data/designs/，
+  // 随 platform/bs-deploy/update.sh 同步到服务器（本地为真源）。localStorage 仅作离线兜底。
+  designBucket: (bucket) => jget('/designs/' + encodeURIComponent(bucket)),
+  designSave: (bucket, scene, data) => jput('/designs/' + encodeURIComponent(bucket), { scene, data }),
+  designDelete: (bucket, scene) =>
+    fetch(BASE + '/designs/' + encodeURIComponent(bucket) + '/' + encodeURIComponent(scene),
+      { method: 'DELETE' }).then((r) => r.json()),
   // 碳市场实时行情（CEA / CCER）
   carbonMarketQuotes: () => jget('/carbon-market/quotes'),
   carbonMarketChart: (instrument = 'cea', kind = 'daily') =>

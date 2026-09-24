@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3256" height="2098" viewBox="0 0 3256 2098">
+  <defs>
+    <linearGradient id="baseGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E2E3E6"/>
+      <stop offset="1" stop-color="#B2B3B7"/>
+    </linearGradient>
+    <filter id="shadowBlur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="34"/>
+    </filter>
+    <clipPath id="silhouette">
+      <rect x="110" y="110" width="3036" height="1830" rx="26"/>
+      <rect x="110" y="1928" width="3036" height="60" rx="46"/>
+    </clipPath>
+  </defs>
+
+  <!-- 阴影 -->
+  <rect x="110" y="130" width="3036" height="1878" rx="46"
+        fill="#000" opacity="0.39" filter="url(#shadowBlur)"/>
+
+  <g clip-path="url(#silhouette)">
+    <!-- 屏幕盖板（黑色边框 + 屏幕） -->
+    <rect x="110" y="110" width="3036" height="1824" rx="26" fill="#121214"/>
+    <!-- 屏幕内容区：留空，由首页上层的演示录屏填充 -->
+    <rect x="158" y="160" width="2940" height="1732" fill="#121214"/>
+    <!-- 底座 -->
+    <rect x="110" y="1934" width="3036" height="54" fill="url(#baseGrad)"/>
+    <line x1="110" y1="1935" x2="3146" y2="1935"
+          stroke="#F0F1F3" stroke-width="2"/>
+    <!-- 开合凹槽 -->
+    <rect x="1478" y="1932" width="300" height="20"
+          rx="10" fill="#96979B"/>
+  </g>
+
+  <!-- 摄像头 -->
+  <circle cx="1628" cy="135" r="7" fill="#282A30"/>
+  <circle cx="1627" cy="134" r="2.5" fill="#464A54"/>
+</svg>

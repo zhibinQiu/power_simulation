@@ -1,4 +1,4 @@
-# 海颐·能优算 · 工业能碳智控平台门户 —— 爬虫访问策略
+# 能优算 · 工业能碳智控平台门户 —— 爬虫访问策略
 # 部署域名/端口变化时，请同步修改下方 Sitemap 行与 index.html 中 canonical/og:url。
 # 站点为纯静态单页（无登录、无私有内容），故对浏览器爬虫与 AI 爬虫一律放行。
 
@@ -90,4 +90,4 @@ User-agent: Amazonbot
 Allow: /
 
 # ---- 站点地图与 AI 站点索引 ----
-Sitemap: http://36.151.146.71:40200/sitemap.xml
+Sitemap: https://www.nengyousuan.com/sitemap.xml

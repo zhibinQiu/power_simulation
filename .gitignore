@@ -37,6 +37,10 @@ backend/server*.log
 # ===== 行情快照（运行时缓存，不进版本库） =====
 backend/data/market_snapshot.json
 backend/data/market_snapshot.json.tmp
+# ===== 辨识脚本运行产物（backend/tools/*_ident.py 输出） =====
+tec_prbs_run.csv
+# ===== 编排方案服务端存档（流程编排 / AI 群控，运行期生成：随 platform/update.sh bs 同步） =====
+backend/data/designs/
 
 # ===== box_console 运行时生成的 onboard 脚本 =====
 backend/generated/

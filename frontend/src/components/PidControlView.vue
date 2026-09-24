@@ -370,6 +370,7 @@ import { useSimStore } from '../stores/sim'
 import { createPid, createEkf2 } from '../utils/control'
 import { createPpoAgent, computeGae, standardize, randn } from '../utils/rl'
 import { DEVICE_MAP } from '../data/flowLibrary'
+import { api } from '../api/client'
 // 附加可调设备（变频器 / 半导体制冷电源…）不在工艺可调设备表内，量程兜底取通用附加设备库
 import { ADJUSTABLE_MAP } from '../data/attachLibrary'
 import RuleFlowEditor from './RuleFlowEditor.vue'
@@ -1240,6 +1241,7 @@ watch([() => adjList.value.length, () => senList.value.length], () => {
 onMounted(() => {
   loadVers()
   loadDesigns()
+  pullDesigns()   // 服务端群控编排存档优先（本地为离线兜底）
   if (versions.value.length) activeVer.value = versions.value[0].id
   scheduleNext()
   autoTimer = setInterval(checkAuto, 15000)
@@ -1326,11 +1328,22 @@ function normalizeModel(m) {
   }
 }
 let saveTimer = null
+// 编排存档场景键：AI 群控模型按场景分档（与流程编排同一口径，切场景不串档）
+function designScene() { return store.sceneId || 'steel' }
+let pushTimer = null
 function persist() {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     try { localStorage.setItem(DESIGNS_KEY, JSON.stringify(designs.value.slice(0, 50))) } catch (e) { /* 忽略 */ }
   }, 200)
+  // 同步到服务端（backend/data/designs/agc.json）：服务端存档是跨端真源，随代码同步到服务器实例
+  try {
+    clearTimeout(pushTimer)
+    pushTimer = setTimeout(() => {
+      api.designSave('agc', designScene(), { designs: designs.value.slice(0, 50), updatedAt: Date.now() })
+        .catch(() => { /* 服务端不可用时保留 localStorage 兜底 */ })
+    }, 600)
+  } catch (e) { /* 忽略 */ }
 }
 function loadDesigns() {
   try {
@@ -1339,6 +1352,20 @@ function loadDesigns() {
     designs.value = Array.isArray(arr) ? arr.filter((m) => m && m.id).map(normalizeModel) : []
   } catch (e) { designs.value = [] }
   seedDcExample()
+}
+// 服务端存档优先（较新者胜出）：使开发机做好的群控编排能随代码同步到其它实例
+async function pullDesigns() {
+  try {
+    const r = await api.designBucket('agc')
+    const remote = (r && r.data) ? r.data[designScene()] : null
+    const arr = remote && Array.isArray(remote.designs) ? remote.designs.filter((m) => m && m.id) : null
+    if (!arr) return
+    // 本地有更新的改动（任一模型 ts 晚于远端存档时间）时保留本地，避免覆盖刚编辑完的编排
+    const localNewest = designs.value.reduce((mx, m) => Math.max(mx, Number((m && m.ts) || 0)), 0)
+    if (localNewest && Number(remote.updatedAt || 0) && localNewest > Number(remote.updatedAt)) return
+    designs.value = arr.map(normalizeModel)
+    try { localStorage.setItem(DESIGNS_KEY, JSON.stringify(designs.value.slice(0, 50))) } catch (e) { /* 忽略 */ }
+  } catch (e) { /* 服务端不可用时沿用 localStorage */ }
 }
 
 // ==================== 内置示例：机房温控「机柜超温 → 降泵压」 ====================

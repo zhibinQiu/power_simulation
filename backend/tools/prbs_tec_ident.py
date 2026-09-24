@@ -4,7 +4,7 @@
 
 【用途】
     为 TEC（半导体制冷片）热系统辨识采集时序数据：由脚本按 5 电平 PRBS 主动改变
-    制冷片「设定电流」，同步记录实际电流、实时功率与三路温度，逐条追加写入 CSV。
+    制冷片「设定电流」，同步记录实际电流、输出电压、实时功率与四路温度，逐条追加写入 CSV。
 
 【重要：开环激励，不做闭环控制】
     本脚本只负责「按 PRBS 序列给定电流 + 采样记录」，**不根据任何温度反馈调整电流**。
@@ -22,8 +22,17 @@
     6. 实验开始前系统应已处于稳态（建议先以 0A 或中间电平预热/预冷 10~30 min，
        可用 --warmup 参数在正式采集前静默等待）；
     7. 制冷片电源须工作在【恒流模式】：脚本初始化阶段自动写 work_mode=1 恒流、
-       电压上限 24V、电流 0A 并使能输出。若电源停在恒压模式，current_set 只是
+       电压上限 24V、电流 0A，并置位输出开关（output_on=1，每次启动都做，且回读
+       校验、最多重试 3 次；确认不了直接中止——输出关着时电流恒为 0A，跑满 83 分钟
+       才发现数据作废代价太大）。若电源停在恒压模式，current_set 只是
        「限流上限」，电流不会跟随 PRBS，整段数据作废（可用 --no-init 跳过初始化）。
+       ★ 关于「恒流下如何让电压最大」：恒流模式下电压【由负载决定】，电源只输出
+         「刚好把电流顶到设定值」所需的电压（V = I·R_TEC + 塞贝克反电动势，实测
+         5A 时约 9.2V），所以恒流时无法、也不需要让电压保持 24V。恒流下电压唯一
+         要做的就是【把电压上限拉满】（voltage_set = 24V，脚本默认已如此），
+         保证电流环不被限压卡住；一旦实际电压顶到上限，电流会掉下来跟不上设定
+         （脚本对这种情况会告警）。真要电压恒定 24V，那必须切恒压模式，但那样
+         current_set 退化成限流上限、PRBS 激励失效——两者不可兼得。
 
 【激励信号】
     - 5 电平 PRBS：GF(5) 上的最大长度序列（m-sequence），电平 0..4 均匀映射到
@@ -44,11 +53,28 @@
             （云端 CRD twins 主链路 + MQTT data/# 兜底）
 
 【CSV】
-    表头：t,current_set,current,power,shuitong_temp,servers_temp,env_temp
+    表头：t,current_set,current,power,voltage,shuitong_temp,servers_temp,env_temp,
+          zhileng_temp,temp_age,temp_new
     t 为从实验开始计时的秒数（0, 5, 10, ...）；缺测写空（pandas 读作 NaN）。
     power 为制冷片实时功率（W，来自 zhileng-power 的 power 点位，输入寄存器 3、
     scale 0.01），与 current 同拍读取——功率是热流的直接来源，做热系统辨识时
     可用它核算 TEC 实际注入/抽走的热量（P = I·V，含塞贝克效应与内阻发热）。
+    voltage 为实际输出电压（V，输入寄存器 0、scale 0.01），恒流模式下由负载决定、
+    不是设定值；用它判断电流环有没有被电压上限卡住（接近 24V 即为限压），
+    并与 current 相乘复核 power 是否自洽。
+    zhileng_temp 为【冷端】风口温度：电流越大冷端越冷，出风温度越低（增益为负）。
+
+【测量滞后（LoRa 温度）及其处理 —— 必读】
+    四路温度都是 LoRa 终端，更新周期约 15s，而平台实时接口只返回「最近一次上行」
+    的值：读数的真实时刻比本拍名义采样时刻早 0~15s 且随机抖动。若直接把该值记在
+    名义时刻 t 上，等于给输出通道加了一个随机纯延迟，辨识出的模型会有偏。脚本按
+    三条口径处理，并在 CSV 末尾给出两列辅助信息（temp_age / temp_new）：
+      1) temp_age（秒）= 本拍四路读数里最大的 age。用「t - temp_age」即可还原读数
+         的真实时刻，把随机滞后补偿掉（辨识时用它重建时间轴，别直接用 t）；
+      2) temp_new（0/1）= 本拍是否有通道拿到了新上行。温度 15s 更新而采样 5s 时，
+         约 2/3 的行是上拍旧值（零阶保持），只取 temp_new=1 的行即得到无重复序列；
+      3) age 超过 --max-age（默认 45s）的陈旧读数按【缺测】写空——现场应答率不足时
+         age 可达数分钟，把这种值写进 CSV 等于伪造动态轨迹，必须丢弃后插值。
 
 【用法】
     # 1) 只生成并自检序列（不接触硬件，推荐先跑一次）
@@ -105,7 +131,21 @@ PSU_DEVICE = "zhileng-power"         # 制冷片电源（24V/5A 数控电源，4
 PSU_PROP_SET = "current_set"         # 可写点位：设定输出电流（保持寄存器 1，0~500 → 0~5.00A）
 PSU_PROP_FB = "current"              # 只读点位：实际输出电流（输入寄存器 1，scale 0.01）
 PSU_PROP_POWER = "power"             # 只读点位：实际输出功率（输入寄存器 3，scale 0.01，单位 W）
+PSU_PROP_VFB = "voltage"             # 只读点位：实际输出电压（输入寄存器 0，scale 0.01，单位 V）
+                                     #   ★ 恒流模式下电压【由负载决定】，不是设定值：
+                                     #     V = I·R_TEC + 塞贝克反电动势（实测 5A 时仅约 9.2V）。
+                                     #     「让电压保持 24V 最大」在恒流下物理上做不到 —— 电源
+                                     #     在恒流环里只会输出「刚好把电流顶到设定值」的电压；
+                                     #     恒流模式唯一能做的是把 voltage_set 上限拉满到 24V，
+                                     #     保证电流环不被限压卡住（电压顶到上限时电流会掉下来）。
+LIMIT_V_RATIO = 0.98                 # 实际电压 ≥ 该比例 × 电压上限 → 判定「顶到限压」
 PSU_PROP_ON = "output_on"            # 线圈 0：输出开关（设完电流必须置位才有输出）
+                                     # ★ 每次启动都必须确保它为 1：输出关着 → 电流恒为 0A，
+                                     #   整段 PRBS 全是废数据。且必须【回读校验】——这台电源
+                                     #   出现过「写入返回成功但回读不变」（485 地址不匹配），
+                                     #   只看写返回码会漏判。
+OUTPUT_ON_RETRY = 3                  # 输出开关置 1 的最大尝试次数（每次都回读校验）
+OUTPUT_ON_WAIT = 2.0                 # 置位后等待平台刷新再回读的时间（秒）
 PSU_PROP_MODE = "work_mode"          # 保持寄存器 6：通讯选择模式下的工作模式
                                      #   0=恒压 1=恒流 2=恒压恒流 3=通讯选择
                                      # ★ 必须工作在恒流（1，或 2）模式，current_set 才是真正的
@@ -115,11 +155,15 @@ PSU_PROP_VSET = "voltage_set"        # 保持寄存器 0：设定输出电压上
 PSU_WORK_MODE = 1                    # 默认恒流模式
 PSU_VOLTAGE = 24.0                   # 默认电压上限 24V（TEC 实际压降由负载决定）
 
-# ---- 被测量：三路温度（均为 LoRa 温度终端，属性名 temperature）----
+# ---- 被测量：四路温度（均为 LoRa 温度终端，属性名 temperature）----
 TEMP_CHANNELS = [                    # (CSV 列名, 设备名, 属性名, 中文说明)
     ("shuitong_temp", "shuitong-temp", "temperature", "TEC 热端冷却水温度"),
     ("servers_temp", "servers-temp", "temperature", "目标水杯水温"),
-    ("env_temp", "env-temp", "temperature", "环境室温"),
+    ("env_temp", "env-temp", "temperature", "环境室温（参考基准）"),
+    # 风口温度：TEC 冷端散热片吹出的冷风温度，电流越大冷端越冷、出风温度越低（增益为负）。
+    # 与 servers-temp 共用同一台 DR206 终端（站2/站7），
+    # 由主设备 servers-temp 一主多从代采，读数周期与 servers-temp 同步。
+    ("zhileng_temp", "zhileng-temp", "temperature", "冷端风口温度"),
 ]
 
 # ---- 激励参数 ----
@@ -143,7 +187,13 @@ PE_COND_LIMIT_HOLD = 500.0           # 采样级（含 hold 展宽）条件数�
 MAX_WRITE_RETRY = 3                  # 单次写设定失败重试次数
 MAX_CONSEC_WRITE_ERR = 3             # 连续写失败达此数 → 安全停机
 MAX_CONSEC_MISSING = 20              # 连续温度缺测达此数 → 安全停机（数据已无意义）
-STALE_SEC = 90.0                     # 温度读数新鲜度阈值（LoRa 周期 15s，老化超时仅告警）
+STALE_SEC = 90.0                     # 功率读数新鲜度阈值（老化超时仅告警）
+TEMP_UPDATE_SEC = 15.0               # LoRa 温度终端实测更新周期（s）= 平台 collectCycle 15s，
+                                     # 一主多从串行问帧，实测四路 age 稳定 9~37s
+MAX_SAMPLE_AGE = 45.0                # 温度读数新鲜度硬门控（s）：age 超此值按【缺测】写空，
+                                     # 不再把数分钟前的陈旧值当作本拍观测写进 CSV
+                                     # （env-temp 应答率低时 age 可达 300s+，旧值当新值写
+                                     #  会让辨识出的动态完全失真）
 FB_TOL = 1.0                         # 设定电流与实际电流偏差告警阈值（A）
 P_SANE_MAX = 200.0                   # 功率合理性上限（W）：电源 24V×5A=120W，超此值视为异常读数
 MAX_CONSEC_POWER_MISSING = 20        # 连续功率缺测达此数 → 告警（功率不参与停机判定）
@@ -437,12 +487,45 @@ class PlatformIO:
         """打开电源输出（线圈 0）；电流设定写完后必须置位才有实际输出。"""
         return self.write_point(PSU_DEVICE, PSU_PROP_ON, 1)
 
+    def read_psu(self):
+        """读电源点位，返回 {属性名: 值}；读不到（平台异常/设备离线）返回空 dict。"""
+        try:
+            return {k: v[0] for k, v in (self.read_all().get(PSU_DEVICE) or {}).items()}
+        except Exception:  # noqa: BLE001
+            return {}
+
+    def ensure_output_on(self):
+        """把输出开关置 1 并【回读校验】，确认不了就抛异常中止。
+
+        为什么不能只写不校验：电源曾出现「写入返回成功但回读不变」（485 地址不匹配），
+        且现场掉电/复位后输出会自己关掉。输出关着时电流恒为 0A、PRBS 激励完全没进系统，
+        跑满 83 分钟才发现数据作废的代价太大，所以宁可开跑前失败。
+        """
+        for attempt in range(1, OUTPUT_ON_RETRY + 1):
+            try:
+                self.output_on()
+            except Exception as e:  # noqa: BLE001
+                log("置位输出开关失败(%d/%d)：%s" % (attempt, OUTPUT_ON_RETRY, e))
+            time.sleep(OUTPUT_ON_WAIT)
+            on = self.read_psu().get(PSU_PROP_ON)
+            if on is None:
+                # 点位不在实时数据里（平台未采集该属性），无法校验，按写入成功处理
+                log("提示：实时数据里没有 %s 点位，无法回读校验输出开关（按写入成功处理）"
+                    % PSU_PROP_ON)
+                return True
+            if on >= 1:
+                log("输出开关已确认置位：%s=%.0f" % (PSU_PROP_ON, on))
+                return True
+            log("输出开关回读仍为 %.0f，重试置位(%d/%d)" % (on, attempt, OUTPUT_ON_RETRY))
+        raise SafetyError("连续 %d 次置位后输出开关仍未打开（%s 未变 1），"
+                          "请检查 485 从站地址与接线后再跑" % (OUTPUT_ON_RETRY, PSU_PROP_ON))
+
     def init_psu(self, mode=PSU_WORK_MODE, voltage=PSU_VOLTAGE):
-        """实验前初始化制冷片电源：恒流模式 → 电压上限 → 电流置 0 → 使能输出。"""
+        """实验前初始化制冷片电源：恒流模式 → 电压上限 → 电流置 0 → 使能输出（带校验）。"""
         self.write_point(PSU_DEVICE, PSU_PROP_MODE, int(mode))
         self.write_point(PSU_DEVICE, PSU_PROP_VSET, clamp_voltage(voltage))
         self.write_point(PSU_DEVICE, PSU_PROP_SET, 0.0)
-        return self.output_on()
+        return self.ensure_output_on()
 
     # ---- 读：实时读数 ----
     def raw_realtime(self):
@@ -475,10 +558,12 @@ class SimIO:
     用途：在不动真实硬件的前提下验证脚本时序、CSV 与 PRBS 逻辑。
     """
     def __init__(self):
+        self.on = False            # 输出开关（模拟），ensure_output_on 后置 True
         self.i_set = 0.0
         self.t_env = 25.0
         self.t_cup = 25.0     # 目标水杯水温
         self.t_water = 24.0   # 热端冷却水温度
+        self.t_feng = 25.0    # 风口温度（冷端散热片出风）
         self._noise = random.Random(20260922)
 
     def set_current(self, amps):
@@ -486,11 +571,17 @@ class SimIO:
         return {"ok": True}
 
     def output_on(self):
+        self.on = True
         return {"ok": True}
+
+    def ensure_output_on(self):
+        self.on = True
+        log("输出开关已确认置位：%s=1（空跑模拟）" % PSU_PROP_ON)
+        return True
 
     def init_psu(self, mode=PSU_WORK_MODE, voltage=PSU_VOLTAGE):
         self.i_set = 0.0
-        return {"ok": True}
+        return self.ensure_output_on()
 
     def read_all(self):
         # 注：仅用于空跑，真实采集请用 PlatformIO
@@ -498,6 +589,9 @@ class SimIO:
         self.t_cup += (TS / 240.0) * (self.t_env - 2.0 * self.i_set - self.t_cup)
         # 热端冷却水：电流越大越热（tau ≈ 120s，静态增益 +1.2 ℃/A）
         self.t_water += (TS / 120.0) * (self.t_env + 1.2 * self.i_set - self.t_water)
+        # 风口温度：冷端出风，电流越大冷端越冷、出风越凉（静态增益为负，-1.5 ℃/A）；
+        # 风道热容远小于水杯，响应比水温快（tau ≈ 60s）
+        self.t_feng += (TS / 60.0) * (self.t_env - 1.5 * self.i_set - self.t_feng)
         self.t_env += self._noise.uniform(-0.01, 0.01)
         now = time.time()
         n = lambda: self._noise.uniform(-0.05, 0.05)
@@ -506,10 +600,13 @@ class SimIO:
         v_te = 2.0 + 1.2 * i_act
         p_act = max(0.0, i_act * v_te + self._noise.uniform(-0.2, 0.2))
         return {
-            PSU_DEVICE: {PSU_PROP_FB: (i_act, now), PSU_PROP_POWER: (p_act, now)},
+            PSU_DEVICE: {PSU_PROP_FB: (i_act, now), PSU_PROP_POWER: (p_act, now),
+                         PSU_PROP_VFB: (v_te + self._noise.uniform(-0.02, 0.02), now),
+                         PSU_PROP_ON: (1.0 if self.on else 0.0, now)},
             "shuitong-temp": {"temperature": (self.t_water + n(), now)},
             "servers-temp": {"temperature": (self.t_cup + n(), now)},
             "env-temp": {"temperature": (self.t_env + n(), now)},
+            "zhileng-temp": {"temperature": (self.t_feng + n(), now)},
         }
 
 
@@ -543,6 +640,9 @@ def parse_args(argv=None):
     p.add_argument("--ts", type=float, default=TS, help="采样周期（秒）")
     p.add_argument("--hold", type=int, default=HOLD, help="每个电平保持的采样周期数")
     p.add_argument("--settle", type=float, default=SETTLE, help="输出后等待稳定的时间（秒）")
+    p.add_argument("--max-age", type=float, default=MAX_SAMPLE_AGE,
+                   help="温度读数新鲜度硬门控（秒）：age 超过此值按缺测写空，"
+                        "建议取温度更新周期的 2~3 倍")
     p.add_argument("--warmup", type=float, default=WARMUP, help="采集前静默等待（秒）")
     p.add_argument("--pe-order", type=int, default=PE_ORDER, help="PE 检验阶次")
     p.add_argument("--dry-run", action="store_true", help="空跑（模拟硬件，不写真实设备）")
@@ -552,7 +652,8 @@ def parse_args(argv=None):
     p.add_argument("--voltage", type=float, default=PSU_VOLTAGE,
                    help="电压上限（V），恒流模式下仅作上限，需高于 TEC 实际压降")
     p.add_argument("--no-init", action="store_true",
-                   help="跳过实验前的电源初始化（恒流模式/电压上限/输出使能）")
+                   help="跳过实验前的电源初始化（恒流模式/电压上限/电流归零）；"
+                        "无论是否加这个参数，启动都会把输出开关置 1 并回读校验")
     return p.parse_args(argv)
 
 
@@ -573,9 +674,9 @@ def preflight(io):
         log("预检 %-14s state=%-9s %s" % (name, d.get("state"), vals))
     # 功率点位缺失不会导致采集中断，但 CSV 的 power 列会全空，提前告知
     psu_props = {tw.get("propertyName") for tw in devs[PSU_DEVICE].get("twins", [])}
-    if PSU_PROP_POWER not in psu_props:
-        log("警告：%s 上没有 %s 点位，CSV 的 power 列将全为空"
-            % (PSU_DEVICE, PSU_PROP_POWER))
+    for _p in (PSU_PROP_POWER, PSU_PROP_VFB):
+        if _p not in psu_props:
+            log("警告：%s 上没有 %s 点位，CSV 的 %s 列将全为空" % (PSU_DEVICE, _p, _p))
 
 
 def print_hardware_notice():
@@ -591,17 +692,69 @@ def print_hardware_notice():
     log("=" * 72)
 
 
+def sample_temps(snap, prev_ts, now, max_age=MAX_SAMPLE_AGE):
+    """从实时快照里取四路温度，并给出本拍的「滞后量」与「是否有新值」。
+
+    返回 (vals, missing, age_max, has_new)：
+      vals      {列名: 温度}——缺测或陈旧被丢弃的通道为 None；
+      missing   无效通道数（缺测 + 陈旧丢弃）；
+      age_max   四路里最大的读数 age（秒），None 表示一路都没读到；
+      has_new   本拍是否有任一通道的时间戳相比上一拍发生变化（拿到新上行）。
+      prev_ts   由调用方持有并在各拍间传递，用于判定「是否新值」。
+
+    ★ 滞后处理的三条口径（详见文件头【测量滞后（LoRa 温度）及其处理】）：
+      1) 平台返回的是最近一次上行值，其真实时刻 = twin 的 timestamp，比本拍名义
+         采样时刻早 0~一个更新周期且随机抖动 → CSV 记 age，辨识时用 (t - age)
+         还原真实时刻，消除随机纯延迟；
+      2) 采样快于更新时多数行是上拍旧值 → 用 timestamp 变化与否标记 has_new，
+         供辨识阶段重采样（只取新值行）；
+      3) age 超过 max_age 的陈旧读数按缺测丢弃，绝不写入 —— 现场应答率不足时
+         age 可达数分钟，写入即伪造动态轨迹。
+    """
+    vals, ages, missing, has_new = {}, [], 0, False
+    for col, dev, prop, desc in TEMP_CHANNELS:
+        got = (snap.get(dev) or {}).get(prop)
+        if got is None:
+            vals[col] = None
+            missing += 1
+            continue
+        value, ts = got[0], got[1]
+        age = (now - ts) if ts else None
+        if age is not None:
+            ages.append(age)
+            if ts != prev_ts.get(col):
+                has_new = True
+            prev_ts[col] = ts
+            if age > max_age:
+                vals[col] = None
+                missing += 1
+                log("陈旧读数丢弃：%s(%s) age=%.0fs > %.0fs，按缺测处理"
+                    % (col, desc, age, max_age))
+                continue
+        vals[col] = value
+    return vals, missing, (max(ages) if ages else None), has_new
+
+
 def main(argv=None):
     args = parse_args(argv)
 
     # 全局参数允许命令行覆盖（模块级常量被多处引用，这里做一次回填）
-    global TS, SETTLE
+    global TS, SETTLE, MAX_SAMPLE_AGE
     TS = args.ts
     SETTLE = args.settle
+    MAX_SAMPLE_AGE = args.max_age
     if SETTLE >= TS:
         raise SystemExit("参数错误：--settle(%.1fs) 必须小于采样周期 --ts(%.1fs)" % (SETTLE, TS))
     if args.hold < 1:
         raise SystemExit("参数错误：--hold 必须 >= 1")
+    if MAX_SAMPLE_AGE < TEMP_UPDATE_SEC:
+        log("警告：--max-age(%.0fs) 小于温度更新周期(%.0fs)，正常读数也会被判缺测"
+            % (MAX_SAMPLE_AGE, TEMP_UPDATE_SEC))
+    if TS < TEMP_UPDATE_SEC:
+        log("提示：采样周期 Ts=%.1fs 快于温度更新周期 %.0fs，约 %.0f%% 的温度行会是上拍旧值"
+            % (TS, TEMP_UPDATE_SEC, 100.0 * (1.0 - TS / TEMP_UPDATE_SEC)))
+        log("      CSV 已记录 temp_age/temp_new：辨识时用 (t - temp_age) 还原读数真实时刻，"
+            "或只取 temp_new=1 的行重采样")
 
     # ---- 1) 生成 PRBS 序列并自检 ----
     u, symbols, meta = build_prbs(n_symbols=args.symbols, n_levels=N_LEVELS, hold=args.hold)
@@ -625,15 +778,18 @@ def main(argv=None):
         % (st["level_counts"], st["all_levels_used"], st["switches"], st["avg_dwell_sec"]))
     log("（电平计数不完全均衡是截取完整周期 %d 个符号中的 %d 个所致，不影响 PE）"
         % (meta["period"], meta["n_symbols"]))
-    log("PE 检验① 符号级（%d 阶，输入更新率 %.0fs）：rank=%d/%d，cond(去均值)=%.2f → %s"
-        % (pe_sym["order"], meta["min_dwell_sec"], pe_sym.get("rank", -1),
+    # 序列太短时 check_pe 走 early-return（只有 ok/reason，没有 order），用 get 兜底
+    log("PE 检验① 符号级（%d 阶，输入更新率 %.0fs）：rank=%d/%d，cond(去均值)=%.2f → %s%s"
+        % (pe_sym.get("order", args.pe_order), meta["min_dwell_sec"], pe_sym.get("rank", -1),
            pe_sym.get("expected_rank", -1), pe_sym.get("cond_cent", float("inf")),
-           "满足持续激励" if pe_sym["ok"] else "不满足！"))
+           "满足持续激励" if pe_sym["ok"] else "不满足！",
+           "" if pe_sym["ok"] else "（%s）" % pe_sym.get("reason", "")))
     log("PE 检验② 采样级（%d 阶，Ts=%.1fs，电平保持带来相关性）：rank=%d/%d，"
-        "cond(去均值)=%.1f，cond(含常数项)=%.1f → %s"
-        % (pe["order"], TS, pe.get("rank", -1), pe.get("expected_rank", -1),
+        "cond(去均值)=%.1f，cond(含常数项)=%.1f → %s%s"
+        % (pe.get("order", args.pe_order), TS, pe.get("rank", -1), pe.get("expected_rank", -1),
            pe.get("cond_cent", float("inf")), pe.get("cond", float("inf")),
-           "满足持续激励" if pe["ok"] else "不满足！"))
+           "满足持续激励" if pe["ok"] else "不满足！",
+           "" if pe["ok"] else "（%s）" % pe.get("reason", "")))
     if not pe_ok:
         raise SystemExit("激励信号不满足 PE 条件，请增大 --symbols 或降低 --pe-order 后重试")
     if not st["all_levels_used"]:
@@ -651,8 +807,9 @@ def main(argv=None):
         os.makedirs(out_dir, exist_ok=True)
     f = open(out_path, "w", newline="", encoding="utf-8")
     writer = csv.writer(f)
-    writer.writerow(["t", "current_set", "current", "power",
-                     "shuitong_temp", "servers_temp", "env_temp"])
+    writer.writerow(["t", "current_set", "current", "power", "voltage",
+                     "shuitong_temp", "servers_temp", "env_temp", "zhileng_temp",
+                     "temp_age", "temp_new"])
     f.flush()
     os.fsync(f.fileno())
     log("CSV 已创建：%s" % os.path.abspath(out_path))
@@ -668,6 +825,7 @@ def main(argv=None):
     consec_missing = 0
     consec_power_missing = 0
     last_set = None
+    prev_temp_ts = {}          # 上一拍各路温度的读数时间戳，用于判定「是否新值」
     exit_code = 0
 
     def safe_shutdown(reason=""):
@@ -698,6 +856,11 @@ def main(argv=None):
                    clamp_voltage(args.voltage)))
             if args.work_mode == 0:
                 log("警告：work_mode=0 为恒压模式，current_set 只是限流上限，PRBS 激励不会生效！")
+        else:
+            # --no-init 只是跳过「模式/电压/电流」的初始化，输出开关仍必须开：
+            # 关着的话电流恒为 0A，PRBS 根本没进系统，整段数据作废。
+            io.ensure_output_on()
+            log("--no-init：已跳过模式/电压/电流初始化，但仍强制确认输出开关=1")
         if args.warmup > 0:
             log("静默等待 %.0fs 让系统进入稳态（电流保持当前值）..." % args.warmup)
             time.sleep(args.warmup)
@@ -767,18 +930,19 @@ def main(argv=None):
                 if power < 0 or power > P_SANE_MAX:
                     log("警告：功率读数 %.2fW 超出合理区间 0~%.0fW" % (power, P_SANE_MAX))
 
-            temps, missing = {}, 0
-            for col, dev, prop, desc in TEMP_CHANNELS:
-                got = snap.get(dev, {}).get(prop)
-                if got is None:
-                    temps[col] = None
-                    missing += 1
-                else:
-                    temps[col] = got[0]
-                    age = (time.time() - got[1]) if got[1] else None
-                    if age is not None and age > STALE_SEC:
-                        log("警告：%s(%s) 读数已老化 %.0fs，可能并非本拍实测值"
-                            % (col, desc, age))
+            # 实际输出电压（V）：恒流模式下由负载决定，不是设定值。
+            # 用途是判断电流环有没有被电压上限卡住——顶到上限就意味着电流跟不上设定。
+            vfb = psu.get(PSU_PROP_VFB)
+            voltage = vfb[0] if vfb else None
+            v_limit = clamp_voltage(args.voltage)
+            if voltage is not None and v_limit > 0 and voltage >= LIMIT_V_RATIO * v_limit:
+                log("警告：实际电压 %.2fV 已顶到电压上限 %.2fV（恒流环被限压，电流将跟不上设定）"
+                    % (voltage, v_limit))
+
+            # 读数时刻 = 名义采样时刻 tick + SETTLE，age 以真实读数时刻计算，
+            # 这样 CSV 里的 (t - temp_age) 就是读数的真实时刻（名义 t 记 k*Ts）。
+            temps, missing, temp_age, temp_new = \
+                sample_temps(snap, prev_temp_ts, time.time(), MAX_SAMPLE_AGE)
             if missing:
                 consec_missing += 1
                 log("警告：本拍缺测 %d 路温度（连续 %d 拍）" % (missing, consec_missing))
@@ -788,19 +952,22 @@ def main(argv=None):
                 consec_missing = 0
 
             # ④ 记录本条样本（t 为从实验开始计时的秒数）
-            row = [_fmt(k * TS), _fmt(set_a), _fmt(current), _fmt(power)] + \
-                  [_fmt(temps[c]) for c, _, _, _ in TEMP_CHANNELS]
+            row = [_fmt(k * TS), _fmt(set_a), _fmt(current), _fmt(power), _fmt(voltage)] + \
+                  [_fmt(temps[c]) for c, _, _, _ in TEMP_CHANNELS] + \
+                  ["" if temp_age is None else "%.1f" % temp_age, 1 if temp_new else 0]
             writer.writerow(row)
             f.flush()
             os.fsync(f.fileno())   # 立即落盘，断电/异常退出也不丢已采数据
 
             if k % 10 == 0 or k == len(u) - 1:
                 done = (k + 1) * TS
-                log("进度 %d/%d（%.0f/%.0f min）| set=%.2fA cur=%s P=%sW | "
-                    "水杯=%s 冷却水=%s 环境=%s"
+                log("进度 %d/%d（%.0f/%.0f min）| set=%.2fA cur=%s V=%s P=%sW | "
+                    "水杯=%s 冷却水=%s 环境=%s 风口=%s | age=%s 新值=%d"
                     % (k + 1, len(u), done / 60.0, len(u) * TS / 60.0, set_a,
-                       _fmt(current), _fmt(power), _fmt(temps["servers_temp"]),
-                       _fmt(temps["shuitong_temp"]), _fmt(temps["env_temp"])))
+                       _fmt(current), _fmt(voltage), _fmt(power), _fmt(temps["servers_temp"]),
+                       _fmt(temps["shuitong_temp"]), _fmt(temps["env_temp"]),
+                       _fmt(temps["zhileng_temp"]),
+                       "-" if temp_age is None else "%.0fs" % temp_age, temp_new))
 
         log("采集完成：共 %d 条样本" % len(u))
 
