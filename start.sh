@@ -13,7 +13,8 @@
 #
 #  说明:
 #    - 本脚本只负责本地启动，启动过程不包含任何推送/同步逻辑
-#    - 线上部署/更新请走 platform/ 统一入口：全新部署 bash platform/deploy.sh、日常更新 bash platform/update.sh（目标见各自 list）
+#    - 线上部署/更新请走仓库根统一入口：全新部署 ./deploy.sh、日常更新 ./update.sh
+#      （./update.sh all = 平台服务器 + 云端 + 中间件 + 文档站 + 官网，加 github 则一并推代码）
 #    - 后端首次运行自动创建 .venv 并安装依赖
 #    - 前端/文档站首次运行自动 npm install
 #    - 日志写入 .logs/ 目录，Ctrl+C 停止全部服务
@@ -47,7 +48,7 @@ for arg in "$@"; do
       exit 0
       ;;
     *)
-      echo "❌ 未知参数: $arg（用 ./start.sh --help 查看用法）" >&2
+      echo "❌ 未知参数: ${arg}（用 ./start.sh --help 查看用法）" >&2
       exit 1
       ;;
   esac
@@ -57,9 +58,8 @@ done
 stop_old_services() {
   echo "==> [清理] 停止上次残留的本项目服务..."
   local stopped=0
-  # 旧后端：uvicorn（--reload 的 reloader+worker 一并终止）与 run.sh 启动器
+  # 旧后端：uvicorn（--reload 的 reloader+worker 一并终止）
   pkill -f "uvicorn app\.main:app" 2>/dev/null && { echo "   - 已停止旧后端 (uvicorn)"; stopped=1; } || true
-  pkill -f "config/run\.sh" 2>/dev/null && { echo "   - 已停止旧后端启动器 (run.sh)"; stopped=1; } || true
   # 旧前端 / 文档站 dev 服务器（vite dev 与 preview 共用 .bin/vite 入口）
   pkill -f "frontend/node_modules/\.bin/vite" 2>/dev/null && { echo "   - 已停止旧前端 dev (vite)"; stopped=1; } || true
   pkill -f "doc-deploy/docs-site/node_modules/\.bin/vite" 2>/dev/null && { echo "   - 已停止旧文档站 dev (vite)"; stopped=1; } || true
@@ -126,7 +126,12 @@ wait_ready() {
 # ---- 启动后端 ----
 if [ "$RUN_BACKEND" = "1" ]; then
   echo "==> [后端] 启动 FastAPI (127.0.0.1:8010)..."
-  bash "$ROOT/backend/config/run.sh" > "$LOG_DIR/backend.log" 2>&1 &
+  # 首次运行自动创建 .venv 并安装依赖（原 backend/config/run.sh 的逻辑已内联于此）
+  if [ ! -d "$ROOT/backend/.venv" ]; then
+    echo "   首次运行，创建后端虚拟环境并安装依赖 (python3 -m venv + pip install)..."
+    (cd "$ROOT/backend" && python3 -m venv .venv && ./.venv/bin/pip install -r config/requirements.txt)
+  fi
+  (cd "$ROOT/backend" && ./.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload --no-access-log) > "$LOG_DIR/backend.log" 2>&1 &
   BACKEND_PID=$!
   echo "   PID: $BACKEND_PID    日志: $LOG_DIR/backend.log"
   wait_ready "http://127.0.0.1:8010/api/health" "后端" || true

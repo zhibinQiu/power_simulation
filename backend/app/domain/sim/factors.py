@@ -85,7 +85,8 @@ DEFAULT_FACTORS: Dict[str, object] = {
 
 # 燃料中文标签（桑基图节点），固定不随配置变化
 FUEL_LABEL = {"coke": "焦炭碳", "coal": "煤碳", "ng": "天然气碳", "biomass": "生物质碳",
-              "elec": "外购电碳", "steel_c": "钢铁料碳", "electrode": "电极碳", "carburizer": "增碳剂碳"}
+              "elec": "外购电碳", "steel_c": "钢铁料碳", "electrode": "电极碳", "carburizer": "增碳剂碳",
+              "carbonate": "碳酸盐碳"}   # 火电湿法脱硫的工业过程排放（脱硫剂 CaCO₃ 分解）
 
 
 def default_factors() -> Dict[str, object]:
@@ -110,6 +111,16 @@ def _merge_factors(factors: Dict) -> Dict:
         cfg["carbonate"].update(factors["carbonate"])
     if factors.get("electrode_ef") is not None:
         cfg["electrode_ef"] = factors["electrode_ef"]
+    # 场景扩展因子（非钢铁通用项）原样并入：
+    # 火电场景 factors.json 的 carbonate_purity（脱硫剂 CaCO₃ 含量）、carbonate_desc 等，
+    # 若不通配合并会在 _merge_factors 阶段被静默丢弃，导致脱硫过程排放按错误的纯度计算。
+    for k, v in factors.items():
+        if k in ("fuels", "grid_ef", "carbonate", "electrode_ef"):
+            continue
+        if isinstance(v, dict) and isinstance(cfg.get(k), dict):
+            cfg[k].update(v)
+        else:
+            cfg[k] = v
     return cfg
 
 

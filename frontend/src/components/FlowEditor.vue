@@ -15,7 +15,7 @@
           <span v-if="groupRenaming !== g.id" class="gname" @click.stop="store.selectFlowGroup(g.id)"
                 @dblclick.stop="startGroupRename(g)">{{ g.name }}</span>
           <input v-else class="gname-in" :value="g.name" @click.stop @mousedown.stop
-                 @input="g.name = $event.target.value; store.schemeDirty = true" @keydown.enter.prevent="endGroupRename"
+                 @input="g.name = $event.target.value" @keydown.enter.prevent="endGroupRename"
                  @keydown.esc.prevent="endGroupRename" @blur="endGroupRename" />
           <span v-if="g.members && g.members.length" class="ncount" :title="t('小组内设备台数')">×{{ g.members.length }}</span>
           <button class="x-btn danger" @mousedown.stop @click.stop="store.removeFlowGroup(g.id)" :title="t('删除小组')">✕</button>
@@ -67,7 +67,7 @@
           <span class="nhd" :style="{ background: nodeColor(n) }"></span>
           <span v-if="renaming !== n.id" class="nname" @click.stop="store.selectFlow(n.id)" @dblclick.stop="startRename(n)">{{ n.name }}</span>
           <input v-else class="nname-in" :value="n.name" @click.stop @mousedown.stop
-                 @input="n.name = $event.target.value; store.schemeDirty = true" @keydown.enter.prevent="endRename"
+                 @input="n.name = $event.target.value" @keydown.enter.prevent="endRename"
                  @keydown.esc.prevent="endRename" @blur="endRename" />
           <span v-if="(n.count || 1) > 1" class="ncount" :title="t('台数')">×{{ n.count }}</span>
           <button class="x-btn danger" @mousedown.stop @click.stop="store.removeFlowNode(n.id)" :title="t('删除节点')">✕</button>
@@ -699,7 +699,7 @@ onBeforeUnmount(() => {
 .edges path.temp.ok { stroke: var(--green); }
 .edges path.temp.bad { stroke: var(--red); }
 /* 管道物料标签 — 与工艺端口标签 .plbl 完全统一：9px / muted / panel 背景 */
-.edge-label { font-size: 9px; fill: var(--muted); font-family: var(--ui); letter-spacing: .2px; font-weight: 400;
+.edge-label { font-size: 10px; fill: var(--muted); font-family: var(--ui); letter-spacing: .2px; font-weight: 400;
   pointer-events: none; user-select: none; }
 .edge-label-gas { fill: var(--gas); }
 /* 工艺设备小组卡片：与普通工艺节点一致的卡片样式（成员折叠为一张卡片，标注台数），双击进入子编排 */
@@ -750,7 +750,7 @@ onBeforeUnmount(() => {
 /* 连线拖拽中的目标合法性高亮：匹配绿、不匹配红 */
 .ph-ok .pdot { border-color: var(--green); background: var(--green); box-shadow: 0 0 0 3px rgba(63,174,122,.30); }
 .ph-bad .pdot { border-color: var(--red); background: var(--red); box-shadow: 0 0 0 3px rgba(199,90,82,.30); }
-.plbl { font-size: 9px; background: var(--panel); padding: 0 3px; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+.plbl { font-size: 10px; background: var(--panel); padding: 0 3px; min-width: 0; overflow: hidden; text-overflow: ellipsis;
   border: 1px solid var(--border); border-radius: 4px; box-shadow: var(--shadow); }
 .devbox { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
 .devtag { font-size: 10px; color: var(--muted); }

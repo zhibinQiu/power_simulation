@@ -55,7 +55,10 @@ def _identify_cloud_device(topic: str, data: Dict[str, Any]) -> "tuple[str, str]
     box: Optional[str] = None
     # 盒子归属优先从主题推断（data/<box>/<device>[/<instance>/<property>]，第 2 段即 boxId）。
     # 该推断独立于 device 识别：payload 带 device 字段但无 box 字段时（如属性级主题
-    # {t, v} 消息），必须仍能从主题取到 box，否则设备会被误归为「未分组」而多渲染一张假盒子卡片。
+    # {t, v} 消息），必须仍能从主题取到 box，否则设备归属为空。
+    # 归属不明时**返回空串而不是「未分组」**：平台订阅的是 `#`，cloud/state、ext/ 上行空间、
+    # 命令回执等大量非 data/<box>/... 消息都会经过这里，一旦兜底成「未分组」这个假盒子名，
+    # 概览就会把这些消息聚合成一张名为「未分组」的能碳一体机卡片（点不开、也删不掉）。
     parts = [p for p in topic.split("/") if p]
     if parts and parts[0] == "data":
         rest = parts[1:]
@@ -73,7 +76,7 @@ def _identify_cloud_device(topic: str, data: Dict[str, Any]) -> "tuple[str, str]
         if isinstance(v, str) and v.strip():
             box = v.strip()
             break
-    return dev, box or "未分组"
+    return dev, box or ""
 
 
 def _primary_value(fields: Dict[str, float]) -> Optional[float]:

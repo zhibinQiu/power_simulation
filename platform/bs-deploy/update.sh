@@ -6,27 +6,26 @@
 #   本地构建前端/文档站产物 → rsync 源码到服务器 → 容器按需重建/热生效 → 健康检查
 #
 # 用法：bash platform/bs-deploy/update.sh [--server root@<主机>] [--skip-build] [--skip-config]
-#       （或统一入口：bash platform/update.sh bs，二者等价）
+#       （或统一入口：./update.sh bs，二者等价）
 #       --skip-config：本次**不**用本地 backend/config 覆盖服务器（默认每次都覆盖，见 [2/3]）
-#       bash platform/bs-deploy/update.sh push ["提交信息" [--tag v1.0.0]]  # 推送代码到 GitHub（调仓库根 ./push.sh）
 #   默认目标：71（root@36.151.146.71:/root/qzb/jianpai，Docker 源码卷挂载 + uvicorn --reload）
-#   说明：同步本地工作区（含未提交改动），改完即可上线；代码入库推送走本脚本 push 子命令，
-#         （协作者 / 其他场景统一用仓库根 ./push.sh）。
+#   说明：同步本地工作区（含未提交改动），改完即可上线；代码入库推送统一走仓库根入口
+#         ./update.sh github "提交信息" [--tag v1.0.0]（./update.sh all github ... = 全量同步 + 推送）。
 #
 #   注意：代码更新一律由开发机向服务器推送（rsync），服务器不自拉 git；
 #   全新部署 / 重装请走 platform/bs-deploy/deploy.sh（服务器侧 git clone）。
 # ============================================================================
 set -euo pipefail
 
-# ---- 公共库（platform/lib.sh）：仓库根 ROOT / servers.conf / ssh_run / rsync_run / 标准排除列表 ----
+# ---- 公共库（仓库根 lib.sh）：仓库根 ROOT / servers.conf / ssh_run / rsync_run / 标准排除列表 ----
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-. "$SELF_DIR/../lib.sh"
+. "$SELF_DIR/../../lib.sh"
 cd "$ROOT"
 
-# ---- push 子命令：把本地改动提交并推送到 GitHub（调用仓库根 push.sh，与协作者同源） ----
+# ---- push 子命令（兼容旧用法）：转发到仓库根统一入口 ./update.sh github ----
 if [ "${1:-}" = "push" ]; then
   shift
-  exec bash "$ROOT/push.sh" "$@"
+  exec bash "$ROOT/update.sh" github "$@"
 fi
 
 CLOUD_MAIN="${CLOUD_MAIN:-${PLATFORM_SSH:-root@36.151.146.71}}"   # 默认目标（现 71）
@@ -67,7 +66,7 @@ fi
 # 配置口径（用户要求：**每次推送都把本地配置文件推到服务器**，本地为唯一真源）：
 #   backend/config/ 整个目录随每次同步覆盖服务器——含 box_devices.json（采集设备/模型定义）、
 #   data_sources.json（数据源目录）、box_config.json / middleware.json / links.json / llm*.json /
-#   mcp_*.json / strategies.json，以及 gitignore 的本地覆盖项 .env 等。
+#   strategies.json，以及 gitignore 的本地覆盖项 .env 等。
 #   生产侧的增删改一律在平台界面操作后回填开发机，否则会被下一次 update.sh 覆盖。
 #   ① 覆盖前先把服务器整目录备份到 <仓库根>/.devcfg-backup/config.<时间戳>（便于回滚）；
 #   ② 显式 --include=backend/config/*** 且置于所有排除规则之前，后续新增宽泛排除不会误伤配置；
@@ -165,5 +164,5 @@ ssh_run "$SERVER" 'for i in $(seq 1 12); do curl -fsS -m 3 -o /dev/null http://1
   || echo "    ⚠ 健康检查未通过，请查看：docker compose logs" || true
 
 echo "==> 完成。平台访问：http://${SERVER##*@}:${PLATFORM_PORT:-40014}  （日志：docker logs -f steel-carbon-twin）"
-echo "    代码入库推送：bash platform/bs-deploy/update.sh push \"提交信息\"（协作者通用：仓库根 ./push.sh）"
+echo "    代码入库推送：./update.sh github \"提交信息\"（全量同步并推送：./update.sh all github \"提交信息\"）"
 exit 0

@@ -71,6 +71,21 @@ DEFAULT_PARAMS: Dict[str, Dict[str, float]] = {
     # —— 轧制 ——
     "rolling_mill":      {"steel_in": 350, "ng_rate": 32, "electricity": 28.0},      # 80 kWh/t
     "cold_rolling":      {"steel_in": 350, "ng_rate": 25, "electricity": 35.0},     # 100 kWh/t
+    # —— 火电（thermal-power 资源包）：单机 660MW 超超临界额定工况，与场景模板一致 ——
+    "coal_handling":     {"power": 3.2},                              # 磨煤机+给煤机+输煤
+    "boiler":            {"coal_rate": 255, "power": 12},             # 入炉煤 255 t/h（发电标煤耗 ~275 gce/kWh）
+    "steam_turbine":     {"steam_rate": 1900, "power": 0.3},          # 主蒸汽 1900 t/h（汽耗率 2.88）
+    "generator":         {"output": 660, "power": 0.2},               # 发电功率 660 MW
+    "condenser":         {"power": 0.5},                              # 真空泵
+    "cooling_tower":     {"power": 6.2},                              # 循环水泵（9 万 t/h，温升 ~10 ℃）
+    "feedwater":         {"power": 14},                               # 电动给水泵
+    "denitration":       {"reagent_rate": 0.33, "power": 0.8},        # 液氨 0.33 t/h + 稀释风机
+    "dedust":            {"power": 1.6},                              # 电除尘电场
+    "desulfurization":   {"limestone_rate": 8, "power": 6.5},         # 石灰石 8 t/h + 浆液循环泵
+    "stack":             {"power": 0.1},                              # CEMS 监测
+    "ash_handling":      {"power": 1.2},                              # 除灰渣（输灰/气化风机）
+    "gypsum_handling":   {"power": 0.6},                              # 石膏脱水（排出泵/真空皮带机）
+    "heat_net":          {"heat_rate": 500, "power": 0.4},            # 热电联产外供热量 500 GJ/h
 }
 
 # 工序展示元数据：中文名 / 几何形状 / 工艺分类（用于工序库分组与3D建模）
@@ -101,6 +116,21 @@ UNIT_META: Dict[str, Dict[str, str]] = {
     # 轧制
     "rolling_mill":      {"label": "热轧机",     "shape": "rollers",  "cat": "轧制"},
     "cold_rolling":      {"label": "冷轧机",     "shape": "rollers",  "cat": "轧制"},
+    # 火电（thermal-power 资源包）：与包字典 dictionary.json 的工序名一致
+    "coal_handling":     {"label": "输煤制粉系统", "shape": "box",    "cat": "火电·燃料"},
+    "boiler":            {"label": "锅炉系统",     "shape": "furnace","cat": "火电·燃烧"},
+    "steam_turbine":     {"label": "汽轮机系统",   "shape": "cylinder","cat": "火电·热功转换"},
+    "generator":         {"label": "发电系统",     "shape": "cylinder","cat": "火电·热功转换"},
+    "condenser":         {"label": "凝汽系统",     "shape": "cylinder","cat": "火电·汽水循环"},
+    "cooling_tower":     {"label": "循环冷却水系统", "shape": "box",  "cat": "火电·汽水循环"},
+    "feedwater":         {"label": "给水除氧系统", "shape": "cylinder","cat": "火电·汽水循环"},
+    "denitration":       {"label": "烟气脱硝系统", "shape": "box",    "cat": "火电·烟气净化"},
+    "dedust":            {"label": "烟气除尘系统", "shape": "box",    "cat": "火电·烟气净化"},
+    "desulfurization":   {"label": "烟气脱硫系统", "shape": "box",    "cat": "火电·烟气净化"},
+    "stack":             {"label": "排烟系统",     "shape": "cylinder","cat": "火电·烟气净化"},
+    "ash_handling":      {"label": "除灰渣系统",   "shape": "box",    "cat": "火电·固废"},
+    "gypsum_handling":   {"label": "石膏脱水系统", "shape": "box",    "cat": "火电·副产品"},
+    "heat_net":          {"label": "热网换热系统", "shape": "box",    "cat": "火电·供热"},
 }
 
 
@@ -209,6 +239,11 @@ _OUTPUT_METAL_TYPES = {
     "caster", "ingot_casting", "reheating_furnace", "rolling_mill", "cold_rolling",
 }
 
+# 全厂「产品产量」口径（非钢场景的产量分母）：火电以发电机出力(MW，等效 MWh/h)为产量，
+# 使强度指标 = 直接排放 ÷ 发电量 × 1000 恰为「度电碳排 g/kWh」的行业口径；
+# 若不纳入，非钢场景 steel_output=0 会使 totals.intensity 退化成排放总量 ×1000 的荒谬值。
+_OUTPUT_PRODUCT_TYPES = _OUTPUT_METAL_TYPES | {"generator"}
+
 
 def simulate(model: ProcessModel, factors: Dict = None) -> SimResult:
     cfg = _merge_factors(factors)
@@ -247,7 +282,7 @@ def simulate(model: ProcessModel, factors: Dict = None) -> SimResult:
                 totals["purchases"]["ngas"] = totals["purchases"].get("ngas", 0.0) + float(it.get("qty", 0.0) or 0.0)
         # 钢产量：仅统计"金属/成品"类工序（铁水、钢水、DRI、成品材），
         # 排除原料类工序（烧结/球团/焦炭/生物质），避免其产品量被误认为钢产量
-        if u.type in _OUTPUT_METAL_TYPES and res["steel_output"] > totals["steel_output"]:
+        if u.type in _OUTPUT_PRODUCT_TYPES and res["steel_output"] > totals["steel_output"]:
             totals["steel_output"] = res["steel_output"]
 
     # 焦炭外购差额：全厂焦炭需求 − 焦炉自产（自产供不足部分才外购，避免入炉煤与焦炭双计）
@@ -268,6 +303,7 @@ def simulate(model: ProcessModel, factors: Dict = None) -> SimResult:
             carbon_to_co2=round(res["carbon_to_co2"], 3),
             carbon_to_steel=round(res["carbon_to_steel"], 3),
             carbon_to_slag=round(res["carbon_to_slag"], 3),
+            carbon_to_product=round(res.get("carbon_to_product", 0.0), 3),
             carbon_captured=round(res["carbon_captured"], 3),
             heat=round(heat, 3),
             steel_output=round(res.get("steel_output", 0.0), 1),
@@ -359,16 +395,25 @@ def _chain_layout(raw, flows) -> Tuple[set, Dict[str, list], Dict[str, int]]:
         if not changed:
             break
     else:
-        cycle_edges = [
-            f"{s}->{t}"
-            for s in all_flow_ids
-            for t, _m in fadj.get(s, [])
-            if depth[t] == depth[s] + 1 and s in depth and t in depth
-        ]
+        # 精确定位环：Kahn 拓扑排序后入度仍 >0 的节点即处于环中。
+        # 仅在此情况下告警——长直链虽需多轮收敛，但并非环，不应误报。
+        indeg = {pid: 0 for pid in all_flow_ids}
+        for s in all_flow_ids:
+            for t, _m in fadj.get(s, []):
+                indeg[t] = indeg.get(t, 0) + 1
+        q = [pid for pid in all_flow_ids if indeg.get(pid, 0) == 0]
+        while q:
+            v = q.pop()
+            for t, _m in fadj.get(v, []):
+                indeg[t] -= 1
+                if indeg.get(t, 0) == 0:
+                    q.append(t)
+        cyclic = sorted(pid for pid in all_flow_ids if indeg.get(pid, 0) > 0)
+        cycle_edges = [f"{s}->{t}" for s in cyclic for t, _m in fadj.get(s, []) if t in cyclic]
         logger.warning(
-            "流程连线检测到环/自环（工序回流），已限制深度计算轮数避免死循环；"
-            "flows=%d 节点=%d 环边=%s",
-            len(flows or []), n_nodes, cycle_edges[:10],
+            "流程连线存在回流回路（环），深度计算已按轮数上限收敛，不影响排放结果。"
+            "汽水循环、循环水回路等物理回流属正常拓扑；环内工序=%s，环内边=%s",
+            cyclic[:8], cycle_edges[:10],
         )
     return ids, fadj, depth
 
@@ -562,6 +607,22 @@ EFF_EFFICIENCY = {
     "dri_midrex":          0.50,
     "smelting_reduction":  0.45,
     "biochar_injection":   0.40,
+    # 火电（thermal-power）：锅炉热效率最高（大型煤粉炉 92~94%），汽轮机受热力学循环限制
+    # （朗肯循环 ~45%，其余为凝汽器冷源损失），冷端/烟囱为纯散热故有效能取 0
+    "coal_handling":       0.98,
+    "boiler":              0.92,
+    "steam_turbine":       0.48,
+    "generator":           0.99,
+    "condenser":           0.00,   # 冷源损失：汽化潜热全部由循环水带走
+    "cooling_tower":       0.00,   # 散热终端
+    "feedwater":           0.95,
+    "denitration":         0.90,
+    "dedust":              0.90,
+    "desulfurization":     0.90,
+    "stack":               0.00,   # 排放口（烟气携带的余热随排烟散失）
+    "ash_handling":        0.90,
+    "gypsum_handling":     0.90,
+    "heat_net":            0.95,
 }
 DEF_EFF_EFFICIENCY = 0.30          # 默认（工辅/未列明工序）
 

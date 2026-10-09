@@ -66,17 +66,24 @@ refactor: 合并冗余计算器
 
 ## 5. 推送（你只需要关心这一步）
 
-推荐用仓库根目录的 **`push.sh`**（纯 git 操作，**不含服务器部署**）：
+推送代码统一走仓库根目录的 **`update.sh`**（git 操作，**不含服务器部署**）：
 
 ```bash
 # 仅推送（要求工作树已提交）
-./push.sh
+./update.sh github
 
 # 或一键：先把所有改动提交再推送
-./push.sh "fix: 修复 xxx"
+./update.sh github "fix: 修复 xxx"
+
+# 打 tag（触发 GitHub Actions 打包并发布 Release）
+./update.sh github "fix: 修复 xxx" --tag v1.2.3
+
+# 先同步到所有服务器/云端，再推送 GitHub
+./update.sh all github "fix: 修复 xxx"
 ```
 
-脚本会自动 `git pull --rebase` 远端最新，避免覆盖他人提交；若产生冲突会提示你手动解决。
+脚本会自动 `git fetch` + `rebase` 远端最新，避免覆盖他人提交；若产生冲突会提示你手动解决。
+（早期使用的 `push.sh` 已删除，全部能力并入 `update.sh`。）
 
 也可手动操作（等效）：
 
@@ -104,6 +111,6 @@ git push github <你的分支>
 ## 7. 常见问题
 
 - **推送被拒（non-fast-forward）**：先 `git pull --rebase github <分支>` 再推。
-- **rebase 冲突**：手动改文件 → `git add <文件>` → `git rebase --continue` → 再跑 `push.sh`。
+- **rebase 冲突**：手动改文件 → `git add <文件>` → `git rebase --continue` → 再跑 `./update.sh github`。
 - **忘了加协作者权限**：推送会报 403，联系 owner 加成员。
 - **不小心提交了构建产物**：用 `git rm --cached <文件>` 移除并补一条提交；`.gitignore` 已默认排除，正常不会误提。

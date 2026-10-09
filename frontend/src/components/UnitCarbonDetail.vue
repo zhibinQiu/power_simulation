@@ -508,19 +508,19 @@ function fmtNum(n) { return Number(n).toLocaleString('zh-CN', { maximumFractionD
 
 <style scoped>
 /* 模块内部说明：不单独成模块，直接写在对应模块内容区顶部 */
-.sec-desc { font-size: 10.5px; line-height: 1.5; color: var(--muted); margin: 0 0 8px 0; padding: 0; }
+.sec-desc { font-size: 11px; line-height: 1.5; color: var(--muted); margin: 0 0 8px 0; padding: 0; }
 /* .chips 已统一定义于全局 main.css */
 /* TFT 卡片：与实时监测其它指标同一 chip2 形式，右侧附加状态徽章 */
-.chip2.tft em { font-style: normal; font-size: 9px; line-height: 15px; color: #fff; border-radius: 8px; padding: 0 6px; margin-left: auto; flex: 0 0 auto; }
+.chip2.tft em { font-style: normal; font-size: 10px; line-height: 15px; color: #fff; border-radius: 8px; padding: 0 6px; margin-left: auto; flex: 0 0 auto; }
 /* 高炉数值仿真分析入口按钮（随「实时监测」TFT 卡片展示） */
-.tft-entry-btn { display: block; width: 100%; margin-top: 8px; padding: 6px 8px; font-size: 11px; text-align: center;
-  border-radius: 3px; border: 1px solid var(--accent2); background: transparent; color: var(--accent2); cursor: pointer; }
-.tft-entry-btn:hover { background: var(--accent2); color: #fff; }
+.tft-entry-btn { display: inline-flex; align-items: center; justify-content: center; width: auto; margin-top: 8px; padding: 0 var(--btn-pad-x); min-height: var(--btn-h); font-size: 11px; text-align: center;
+  border-radius: 3px; border: 1px solid transparent; background: var(--btn-bg); color: var(--accent2); cursor: pointer; }
+.tft-entry-btn:hover { background: color-mix(in srgb, var(--accent2) 18%, var(--btn-bg)); color: var(--text); }
 /* 输入输出（编排设定）只读展示 */
 .io-card { display: flex; gap: 14px; }
 .io-col { flex: 1; min-width: 0; }
 .io-col .pc-t { display: block; font-size: 10px; color: var(--muted); margin-bottom: 4px; }
-.io-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 5px 0; border-bottom: 1px dashed var(--line); font-size: 11.5px; }
+.io-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 5px 0; border-bottom: 1px dashed var(--line); font-size: 12px; }
 .io-row:last-child { border-bottom: none; }
 .io-mat { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .io-val { color: var(--accent-d); font-weight: 600; flex: 0 0 auto; }
@@ -553,13 +553,13 @@ function fmtNum(n) { return Number(n).toLocaleString('zh-CN', { maximumFractionD
 .scope-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
 .scope-dot.direct { background: var(--red); } .scope-dot.indirect { background: var(--yellow); } .scope-dot.neg { background: var(--green); }
 /* 空态提示 */
-.empty-tip { padding: 14px 10px; text-align: center; color: var(--muted); font-size: 11.5px; }
-.empty-tip .sub { font-size: 10.5px; margin-top: 4px; opacity: .75; }
+.empty-tip { padding: 14px 10px; text-align: center; color: var(--muted); font-size: 12px; }
+.empty-tip .sub { font-size: 11px; margin-top: 4px; opacity: .75; }
 /* 可调设备列表：与资源管理视图一致（.lrow 等为全局样式） */
 .list-card { padding: 2px 8px; }
 /* 厂内实例切换条 */
 .inst-switch { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
-.inst-chip { font-size: 10.5px; padding: 3px 10px; border-radius: 2px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); cursor: pointer; }
+.inst-chip { font-size: 11px; padding: 3px 10px; border-radius: 2px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); cursor: pointer; }
 .inst-chip:hover { border-color: var(--accent2); }
 .inst-chip.on { background: var(--accent2); border-color: var(--accent2); color: var(--on-accent); }
 
@@ -593,7 +593,7 @@ function fmtNum(n) { return Number(n).toLocaleString('zh-CN', { maximumFractionD
 .slag-tbl { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
 .slag-tr { display: grid; grid-template-columns: 1.6fr 0.7fr 0.75fr 0.75fr 0.75fr 0.75fr; font-size: 11px; padding: 3px 8px; }
 .slag-tr + .slag-tr { border-top: 1px solid var(--line); }
-.slag-th { color: var(--muted); font-size: 10.5px; background: rgba(0,0,0,.02); }
+.slag-th { color: var(--muted); font-size: 11px; background: rgba(0,0,0,.02); }
 .slag-sum { font-weight: 500; background: rgba(0,0,0,.02); }
 .slag-neg { color: #b04a3a; }
 </style>

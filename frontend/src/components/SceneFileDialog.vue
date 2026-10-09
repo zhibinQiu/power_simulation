@@ -218,7 +218,7 @@ async function onOk() {
 .sf-x { border: 0; background: transparent; color: var(--muted, #8b95a3); font-size: 16px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 3px; }
 .sf-x:hover { color: var(--text, #e6ebf2); background: rgba(255, 255, 255, 0.06); }
 .sf-body { padding: 12px; overflow: auto; }
-.sf-desc { font-size: 11.5px; color: var(--muted, #8b95a3); line-height: 1.7; margin-bottom: 10px; }
+.sf-desc { font-size: 12px; color: var(--muted, #8b95a3); line-height: 1.7; margin-bottom: 10px; }
 .sf-cats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .sf-cat { text-align: left; padding: 8px 10px; border: 1px solid var(--line, #2c333d); border-radius: 4px; background: transparent; color: var(--text, #e6ebf2); cursor: pointer; }
 .sf-cat:hover { border-color: var(--accent2, #4f9d6b); }
@@ -226,7 +226,7 @@ async function onOk() {
 .c-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; margin-bottom: 4px; }
 .c-badge { font-size: 10px; color: var(--muted, #8b95a3); border: 1px solid var(--line, #2c333d); border-radius: 8px; padding: 1px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46%; }
 .c-badge.ok { color: var(--accent2, #4f9d6b); border-color: rgba(79, 157, 107, 0.5); }
-.c-desc { font-size: 10.5px; color: var(--muted, #8b95a3); line-height: 1.6; }
+.c-desc { font-size: 11px; color: var(--muted, #8b95a3); line-height: 1.6; }
 .sf-warn { margin-top: 10px; font-size: 11px; color: #d08a3a; line-height: 1.7; }
 .sf-link { border: 0; background: transparent; color: var(--accent-d, #d8b45c); font-size: 11px; cursor: pointer; padding: 0 2px; text-decoration: underline; }
 .sf-group + .sf-group { margin-top: 10px; }
@@ -240,18 +240,18 @@ async function onOk() {
 .sf-main { flex: 1; min-width: 0; }
 .sf-name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sf-ent { font-size: 10px; color: var(--muted, #8b95a3); font-style: normal; }
-.sf-sub { font-size: 10.5px; color: var(--muted, #8b95a3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sf-sub { font-size: 11px; color: var(--muted, #8b95a3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sf-tag { font-size: 10px; color: var(--muted, #8b95a3); border: 1px solid var(--line, #2c333d); border-radius: 8px; padding: 1px 6px; }
 .sf-tag.cur { color: var(--accent, #c9a33e); border-color: rgba(201, 163, 62, 0.5); }
-.sf-field { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 11.5px; }
+.sf-field { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }
 .sf-field > span { width: 68px; flex: 0 0 auto; color: var(--muted, #8b95a3); }
-.sf-input { flex: 1; min-width: 0; font-size: 11.5px; padding: 4px 6px; border: 1px solid var(--line, #2c333d); border-radius: 3px; background: var(--bg, #14181e); color: var(--text, #e6ebf2); }
-.sf-check { display: flex; align-items: center; gap: 6px; font-size: 11.5px; margin-top: 2px; cursor: pointer; }
-.sf-meta { margin-top: 8px; font-size: 10.5px; color: var(--muted, #8b95a3); }
+.sf-input { flex: 1; min-width: 0; font-size: 12px; padding: 4px 6px; border: 1px solid var(--line, #2c333d); border-radius: 3px; background: var(--bg, #14181e); color: var(--text, #e6ebf2); }
+.sf-check { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 2px; cursor: pointer; }
+.sf-meta { margin-top: 8px; font-size: 11px; color: var(--muted, #8b95a3); }
 .sf-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line, #2c333d); }
 .sf-busy { flex: 1; font-size: 11px; color: var(--muted, #8b95a3); }
-.sf-btn { font-size: 11.5px; padding: 5px 12px; border: 1px solid var(--line, #2c333d); border-radius: 3px; background: transparent; color: var(--text, #e6ebf2); cursor: pointer; }
-.sf-btn:hover { border-color: var(--accent2, #4f9d6b); }
+.sf-btn { font-size: 12px; padding: 0 var(--btn-pad-x-lg); min-height: var(--btn-h-lg); min-width: var(--btn-min-w); display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 3px; background: var(--btn-bg, var(--panel-3, #2c333d)); color: var(--text, #e6ebf2); cursor: pointer; }
+.sf-btn:hover { background: var(--btn-bg-hover, #3a3f47); }
 .sf-btn.primary { background: var(--accent, #c9a33e); border-color: var(--accent, #c9a33e); color: #1a1a1a; }
 .sf-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

@@ -559,8 +559,21 @@ T2D_FIGURES.boiler = T2D_FIGURES.aux_boiler
 T2D_FIGURES.oxygen = T2D_FIGURES.oxy_supply
 
 /** 取设备图形：未登记的类型回退 default（不会出现空白节点） */
+// 类型别名：与已有图形同族的类型复用其图形（火电系统内部的辅机设备沿用泵/风机/给料机图形）
+const T2D_ALIAS = {
+  tp_mill: 'feeder',          // 磨煤机：给料/破碎类造型
+  tp_fd_fan: 'blower',        // 送风机
+  tp_id_fan: 'id_fan',        // 引风机
+  tp_pa_fan: 'blower',        // 一次风机
+  tp_oxi_fan: 'blower',       // 氧化风机（罗茨风机）
+  tp_feed_pump: 'cool_pump',  // 给水泵
+  tp_circ_pump: 'cool_pump',  // 循环水泵
+  tp_cond_pump: 'cool_pump',  // 凝结水泵
+  tp_slurry_pump: 'cool_pump',// 浆液循环泵
+  tp_heat_pump: 'cool_pump',  // 热网循环泵
+}
 export function figureOf(type) {
-  return T2D_FIGURES[type] || T2D_FIGURES.default
+  return T2D_FIGURES[type] || T2D_FIGURES[T2D_ALIAS[type]] || T2D_FIGURES.default
 }
 
 /** 图形自身宽高比（供 Twin2DView 计算显示盒；图形真实边界 == 显示盒，无需外部标定） */

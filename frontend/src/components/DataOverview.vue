@@ -28,8 +28,10 @@
       </div>
     </header>
 
-    <!-- 页面切换（一级总览 / 二级明细） -->
-    <Transition name="ovpg" mode="out-in">
+    <!-- 内容区：左侧页面（总览 / 明细） + 右侧实时调控建议 -->
+    <div class="ov-body">
+      <!-- 页面切换（一级总览 / 二级明细） -->
+      <Transition name="ovpg" mode="out-in">
       <!-- ================= 一级：总览（仅汇总信息） ================= -->
       <section v-if="page === 'home'" key="home" class="ov-page">
         <!-- KPI 触控卡片行 -->
@@ -205,8 +207,8 @@
             </div>
           </div>
           <div class="dt-metrics">
-            <div class="dmetric"><span class="dm-k">{{ t('吨钢排放强度') }}</span><b data-fit>{{ fmtNum(carbon.intensity) }}<em> kgCO₂/t</em></b></div>
-            <div class="dmetric"><span class="dm-k">{{ t('年产量') }}</span><b data-fit>{{ fmtWan(carbon.steelYear) }}<em> {{ t('万吨') }}</em></b></div>
+            <div class="dmetric"><span class="dm-k">{{ powerScene ? t('度电碳排') : t('吨钢排放强度') }}</span><b data-fit>{{ fmtNum(carbon.intensity) }}<em> {{ powerScene ? 'gCO₂/kWh' : 'kgCO₂/t' }}</em></b></div>
+            <div class="dmetric"><span class="dm-k">{{ powerScene ? t('年发电量') : t('年产量') }}</span><b data-fit>{{ fmtWan(powerScene ? carbon.powerYear : carbon.steelYear) }}<em> {{ powerScene ? t('亿kWh') : t('万吨') }}</em></b></div>
             <div class="dmetric"><span class="dm-k">{{ t('碳捕集速率') }}</span><b data-fit>{{ fmtNum(carbon.captured) }}<em> t/h</em></b></div>
             <div class="dmetric"><span class="dm-k">{{ t('直接排放占比') }}</span><b data-fit>{{ carbon.directPct.toFixed(1) }}<em> %</em></b></div>
           </div>
@@ -273,7 +275,41 @@
           </div>
         </template>
       </section>
-    </Transition>
+      </Transition>
+
+      <!-- ── 右侧：实时调控建议（操作人员据此手动调控对应设备，平台不自动下发） ── -->
+      <aside class="ov-aside">
+        <div class="adv-head">
+          <span class="adv-title">{{ t('实时调控建议') }}</span>
+          <span class="adv-tag" :class="{ sample: advice.sample }">{{ advice.sample ? t('示例') : t('实时') }}</span>
+        </div>
+        <div class="adv-scene">{{ t(advice.sceneLabel) }}</div>
+        <div class="adv-kpis">
+          <div class="adv-kpi"><i>{{ t('发电') }}</i><b data-fit>{{ Math.round(advice.ops.gen) }}<em> MW</em></b></div>
+          <div class="adv-kpi"><i>{{ t('入炉煤') }}</i><b data-fit>{{ advice.ops.coal.toFixed(1) }}<em> t/h</em></b></div>
+          <div class="adv-kpi"><i>{{ t('厂用电率') }}</i><b data-fit>{{ advice.ops.auxRate.toFixed(2) }}<em> %</em></b></div>
+          <div class="adv-kpi"><i>{{ t('发电煤耗') }}</i><b data-fit>{{ advice.ops.coalGce.toFixed(1) }}<em> gce/kWh</em></b></div>
+        </div>
+        <div class="adv-list">
+          <article v-for="a in adviceItems" :key="a.id" class="adv-item" :class="['lv-' + a.level, { done: isDone(a) }]">
+            <div class="ai-top">
+              <span class="ai-lv">{{ t(levelLabel(a)) }}</span>
+              <span class="ai-title">{{ t(a.title) }}</span>
+            </div>
+            <div class="ai-row"><span class="ai-k">{{ t('调控对象') }}</span><span class="ai-v">{{ t(a.target) }}</span></div>
+            <div class="ai-cmp">
+              <span class="ai-cur"><i>{{ t('当前') }}</i><b>{{ a.cur }}</b><em>{{ a.unit }}</em></span>
+              <span class="ai-ar">→</span>
+              <span class="ai-go"><i>{{ t('目标') }}</i><b>{{ a.goal }}</b></span>
+            </div>
+            <div class="ai-row act"><span class="ai-k">{{ t('操作指引') }}</span><span class="ai-v">{{ t(a.action) }}</span></div>
+            <div class="ai-row gain"><span class="ai-k">{{ t('预期') }}</span><span class="ai-v">{{ t(a.gain, a.gainArgs || {}) }}</span></div>
+            <button type="button" class="ai-btn" :class="{ on: isDone(a) }" @click="toggleDone(a)">{{ isDone(a) ? t('已执行') : t('标记已执行') }}</button>
+          </article>
+          <div v-if="!adviceItems.length" class="ov-empty sm">{{ t('当前工况平稳，暂无调控建议') }}</div>
+        </div>
+      </aside>
+    </div>
   </div>
 </template>
 
@@ -283,6 +319,7 @@ import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
 import { t } from '../i18n'
 import { visiblePoll } from '../utils/poll'
+import { buildHmiAdvice } from '../data/hmiAdvice'
 import Icon from './Icon.vue'
 
 const store = useSimStore()
@@ -303,6 +340,7 @@ const now = ref(Date.now())
 const lastRefresh = ref(Math.floor(Date.now() / 1000))
 let stopClockPoll = null
 let stopBoxPoll = null
+let stopAdvicePoll = null
 
 // 一体机云端数据（10s 轮询）
 const boxOverview = ref(null)
@@ -485,8 +523,52 @@ const carbon = computed(() => {
     indirectPct: total > 0 ? (indirect / total) * 100 : 0,
     intensity: t.intensity || 0,
     steelYear: ((t.steel_output || 0) * ANNUAL_HOURS) / 10000,
+    // 火电：产量口径为发电功率(MW)，年发电量 = MW × 年运行小时 ÷ 1e5（亿 kWh）
+    powerYear: ((t.steel_output || 0) * ANNUAL_HOURS) / 100000,
     captured: t.captured || 0,
   }
+})
+
+// ---------- 右侧：实时调控建议 ----------
+// 开环建议：只告诉操作人员「调哪台设备、调到多少、为什么」，不自动下发设定值。
+// 火电场景的产量口径是发电功率（MW）而非钢产量：强度即「度电碳排 g/kWh」
+const powerScene = computed(() => store.sceneId === 'thermal-power')
+
+// 火电场景取编排方案里的实时工序参数；其它场景以火电包出厂工况为例展示（面板标注「示例」）。
+const advice = computed(() => buildHmiAdvice({
+  sceneId: store.sceneId,
+  units: store.sceneId === 'thermal-power' ? (store.model?.units || store.baseline?.units || []) : [],
+  devices: store.allDevices,
+}))
+const LEVEL_LABEL = { high: '紧急', mid: '建议', low: '优化' }
+function levelLabel(a) { return LEVEL_LABEL[a.level] || '建议' }
+
+// 「已执行」标记：操作人员手动调完点一下，条目置灰排后。
+// 签名带上当前值 —— 工况数值一变（说明又偏离了）标记自动失效，避免误以为一直处理完。
+const doneKeys = ref(new Set())
+function keyOf(a) { return `${a.id}@${a.cur}` }
+function isDone(a) { return doneKeys.value.has(keyOf(a)) }
+function toggleDone(a) {
+  const k = keyOf(a)
+  const s = new Set(doneKeys.value)
+  if (s.has(k)) s.delete(k); else s.add(k)
+  doneKeys.value = s
+}
+// 稳定化：实时读数在判据边界附近会抖动，条目忽隐忽现会让操作员无所适从。
+// 每 3s 采样一次：命中累加、缺席递减，达到 2 次才上屏、连续缺席才撤下（首屏立即上屏）。
+const stableHits = ref({})
+function sampleAdvice(first) {
+  const ids = new Set((advice.value.items || []).map((x) => x.id))
+  const s = { ...stableHits.value }
+  for (const id of ids) s[id] = Math.min(5, (s[id] ?? (first ? 3 : 0)) + 1)
+  for (const k of Object.keys(s)) if (!ids.has(k)) s[k] = Math.max(0, (s[k] || 0) - 1)
+  stableHits.value = s
+}
+const adviceItems = computed(() => {
+  const rank = { high: 0, mid: 1, low: 2 }
+  return (advice.value.items || [])
+    .filter((a) => (stableHits.value[a.id] || 0) >= 2)
+    .sort((x, y) => (Number(isDone(x)) - Number(isDone(y))) || ((rank[x.level] ?? 9) - (rank[y.level] ?? 9)))
 })
 
 // ---------- 数据源 / 工具函数 ----------
@@ -537,12 +619,15 @@ onMounted(() => {
   if (saved === 'light' || saved === 'dark') theme.value = saved
   else theme.value = document.querySelector('.app')?.classList.contains('sim-dark') ? 'dark' : 'light'
   loadBox()
+  sampleAdvice(true)   // 首屏立即给出建议，不等第一次采样周期
   stopClockPoll = visiblePoll(() => { now.value = Date.now() }, 1000)
   stopBoxPoll = visiblePoll(loadBox, 10000)
+  stopAdvicePoll = visiblePoll(() => sampleAdvice(false), 3000)
 })
 onBeforeUnmount(() => {
   if (stopClockPoll) { stopClockPoll(); stopClockPoll = null }
   if (stopBoxPoll) { stopBoxPoll(); stopBoxPoll = null }
+  if (stopAdvicePoll) { stopAdvicePoll(); stopAdvicePoll = null }
 })
 
 // ---------- 数值自适应缩放（v-fit）：内容超出容器宽度时等比缩小字号，保证数字不溢出模块 ----------
@@ -701,7 +786,7 @@ const vFit = {
 
 /* ================= 页面切换动画 ================= */
 /* 页面区占满头部以下全部高度：内容不足时弹性吸收，无底部空白 */
-.ov-page { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: clamp(8px, 1vw, 12px); position: relative; z-index: 1; }
+.ov-page { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: clamp(8px, 1vw, 12px); position: relative; z-index: 1; }
 /* 明细页空状态：弹性居中占满，避免留白 */
 .ov-page > .ov-empty { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; }
 .ovpg-enter-active, .ovpg-leave-active { transition: opacity .18s ease, transform .18s ease; }
@@ -716,6 +801,12 @@ const vFit = {
 .lg.st { background: var(--ov-st); }
 
 /* ================= KPI 触控卡片 ================= */
+/* HMI 全屏触控界面例外：卡片 / 模块面板按钮一律铺满父容器（全局「按钮按内容自适应、不占满父容器」规则不适用于本界面）。
+   .module 显式声明 align-items:stretch，避免全局 button 规则的 align-items:center 渗入 flex column 容器，
+   导致 .mod-units / .mod-grid 等子块收窄居中、指标格退化单列。
+   固定尺寸的图标按钮（.fs-tool-btn / .ov-theme）与返回按钮 .ov-back 仍按内容自适应。 */
+.kpi, .module { width: 100%; }
+.module { align-items: stretch; justify-content: flex-start; }
 .ov-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: clamp(8px, 1vw, 12px); }
 .kpi {
   position: relative; display: flex; align-items: center; gap: 13px;
@@ -778,7 +869,7 @@ const vFit = {
 .module:active { transform: scale(0.985); }
 @media (hover: hover) { .module:hover { border-color: var(--ov-border-ac); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.10); } }
 .mod-head { display: flex; align-items: center; justify-content: space-between; }
-.mod-title { font-size: 15px; font-weight: 700; color: var(--ov-text); letter-spacing: 1px; }
+.mod-title { font-size: var(--fs-xl); font-weight: 700; color: var(--ov-text); letter-spacing: 1px; }
 .mod-title::before { content: "▍"; color: var(--ov-accent); margin-right: 6px; }
 .mod-link { font-size: 12px; color: var(--ov-accent); }
 
@@ -929,7 +1020,7 @@ const vFit = {
 /* ================= 一体机明细 ================= */
 /* 三张卡片弹性均分占满页面高度（首卡云端链路固定内容高度，节点/传感器卡吸收剩余） */
 .dt-card {
-  flex: 1 1 0; min-height: 0; overflow: hidden;
+  flex: 0 0 auto; min-height: 0;
   display: flex; flex-direction: column;
   background: var(--ov-panel);
   border: 1px solid var(--ov-border); border-radius: 6px; padding: 13px 15px;
@@ -946,7 +1037,7 @@ const vFit = {
 .dtc-item b.cld-live { color: var(--ov-ok); } .dtc-item b.cld-stale { color: var(--ov-mid); }
 .dtc-item b.cld-degraded { color: var(--ov-warn); } .dtc-item b.cld-unreachable { color: var(--ov-ab); }
 .dtc-err { margin-top: 9px; font-size: 12px; color: var(--ov-ab); line-height: 1.5; }
-.dt-nodes, .dt-sensors { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 6px; }
+.dt-nodes, .dt-sensors { flex: 0 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 6px; }
 .dt-node, .dt-sensor {
   display: flex; align-items: center; gap: 9px;
   background: var(--ov-panel-2); border: 1px solid var(--ov-border); border-radius: 4px; padding: 8px 11px; font-size: 13px;
@@ -989,6 +1080,74 @@ const vFit = {
 .al-time { flex: 0 0 auto; font-family: ui-monospace, monospace; font-size: 12px; color: var(--ov-faint); }
 .al-ok-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--ov-ok); margin-right: 8px; animation: breathe 2s ease-in-out infinite; }
 
+/* ================= 右侧：实时调控建议 ================= */
+.ov-body { flex: 1 1 auto; min-height: 0; display: flex; gap: clamp(8px, 1vw, 12px); }
+.ov-aside {
+  flex: 0 0 clamp(280px, 22vw, 340px); min-width: 0;
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--ov-panel);
+  border: 1px solid var(--ov-border); border-radius: 0; padding: 11px 12px;
+}
+.adv-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.adv-title { font-size: var(--fs-xl); font-weight: 700; color: var(--ov-text); letter-spacing: 1px; }
+.adv-title::before { content: "▍"; color: var(--ov-accent); margin-right: 6px; }
+.adv-tag { flex: 0 0 auto; font-size: 11px; font-weight: 800; padding: 2px 8px; border: 1px solid var(--ov-ok); color: var(--ov-ok); background: var(--ov-ok-bg); }
+.adv-tag::before { content: "●"; margin-right: 4px; animation: breathe 2s ease-in-out infinite; }
+.adv-tag.sample { border-color: var(--ov-mid); color: var(--ov-mid); background: var(--ov-mid-bg); }
+.adv-tag.sample::before { animation: none; }
+.adv-scene { font-size: 12px; color: var(--ov-text-3); }
+.adv-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.adv-kpi { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; background: var(--ov-panel-2); border: 1px solid var(--ov-border); }
+.adv-kpi i { font-style: normal; font-size: 11px; color: var(--ov-text-3); }
+.adv-kpi b { font-family: ui-monospace, monospace; font-size: 16px; font-weight: 800; color: var(--ov-num); line-height: 1.1; }
+.adv-kpi b em { font-style: normal; font-size: 11px; color: var(--ov-text-3); font-weight: 500; }
+.adv-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 7px; padding-right: 3px; }
+.adv-list::-webkit-scrollbar { width: 6px; }
+.adv-list::-webkit-scrollbar-thumb { background: var(--ov-border); }
+.adv-item {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 9px 10px; background: var(--ov-panel-2);
+  border: 1px solid var(--ov-border); border-left: 3px solid var(--ov-warn); border-radius: 0;
+}
+.adv-item.lv-high { border-left-color: var(--ov-ab); }
+.adv-item.lv-mid { border-left-color: var(--ov-mid); }
+.adv-item.lv-low { border-left-color: var(--ov-warn); }
+.adv-item.done { opacity: 0.48; }
+.ai-top { display: flex; align-items: center; gap: 7px; }
+.ai-lv { flex: 0 0 auto; font-size: 11px; font-weight: 800; padding: 1px 7px; border: 1px solid; background: var(--ov-mask); }
+.adv-item.lv-high .ai-lv { color: var(--ov-ab); border-color: var(--ov-ab); background: var(--ov-ab-bg); }
+.adv-item.lv-mid .ai-lv { color: var(--ov-mid); border-color: var(--ov-mid); background: var(--ov-mid-bg); }
+.adv-item.lv-low .ai-lv { color: var(--ov-warn); border-color: var(--ov-warn); background: var(--ov-warn-bg); }
+.ai-title { flex: 1 1 auto; min-width: 0; font-size: 13px; font-weight: 700; color: var(--ov-text); }
+.adv-item.done .ai-title { text-decoration: line-through; }
+.ai-row { display: flex; gap: 6px; font-size: 12px; line-height: 1.45; }
+.ai-k { flex: 0 0 auto; color: var(--ov-text-3); }
+.ai-v { flex: 1 1 auto; min-width: 0; color: var(--ov-text-2); }
+.ai-row.act .ai-v { color: var(--ov-text); }
+.ai-row.gain .ai-v { color: var(--ov-ok); }
+.ai-cmp { display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: var(--ov-mask); border: 1px dashed var(--ov-border); }
+.ai-cmp i { font-style: normal; font-size: 11px; color: var(--ov-text-3); margin-right: 4px; }
+.ai-cmp b { font-family: ui-monospace, monospace; font-size: 15px; font-weight: 800; }
+.ai-cur b { color: var(--ov-ab); }
+.ai-cur em { font-style: normal; font-size: 11px; color: var(--ov-text-3); font-weight: 500; margin-left: 2px; }
+.ai-go b { color: var(--ov-ok); font-size: 13px; }
+.ai-ar { color: var(--ov-accent); font-size: 14px; }
+.ai-btn {
+  align-self: flex-start; min-height: 40px; padding: 0 14px; margin-top: 2px;
+  background: var(--ov-accent-soft); border: 1px solid var(--ov-border-ac); border-radius: 0;
+  color: var(--ov-accent); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: transform .12s, background .12s; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.ai-btn:active { transform: scale(0.97); }
+.ai-btn.on { background: var(--ov-ok-bg); border-color: var(--ov-ok); color: var(--ov-ok); }
+@media (hover: hover) { .ai-btn:hover { background: var(--ov-ac-bg); } }
+
+/* 中等宽度（≤1180px）：建议栏改为置于页面下方，避免挤压左侧一屏内容 */
+@media (max-width: 1180px) {
+  .ov-body { flex-direction: column; }
+  .ov-aside { flex: 0 0 auto; max-height: 42%; }
+}
+
 /* 小屏适配（后续放置于较小触控屏） */
 @media (max-width: 720px) {
   .dt-unit-cnt { display: none; }
@@ -1015,7 +1174,10 @@ const vFit = {
 .data-overview .dt-dev,
 .data-overview .dt-node,
 .data-overview .dt-sensor,
-.data-overview .as-item {
+.data-overview .as-item,
+.data-overview .ov-aside,
+.data-overview .adv-item,
+.data-overview .adv-kpi {
   background-image: var(--ov-meta);
   box-shadow: inset 0 1px 0 rgba(208, 230, 255, 0.07), 0 1px 3px rgba(0, 0, 0, 0.22);
 }
@@ -1033,7 +1195,10 @@ const vFit = {
 .data-overview.ov-light .dt-dev,
 .data-overview.ov-light .dt-node,
 .data-overview.ov-light .dt-sensor,
-.data-overview.ov-light .as-item {
+.data-overview.ov-light .as-item,
+.data-overview.ov-light .ov-aside,
+.data-overview.ov-light .adv-item,
+.data-overview.ov-light .adv-kpi {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
@@ -1053,7 +1218,9 @@ const vFit = {
 .data-overview .dts-val,
 .data-overview .dtc-item b,
 .data-overview .as-item b,
-.data-overview .kpi-ring-inner b {
+.data-overview .kpi-ring-inner b,
+.data-overview .adv-kpi b,
+.data-overview .ai-cmp b {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 .data-overview.ov-light .kpi-num,
@@ -1064,7 +1231,9 @@ const vFit = {
 .data-overview.ov-light .dts-val,
 .data-overview.ov-light .dtc-item b,
 .data-overview.ov-light .as-item b,
-.data-overview.ov-light .kpi-ring-inner b {
+.data-overview.ov-light .kpi-ring-inner b,
+.data-overview.ov-light .adv-kpi b,
+.data-overview.ov-light .ai-cmp b {
   text-shadow: none;
 }
 </style>

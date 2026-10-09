@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# 能碳平台 · 部署脚本公共库（platform/lib.sh，被各 update/deploy 脚本 source）
+# 能碳平台 · 部署脚本公共库（仓库根 lib.sh，被各 update/deploy 脚本 source）
 #
 # 统一四件事（此前在每个脚本里逐字重复，改一处要改三处）：
 #   ① 仓库根定位 ROOT —— 无论从哪个目录被调用都能定位到仓库根
@@ -9,17 +9,21 @@
 #   ④ 标准排除列表 —— 源码同步（构建缓存/密钥/运行数据）与运行期状态文件分开
 #
 # 用法（在各脚本顶部，self_dir 指向该脚本所在目录）：
-#   SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-#   . "$SELF_DIR/../lib.sh"        # 或 . "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
+#   仓库根脚本（update.sh / deploy.sh …）：
+#     SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+#     . "$SELF_DIR/lib.sh"
+#   platform/<部署单元>/ 下的脚本（多一层，需上溯两级）：
+#     SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+#     . "$SELF_DIR/../../lib.sh"
 #
 # 注意：本文件只提供函数与变量，不做任何动作；被引用的脚本须自行 set -euo pipefail。
 # ============================================================================
 
 _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "${_LIB_DIR}/.." && pwd)"
+ROOT="${_LIB_DIR}"
 
 # ---- 服务器地址集中配置（platform/servers.conf，缺失则用各脚本内置默认值）----
-CONF="${_LIB_DIR}/servers.conf"
+CONF="${_LIB_DIR}/platform/servers.conf"
 [ -f "${CONF}" ] && . "${CONF}" || true
 
 # ---- 传输通道：免密优先（BatchMode=yes 避免卡在密码输入），有密码才走 sshpass ----

@@ -47,14 +47,14 @@ from .api.settings_router import router as settings_router
 
 
 async def _lifespan(app):
-    """应用生命周期：后台初始化 Skills（内置 + MCP）+ 启动 MQTT 实时数据源 + 设备历史预填。
+    """应用生命周期：后台初始化 Skills（内置）+ 启动 MQTT 实时数据源 + 设备历史预填。
 
     启动副作用统一收敛于此：import 模块不再产生任何副作用（组合根纯装配），
     便于测试与工具脚本安全导入。
     """
     from .skills.registry import init_registry
 
-    init_registry(connect_mcp=True)
+    init_registry()
     # 启动实时数据源（MQTT 订阅，参照参考项目 yunduan1 数据链路）：
     # 后台线程连接云端 MQTT Broker 订阅主题（Broker 配置前端化：能碳一体机管理 -> 总览 -> 配置 Broker，
     # 保存后热更新重连并持久化到 box_config.json），设备读数一律来自该真实数据源。

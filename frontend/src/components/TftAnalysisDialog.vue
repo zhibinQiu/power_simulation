@@ -886,7 +886,7 @@ function fmt1(v) {
 }
 .tad-titlebar:active { cursor: grabbing; }
 .tad-icon { color: var(--accent-d); font-size: 13px; }
-.tad-title { font-size: 12.5px; font-weight: 600; color: var(--text); letter-spacing: 0.3px; }
+.tad-title { font-size: 12px; font-weight: 600; color: var(--text); letter-spacing: 0.3px; }
 .tad-subtitle {
   font-size: 11px; font-weight: 400; color: var(--muted); letter-spacing: 0.2px;
   margin-left: 2px;
@@ -895,7 +895,7 @@ function fmt1(v) {
 .tad-spacer { flex: 1; }
 .tad-restore {
   height: 26px; padding: 0 12px; border: 1px solid var(--border); background: var(--panel-2);
-  color: var(--muted); border-radius: 4px; font-size: 11.5px; cursor: pointer;
+  color: var(--muted); border-radius: 4px; font-size: 12px; cursor: pointer;
   display: inline-flex; align-items: center; letter-spacing: 0.3px;
   transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
@@ -940,14 +940,14 @@ function fmt1(v) {
 .cell-name { color: var(--muted); font-weight: 600; white-space: nowrap; }
 .tad-cell.on .cell-name { color: var(--accent-d); }
 .cell-val { color: var(--text); font-size: 11px; }
-.cell-eff { font-size: 9px; color: var(--faint); margin-left: 2px; }
+.cell-eff { font-size: 10px; color: var(--faint); margin-left: 2px; }
 .tad-cell svg { width: 100%; height: auto; aspect-ratio: 290 / 200; display: block; }
-.tad-cell svg text { font-size: 9px; fill: var(--faint); }
+.tad-cell svg text { font-size: 10px; fill: var(--faint); }
 
 .tad-tip {
   position: absolute; transform: translate(-50%, -100%); pointer-events: none;
   background: var(--bar); color: var(--text); padding: 5px 9px; border-radius: 4px;
-  border: 1px solid var(--border); font-size: 11.5px; white-space: nowrap; z-index: 5;
+  border: 1px solid var(--border); font-size: 12px; white-space: nowrap; z-index: 5;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
 }
 .tad-tip .t1 { color: var(--faint); }
@@ -965,7 +965,7 @@ function fmt1(v) {
 .ts-val b { font-size: 15px; color: var(--text); }
 .ts-badge {
   margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
-  font-size: 10.5px; padding: 1px 9px; border-radius: 8px; font-weight: 600;
+  font-size: 11px; padding: 1px 9px; border-radius: 8px; font-weight: 600;
 }
 .ts-badge .bd-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 .ts-badge.ok { background: rgba(46, 139, 87, .12); color: var(--green); }
@@ -983,7 +983,7 @@ function fmt1(v) {
 
 /* 喷煤比轴「设定 vs 有效」说明（富氧派生联动时避免数值误解） */
 .ts-eff {
-  font-size: 10.5px; line-height: 1.5; color: var(--muted);
+  font-size: 11px; line-height: 1.5; color: var(--muted);
   background: var(--panel-2); border: 1px solid var(--border); border-radius: 2px;
   padding: 4px 8px; margin-top: 3px;
 }
@@ -992,7 +992,7 @@ function fmt1(v) {
 /* ---- 动态解读（MATLAB 状态条风格） ---- */
 .tad-note {
   flex: none; display: flex; gap: 7px; align-items: flex-start;
-  font-size: 11.5px; line-height: 1.5; padding: 7px 10px; border-radius: 3px;
+  font-size: 12px; line-height: 1.5; padding: 7px 10px; border-radius: 3px;
   border: 1px solid var(--border);
 }
 .tad-note .note-icon { font-size: 12px; font-weight: 700; line-height: 1.4; }
@@ -1013,7 +1013,7 @@ function fmt1(v) {
 .cond-unit { font-size: 12px; color: var(--faint); }
 .cond-st {
   margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
-  font-size: 11.5px; font-weight: 600;
+  font-size: 12px; font-weight: 600;
 }
 .cond-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px;
@@ -1023,7 +1023,7 @@ function fmt1(v) {
 .cg-k { color: var(--faint); white-space: nowrap; }
 .cg-item b { color: var(--text); font-weight: 600; }
 .cond-tip {
-  font-size: 10.5px; line-height: 1.5; color: var(--faint);
+  font-size: 11px; line-height: 1.5; color: var(--faint);
   background: var(--panel-2); border: 1px solid var(--border); border-radius: 2px; padding: 5px 7px;
 }
 
@@ -1033,7 +1033,7 @@ function fmt1(v) {
   display: flex; flex-direction: column; gap: 5px;
 }
 .co2-main { display: flex; align-items: baseline; gap: 6px; }
-.co2-k { font-size: 10.5px; color: var(--faint); font-weight: 600; letter-spacing: 0.4px; white-space: nowrap; }
+.co2-k { font-size: 11px; color: var(--faint); font-weight: 600; letter-spacing: 0.4px; white-space: nowrap; }
 .co2-val { font-size: 20px; font-weight: 700; color: var(--text); line-height: 1; }
 .co2-unit { font-size: 11px; color: var(--faint); white-space: nowrap; }
 .co2-grid {
@@ -1055,7 +1055,7 @@ function fmt1(v) {
 }
 .cg-wide { grid-column: 1 / -1; }
 .slag-tbl {
-  display: flex; flex-direction: column; font-size: 10.5px;
+  display: flex; flex-direction: column; font-size: 11px;
   border: 1px solid var(--border); border-radius: 2px; overflow: hidden;
 }
 .slag-tr {
@@ -1071,7 +1071,7 @@ function fmt1(v) {
 
 /* ---- 右栏标题（平台分区小标题风格） ---- */
 .tad-sec-title {
-  flex: none; font-size: 10.5px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
+  flex: none; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
   color: var(--muted); padding-bottom: 5px; border-bottom: 1px solid var(--border);
 }
 .tad-sec-title .sec-sub {
@@ -1108,7 +1108,7 @@ function fmt1(v) {
 .tad-table tr.on td { background: var(--sel); color: var(--text); }
 .tad-table tr.on .c-name { color: var(--accent-d); }
 .tad-table .c-name { font-weight: 600; color: var(--accent-d); }
-.tad-table .trend { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; }
+.tad-table .trend { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; }
 .tad-table .td-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 .tad-table .trend.up { color: var(--red); }
 .tad-table .trend.up .td-dot { background: var(--red); }

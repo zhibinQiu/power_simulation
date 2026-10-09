@@ -293,60 +293,68 @@ function shortTs(ts) {
 </script>
 
 <style scoped>
+/* ══════════ 粒子群（PSO）· 视觉规范（与群控主页共用同一套令牌） ══════════
+   区块标题 12/600，正文 11，辅助 10；彩色只给「选中态 · 关键数值 · 运行中的状态」 */
+
 .pso { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
-.pso-cfg { flex: 1 1 460px; min-width: 320px; display: flex; flex-direction: column; gap: 8px; }
-.pso-run { flex: 0 0 340px; min-width: 280px; display: flex; flex-direction: column; gap: 6px; }
+.pso em, .pso i { font-style: normal; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.dim { color: var(--faint); }
 
-.pso-blk { padding: 7px 9px 9px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 3px; }
-.pso-t { font-size: 11px; font-weight: 600; color: var(--text); padding-bottom: 5px; }
-.pso-t.sm { font-size: 10px; color: var(--muted); padding-top: 2px; }
-.pso-n { font-style: normal; margin-left: 5px; font-size: 10px; color: var(--faint); }
-.pso-emp { font-size: 10px; color: var(--faint); }
+.pso-cfg { flex: 1 1 460px; min-width: 320px; display: flex; flex-direction: column; gap: 10px; }
+.pso-run { flex: 0 0 340px; min-width: 280px; display: flex; flex-direction: column; gap: 8px; }
 
-.pso-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.pso-blk {
+  display: flex; flex-direction: column; gap: 8px; padding: 10px 12px;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.pso-t { font-size: var(--fs-t); font-weight: var(--fw-t); color: var(--text); }
+.pso-t.sm { font-size: var(--fs-s); font-weight: 400; color: var(--muted); }
+.pso-n { margin-left: 5px; font-size: var(--fs-s); color: var(--faint); }
+.pso-emp { font-size: var(--fs-s); color: var(--faint); }
+
+.pso-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .pso-chip {
-  padding: 1px 8px; font-size: 10.5px; border-radius: 10px; cursor: pointer;
+  padding: 2px 10px; font-size: var(--fs-s); white-space: nowrap; border-radius: 10px; cursor: pointer;
   color: var(--muted); background: var(--panel); border: 1px solid var(--border);
 }
-.pso-chip.adj.on { color: #fff; background: #D97A21; border-color: transparent; }
 .pso-chip:hover { border-color: var(--accent2); }
-.pso-dims { display: flex; flex-wrap: wrap; gap: 4px 12px; padding-top: 6px; }
-.pso-dim { display: flex; align-items: baseline; gap: 6px; font-size: 10px; color: var(--muted); }
-.pso-dim b { font-weight: 600; color: var(--text); font-size: 10.5px; }
+.pso-chip.on { color: var(--on-accent); background: var(--k-adj); border-color: transparent; }
+.pso-dims { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.pso-dim { display: flex; align-items: baseline; gap: 6px; font-size: var(--fs-s); color: var(--muted); }
+.pso-dim b { font-size: var(--fs-b); font-weight: var(--fw-m); color: var(--text); }
 
-.pso-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
-.pso-lb { font-style: normal; flex: 0 0 auto; font-size: 10.5px; color: var(--muted); }
+.pso-row { display: flex; align-items: center; gap: 6px; }
+.pso-lb { flex: 0 0 auto; font-size: var(--fs-s); color: var(--muted); }
 .pso-sel, .pso-num {
-  min-width: 0; padding: 2px 4px; font-size: 11px; font-family: inherit; color: var(--text);
-  background: var(--panel); border: 1px solid var(--border); border-radius: 3px; outline: none;
+  min-width: 0; padding: 3px 6px; font-size: var(--fs-b); color: var(--text);
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); outline: none;
 }
-.pso-sel:focus, .pso-num:focus { border-color: var(--accent2); }
+.pso-sel { font-family: inherit; }
+.pso-num { width: 76px; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.pso-sel:focus, .pso-num:focus { border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent-l); }
 .pso-sel.grow { flex: 1 1 auto; }
-.pso-num { width: 76px; text-align: right; font-family: var(--mono); }
-.pso-u { font-style: normal; font-size: 10px; color: var(--faint); }
-.pso-lv { font-size: 11px; color: var(--accent-d); }
+.pso-u { flex: 0 0 auto; font-size: var(--fs-s); color: var(--faint); }
+.pso-lv { font-size: var(--fs-b); font-weight: var(--fw-m); color: var(--accent-d); font-variant-numeric: tabular-nums; }
 
-.pso-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 4px 10px; }
-.pso-f { display: flex; align-items: center; gap: 5px; }
-.pso-f em { font-style: normal; flex: 1 1 auto; font-size: 10.5px; color: var(--muted); }
-.pso-f .pso-num { width: 62px; }
+.pso-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px 12px; }
+.pso-f { display: flex; align-items: center; gap: 6px; }
+.pso-f em { flex: 1 1 auto; font-size: var(--fs-s); color: var(--muted); white-space: nowrap; }
+.pso-f .pso-num { width: 66px; }
 
 .pso-rhd { display: flex; align-items: center; gap: 6px; }
 .pso-sp { flex: 1 1 auto; }
-.pso-st { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--faint); }
-.pso-st .dot { width: 7px; height: 7px; border-radius: 50%; background: #888; }
+.pso-st { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-s); color: var(--faint); }
+.pso-st .dot { flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
 .pso-st.on { color: var(--green); }
 .pso-st.on .dot { background: var(--green); animation: pso-pulse 1s infinite; }
 @keyframes pso-pulse { 50% { opacity: .35; } }
 .pso-bar { height: 5px; background: var(--bar); border-radius: 3px; overflow: hidden; }
 .pso-bar i { display: block; height: 100%; background: var(--accent-d); transition: width .2s; }
-.pso-cv { width: 100%; height: 74px; background: var(--panel); border: 1px solid var(--border); border-radius: 3px; }
+.pso-cv { width: 100%; height: 74px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); }
 .pso-cv .cv-g { fill: none; stroke: var(--accent-d); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
-.pso-ft { display: flex; align-items: center; gap: 10px; font-size: 10px; color: var(--muted); }
-.pso-ft b { color: var(--accent-d); }
-.pso-bx { padding-top: 2px; }
-.pso-tip { font-size: 9.5px; color: var(--faint); line-height: 1.6; }
-
-.mono { font-family: var(--mono); }
-.dim { color: var(--faint); }
+.pso-ft { display: flex; align-items: center; gap: 12px; font-size: var(--fs-s); color: var(--muted); }
+.pso-ft b { font-weight: var(--fw-m); color: var(--accent-d); font-variant-numeric: tabular-nums; }
+.pso-bx { display: flex; flex-direction: column; gap: 4px; }
+.pso-tip { margin: 0; font-size: var(--fs-s); line-height: 1.6; color: var(--faint); }
 </style>

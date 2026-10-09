@@ -1,0 +1,129 @@
+{
+  "library": {
+    "coal_belt_scale": {
+      "label": "给煤机皮带秤",
+      "icon": "⚖️",
+      "color": "#6f9e74",
+      "measures": "入炉煤质量流量",
+      "unit": "t/h",
+      "accuracy": "±0.5%",
+      "range": "0–600 t/h",
+      "desc": "称重式给煤机上的连续计量装置，计量进入磨煤机的原煤质量流量，是燃料燃烧排放「活动数据」的主源头（配合入炉煤元素碳实测可替代默认因子）。"
+    },
+    "coal_analyzer": {
+      "label": "煤质分析仪",
+      "icon": "🧪",
+      "color": "#8a7bb0",
+      "measures": "元素碳含量 / 低位发热量",
+      "unit": "% / GJ/t",
+      "accuracy": "±0.5%",
+      "range": "C 40–85% · Q 10–30 GJ/t",
+      "desc": "入炉煤工业分析与元素分析（碳含量、低位发热量、全硫、灰分、全水分），用于把默认排放因子替换为实测值（发电企业核算要求逐批次检测）。"
+    },
+    "steam_flowmeter": {
+      "label": "蒸汽流量计",
+      "icon": "💨",
+      "color": "#c0903e",
+      "measures": "主蒸汽/给水质量流量（带温压补偿）",
+      "unit": "t/h",
+      "accuracy": "±1.0%",
+      "range": "0–3200 t/h",
+      "desc": "主蒸汽、给水、凝结水的质量流量计量（孔板/喷嘴/超声），用于机组热耗率与汽水平衡校核，是能效类指标的数据基础。"
+    },
+    "water_flowmeter": {
+      "label": "循环水流量计",
+      "icon": "🌊",
+      "color": "#3b9ee0",
+      "measures": "循环冷却水流量",
+      "unit": "m³/h",
+      "accuracy": "±1.0%",
+      "range": "0–120000 m³/h",
+      "desc": "循环冷却水管道的电磁/超声流量计，与循环水泵变频联动（Q ∝ n），是循环水系统节能优化的主要观测量。"
+    },
+    "flue_gas_meter": {
+      "label": "烟气流量计",
+      "icon": "🏭",
+      "color": "#8a7f72",
+      "measures": "标态干烟气流量",
+      "unit": "m³/h",
+      "accuracy": "±2.0%",
+      "range": "0–4e6 m³/h",
+      "desc": "烟道断面流速 × 截面换算的标态干烟气量，配合 CO₂ 浓度可算得烟囱直接排放量（直接监测法，与因子法交叉校验）。"
+    },
+    "cems": {
+      "label": "CEMS 烟气在线监测",
+      "icon": "📡",
+      "color": "#c4774a",
+      "measures": "CO₂ 浓度 × 流量（直接排放）/ 污染物浓度",
+      "unit": "mg/m³ · tCO₂/h",
+      "accuracy": "±2.0%",
+      "range": "SO₂/NOx 0–500 mg/m³ · 粉尘 0–100 mg/m³",
+      "desc": "烟囱排放连续监测系统：直接测得 CO₂ 排放速率与 SO₂/NOx/粉尘浓度，是超低排放考核与因子法交叉校验的权威数据源。"
+    },
+    "o2_analyzer": {
+      "label": "烟气氧量分析仪",
+      "icon": "🫧",
+      "color": "#5fa8a0",
+      "measures": "烟气含氧量",
+      "unit": "%",
+      "accuracy": "±0.2%",
+      "range": "0–25%",
+      "desc": "氧化锆氧量计，监测省煤器出口烟气含氧量，用于燃烧风量优化与过量空气系数控制（氧量↑ → 排烟损失↑、风机电耗↑）。"
+    },
+    "power_meter": {
+      "label": "智能电表",
+      "icon": "⚡",
+      "color": "#8a7bb0",
+      "measures": "发电量 / 厂用电功率",
+      "unit": "MWh/h",
+      "accuracy": "±0.2%",
+      "range": "0–1300 MWh/h",
+      "desc": "关口表与厂用电分表：计量发电量与各辅机（磨煤机/风机/给水泵/循环水泵/脱硫）用电，是厂用电率与范围二折碳的活动数据来源。"
+    },
+    "temp_transmitter": {
+      "label": "温度变送器",
+      "icon": "🌡️",
+      "color": "#c46b4a",
+      "measures": "汽水 / 烟气温度",
+      "unit": "℃",
+      "accuracy": "±0.5 ℃",
+      "range": "0–800 ℃",
+      "desc": "热电偶/热电阻测温，监测主蒸汽温度、排烟温度、循环水温升等；排烟温度↑ 直接反映锅炉效率下降与煤耗上升。"
+    },
+    "pressure_transmitter": {
+      "label": "压力变送器",
+      "icon": "🧭",
+      "color": "#5b83a8",
+      "measures": "汽水 / 烟风压力",
+      "unit": "MPa / kPa",
+      "accuracy": "±0.25 %FS",
+      "range": "0–40 MPa",
+      "desc": "压力变送器，监测主蒸汽压力、凝汽器真空（背压）、烟道阻力；背压↑ 会使机组热耗上升、煤耗增加。"
+    }
+  },
+  "process_specs": {
+    "boiler": [
+      {
+        "key": "tp_300",
+        "label": "亚临界 300MW 级",
+        "desc": "亚临界参数（~17 MPa / 540 ℃）机组，发电煤耗偏高（约 320 g/kWh）",
+        "defaults": { "coal_rate": 135, "power": 7 },
+        "ranges": { "coal_rate": { "min": 40, "max": 200, "step": 5 } }
+      },
+      {
+        "key": "tp_660",
+        "label": "超超临界 660MW 级",
+        "desc": "超超临界参数（25 MPa / 600 ℃）机组，发电煤耗约 275 g/kWh（本包默认）",
+        "defaults": { "coal_rate": 255, "power": 12 },
+        "ranges": { "coal_rate": { "min": 80, "max": 320, "step": 5 } }
+      },
+      {
+        "key": "tp_1000",
+        "label": "超超临界 1000MW 级",
+        "desc": "百万千瓦超超临界机组，发电煤耗可低至 265 g/kWh 以下",
+        "defaults": { "coal_rate": 372, "power": 17 },
+        "ranges": { "coal_rate": { "min": 120, "max": 420, "step": 5 } }
+      }
+    ]
+  }
+}

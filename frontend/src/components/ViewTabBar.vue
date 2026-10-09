@@ -11,8 +11,6 @@
     <button v-for="id in store.openViews" :key="id" class="vw-tab" :class="{ on: store.activeViewId === id }"
             @click="store.activateView(id)" :title="t(VIEW_TITLE[id] || id)">
       <span class="vw-t">{{ t(VIEW_TITLE[id] || id) }}</span>
-      <!-- 流程编排标签：方案有未保存改动时显示红点（与工具条「保存」按钮一致） -->
-      <i v-if="id === 'flowEdit' && store.schemeDirty" class="vw-dot" :title="t('有未保存的修改')"></i>
       <span class="vw-x" :title="id === 'flowEdit' ? t('完成编排并关闭') : t('关闭该窗口')" @click.stop="close(id)">✕</span>
     </button>
   </div>
@@ -33,36 +31,32 @@ function close(id) { store.closeViewById(id) }
 </script>
 
 <style scoped>
-/* 标签条：占用工具栏行（grid-area: toolbar），与 Ribbon 同高（28px），风格统一 */
+/* 标签条：占用工具栏行（grid-area: toolbar），与 Ribbon 同高（--head-h 28px），
+   度量/字号/激活指示条与左栏分类 tab、底部面板页签完全一致（见 main.css 全局标签条） */
 .vw-tabs {
   grid-area: toolbar;
-  display: flex; align-items: stretch; height: 28px;
-  background: var(--panel); border-bottom: 1px solid var(--border);
+  display: flex; align-items: stretch; height: var(--head-h);
+  background: var(--panel-2); border-bottom: 1px solid var(--border);
   border-left: 1px solid var(--border); border-right: 1px solid var(--border);
   overflow-x: auto; overflow-y: hidden; user-select: none;
 }
 .vw-tabs::-webkit-scrollbar { height: 0; }
 .vw-tab {
-  position: relative; display: inline-flex; align-items: center; gap: 6px;
-  flex: 0 0 auto; max-width: 220px; height: 100%; padding: 0 8px 0 12px;
-  font-family: var(--ui); font-size: 12px; color: var(--muted);
+  position: relative; display: inline-flex; align-items: center; gap: var(--sp-2);
+  flex: 0 0 auto; max-width: 220px; height: 100%; padding: 0 var(--sp-4);
+  font-family: var(--ui); font-size: var(--fs-t); color: var(--muted);
   background: transparent; border: none; border-right: 1px solid var(--border);
   cursor: pointer; white-space: nowrap; transition: background .12s, color .12s;
 }
 .vw-tab:hover { color: var(--text); background: var(--panel-3); }
-.vw-tab.on { color: var(--text); background: var(--panel-2); }
+.vw-tab.on { color: var(--text); background: var(--panel); }
 .vw-t { overflow: hidden; text-overflow: ellipsis; }
 .vw-x {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px; border-radius: 4px; font-size: 10px; line-height: 1;
+  width: 16px; height: 16px; border-radius: 4px; font-size: var(--fs-s); line-height: 1;
   color: var(--muted); opacity: .7;
 }
 .vw-x:hover { color: #fff; background: var(--red, #e5484d); opacity: 1; }
-/* 固定标签（三维仿真）不带关闭按钮，右侧留白与其它标签对齐 */
-.vw-scene { padding-right: 14px; font-weight: 600; }
-/* 未保存标记（流程编排）：与工具条保存按钮的红点同款 */
-.vw-dot {
-  flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%;
-  background: var(--red, #e5484d);
-}
+/* 固定标签（三维仿真）不带关闭按钮，左右留白与其它标签对齐 */
+.vw-scene { padding: 0 var(--sp-4); }
 </style>

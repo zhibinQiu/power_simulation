@@ -141,8 +141,12 @@ def test_patches_keep_box_snapshot_custom_fields():
     assert built["snapshot"] is True
 
 
-def test_patches_empty_when_no_lora_devices():
-    built = lora_dtu.build_patches([{"name": "f", "protocol": "modbus"}], None)
+def test_patches_empty_for_unsupported_protocol():
+    """LoRa 与 Modbus 之外的协议（opcua/蓝牙等）盒子侧为现场定制，平台不下发。
+
+    Modbus 是例外：平台改从站号/串口必须同步给盒子，见 tests/test_box_device_patch.py。
+    """
+    built = lora_dtu.build_patches([{"name": "f", "protocol": "opcua"}], None)
     assert built["patches"] == [] and built["changes"] == []
 
 
@@ -205,8 +209,11 @@ def test_lora_sync_requires_box(monkeypatch):
 
 
 def test_lora_sync_no_lora_device_is_noop(monkeypatch):
+    # publish 必须被拦截：否则"没有 LoRa 设备"的分支一旦写错，单测会把假设备真发到线上盒子
+    monkeypatch.setattr(lora_dtu.mqtt_source, "publish_box_cmd",
+                        lambda box, payload: pytest.fail("不该向盒子下发: %s" % payload))
     monkeypatch.setattr(lora_dtu, "_load_devices",
-                        lambda: {"devices": [{"name": "f", "protocol": "modbus", "node": "nt001"}]})
+                        lambda: {"devices": [{"name": "f", "protocol": "opcua", "node": "nt001"}]})
     monkeypatch.setattr(lora_dtu, "fetch_box_devices", lambda box, timeout=8.0: None)
     res = lora_dtu.lora_sync(box="nt001")
     assert res["ok"] and res["applied"] is False and "无需下发" in res["note"]

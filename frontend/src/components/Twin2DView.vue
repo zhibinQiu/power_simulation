@@ -1768,7 +1768,7 @@ watch(() => store.scheme, () => relayout(), { deep: true })
 .t2d-card-mat { font-size: 11px; font-weight: 600; letter-spacing: 0.01em; }
 .t2d-card-rate { font-variant-numeric: tabular-nums; }
 .t2d-card-val { font-size: 12px; font-weight: 700; letter-spacing: 0.01em; }
-.t2d-card-unit { font-size: 9.5px; font-weight: 400; }
+.t2d-card-unit { font-size: 10px; font-weight: 400; }
 
 /* —— 设备节点 —— */
 .t2d-node { cursor: pointer; }

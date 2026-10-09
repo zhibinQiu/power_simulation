@@ -8,7 +8,7 @@
 #      （rsync 源码到服务器 → 远端执行本地安装 → venv 依赖 → systemd 常驻）
 #   2) 服务器本地安装（源码已就位，脚本随源码 rsync 到服务器）：
 #        sudo bash deploy_middleware.sh --local-only
-#   3) 日常只更新代码（配合 platform/update.sh middleware）：
+#   3) 日常只更新代码（配合 ./update.sh middleware）：
 #        bash deploy_middleware.sh sync --server root@36.151.146.71
 #
 # 约定：

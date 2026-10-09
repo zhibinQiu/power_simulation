@@ -1,0 +1,20 @@
+[Unit]
+Description=EdgeCore
+# containerd/docker：edged 起来时要校验 CRI 运行时，冷启动时这两个服务还没就绪会直接
+# 「Start edged failed: validate service connection: validate CRI」并以 exit 1 退出，
+# 只能等 systemd 重启才成功（实测每次断电上电必现，白白多花一次重启的时间）。
+# 加上顺序依赖后冷启动不再崩，上电到上线的时间反而更短。
+After=syslog.target network-online.target containerd.service docker.service
+Wants=network-online.target containerd.service docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/edgecore
+Restart=always
+RestartSec=5
+# 崩溃循环时不要触发 systemd 的 start-limit 而彻底放弃（否则终端永久不上线）
+StartLimitBurst=20
+StartLimitIntervalSec=300
+
+[Install]
+WantedBy=multi-user.target

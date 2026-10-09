@@ -1,11 +1,7 @@
 """Skills 基础层。
 
-Skill 是本系统统一的能力单元，兼容 MCP Tool 协议：
-- 内置 Skill：纯 Python 函数（查询设备、仿真、碳市场等），以 MCP Tool 的
-  JSON Schema 定义入参，可被 LangGraph 智能体调用，也可通过 MCP Server
-  对外暴露给第三方 MCP 客户端。
-- 远端 Skill：本系统作为 MCP Client 连接第三方 MCP Server，将其 tools
-  包装成 Skill 供智能体使用。
+Skill 是本系统统一的能力单元：纯 Python 函数（查询设备、仿真、碳市场、方法学等），
+以 JSON Schema 定义入参，供 LangGraph 智能体通过 tool calling 调用。
 
 handler 统一返回文本（str），供 LLM 观察；可以是同步函数或协程。
 """
@@ -26,15 +22,15 @@ MAX_TOOL_OUTPUT = 4000
 
 @dataclass
 class Skill:
-    name: str                      # 唯一标识（MCP tool name 同）
+    name: str                      # 唯一标识（与 LLM tool name 同）
     description: str               # 给 LLM 看的描述
-    input_schema: Dict[str, Any]   # JSON Schema（兼容 MCP InputSchema）
+    input_schema: Dict[str, Any]   # JSON Schema（入参定义）
     handler: Callable[..., Any]    # fn(args: dict) -> str 或 async fn(args) -> str
-    source: str = "builtin"        # builtin | mcp:{server_name}
+    source: str = "builtin"        # 能力来源（当前全部为内置）
     tags: List[str] = field(default_factory=list)  # 例如 ["device","simulation","carbon"]
     enabled: bool = True
     timeout: float = 45.0          # 单次执行超时（秒），防止慢/卡死工具拖垮智能体链路
-    meta: Dict[str, Any] = field(default_factory=dict)  # 扩展信息（如 MCP 服务器地址）
+    meta: Dict[str, Any] = field(default_factory=dict)  # 扩展信息
 
     def to_public(self) -> Dict[str, Any]:
         """对外（前端/LLM）可见的信息，不暴露 handler。"""
@@ -46,14 +42,6 @@ class Skill:
             "tags": self.tags,
             "enabled": self.enabled,
             "meta": self.meta,
-        }
-
-    def to_mcp_tool(self) -> Dict[str, Any]:
-        """转换为 MCP tools 协议格式（供 MCP Server 对外暴露）。"""
-        return {
-            "name": self.name,
-            "description": self.description,
-            "inputSchema": self.input_schema or {"type": "object", "properties": {}},
         }
 
     def to_openai_tool(self) -> Dict[str, Any]:
@@ -69,7 +57,7 @@ class Skill:
 
 
 class SkillRegistry:
-    """Skills 注册表：统一管理内置与 MCP 动态加载的 skills。"""
+    """Skills 注册表：统一管理内置 skills。"""
 
     def __init__(self) -> None:
         self._skills: Dict[str, Skill] = {}

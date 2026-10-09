@@ -1,6 +1,24 @@
 {
   "sessions": [
     {
+      "id": "530cb81a109f",
+      "title": "今年以来工厂一共排放了多少碳，消耗了多少能源",
+      "agent": "general",
+      "skills": [],
+      "created_at": "2026-10-09 13:49:05",
+      "updated_at": "2026-10-09 13:49:05",
+      "messages": [
+        {
+          "role": "user",
+          "content": "今年以来工厂一共排放了多少碳，消耗了多少能源"
+        },
+        {
+          "role": "assistant",
+          "content": "（模型未配置或未连通：请在后端设置 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL 后重启）"
+        }
+      ]
+    },
+    {
       "id": "87cb0de2ec16",
       "title": "今年以来工厂一共排放了多少碳，消耗了多少能源",
       "agent": "general",

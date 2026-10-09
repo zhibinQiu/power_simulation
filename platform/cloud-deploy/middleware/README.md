@@ -204,7 +204,7 @@ class HttpPollAdapter(BaseAdapter):
 
 ```bash
 # 开发机 1：起模拟源（自带 Broker 127.0.0.1:41885）
-bash platform/update.sh simsource start          # 等价于 ../sim-source/sim_source.py --config ../sim-source/config.json
+./update.sh simsource start          # 等价于 ../sim-source/sim_source.py --config ../sim-source/config.json
 
 # 开发机 2：本中间件用开发机配置启动（订阅 41885 的 steel/#、idc/# → 直发 36.151.146.71:41883）
 python3 runner.py --config config.dev.json
@@ -230,7 +230,7 @@ python3 runner.py --config config.dev.json
 # 开发机执行：rsync 源码 → 服务器 → venv 依赖 → systemd 常驻
 bash platform/cloud-deploy/middleware/deploy_middleware.sh --server root@36.151.146.71
 # 服务器上本地执行（源码已就位时）：bash deploy_middleware.sh --local-only
-# 日常只更新代码（配合 platform/update.sh middleware）：bash deploy_middleware.sh sync
+# 日常只更新代码（配合 ./update.sh middleware）：bash deploy_middleware.sh sync
 ```
 
 - 安装目录 `/opt/nengtan-middleware`（源码在 `middleware/` 子目录，venv 在外层）；

@@ -1,0 +1,12 @@
+[Unit]
+Description=EdgeCore message-channel watchdog (auto recover from twin-channel-full / metaclient timeout)
+After=edgecore.service box-mapper.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/edgecore-watchdog.sh
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

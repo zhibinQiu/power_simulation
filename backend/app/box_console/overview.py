@@ -25,15 +25,26 @@ def _fetch_cloud_k8s(force: bool = False) -> Dict[str, Any]:
     return cloud_agent.state(force=force)
 
 
+# 归属不明的占位盒子名（历史兜底值 / 缺省值）：命中即不合成节点
+_PLACEHOLDER_BOXES = {"", "未分组", "unknown-box", "unknown", "default"}
+
+
 def _mqtt_boxes() -> List[Dict[str, Any]]:
     """从 MQTT 云端设备分组识别盒子列表（box_overview 共用）。
 
     盒子侧版本未知时不虚构 version；age 取最近上报时间。
+
+    **归属不明不合成节点**：平台订阅的是 `#`，cloud/state、ext/ 上行空间、命令回执等
+    非 data/<box>/... 消息同样会进设备缓存，它们没有盒子归属。若兜底成「未分组」这类
+    占位名，概览就会凭空多出一张「未分组」的能碳一体机卡片（无 IP、无服务、点不开，
+    还会与真实盒子抢拓扑位置）。归属不明即留空并跳过，设备仍可在设备列表/信号目录查看。
     """
     now = time.time()
     boxes: Dict[str, Dict[str, Any]] = {}
     for cid, info in mqtt_source.snapshot_cloud_devices().items():
-        b = info.get("box") or "unknown-box"
+        b = str(info.get("box") or "").strip()
+        if not b or b.lower() in _PLACEHOLDER_BOXES:
+            continue
         boxes.setdefault(b, {"box": b, "devices": 0, "last_seen": 0})
         boxes[b]["devices"] += 1
         boxes[b]["last_seen"] = max(boxes[b]["last_seen"], float(info.get("last_seen") or 0))

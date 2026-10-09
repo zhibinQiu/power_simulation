@@ -208,7 +208,6 @@ function onRun() {
   const hasStrategies = Object.values(store.unitStrategies).some(s => s.enabled)
   if (hasStrategies) store.runAllEnabledStrategies()
   else store.refresh()
-  pushCmd(t('simulate >> 重新运行仿真，已刷新全厂碳素流、能流与排放。'), 'out')
 }
 function onSimToggle() {
   if (store.simMode) store.exitSim()
@@ -217,40 +216,30 @@ function onSimToggle() {
     consoleRef.value && consoleRef.value.focusInput()
   }
 }
-function onResetParams() { store.refresh(); pushCmd(t('已重置仿真参数并重新计算。'), 'out') }
-function onRefresh() { store.resetView(); store.refresh(); pushCmd(t('已重置视角并同步数据。'), 'out') }
-function onResetView() { store.resetView(); pushCmd(t('视图 >> 相机视角已重置为园区俯瞰。'), 'out') }
-function toggleAuto() { store.setAutoRotate(!store.autoRotate); pushCmd(t('自动环视 ') + (store.autoRotate ? t('开启') : t('关闭')) + t('。'), 'out') }
+// 操作结果由界面本身呈现（视图变化 / 数据刷新 / 面板打开），命令行只在「失败或需要警示」时播报，
+// 避免把控制台变成复述操作的流水账
+function onResetParams() { store.refresh() }
+function onRefresh() { store.resetView(); store.refresh() }
+function onResetView() { store.resetView() }
+function toggleAuto() { store.setAutoRotate(!store.autoRotate) }
 function focusSel(mode) {
   if (!store.selectedUnitId) { pushCmd(t('未选中工序：请先在左侧资产树或 3D 孪生中点选工序。'), 'warn'); return }
   store.viewUnit(store.selectedUnitId, mode)
-  const map = { top: t('俯视'), front: t('正视'), side: t('侧视'), focus: t('聚焦'), overview: t('全景') }
-  pushCmd(t('视图 >> ') + (map[mode] || mode) + t('（') + store.selectedUnitId + t('）。'), 'out')
 }
-function onOverview() {
-  store.viewUnit('__overview__', 'overview')
-  pushCmd(t('视图 >> 已切换到全场景俯瞰视角。'), 'out')
-}
-function onAutoLayout() {
-  store.autoLayout()
-  store.refresh()
-  store.sceneRev++
-  pushCmd(t('视图 >> 已重新自动布局工序。'), 'out')
-}
-function onToggleEdit() { if (store.editMode) store.exitEdit(); else store.enterEdit(); pushCmd(store.editMode ? t('已退出流程编排。') : t('进入流程编排：可从左侧「资源管理器」拖拽条目到画布，节点参数在右侧编排属性中调整。'), 'out') }
-// 保存编排方案并生效：编辑（参数/设定值/配方/连线等）仅在画布草稿中，点击保存后统一应用并持久化
-function saveFlow() { store.saveScheme(); pushCmd(t('已保存编排方案并生效（应用到孪生场景与仿真计算）。'), 'out') }
+function onOverview() { store.viewUnit('__overview__', 'overview') }
+function onAutoLayout() { store.autoLayout(); store.refresh(); store.sceneRev++ }
+function onToggleEdit() { if (store.editMode) store.exitEdit(); else store.enterEdit() }
 // 编排动作（载入模板 / 清空画布 / 自动布局…）前置：未进入编排则进入；已在编排但当前在其它 tab 则切回编排标签
 function ensureEdit() { if (!store.editMode) store.enterEdit(); else store.activateView('flowEdit') }
-function loadExample(route) { ensureEdit(); store.loadTemplate(route); pushCmd(route === 'short' ? t('已载入短流程炼钢模板。') : t('已载入长流程炼钢模板。'), 'out') }
-function clearScheme() { ensureEdit(); store.clearScheme(); pushCmd(t('已清空编排画布。'), 'out') }
+function loadExample(route) { ensureEdit(); store.loadTemplate(route) }
+function clearScheme() { ensureEdit(); store.clearScheme() }
 // 自动布局：主工艺沿水平中线成主干、工辅分列主干上下两侧（与 3D 孪生空间一致），布局后自动适配视图
-function autoLayoutScheme() { ensureEdit(); store.autoLayoutScheme(); store.flowZoomFit(); pushCmd(t('已自动布局：主工艺横向排成主干，工辅分布在主干两侧。'), 'out') }
-function addGroupBtn() { ensureEdit(); const id = store.addFlowGroup(); pushCmd(id ? t('已新建小组，可将设备拖入其中。') : t('新建小组失败。'), 'out') }
-function duplicateGroupBtn() { ensureEdit(); const id = store.duplicateFlowGroup(store.selectedGroupId); if (id) pushCmd(t('已复制小组。'), 'out') }
+function autoLayoutScheme() { ensureEdit(); store.autoLayoutScheme(); store.flowZoomFit() }
+function addGroupBtn() { ensureEdit(); if (!store.addFlowGroup()) store.toast = t('新建小组失败。') }
+function duplicateGroupBtn() { ensureEdit(); store.duplicateFlowGroup(store.selectedGroupId) }
 function flowZoomBtn(f) { store.flowZoom(f) }
 function flowFit() { store.flowZoomFit() }
-function onEnvChange(e) { store.setEnvMode(e.target.value); pushCmd(t('外围景观 → ') + (store.envModes.find((m) => m.id === store.envMode)?.label || store.envMode) + t('。'), 'out') }
+function onEnvChange(e) { store.setEnvMode(e.target.value) }
 // 导出 AI 分析报告：基线数据分析 + 使用的策略 + 策略前后对比，由后端大模型生成 Markdown
 function onExport() {
   if (!store.baseline) { pushCmd(t('暂无可导出数据：请先运行仿真或应用情景。'), 'tip'); store.showToast(t('请先运行仿真再导出报告'), 'warn'); return }
@@ -264,7 +253,6 @@ function onExport() {
     understood: store.parsed?.understood || [],
     scenario: store.scenarios.find((s) => s.id === store.scenario)?.label || store.scenario,
   })
-  pushCmd(t('已打开右侧报告面板：请配置标题、引擎与分析深度后点击「生成报告」。'), 'out')
 }
 // 打开独立文档网站（宣传手册 / 使用手册 / 技术文档）：文档站已并入平台【同源】访问，
 // 统一入口为 /docs/#/<page>（页面路径 /docs/ + hash 路由）：
@@ -288,7 +276,6 @@ const tabMode = computed(() => store.openViews.length > 0)
 function closeView() {
   if (store.activeViewId) store.closeViewById(store.activeViewId)
   else if (store.editMode) store.exitEdit()
-  pushCmd(t('已返回数字孪生场景。'), 'out')
 }
 // 工况数据分析 / AI群控：重新拉取历史数据（DataView 暴露的 refresh，按当前激活窗口取对应实例）
 async function dataRefresh() {
@@ -304,20 +291,14 @@ function openAiModel(id) {
     const cur = store.selectedStrategyId
     const curOpt = /^ai::(ga|pso|rl)$/.test(String(cur || ''))
     store.selectStrategy(curOpt ? cur : 'ai::ga')
-    store.toast = t('已打开参数优化属性面板：可在面板顶部切换 遗传算法 / 粒子群 / 强化学习')
     return
   }
   const cur = store.selectedStrategyId
   store.selectStrategy(cur === id ? cur : id)
-  const m = id === 'ai::seq' ? t('时序预测') : id === 'ai::clu' ? t('聚类分析') : id === 'ai::fit' ? t('数据拟合') : t('AI 模型')
-  store.toast = t('已打开「') + m + t('」属性面板')
 }
 // AI 群控视图（AI → AI群控 / 活动栏按钮共用）：与数据分析同布局、无 tab，
 // 内容区左右两栏：左「训练前测试」（滤波 → 稳态闭环控制实验）｜右「训练相关设定」（低能耗稳态寻优训练，GA/PSO/RL）
-function openAiGroup() {
-  store.openAiGroup()
-  if (store.aiGroupOn) pushCmd(t('AI群控：请从左侧「场景」资源树拖入受控设备 —— 左栏「训练前测试」做滤波与稳态闭环测试，右栏「训练相关设定」配置算法/目标后开始训练，得到低能耗稳态最优参数。'), 'out')
-}
+function openAiGroup() { store.openAiGroup() }
 // 碳资产管理视图：刷新行情（CarbonAssistantView 暴露的 loadAll）
 async function marketRefresh() { await waitViewRef(marketViewRef); if (marketViewRef.value?.loadAll) marketViewRef.value.loadAll() }
 // 碳资产管理视图：切换品种（CEA / CCER）与预测叠加开关（CarbonAssistantView 暴露）
@@ -335,31 +316,21 @@ const marketSubNav = async (id) => {
   store.openView('carbonMarket')
   await waitViewRef(marketViewRef)
   if (marketViewRef.value) marketViewRef.value.switchTab(id)
-  pushCmd(t('工具 >> 双碳 >> 碳资产管理 >> ') + (id === 'market' ? t('CEA / CCER 行情') : t('企业台账与策略')) + t('。'), 'out')
 }
 // 顶栏「视图」菜单：打开数据源管理（能碳一体机 + 外部数据源统一接入；
 // 原「数据概览 / 设备管理」两页签已合并为同一界面，对外名称为「数据源管理」）
-const boxSubNav = () => {
-  store.openView('boxManage')
-  pushCmd(t('视图 >> 数据源管理。'), 'out')
-}
+const boxSubNav = () => { store.openView('boxManage') }
 // 碳资产管理视图：刷新企业台账（CarbonAssistantView 暴露的 refreshLedger，转发到台账面板 loadAll）
 const marketLedgerRefresh = async () => { await waitViewRef(marketViewRef); if (marketViewRef.value?.refreshLedger) marketViewRef.value.refreshLedger() }
 // 工具栏「三维仿真/HMI人机交互屏」切换：中间 3D 场景 ↔ 企业实时运行 HMI 大屏
-function toggleOverview() {
-  store.toggleOverview()
-  pushCmd(store.overviewOn ? t('视图 >> HMI人机交互屏：企业各工艺设备实时运行情况大屏。') : t('视图 >> 已返回三维仿真场景。'), 'out')
-}
+function toggleOverview() { store.toggleOverview() }
 // 工具栏「本析智擎」切换：右侧属性弹窗 ↔ 智能体对话界面（中间 3D 场景保持）
-function toggleAgent() {
-  store.toggleAgent()
-  pushCmd(store.agentOn ? t('工具 >> 本析智擎：右侧属性面板已切换为智能体对话界面。') : t('工具 >> 已关闭本析智擎，右侧恢复属性面板。'), 'out')
-}
+function toggleAgent() { store.toggleAgent() }
 
 // 供命令窗口调用的孪生控制动作
 const twinActions = { onSimToggle, onResetView, onOverview, focusSel, onToggleEdit }
 // 供工具条调用的动作
-const ribbonActions = { onSimToggle, onToggleEdit, saveFlow, toggleAuto, onResetView, toggleOverview, toggleAgent, autoLayoutScheme, flowZoomBtn, flowFit, loadExample, clearScheme, closeView, dataRefresh, openAiModel, marketRefresh, marketSwitch, marketForecast, marketLedgerRefresh, carbonReport, marketInstrument, marketForecastOn, marketTabOn }
+const ribbonActions = { onSimToggle, onToggleEdit, toggleAuto, onResetView, toggleOverview, toggleAgent, autoLayoutScheme, flowZoomBtn, flowFit, loadExample, clearScheme, closeView, dataRefresh, openAiModel, marketRefresh, marketSwitch, marketForecast, marketLedgerRefresh, carbonReport, marketInstrument, marketForecastOn, marketTabOn }
 
 /* ---------------- 经典菜单条（文件 / 仿真 / 视图 / 编辑 / 工具 / 帮助；AI 已整体并入「工具」） ---------------- */
 const menus = computed(() => [
@@ -393,7 +364,6 @@ const menus = computed(() => [
   ] },
   { id: 'edit', label: t('编辑'), items: [
     { label: store.editMode ? t('完成编排') : t('进入流程编排'), act: onToggleEdit },
-    { label: t('保存编排并生效'), hide: () => !store.editMode, act: saveFlow },
     { sep: true },
     { label: t('撤销'), accel: 'Ctrl+Z', disabled: () => !store.canUndo, act: () => store.undo() },
     { label: t('重做'), accel: 'Ctrl+Y', disabled: () => !store.canRedo, act: () => store.redo() },

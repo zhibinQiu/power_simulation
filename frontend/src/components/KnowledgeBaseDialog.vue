@@ -601,12 +601,12 @@ onMounted(refresh)
 .kb-doc:hover .kb-doc-ops { display: flex; }
 
 /* 通用小按钮 */
-.kb-mini { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px;
+.kb-mini { width: var(--btn-h-sm); height: var(--btn-h-sm); display: inline-flex; align-items: center; justify-content: center; font-size: 12px;
   color: var(--muted); background: transparent; border: none; border-radius: 3px; cursor: pointer; padding: 0; }
 .kb-mini:hover { color: var(--accent-d); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .kb-mini.danger:hover { color: var(--red); background: rgba(188,59,48,.10); }
-.kb-btn { padding: 6px 14px; font-size: 12px; font-family: var(--ui); border-radius: 4px; cursor: pointer;
-  color: var(--text); background: var(--panel-2); border: 1px solid var(--border); text-decoration: none; display: inline-flex; align-items: center; }
+.kb-btn { padding: 0 var(--btn-pad-x-lg); min-height: var(--btn-h-lg); min-width: var(--btn-min-w); font-size: 12px; font-family: var(--ui); border-radius: 4px; cursor: pointer;
+  color: var(--text); background: var(--btn-bg); border: 1px solid var(--border); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 .kb-btn:hover { border-color: var(--accent); color: var(--accent-d); }
 .kb-btn.primary { color: #fff; background: var(--accent); border-color: var(--accent); }
 .kb-btn.primary:hover { background: var(--accent-d); border-color: var(--accent-d); color: #fff; }

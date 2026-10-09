@@ -359,7 +359,7 @@ function f(n) { return n == null ? '—' : Number(n).toLocaleString('zh-CN', { m
 
 <style scoped>
 /* 模块内部说明：不单独成模块，直接写在对应模块内容区顶部 */
-.sec-desc { font-size: 10.5px; line-height: 1.5; color: var(--muted); margin: 0 0 8px 0; padding: 0; }
+.sec-desc { font-size: 11px; line-height: 1.5; color: var(--muted); margin: 0 0 8px 0; padding: 0; }
 .dh-row { display: flex; align-items: center; gap: 10px; }
 .dh-icon { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 3px; background: var(--panel-3); }
 .insp-head { margin-bottom: 4px; }
@@ -403,7 +403,7 @@ function f(n) { return n == null ? '—' : Number(n).toLocaleString('zh-CN', { m
 .cb-note.data { color: var(--accent2); background: rgba(95,130,148,.10); border: 1px solid rgba(95,130,148,.28);
   border-radius: 3px; padding: 5px 8px; }
 /* 高炉数值仿真分析入口按钮（随 TFT 策略面板展示） */
-.tft-entry-btn { display: block; width: 100%; margin-top: 8px; padding: 6px 8px; font-size: 11px; text-align: center;
-  border-radius: 3px; border: 1px solid var(--accent2); background: transparent; color: var(--accent2); cursor: pointer; }
-.tft-entry-btn:hover { background: var(--accent2); color: #fff; }
+.tft-entry-btn { display: inline-flex; align-items: center; justify-content: center; width: auto; margin-top: 8px; padding: 0 var(--btn-pad-x); min-height: var(--btn-h); font-size: 11px; text-align: center;
+  border-radius: 3px; border: 1px solid transparent; background: var(--btn-bg); color: var(--accent2); cursor: pointer; }
+.tft-entry-btn:hover { background: color-mix(in srgb, var(--accent2) 18%, var(--btn-bg)); color: var(--text); }
 </style>

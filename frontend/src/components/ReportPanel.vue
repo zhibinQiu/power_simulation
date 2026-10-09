@@ -445,7 +445,7 @@ async function copy() {
   border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg);
 }
 .rp-check-text { color: var(--text); }
-.rp-gen-btn { width: 100%; padding: 8px 0; font-size: 11px; font-weight: 600; }
+.rp-gen-btn { width: auto; align-self: flex-start; padding: 0 var(--btn-pad-x); min-height: var(--btn-h); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; }
 
 /* —— 生成进度 —— */
 .rp-progress { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 6px; }
@@ -473,15 +473,15 @@ async function copy() {
 .report-panel .rp-scroll { line-height: 1.7; font-size: 12px; color: var(--text); }
 .report-panel .rp-scroll h1 { font-size: 15px; margin: 10px 0 6px; padding-bottom: 4px; border-bottom: 2px solid var(--accent); }
 .report-panel .rp-scroll h2 { font-size: 13px; margin: 12px 0 6px; color: var(--accent2); }
-.report-panel .rp-scroll h3 { font-size: 11.5px; margin: 10px 0 4px; }
-.report-panel .rp-scroll h4 { font-size: 11.5px; margin: 8px 0 4px; }
+.report-panel .rp-scroll h3 { font-size: 12px; margin: 10px 0 4px; }
+.report-panel .rp-scroll h4 { font-size: 12px; margin: 8px 0 4px; }
 .report-panel .rp-scroll p { margin: 6px 0; }
 .report-panel .rp-scroll table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 11px; display: block; overflow-x: auto; white-space: nowrap; }
 .report-panel .rp-scroll th, .report-panel .rp-scroll td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
 .report-panel .rp-scroll th { background: var(--panel-2); font-weight: 600; }
 .report-panel .rp-scroll blockquote { margin: 6px 0; padding: 6px 10px; border-left: 3px solid var(--accent); background: rgba(13, 110, 253, 0.06); color: var(--muted); border-radius: 0 6px 6px 0; }
-.report-panel .rp-scroll code { background: var(--panel-2); padding: 1px 4px; border-radius: 3px; font-size: 10.5px; }
-.report-panel .rp-scroll pre.rp-code { background: #1e2530; color: #d8e0ea; padding: 10px; border-radius: 3px; overflow: auto; font-size: 10.5px; }
+.report-panel .rp-scroll code { background: var(--panel-2); padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+.report-panel .rp-scroll pre.rp-code { background: #1e2530; color: #d8e0ea; padding: 10px; border-radius: 3px; overflow: auto; font-size: 11px; }
 .report-panel .rp-scroll pre.rp-code code { background: transparent; color: inherit; padding: 0; }
 .report-panel .rp-scroll ul, .report-panel .rp-scroll ol { margin: 6px 0; padding-left: 20px; }
 .report-panel .rp-scroll li { margin: 3px 0; }

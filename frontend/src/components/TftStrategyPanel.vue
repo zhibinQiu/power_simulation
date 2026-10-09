@@ -219,11 +219,11 @@ function deltaLabel(d) { return `TFT ${d >= 0 ? '↑' : '↓'} ${Math.abs(d).toF
 .tft-bar { position: relative; height: 8px; background: var(--bg); border-radius: 4px; margin: 10px 0 4px; border: 1px solid var(--line); }
 .tft-bar-ok { position: absolute; top: 0; bottom: 0; background: rgba(63,174,106,.18); }
 .tft-bar-fill { position: absolute; top: -3px; width: 10px; height: 12px; border-radius: 5px; transform: translateX(-50%); box-shadow: 0 0 4px rgba(0,0,0,.35); }
-.tft-bar-labels { display: flex; justify-content: space-between; font-size: 9px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tft-bar-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .tft-desc { font-size: 11px; color: var(--muted); line-height: 1.55; margin: 8px 0 0; }
-.tft-calc { margin-top: 10px; padding: 8px 10px; background: rgba(95,130,148,.06); border: 1px dashed var(--border); border-radius: 6px; }
+.tft-calc { margin-top: 10px; padding: 8px 10px; background: rgba(95,130,148,.06); border: 1px solid var(--border); border-radius: 6px; }
 .tft-calc-title { font-size: 11px; color: var(--text); font-weight: 500; margin-bottom: 4px; }
-.tft-calc-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 10.5px; line-height: 1.7; }
+.tft-calc-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 11px; line-height: 1.7; }
 .tft-calc-row span { color: var(--muted); }
 .tft-calc-row b { font-weight: 400; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tft-calc-formula { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); font-size: 11px; }

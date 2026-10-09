@@ -16,7 +16,9 @@ def _record_box_state(topic: str, data: Dict[str, Any]) -> None:
     box = str(data.get("box") or "").strip()
     if not box:
         parts = [p for p in topic.split("/") if p]
-        box = parts[1] if len(parts) > 1 else "未分组"
+        box = parts[1] if len(parts) > 1 else ""
+    if not box:
+        return          # 归属不明的状态帧不落缓存（避免制造名为「未分组」的假盒子）
     now = time.time()
     with _LOCK:
         if topic.endswith("/services"):

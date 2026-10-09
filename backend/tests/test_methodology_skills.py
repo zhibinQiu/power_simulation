@@ -84,12 +84,13 @@ def test_methodology_skill_openai_format():
     assert "required" in tool["function"]["parameters"]
 
 
-def test_methodology_skill_mcp_format():
+def test_methodology_skill_openai_format_accounting():
     registry = get_registry()
     skill = registry.get("compute_carbon_accounting")
-    tool = skill.to_mcp_tool()
-    assert tool["name"] == "compute_carbon_accounting"
-    assert "inputSchema" in tool
+    tool = skill.to_openai_tool()
+    assert tool["type"] == "function"
+    assert tool["function"]["name"] == "compute_carbon_accounting"
+    assert "required" in tool["function"]["parameters"]
 
 
 # ---------------------------------------------------------------------------

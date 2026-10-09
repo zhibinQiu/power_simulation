@@ -690,6 +690,217 @@ def calc_cold(p, cfg=DEFAULT_FACTORS):
     return r
 
 
+# ==================== 火电（thermal-power 资源包） ====================
+# 核算口径：GB/T 32151.1《温室气体排放核算与报告要求 第 1 部分：发电企业》
+#  ① 范围一（化石燃料燃烧）= 入炉煤量 × 低位发热量 × 单位热值含碳量 × 碳氧化率 × 44/12
+#     —— 碳氧化率(OF)是发电锅炉必乘项：煤粉炉典型 0.98，未燃尽部分以灰渣残碳形态
+#        随固废排出（不氧化为 CO₂），故记为 carbon_to_product 而非排放。
+#  ② 范围一（工业过程）= 脱硫剂碳酸钙分解：石灰石耗量 × CaCO₃ 含量 × 0.4395 tCO₂/t
+#  ③ 范围二（间接）= 各系统辅机厂用电(MWh/h) × 电网排放因子；
+#     厂用电为机组自发自用，按外购电口径折算作范围二指示量。
+def _tp_ox(cfg: Dict, fuel: str = "coal") -> float:
+    """燃料碳氧化率（OF）：煤粉炉 0.98、燃气 0.99；缺省按 1.0（视为全氧化）。"""
+    f = (cfg.get("fuels") or {}).get(fuel) or {}
+    try:
+        v = float(f.get("ox"))
+    except (TypeError, ValueError):
+        return 1.0
+    return _clamp(v, 0.0, 1.0)
+
+
+def _tp_purity(cfg: Dict) -> float:
+    """脱硫剂碳酸钙含量（场景因子 carbonate_purity，默认 0.90）。"""
+    try:
+        v = float(cfg.get("carbonate_purity"))
+    except (TypeError, ValueError):
+        return 0.90
+    return _clamp(v, 0.0, 1.0)
+
+
+def _tp_aux(p, cfg, elec_label: str, note: str) -> Dict:
+    """火电通用辅机核算基底：直接排放恒为 0，仅计厂用电对应的范围二电耗。"""
+    power = float(p.get("power", 0.0) or 0.0)
+    green = p.get("green_ratio")
+    if isinstance(green, (int, float)):
+        power = power * (1.0 - float(green) / 100.0)
+    elec = power                                     # MW 运行 1h = MWh/h
+    indirect = elec * cfg["grid_ef"]
+    r = _base()
+    r.update(co2_direct=0.0, co2_indirect=indirect, carbon_in=0.0,
+             carbon_to_co2=0.0, carbon_by_fuel={"elec": indirect / CO2_PER_C})
+    r["ledger"] = [
+        _led(elec_label, elec, "MWh/h", f"电网因子 {cfg['grid_ef']} tCO₂/MWh", indirect, "indirect",
+             formula=_elec_formula(elec, indirect, cfg)),
+    ]
+    r["notes"] = [note]
+    return r
+
+
+def calc_coal_handling(p, cfg=DEFAULT_FACTORS):
+    """输煤制粉系统：原煤输送与研磨（物理过程），无燃烧、无直接排放，仅制粉电耗。"""
+    r = _tp_aux(p, cfg, "输煤制粉电耗",
+                "输煤/给煤/磨煤为物理制备过程，不产生直接排放；仅计磨煤机与输煤系统厂用电（范围二）")
+    return r
+
+
+def calc_boiler(p, cfg=DEFAULT_FACTORS):
+    """锅炉系统：全厂范围一主要来源——燃煤燃烧排放 = 煤量×NCV×CC×碳氧化率×44/12。"""
+    coal = float(p.get("coal_rate", 0.0) or 0.0)
+    f = (cfg.get("fuels") or {}).get("coal") or {}
+    ncv, cc = float(f.get("ncv", 0.0) or 0.0), float(f.get("cc", 0.0) or 0.0)
+    ox = _tp_ox(cfg, "coal")
+    gj = coal * ncv                              # GJ/h 入炉热量
+    c_in = gj * cc                               # tC/h 入炉煤全碳
+    c_to_co2 = c_in * ox                         # 氧化为 CO₂ 的碳
+    c_unburned = c_in - c_to_co2                 # 未燃尽碳（灰渣残碳，随固废排出不排放）
+    direct = c_to_co2 * CO2_PER_C
+    elec = float(p.get("power", 0.0) or 0.0)     # 送/引/一次风机厂用电
+    indirect = elec * cfg["grid_ef"]
+    r = _base()
+    r.update(co2_direct=direct, co2_indirect=indirect, carbon_in=c_in,
+             carbon_to_co2=c_to_co2, carbon_to_product=c_unburned,
+             carbon_by_fuel={"coal": c_in})
+    r["ledger"] = [
+        _led("燃煤燃烧(范围一)", coal, "t/h", "AD×NCV×CC×OF×44/12", direct, "direct",
+             formula=f"{coal:.1f} t/h × {ncv} GJ/t × {cc} tC/GJ × 碳氧化率 {ox:.2f} × 3.667 = {direct:.1f} tCO₂/h"),
+        _led("未燃尽碳(灰渣残碳)", c_unburned, "tC/h",
+             f"碳氧化率 {ox:.2f} 之外的未燃碳随飞灰/底渣排出，未氧化为 CO₂，不计排放", 0.0, "direct",
+             formula=f"{c_in:.1f} tC/h × (1 − {ox:.2f}) = {c_unburned:.1f} tC/h（随固废排出）"),
+        _led("风机辅机电耗", elec, "MWh/h", f"电网因子 {cfg['grid_ef']} tCO₂/MWh", indirect, "indirect",
+             formula=_elec_formula(elec, indirect, cfg)),
+    ]
+    r["notes"] = ["锅炉是全厂范围一的唯一燃烧排放源：入炉煤量 × 低位发热量 × 单位热值含碳量 × 碳氧化率 × 44/12",
+                  f"碳氧化率 {ox:.2f}（煤粉炉典型值）；未燃尽碳 {c_unburned:.1f} tC/h 随灰渣排出，不重复计入排放",
+                  "入炉煤量与煤质（NCV/CC）应优先采用皮带秤计量值与入厂煤质化验单实测值"]
+    _purchases(r, coal=coal)                     # 外购：发电用原煤（入炉煤量）
+    return r
+
+
+def calc_steam_turbine(p, cfg=DEFAULT_FACTORS):
+    """汽轮机系统：热功转换（物理过程），无直接排放，仅润滑油泵等微小厂用电。"""
+    r = _tp_aux(p, cfg, "汽轮机辅机电耗",
+                "汽轮机为热功转换设备，蒸汽不外泄、无燃烧，无直接排放；仅计润滑油泵/盘车等厂用电")
+    return r
+
+
+def calc_generator(p, cfg=DEFAULT_FACTORS):
+    """发电系统：机电转换，无直接排放；发电量作为本场景的产品产量口径（供全厂强度指标）。"""
+    r = _tp_aux(p, cfg, "发电机辅助用电",
+                "发电机为机电转换设备，无直接排放；仅计励磁/氢冷/控制等辅助负荷")
+    # 产量口径：火电以「发电量(MW)」作为全厂强度指标的分母（等效 MWh/h），
+    # 使 totals.intensity = 直接排放 ÷ 发电量 × 1000 即「度电碳排 g/kWh」
+    r["steel_output"] = float(p.get("output", 0.0) or 0.0)
+    return r
+
+
+def calc_condenser(p, cfg=DEFAULT_FACTORS):
+    """凝汽系统：乏汽凝结与真空建立（冷端散热），无直接排放，仅真空泵厂用电。"""
+    r = _tp_aux(p, cfg, "真空系统电耗",
+                "凝汽器把乏汽汽化潜热带入循环水（冷源损失），属能量损失不属碳排放；仅计真空泵厂用电")
+    return r
+
+
+def calc_cooling_tower(p, cfg=DEFAULT_FACTORS):
+    """循环冷却水系统：冷端散热，无直接排放；循环水泵与塔风机是厂用电大户（变频改造重点）。"""
+    r = _tp_aux(p, cfg, "循环水泵电耗",
+                "循环水系统与冷端散热相关，无直接排放；水泵电耗约与流量一次方、转速三次方相关（变频节能空间大）")
+    return r
+
+
+def calc_feedwater(p, cfg=DEFAULT_FACTORS):
+    """给水除氧系统：凝结水回热与升压（物理过程），无直接排放；电动给水泵为主要辅机负荷。"""
+    r = _tp_aux(p, cfg, "给水泵电耗",
+                "给水系统为汽水循环回热环节，无直接排放；电动给水泵是主要厂用电负荷（汽动泵方案可显著下降）")
+    return r
+
+
+def calc_denitration(p, cfg=DEFAULT_FACTORS):
+    """烟气脱硝系统：SCR 把 NOx 还原为 N₂ 与 H₂O，无 CO₂ 生成；还原剂逸散量级极小不计。"""
+    r = _tp_aux(p, cfg, "脱硝辅机电耗",
+                "SCR 脱硝为 NOx 还原反应，不产生 CO₂；还原剂（液氨/尿素）逸散量级极小，本包不计工艺排放")
+    reagent = float(p.get("reagent_rate", 0.0) or 0.0)
+    if reagent > 1e-9:
+        r["ledger"].append(
+            _led("还原剂耗量(液氨)", reagent, "t/h", "NOx 还原反应无 CO₂ 生成，不计碳排", 0.0, "direct",
+                 formula=f"{reagent:.2f} t/h 液氨参与 NOx→N₂ 还原，无 CO₂ 生成"))
+    return r
+
+
+def calc_dedust(p, cfg=DEFAULT_FACTORS):
+    """烟气除尘系统：电除尘/布袋捕集飞灰（物理分离），无直接排放，仅电场与输灰电耗。"""
+    r = _tp_aux(p, cfg, "除尘电场电耗",
+                "除尘为气固物理分离，不产生碳排放；飞灰中的未燃碳已在锅炉碳氧化率中扣除，不重复计算")
+    return r
+
+
+def calc_desulfurization(p, cfg=DEFAULT_FACTORS):
+    """烟气脱硫系统：石灰石-石膏湿法，脱硫剂碳酸钙分解属工业过程排放（范围一）。"""
+    lime = float(p.get("limestone_rate", 0.0) or 0.0)
+    purity = _tp_purity(cfg)
+    pure = lime * purity                         # 脱硫剂中 CaCO₃ 的量 t/h
+    direct = pure * cfg["carbonate"]["limestone"]
+    c_in = direct / CO2_PER_C
+    elec = float(p.get("power", 0.0) or 0.0)     # 浆液循环泵+氧化风机
+    indirect = elec * cfg["grid_ef"]
+    r = _base()
+    r.update(co2_direct=direct, co2_indirect=indirect, carbon_in=c_in,
+             carbon_to_co2=c_in, carbon_by_fuel={"carbonate": c_in})
+    r["ledger"] = [
+        _led("脱硫剂碳酸盐分解(范围一)", pure, "t/h",
+             f"CaCO₃ 分解因子 {cfg['carbonate']['limestone']} tCO₂/t", direct, "direct",
+             formula=f"{lime:.1f} t/h × 含量 {purity:.2f} × {cfg['carbonate']['limestone']} tCO₂/t = {direct:.1f} tCO₂/h"),
+        _led("石膏副产品(固硫不排碳)", lime, "t/h", "SO₂ 固定为 CaSO₄·2H₂O，成盐过程不产生 CO₂", 0.0, "direct",
+             formula="SO₂ + CaCO₃ → CaSO₃ + CO₂（仅碳酸根分解排碳，硫固定为石膏）"),
+        _led("浆液循环泵电耗", elec, "MWh/h", f"电网因子 {cfg['grid_ef']} tCO₂/MWh", indirect, "indirect",
+             formula=_elec_formula(elec, indirect, cfg)),
+    ]
+    r["notes"] = [f"湿法脱硫的工业过程排放：石灰石耗量 × CaCO₃ 含量（默认 {purity:.2f}）× 0.4395 tCO₂/t，计入范围一",
+                  "排放量与入炉煤含硫量、钙硫比直接相关；脱硫只是把硫固定为石膏，不减少 CO₂",
+                  "浆液循环泵与氧化风机是脱硫系统主要厂用电负荷"]
+    _purchases(r, limestone=lime)                # 外购：脱硫剂（石灰石粉）
+    return r
+
+
+def calc_stack(p, cfg=DEFAULT_FACTORS):
+    """排烟系统：烟囱为排放汇总展示点，本身无排放源；CEMS 监测用电计入范围二。"""
+    r = _tp_aux(p, cfg, "CEMS 监测电耗",
+                "烟囱是排放口而非排放源：CO₂ 已在锅炉（燃烧）与脱硫（过程）核算，此处仅作排放汇总展示")
+    return r
+
+
+def calc_heat_net(p, cfg=DEFAULT_FACTORS):
+    """热网换热系统（热电联产）：抽汽对外供热，无直接排放；供热分摊的燃料已在锅炉全额计入。"""
+    r = _tp_aux(p, cfg, "热网循环泵电耗",
+                "热网换热为汽水换热，无直接排放；供热分摊的燃料与排放已在锅炉全额计入，此处不重复核算")
+    heat = float(p.get("heat_rate", 0.0) or 0.0)
+    if heat > 1e-9:
+        # 热量法分摊：供热标准煤耗约 40 kgce/GJ（供热分摊燃料量，仅作热电分摊展示，不影响排放合计）
+        share = heat * 0.040
+        r["ledger"].append(
+            _led("供热分摊燃料(热量法)", share, "tce/h",
+                 "按 40 kgce/GJ 分摊的供热燃料量；其排放已在锅炉计入，此处仅作热电联产效益展示", 0.0, "direct",
+                 formula=f"{heat:.0f} GJ/h × 40 kgce/GJ ÷ 1000 = {share:.1f} tce/h（锅炉已计，不重复）"))
+        r["notes"].append(
+            f"热电联产：外供热量 {heat:.0f} GJ/h，按热量法分摊燃料约 {share:.1f} tce/h；"
+            "供热比越高，分摊到发电侧的燃料与排放越少")
+    return r
+
+
+def calc_ash_handling(p, cfg=DEFAULT_FACTORS):
+    """除灰渣系统：收集锅炉底渣与除尘器飞灰并输送至灰库（固废物流终点），无直接排放。"""
+    r = _tp_aux(p, cfg, "除灰渣系统电耗",
+                "底渣与飞灰为燃烧残余固废，其未燃碳已在锅炉碳氧化率中扣除，不重复核算；"
+                "综合利用（水泥/混凝土掺合料）部分属固废资源化，不计排放")
+    return r
+
+
+def calc_gypsum(p, cfg=DEFAULT_FACTORS):
+    """石膏脱水系统：脱硫石膏脱水储存（副产品物流终点），无直接排放。"""
+    r = _tp_aux(p, cfg, "石膏脱水电耗",
+                "石膏为脱硫副产品（二水硫酸钙），成盐过程不产生 CO₂；仅计石膏排出泵与脱水机厂用电")
+    return r
+
+
 RULES = {
     # 原料准备
     "sinter_plant": calc_sinter,
@@ -717,6 +928,27 @@ RULES = {
     # 轧制
     "rolling_mill": calc_roll,
     "cold_rolling": calc_cold,
+    # —— 火电（thermal-power 资源包）——
+    # 燃料与燃烧
+    "coal_handling": calc_coal_handling,     # 输煤制粉系统（物理制备，仅厂用电）
+    "boiler": calc_boiler,                   # 锅炉系统（唯一燃烧排放源：煤×NCV×CC×OF×44/12）
+    # 热功转换与发电
+    "steam_turbine": calc_steam_turbine,     # 汽轮机系统
+    "generator": calc_generator,             # 发电系统（发电量作为产品产量口径）
+    # 汽水循环（冷端与回热）
+    "condenser": calc_condenser,             # 凝汽系统
+    "cooling_tower": calc_cooling_tower,     # 循环冷却水系统
+    "feedwater": calc_feedwater,             # 给水除氧系统
+    # 烟气净化
+    "denitration": calc_denitration,         # 烟气脱硝系统（SCR）
+    "dedust": calc_dedust,                   # 烟气除尘系统
+    "desulfurization": calc_desulfurization, # 烟气脱硫系统（碳酸盐分解过程排放）
+    "stack": calc_stack,                     # 排烟系统（排放汇总展示点）
+    # 固废与副产品物流终点
+    "ash_handling": calc_ash_handling,       # 除灰渣系统（底渣/飞灰 → 综合利用）
+    "gypsum_handling": calc_gypsum,          # 石膏脱水系统（脱硫石膏 → 副产品）
+    # 热电联产
+    "heat_net": calc_heat_net,               # 热网换热系统（对外供热）
 }
 
 

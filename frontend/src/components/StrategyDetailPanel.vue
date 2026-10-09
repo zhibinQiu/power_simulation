@@ -1150,7 +1150,7 @@ textarea.inp { resize: vertical; font-family: inherit; line-height: 1.5; }
 .legend .lg.dot-blue::before { background: var(--accent2); width: 8px; height: 8px; border-radius: 50%; }
 /* 参数优化集中面板：GA / PSO / RL 算法切换 tabs */
 .opt-tabs { display: flex; gap: 6px; margin: 8px 0 2px; }
-.opt-tab { flex: 1; padding: 6px 4px; font-size: 11.5px; border: 1px solid var(--line); border-radius: 4px;
+.opt-tab { flex: 1; padding: 6px 4px; font-size: 12px; border: 1px solid var(--line); border-radius: 4px;
   background: var(--panel-2); color: var(--muted); cursor: pointer; transition: all .12s; }
 .opt-tab.on { border-color: var(--accent-d); color: var(--accent-d); background: var(--accent-l); font-weight: 600; }
 .opt-tab:hover:not(.on) { border-color: var(--accent-d); color: var(--text); }
@@ -1170,7 +1170,7 @@ textarea.inp { resize: vertical; font-family: inherit; line-height: 1.5; }
 .bp-left .muted { font-size: 10px; }
 .bp-right { display: flex; align-items: center; gap: 6px; font-size: 11px; flex: 0 0 auto; }
 .bp-right .init { text-decoration: line-through; opacity: .7; }
-.bp-right .arrow { color: var(--muted); font-size: 9px; }
+.bp-right .arrow { color: var(--muted); font-size: 10px; }
 .bp-right .arrow.up { color: #fbbf24; }
 .bp-right .arrow.down { color: #34d399; }
 .bp-right b { font-size: 12px; color: var(--accent2); font-variant-numeric: tabular-nums; }

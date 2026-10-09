@@ -96,8 +96,8 @@ git clone --depth 1 -b "$BRANCH" "https://github.com/$REPO.git" "$INSTALL_DIR"
 # 前端/文档站产物不入版本库：全新 clone 后 dist 为空，提示先补产物（产物由开发机 rsync）
 if [ ! -d "$INSTALL_DIR/frontend/dist" ] || [ -z "$(ls -A "$INSTALL_DIR/frontend/dist" 2>/dev/null)" ]; then
   log "注意：frontend/dist 为空（产物不入版本库，git clone 不含）。"
-  log "      请在本机（开发机）先执行：bash platform/update.sh bs"
-  log "      （也可：bash platform/update.sh docs 补文档站）再回来访问平台。"
+  log "      请在本机（开发机）先执行：./update.sh bs"
+  log "      （也可：./update.sh docs 补文档站）再回来访问平台。"
   log "      后端可先行启动，/api/health 自检不受影响。"
 fi
 
@@ -126,7 +126,7 @@ if docker ps --format '{{.Names}}' | grep -qx "$NAME"; then
   log "  访问地址：http://${IP:-<服务器IP>}:$PORT"
   log "  文档站  ：http://${IP:-<服务器IP>}:40184"
   log "  日志查看：docker logs -f $NAME"
-  log "  更新     ：开发机推送代码即热生效：bash platform/update.sh bs（服务器不自拉 git）"
+  log "  更新     ：开发机推送代码即热生效：./update.sh bs（服务器不自拉 git）"
   log "  备注：平台如需连接云端 MQTT / cloud-agent，在「总览 → 配置」填写云端地址即可"
 else
   err "平台容器启动失败，请查看：docker compose logs"

@@ -135,7 +135,7 @@
         <section id="cbx-sec-sources" class="cbx-sec cbx-sec-sources">
           <div class="cbx-sec-head">
             <button class="cbx-caret" @click="toggleSec('sources')" :title="secFold.sources ? t('收起') : t('展开')">{{ secFold.sources ? '▾' : '▸' }}</button>
-            <b class="cbx-sec-toggle" @click="toggleSec('sources')">🔌 {{ t('数据源接入') }}</b>
+            <b class="cbx-sec-toggle" @click="toggleSec('sources')">{{ t('数据源接入') }}</b>
             <span class="cbx-sec-spacer"></span>
             <button class="cbx-op primary cbx-xs" @click="openAddForm()">＋ {{ t('注册外部数据源') }}</button>
           </div>
@@ -843,28 +843,6 @@
                   <span class="cbx-sec-sub">{{ t('模型为共享配置：点位变更对引用它的所有设备同时生效，无单独设备名') }}</span>
                 </template>
               </div>
-              <div v-if="editTarget !== 'model'" class="cbx-form-row">
-                <label>{{ t('绑定流程设备') }}</label>
-                <select v-model="editForm.boundDevice" class="cbx-select" style="width:300px" :title="t('从现有系统流程的设备中选择：保存后该设备的云端读数将同步到所选流程设备实例（关联制）')">
-                  <option value="">{{ t('不绑定') }}</option>
-                  <optgroup v-for="grp in procGroups" :key="grp.unit" :label="grp.unit">
-                    <option v-for="d in grp.devices" :key="d.id" :value="d.id">{{ d.label || d.name }}（{{ d.id }}）</option>
-                  </optgroup>
-                </select>
-                <label v-if="editForm.boundDevice" style="margin-left:10px">{{ t('换算系数') }}</label>
-                <input v-if="editForm.boundDevice" v-model.number="editForm.boundFactor" type="number" step="any" class="cbx-input" style="width:90px" :title="t('云端原始读数 × 此系数 = 同步到流程设备的读数（如传感器 kg/min → t/h 填 0.06；无需换算填 1）')"/>
-                <span class="cbx-sec-sub">{{ t('未选择则解除当前绑定') }}</span>
-              </div>
-              <div v-if="editTarget !== 'model'" class="cbx-form-row">
-                <label>{{ t('绑定云端设备') }}</label>
-                <select v-model="editForm.cloudDevice" class="cbx-select" style="width:300px" :title="t('选择盒子已上报、平台已识别的云端真实设备：保存后该设备的实时读数将归入此设备')">
-                  <option value="">{{ t('不绑定（按设备名自动匹配）') }}</option>
-                  <optgroup v-for="g in cloudUnboundGroups" :key="g.label" :label="g.label">
-                    <option v-for="c in g.items" :key="c.name" :value="c.name">{{ c.name }}（{{ stateZh(c.state) }}<template v-if="c.model"> · {{ c.model }}</template>）</option>
-                  </optgroup>
-                </select>
-                <span class="cbx-sec-sub">{{ t('未选择则按设备名自动匹配') }}</span>
-              </div>
               <div class="cbx-form-row">
                 <label>{{ t('命名空间') }}</label><input v-model="editForm.namespace" class="cbx-input" style="width:110px"/>
                 <template v-if="editTarget !== 'model'">
@@ -1204,29 +1182,6 @@
                 <label>{{ t('设备名') }}</label><input v-model="form.deviceName" class="cbx-input" placeholder="box-device"/>
               </div>
               <div class="cbx-form-row">
-                <label>{{ t('绑定流程设备') }}</label>
-                <select v-model="form.boundDevice" class="cbx-select" style="width:300px" :title="t('从现有系统流程的设备中选择：保存后该设备的云端读数将同步到所选流程设备实例（关联制）')">
-                  <option value="">{{ t('不绑定') }}</option>
-                  <optgroup v-for="grp in procGroups" :key="grp.unit" :label="grp.unit">
-                    <option v-for="d in grp.devices" :key="d.id" :value="d.id">{{ d.label || d.name }}（{{ d.id }}）</option>
-                  </optgroup>
-                </select>
-                <label v-if="form.boundDevice" style="margin-left:10px">{{ t('换算系数') }}</label>
-                <input v-if="form.boundDevice" v-model.number="form.boundFactor" type="number" step="any" class="cbx-input" style="width:90px" :title="t('云端原始读数 × 此系数 = 同步到流程设备的读数（如传感器 kg/min → t/h 填 0.06；无需换算填 1）')"/>
-                <span class="cbx-sec-sub">{{ t('保存后云端读数同步到该流程设备') }}</span>
-              </div>
-              <div class="cbx-form-row">
-                <label>{{ t('绑定云端设备') }}</label>
-                <select v-model="form.cloudDevice" class="cbx-select" style="width:300px" :title="t('选择盒子已上报、平台已识别的云端真实设备：保存后该设备的实时读数将归入此设备（云端身份优先于此名匹配）')" @change="onPickCloudDevice">
-                  <option value="">{{ t('不绑定（按设备名自动匹配）') }}</option>
-                  <optgroup v-for="g in cloudUnboundGroups" :key="g.label" :label="g.label">
-                    <option v-for="c in g.items" :key="c.name" :value="c.name">{{ c.name }}（{{ stateZh(c.state) }}<template v-if="c.model"> · {{ c.model }}</template>）</option>
-                  </optgroup>
-                  <option v-if="!cloudUnbound.length" value="" disabled>{{ t('未识别到云端设备（盒子需已接入并上报读数）') }}</option>
-                </select>
-                <span class="cbx-sec-sub">{{ t('选中后自动采用该云端设备名（一键转平台设备）') }}</span>
-              </div>
-              <div class="cbx-form-row">
                 <label>{{ t('命名空间') }}</label><input v-model="form.namespace" class="cbx-input" style="width:90px" placeholder="default"/>
                 <label>{{ t('调度节点') }}</label>
                 <select v-model="form.nodeName" class="cbx-input" :title="t('从识别到的盒子中选择')">
@@ -1490,7 +1445,7 @@
         <div class="cbx-form">
           <div class="cbx-form-row">
             <label>{{ t('名称') }}</label><input v-model="edgeCfg.name" class="cbx-input" style="flex:1" :placeholder="t('盒子显示名称（留空=使用云端节点名）')"/>
-            <label>{{ t('节点名') }}</label><code class="cbx-input" style="flex:0 0 auto;width:auto;padding:4px 8px;font-size:10.5px;color:var(--muted)">{{ edgeCfgBox }}</code>
+            <label>{{ t('节点名') }}</label><code class="cbx-input" style="flex:0 0 auto;width:auto;padding:4px 8px;font-size: 11px;color:var(--muted)">{{ edgeCfgBox }}</code>
           </div>
           <div class="cbx-form-row">
             <label>{{ t('盒子 IP') }}</label><input v-model="edgeCfg.host" class="cbx-input" style="flex:1" :placeholder="t('现场可达地址（内网 IP / 跳板机 / frp）')"/>
@@ -1894,9 +1849,6 @@ const form = reactive({
   namespace: 'default',
   nodeName: 'edge-node',
   collectCycle: 1000,
-  cloudDevice: '',   // 可选：绑定云端识别设备 id（实时匹配优先）
-  boundDevice: '',   // 可选：绑定平台流程设备实例 id（关联制：云端读数同步到该仿真设备）
-  boundFactor: 1,    // 绑定换算系数：云端原始读数 × factor = 流程设备读数（如 kg/min → t/h 填 0.06）
   comm: { commType: 'serial', slaveID: 1, serialPort: '/dev/ttyS0', baudRate: 9600, parity: 'none', tcpIP: '192.168.1.10', tcpPort: 502 },
   opcua: { url: 'opc.tcp://127.0.0.1:4840', userName: '', password: '' },
   bluetooth: { macAddress: 'AA:BB:CC:DD:EE:FF' },
@@ -1911,9 +1863,6 @@ const createOpen = ref(false)
 function openCreate() {
   preview.value = ''
   formErr.value = ''
-  form.boundDevice = ''
-  form.boundFactor = 1
-  form.cloudDevice = ''
   // 一键化：自动生成设备名与同名模型（模型留空即自动创建，无需先建模型）
   form.deviceName = 'box-dev-' + ((devices.value.devices || []).length + 1)
   form.modelName = ''
@@ -1922,7 +1871,6 @@ function openCreate() {
   // 默认选中第一个 Ready 盒子，避免出现「未识别」选项
   const ready = (overview.value.nodes || []).find((n) => n.ready) || (overview.value.nodes || [])[0]
   if (ready) form.nodeName = ready.name
-  loadLinks()
   createOpen.value = true
 }
 async function loadDevices() { try { devices.value = await api.boxDevices() } catch (e) {} }
@@ -1956,43 +1904,12 @@ function renameClash(f) {
   return hit ? hit.name : ''
 }
 
-// ---- 绑定平台流程设备（关联制：云端识别设备 <-> 仿真设备实例，links.json 持久化）----
-// 平台仿真流程设备（store.allDevices：计量设备 + 可调设备），按工序分组供下拉选择
-const procGroups = computed(() => {
-  const g = {}
-  for (const d of store.allDevices) {
-    const k = d.unitName || d.unitType || t('其他')
-    ;(g[k] = g[k] || []).push(d)
-  }
-  return Object.keys(g).map((k) => ({ unit: k, devices: g[k] }))
-})
-const boxLinks = ref([])   // [{ cloud_id, local_id }]
-async function loadLinks() {
-  try { boxLinks.value = (await api.boxLinks()).links || [] } catch (e) { boxLinks.value = [] }
-}
-// 反查：某盒子设备的云端身份（cloudDevice || name）当前绑定的流程设备 id
-function boundLocalOf(d) {
-  const cloudId = (d.cloudDevice || d.name || '').trim()
-  if (!cloudId) return ''
-  const l = boxLinks.value.find((x) => x.cloud_id === cloudId)
-  return l ? l.local_id : ''
-}
-// 反查：某盒子设备当前绑定的读数换算系数（未配置默认 1）
-function boundFactorOf(d) {
-  const cloudId = (d.cloudDevice || d.name || '').trim()
-  if (!cloudId) return 1
-  const l = boxLinks.value.find((x) => x.cloud_id === cloudId)
-  return l && l.factor != null ? l.factor : 1
-}
-// 同步绑定：保存/删除设备时建立或解除云端设备 <-> 流程设备关联
-async function syncBound(cloudId, localId, factor = 1) {
+// ---- 采集设备 <-> 流程设备的绑定统一在「编排模式」下由流程设备选择采集设备完成 ----
+// 这里只在删除采集设备时清理可能残留的云端设备关联，避免留下悬空绑定
+async function unbindCloud(cloudId) {
   cloudId = (cloudId || '').trim()
   if (!cloudId) return
-  try {
-    if (localId) await api.linkMqttDevice(cloudId, localId, factor)
-    else await api.unlinkMqttDevice(cloudId)
-    await loadLinks()
-  } catch (e) {}
+  try { await api.unlinkMqttDevice(cloudId) } catch (e) {}
 }
 
 // ---- 新建模型（DeviceModel）：顶部工具栏「新建模型」入口，保存后可在设备接入/修改时选择 ----
@@ -2059,34 +1976,6 @@ function onPickModel() {
   if (!m) return
   form.protocol = m.protocol || form.protocol
   form.properties.splice(0, form.properties.length, ...(m.properties || []).map((p) => ({ ...p })))
-}
-// ---- 云端已识别设备绑定（一键转平台设备：选云端设备 → 自动采用其设备名，读数同步）----
-// 未绑定其它本地设备的云端 CRD 设备列表（当前编辑设备自身持有的不视为占用）
-const cloudUnbound = computed(() => {
-  const taken = new Set()
-  for (const d of devices.value.devices || []) {
-    const cid = (d.cloudDevice || '').trim()
-    if (!cid) continue
-    if (d.name === editForm.deviceName) continue
-    taken.add(cid)
-  }
-  return (cloudCrd.value.devices || []).filter((c) => c.name && !taken.has(c.name))
-})
-const cloudUnboundGroups = computed(() => {
-  const list = cloudUnbound.value
-  // 在线 = 有实时数据推送（后端 data_online），注册在线(CRD state)不计；离线项 state 归一便于文案展示
-  const norm = (c) => ({ ...c, state: c.data_online ? 'online' : 'offline' })
-  const on = list.filter((c) => c.data_online).map(norm)
-  const off = list.filter((c) => !c.data_online).map(norm)
-  const groups = []
-  if (on.length) groups.push({ label: t('在线'), items: on })
-  if (off.length) groups.push({ label: t('离线'), items: off })
-  return groups
-})
-function onPickCloudDevice() {
-  if (!form.cloudDevice) return
-  // 设备名仍是自动生成占位（box-dev-N）时，直接采用云端设备名 → 一键转为平台设备
-  if (/^box-dev-\d+$/.test(form.deviceName || '')) form.deviceName = form.cloudDevice
 }
 // 修改设备表单：切换模型同样带出协议与属性点位
 function onPickEditModel() {
@@ -2419,11 +2308,9 @@ async function applyDev() {
     const base = { ...form, modelName: form.modelName || form.deviceName }
     const r = await api.boxCreateDevice(devPayload(base, 'apply'))
     preview.value = r.yamls.model + '\n---\n' + r.yamls.device
-    // 绑定流程设备：云端身份（cloudDevice || deviceName）<-> 所选流程设备（含读数换算系数）
-    await syncBound(form.cloudDevice || form.deviceName, form.boundDevice, form.boundFactor != null ? form.boundFactor : 1)
     const cs = r.cloud_sync || {}
     // 保存即自动同步云端（后端已下发）
-    store.showToast(`${t('设备')} ${form.deviceName} ${t('已保存')}` + (cs.ok ? t('，已同步云端') : `，${t('云端同步失败')}：${cs.error || t('未知错误')}（${t('本地已保存')}）`) + (form.boundDevice ? `，${t('已绑定流程设备')} ${form.boundDevice}${form.boundFactor !== 1 ? `（${t('读数')}×${form.boundFactor}）` : ''}` : ''), cs.ok ? 'success' : 'warn')
+    store.showToast(`${t('设备')} ${form.deviceName} ${t('已保存')}` + (cs.ok ? t('，已同步云端') : `，${t('云端同步失败')}：${cs.error || t('未知错误')}（${t('本地已保存')}）`), cs.ok ? 'success' : 'warn')
     await loadDevices()
   } catch (e) { formErr.value = e.message || e }
 }
@@ -2439,7 +2326,7 @@ async function delDevice(d) {
   }))) return
   try {
     const r = await api.boxDeleteDevice('device', name, d.namespace || 'default', true, true)
-    await syncBound((d.cloudDevice || name), null)   // 解除流程设备绑定，避免留悬空绑定
+    await unbindCloud(d.cloudDevice || name)   // 清理该云端身份可能残留的关联，避免留悬空绑定
     const bs = (r.box_sync || {})[d.node || ''] || {}
     const cs = r.cloud || {}
     const ok = r.ok !== false && cs.ok !== false
@@ -2948,15 +2835,6 @@ function roleZh(r) {
   if (!r || r === '—') return '—'
   return t(ROLE_ZH[String(r).toLowerCase()]) || r
 }
-// 状态统一中文：online→在线 / offline→离线 / 未知
-function stateZh(s) {
-  if (s === 'online') return t('在线')
-  if (s === 'offline') return t('离线')
-  if (s === 'Ready' || s === 'ready') return t('就绪')
-  if (s === 'NotReady') return t('未就绪')
-  if (s === 'unknown' || !s) return t('未知')
-  return s
-}
 // 盒子三态中文：true=就绪 / false=未就绪 / null=状态未知（云端数据过期时后端置 null，避免旧缓存冒充实时）
 function readyZh(r) {
   if (r === true) return t('就绪')
@@ -3322,7 +3200,7 @@ const editPreview = ref('')
 const editPreviewMode = ref('')
 const editForm = reactive({
   protocol: 'modbus', modelName: '', deviceName: '', namespace: 'default',
-  nodeName: 'edge-node', collectCycle: 1000, cloudDevice: '', boundDevice: '', boundFactor: 1, origName: '',
+  nodeName: 'edge-node', collectCycle: 1000, cloudDevice: '', origName: '',
   comm: { commType: 'serial', slaveID: 1, serialPort: '/dev/ttyS0', baudRate: 9600, parity: 'none', tcpIP: '192.168.1.10', tcpPort: 502 },
   opcua: { url: 'opc.tcp://127.0.0.1:4840', userName: '', password: '' },
   bluetooth: { macAddress: 'AA:BB:CC:DD:EE:FF' },
@@ -3373,10 +3251,6 @@ async function openEditDev(d) {
   editForm.cellular.apn = cellular.apn || 'cmnet'
   editForm.cellular.iface = cellular.iface || 'wwan0'
   editForm.properties.splice(0, editForm.properties.length, ...(src.properties || []).map((p) => ({ ...p })))
-  // 反查该设备当前绑定的流程设备（关联制）与换算系数：先刷新关联列表再回显，避免用旧值导致绑定选择丢失
-  await loadLinks()
-  editForm.boundDevice = boundLocalOf(src)
-  editForm.boundFactor = boundFactorOf(src)
   editOpen.value = true
 }
 function openEditModel(m) {
@@ -3450,10 +3324,8 @@ async function saveEditDev() {
     const n = (r.synced_devices || []).filter((x) => x !== editForm.deviceName).length
     const renamedFrom = r.renamed_from || ''
     const cs = r.cloud_sync || {}
-    // 绑定流程设备：云端身份（cloudDevice || deviceName）<-> 所选流程设备（含读数换算系数）；未选择则解除原绑定
-    await syncBound(editForm.cloudDevice || editForm.deviceName, editForm.boundDevice, editForm.boundFactor != null ? editForm.boundFactor : 1)
     // 保存即自动同步云端（后端已下发 + 改名联动删除云端旧 CRD）
-    let tip = t('已保存：{name}', { name: editForm.deviceName }) + (n ? t('，模型点位同步 {n} 台设备', { n }) : '') + (editForm.boundDevice ? t('，已绑定流程设备 {dev}{factor}', { dev: editForm.boundDevice, factor: editForm.boundFactor !== 1 ? `（${t('读数')}×${editForm.boundFactor}）` : '' }) : '')
+    let tip = t('已保存：{name}', { name: editForm.deviceName }) + (n ? t('，模型点位同步 {n} 台设备', { n }) : '')
     if (renamedFrom) tip += t('（由「{name}」改名）', { name: renamedFrom })
     if (cs.old_crd_removed === false && cs.old_crd_reason) tip += t('；{reason}', { reason: cs.old_crd_reason })
     tip += cs.ok ? t('；已同步云端') : t('；云端同步失败：{err}（本地已保存）', { err: cs.error || t('未知错误') })
@@ -3495,11 +3367,8 @@ async function applyEditDev() {
     editPreview.value = ''
     const renamedFrom = r.renamed_from || ''
     const cs = r.cloud_sync || {}
-    // 绑定流程设备：云端身份（cloudDevice || deviceName）<-> 所选流程设备（含读数换算系数）；未选择则解除原绑定
-    await syncBound(editForm.cloudDevice || editForm.deviceName, editForm.boundDevice, editForm.boundFactor != null ? editForm.boundFactor : 1)
     // 后端已自动完成：下发新设备 + 改名联动删除云端旧 CRD（云端及时同步）
     let tip = t('已保存并下发：{name}', { name: editForm.deviceName })
-    if (editForm.boundDevice) tip += t('，已绑定流程设备 {dev}{factor}', { dev: editForm.boundDevice, factor: editForm.boundFactor !== 1 ? `（${t('读数')}×${editForm.boundFactor}）` : '' })
     if (renamedFrom) tip += t('（由「{name}」改名，云端旧设备{del}）', { name: renamedFrom, del: cs.old_crd_removed ? t('已删除') : t('未删除') })
     if (cs.old_crd_removed === false && cs.old_crd_reason) tip += t('；{reason}', { reason: cs.old_crd_reason })
     if (!cs.ok) tip += t('；云端同步失败：{err}（本地已保存）', { err: cs.error || t('未知错误') })
@@ -4217,34 +4086,34 @@ onUnmounted(stopCmdPoll)
 /* 树节点 */
 .cbx-tree-sec {
   display: flex; align-items: center; gap: 5px;
-  padding: 5px 10px; font-size: 11.5px; font-weight: 400; color: var(--text);
+  padding: 5px 10px; font-size: 12px; font-weight: 400; color: var(--text);
   cursor: pointer; user-select: none; white-space: nowrap;
 }
 .cbx-tree-sec:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.cbx-tree-arrow { font-size: 9px; color: var(--faint); width: 10px; flex: none; }
+.cbx-tree-arrow { font-size: 10px; color: var(--faint); width: 10px; flex: none; }
 .cbx-tree-count { margin-left: auto; font-size: 10px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .cbx-tree-children { padding-left: 8px; }
 .cbx-tree-node { margin: 0; }
 .cbx-tree-row {
   display: flex; align-items: center; gap: 5px;
-  padding: 4px 10px 4px 16px; font-size: 11.5px; cursor: pointer;
+  padding: 4px 10px 4px 16px; font-size: 12px; cursor: pointer;
   color: var(--text); white-space: nowrap;
 }
 .cbx-tree-row:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .cbx-tree-label { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .cbx-tree-tag {
-  margin-left: auto; flex: none; font-size: 9px; padding: 0;
+  margin-left: auto; flex: none; font-size: 10px; padding: 0;
   color: var(--faint); white-space: nowrap;
 }
 .cbx-tree-tag.ok { color: var(--green); }
 .cbx-tree-leaf {
   display: flex; align-items: center; gap: 5px;
-  padding: 4px 10px 4px 26px; font-size: 11.5px; cursor: pointer;
+  padding: 4px 10px 4px 26px; font-size: 12px; cursor: pointer;
   color: var(--text); white-space: nowrap;
 }
 .cbx-tree-leaf:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .cbx-tree-leaf .cbx-tree-label { flex: 1; }
-.cbx-tree-empty { padding: 6px 26px; font-size: 10.5px; color: var(--faint); }
+.cbx-tree-empty { padding: 6px 26px; font-size: 11px; color: var(--faint); }
 /* 区块头部工具按钮（flex 撑开） */
 .cbx-sec-spacer { flex: 1 1 auto; }
 
@@ -4259,7 +4128,7 @@ onUnmounted(stopCmdPoll)
 }
 .cbx-tab {
   display: flex; align-items: center; flex: none;
-  padding: 0 14px; font-size: 11.5px; color: var(--muted);
+  padding: 0 14px; font-size: 12px; color: var(--muted);
   cursor: pointer; user-select: none; white-space: nowrap;
   border-top: 1px solid transparent;
   position: relative;
@@ -4268,13 +4137,14 @@ onUnmounted(stopCmdPoll)
 .cbx-tab:hover { color: var(--text); }
 .cbx-tab.active {
   background: var(--panel-2); color: var(--text);
-  border-top: 2px solid var(--accent);
 }
 .cbx-tab-grow { flex: 1 1 auto; }
 .cbx-editor { flex: 1 1 auto; overflow: hidden; position: relative; }
 .cbx-page {
   position: absolute; inset: 0; overflow: auto;
-  padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;
+  /* 四边统一留白：外层区块卡片（运行状态总览 / 数据源接入 / 系统连接图…）
+     与父容器编辑区保持明显边距，避免顶到左右上下边界 */
+  padding: 18px 24px; display: flex; flex-direction: column; gap: 10px;
 }
 
 /* ---- 资源列表（拓扑图下方：盒子 / 模型 / 设备三列并排） ---- */
@@ -4286,20 +4156,20 @@ onUnmounted(stopCmdPoll)
 .cbx-ref-ic.spin { animation: cbx-ref-spin .8s linear infinite; }
 .cbx-reslist { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .cbx-rescol { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--panel); }
-.cbx-rescol-head { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--text); padding: 8px 10px; background: var(--bar, var(--panel-3)); border-bottom: 1px solid var(--border); }
-.cbx-rescol-n { margin-left: auto; font-size: 10.5px; font-weight: 400; color: var(--faint); }
+.cbx-rescol-head { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text); padding: 8px 10px; background: var(--bar, var(--panel-3)); border-bottom: 1px solid var(--border); }
+.cbx-rescol-n { margin-left: auto; font-size: 11px; font-weight: 400; color: var(--faint); }
 .cbx-rescol-body { display: flex; flex-direction: column; max-height: 248px; overflow-y: auto; }
 .cbx-resrow { display: flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
 .cbx-resrow:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .cbx-resrow + .cbx-resrow { border-top: 1px dashed var(--border); }
-.cbx-res-name { flex: 0 1 auto; font-size: 12.5px; font-weight: 400; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cbx-res-name { flex: 0 1 auto; font-size: 12px; font-weight: 400; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cbx-res-tag { flex: none; font-size: 10px; padding: 0; color: var(--faint); }
 .cbx-res-tag.ok { color: var(--green); }
 .cbx-res-tag.err { color: var(--red); }
 .cbx-res-tag.local { color: var(--accent-d); }
-.cbx-res-sub { flex: 1 1 auto; min-width: 0; font-size: 10.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+.cbx-res-sub { flex: 1 1 auto; min-width: 0; font-size: 11px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
 .cbx-res-ops { display: inline-flex; gap: 2px; flex: none; }
-.cbx-res-ops .cbx-op.cbx-tiny { padding: 1px 5px; font-size: 9px; min-height: 16px; }
+.cbx-res-ops .cbx-op.cbx-tiny { padding: 1px 5px; font-size: 10px; min-height: 16px; }
 .cbx-res-empty { padding: 14px 10px; font-size: 11px; color: var(--faint); text-align: center; }
 
 /* 状态栏（Status Bar）：底部细条，左侧状态 + 右侧信息 */
@@ -4308,7 +4178,7 @@ onUnmounted(stopCmdPoll)
   height: 24px; padding: 0 10px;
   background: var(--bar, var(--panel-3));
   border-top: 1px solid var(--border);
-  font-size: 10.5px; color: var(--muted);
+  font-size: 11px; color: var(--muted);
 }
 .cbx-statusbar .cbx-st-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .cbx-statusbar .cbx-st-grow { flex: 1 1 auto; }
@@ -4318,7 +4188,7 @@ onUnmounted(stopCmdPoll)
   background: var(--bar, var(--panel)); border: 1px solid var(--border); border-radius: 3px;
   flex-wrap: wrap; font-size: 11px;
 }
-.cbx-toolbar-title { font-size: 12.5px; font-weight: 400; letter-spacing: .2px; padding-right: 4px; }
+.cbx-toolbar-title { font-size: 12px; font-weight: 400; letter-spacing: .2px; padding-right: 4px; }
 .cbx-toolbar-sep { width: 1px; height: 16px; background: var(--border); margin: 0 2px; }
 .cbx-toolbar-msg { margin-left: auto; font-size: 10px; color: var(--muted); }
 /* ---- 面板（VSCode 风格：方角 + 标题分隔线 + 统一标题字号） ---- */
@@ -4343,11 +4213,11 @@ onUnmounted(stopCmdPoll)
 .cbx-side-head b, .cbx-guide-title b { font-weight: 500; }
 .cbx-deploy-bar {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 10px; margin-bottom: 8px;
-  background: var(--panel-2); border: 1px dashed var(--border); border-radius: 3px; font-size: 11px;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 3px; font-size: 11px;
   position: relative; /* 作为 YAML 预览浮层的定位锚点 */
 }
-.cbx-deploy-title { font-size: 12.5px; font-weight: 400; color: var(--muted); flex: none; }
-.cbx-deploy-msg { color: var(--green); font-size: 10.5px; max-width: 340px; word-break: break-all; }
+.cbx-deploy-title { font-size: 12px; font-weight: 400; color: var(--muted); flex: none; }
+.cbx-deploy-msg { color: var(--green); font-size: 11px; max-width: 340px; word-break: break-all; }
 /* ---- 输入控件（VSCode 输入框：圆角 2px + 聚焦蓝环） ---- */
 .cbx-input {
   border: 1px solid var(--border); border-radius: 2px; background: var(--panel-2);
@@ -4394,7 +4264,7 @@ onUnmounted(stopCmdPoll)
 }
 .cbx-yaml-head {
   display: flex; align-items: center; justify-content: space-between; padding: 6px 10px;
-  background: var(--panel-3, var(--panel-2)); font-size: 11.5px; border-bottom: 1px solid var(--border);
+  background: var(--panel-3, var(--panel-2)); font-size: 12px; border-bottom: 1px solid var(--border);
 }
 .cbx-yaml-tools { display: flex; gap: 6px; }
 .cbx-yaml {
@@ -4404,7 +4274,7 @@ onUnmounted(stopCmdPoll)
 }
 /* ---- 标签（VSCode badge 风格，语义色跟随主题） ---- */
 .cbx-tag {
-  font-size: 9.5px; color: var(--muted);
+  font-size: 10px; color: var(--muted);
   border: 1px solid var(--border); border-radius: 2px; padding: 1px 7px; letter-spacing: .2px;
 }
 .cbx-tag.ok { color: var(--green); border-color: color-mix(in srgb, var(--green) 45%, var(--border)); }
@@ -4436,7 +4306,7 @@ onUnmounted(stopCmdPoll)
   vertical-align: middle; font-variant-numeric: tabular-nums;
 }
 .cbx-table th {
-  color: var(--muted); font-weight: 400; font-size: 10.5px; white-space: nowrap;
+  color: var(--muted); font-weight: 400; font-size: 11px; white-space: nowrap;
   background: var(--panel-3, var(--panel-2)); letter-spacing: .3px;
 }
 .cbx-table tbody tr { transition: background .1s; }
@@ -4472,7 +4342,7 @@ onUnmounted(stopCmdPoll)
 .cbx-hero-verdict.tone-err .cbx-hero-ic { background: color-mix(in srgb, var(--red) 13%, transparent); color: var(--red); }
 .cbx-hero-verdict.tone-mute .cbx-hero-ic { background: color-mix(in srgb, var(--faint) 10%, transparent); color: var(--faint); }
 .cbx-hero-tt { min-width: 0; }
-.cbx-hero-tt b { font-size: 15px; color: var(--text); letter-spacing: .2px; }
+.cbx-hero-tt b { font-size: var(--fs-xl); color: var(--text); letter-spacing: .2px; }
 .cbx-hero-tt p { margin: 3px 0 0; font-size: 11px; color: var(--muted); line-height: 1.6; }
 .cbx-guide-btn { flex: none; }
 .cbx-hero-stats { display: flex; gap: 8px; flex: none; }
@@ -4489,14 +4359,14 @@ onUnmounted(stopCmdPoll)
 .cbx-hero-stat.tone-warn b { color: var(--yellow); }
 .cbx-hero-stat.tone-err b { color: var(--red); }
 .cbx-hero-stat.tone-mute b { color: var(--faint); }
-.cbx-guide { margin-top: 10px; padding: 10px 12px; background: var(--panel-2); border: 1px dashed var(--accent); border-radius: 8px; }
+.cbx-guide { margin-top: 10px; padding: 10px 12px; background: var(--panel-2); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: 8px; }
 .cbx-guide-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--accent-d); margin-bottom: 6px; }
-.cbx-guide-sub { font-size: 10.5px; font-weight: 400; color: var(--muted); }
+.cbx-guide-sub { font-size: 11px; font-weight: 400; color: var(--muted); }
 .cbx-guide-steps { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; }
-.cbx-guide-steps li { font-size: 11.5px; color: var(--text); line-height: 1.7; }
+.cbx-guide-steps li { font-size: 12px; color: var(--text); line-height: 1.7; }
 .cbx-empty {
   font-size: 11px; color: var(--faint); background: var(--panel-2);
-  border: 1px dashed var(--border); border-radius: 4px; padding: 16px; line-height: 1.7; text-align: center;
+  border: 1px solid var(--border); border-radius: 4px; padding: 16px; line-height: 1.7; text-align: center;
 }
 /* ---- 本地/云端配置：等高 + 分页（每页 5 条）+ 数据行固定等高 + 分页贴底 ----
      条目不足 5 条时不撑满高度，按实际条数高度显示 */
@@ -4508,16 +4378,16 @@ onUnmounted(stopCmdPoll)
 .cbx-dev-grid .cbx-table th, .cbx-dev-grid .cbx-table td { padding: 0 10px; height: 28px; overflow: hidden; }
 .cbx-dev-grid .cbx-table .cbx-empty-td { height: auto; overflow: visible; }
 .cbx-pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding-top: 8px; margin-top: auto; border-top: 1px dashed var(--border); flex: none; }
-.cbx-pager .cbx-page-num { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cbx-pager .cbx-page-num { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .cbx-pager .cbx-op:disabled { opacity: .35; cursor: not-allowed; }
 /* ---- 关联管理 ---- */
-.cbx-note { font-size: 10.5px; color: var(--muted); line-height: 1.7; margin-bottom: 8px; }
+.cbx-note { font-size: 11px; color: var(--muted); line-height: 1.7; margin-bottom: 8px; }
 .cbx-note b { color: var(--text); }
 .cbx-group { margin-bottom: 10px; }
 .cbx-group:last-child { margin-bottom: 0; }
 .cbx-group-head {
   display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
-  font-size: 11.5px; color: var(--accent2); font-weight: 400; letter-spacing: .2px;
+  font-size: 12px; color: var(--accent2); font-weight: 400; letter-spacing: .2px;
 }
 .cbx-group-box { background: var(--accent-l); border-radius: 4px; padding: 1px 8px; }
 .cbx-group-count { font-size: 10px; color: var(--faint); font-weight: 400; }
@@ -4529,10 +4399,10 @@ onUnmounted(stopCmdPoll)
 .cbx-row:hover { border-color: var(--muted); }
 .cbx-row.linked { border-color: color-mix(in srgb, var(--green) 45%, transparent); background: color-mix(in srgb, var(--green) 8%, transparent); }
 .cbx-dev { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; flex-wrap: wrap; }
-.cbx-dev-id { font-size: 12.5px; font-weight: 400; color: var(--text); }
+.cbx-dev-id { font-size: 12px; font-weight: 400; color: var(--text); }
 .cbx-dev-val { color: var(--accent-d); font-weight: 400; font-variant-numeric: tabular-nums; }
-.cbx-dev-fields { font-size: 9.5px; color: var(--muted); background: var(--panel); border: 1px solid var(--border); border-radius: 3px; padding: 0 6px; }
-.cbx-dev-seen { font-size: 9.5px; color: var(--faint); }
+.cbx-dev-fields { font-size: 10px; color: var(--muted); background: var(--panel); border: 1px solid var(--border); border-radius: 3px; padding: 0 6px; }
+.cbx-dev-seen { font-size: 10px; color: var(--faint); }
 .cbx-arrow { color: var(--faint); }
 .cbx-local { color: var(--accent-d); font-weight: 400; }
 /* ---- 表单 ---- */
@@ -4540,16 +4410,16 @@ onUnmounted(stopCmdPoll)
 .cbx-form-row { display: flex; align-items: center; gap: 8px; font-size: 11px; flex-wrap: wrap; }
 .cbx-form-row label { color: var(--muted); flex: none; }
 .cbx-form-sep {
-  margin: 4px 0 2px; padding: 4px 8px; font-size: 10.5px; color: var(--accent-d);
+  margin: 4px 0 2px; padding: 4px 8px; font-size: 11px; color: var(--accent-d);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   border-left: 2px solid var(--accent); border-radius: 2px;
 }
 .cbx-form-hint { font-size: 10px; color: var(--faint); line-height: 1.5; margin: 2px 0 6px; }
 .cbx-agent-bar {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 10.5px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 11px;
   margin: 2px 0 6px; padding: 5px 8px; border-radius: 3px;
   background: color-mix(in srgb, var(--red, #e5484d) 8%, transparent);
-  border: 1px dashed color-mix(in srgb, var(--red, #e5484d) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--red, #e5484d) 35%, transparent);
 }
 .cbx-agent-bar.ok {
   background: color-mix(in srgb, var(--ok, #30a46c) 8%, transparent);
@@ -4564,24 +4434,26 @@ onUnmounted(stopCmdPoll)
   display: inline-flex; align-items: center; justify-content: center; gap: 4px;
   font-family: var(--ui, -apple-system, "Segoe UI", "PingFang SC", sans-serif);
   font-size: 11px; line-height: 1; font-weight: 400;
-  color: var(--text); background: var(--panel-3); border: 1px solid transparent; border-radius: 2px;
-  padding: 5px 12px; min-height: 24px; cursor: pointer; flex: 0 0 auto;
+  color: var(--text); background: var(--btn-bg); border: 1px solid transparent; border-radius: 2px;
+  padding: 0 var(--btn-pad-x); min-height: var(--btn-h); cursor: pointer; flex: 0 0 auto; width: fit-content;
   white-space: nowrap; user-select: none;
   transition: background .12s, border-color .12s, color .12s, box-shadow .12s;
 }
-.cbx-op:hover:not(:disabled) { background: color-mix(in srgb, var(--panel-3) 76%, var(--text)); color: var(--text); }
+.cbx-op:hover:not(:disabled) { background: var(--btn-bg-hover); color: var(--text); }
 .cbx-op:active:not(:disabled) { background: var(--sel); }
 .cbx-op:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
 .cbx-op:disabled { opacity: .4; cursor: not-allowed; }
 .cbx-op.primary { color: var(--on-accent); background: var(--accent); border-color: transparent; font-weight: 600; }
 .cbx-op.primary:hover:not(:disabled) { background: var(--accent-h); color: var(--on-accent); }
-.cbx-op.danger { color: var(--red); background: transparent; border-color: transparent; }
+.cbx-op.danger { color: var(--red); background: var(--btn-bg); border-color: transparent; }
 .cbx-op.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); }
-.cbx-op.cbx-xs { padding: 3px 8px; font-size: 10px; min-height: 20px; }
+.cbx-op.cbx-xs { padding: 0 var(--btn-pad-x-sm); font-size: 10px; min-height: var(--btn-h-sm); }
+/* 弹窗操作行：同一组按钮统一弹窗档（28px 高 / 左右 12px / 最小宽 76px），高宽对齐 */
+.cbx-mask .cbx-form-row .cbx-op { min-height: var(--btn-h-lg); padding: 0 var(--btn-pad-x-lg); min-width: var(--btn-min-w); }
 /* 图标按钮（VSCode 工具栏风格：无边框、hover 底色、线性图标居中） */
 .cbx-op.cbx-ic {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 24px; height: 22px; padding: 0; flex: none;
+  width: var(--btn-h); height: var(--btn-h); padding: 0; flex: none;
   color: var(--text);
   background: transparent; border: none; border-radius: 3px;
 }
@@ -4641,15 +4513,15 @@ onUnmounted(stopCmdPoll)
 /* ---- 接入指引 ---- */
 .cbx-guide-flow { display: flex; align-items: stretch; gap: 10px; margin: 8px 0; flex-wrap: wrap; }
 .cbx-flow-node {
-  flex: 1 1 0; min-width: 130px; text-align: center; font-size: 12.5px; font-weight: 400;
+  flex: 1 1 0; min-width: 130px; text-align: center; font-size: 12px; font-weight: 400;
   background: var(--accent-l); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
   border-radius: 4px; padding: 10px 8px;
 }
-.cbx-flow-node span { display: block; font-size: 9.5px; color: var(--muted); font-weight: 400; margin-top: 4px; }
+.cbx-flow-node span { display: block; font-size: 10px; color: var(--muted); font-weight: 400; margin-top: 4px; }
 .cbx-flow-arrow { display: flex; align-items: center; color: var(--faint); font-size: 16px; }
 /* ---- 徽章 / 标签（语义色跟随主题） ---- */
 .cbx-badge {
-  display: inline-block; font-size: 9.5px; border-radius: 3px; padding: 1px 6px;
+  display: inline-block; font-size: 10px; border-radius: 3px; padding: 1px 6px;
   font-weight: 400; letter-spacing: .2px; vertical-align: 1px;
 }
 .cbx-badge.model { color: var(--yellow); background: color-mix(in srgb, var(--yellow) 12%, transparent); }
@@ -4663,12 +4535,12 @@ onUnmounted(stopCmdPoll)
 .cbx-twin-chip.cbx-invalid { color: var(--red); background: color-mix(in srgb, var(--red) 10%, transparent); }
 /* 云端配置设备条：内联实时读数 */
 .cbx-rt-tag {
-  display: inline-block; font-size: 9px; font-weight: 400; color: var(--green);
+  display: inline-block; font-size: 10px; font-weight: 400; color: var(--green);
   background: color-mix(in srgb, var(--green) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--green) 35%, transparent);
   border-radius: 2px; padding: 0 4px; margin: 1px 4px 1px 0; vertical-align: 1px;
 }
-.cbx-rt-ago { font-size: 9.5px; color: var(--muted); margin-left: 2px; }
+.cbx-rt-ago { font-size: 10px; color: var(--muted); margin-left: 2px; }
 /* ---- Broker 配置弹窗（VSCode 对话框） ---- */
 .cbx-mask {
   position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,.5);
@@ -4685,12 +4557,12 @@ onUnmounted(stopCmdPoll)
   display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
   padding-bottom: 10px; border-bottom: 1px solid var(--border);
 }
-.cbx-dialog-head b { font-size: 13.5px; font-weight: 500; letter-spacing: .2px; }  /* L2 弹窗标题 */
+.cbx-dialog-head b { font-size: 13px; font-weight: 500; letter-spacing: .2px; }  /* L2 弹窗标题 */
 .cbx-dialog-head .cbx-op { margin-left: auto; }
 .cbx-dialog-head .x-btn.lg { margin-left: auto; }
 /* ---- 系统连接图（以设备为单位：每台设备一张卡，卡内为运行在本设备上的服务）---- */
 .cbx-topo { position: relative; }
-.cbx-topo-lanes { display: flex; align-items: flex-start; gap: 26px; flex-wrap: wrap; justify-content: space-between; }
+.cbx-topo-lanes { display: flex; align-items: flex-start; gap: 26px; flex-wrap: wrap; justify-content: space-between; padding: 0 8px; }
 .cbx-topo-lane { display: flex; flex-direction: column; gap: 14px; flex: 0 1 158px; min-width: 0; }
 .cbx-topo-lane.host-lane { flex: 0 1 186px; }
 .cbx-topo-lane.cloud-lane { flex: 0 1 224px; }
@@ -4713,8 +4585,8 @@ onUnmounted(stopCmdPoll)
 .cbx-topo-mod.dragging { cursor: grabbing; box-shadow: 0 10px 30px rgba(15,23,42,.32); }
 .cbx-topo-mod-ph { visibility: hidden; }
 .cbx-topo-canvas { min-height: 700px; }
-.cbx-topo-legend { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 6px 10px; margin-bottom: 10px; border: 1px dashed var(--line, #2b3652); border-radius: 8px; background: rgba(255,255,255,.015); }
-.cbx-topo-legend .leg { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #8a94a6; line-height: 1.7; }
+.cbx-topo-legend { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 6px 10px; margin-bottom: 10px; border: 1px solid var(--line, #2b3652); border-radius: 8px; background: rgba(255,255,255,.015); }
+.cbx-topo-legend .leg { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #8a94a6; line-height: 1.7; }
 .cbx-topo-legend i.lg { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .cbx-topo-legend i.g { background: var(--green); }
 .cbx-topo-legend i.b { background: var(--accent); }
@@ -4737,31 +4609,31 @@ onUnmounted(stopCmdPoll)
   font-weight: 400; font-size: 12px; color: var(--text);
   flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.cbx-topo-mod-badge { flex: none; font-size: 9px; font-weight: 400; padding: 1px 6px; border-radius: 2px; color: var(--muted); border: 1px solid var(--border); letter-spacing: .2px; }
+.cbx-topo-mod-badge { flex: none; font-size: 10px; font-weight: 400; padding: 1px 6px; border-radius: 2px; color: var(--muted); border: 1px solid var(--border); letter-spacing: .2px; }
 .cbx-topo-mod-badge.ok { color: var(--green); border-color: color-mix(in srgb, var(--green) 45%, var(--border)); }
 .cbx-topo-mod-sub { font-size: 10px; color: var(--muted); margin-top: 4px; line-height: 1.55; }
 .cbx-topo-mod-ops { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
-.cbx-topo-mod-ops .cbx-op.cbx-xs { padding: 2px 7px; font-size: 9.5px; min-height: 18px; }
+.cbx-topo-mod-ops .cbx-op.cbx-xs { padding: 2px 7px; font-size: 10px; min-height: 18px; }
 /* 盒子卡片：当前运行的服务/模型（云端部署，盒子周期上报） */
 .cbx-topo-svcs { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; max-height: 88px; overflow: auto; }
-.cbx-topo-svc { display: flex; align-items: center; gap: 5px; font-size: 9.5px; background: rgba(0,0,0,.25); border-radius: 3px; padding: 2px 6px; }
+.cbx-topo-svc { display: flex; align-items: center; gap: 5px; font-size: 10px; background: rgba(0,0,0,.25); border-radius: 3px; padding: 2px 6px; }
 .cbx-topo-svc-dot { flex: none; width: 6px; height: 6px; border-radius: 1px; background: var(--faint); }
 .cbx-topo-svc-dot.on { background: var(--green); }
 .cbx-topo-svc-name { color: var(--text); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 服务连接地址（host:port / 串口 / 端点 URL）：等宽字体，过长省略，完整值见 title */
-.cbx-topo-svc-addr { flex: 1 1 auto; min-width: 0; color: var(--faint); font-size: 8.5px; opacity: .9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cbx-topo-svc-type { color: var(--faint); font-size: 8.5px; margin-left: auto; flex: none; }
-.cbx-topo-svc-empty { font-size: 9.5px; color: var(--faint); padding: 2px 0; }
+.cbx-topo-svc-addr { flex: 1 1 auto; min-width: 0; color: var(--faint); font-size: 10px; opacity: .9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cbx-topo-svc-type { color: var(--faint); font-size: 10px; margin-left: auto; flex: none; }
+.cbx-topo-svc-empty { font-size: 10px; color: var(--faint); padding: 2px 0; }
 /* 服务地址可跳转的情况（HTTP 类）：渲染为链接，hover 下划线提示可点 */
 a.cbx-topo-svc-addr { color: var(--accent2); opacity: .95; text-decoration: none; cursor: pointer; }
 a.cbx-topo-svc-addr:hover { text-decoration: underline; opacity: 1; }
 /* 服务行微操作（重启 Broker/CloudCore/agent/box-mapper 等） */
 .cbx-topo-svc-ops { display: inline-flex; gap: 2px; flex: none; margin-left: 4px; }
-.cbx-topo-svc-ops .cbx-op.cbx-tiny { padding: 0 4px; font-size: 9px; min-height: 15px; line-height: 15px; }
+.cbx-topo-svc-ops .cbx-op.cbx-tiny { padding: 0 4px; font-size: 10px; min-height: 15px; line-height: 15px; }
 /* 设备内部通信说明（本机进程间通信，不占系统级连线） */
 .cbx-topo-inner {
   margin-top: 6px; padding-top: 5px; border-top: 1px dashed var(--border);
-  font-size: 8.5px; color: var(--faint); line-height: 1.5;
+  font-size: 10px; color: var(--faint); line-height: 1.5;
 }
 /* 设备卡（系统连接图的基本单元）：头部为设备标识，卡内列表为运行在该设备上的服务 */
 .cbx-topo-mod.device { padding: 8px 9px; }
@@ -4774,10 +4646,10 @@ a.cbx-topo-svc-addr:hover { text-decoration: underline; opacity: 1; }
 }
 .cbx-topo-dev-meta { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 .cbx-topo-dev-title {
-  font-size: 12.5px; font-weight: 400; color: var(--text); letter-spacing: .2px;
+  font-size: 12px; font-weight: 400; color: var(--text); letter-spacing: .2px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.cbx-topo-dev-addr { font-size: 9px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cbx-topo-dev-addr { font-size: 10px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cbx-topo-mod.device .cbx-topo-svcs { max-height: 138px; gap: 3px; }
 .cbx-topo-mod.device .cbx-topo-devlist { margin-left: 0; padding-left: 6px; margin-top: 6px; }
 .cbx-topo-svc.off .cbx-topo-svc-name { color: var(--muted); }
@@ -4801,7 +4673,7 @@ a.cbx-topo-svc-addr:hover { text-decoration: underline; opacity: 1; }
   padding: 7px 12px; font-size: 11px;
   border: 1px solid var(--border); border-radius: 3px; background: var(--panel-2);
 }
-.cbx-certrow code { color: var(--accent2); font-size: 10.5px; font-weight: 400; flex: none; }
+.cbx-certrow code { color: var(--accent2); font-size: 11px; font-weight: 400; flex: none; }
 .cbx-cert-exp { color: var(--muted); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cbx-cert-days { flex: none; color: var(--green); font-weight: 400; font-variant-numeric: tabular-nums; }
 .cbx-cert-days.warn { color: var(--red); }
@@ -4809,41 +4681,41 @@ a.cbx-topo-svc-addr:hover { text-decoration: underline; opacity: 1; }
 .cbx-topo-devlist { border-left: 2px solid var(--border); margin-left: 12px; padding-left: 10px; display: flex; flex-direction: column; gap: 4px; }
 .cbx-topo-unmounted { border-left-color: color-mix(in srgb, var(--yellow) 50%, transparent); }
 .cbx-topo-devgroup { display: flex; flex-direction: column; gap: 3px; }
-.cbx-topo-devlabel { font-size: 9px; color: var(--faint); margin-top: 3px; }
-.cbx-topo-dev { display: flex; align-items: center; gap: 6px; font-size: 10.5px; cursor: pointer; padding: 2px 3px; border-radius: 2px; transition: background .12s; flex-wrap: wrap; row-gap: 3px; }
+.cbx-topo-devlabel { font-size: 10px; color: var(--faint); margin-top: 3px; }
+.cbx-topo-dev { display: flex; align-items: center; gap: 6px; font-size: 11px; cursor: pointer; padding: 2px 3px; border-radius: 2px; transition: background .12s; flex-wrap: wrap; row-gap: 3px; }
 .cbx-topo-dev:hover { background: var(--accent-l); }
 .cbx-topo-dev.cloud .cbx-topo-dev-dot { background: var(--accent); }
 .cbx-topo-dev.cloud.on .cbx-topo-dev-dot { background: var(--green); }
-.cbx-topo-dev.pending { border: 1px dashed color-mix(in srgb, var(--red) 45%, transparent); padding: 1px 4px; border-radius: 3px; }
+.cbx-topo-dev.pending { border: 1px solid color-mix(in srgb, var(--red) 45%, transparent); padding: 1px 4px; border-radius: 3px; }
 .cbx-topo-dev.pending .cbx-topo-dev-name { color: var(--orange, var(--yellow)); }
 .cbx-topo-dev-dot { width: 6px; height: 6px; border-radius: 1px; background: var(--faint); flex: none; }
 .cbx-topo-dev.on .cbx-topo-dev-dot { background: var(--green); }
 .cbx-topo-dev-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 设备接入地址：Modbus 串口/TCP、OPC UA 端点、LoRa EUI+从站号、外部源 Broker —— 过长省略，完整值见 title */
-.cbx-topo-dev-addr { flex: 1 1 auto; min-width: 0; font-size: 9px; color: var(--faint); opacity: .9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cbx-topo-dev-addr { flex: 1 1 auto; min-width: 0; font-size: 10px; color: var(--faint); opacity: .9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cbx-topo-dev-empty { font-size: 10px; color: var(--faint); padding: 2px 0; }
-.cbx-topo-empty { font-size: 10.5px; color: var(--faint); border: 1px dashed var(--border); border-radius: 4px; padding: 10px; }
+.cbx-topo-empty { font-size: 11px; color: var(--faint); border: 1px solid var(--border); border-radius: 4px; padding: 10px; }
 /* ---- 实时数据折线图弹窗 ---- */
 .cbx-rt { display: flex; flex-direction: column; gap: 10px; }
 .cbx-rt-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
 .cbx-rt-tab {
   display: flex; align-items: center; gap: 6px;
   padding: 5px 10px; border: 1px solid var(--border); border-radius: 3px;
-  background: var(--panel-2); cursor: pointer; font-size: 10.5px; color: var(--text);
+  background: var(--panel-2); cursor: pointer; font-size: 11px; color: var(--text);
   transition: border-color .15s, background .12s;
 }
 .cbx-rt-tab:hover { border-color: var(--muted); background: var(--panel-3, var(--panel)); }
-.cbx-rt-tab code { color: var(--accent2); font-size: 10.5px; }
+.cbx-rt-tab code { color: var(--accent2); font-size: 11px; }
 .cbx-rt-tab.active { border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent); }
 .cbx-rt-tab .cbx-rt-cur { font-weight: 400; color: var(--accent-d); font-variant-numeric: tabular-nums; }
-.cbx-rt-tab .cbx-rt-unit { color: var(--faint); font-size: 9.5px; }
+.cbx-rt-tab .cbx-rt-unit { color: var(--faint); font-size: 10px; }
 .cbx-rt-chart {
   position: relative; border: 1px solid var(--border); border-radius: 4px;
   background: var(--panel-2); padding: 6px 8px 0;
 }
 .cbx-rt-svg { width: 100%; height: auto; display: block; }
 .cbx-grid { stroke: var(--border); stroke-width: 1; }
-.cbx-axis { fill: var(--muted); font-size: 9.5px; }
+.cbx-axis { fill: var(--muted); font-size: 10px; }
 .cbx-rt-line { stroke: var(--accent); stroke-width: 1.8; fill: none; stroke-linejoin: round; stroke-linecap: round; }
 .cbx-rt-area { fill: var(--accent); opacity: .12; }
 .cbx-hv-line { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
@@ -4891,7 +4763,7 @@ a.cbx-topo-svc-addr:hover { text-decoration: underline; opacity: 1; }
 .ds-card.off { opacity: .72; }
 .ds-card.mwdown { border-color: color-mix(in srgb, var(--red) 45%, var(--border)); }
 .ds-card-hd { display: flex; align-items: center; gap: 6px; }
-.ds-card-hd b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-card-hd b { font-size: var(--fs-xl); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ds-tag { font-size: 11px; padding: 1px 7px; border-radius: 9px; color: var(--muted);
   background: color-mix(in srgb, var(--muted) 13%, transparent); white-space: nowrap; }
 .ds-tag.builtin { color: var(--green); background: color-mix(in srgb, var(--green) 13%, transparent); }
@@ -4912,7 +4784,7 @@ a.cbx-topo-svc-addr:hover { text-decoration: underline; opacity: 1; }
 .ds-ep.off { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, var(--border)); }
 .ds-ops { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
 .cbx-op.danger { color: var(--red); border-color: transparent; }
-.ds-card.ds-empty { align-items: center; text-align: center; cursor: pointer; padding: 22px 18px; border-style: dashed; }
+.ds-card.ds-empty { align-items: center; text-align: center; cursor: pointer; padding: 22px 18px; border-style: solid; background: var(--panel-2); }
 .ds-card.ds-empty:hover { border-color: var(--accent); }
 .ds-empty-ic { font-size: 30px; opacity: .5; }
 .ds-card.ds-empty b { font-size: 14px; font-weight: 400; }

@@ -82,6 +82,7 @@ class UnitResult(BaseModel):
     carbon_to_co2: float = 0.0       # tC/h 以 CO2 排出
     carbon_to_steel: float = 0.0     # tC/h 固结于钢
     carbon_to_slag: float = 0.0      # tC/h 进入高炉渣
+    carbon_to_product: float = 0.0   # tC/h 随产品/固废离开系统（火电：未燃尽碳随灰渣排出，不氧化为 CO₂）
     carbon_captured: float = 0.0     # tC/h 被捕集
     heat: float = 0.0                # 0~1，用于热力图着色
     # —— 能耗（节能减碳主题：先能后碳）——

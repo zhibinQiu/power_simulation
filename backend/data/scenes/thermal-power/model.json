@@ -1,0 +1,34 @@
+{
+  "units": [
+    { "id": "ch1", "type": "coal_handling", "name": "输煤与制粉", "x": -40.0, "z": -10.0, "rot": 0.0, "enabled": true, "params": { "power": 3.2 }, "techs": [], "spec": "" },
+    { "id": "bo1", "type": "boiler", "name": "锅炉", "x": -26.0, "z": -10.0, "rot": 0.0, "enabled": true, "params": { "coal_rate": 255, "power": 12 }, "techs": [], "spec": "tp_660" },
+    { "id": "st1", "type": "steam_turbine", "name": "汽轮机", "x": -12.0, "z": -10.0, "rot": 0.0, "enabled": true, "params": { "steam_rate": 1900, "power": 0.3 }, "techs": [], "spec": "" },
+    { "id": "gn1", "type": "generator", "name": "发电机", "x": 0.0, "z": -10.0, "rot": 0.0, "enabled": true, "params": { "output": 660, "power": 0.2 }, "techs": [], "spec": "" },
+    { "id": "cd1", "type": "condenser", "name": "凝汽器", "x": 12.0, "z": -10.0, "rot": 0.0, "enabled": true, "params": { "power": 0.5 }, "techs": [], "spec": "" },
+    { "id": "ct1", "type": "cooling_tower", "name": "冷却塔与循环水泵", "x": 26.0, "z": -10.0, "rot": 0.0, "enabled": true, "params": { "power": 6.2 }, "techs": [], "spec": "" },
+    { "id": "fw1", "type": "feedwater", "name": "给水与除氧", "x": -26.0, "z": 6.0, "rot": 0.0, "enabled": true, "params": { "power": 14 }, "techs": [], "spec": "" },
+    { "id": "dn1", "type": "denitration", "name": "脱硝（SCR）", "x": -14.0, "z": -26.0, "rot": 0.0, "enabled": true, "params": { "reagent_rate": 0.33, "power": 0.8 }, "techs": [], "spec": "" },
+    { "id": "du1", "type": "dedust", "name": "除尘", "x": -2.0, "z": -26.0, "rot": 0.0, "enabled": true, "params": { "power": 1.6 }, "techs": [], "spec": "" },
+    { "id": "ds1", "type": "desulfurization", "name": "脱硫（石灰石-石膏法）", "x": 10.0, "z": -26.0, "rot": 0.0, "enabled": true, "params": { "limestone_rate": 8, "power": 6.5 }, "techs": [], "spec": "" },
+    { "id": "sk1", "type": "stack", "name": "烟囱", "x": 22.0, "z": -26.0, "rot": 0.0, "enabled": true, "params": { "power": 0.1 }, "techs": [], "spec": "" },
+    { "id": "ah1", "type": "ash_handling", "name": "除灰渣与灰库", "x": -14.0, "z": -38.0, "rot": 0.0, "enabled": true, "params": { "power": 1.2 }, "techs": [], "spec": "" },
+    { "id": "gy1", "type": "gypsum_handling", "name": "石膏脱水与储存", "x": 10.0, "z": -38.0, "rot": 0.0, "enabled": true, "params": { "power": 0.6 }, "techs": [], "spec": "" }
+  ],
+  "flows": [
+    { "id": "f0", "from_unit": "ch1", "to_unit": "bo1", "material": "pulverized_coal", "rate": 255.0 },
+    { "id": "f1", "from_unit": "bo1", "to_unit": "st1", "material": "main_steam", "rate": 1900.0 },
+    { "id": "f2", "from_unit": "st1", "to_unit": "gn1", "material": "shaft_power", "rate": 660.0 },
+    { "id": "f3", "from_unit": "st1", "to_unit": "cd1", "material": "exhaust_steam", "rate": 1500.0 },
+    { "id": "f4", "from_unit": "ct1", "to_unit": "cd1", "material": "cooling_water_supply", "rate": 90000.0 },
+    { "id": "f5", "from_unit": "cd1", "to_unit": "ct1", "material": "cooling_water_return", "rate": 90000.0 },
+    { "id": "f6", "from_unit": "cd1", "to_unit": "fw1", "material": "condensate", "rate": 1500.0 },
+    { "id": "f7", "from_unit": "fw1", "to_unit": "bo1", "material": "feed_water", "rate": 1900.0 },
+    { "id": "f8", "from_unit": "bo1", "to_unit": "dn1", "material": "flue_gas", "rate": 2400000.0 },
+    { "id": "f9", "from_unit": "dn1", "to_unit": "du1", "material": "flue_gas_deno", "rate": 2400000.0 },
+    { "id": "f10", "from_unit": "du1", "to_unit": "ds1", "material": "flue_gas_clean", "rate": 2400000.0 },
+    { "id": "f11", "from_unit": "ds1", "to_unit": "sk1", "material": "flue_gas_desul", "rate": 2590000.0 },
+    { "id": "f12", "from_unit": "bo1", "to_unit": "ah1", "material": "bottom_ash", "rate": 8.0 },
+    { "id": "f13", "from_unit": "du1", "to_unit": "ah1", "material": "fly_ash", "rate": 43.0 },
+    { "id": "f14", "from_unit": "ds1", "to_unit": "gy1", "material": "gypsum", "rate": 13.5 }
+  ]
+}

@@ -226,7 +226,7 @@ function materialInScene(matId) {
 .sp-search-box .x-btn { flex: 0 0 auto; }
 .sp-scene {
   flex: 0 0 auto; display: flex; align-items: center; gap: 4px;
-  font-size: 10.5px; color: var(--muted); cursor: pointer; user-select: none;
+  font-size: 11px; color: var(--muted); cursor: pointer; user-select: none;
   padding: 3px 7px; border: 1px solid var(--border); border-radius: 6px;
   white-space: nowrap; transition: all .15s; line-height: 1;
 }
@@ -237,12 +237,12 @@ function materialInScene(matId) {
 .sp-group { margin-top: 2px; }
 .sp-group-title {
   display: flex; align-items: center; gap: 5px; padding: 4px 6px;
-  font-size: 11.5px; font-weight: 600; color: var(--muted); cursor: pointer;
+  font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer;
   border-radius: 4px; user-select: none;
 }
 .sp-group-title:hover { color: var(--text); background: var(--panel-2); }
 .sp-group-name { flex: 1; }
-.sp-count { font-size: 10.5px; color: var(--faint); font-weight: 400; }
+.sp-count { font-size: 11px; color: var(--faint); font-weight: 400; }
 .sp-items { padding-left: 6px; }
 .sp-item {
   display: flex; align-items: center; gap: 6px; padding: 4px 8px;
@@ -253,8 +253,8 @@ function materialInScene(matId) {
 .sp-item.active { background: var(--accent-l); color: var(--accent-d); }
 .sp-item-ic { flex: 0 0 auto; color: var(--accent2); opacity: .85; }
 .sp-item-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sp-item-sub { flex: 0 1 auto; font-size: 10.5px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sp-item-live { flex: 0 0 auto; font-size: 10.5px; color: var(--accent2); font-variant-numeric: tabular-nums; }
+.sp-item-sub { flex: 0 1 auto; font-size: 11px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-item-live { flex: 0 0 auto; font-size: 11px; color: var(--accent2); font-variant-numeric: tabular-nums; }
 .sp-body.scrolling { scrollbar-width: thin; }
-.empty-hint { padding: 14px 10px; color: var(--faint); font-size: 11.5px; line-height: 1.7; }
+.empty-hint { padding: 14px 10px; color: var(--faint); font-size: 12px; line-height: 1.7; }
 </style>

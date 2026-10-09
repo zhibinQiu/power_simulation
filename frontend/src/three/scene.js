@@ -65,6 +65,40 @@ const MAT_VIS = {
   oxygen:        { style: 'gas', color: 0x3a7aa0 },
   ngas:          { style: 'gas', color: 0x7a6f95 },
   co2:           { style: 'gas', color: 0xa05a4c },
+  // 火电（thermal-power 资源包）介质：固体走传送带，气体/液体走圆桶管道，电/功走母线管
+  // —— 固体（燃料 / 灰渣 / 石膏）
+  pulverized_coal:      { style: 'granular', color: 0x6b6257 },
+  bottom_ash:           { style: 'granular', color: 0x6a6259 },
+  fly_ash:              { style: 'granular', color: 0x9a9186 },
+  gypsum:               { style: 'granular', color: 0xcfc9b4 },
+  ash_product:          { style: 'granular', color: 0x8b8378 },   // 综合利用灰渣（成品外运）
+  gypsum_product:       { style: 'granular', color: 0xe8e2d0 },   // 成品脱硫石膏（建材原料）
+  // —— 液体（水 / 浆液）：圆桶管道
+  feed_water:           { style: 'liquid', color: 0x2f7fb0 },
+  condensate:           { style: 'liquid', color: 0x3f9ecf },
+  cooling_water_supply: { style: 'liquid', color: 0x2f7fb0 },
+  cooling_water_return: { style: 'liquid', color: 0xd4803a },
+  limestone_slurry:     { style: 'liquid', color: 0xb8b09a },
+  heat_supply:          { style: 'liquid', color: 0xd0453a },
+  heat_return:          { style: 'liquid', color: 0x3f7fb0 },
+  // —— 气体（风 / 蒸汽 / 烟气 / 氨）：圆桶管道
+  combustion_air:       { style: 'gas', color: 0x5bb8e0 },
+  main_steam:           { style: 'gas', color: 0xc9d6e0 },
+  exhaust_steam:        { style: 'gas', color: 0x8fa8bd },
+  heating_steam:        { style: 'gas', color: 0xc9d6e0 },
+  flue_gas:             { style: 'gas', color: 0x7d858d },
+  flue_gas_deno:        { style: 'gas', color: 0x8a9099 },
+  flue_gas_clean:       { style: 'gas', color: 0x9aa5ae },
+  flue_gas_desul:       { style: 'gas', color: 0xa8b2ba },
+  emission:             { style: 'gas', color: 0xb0b8bf },
+  ammonia:              { style: 'gas', color: 0xd8e8f0 },
+  // —— 能量（轴功率 / 电力）：实心母线管（走液体管道的圆桶造型，材质自发光）
+  shaft_power:          { style: 'liquid', color: 0xc9a227, emissive: 0x6b4d00, emi: 0.35 },
+  electricity:          { style: 'liquid', color: 0xf0c419, emissive: 0x8a6a00, emi: 0.4 },
+  // 机房温控（dc-thermal 资源包）：冷冻水/冷却水走液体管道，冷风走气管
+  cool_water_supply:    { style: 'liquid', color: 0x2f7fb0 },
+  cool_water_return:    { style: 'liquid', color: 0xd4803a },
+  cold_air:             { style: 'gas', color: 0x8fd0e8 },
   _default:      { style: 'chunk', color: 0x5a6a80 },
 }
 
@@ -130,6 +164,33 @@ const UNIT_META = {
   ccs: { label: '碳捕集', shape: 'utility' },
   oxy_supply: { label: '供氧系统', shape: 'utility' },
   power_supply: { label: '供电系统', shape: 'utility' },
+  // 火电（thermal-power 资源包）：工序以「系统」口径命名（与包字典/模板一致）
+  coal_handling: { label: '输煤制粉系统', shape: 'power' },
+  boiler: { label: '锅炉系统', shape: 'power' },
+  steam_turbine: { label: '汽轮机系统', shape: 'power' },
+  generator: { label: '发电系统', shape: 'power' },
+  condenser: { label: '凝汽系统', shape: 'power' },
+  cooling_tower: { label: '循环冷却水系统', shape: 'power' },
+  feedwater: { label: '给水除氧系统', shape: 'power' },
+  denitration: { label: '烟气脱硝系统', shape: 'power' },
+  dedust: { label: '烟气除尘系统', shape: 'power' },
+  desulfurization: { label: '烟气脱硫系统', shape: 'power' },
+  stack: { label: '排烟系统', shape: 'power' },
+  heat_net: { label: '热网换热系统', shape: 'power' },
+  ash_handling: { label: '除灰渣系统', shape: 'power' },
+  gypsum_handling: { label: '石膏脱水系统', shape: 'power' },
+  // 火电「系统内部的可调能源设备」：属于哪个系统就挂在哪个系统小组内
+  // （顶层聚合进所属系统，双击系统进入小组子场景后展开为独立模型）
+  tp_mill: { label: '磨煤机', shape: 'power' },
+  tp_fd_fan: { label: '送风机', shape: 'power' },
+  tp_id_fan: { label: '引风机', shape: 'power' },
+  tp_pa_fan: { label: '一次风机', shape: 'power' },
+  tp_cond_pump: { label: '凝结水泵', shape: 'power' },
+  tp_circ_pump: { label: '循环水泵', shape: 'power' },
+  tp_feed_pump: { label: '给水泵', shape: 'power' },
+  tp_slurry_pump: { label: '浆液循环泵', shape: 'power' },
+  tp_oxi_fan: { label: '氧化风机', shape: 'power' },
+  tp_heat_pump: { label: '热网循环泵', shape: 'power' },
 }
 
 const SCALE = 1 // 世界单位 = 米（示意）
@@ -148,7 +209,8 @@ function boxMesh(w, h, d, material) {
 
 // ---------------- 工序竖式铭牌（窄高名片，模型旁显示名称 + 实时能耗/碳排） ----------------
 // 画布按「逻辑尺寸 × LABEL_SS」超采样绘制，再由 sRGB 纹理下采样呈现，保证文字锐利。
-const LABEL_W = 88              // 逻辑宽（绘制坐标系）——窄竖卡：横向瘦、纵向紧凑排 3 行
+const LABEL_W = 88              // 逻辑宽（绘制坐标系）——窄竖卡：横向瘦、纵向紧凑排 3 行；同时是自适应卡宽的下限
+const LABEL_W_MAX = 220         // 自适应卡宽上限：名称更长时先加宽到此限，仍放不下才降字号/截断
 const LABEL_H = 52              // 连接/管道标签逻辑高（两行：物料名 + 速度）
 const UNIT_LABEL_H = 86         // 工艺/工辅标签逻辑高（三行：名称 + 能耗 + 碳排）
 const GROUP_LABEL_H = 92        // 小组聚合标签逻辑高（四行：名称 + ×N 徽章 + 能耗 + 碳排）
@@ -167,6 +229,7 @@ const LABEL_PAD = 13            // 竖卡左右内边距（文字绘制区宽度
 const LABEL_BODY_W = LABEL_W - LABEL_PAD * 2   // 可用正文宽度
 const LABEL_FOCUS_GAIN = 1.2    // 聚焦时的放大倍率
 const LABEL_FONT = '"PingFang SC","Microsoft YaHei",-apple-system,sans-serif'
+const NAME_FONT = `bold 13.5px ${LABEL_FONT}`   // 标签第 1 行（名称）字体：卡宽自适应时按此测量宽度
 const LABEL_NUM_FONT = '"SF Mono","Roboto Mono",Consolas,"Courier New","PingFang SC",sans-serif'
 
 function _fmtMetric(v) {
@@ -177,9 +240,10 @@ function _fmtMetric(v) {
 // 标签底板：磨砂玻璃（Glassmorphism）——
 // 半透明渐变基板 + 顶部高光带 + 玻璃质感细描边，背景场景可透出且不干扰文字阅读。
 // 浅色环境 = 白玻璃（深字），深色环境 = 深蓝灰玻璃（白字），聚焦时高亮描边并更实。
-// h 为可选卡片高度（工艺标签为 UNIT_LABEL_H，小组 GROUP_LABEL_H，其余 LABEL_H）
-function _drawLabelCard(ctx, focused, role, slim, main, light, h = LABEL_H) {
-  const W = LABEL_W, H = h
+// h 为可选卡片高度（工艺标签为 UNIT_LABEL_H，小组 GROUP_LABEL_H，其余 LABEL_H）；
+// w 为可选卡片宽度（自适应卡宽：按名称实际长度算出的逻辑宽，默认 LABEL_W）
+function _drawLabelCard(ctx, focused, role, slim, main, light, h = LABEL_H, cardW = LABEL_W) {
+  const W = cardW, H = h
   const r = Math.min(7, H * 0.22)          // 圆角（小卡保持轻圆角）
   const x = 0.5, y = 0.5, w = W - 1, hh = H - 1
 
@@ -880,7 +944,33 @@ const IO_Y_DEFS = {
   hot_metal_pretreat: { inY: 7, outY: 2 }, ingot_casting: { inY: 15, outY: 2 },
   reheating_furnace: { inY: 5, outY: 5 },
   gas_power: { inY: 6, outY: 6 }, waste_heat: { inY: 6, outY: 6 }, ccs: { inY: 6, outY: 6 },
-  oxy_supply: { inY: 6, outY: 6 }
+  oxy_supply: { inY: 6, outY: 6 },
+  // 火电：煤粉/给水自中部入，主蒸汽与烟气自炉膛上部出；烟囱净烟气自底部入、顶部排
+  coal_handling: { inY: 5, outY: 8 },
+  boiler: { inY: 10, outY: 24 },
+  steam_turbine: { inY: 7, outY: 4 },
+  generator: { inY: 7, outY: 7 },
+  condenser: { inY: 7, outY: 4 },
+  cooling_tower: { inY: 9, outY: 6 },
+  feedwater: { inY: 6, outY: 7 },
+  denitration: { inY: 15, outY: 6 },
+  dedust: { inY: 8, outY: 8 },
+  desulfurization: { inY: 8, outY: 18 },
+  stack: { inY: 4, outY: 26 },
+  heat_net: { inY: 6, outY: 6 },
+  ash_handling: { inY: 9, outY: 3 },      // 底渣/飞灰自筒仓上部入，成品灰自锥底卸料口出
+  gypsum_handling: { inY: 10, outY: 3 },  // 石膏浆液自旋流器顶部入，成品石膏自皮带机端部落料
+  // 系统内部辅机：不参与物料连线，端口高度仅用于小组内示意
+  tp_mill: { inY: 3, outY: 17 },          // 原煤自下部入，煤粉自顶部出口管出
+  tp_fd_fan: { inY: 5, outY: 14 },
+  tp_id_fan: { inY: 5, outY: 14 },
+  tp_pa_fan: { inY: 5, outY: 14 },
+  tp_cond_pump: { inY: 4, outY: 11 },
+  tp_circ_pump: { inY: 4, outY: 11 },
+  tp_feed_pump: { inY: 4, outY: 11 },
+  tp_slurry_pump: { inY: 4, outY: 11 },
+  tp_oxi_fan: { inY: 5, outY: 14 },
+  tp_heat_pump: { inY: 4, outY: 11 },
 }
 const Y_STRETCH_DEFS = {
   blast_furnace: 1.0, eaf: 1.4, furnace: 1.4, bof: 1.4, converter: 1.4,
@@ -888,7 +978,7 @@ const Y_STRETCH_DEFS = {
   caster: 1.45, slab_caster: 1.45, rolling_mill: 1.45,
   sinter_plant: 1.4, pelletizing: 1.4, coke_oven: 1.4,
   hot_metal_pretreat: 1.5, ingot_casting: 1.45,
-  reheating_furnace: 1.5, gas_power: 1.3, waste_heat: 1.3, ccs: 1.3, oxy_supply: 1.3
+  reheating_furnace: 1.5, gas_power: 1.3, waste_heat: 1.3, ccs: 1.3, oxy_supply: 1.3, power_supply: 1.3
 }
 const SCALE_DEFS = {
   blast_furnace: 4.0, eaf: 5.0, furnace: 5.0, bof: 5.0, converter: 5.0,
@@ -896,7 +986,16 @@ const SCALE_DEFS = {
   caster: 4.6, slab_caster: 4.6, rolling_mill: 4.6,
   sinter_plant: 4.6, pelletizing: 4.6, coke_oven: 4.6,
   hot_metal_pretreat: 4.2, ingot_casting: 4.2,
-  reheating_furnace: 4.2, gas_power: 3.8, waste_heat: 3.5, ccs: 3.5, oxy_supply: 3.8
+  reheating_furnace: 4.2, gas_power: 3.8, waste_heat: 3.5, ccs: 3.5, oxy_supply: 3.8, power_supply: 3.8,
+  // 火电：锅炉/冷却塔/烟囱体量最大，辅机（给水泵/换热站/凝汽器）相对小
+  coal_handling: 3.4, boiler: 4.2, steam_turbine: 3.6, generator: 3.4,
+  condenser: 3.2, cooling_tower: 4.0, feedwater: 3.0,
+  denitration: 3.4, dedust: 3.2, desulfurization: 3.6, stack: 3.8, heat_net: 3.0,
+  ash_handling: 3.4, gypsum_handling: 3.0,   // 灰库筒仓较高、石膏脱水线较矮长
+  // 系统内部的辅机设备：体量小于所属系统，进入小组 sub-scene 后再按 GROUP_SCENE_GAIN 放大
+  tp_mill: 3.0, tp_fd_fan: 2.8, tp_id_fan: 2.9, tp_pa_fan: 2.6,
+  tp_cond_pump: 2.5, tp_circ_pump: 2.9, tp_feed_pump: 3.0,
+  tp_slurry_pump: 2.7, tp_oxi_fan: 2.4, tp_heat_pump: 2.5,
 }
 // 各工艺 IO 端口在模型空间的 XZ 偏移（反映实际出铁口/兑铁口/铸坯出口等真实位置）
 const PORT_OFFSET_DEFS = {
@@ -920,7 +1019,22 @@ const PORT_OFFSET_DEFS = {
   gas_power:        { outX:   5, outZ: 0,  inX:  -5, inZ: 0 },
   waste_heat:       { outX:   5, outZ: 0,  inX:  -5, inZ: 0 },
   ccs:              { outX:   5, outZ: 0,  inX:  -5, inZ: 0 },
-  oxy_supply:       { outX:   5, outZ: 0,  inX:  -5, inZ: 0 }
+  oxy_supply:       { outX:   5, outZ: 0,  inX:  -5, inZ: 0 },
+  // 火电：介质水平贯通（左进右出），与工艺流程走向一致；烟囱为终端（无下游出口偏移）
+  coal_handling:    { outX:  11, outZ: 0,  inX: -11, inZ: 0 },
+  boiler:           { outX:  10, outZ: 0,  inX: -10, inZ: 0 },
+  steam_turbine:    { outX:  11, outZ: 0,  inX: -11, inZ: 0 },
+  generator:        { outX:  11, outZ: 0,  inX: -11, inZ: 0 },
+  condenser:        { outX:   9, outZ: 0,  inX:  -9, inZ: 0 },
+  cooling_tower:    { outX:   9, outZ: 0,  inX:  -9, inZ: 0 },
+  feedwater:        { outX:   9, outZ: 0,  inX:  -9, inZ: 0 },
+  denitration:      { outX:   9, outZ: 0,  inX:  -9, inZ: 0 },
+  dedust:           { outX:  10, outZ: 0,  inX: -10, inZ: 0 },
+  desulfurization:  { outX:   9, outZ: 0,  inX:  -9, inZ: 0 },
+  stack:            { outX:   0, outZ: 0,  inX:  -8, inZ: 0 },
+  heat_net:         { outX:   9, outZ: 0,  inX:  -9, inZ: 0 },
+  ash_handling:     { outX:  11, outZ: 0,  inX: -11, inZ: 0 },  // 灰库锥底卸料口（成品外运）
+  gypsum_handling:  { outX:  13, outZ: 0,  inX: -10, inZ: 0 },  // 皮带机头部落料（成品石膏）
 }
 
 // 共享单位几何体：所有连廊段/法兰共用一个几何体，通过 Mesh.scale 适配长度，
@@ -936,7 +1050,8 @@ GEO_UNIT_BOX.userData.__shared = GEO_UNIT_CYL.userData.__shared =
 
 const VEC_UP = new THREE.Vector3(0, 1, 0)
 const VEC_X = new THREE.Vector3(1, 0, 0)
-const PIPE_R = 2.05  // 气体管道外半径（内壁发光层半径 = PIPE_R - 0.3）
+const PIPE_R = 2.05      // 气体管道外半径（内壁发光层半径 = PIPE_R - 0.3）
+const PIPE_LIQ_R = 1.55  // 液体/浆液管道外半径（水/浆液口径小于烟风道，内壁液体芯 = R - 0.55）
 
 export class TwinScene {
   constructor(container, opts = {}) {
@@ -2067,7 +2182,10 @@ export class TwinScene {
       bof: 30, eaf: 31,
       ladle_furnace: 40, aod: 41, vd_vacuum: 42, rh_vacuum: 43,
       caster: 50, ingot_casting: 51,
-      reheating_furnace: 60, rolling_mill: 61, cold_rolling: 62
+      reheating_furnace: 60, rolling_mill: 61, cold_rolling: 62,
+      // 火电主流程：输煤制粉 → 锅炉 → 汽轮机 → 发电机（热网换热站随发电机之后）
+      coal_handling: 71, boiler: 72, steam_turbine: 73, generator: 74, heat_net: 75,
+      ash_handling: 76, gypsum_handling: 77,   // 固废与副产品物流终点
     }
     const prioOfType = (t) => (TYPE_PRIORITY[t] != null ? TYPE_PRIORITY[t] : 999)
     // —— 工辅默认服务的主工艺（无连线时的兜底绑定；有连线时以实际连线为准）——
@@ -2161,7 +2279,14 @@ export class TwinScene {
           const other = unitNode.get(fromAux ? f.to_unit : f.from_unit)
           if (!other || other.id === n.id) continue
           if (!(mainById.has(other.id) || auxSet.has(other.id))) continue
-          const weight = want && f.material && f.material === want ? 10 : 1
+          // 主工艺优先：辅助系统应挂在它「服务的主工艺」下，而不是下游的辅助工序。
+          // 链式辅助系统（火电：锅炉→脱硝→除尘→脱硫→烟囱；钢铁：鼓风机→热风炉→高炉）
+          // 若只按「输出物料投给谁」计票，链条上每个工辅都会投给自己的下游工辅，
+          // 整条链反向挂在 aux 之下 → 没有任何一级根接入主干 → 6 的分支展开覆盖不到，
+          // 全部退化成 6.1 的孤立链兜底（落位不避让，会压在别的分支上）。
+          // 给主工艺候选加主导权重，使链条按其服务对象挂到主干上，再按深度分层展开。
+          let weight = want && f.material && f.material === want ? 10 : 1
+          if (mainById.has(other.id)) weight += 100
           votes.set(other.id, (votes.get(other.id) || 0) + weight)
         }
         for (const [id, c] of votes) if (c > best) { best = c; target = nodeById.get(id) }
@@ -2221,15 +2346,43 @@ export class TwinScene {
     //     的实际落位一致（每棵子树占 maxW 列、相邻子树间留 1 列空隙）。
     const sidesOf = new Map()
     const spanOf = new Map()
+    // 辅助系统分组（资源包字典 auxGroup，如火电 water 汽水循环 / flue 烟气治理）：
+    // 不同分组的辅助链**全局强制分列主干两侧**——同一系统（如整条烟气链）落在一侧，
+    // 另一系统（汽水循环）落在另一侧，与电厂总平面「主厂房居中、烟气与循环水分列两翼」一致。
+    // 只在单个父节点内做左右贪心时，两条链会被同时挤到同一侧（各按自身负载都选了同一边），
+    // 故分组侧的负载按全局累计、且同一分组复用同一侧。未标注分组的辅助链沿用原贪心。
+    const auxGroupOf = (n) => {
+      if (!n) return ''
+      return (n.members ? (n.members[0] && n.members[0].auxGroup) : (n.unit && n.unit.auxGroup)) || ''
+    }
+    const groupSide = new Map()
+    const groupLoad = { '-1': 0, '1': 0 }
     for (const m of mainNodes) {
       const roots = subRootsOf.get(m.id) || []
       const items = roots.map((r) => ({ id: r.id, size: subtreeInfo.get(r.id).size, w: subtreeInfo.get(r.id).maxW }))
       items.sort((a, b) => b.size - a.size)
       const sides = { '-1': [], '1': [] }
       let ls = 0, rs = 0, lc = 0, rc = 0
+      const push = (it, key) => {
+        sides[key].push(it.id)
+        if (key === '-1') { ls += it.w; lc++ } else { rs += it.w; rc++ }
+      }
+      // 3.5a 先安置带 auxGroup 的辅助链：同组同侧、不同组分居两侧
       for (const it of items) {
-        if (ls <= rs) { sides['-1'].push(it.id); ls += it.w; lc++ }
-        else { sides['1'].push(it.id); rs += it.w; rc++ }
+        const gk = auxGroupOf(nodeById.get(it.id))
+        if (!gk) continue
+        let key = groupSide.get(gk)
+        if (!key) {
+          key = groupLoad['-1'] <= groupLoad['1'] ? '-1' : '1'
+          groupSide.set(gk, key)
+        }
+        groupLoad[key] += it.w
+        push(it, key)
+      }
+      // 3.5b 其余（无分组标注）按子树大小贪心均衡
+      for (const it of items) {
+        if (auxGroupOf(nodeById.get(it.id))) continue
+        push(it, ls <= rs ? '-1' : '1')
       }
       sidesOf.set(m.id, sides)
       spanOf.set(m.id, { left: ls + Math.max(0, lc - 1), right: rs + Math.max(0, rc - 1) })
@@ -2266,14 +2419,16 @@ export class TwinScene {
     order.forEach((id) => mainX.set(id, mainX.get(id) + shift))
 
     // 5) 落位：独立主节点直接放主线；主组内主工艺成员沿 Z 并列、辅成员置于两侧。
+    //    placed 记录已落位的单元，供 6.1 兜底识别「未被任何分支展开的孤立辅助链」。
+    const placed = new Set()
     const Z_STEP = 175, MEMBER_Z = 64
     for (const n of mainNodes) {
       const x = mainX.get(n.id)
-      if (!n.members) { n.unit.x = x; n.unit.z = 0; continue }
+      if (!n.members) { n.unit.x = x; n.unit.z = 0; placed.add(n.unit.id); continue }
       const ms = n.members.filter(isMainU)
       const as = n.members.filter(isAuxU)
-      ms.forEach((u, i) => { u.x = x; u.z = (i - (ms.length - 1) / 2) * MEMBER_Z })
-      as.forEach((u, i) => { const s = i % 2 === 0 ? 1 : -1; const r = Math.floor(i / 2); u.x = x; u.z = s * (Z_STEP + r * Z_STEP) })
+      ms.forEach((u, i) => { u.x = x; u.z = (i - (ms.length - 1) / 2) * MEMBER_Z; placed.add(u.id) })
+      as.forEach((u, i) => { const s = i % 2 === 0 ? 1 : -1; const r = Math.floor(i / 2); u.x = x; u.z = s * (Z_STEP + r * Z_STEP); placed.add(u.id) })
     }
 
     // 6) 工辅/全辅组按「工艺树」落位（树状结构）：工辅分布在主干工艺「垂直方向（前/后，即 Z 轴）两侧」、
@@ -2317,15 +2472,88 @@ export class TwinScene {
                   const row = Math.floor(i / cols)
                   u.x = cx + (col - (cols - 1) / 2) * 95
                   u.z = cz + (row - (rows - 1) / 2) * 110
+                  placed.add(u.id)
                 })
               } else {
                 c.unit.x = cx
                 c.unit.z = cz
+                placed.add(c.unit.id)
               }
             })
           }
           colCursor += maxW + 1   // 不同子树在水平方向留一列间隔
         }
+      }
+    }
+
+    // 6.1) 孤立辅助链兜底落位：整条辅助链都挂在另一个辅助工序下（没有一级根接入主干）时，
+    //      6 的分支展开不会覆盖它们，坐标仍是模板原值 —— 表现为辅助设备夹在主流程中间。
+    //      典型场景：火电汽水循环（凝汽器↔冷却塔↔给水，互为上下游形成闭环链）。
+    //      此处按 auxGroup 分组，整组挂到「最近的主工艺」的一侧（同组同侧、不同组对侧），
+    //      组内沿该侧 Z 方向逐层排开，与主流程垂直 —— 仍是「辅助系统分居两翼」的总平面效果。
+    const orphans = []
+    for (const n of nodes) {
+      const us = n.members || [n.unit]
+      for (const u of us) if (u && !placed.has(u.id) && !isMainU(u)) orphans.push(u)
+    }
+    if (orphans.length) {
+      // 占位表：主干与分支展开已占用的格位。孤立链兜底原本只看「主工艺 X + 深度层 Z」，
+      // 不避让任何已落位节点 —— 火电就出现过除灰渣压在脱硝、石膏脱水压在给水上的重合。
+      // 这里按「同一格位（±格距内）视为冲突」沿水平方向逐列外移，直到不冲突。
+      const taken = []
+      for (const n of nodes) {
+        const us = n.members || [n.unit]
+        for (const u of us) if (u && placed.has(u.id)) taken.push({ x: u.x, z: u.z || 0 })
+      }
+      // 水平判据取 1.05 倍列距（略宽于 COLSTEP3）：恰好同层相邻一格（间距 = COLSTEP3）也应视为冲突，
+      // 否则孤立链会紧贴已落位节点（火电烟囱与石膏脱水曾正好差 110 = 一列，视觉上几乎相碰）。
+      const clash = (x, z) => taken.some((t) => Math.abs(t.x - x) < COLSTEP3 * 1.05 && Math.abs((t.z || 0) - z) < ZSTEP * 0.9)
+      const byGroup = new Map()
+      for (const u of orphans) {
+        const gk = u.auxGroup || ''
+        if (!byGroup.has(gk)) byGroup.set(gk, [])
+        byGroup.get(gk).push(u)
+      }
+      for (const [gk, list] of byGroup) {
+        let sv = groupSide.has(gk) ? Number(groupSide.get(gk)) : 0
+        if (!sv) {
+          sv = groupLoad['-1'] <= groupLoad['1'] ? -1 : 1
+          groupSide.set(gk, String(sv))
+          groupLoad[String(sv)] = (groupLoad[String(sv)] || 0) + 1
+        }
+        // 锚定主工艺：优先按实际物料连线（组内成员与哪个主工艺相连最多），
+        // 使辅助系统落在其**服务对象**正侧方（如汽水循环贴近汽轮机、而非仅按坐标就近的锅炉）；
+        // 无连线时退回「原始位置最近的主工艺」。
+        const idsIn = new Set(list.map((u) => u.id))
+        const inGroup = (n) => (n && n.members ? n.members.some((m) => idsIn.has(m.id)) : !!(n && n.unit && idsIn.has(n.unit.id)))
+        const vote = new Map()
+        for (const f of flows || []) {
+          const na = unitNode.get(f.from_unit), nb = unitNode.get(f.to_unit)
+          if (!na || !nb) continue
+          const other = inGroup(na) ? nb : (inGroup(nb) ? na : null)
+          if (!other || !mainById.has(other.id)) continue
+          vote.set(other.id, (vote.get(other.id) || 0) + 1)
+        }
+        let anchorX = null
+        let bestVote = 0
+        for (const [id, c] of vote) if (c > bestVote) { bestVote = c; anchorX = mainX.get(id) || 0 }
+        if (anchorX == null) {
+          let nd = Infinity
+          for (const m of mainNodes) {
+            const mx = m.members ? m.members[0].x : m.unit.x
+            const d = Math.abs(mx - list[0].x)
+            if (d < nd) { nd = d; anchorX = mainX.get(m.id) || 0 }
+          }
+        }
+        list.forEach((u, i) => {
+          const uz = sv * (i + 1) * ZSTEP
+          let ux = anchorX
+          // 冲突时沿该侧水平外扩方向逐列避让（前侧向左、后侧向右，与 6 的 sideH 一致）
+          for (let k = 0; k < 8 && clash(ux, uz); k++) ux = anchorX + sv * (k + 1) * COLSTEP3
+          u.x = ux
+          u.z = uz
+          taken.push({ x: ux, z: uz })
+        })
       }
     }
 
@@ -2455,20 +2683,14 @@ export class TwinScene {
     const meta = UNIT_META[unit.type] || { label: unit.name, shape: 'box' }
     const group = new THREE.Group()
     group.position.set(unit.x * SCALE, 2.5, (unit.z || 0) * SCALE) // 落于厂区地坪之上（地坪顶 y=-0.5，提升量抵消建造器负向基准）
-    // 各工艺按实际规模差异化缩放 —— 高炉巨大、转炉/电炉中等、精炼/辅助偏小；
-    // 小组子场景（groupScene）模式下整体再放大 GROUP_SCENE_GAIN 倍，成员模型更大更醒目
-    const SCALE_MAP = {
-      blast_furnace: 4.0, eaf: 5.0, furnace: 5.0, bof: 5.0, converter: 5.0,
-      ladle_furnace: 4.6, rh_vacuum: 4.6, cylinder: 4.6,
-      caster: 4.6, slab_caster: 4.6, rolling_mill: 4.6,
-      sinter_plant: 4.6, pelletizing: 4.6, coke_oven: 4.6,
-      hot_metal_pretreat: 4.2, ingot_casting: 4.2,
-      reheating_furnace: 4.2, gas_power: 3.8, waste_heat: 3.5, ccs: 3.5, oxy_supply: 3.8, power_supply: 3.8
-    }
-    // 进入小组子场景后，成员模型大小与普通工艺保持一致（不再整体放大 GROUP_SCENE_GAIN 倍）
+    // 模型缩放 / Y 拉伸 / 端口高度一律取模块级常量（SCALE_DEFS / Y_STRETCH_DEFS / IO_Y_DEFS），
+    // 与 _ioHeights（管道端口计算）共用同一套真相源。此前这里是各自的局部副本且缺火电条目，
+    // 火电模型按 UNIT_SCALE=2.4 渲染、端口却按 SCALE_DEFS（锅炉 4.2 等）换算，
+    // 端点被推到模型外侧/上方的空中 —— 管线看起来"没连到设备上"。
+    // 小组子场景（groupScene）模式下成员模型不再整体放大，与普通工艺保持一致
     const gsGain = 1
-    group.scale.setScalar((SCALE_MAP[unit.type] || UNIT_SCALE) * gsGain)
-    const scale = (SCALE_MAP[unit.type] || UNIT_SCALE) * gsGain
+    group.scale.setScalar((SCALE_DEFS[unit.type] || UNIT_SCALE) * gsGain)
+    const scale = (SCALE_DEFS[unit.type] || UNIT_SCALE) * gsGain
     const col = emissionColor(share)
     const co2Css = emissionCss(share)
 
@@ -2488,17 +2710,8 @@ export class TwinScene {
     }
     if (body.userData.topY == null) body.userData.topY = 16
 
-    // 工艺模型Y轴拉伸（高炉除外），使各装置更具规模感
-    const Y_STRETCH = {
-      blast_furnace: 1.0, // 高炉不额外拉伸
-      eaf: 1.4, furnace: 1.4, bof: 1.4, converter: 1.4,
-      ladle_furnace: 1.35, rh_vacuum: 1.35, cylinder: 1.35,
-      caster: 1.45, slab_caster: 1.45, rolling_mill: 1.45,
-      sinter_plant: 1.4, pelletizing: 1.4, coke_oven: 1.4,
-      hot_metal_pretreat: 1.5, ingot_casting: 1.45,
-      reheating_furnace: 1.5, gas_power: 1.3, waste_heat: 1.3, ccs: 1.3, oxy_supply: 1.3, power_supply: 1.3
-    }
-    const yStretch = Y_STRETCH[unit.type] || 1.0
+    // 工艺模型Y轴拉伸（高炉除外），使各装置更具规模感（与 _ioHeights 同源）
+    const yStretch = Y_STRETCH_DEFS[unit.type] || 1.0
     if (yStretch !== 1.0) {
       body.scale.y = yStretch
       body.userData.topY *= yStretch
@@ -2506,34 +2719,8 @@ export class TwinScene {
       if (body.userData.heatInternalH != null) body.userData.heatInternalH *= yStretch
     }
 
-    // 各工艺的原料输入/产品输出位置（模型空间Y坐标，反映实际生产高度差）
-    const IO_Y = {
-      // 高炉：固料从炉顶料钟入（高），铁水/炉渣从底部出铁口出（低）
-      blast_furnace: { inY: 55, outY: 4 },
-      // 电弧炉：废钢从炉顶加料，钢水从下方出钢口出
-      eaf: { inY: 12, outY: 3 }, furnace: { inY: 12, outY: 3 },
-      // 转炉：铁水从顶部兑入，钢水从底部出钢口出
-      bof: { inY: 14, outY: 2 }, converter: { inY: 14, outY: 2 },
-      // LF/RH/VD精炼：钢水从顶部注入，精炼后从底部出
-      ladle_furnace: { inY: 10, outY: 3 }, rh_vacuum: { inY: 10, outY: 3 }, cylinder: { inY: 10, outY: 3 },
-      // 连铸机：钢水从中间包（高）注入，铸坯从底部拉出
-      caster: { inY: 12, outY: 3 }, slab_caster: { inY: 12, outY: 3 },
-      // 轧机：板坯水平进、水平出（相近高度）
-      rolling_mill: { inY: 4, outY: 4 },
-      // 烧结机/球团：原料从上方布料，烧结矿/球团从下方排出
-      sinter_plant: { inY: 9, outY: 3 }, pelletizing: { inY: 9, outY: 3 },
-      // 焦炉：煤从顶部装煤车装入，焦炭从推焦侧推出
-      coke_oven: { inY: 14, outY: 3 },
-      // 铁水预处理：铁水从上方注入，处理后从下方倒出
-      hot_metal_pretreat: { inY: 7, outY: 2 },
-      // 模铸：钢水从上方浇注，钢锭在底部成型
-      ingot_casting: { inY: 15, outY: 2 },
-      // 加热炉：板坯从中间高度进/出
-      reheating_furnace: { inY: 5, outY: 5 },
-      // 工辅工艺：管线中位进/出
-      gas_power: { inY: 6, outY: 6 }, waste_heat: { inY: 6, outY: 6 }, ccs: { inY: 6, outY: 6 }
-    }
-    const io = IO_Y[unit.type] || { inY: 10, outY: 4 }
+    // 各工艺的原料输入/产品输出位置（模型空间Y坐标，反映实际生产高度差；与 _ioHeights 同源）
+    const io = IO_Y_DEFS[unit.type] || { inY: 10, outY: 4 }
 
     group.add(body)
 
@@ -2548,6 +2735,24 @@ export class TwinScene {
       if (Number.isFinite(minLocal) && minLocal < 0.01) lift = -minLocal + 0.01
     }
     if (lift > 0.001) body.position.y = lift
+
+    // 工艺模型的局部包围盒（group 局部单位，已含 lift）—— 管道端口的「贴合兜底」：
+    // _ioHeights 会把端口点钳制到这个盒子内，即使端口定义与实际造型有偏差，
+    // 管线端头也一定落在工艺模型本体上，而不会悬在模型外的空中。
+    let ioBox = null
+    {
+      group.updateMatrixWorld(true)
+      const _box = new THREE.Box3().setFromObject(body)
+      if (Number.isFinite(_box.min.y) && Number.isFinite(_box.max.y)) {
+        const sx = group.scale.x || 1, sy = group.scale.y || 1
+        ioBox = {
+          minY: (_box.min.y - group.position.y) / sy,
+          maxY: (_box.max.y - group.position.y) / sy,
+          halfX: Math.max(Math.abs(_box.max.x - group.position.x), Math.abs(_box.min.x - group.position.x)) / sx,
+          halfZ: Math.max(Math.abs(_box.max.z - group.position.z), Math.abs(_box.min.z - group.position.z)) / sx,
+        }
+      }
+    }
 
     // 底座：不跟随模型旋转，始终贴地平放。
     // 世界高度恒为 3：顶面贴合模型底部（世界 y=2.5），底面贴地坪（世界 y≈-0.5），
@@ -2722,6 +2927,7 @@ export class TwinScene {
       ioY: { in: io.inY * yStretch, out: io.outY * yStretch },   // 模型空间输入/输出口高度
       yStretch,   // Y轴拉伸系数
       lift,       // 本体相对底座顶面的提升量（局部），用于管道连接点等世界定位
+      ioBox,      // 模型局部包围盒（端口钳制用，保证管线端头贴在本体上）
       flame: anim.flame, glow: anim.glow, glowMats: anim.glowMats, glowBase: anim.glowBase,
       rollers: anim.rollers, slab: anim.slab, slabT: 0, plume: null,
       converterPivot: anim.converterPivot, converterMelt: anim.converterMelt,
@@ -2753,9 +2959,16 @@ export class TwinScene {
     const gname = String(gMeta.name || '设备小组').slice(0, 14)
     const n = members.length
 
-    // 1) 组中心 = 成员包围盒中心（世界坐标，SCALE=1）
+    // 1) 组中心 = 主工艺成员的包围盒中心（世界坐标，SCALE=1）。
+    //    小组的语义是「以某台主工艺为核心的成套系统」（锅炉系统 = 锅炉 + 送/引/一次风机；
+    //    输煤制粉系统 = 输煤 + 磨煤机），因此它的位置必须由主工艺决定、**锚在主干线 z=0 上**。
+    //    此前按全体成员包围盒取中：辅助成员单侧偏多时（锅炉组 3 台风机落在 +175/-175/+350）
+    //    组中心被拽到 z≈87.5，表现为「锅炉、输煤制粉站在蓝色主干线旁边」，并与紧邻的
+    //    烟气治理系统（z=150）叠在一起。无主工艺成员的全辅组仍按全体包围盒中心。
+    const _isMainMember = (u) => u.route !== 'aux' && u.route !== 'util'
+    const anchorMembers = members.some(_isMainMember) ? members.filter(_isMainMember) : members
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
-    for (const u of members) {
+    for (const u of anchorMembers) {
       const z = u.z || 0
       if (u.x < minX) minX = u.x
       if (u.x > maxX) maxX = u.x
@@ -2817,7 +3030,7 @@ export class TwinScene {
     built.group.add(label)
 
     // 5) 管道连接用统一 IO 高度（世界坐标，与代表成员一致，汇聚到组中心）
-    const io = this._ioHeights(rep.type, built.lift)
+    const io = this._ioHeights(rep.type, built.lift, built.ioBox)
 
     group.userData = {
       unitId: null,
@@ -2839,8 +3052,10 @@ export class TwinScene {
 
   // 小组标签：组名 + 「×N」倍数 + 汇总能耗/碳排（尺寸与普通工艺标签一致，两行布局）
   _makeGroupLabel(name, count, co2, energy) {
+    // 组名同样按长度自适应卡宽（组名含「×N」徽章与「点击 ▸」，副行最小正文宽取大一些）
+    const w = this._fitLabelW(this._measureText(name, NAME_FONT), 84)
     const canvas = document.createElement('canvas')
-    canvas.width = LABEL_W * LABEL_SS
+    canvas.width = w * LABEL_SS
     canvas.height = GROUP_LABEL_H * LABEL_SS
     const ctx = canvas.getContext('2d')
     const tex = new THREE.CanvasTexture(canvas)
@@ -2849,9 +3064,9 @@ export class TwinScene {
     tex.magFilter = THREE.LinearFilter
     tex.generateMipmaps = false
     const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }))
-    spr.scale.set(LABEL_SCALE, LABEL_SCALE * (GROUP_LABEL_H / LABEL_W), 1)
+    spr.scale.set(LABEL_SCALE * (w / LABEL_W), LABEL_SCALE * (GROUP_LABEL_H / LABEL_W), 1)
     spr.renderOrder = 11
-    const obj = { canvas, ctx, tex, sprite: spr, name, count, co2, energy, isGroup: true, _key: null }
+    const obj = { canvas, ctx, tex, sprite: spr, w, name, count, co2, energy, isGroup: true, _key: null }
     spr.userData.labelObj = obj
     this._drawGroupLabel(obj, co2, energy)
     return spr
@@ -2866,24 +3081,26 @@ export class TwinScene {
     if (obj._key === key) return
     obj._key = key
     obj.co2 = co2; obj.energy = energy
+    const W = obj.w || LABEL_W
+    const BODY_W = this._labelBodyW(W)
     ctx.setTransform(LABEL_SS, 0, 0, LABEL_SS, 0, 0)
-    ctx.clearRect(0, 0, LABEL_W, GROUP_LABEL_H)
+    ctx.clearRect(0, 0, W, GROUP_LABEL_H)
 
     const light = this.envMode === 'industrial'
     // 背景卡片：磨砂玻璃面板（与工艺/连接标签统一玻璃质感）
-    _drawLabelCard(ctx, false, undefined, undefined, undefined, light, GROUP_LABEL_H)
+    _drawLabelCard(ctx, false, undefined, undefined, undefined, light, GROUP_LABEL_H, W)
 
-    // 第 1 行：组名（自适应字号，超长优先降号再截断）
+    // 第 1 行：组名（卡片已按组名加宽，仅超上限时降号再截断）
     ctx.textBaseline = 'middle'
     ctx.textAlign = 'left'
     ctx.font = `bold 13.5px ${LABEL_FONT}`
     ctx.fillStyle = light ? '#1f2733' : 'rgba(255,255,255,0.95)'
     let nm = name
-    if (ctx.measureText(nm).width > LABEL_BODY_W) {
-      const px = Math.max(11, Math.floor((13.5 * LABEL_BODY_W) / ctx.measureText(nm).width * 2) / 2)
+    if (ctx.measureText(nm).width > BODY_W) {
+      const px = Math.max(11, Math.floor((13.5 * BODY_W) / ctx.measureText(nm).width * 2) / 2)
       ctx.font = `bold ${px}px ${LABEL_FONT}`
-      if (ctx.measureText(nm).width > LABEL_BODY_W) {
-        while (nm.length > 1 && ctx.measureText(nm + '…').width > LABEL_BODY_W) nm = nm.slice(0, -1)
+      if (ctx.measureText(nm).width > BODY_W) {
+        while (nm.length > 1 && ctx.measureText(nm + '…').width > BODY_W) nm = nm.slice(0, -1)
         nm += '…'
       }
     }
@@ -2908,7 +3125,7 @@ export class TwinScene {
     ctx.textAlign = 'right'
     ctx.font = `600 10.5px ${LABEL_FONT}`
     ctx.fillStyle = light ? '#005E94' : '#6ecfff'
-    ctx.fillText('点击 ▸', LABEL_W - 12, 35)
+    ctx.fillText('点击 ▸', W - 12, 35)
 
     // 第 3 行：汇总能耗 ⚡
     ctx.textAlign = 'left'
@@ -2935,8 +3152,10 @@ export class TwinScene {
   // 每个工序有且仅有一个标签（工序名 + 先能后碳）。聚焦时只改变其样式与尺寸，不再另建卡片，
   // 避免此前「常驻名称标签 + 聚焦 HUD 卡片」同时出现造成的重影。
   _makeLabel(name, co2, energy, role, co2Css) {
+    // 卡片宽度按工序名自适应（如「循环冷却水系统」比「锅炉系统」宽），名称完整显示
+    const w = this._fitLabelW(this._measureText(name, NAME_FONT))
     const canvas = document.createElement('canvas')
-    canvas.width = LABEL_W * LABEL_SS
+    canvas.width = w * LABEL_SS
     canvas.height = UNIT_LABEL_H * LABEL_SS
     const ctx = canvas.getContext('2d')
     ctx.setTransform(LABEL_SS, 0, 0, LABEL_SS, 0, 0)   // 之后统一按逻辑坐标绘制
@@ -2947,9 +3166,10 @@ export class TwinScene {
     tex.magFilter = THREE.LinearFilter
     tex.generateMipmaps = false
     const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }))
-    spr.scale.set(LABEL_SCALE, LABEL_SCALE * (UNIT_LABEL_H / LABEL_W), 1)
+    // 世界宽度按卡宽同比放大（高度不变），保持字号恒定、只是卡片变宽
+    spr.scale.set(LABEL_SCALE * (w / LABEL_W), LABEL_SCALE * (UNIT_LABEL_H / LABEL_W), 1)
     spr.renderOrder = 12
-    const obj = { canvas, ctx, tex, sprite: spr, name, role, co2Css, focused: false }
+    const obj = { canvas, ctx, tex, sprite: spr, w, _wFor: name, name, role, co2Css, focused: false }
     this._drawLabel(obj, co2, energy, role, co2Css)
     spr.userData.labelObj = obj
     return spr
@@ -2959,6 +3179,22 @@ export class TwinScene {
   _maxAniso() {
     try { return Math.min(8, this.renderer.capabilities.getMaxAnisotropy()) } catch (e) { return 2 }
   }
+
+  // —— 标签宽度自适应（名称多长、卡片就多宽，保证名称完整显示不被截断）——
+  // 复用一个离屏 ctx 测量文本宽度，避免每个标签新建 canvas 造成 GC 压力。
+  _measureText(text, font) {
+    const c = this._mCtx || (this._mCtx = document.createElement('canvas').getContext('2d'))
+    c.font = font
+    return c.measureText(text || '').width
+  }
+  // 按正文实际宽度算卡片逻辑宽：左右各留 LABEL_PAD，夹在 [LABEL_W, LABEL_W_MAX]。
+  // minBody 为副行（能耗/碳排/速度行）的最小正文宽，避免指标行被压窄。
+  _fitLabelW(namePx, minBody = 62) {
+    const need = Math.max(namePx || 0, minBody) + LABEL_PAD * 2
+    return Math.round(Math.min(LABEL_W_MAX, Math.max(LABEL_W, need)))
+  }
+  // 给定卡宽下的正文可用宽度（供超长名的兜底截断判断使用）
+  _labelBodyW(w) { return (w || LABEL_W) - LABEL_PAD * 2 }
 
   // 传 undefined 的字段表示「沿用上次值」，便于实时帧只刷新变化的指标。
   // 工艺标签两行布局：第一行工序名 + 角色色点，第二行实时能耗 ⚡ / 碳排 ☁（先能后碳），无需点击即可直接查看。
@@ -2972,6 +3208,16 @@ export class TwinScene {
     const c = obj.co2
     const e = obj.energy
     const focused = !!obj.focused
+    // 卡宽随名称自适应：改名后重新测量宽度并重排画布（resize 会清空画布，故强制重绘）
+    if (obj._wFor !== obj.name) {
+      obj.w = this._fitLabelW(this._measureText(obj.name, NAME_FONT))
+      obj._wFor = obj.name
+      obj.canvas.width = obj.w * LABEL_SS
+      obj.ctx.setTransform(LABEL_SS, 0, 0, LABEL_SS, 0, 0)
+      obj._key = null
+    }
+    const W = obj.w || LABEL_W
+    const BODY_W = this._labelBodyW(W)
     const key = [obj.name, obj.role, focused, obj.main === true, c, e, obj.co2Css, this.envMode].join('|')
     if (obj._key === key) return
     obj._key = key
@@ -2979,21 +3225,21 @@ export class TwinScene {
     // 白底浅灰卡片、无角色圆点/彩色侧条，左侧深色工序名，下方数据行
     const light = this.envMode === 'industrial'
 
-    ctx.clearRect(0, 0, LABEL_W, UNIT_LABEL_H)
+    ctx.clearRect(0, 0, W, UNIT_LABEL_H)
 
     if (light) {
-      _drawLabelCard(ctx, focused, undefined, undefined, undefined, true, UNIT_LABEL_H)
+      _drawLabelCard(ctx, focused, undefined, undefined, undefined, true, UNIT_LABEL_H, W)
       ctx.textBaseline = 'middle'
-      // 第 1 行：工序名（深色；长名优先降字号，再截断）
+      // 第 1 行：工序名（深色；卡片已按名称加宽，仅超上限时降字号，再截断）
       ctx.textAlign = 'left'
       ctx.font = `bold 13.5px ${LABEL_FONT}`
       ctx.fillStyle = focused ? '#004B76' : '#1C1C1C'
       let text = obj.name
-      if (ctx.measureText(text).width > LABEL_BODY_W) {
-        const px = Math.max(11, Math.floor((13.5 * LABEL_BODY_W) / ctx.measureText(text).width * 2) / 2)
+      if (ctx.measureText(text).width > BODY_W) {
+        const px = Math.max(11, Math.floor((13.5 * BODY_W) / ctx.measureText(text).width * 2) / 2)
         ctx.font = `bold ${px}px ${LABEL_FONT}`
-        if (ctx.measureText(text).width > LABEL_BODY_W) {
-          while (text.length > 1 && ctx.measureText(text + '…').width > LABEL_BODY_W) text = text.slice(0, -1)
+        if (ctx.measureText(text).width > BODY_W) {
+          while (text.length > 1 && ctx.measureText(text + '…').width > BODY_W) text = text.slice(0, -1)
           text += '…'
         }
       }
@@ -3003,7 +3249,7 @@ export class TwinScene {
       ctx.lineWidth = 1
       ctx.beginPath()
       ctx.moveTo(LABEL_PAD, 33)
-      ctx.lineTo(LABEL_W - LABEL_PAD, 33)
+      ctx.lineTo(W - LABEL_PAD, 33)
       ctx.stroke()
       // 第 2 行：实时能耗 ⚡
       ctx.font = `600 11.5px ${LABEL_FONT}`
@@ -3018,20 +3264,20 @@ export class TwinScene {
     }
 
     // ===== 深色半透明铭牌（非 industrial 场景：虚空/沙漠/城市/海滩） =====
-    _drawLabelCard(ctx, focused, obj.role, true, obj.main, false, UNIT_LABEL_H)
+    _drawLabelCard(ctx, focused, obj.role, true, obj.main, false, UNIT_LABEL_H, W)
 
     ctx.textBaseline = 'middle'
 
-    // 第 1 行：工序名（高亮文字；长名优先降字号，再截断）——所有工艺统一文字颜色，不做角色色区分
+    // 第 1 行：工序名（高亮文字；卡片已按名称加宽，仅超上限时降字号，再截断）——所有工艺统一文字颜色，不做角色色区分
     ctx.textAlign = 'left'
     ctx.font = `bold 13.5px ${LABEL_FONT}`
     ctx.fillStyle = focused ? '#ffffff' : 'rgba(255,255,255,0.92)'
     let text = obj.name
-    if (ctx.measureText(text).width > LABEL_BODY_W) {
-      const px = Math.max(11, Math.floor((13.5 * LABEL_BODY_W) / ctx.measureText(text).width * 2) / 2)
+    if (ctx.measureText(text).width > BODY_W) {
+      const px = Math.max(11, Math.floor((13.5 * BODY_W) / ctx.measureText(text).width * 2) / 2)
       ctx.font = `bold ${px}px ${LABEL_FONT}`
-      if (ctx.measureText(text).width > LABEL_BODY_W) {
-        while (text.length > 1 && ctx.measureText(text + '…').width > LABEL_BODY_W) text = text.slice(0, -1)
+      if (ctx.measureText(text).width > BODY_W) {
+        while (text.length > 1 && ctx.measureText(text + '…').width > BODY_W) text = text.slice(0, -1)
         text += '…'
       }
     }
@@ -3042,7 +3288,7 @@ export class TwinScene {
     ctx.lineWidth = 1
     ctx.beginPath()
     ctx.moveTo(LABEL_PAD, 33)
-    ctx.lineTo(LABEL_W - LABEL_PAD, 33)
+    ctx.lineTo(W - LABEL_PAD, 33)
     ctx.stroke()
 
     // 第 2 行：实时能耗 ⚡
@@ -3113,11 +3359,12 @@ export class TwinScene {
       return { obj: m, mat: m.material, emi: V.emi, anim: 'molten' }
     }
     if (style === 'liquid') {
+      // 液体/浆液（含电力母线）：管内流动的液滴（尺寸须小于液体管内径 PIPE_LIQ_R，避免穿出管壁）
       const m = new THREE.Mesh(
         new THREE.SphereGeometry(1.2, 12, 9),
         mat(V.color, { roughness: 0.2, metalness: 0.0, transparent: true, opacity: 0.85 }),
       )
-      m.scale.set(1.5, 0.6, 1.2)
+      m.scale.set(1.0, 0.5, 0.85)
       return { obj: m, mat: m.material, emi: 0, anim: 'liquid' }
     }
     if (style === 'slab') {
@@ -3180,8 +3427,10 @@ export class TwinScene {
   // 工艺间连接标签：与工序标签保持一致的蓝调铭牌 + 两行指标（先主后碳），
   // 仅标题/副标题语义不同——工序为「名称 + 角色」，连接为「物料名 + 速度」。
   _makeFlowLabel(name, hexColor, rate, carbon, speed) {
+    // 物料名同样自适应卡宽（副行为「x.x m/s」，最小正文宽 62）
+    const w = this._fitLabelW(this._measureText(name, NAME_FONT))
     const canvas = document.createElement('canvas')
-    canvas.width = LABEL_W * LABEL_SS
+    canvas.width = w * LABEL_SS
     canvas.height = LABEL_H * LABEL_SS
     const ctx = canvas.getContext('2d')
     ctx.setTransform(LABEL_SS, 0, 0, LABEL_SS, 0, 0)
@@ -3192,16 +3441,19 @@ export class TwinScene {
     tex.magFilter = THREE.LinearFilter
     tex.generateMipmaps = false
     const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }))
-    spr.scale.set(LABEL_SCALE, LABEL_SCALE * LABEL_ASPECT, 1)   // 与工序标签统一尺寸
+    spr.scale.set(LABEL_SCALE * (w / LABEL_W), LABEL_SCALE * LABEL_ASPECT, 1)   // 与工序标签统一尺寸
     spr.renderOrder = 12
-    this._drawFlowLabel(ctx, tex, name, hexColor, rate, carbon, speed)
+    spr.userData = { w }   // 自适应卡宽，供 _updateLabelScales 按宽高比缩放
+    this._drawFlowLabel(ctx, tex, name, hexColor, rate, carbon, speed, w)
     return spr
   }
 
-  _drawFlowLabel(ctx, tex, name, color, rate, carbon, speed) {
-    ctx.clearRect(0, 0, LABEL_W, LABEL_H)
+  _drawFlowLabel(ctx, tex, name, color, rate, carbon, speed, w = LABEL_W) {
+    const W = w
+    const BODY_W = this._labelBodyW(W)
+    ctx.clearRect(0, 0, W, LABEL_H)
     const light = this.envMode === 'industrial'
-    _drawLabelCard(ctx, false, undefined, undefined, undefined, light)
+    _drawLabelCard(ctx, false, undefined, undefined, undefined, light, LABEL_H, W)
 
     ctx.textBaseline = 'middle'
 
@@ -3210,11 +3462,11 @@ export class TwinScene {
     ctx.font = `bold 13.5px ${LABEL_FONT}`
     ctx.fillStyle = light ? '#1C1C1C' : 'rgba(255,255,255,0.92)'
     let nm = name
-    if (ctx.measureText(nm).width > LABEL_BODY_W) {
-      const px = Math.max(11, Math.floor((13.5 * LABEL_BODY_W) / ctx.measureText(nm).width * 2) / 2)
+    if (ctx.measureText(nm).width > BODY_W) {
+      const px = Math.max(11, Math.floor((13.5 * BODY_W) / ctx.measureText(nm).width * 2) / 2)
       ctx.font = `bold ${px}px ${LABEL_FONT}`
-      if (ctx.measureText(nm).width > LABEL_BODY_W) {
-        while (nm.length > 1 && ctx.measureText(nm + '…').width > LABEL_BODY_W) nm = nm.slice(0, -1)
+      if (ctx.measureText(nm).width > BODY_W) {
+        while (nm.length > 1 && ctx.measureText(nm + '…').width > BODY_W) nm = nm.slice(0, -1)
         nm += '…'
       }
     }
@@ -3224,7 +3476,7 @@ export class TwinScene {
     ctx.textAlign = 'right'
     ctx.font = `600 11px ${LABEL_FONT}`
     ctx.fillStyle = light ? (color || '#005E94') : '#6ecfff'
-    ctx.fillText(speed + ' m/s', LABEL_W - LABEL_PAD, 39)
+    ctx.fillText(speed + ' m/s', W - LABEL_PAD, 39)
 
     ctx.shadowBlur = 0; ctx.shadowOffsetY = 0
     tex.needsUpdate = true
@@ -3232,19 +3484,41 @@ export class TwinScene {
 
   // 计算某类工艺在世界空间中的输入/输出口高度（含Y拉伸与整体缩放 + 本体底部提升量）。
   // 端口定义（IO_Y_DEFS / Y_STRETCH_DEFS / SCALE_DEFS / PORT_OFFSET_DEFS）为模块级常量。
-  _ioHeights(type, lift = 0) {
+  // ioBox：工艺模型的局部包围盒（见 _makeUnit），用于把端口钳制到模型本体上（可为 null）。
+  _ioHeights(type, lift = 0, ioBox = null) {
     const io = IO_Y_DEFS[type] || { inY: 10, outY: 4 }
     const ys = Y_STRETCH_DEFS[type] || 1.0
-    // 小组子场景成员整体放大 GROUP_SCENE_GAIN 倍，端口高度/偏移同步放大，管道端点才能贴合放大后的模型
-    const s = (SCALE_DEFS[type] || UNIT_SCALE) * (this.groupScene ? GROUP_SCENE_GAIN : 1)
+    const s = (SCALE_DEFS[type] || UNIT_SCALE)
     const po = PORT_OFFSET_DEFS[type] || { outX: 8, outZ: 0, inX: 0, inZ: 0 }
+
+    // 端口在「模型局部空间」的 Y（含本体提升量 lift）与 XZ 偏移（body 局部随 s 缩放到世界）
+    let inLY = io.inY * ys + lift, outLY = io.outY * ys + lift
+    let inLX = po.inX, inLZ = po.inZ, outLX = po.outX, outLZ = po.outZ
+    if (ioBox) {
+      // 钳制到模型包围盒内：端口高度不许超出模型顶/底，水平偏移不许伸出模型侧面，
+      // 保证管线端头插在工艺模型上（而不是悬在模型外的空中）。
+      const m = 1.2                                   // 与模型顶/底的最小间隙（局部单位）
+      const lo = ioBox.minY + m, hi = ioBox.maxY - m
+      if (hi > lo) {
+        inLY = Math.min(hi, Math.max(lo, inLY))
+        outLY = Math.min(hi, Math.max(lo, outLY))
+      } else {
+        inLY = outLY = (ioBox.minY + ioBox.maxY) / 2
+      }
+      // 端口偏移定义在模型局部空间、再随工艺朝向（rot）旋转到世界，而包围盒是世界 AABB，
+      // 因此 X/Z 统一取「两轴较小半宽」作上限：任何朝向下端口都不会伸出模型侧面。
+      const h = Math.max(0.5, Math.min(ioBox.halfX || 0, ioBox.halfZ || 0) - 0.8)
+      const cl = (v, hh) => Math.min(hh, Math.max(-hh, v))
+      inLX = cl(inLX, h); outLX = cl(outLX, h)
+      inLZ = cl(inLZ, h); outLZ = cl(outLZ, h)
+    }
 
     // 2.5 为 _makeUnit 中 group.position.y（位于厂区地坪之上）；lift 为本体底部提升量（局部），乘 s 换算到世界
     return {
-      inY:  2.5 + io.inY  * ys * s + lift * s,
-      outY: 2.5 + io.outY * ys * s + lift * s,
-      inX:  po.inX  * s,  inZ:  po.inZ  * s,   // 模型空间 * 整体缩放 → 局部空间偏移
-      outX: po.outX * s,  outZ: po.outZ * s
+      inY:  2.5 + inLY  * s,
+      outY: 2.5 + outLY * s,
+      inX:  inLX * s,  inZ:  inLZ * s,   // 模型空间 * 整体缩放 → 世界偏移
+      outX: outLX * s, outZ: outLZ * s
     }
   }
   _makeFlows(flows, byId) {
@@ -3306,8 +3580,8 @@ export class TwinScene {
       // 组内连线：聚合模型已体现内部工艺关系，不再单独绘制管道
       if (ga && gb && ga.isGroup && gb.isGroup && ga.groupId === gb.groupId) return
       // 组成员端口统一锚定到组模型中心与组统一 IO 高度
-      const ioA = (ga && ga.isGroup) ? ga.ioY : this._ioHeights(a.type, (ga && ga.lift) || 0)
-      const ioB = (gb && gb.isGroup) ? gb.ioY : this._ioHeights(b.type, (gb && gb.lift) || 0)
+      const ioA = (ga && ga.isGroup) ? ga.ioY : this._ioHeights(a.type, (ga && ga.lift) || 0, ga && ga.ioBox)
+      const ioB = (gb && gb.isGroup) ? gb.ioY : this._ioHeights(b.type, (gb && gb.lift) || 0, gb && gb.ioBox)
       const rotA = a.rot || 0, rotB = b.rot || 0
       const cosA = Math.cos(rotA), sinA = Math.sin(rotA)
       const cosB = Math.cos(rotB), sinB = Math.sin(rotB)
@@ -3381,12 +3655,26 @@ export class TwinScene {
       // 水平段高度 = 目标入口高度 + 层差（多条线路汇聚/可能交叉时用不同高度区分）
       const H = pb.y + (L.yLayer || 0)
       const V = MAT_VIS[L.f.material] || MAT_VIS._default
-      const state = (V.style === 'gas') ? 'gas' : (V.style === 'molten' || V.style === 'liquid') ? 'liquid' : 'solid'
+      // 形态决定运输媒介：散料/块料（固体）→ 传送带；气体 → 透明气管；液体（含浆液/母线）→ 圆桶管道；
+      // 熔体（铁水/钢水）→ 敞口流槽（钢铁特有，高温熔融金属靠敞口槽输送）
+      const state = (V.style === 'gas') ? 'gas'
+        : (V.style === 'molten') ? 'molten'
+        : (V.style === 'liquid') ? 'liquid' : 'solid'
 
       // 本 flow 的媒介材质：各段复用同一组（避免每段重复创建材质对象）
       const isLightFlow = this.envMode === 'industrial'
       let pipeMat, innerMat, beltMat, railMat, troughMat, liquidMat, ringMat
-      if (state === 'gas') {
+      if (state === 'liquid') {
+        // 液体/浆液（以及电力-母线）：圆桶管道 —— 外壳金属半透明、内为液体（电流）芯，
+        // 管内介质色即物料色，流动的载运体在半透明管中可见；比气管略细（水管口径小于烟风道）
+        pipeMat = mat(0x9aa5ae, { roughness: 0.3, metalness: 0.55, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false })
+        innerMat = mat(V.color, {
+          emissive: V.emissive != null ? V.emissive : V.color,
+          emissiveIntensity: V.emi != null ? V.emi * 0.8 : 0.28,
+          roughness: 0.35, metalness: 0.1, transparent: true, opacity: 0.72, side: THREE.BackSide, depthWrite: false,
+        })
+        ringMat = mat(0x5a6a7a, { roughness: 0.4, metalness: 0.6 })
+      } else if (state === 'gas') {
         // 浅色/深色环境均保持通透明亮的玻璃管质感（提高不透明度与自发光，降低金属度避免暗场发黑）
         pipeMat = mat(V.color, { roughness: 0.35, metalness: 0.2, transparent: true, opacity: isLightFlow ? 0.62 : 0.5, side: THREE.DoubleSide, depthWrite: false, emissive: V.color, emissiveIntensity: isLightFlow ? 0.3 : 0.6 })
         innerMat = new THREE.MeshStandardMaterial({ color: V.color, emissive: V.color, emissiveIntensity: isLightFlow ? 0.8 : 0.6, roughness: 0.5, metalness: 0.1, transparent: true, opacity: isLightFlow ? 0.42 : 0.3, side: THREE.BackSide, depthWrite: false })
@@ -3486,6 +3774,20 @@ export class TwinScene {
             iMesh.scale.set(PIPE_R - 0.3, segLen, PIPE_R - 0.3)
             segGrp.add(iMesh)
             this._flowGroup.add(segGrp)
+          } else if (state === 'liquid') {
+            // 液体：圆桶管道（CylinderGeometry 沿 local Y 轴，映射到 segDir；与气管同构造，口径略细）
+            _q.setFromUnitVectors(VEC_UP, _v3)
+            const segGrp = new THREE.Group()
+            segGrp.position.copy(_v2)
+            segGrp.setRotationFromQuaternion(_q)
+            const pMesh = new THREE.Mesh(GEO_UNIT_CYL, pipeMat)
+            pMesh.scale.set(PIPE_LIQ_R, segLen, PIPE_LIQ_R)
+            segGrp.add(pMesh)
+            // 管内液体芯（物料色，半透明可见流动载运体）
+            const iMesh = new THREE.Mesh(GEO_UNIT_CYL_IN, innerMat)
+            iMesh.scale.set(PIPE_LIQ_R - 0.55, segLen, PIPE_LIQ_R - 0.55)
+            segGrp.add(iMesh)
+            this._flowGroup.add(segGrp)
           } else if (state === 'solid') {
             // 固体：宽传送带（BoxGeometry，local X 沿 segDir，local Y 保持朝上）
             const segGrp = new THREE.Group()
@@ -3528,17 +3830,19 @@ export class TwinScene {
           }
         }
 
-        // 气体管道法兰环（分布在各段端点和转折点，共享单位圆环几何体）
-        if (state === 'gas') {
+        // 管道法兰环（气/液均适用，分布在各段端点和转折点，共享单位圆环几何体）
+        if (state === 'gas' || state === 'liquid') {
+          const rScale = state === 'liquid' ? PIPE_LIQ_R / PIPE_R : 1   // 液体管更细，环径同比缩小
           for (let pi = 0; pi < wp.length; pi++) {
             const pt = wp[pi]
             const fring = new THREE.Mesh(GEO_TORUS, ringMat)
+            fring.scale.setScalar(rScale)
             fring.position.copy(pt)
             this._flowGroup.add(fring)
             // 转折点（非端点）加球形弯头连接件：让立管↔水平段转角圆润、不再是生硬直角
             if (pi > 0 && pi < wp.length - 1) {
               const joint = new THREE.Mesh(GEO_UNIT_ICO, ringMat)
-              joint.scale.setScalar(PIPE_R * 1.15)
+              joint.scale.setScalar(PIPE_R * 1.15 * rScale)
               joint.position.copy(pt)
               this._flowGroup.add(joint)
             }
@@ -3574,12 +3878,12 @@ export class TwinScene {
         const hu = segLens[hsi] > 0 ? Math.min(hDist / segLens[hsi], 1) : 0
         const midPt = new THREE.Vector3().lerpVectors(wp[hsi], wp[hsi + 1], hu)
         label.position.set(midPt.x, midPt.y + 5.5, midPt.z)
-        label.userData = { kind: 'flow', flowId: L.f.id }
+        label.userData = Object.assign(label.userData || {}, { kind: 'flow', flowId: L.f.id })
         this._flowGroup.add(label)
 
         // 载运体垂直偏移：根据运输媒介类型决定
-        // gas 管道中心=0 | solid 传送带面=0.45 + 载运体半径0.35=0.8 | liquid 流槽液面=0.75
-        const carrierOffset = state === 'gas' ? 0 : state === 'solid' ? 0.8 : 0.75
+        // 管道（气/液）中心=0 | solid 传送带面=0.45 + 载运体半径0.35=0.8 | molten 流槽液面=0.75
+        const carrierOffset = (state === 'gas' || state === 'liquid') ? 0 : state === 'solid' ? 0.8 : 0.75
         this.flows.push({
           totalLen, carrierOffset, flowId: L.f.id,
           obj: carrier.obj, mat: carrier.mat, emi: carrier.emi, anim: carrier.anim,
@@ -4339,6 +4643,12 @@ export class TwinScene {
       }
       // 物料转变动画：原料进→工艺处理→产品出
       if (g.matFlow) this._stepMaterialFlow(g.matFlow, t, dt)
+      // === 资源包场景（火电等）专属动画 ===
+      // 各设备模型自带 _tpTick 动画钩子（见 builders/ThermalPower.js），逐帧回调自描述动作，
+      // 新增设备/新场景不必再改本循环 —— 与下面工辅/钢铁的固定分支互不干扰。
+      if (g._tpTick) {
+        for (let ti = 0; ti < g._tpTick.length; ti++) g._tpTick[ti](t, dt, phase)
+      }
       // === 工辅专属动画 ===
       // 旋转机械（鼓风机/引风机/驱动电源）：叶轮持续旋转
       if (g._fanBlades) {
@@ -4622,10 +4932,12 @@ export class TwinScene {
       // 归一化后消除继承父级缩放造成的尺寸差异，且三类标签呈现明确的层级大小关系。
       const ps = lo.sprite.parent ? lo.sprite.parent.getWorldScale(parentScale) : parentScale.set(1, 1, 1)
       const base = sf * LABEL_PARENT_REF * (lo.isGroup || lo.main !== true ? LABEL_AUX_GAIN : 1)
-      // 高宽比按标签类型取：工艺/工辅卡 UNIT_LABEL_H，小组聚合卡 GROUP_LABEL_H
+      // 高宽比按标签类型取：工艺/工辅卡 UNIT_LABEL_H，小组聚合卡 GROUP_LABEL_H；
+      // 宽度按自适应卡宽同比放大（名称越长卡片越宽，字号与卡高保持不变）
+      const lw = lo.w || LABEL_W
       const lh = (lo.isGroup ? GROUP_LABEL_H : UNIT_LABEL_H) / LABEL_W
       const ly = (base * lh) / ps.y
-      lo.sprite.scale.set(base / ps.x, ly, 1)
+      lo.sprite.scale.set((base * (lw / LABEL_W)) / ps.x, ly, 1)
       // 纵向摆位：卡底缘 = 模型最高点 + 悬停间隙（父级局部单位，每帧重算）。
       // 卡片为保持屏幕尺寸会随视距放大（factor 最大 5.2×），若只在创建时按基准半高摆一次，
       // 远视距下膨胀的卡片会把间隙吃回去、卡底缘沉到模型顶以下 —— 矮小装置（机房温控的冷却水 /
@@ -4648,7 +4960,8 @@ export class TwinScene {
         const focused = this.focusedFlowId && spr.userData.flowId === this.focusedFlowId
         const gain = focused ? LABEL_FOCUS_GAIN : 1
         const sf = LABEL_SCALE * factor * gain
-        spr.scale.set(sf, sf * LABEL_ASPECT, 1)
+        const fw = (spr.userData && spr.userData.w) || LABEL_W
+        spr.scale.set(sf * (fw / LABEL_W), sf * LABEL_ASPECT, 1)
       })
     }
   }

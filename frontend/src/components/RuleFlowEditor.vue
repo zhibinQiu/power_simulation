@@ -1,30 +1,35 @@
 <!-- ============ 规则控制 · 可编排视图 ============
      与「流程编排 FlowEditor」完全不同的语义：
        流程编排 = 物料流 / 工艺拓扑（节点=工艺·物料·设备，连线=物流）
-       规则编排 = 控制逻辑（节点=可调/传感/IF，连线=执行顺序）
-     三类模块用三种颜色区分：可调（可设定数值）· 传感（只读观测）· IF 条件（if/elif/else 分支）。
-     拖拽左侧「可调设备 / 传感设备」到画布即建节点；IF 模块默认 if-else，可手动添加 elif。
-     每个条件分支的输出端口可继续往下连接可调或传感节点并进行设置（只有可调可设定数值）。 -->
+       规则编排 = 控制逻辑（节点=可调/传感/IF/循环，连线=执行顺序）
+     五类模块用五种颜色区分：可调（可设定数值）· 传感（只读观测）· IF 条件（if/elif/else 分支）·
+     AND / OR 逻辑门（把若干条判定归约成一个真 / 假出口）· 循环（重复跑下游）。
+     左侧模块列表拖入画布即建节点（也可点工具条按钮）；IF 模块默认 if-else，可手动添加 elif，
+     每条分支也可单条删除（至少保留一条）。
+     每个条件分支的输出端口可继续往下连接可调或传感节点并进行设置（只有可调可设定数值）；
+     同一个输出端口可以连接多个下游模块，命中该分支时这些下游并列推进（不再限制「一个端口只能一条出线」）。
+     循环模块只有一对出入端口：走到它时把下游链路重复执行 N 轮，轮与轮之间可设间隔秒数。 -->
 <template>
   <div class="rfe">
     <!-- ══════════ 工具条 ══════════ -->
     <div class="rfe-bar">
-      <button class="rf-b pri" @click="addIf">{{ t('+ if 模块') }}</button>
-      <button class="rf-b" @click="addDev('adj')" :disabled="!adjList.length">{{ t('+ 可调设备') }}</button>
-      <button class="rf-b" @click="addDev('sen')" :disabled="!senList.length">{{ t('+ 传感设备') }}</button>
-      <span class="rf-sep"></span>
       <button class="rf-b" title="Ctrl+Z" :disabled="!canUndo" @click="undo">{{ t('撤销') }}</button>
       <button class="rf-b" title="Ctrl+Shift+Z / Ctrl+Y" :disabled="!canRedo" @click="redo">{{ t('重做') }}</button>
       <button class="rf-b" title="Ctrl+C" :disabled="!selNode" @click="copySel">{{ t('复制') }}</button>
       <button class="rf-b" title="Ctrl+X" :disabled="!selNode" @click="cutSel">{{ t('剪切') }}</button>
       <button class="rf-b" title="Ctrl+V" :disabled="!clipboard" @click="paste">{{ t('粘贴') }}</button>
       <span class="rf-sp"></span>
+      <span class="rf-lg"><i class="lg-d st"></i>{{ t('开始') }}</span>
+      <span class="rf-lg"><i class="lg-d en"></i>{{ t('结束') }}</span>
       <span class="rf-lg"><i class="lg-d adj"></i>{{ t('可调') }}</span>
       <span class="rf-lg"><i class="lg-d sen"></i>{{ t('传感') }}</span>
       <span class="rf-lg"><i class="lg-d ifn"></i>{{ t('条件') }}</span>
+      <span class="rf-lg"><i class="lg-d gat"></i>{{ t('逻辑') }}</span>
+      <span class="rf-lg"><i class="lg-d lop"></i>{{ t('循环') }}</span>
       <span class="rf-sp"></span>
       <span class="rf-cnt mono">{{ nodes.length }} {{ t('模块') }} · {{ edges.length }} {{ t('连线') }}</span>
       <span class="rf-cnt mono">{{ t('本轮动作') }} {{ lastActs.length }}</span>
+      <span class="rf-path" :class="{ on: flow.ok }">{{ flow.ok ? t('通路已连通') : t('通路未连通') }}</span>
       <button class="rf-b" @click="fitView" :disabled="!nodes.length">{{ t('适应') }}</button>
       <button class="rf-b" @click="clearAll" :disabled="!nodes.length">{{ t('清空') }}</button>
       <button class="rf-b ghost" @click="showLog = !showLog">{{ t('日志') }}{{ log.length ? '(' + log.length + ')' : '' }}</button>
@@ -32,8 +37,9 @@
     </div>
 
     <!-- ══════════ 画布 ══════════ -->
-    <div class="rfe-cv" ref="cvEl"
-         @mousedown="onCvDown" @wheel.prevent="onWheel">
+    <div class="rfe-cv" ref="cvEl" :class="{ drop: dragOver }"
+         @mousedown="onCvDown" @wheel.prevent="onWheel"
+         @dragover.prevent="dragOver = true" @dragleave="dragOver = false" @drop.prevent="onDrop">
       <div class="rfe-vp" :style="vpStyle">
         <svg class="rfe-svg" :width="CV_W" :height="CV_H">
           <path v-for="e in edges" :key="'h' + e.id" class="rf-e-hit" :d="edgeD(e)" @mousedown.stop="selEdge = e.id" />
@@ -79,12 +85,23 @@
             <span v-if="!isLinked(n)" class="rf-warn">{{ t('未接入条件分支') }}</span>
           </div>
 
-          <span class="rf-pt out" @mousedown.stop="startLink(n, 'out')"></span>
+          <span class="rf-pt out" :title="t('输出端口可连接多个下游')" @mousedown.stop="startLink(n, 'out')"></span>
+        </div>
+
+        <!-- ─────── 开始 / 结束 节点（流程端点：只有连通二者的那条路会执行） ─────── -->
+        <div v-for="n in flowNodes" :key="n.id" class="rf-node flow" :data-nid="n.id"
+             :class="[n.kind, { sel: n.id === selNode, act: activeNode.has(n.id) }]"
+             :style="nodeStyle(n)" @mousedown.stop="startMove(n, $event)">
+          <span v-if="n.kind === 'end'" class="rf-pt in"></span>
+          <i class="rf-fic">{{ n.kind === 'start' ? '▶' : '■' }}</i>
+          <span class="rf-fnm">{{ n.kind === 'start' ? t('开始') : t('结束') }}</span>
+          <button class="rf-x" :title="t('删除模块')" @mousedown.stop @click.stop="delNode(n)">✕</button>
+          <span v-if="n.kind === 'start'" class="rf-pt out" :title="t('输出端口可连接多个下游')" @mousedown.stop="startLink(n, 'out')"></span>
         </div>
 
         <!-- ─────── IF 条件节点 ─────── -->
         <div v-for="n in ifNodes" :key="n.id" class="rf-node ifn" :data-nid="n.id"
-             :class="{ sel: n.id === selNode }" :style="nodeStyle(n)" @mousedown.stop="selNode = n.id">
+             :class="{ sel: n.id === selNode, act: activeNode.has(n.id) }" :style="nodeStyle(n)" @mousedown.stop="selNode = n.id">
           <span class="rf-pt in"></span>
 
           <div class="rf-hd" @mousedown.stop="startMove(n, $event)">
@@ -109,20 +126,97 @@
                 <input class="rf-num sm" type="number" v-model.number="b.val" @mousedown.stop @focus="histBegin" @change="histCommit" />
               </template>
               <span v-else class="rf-el">{{ t('以上都不满足') }}</span>
-              <button v-if="b.type === 'elif'" class="rf-bx" :title="t('删除该分支')" @mousedown.stop @click.stop="delBranch(n, b)">✕</button>
+              <button class="rf-bx" :disabled="b.type === 'else'" @mousedown.stop @click.stop="delBranch(n, b)"
+                      :title="b.type === 'else' ? t('else 分支不可删除') : t('删除该分支')">✕</button>
             </div>
             <div class="rf-br2">
-              <span class="rf-tg" :class="{ none: !branchTarget(n, b) }">
-                {{ branchTarget(n, b) ? '→ ' + branchTarget(n, b).label : t('未连接下游') }}
-              </span>
+              <span class="rf-tg" :class="{ none: !branchTargets(n, b).length }">{{ branchTgTxt(n, b) }}</span>
               <span class="rf-sv mono" v-if="b.type !== 'else'">{{ branchSrcTxt(n, b) }}</span>
             </div>
-            <span class="rf-pt out" @mousedown.stop="startLink(n, b.id)"></span>
+            <span class="rf-pt out" :title="t('输出端口可连接多个下游')" @mousedown.stop="startLink(n, b.id)"></span>
           </div>
 
           <div class="rf-nft">
             <button class="rf-add" @mousedown.stop @click.stop="addBranch(n)">+ {{ t('elif') }}</button>
           </div>
+        </div>
+
+        <!-- ─────── AND / OR 逻辑门：若干条判定归约成一个「满足 / 不满足」出口 ─────── -->
+        <div v-for="n in gateNodes" :key="n.id" class="rf-node gate" :data-nid="n.id"
+             :class="{ sel: n.id === selNode, act: activeNode.has(n.id) }" :style="nodeStyle(n)" @mousedown.stop="selNode = n.id">
+          <span class="rf-pt in"></span>
+
+          <div class="rf-hd" @mousedown.stop="startMove(n, $event)">
+            <i class="rf-ic">{{ n.op === 'or' ? '∨' : '∧' }}</i>
+            <span class="rf-nm">{{ n.op === 'or' ? 'OR' : 'AND' }} · {{ t('逻辑') }}</span>
+            <select class="rf-gop" v-model="n.op" @mousedown.stop @focus="histBegin" @change="histCommit">
+              <option value="and">AND</option>
+              <option value="or">OR</option>
+            </select>
+            <button class="rf-x" :title="t('删除模块')" @mousedown.stop @click.stop="delNode(n)">✕</button>
+          </div>
+
+          <div v-for="(c, i) in n.conds" :key="c.id" class="rf-gc">
+            <span class="rf-gt">{{ i === 0 ? (n.op === 'or' ? t('任一') : t('全部')) : (n.op === 'or' ? t('或者') : t('并且')) }}</span>
+            <select class="rf-sel src" v-model="c.src" @mousedown.stop @focus="histBegin" @change="histCommit">
+              <option value="">{{ t('跟随输入') }}</option>
+              <option v-for="d in devNodes" :key="d.id" :value="d.id">{{ d.label }}</option>
+            </select>
+            <select class="rf-sel op" v-model="c.op" @mousedown.stop @focus="histBegin" @change="histCommit">
+              <option v-for="o in OPS" :key="o.v" :value="o.v">{{ o.l }}</option>
+            </select>
+            <input class="rf-num sm" type="number" v-model.number="c.val" @mousedown.stop @focus="histBegin" @change="histCommit" />
+            <button class="rf-bx" :disabled="n.conds.length <= 1" @mousedown.stop @click.stop="delCond(n, c)"
+                    :title="n.conds.length <= 1 ? t('至少保留一条条件') : t('删除该条件')">✕</button>
+          </div>
+
+          <div class="rf-nft">
+            <button class="rf-add" @mousedown.stop @click.stop="addCond(n)">+ {{ t('条件') }}</button>
+          </div>
+
+          <div v-for="g in GATE_OUTS" :key="g.id" class="rf-br" :class="{ act: activeBranch === n.id + ':' + g.id }">
+            <div class="rf-br1">
+              <span class="rf-bt" :class="g.p">{{ g.name }}</span>
+              <span class="rf-el">{{ gateTxt(n) }}</span>
+            </div>
+            <div class="rf-br2">
+              <span class="rf-tg" :class="{ none: !branchTargets(n, g).length }">{{ branchTgTxt(n, g) }}</span>
+            </div>
+            <span class="rf-pt out" :title="t('输出端口可连接多个下游')" @mousedown.stop="startLink(n, g.id)"></span>
+          </div>
+        </div>
+
+        <!-- ─────── 循环节点：走到它时把下游链路重复执行 N 轮 ─────── -->
+        <div v-for="n in loopNodes" :key="n.id" class="rf-node loop" :data-nid="n.id"
+             :class="{ sel: n.id === selNode, act: activeNode.has(n.id) }"
+             :style="nodeStyle(n)" @mousedown.stop="startMove(n, $event)">
+          <span class="rf-pt in"></span>
+
+          <div class="rf-hd" @mousedown.stop="startMove(n, $event)">
+            <i class="rf-ic">↻</i>
+            <span class="rf-nm">{{ n.label || t('循环模块') }}</span>
+            <em class="rf-ut mono">repeat</em>
+            <button class="rf-x" :title="t('删除模块')" @mousedown.stop @click.stop="delNode(n)">✕</button>
+          </div>
+
+          <div class="rf-lpr">
+            <em class="rf-lb">{{ t('循环次数') }}</em>
+            <input class="rf-num" type="number" min="1" max="999" step="1" v-model.number="n.times"
+                   @mousedown.stop @focus="histBegin" @change="commitLoop(n)" />
+            <i class="rf-u">{{ t('次') }}</i>
+          </div>
+          <div class="rf-lpr">
+            <em class="rf-lb">{{ t('每轮间隔') }}</em>
+            <input class="rf-num" type="number" min="0" max="3600" step="1" v-model.number="n.gap"
+                   @mousedown.stop @focus="histBegin" @change="commitLoop(n)" />
+            <i class="rf-u">{{ t('秒') }}</i>
+          </div>
+          <div class="rf-ft">
+            <span class="rf-hint">{{ t('重复执行下游链路') }}</span>
+            <span v-if="!isLinked(n)" class="rf-warn">{{ t('未接入流程') }}</span>
+          </div>
+
+          <span class="rf-pt out" :title="t('输出端口可连接多个下游')" @mousedown.stop="startLink(n, 'out')"></span>
         </div>
 
         <!-- ─────── 模块实时值：点选卡片后直接显示在其下方 ─────── -->
@@ -145,8 +239,8 @@
       </div>
 
       <div v-if="!nodes.length" class="rf-empty">
-        <p class="t1">{{ t('从左侧「可调设备 / 传感设备」拖拽到画布，或点击「+ if 模块」开始编排') }}</p>
-        <p class="t2">{{ t('规则逻辑：传感/可调 → IF 条件 → 命中的分支 → 下游可调（自动写入设定值）或传感（仅观测）') }}</p>
+        <p class="t1">{{ t('从左侧「模块」列表拖入画布，或点击工具条按钮开始编排') }}</p>
+        <p class="t2">{{ t('规则逻辑：开始 → 传感/可调 → IF 条件或 AND/OR 逻辑 → 命中的出口 → 下游可调（自动写入设定值）或传感（仅观测）→ 结束；只有形成「开始 → 结束」通路的流程才会执行') }}</p>
       </div>
     </div>
 
@@ -173,6 +267,7 @@ import { useSimStore } from '../stores/sim'
 import { DEVICE_MAP } from '../data/flowLibrary'
 import { ADJUSTABLE_MAP } from '../data/attachLibrary'
 import { t } from '../i18n'
+import { flowPath, isDevKind, isFlowKind, isGateKind, KIND_START, KIND_END } from '../utils/ruleFlow'
 
 const props = defineProps({
   // { nodes: [], edges: [] } —— 由父组件（模型）持有的响应式对象，本组件就地读写，持久化由父组件负责
@@ -182,23 +277,41 @@ const props = defineProps({
   period: { type: Number, default: 2 },
 })
 
-// 画布自身发生增删改（含撤销/重做）时通知编排页：左栏勾选随之同步，保持「勾选 ⇄ 模块」一致
-const emit = defineEmits(['canvas-change'])
-
 const store = useSimStore()
 
 // ─────────── 几何常量 ───────────
 const CV_W = 4200
 const CV_H = 3000
+// 往左 / 上可拖出的余量。画布里的连线画在 .rfe-svg 上（overflow: visible，负坐标照常绘制），
+// 卡片本身也是绝对定位的 div，都不受 SVG 尺寸裁剪 —— 所以负方向只受这里的人为限制。
+// 留一个大余量防止甩飞，同时保证往左 / 上拖动不会再撞上一道「隐形边界」。
+const NEG = 6000
 // 原点余量：把世界原点 (0,0) 向右下推 ORIGIN 像素渲染，于是 -ORIGIN ~ 0 的负坐标仍在画布内可见。
 // 模块才能往左 / 往上自由拖动布局（否则坐标只能 ≥ 0 = 死死贴在画布左上角，往上拖完全没反应）。
 const ORIGIN = 400
 const DEV_W = 208
 const DEV_H = 84
+// 循环模块：只有一对出入端口（头部 + 次数 + 间隔 + 提示）
+const LOOP_W = 196
+const LOOP_H = 104   // 头部 30 + 两行参数 + 底部提示
+// 开始 / 结束：流程端点（胶囊形，比设备卡片小，只承载一个端口）
+const ST_W = 132
+const ST_H = 40
 const IF_W = 300
 const IF_HD = 30       // 头部
 const IF_BR = 46       // 每条分支（两行：条件 + 下游提示）
 const IF_FT = 28       // 底部 +elif
+// AND / OR 逻辑门：头部 + 若干条条件行 + 「满足 / 不满足」两条出口 + 底部 +条件
+const GATE_W = 300
+const GATE_HD = 30
+const GATE_ROW = 30    // 每条条件行（与 .rf-gc 同高）
+const GATE_BR = 46     // 每个出口行（复用 .rf-br 的高度）
+const GATE_FT = 28     // 底部「+ 条件」（复用 .rf-nft 的高度）
+/** 逻辑门的两个出口：id 即端口 id（写进连线的 port 字段），t = 满足、f = 不满足 */
+const GATE_OUTS = [
+  { id: 't', name: 'TRUE' },
+  { id: 'f', name: 'FALSE' },
+]
 const OPS = [
   { v: '>', l: '>' }, { v: '>=', l: '≥' }, { v: '<', l: '<' },
   { v: '<=', l: '≤' }, { v: '==', l: '=' }, { v: '!=', l: '≠' },
@@ -207,7 +320,14 @@ const OPS = [
 const nodes = computed(() => (props.graph && props.graph.nodes) || [])
 const edges = computed(() => (props.graph && props.graph.edges) || [])
 const ifNodes = computed(() => nodes.value.filter((n) => n.kind === 'if'))
-const devNodes = computed(() => nodes.value.filter((n) => n.kind !== 'if'))
+const gateNodes = computed(() => nodes.value.filter((n) => isGateKind(n.kind)))
+// 设备模块只含可调 / 传感；开始 / 结束是流程端点，不对应任何设备
+const devNodes = computed(() => nodes.value.filter((n) => isDevKind(n.kind)))
+const flowNodes = computed(() => nodes.value.filter((n) => isFlowKind(n.kind)))
+const loopNodes = computed(() => nodes.value.filter((n) => n.kind === 'loop'))
+/** 通路分析：只有落在 live 里的模块才会被执行（见 utils/ruleFlow.js） */
+// 注意：不要命名为 path —— Vue 模板编译器会把 setup 里的同名绑定解析成 <path> 组件
+const flow = computed(() => flowPath(props.graph))
 
 // ─────────── 设备候选（与 AI 群控左栏同源） ───────────
 const all = computed(() => store.allDevices || [])
@@ -250,7 +370,7 @@ function liveOf(id) {
   if (d && d.reading != null) return Number(d.reading)
   return null
 }
-function isMissing(n) { return n.kind !== 'if' && !findDev(n.devId) }
+function isMissing(n) { return isDevKind(n.kind) && !findDev(n.devId) }
 
 // ─────────── 视图（平移 / 缩放） ───────────
 const view = reactive({ x: 0, y: 0, z: 1 })
@@ -267,16 +387,23 @@ function onWheel(e) {
   if (!el) return
   const r = el.getBoundingClientRect()
   // 换算到「未平移前的世界坐标」基准（与 toWorld 一致），保证以光标为锚点缩放
-  const mx = e.clientX - r.left - ORIGIN
-  const my = e.clientY - r.top - ORIGIN
+  const mx = e.clientX - r.left - el.clientLeft - ORIGIN
+  const my = e.clientY - r.top - el.clientTop - ORIGIN
   const nz = Math.min(1.8, Math.max(0.35, view.z * (e.deltaY < 0 ? 1.1 : 1 / 1.1)))
   view.x = mx - ((mx - view.x) * nz) / view.z
   view.y = my - ((my - view.y) * nz) / view.z
   view.z = nz
 }
 function toWorld(cx, cy) {
-  const r = cvEl.value ? cvEl.value.getBoundingClientRect() : { left: 0, top: 0 }
-  return { x: (cx - r.left - view.x - ORIGIN) / view.z, y: (cy - r.top - view.y - ORIGIN) / view.z }
+  const el = cvEl.value
+  // clientLeft / clientTop = 画布左边框 / 上边框宽度：内容层 .rfe-vp 以「内边距盒」为原点，
+  // 光标换算必须剔除边框，否则落点会整体偏出一个边框宽度（拖拽放模块时肉眼可见的错位）。
+  if (!el) return { x: (cx - view.x - ORIGIN) / view.z, y: (cy - view.y - ORIGIN) / view.z }
+  const r = el.getBoundingClientRect()
+  return {
+    x: (cx - r.left - el.clientLeft - view.x - ORIGIN) / view.z,
+    y: (cy - r.top - el.clientTop - view.y - ORIGIN) / view.z,
+  }
 }
 
 // ─────────── 鼠标交互（移动 / 平移 / 连线） ───────────
@@ -306,15 +433,17 @@ function startLink(n, port) {
   drag = { kind: 'link' }
 }
 /** 把卡片落到光标下（世界坐标），并按画布范围夹取：
- *  下界 -ORIGIN（可拖到画布左 / 上方可见区），上界 画布尺寸 - 卡片尺寸（不越出右 / 下边界）。 */
+ *  下界 -NEG（往左 / 上可自由拖出很长一段，见 NEG 注释），上界 画布尺寸 - 卡片尺寸。
+ *  返回 false 表示已被夹在边界上、卡片无法再跟着光标走（此时自动平移也要停，否则只是白滚画布）。 */
 function moveNodeTo(cx, cy) {
-  if (!drag || drag.kind !== 'node') return
+  if (!drag || drag.kind !== 'node') return false
   const n = nodes.value.find((x) => x.id === drag.id)
-  if (!n) return
-  const clampX = (v) => Math.round(Math.min(CV_W - nodeW(n), Math.max(-ORIGIN, v)))
-  const clampY = (v) => Math.round(Math.min(CV_H - nodeH(n), Math.max(-ORIGIN, v)))
-  n.x = clampX(drag.ox + (cx - drag.sx) / view.z)
-  n.y = clampY(drag.oy + (cy - drag.sy) / view.z)
+  if (!n) return false
+  const wx = drag.ox + (cx - drag.sx) / view.z
+  const wy = drag.oy + (cy - drag.sy) / view.z
+  n.x = clampX(wx, nodeW(n))
+  n.y = clampY(wy, nodeH(n))
+  return n.x === wx && n.y === wy
 }
 // 拖到画布边缘时自动平移视图：卡片才能继续往上 / 左（或下 / 右）拖出可视区，而不是卡在边上
 const EDGE = 30, PAN_STEP = 14
@@ -333,12 +462,18 @@ function autoPanTick() {
   if (lastPt.y < r.top) dy = PAN_STEP
   else if (lastPt.y > r.bottom) dy = -PAN_STEP
   if (!dx && !dy) return
+  const vx = view.x, vy = view.y, ox = drag.ox, oy = drag.oy
   view.x += dx
   view.y += dy
   // 视图平移后光标对应的世界坐标变了：补偿拖拽起点，让卡片始终黏在光标下而不是跟着画布跑
   drag.ox -= dx / view.z
   drag.oy -= dy / view.z
-  moveNodeTo(lastPt.x, lastPt.y)
+  const ok = moveNodeTo(lastPt.x, lastPt.y)
+  if (!ok) {
+    // 卡片已顶到边界：撤销这一帧的平移，否则画布照滚而卡片不动，看起来像「往回跑」
+    view.x = vx; view.y = vy; drag.ox = ox; drag.oy = oy
+    return
+  }
   panRaf = requestAnimationFrame(autoPanTick)
 }
 function onWinMove(e) {
@@ -371,11 +506,13 @@ function finishLink(toId) {
   const from = link.value ? link.value.node : null
   const port = link.value ? link.value.port : 'out'
   if (!from || !toId || toId === from.id) return
+  const tgt = nodes.value.find((x) => x.id === toId)
+  // 开始模块是流程入口，没有入口端口；结束模块之后不再往下走
+  if (!tgt || tgt.kind === KIND_START || from.kind === KIND_END) return
+  // 同一个输出端口可以连多个下游：命中该分支（或走到该模块）时，所有下游并列推进。
+  // 只有「完全相同的连线」才忽略，不再清掉该端口已有的其它出线。
+  if (edges.value.some((e) => e.from === from.id && e.port === port && e.to === toId)) return
   histBegin()
-  // 一个输出端口只允许一条出线（条件分支需要唯一走向）
-  for (let i = edges.value.length - 1; i >= 0; i--) {
-    if (edges.value[i].from === from.id && edges.value[i].port === port) edges.value.splice(i, 1)
-  }
   edges.value.push({ id: 'e' + Math.random().toString(36).slice(2, 8), from: from.id, port, to: toId })
   histCommit()
 }
@@ -407,30 +544,140 @@ function centerWorld() {
   const r = el.getBoundingClientRect()
   return toWorld(r.left + el.clientWidth / 2, r.top + el.clientHeight / 2)
 }
-function addIf() {
+/** 落点定位：卡片**中心**对准落点（拖拽时即鼠标位置，点击添加时为视图中心）。
+ *  夹取范围必须与 moveNodeTo 完全一致（下界 -NEG、上界 画布尺寸 - 卡片尺寸）——
+ *  曾用 Math.max(12, …) 把落点硬夹在左上角，而画布本来就支持负坐标（ORIGIN / NEG 就是为了往左、往上布局），
+ *  一旦平移或缩放过画布，落点世界坐标变负就会被吸到 (12,12)，表现为「模块没落在我松手的位置」。
+ *  只有该位置已被另一张卡片占住时才做一次微小错开，避免新卡片被完全盖住。 */
+function dropPoint(at, w, h) {
+  const c = at || centerWorld()
+  let x = clampX(c.x - w / 2, w)
+  let y = clampY(c.y - h / 2, h)
+  const clash = nodes.value.some((n) => Math.abs(n.x - x) < 12 && Math.abs(n.y - y) < 12)
+  if (clash) { x = clampX(x + 24, w); y = clampY(y + 20, h) }
+  return { x, y }
+}
+function addIf(at) {
   histBegin()
-  const c = centerWorld()
-  const n = nodes.value.length
-  nodes.value.push({
+  const n = {
     id: nid('if'),
     kind: 'if',
-    x: Math.max(12, Math.round(c.x - IF_W / 2 + (n % 4) * 18)),
-    y: Math.max(12, Math.round(c.y - 70 + (n % 4) * 14)),
+    x: 0,
+    y: 0,
     branches: [
       { id: 'b1', type: 'if', src: '', op: '>', val: 0 },
       { id: 'b2', type: 'else', src: '', op: '>', val: 0 },
     ],
+  }
+  const p = dropPoint(at, IF_W, nodeH(n))
+  n.x = p.x
+  n.y = p.y
+  nodes.value.push(n)
+  histCommit()
+}
+/**
+ * AND / OR 逻辑门：把若干条「传感读数 vs 阈值」的判定归约成一个出口。
+ * 条件全部成立（AND）或任一成立（OR）→ 走 TRUE 出口；否则走 FALSE 出口。
+ */
+function addGate(op, at) {
+  histBegin()
+  const n = {
+    id: nid('gate'),
+    kind: 'gate',
+    op: op === 'or' ? 'or' : 'and',
+    conds: [{ id: 'c' + Date.now().toString(36) + (seq++), src: '', op: '>', val: 0 }],
+    x: 0,
+    y: 0,
+  }
+  const p = dropPoint(at, GATE_W, nodeH(n))
+  n.x = p.x
+  n.y = p.y
+  nodes.value.push(n)
+  histCommit()
+}
+/** 给逻辑门追加一条条件（AND = 并且，OR = 或者） */
+function addCond(n) {
+  if (!n || !Array.isArray(n.conds)) return
+  histBegin()
+  n.conds.push({ id: 'c' + Date.now().toString(36) + (seq++), src: '', op: '>', val: 0 })
+  histCommit()
+}
+/** 删除逻辑门的一条条件：至少保留一条 */
+function delCond(n, c) {
+  if (!n || !Array.isArray(n.conds) || n.conds.length <= 1) return
+  histBegin()
+  const i = n.conds.indexOf(c)
+  if (i >= 0) n.conds.splice(i, 1)
+  histCommit()
+}
+/** 条件行的判定来源：显式指定 > 逻辑门的上游连线 > 无（与 IF 分支同一口径） */
+function condSrc(n, c) {
+  if (c && c.src) {
+    const x = nodes.value.find((k) => k.id === c.src)
+    if (x && !isGateKind(x.kind) && x.kind !== 'if') return x
+  }
+  const e = edges.value.find((x) => x.to === n.id)
+  if (!e) return null
+  const s = nodes.value.find((x) => x.id === e.from)
+  return s && !isGateKind(s.kind) && s.kind !== 'if' ? s : null
+}
+/** 逻辑门出口上的即时摘要：各条件的「来源 = 读数」 */
+function gateTxt(n) {
+  const out = []
+  for (const c of n.conds || []) {
+    const s = condSrc(n, c)
+    if (!s) continue
+    const v = liveOf(s.devId)
+    out.push(`${s.label} ${c.op} ${fmt(c.val)} → ${v == null ? '—' : fmt(v)}`)
+    if (out.length >= 2) break
+  }
+  return out.length ? out.join('；') : t('无判定来源')
+}
+/** 循环模块：走到它时把下游链路重复执行 N 轮（每轮之间可设间隔秒数） */
+function addLoop(at) {
+  histBegin()
+  const p = dropPoint(at, LOOP_W, LOOP_H)
+  nodes.value.push({
+    id: nid('loop'),
+    kind: 'loop',
+    label: t('循环模块'),
+    times: 3,
+    gap: 0,
+    x: p.x,
+    y: p.y,
   })
   histCommit()
 }
-function addDev(kind) {
-  const list = kind === 'adj' ? adjList.value : senList.value
-  if (!list.length) return
-  addDevById(kind, list[0], null)
+/** 循环参数钳取：次数 1~999 整数，间隔 0~3600 秒 */
+function loopTimes(n) {
+  const v = Math.round(Number(n && n.times))
+  return Number.isFinite(v) ? Math.min(999, Math.max(1, v)) : 1
+}
+function loopGap(n) {
+  const v = Number(n && n.gap)
+  return Number.isFinite(v) ? Math.min(3600, Math.max(0, v)) : 0
+}
+/** 循环参数编辑：先钳回合法区间再入历史 */
+function commitLoop(n) {
+  n.times = loopTimes(n)
+  n.gap = loopGap(n)
+  histCommit()
+}
+/** 流程端点（开始 / 结束）：整条流程的入口与出口，只有连通二者的那条路才会执行 */
+function addFlow(kind, at) {
+  histBegin()
+  const p = dropPoint(at, ST_W, ST_H)
+  nodes.value.push({
+    id: nid(kind),
+    kind,
+    x: p.x,
+    y: p.y,
+  })
+  histCommit()
 }
 function addDevById(kind, d, at) {
   histBegin()
-  const c = at || centerWorld()
+  const p = dropPoint(at, DEV_W, DEV_H)
   const v = kind === 'adj'
     ? Number(Number(d && d.setpoint != null ? d.setpoint : spMin(d.id)).toFixed(3))
     : null
@@ -442,8 +689,8 @@ function addDevById(kind, d, at) {
     unit: d.unit || '',
     unitName: d.unitName || '',
     value: v,
-    x: Math.max(12, Math.round(c.x - DEV_W / 2)),
-    y: Math.max(12, Math.round(c.y - DEV_H / 2)),
+    x: p.x,
+    y: p.y,
   })
   histCommit()
 }
@@ -456,14 +703,36 @@ function addBranch(n) {
   else n.branches.push(item)
   histCommit()
 }
+/** 删除一条分支：else 是兜底出口，永不删除；删掉 if / elif 后重排分支语义（仍保证有一条 else） */
 function delBranch(n, b) {
+  if (!n || !b || !Array.isArray(n.branches)) return
+  if (b.type === 'else') return
   histBegin()
   const i = n.branches.indexOf(b)
   if (i >= 0) n.branches.splice(i, 1)
   for (let k = edges.value.length - 1; k >= 0; k--) {
     if (edges.value[k].from === n.id && edges.value[k].port === b.id) edges.value.splice(k, 1)
   }
+  normBranches(n)
   histCommit()
+}
+/**
+ * 分支语义重排：首条为 if、中间为 elif、else 固定一条且在末位（兜底出口，不可删除）；
+ * 缺失 else 时自动补一条（兼容只写了 if 的旧编排），多余 / 失效端口的连线一并清理。
+ */
+function normBranches(n) {
+  const bs = Array.isArray(n.branches) ? n.branches : []
+  const head = bs.filter((x) => x && x.type !== 'else')
+  head.forEach((x, i) => { x.type = i === 0 ? 'if' : 'elif' })
+  let tail = bs.filter((x) => x && x.type === 'else').slice(0, 1)
+  if (!tail.length) tail = [{ id: 'b' + Date.now().toString(36) + (seq++), type: 'else', src: '', op: '>', val: 0 }]
+  n.branches = head.concat(tail)
+  const ids = {}
+  for (const x of n.branches) ids[x.id] = 1
+  for (let k = edges.value.length - 1; k >= 0; k--) {
+    const e = edges.value[k]
+    if (e.from === n.id && !ids[e.port]) edges.value.splice(k, 1)
+  }
 }
 function delNode(n) {
   if (!n) return
@@ -474,8 +743,11 @@ function delNode(n) {
     const e = edges.value[k]
     if (e.from === n.id || e.to === n.id) edges.value.splice(k, 1)
   }
-  // 清掉其它 IF 分支里指向它的判定来源
-  for (const m of ifNodes.value) for (const b of m.branches) if (b.src === n.id) b.src = ''
+  // 清掉其它模块里指向它的判定来源（IF 分支 / 逻辑门条件）
+  for (const m of nodes.value) {
+    if (m.kind === 'if') for (const b of m.branches || []) if (b.src === n.id) b.src = ''
+    else if (isGateKind(m.kind)) for (const c of m.conds || []) if (c.src === n.id) c.src = ''
+  }
   if (selNode.value === n.id) selNode.value = ''
   histCommit()
 }
@@ -490,6 +762,7 @@ function clearAll() {
   histBegin()
   nodes.value.splice(0, nodes.value.length)
   edges.value.splice(0, edges.value.length)
+  pendLoops.value = []   // 模块都没了，挂起的后续轮次一并作废
   selNode.value = ''
   selEdge.value = ''
   histCommit()
@@ -517,7 +790,6 @@ function histCommit() {
     undoStack.value.push(JSON.parse(preSnap))
     if (undoStack.value.length > HIST_CAP) undoStack.value.shift()
     redoStack.value = []
-    emit('canvas-change')
   }
   preSnap = null
 }
@@ -534,7 +806,6 @@ function undo() {
   applyState(undoStack.value.pop())
   selNode.value = ''
   selEdge.value = ''
-  emit('canvas-change')
 }
 function redo() {
   histCommit()
@@ -543,7 +814,6 @@ function redo() {
   applyState(redoStack.value.pop())
   selNode.value = ''
   selEdge.value = ''
-  emit('canvas-change')
 }
 /** 数值输入整段编辑合并为一步（focus 捕获，change 提交） */
 function commitVal(n) { clampVal(n); histCommit() }
@@ -568,12 +838,18 @@ function paste() {
   histBegin()
   const c = cloneNode(src)
   c.id = nid(c.kind === 'if' ? 'if' : c.kind)
-  c.x = Math.min(CV_W - nodeW(c) - 12, Math.max(12, (c.x || 40) + 28))
-  c.y = Math.min(CV_H - nodeH(c) - 12, Math.max(12, (c.y || 40) + 28))
+  c.x = clampX((c.x || 40) + 28, nodeW(c))
+  c.y = clampY((c.y || 40) + 28, nodeH(c))
   if (c.kind === 'if' && Array.isArray(c.branches)) {
     for (const b of c.branches) {
       b.id = 'b' + Date.now().toString(36) + '_' + (seq++)
       if (b.src) b.src = ''   // 分支判定来源指向旧节点，粘贴后需重新指定
+    }
+  }
+  if (isGateKind(c.kind) && Array.isArray(c.conds)) {
+    for (const q of c.conds) {
+      q.id = 'c' + Date.now().toString(36) + '_' + (seq++)
+      if (q.src) q.src = ''   // 同上：条件来源指向旧节点
     }
   }
   nodes.value.push(c)
@@ -582,13 +858,51 @@ function paste() {
   histCommit()
 }
 
-// ─────────── 拖放（左侧设备 → 画布） ───────────
-
-
+// ─────────── 拖放（左侧模块列表 → 画布） ───────────
+// 左栏把模块（开始 / 结束 / IF / AND / OR / 循环 / 可调 / 传感）以 JSON 写进 dataTransfer，
+// 落到画布时按落点世界坐标建模块；点击左栏项时由父组件调 addModule 加到视图中心。
+const dragOver = ref(false)
+function onDrop(e) {
+  dragOver.value = false
+  const raw = e && e.dataTransfer ? e.dataTransfer.getData('text/plain') : ''
+  if (!raw) return
+  let p = null
+  try { p = JSON.parse(raw) } catch (err) { return }
+  if (!p || !p.k) return
+  addModule(p, toWorld(e.clientX, e.clientY))
+}
+/** 按载荷建模块：{ k, op?, devId? }；at 为世界坐标（缺省落到视图中心） */
+function addModule(p, at) {
+  if (!p || !p.k) return
+  if (p.k === KIND_START || p.k === KIND_END) { addFlow(p.k, at); return }
+  if (p.k === 'if') { addIf(at); return }
+  if (p.k === 'gate') { addGate(p.op, at); return }
+  if (p.k === 'loop') { addLoop(at); return }
+  if (p.k === 'adj' || p.k === 'sen') {
+    const list = p.k === 'adj' ? adjList.value : senList.value
+    const d = list.find((x) => x.id === p.devId) || list[0]
+    if (d) addDevById(p.k, d, at)
+  }
+}
 
 // ─────────── 几何：端口与连线 ───────────
-function nodeW(n) { return n.kind === 'if' ? IF_W : DEV_W }
-function nodeH(n) { return n.kind === 'if' ? IF_HD + n.branches.length * IF_BR + IF_FT : DEV_H }
+function nodeW(n) {
+  if (n.kind === 'if') return IF_W
+  if (isGateKind(n.kind)) return GATE_W
+  if (n.kind === 'loop') return LOOP_W
+  return isFlowKind(n.kind) ? ST_W : DEV_W
+}
+function nodeH(n) {
+  if (n.kind === 'if') return IF_HD + n.branches.length * IF_BR + IF_FT
+  // 头部 + 条件行 + 底部「+ 条件」+ 真 / 假 两条出口
+  if (isGateKind(n.kind)) return GATE_HD + (n.conds || []).length * GATE_ROW + GATE_FT + 2 * GATE_BR
+  if (n.kind === 'loop') return LOOP_H
+  return isFlowKind(n.kind) ? ST_H : DEV_H
+}
+/** 坐标夹取（拖拽移动与拖放落点共用同一口径）：
+ *  下界 -NEG（往左 / 上可自由拖出很长一段，见 NEG 注释），上界 画布尺寸 - 卡片尺寸。 */
+function clampX(v, w) { return Math.round(Math.min(CV_W - w, Math.max(-NEG, v))) }
+function clampY(v, h) { return Math.round(Math.min(CV_H - h, Math.max(-NEG, v))) }
 function nodeStyle(n) {
   return { left: n.x + 'px', top: n.y + 'px', width: nodeW(n) + 'px', height: nodeH(n) + 'px' }
 }
@@ -599,6 +913,14 @@ function outPort(n, port) {
     if (i < 0) i = 0
     return { x: n.x + IF_W, y: n.y + IF_HD + i * IF_BR + IF_BR / 2 }
   }
+  if (isGateKind(n.kind)) {
+    // 出口排在条件行与底部「+ 条件」之后：0 = 满足（TRUE）、1 = 不满足（FALSE）
+    const i = port === 'f' ? 1 : 0
+    const top = n.y + GATE_HD + (n.conds || []).length * GATE_ROW + GATE_FT
+    return { x: n.x + GATE_W, y: top + i * GATE_BR + GATE_BR / 2 }
+  }
+  if (n.kind === KIND_START) return { x: n.x + ST_W, y: n.y + ST_H / 2 }
+  if (n.kind === 'loop') return { x: n.x + LOOP_W, y: n.y + LOOP_H / 2 }
   return { x: n.x + DEV_W, y: n.y + DEV_H / 2 }
 }
 function bez(a, b) {
@@ -621,14 +943,40 @@ const edgeMid = computed(() => {
   const b = inPort(to)
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
 })
+/** 模块显示名（校验提示 / 下游摘要用）：设备用标签，逻辑类用种类名 */
+function nodeName(n) {
+  if (!n) return t('模块')
+  if (n.label) return n.label
+  if (n.kind === 'if') return t('条件判断')
+  if (isGateKind(n.kind)) return `${n.op === 'or' ? 'OR' : 'AND'} · ${t('逻辑')}`
+  if (n.kind === 'loop') return t('循环模块')
+  if (n.kind === KIND_START) return t('开始')
+  if (n.kind === KIND_END) return t('结束')
+  return t('模块')
+}
 function isLinked(n) {
-  if (n.kind === 'if') return true
+  if (n.kind === 'if' || isGateKind(n.kind)) return true
+  if (n.kind === KIND_START) return edges.value.some((e) => e.from === n.id)
+  if (n.kind === KIND_END) return edges.value.some((e) => e.to === n.id)
   return edges.value.some((e) => e.to === n.id || e.from === n.id)
 }
-function branchTarget(n, b) {
-  const e = edges.value.find((x) => x.from === n.id && x.port === b.id)
-  if (!e) return null
-  return nodes.value.find((x) => x.id === e.to) || null
+/** 一条分支的全部下游（同一分支输出可连多个模块，命中时并列推进） */
+function branchTargets(n, b) {
+  const out = []
+  for (const e of edges.value) {
+    if (e.from !== n.id || e.port !== b.id) continue
+    const t = nodes.value.find((x) => x.id === e.to)
+    if (t) out.push(t)
+  }
+  return out
+}
+/** 分支下游摘要：两个以内全列，更多则「前两个 + N」 */
+function branchTgTxt(n, b) {
+  const ts = branchTargets(n, b)
+  if (!ts.length) return t('未连接下游')
+  const names = ts.map((x) => nodeName(x))
+  if (names.length <= 2) return '→ ' + names.join('、')
+  return '→ ' + names.slice(0, 2).join('、') + ' +' + (names.length - 2)
 }
 function branchSrcTxt(n, b) {
   const s = srcNodeOf(n, b)
@@ -651,6 +999,21 @@ function srcNodeOf(n, b) {
 // ─────────── 校验 ───────────
 const issues = computed(() => {
   const out = []
+  const fp = flow.value
+  // ① 流程端点：没有「开始 → … → 结束」通路，整条流程一次都不会执行
+  if (!fp.starts.length) out.push(t('缺少「开始」模块：点击工具条「+ 开始」添加流程入口'))
+  if (!fp.ends.length) out.push(t('缺少「结束」模块：点击工具条「+ 结束」添加流程出口'))
+  if (fp.starts.length && fp.ends.length && !fp.ok) {
+    out.push(t('「开始」与「结束」之间没有形成通路，流程不会执行'))
+  }
+  for (const id of fp.starts) {
+    if (!edges.value.some((e) => e.from === id)) out.push(t('「开始」模块未连接下游模块'))
+  }
+  for (const id of fp.ends) {
+    if (!edges.value.some((e) => e.to === id)) out.push(t('「结束」模块未接入上游模块'))
+  }
+  // ② 模块自身（通路已通时才逐个点名「落在通路外的模块」，否则整条流程一条提示即可）
+  const linked = fp.ok
   for (const n of nodes.value) {
     if (n.kind === 'if') {
       if (!n.branches.some((b) => b.type === 'else')) {
@@ -662,12 +1025,28 @@ const issues = computed(() => {
           if (!srcNodeOf(n, b)) out.push(t('IF 模块「{name}」分支未接入判定来源', { name: bn }))
           if (!Number.isFinite(Number(b.val))) out.push(t('IF 模块「{name}」分支阈值未填写', { name: bn }))
         }
-        if (!branchTarget(n, b)) out.push(t('IF 模块「{name}」分支未连接下游模块', { name: bn }))
+        if (!branchTargets(n, b).length) out.push(t('IF 模块「{name}」分支未连接下游模块', { name: bn }))
       }
-    } else {
+    } else if (isGateKind(n.kind)) {
+      const nm = nodeName(n)
+      for (const c of n.conds || []) {
+        if (!condSrc(n, c)) out.push(t('逻辑模块「{name}」条件未接入判定来源', { name: nm }))
+        if (!Number.isFinite(Number(c.val))) out.push(t('逻辑模块「{name}」条件阈值未填写', { name: nm }))
+      }
+      if (!branchTargets(n, GATE_OUTS[0]).length) out.push(t('逻辑模块「{name}」「满足」出口未连接下游模块', { name: nm }))
+      if (!branchTargets(n, GATE_OUTS[1]).length) out.push(t('逻辑模块「{name}」「不满足」出口未连接下游模块', { name: nm }))
+    } else if (isDevKind(n.kind)) {
       if (isMissing(n)) out.push(t('模块「{name}」对应的设备已不存在', { name: n.label }))
       if (n.kind === 'adj' && !Number.isFinite(Number(n.value))) out.push(t('可调模块「{name}」未设定数值', { name: n.label }))
       if (!isLinked(n)) out.push(t('模块「{name}」未接入任何模块，不会被执行', { name: n.label }))
+    } else if (n.kind === 'loop') {
+      const nm = n.label || t('循环模块')
+      if (!edges.value.some((e) => e.to === n.id)) out.push(t('循环模块「{name}」未接入上游模块', { name: nm }))
+      if (!edges.value.some((e) => e.from === n.id)) out.push(t('循环模块「{name}」未连接下游模块', { name: nm }))
+    }
+    // 接了线但没落在「开始 → 结束」通路上：同样不会被执行
+    if (linked && n.kind !== KIND_START && n.kind !== KIND_END && !fp.live.has(n.id)) {
+      out.push(t('模块「{name}」不在「开始 → 结束」通路上，不会被执行', { name: nodeName(n) }))
     }
   }
   return out
@@ -681,6 +1060,22 @@ const activeNode = ref(new Set())
 const activeEdge = ref(new Set())
 const activeBranch = ref('')
 let runTimer = null
+// 「每轮间隔 > 0」的循环把后续轮次挂起到这里，下一次 tick 到期再跑：{ at, nodeId, round, total, gap }
+const pendLoops = ref([])
+/** 取出到期（且模块还在）的挂起轮次；模块已被删除的条目直接丢弃 */
+function takeDueLoops() {
+  if (!pendLoops.value.length) return []
+  const now = Date.now()
+  const due = []
+  const rest = []
+  for (const q of pendLoops.value) {
+    if (!nodes.value.some((x) => x.id === q.nodeId)) continue
+    if (q.at <= now) due.push(q)
+    else rest.push(q)
+  }
+  pendLoops.value = rest
+  return due
+}
 
 function cmp(a, op, b) {
   const x = Number(a)
@@ -700,7 +1095,7 @@ function pushLog(txt) {
   log.value.unshift({ ts: Date.now(), txt })
   if (log.value.length > 40) log.value.length = 40
 }
-/** 执行一遍：IF 命中分支 → 写入下游可调设定值（传感仅观测）→ 继续往下串联 */
+/** 执行一遍：从「开始」出发沿通路推进，IF 命中分支 → 写入下游可调设定值（传感仅观测）→ 继续往下串联 */
 function runOnce(withLog) {
   const acts = []
   const an = new Set()
@@ -708,9 +1103,33 @@ function runOnce(withLog) {
   let ab = ''
   const visited = new Set()
   const onBr = (v) => { if (!ab) ab = v }
-  for (const n of ifNodes.value) {
-    if (visited.has(n.id)) continue
-    evalIf(n, visited, 0, acts, an, ae, onBr)
+  const fp = flow.value
+  if (!fp.ok) {
+    // 没有「开始 → … → 结束」通路：整条流程不执行（也就不产生任何写入）
+    pendLoops.value = []
+    lastActs.value = []
+    activeNode.value = an
+    activeEdge.value = ae
+    activeBranch.value = ''
+    if (withLog) pushLog(t('未形成「开始 → 结束」通路，本轮不执行'))
+    return []
+  }
+  // ① 到期的挂起轮次（循环模块「每轮间隔 > 0」时排在之后的 tick 执行）
+  for (const q of takeDueLoops()) {
+    const n = nodes.value.find((x) => x.id === q.nodeId)
+    if (!n || !fp.live.has(n.id)) continue
+    an.add(n.id)
+    acts.push({ write: false, txt: roundTxt(n, q.round, q.total) })
+    for (const e of edges.value.filter((x) => x.from === n.id)) {
+      advance(e, fp, 1, acts, an, ae, new Set([n.id]), onBr)
+    }
+    if (q.round < q.total) pendLoops.value.push({ ...q, at: Date.now() + q.gap * 1000, round: q.round + 1 })
+  }
+  for (const id of fp.starts) {
+    an.add(id)
+    for (const e of edges.value.filter((x) => x.from === id)) {
+      advance(e, fp, 0, acts, an, ae, visited, onBr)
+    }
   }
   for (const a of acts) {
     if (a.write) store.setDeviceSetpoint(a.devId, a.value)
@@ -725,7 +1144,41 @@ function runOnce(withLog) {
   }
   return acts
 }
-function evalIf(n, visited, depth, acts, an, ae, onBranch) {
+/** 沿一条连线推进：只在「开始 → 结束」通路上前进，落在通路外的分支一律不执行 */
+function advance(e, fp, depth, acts, an, ae, visited, onBranch) {
+  if (depth > 24) return
+  const tgt = nodes.value.find((x) => x.id === e.to)
+  if (!tgt || !fp.live.has(tgt.id)) return
+  ae.add(e.id)
+  an.add(tgt.id)
+  if (tgt.kind === KIND_END) return
+  if (tgt.kind === 'if') {
+    evalIf(tgt, fp, depth, acts, an, ae, visited, onBranch)
+    return
+  }
+  if (isGateKind(tgt.kind)) {
+    evalGate(tgt, fp, depth, acts, an, ae, visited, onBranch)
+    return
+  }
+  if (tgt.kind === 'loop') {
+    evalLoop(tgt, fp, depth, acts, an, ae, visited, onBranch)
+    return
+  }
+  if (!isDevKind(tgt.kind)) return
+  if (tgt.kind === 'adj') {
+    const v = Number(tgt.value)
+    if (Number.isFinite(v)) {
+      acts.push({ write: true, devId: tgt.devId, value: v, txt: `${tgt.label} ← ${t('写入')} ${fmt(v)}${tgt.unit || ''}` })
+    }
+  } else {
+    acts.push({ write: false, devId: tgt.devId, txt: `${tgt.label}（${t('仅观测，不写入')}）` })
+  }
+  // 继续往下串联
+  for (const nx of edges.value.filter((x) => x.from === tgt.id)) {
+    advance(nx, fp, depth + 1, acts, an, ae, visited, onBranch)
+  }
+}
+function evalIf(n, fp, depth, acts, an, ae, visited, onBranch) {
   if (depth > 8 || visited.has(n.id)) return
   visited.add(n.id)
   let hit = null
@@ -738,24 +1191,63 @@ function evalIf(n, visited, depth, acts, an, ae, onBranch) {
   if (!hit) hit = n.branches.find((b) => b.type === 'else') || null
   if (!hit) return
   onBranch(n.id + ':' + hit.id)
+  // 只推进命中分支，且下游必须仍在通路上（能走到「结束」）
   for (const e of edges.value.filter((x) => x.from === n.id && x.port === hit.id)) {
-    ae.add(e.id)
-    const tgt = nodes.value.find((x) => x.id === e.to)
-    if (!tgt) continue
-    an.add(tgt.id)
-    if (tgt.kind === 'adj') {
-      const v = Number(tgt.value)
-      if (Number.isFinite(v)) {
-        acts.push({ write: true, devId: tgt.devId, value: v, txt: `${tgt.label} ← ${t('写入')} ${fmt(v)}${tgt.unit || ''}` })
-      }
-    } else {
-      acts.push({ write: false, devId: tgt.devId, txt: `${tgt.label}（${t('仅观测，不写入')}）` })
+    advance(e, fp, depth, acts, an, ae, visited, onBranch)
+  }
+}
+/**
+ * AND / OR 逻辑门：逐条求值后归约 —— AND 全部成立 / OR 任一成立 → 走「满足」出口，否则走「不满足」。
+ * 一条都取不到读数时按「不满足」处理（保守，避免误写入设定值）。
+ */
+function evalGate(n, fp, depth, acts, an, ae, visited, onBranch) {
+  if (depth > 8 || visited.has(n.id)) return
+  visited.add(n.id)
+  const or = n.op === 'or'
+  let ok = !or          // AND 从「真」起算（遇假即假）；OR 从「假」起算（遇真即真）
+  let any = false       // 是否至少有一条条件取到了读数
+  for (const c of n.conds || []) {
+    const s = condSrc(n, c)
+    const v = s ? liveOf(s.devId) : null
+    if (v == null || !Number.isFinite(Number(c.val))) continue
+    any = true
+    const r = cmp(v, c.op, c.val)
+    if (or) { if (r) { ok = true; break } }
+    else if (!r) { ok = false; break }
+  }
+  const hit = ok && any ? GATE_OUTS[0] : GATE_OUTS[1]
+  onBranch(n.id + ':' + hit.id)
+  acts.push({ write: false, txt: `${nodeName(n)} → ${hit.id === 't' ? t('满足') : t('不满足')}` })
+  // 只推进命中出口，且下游必须仍在通路上（能走到「结束」）
+  for (const e of edges.value.filter((x) => x.from === n.id && x.port === hit.id)) {
+    advance(e, fp, depth, acts, an, ae, visited, onBranch)
+  }
+}
+function roundTxt(n, i, total) {
+  return `${n.label || t('循环模块')} · ${t('第 {i}/{n} 轮', { i, n: total })}`
+}
+/**
+ * 循环：把下游链路重复执行 times 轮。
+ * 每轮用独立的 visited 起点（含本模块自身），保证循环体内的 IF 每轮都重新求值，
+ * 同时用「已含自身」的副本防止 loop → loop 自环无限递归。
+ * 间隔为 0 时同一轮 tick 内连续跑完；间隔 > 0 时把剩余轮次挂起到之后的 tick（见 takeDueLoops）。
+ */
+function evalLoop(n, fp, depth, acts, an, ae, visited, onBranch) {
+  if (depth > 8 || visited.has(n.id)) return
+  const times = loopTimes(n)
+  const gap = loopGap(n)
+  const seal = new Set(visited)
+  seal.add(n.id)
+  // 新一轮开始：清掉该模块旧的挂起轮次，避免主流程重复命中后越排越多
+  pendLoops.value = pendLoops.value.filter((q) => q.nodeId !== n.id)
+  for (let i = 1; i <= times; i++) {
+    if (i > 1 && gap > 0) {
+      pendLoops.value.push({ at: Date.now() + gap * 1000, nodeId: n.id, round: i, total: times, gap })
+      break
     }
-    // 继续往下串联
-    const nx = edges.value.find((x) => x.from === tgt.id)
-    if (nx) {
-      const nn = nodes.value.find((x) => x.id === nx.to)
-      if (nn && nn.kind === 'if') evalIf(nn, visited, depth + 1, acts, an, ae, onBranch)
+    acts.push({ write: false, txt: roundTxt(n, i, times) })
+    for (const e of edges.value.filter((x) => x.from === n.id)) {
+      advance(e, fp, depth + 1, acts, an, ae, new Set(seal), onBranch)
     }
   }
 }
@@ -766,6 +1258,7 @@ function startTimer() {
 }
 function stopTimer() {
   if (runTimer) { clearInterval(runTimer); runTimer = null }
+  pendLoops.value = []   // 停止后不再补跑挂起的轮次，下次运行从第一轮重新开始
 }
 watch(() => props.running, (on) => { if (on) startTimer(); else stopTimer() }, { immediate: true })
 watch(() => props.period, () => { if (props.running) startTimer() })
@@ -805,7 +1298,7 @@ function tsTxt(ts) {
 // ─────────── 模块选中 → 卡片下方直接显示实时值 ───────────
 const selDev = computed(() => {
   const n = selNode.value ? nodes.value.find((x) => x.id === selNode.value) : null
-  return n && n.kind !== 'if' ? n : null
+  return n && isDevKind(n.kind) ? n : null
 })
 /** 检查器贴在被点选卡片的正下方（画布世界坐标，随缩放平移一起动） */
 function inspStyle(n) {
@@ -856,6 +1349,8 @@ onMounted(() => {
   window.addEventListener('mousemove', onWinMove)
   window.addEventListener('mouseup', onWinUp)
   window.addEventListener('keydown', onKey)
+  // 兼容只写了 if / elif 的旧编排：进入时补齐不可删除的 else 兜底分支
+  for (const n of nodes.value) if (n && n.kind === 'if') normBranches(n)
   if (nodes.value.length) setTimeout(fitView, 0)
 })
 onBeforeUnmount(() => {
@@ -866,238 +1361,262 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
 })
 
-defineExpose({ runOnce, fitView })
+// addModule：供编排页左栏「点击模块项 → 加到画布中心」直接调用（拖拽则由画布 drop 处理）
+defineExpose({ runOnce, fitView, addModule })
 </script>
 
 <style scoped>
-.rfe { display: flex; flex-direction: column; min-height: 0; }
+/* ══════════ 规则画布 · 视觉规范（与群控主页共用同一套令牌） ══════════
+   画布内只出现 2 档正文字号（11 正文 / 10 辅助）与唯一的「大数字」读数；
+   颜色只有三类：结构色 text·muted·faint，种类色 --k-adj/sen/if/loop，语义色 green/red */
+
+.rfe {
+  display: flex; flex-direction: column; min-height: 0;
+  /* 逻辑门种类色：由条件紫与传感青调和而来，不额外引入主题变量 */
+  --k-gate: color-mix(in srgb, var(--k-if) 52%, var(--k-sen));
+}
+.rfe em, .rfe i { font-style: normal; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
 /* ══════════ 工具条 ══════════ */
 .rfe-bar {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  padding: 6px 8px; background: var(--panel-2); border: 1px solid var(--border);
-  border-bottom: 0; border-radius: 3px 3px 0 0;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 8px;
+  background: var(--panel-2); border: 1px solid var(--border); border-bottom: 0;
+  border-radius: var(--radius) var(--radius) 0 0;
 }
 .rf-b {
-  padding: 2px 9px; font-size: 11px; font-family: inherit; color: var(--muted);
-  background: var(--panel); border: 1px solid var(--border); border-radius: 3px; cursor: pointer;
+  padding: 3px 9px; font-family: inherit; font-size: var(--fs-b); font-weight: var(--fw-m); line-height: 1;
+  color: var(--text); background: var(--panel-3); border: 1px solid transparent; border-radius: 2px;
+  cursor: pointer; white-space: nowrap;
 }
-.rf-b:hover:not(:disabled) { border-color: var(--accent2); color: var(--accent-d); }
+.rf-b:hover:not(:disabled) { background: color-mix(in srgb, var(--panel-3) 76%, var(--text)); }
 .rf-b:disabled { opacity: .45; cursor: not-allowed; }
-.rf-b.pri { color: #fff; background: var(--accent-d); border-color: transparent; font-weight: 500; }
-.rf-b.pri:hover:not(:disabled) { filter: brightness(1.08); color: #fff; }
-.rf-b.ghost { background: transparent; }
-.rf-sep { flex: 0 0 auto; width: 1px; height: 14px; background: var(--line); }
+.rf-b.ghost { background: transparent; border-color: var(--border); }
+.rf-b.ghost:hover:not(:disabled) { background: var(--panel); }
+
+.rf-sep { flex: 0 0 auto; width: 1px; height: 14px; background: var(--border); }
 .rf-sp { flex: 1 1 auto; }
-.rf-lg { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--muted); }
-.lg-d { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
-.lg-d.adj { background: #D97A21; }
-.lg-d.sen { background: #17957F; }
-.lg-d.ifn { background: #7A5AA8; }
-.rf-cnt { font-size: 10px; color: var(--faint); }
-.rf-zoom { font-size: 10px; color: var(--faint); min-width: 34px; text-align: right; }
+.rf-lg { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-s); color: var(--muted); white-space: nowrap; }
+.lg-d { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.lg-d.adj { background: var(--k-adj); }
+.lg-d.sen { background: var(--k-sen); }
+.lg-d.ifn { background: var(--k-if); }
+.lg-d.gat { background: var(--k-gate); }
+.lg-d.lop { background: var(--k-loop); }
+.lg-d.st { background: var(--green); }
+.lg-d.en { background: var(--red); }
+.rf-cnt { font-size: var(--fs-s); color: var(--faint); white-space: nowrap; }
+.rf-path {
+  padding: 0 6px; border-radius: 8px; white-space: nowrap; font-size: var(--fs-s); line-height: 15px;
+  color: var(--red); border: 1px solid color-mix(in srgb, var(--red) 34%, transparent);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+}
+.rf-path.on {
+  color: var(--green); border-color: color-mix(in srgb, var(--green) 34%, transparent);
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+}
+.rf-zoom { font-size: var(--fs-s); color: var(--faint); min-width: 34px; text-align: right; }
 
 /* ══════════ 画布 ══════════ */
 .rfe-cv {
-  position: relative; flex: 1 1 auto; min-height: 420px; overflow: hidden;
-  border: 1px solid var(--border);
-  background: radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0 / 22px 22px, var(--panel);
+  position: relative; flex: 1 1 auto; min-height: 420px; overflow: hidden; border: 1px solid var(--border);
+  background: radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0) 0 0 / 22px 22px, var(--panel);
 }
+/* 左侧模块拖到画布上方时的落点提示 */
+.rfe-cv.drop { border-color: var(--accent-d); box-shadow: inset 0 0 0 1px var(--accent-l); }
 .rfe-vp { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
 .rfe-svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .rf-e-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
-.rf-e { fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; pointer-events: none; }
-.rf-e.on { stroke: var(--accent-d); stroke-width: 2.4; }
-.rf-e.act { stroke: #2E8B57; stroke-width: 2.6; }
+.rf-e { fill: none; stroke: var(--faint); stroke-width: 1.6; stroke-linecap: round; pointer-events: none; }
+.rf-e.on { stroke: var(--accent-d); stroke-width: 2.2; }
+.rf-e.act { stroke: var(--green); stroke-width: 2.4; }
 .rf-e.tmp { stroke: var(--accent-d); stroke-dasharray: 5 4; }
 .rf-eg { cursor: pointer; pointer-events: all; }
 .rf-ebg { fill: var(--red); }
-.rf-ex { fill: #fff; font-size: 10px; text-anchor: middle; }
+.rf-ex { fill: #fff; font-size: var(--fs-s); text-anchor: middle; }
+.rf-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 0 40px; text-align: center; pointer-events: none; }
+.rf-empty .t1 { font-size: var(--fs-t); color: var(--muted); }
+.rf-empty .t2 { font-size: var(--fs-s); line-height: 1.6; color: var(--faint); max-width: 520px; }
 
-.rf-empty {
-  position: absolute; inset: 0; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 6px; padding: 0 40px;
-  text-align: center; pointer-events: none;
-}
-.rf-empty .t1 { font-size: 12px; color: var(--muted); }
-.rf-empty .t2 { font-size: 10.5px; color: var(--faint); max-width: 520px; line-height: 1.7; }
-
-/* ══════════ 节点通用 ══════════ */
-/* 模块实时值：贴在卡片正下方（画布世界坐标） */
+/* ══════════ 模块实时值（贴在卡片正下方） ══════════ */
 .rf-insp {
-  /* 只作展示：不拦截鼠标，避免压住下方卡片的拖动/点击（仅关闭按钮可点） */
+  /* 纯展示：不拦截鼠标，避免压住下方卡片的拖动 / 点击（仅关闭按钮可点） */
   pointer-events: none;
   position: absolute; z-index: 6; width: 208px; box-sizing: border-box;
-  display: flex; flex-direction: column; gap: 4px; padding: 7px 9px 8px;
-  border: 1px solid var(--border); border-top: 2px solid var(--accent-d); border-radius: 3px;
-  background: var(--panel); box-shadow: 0 3px 12px rgba(0, 0, 0, .16);
+  display: flex; flex-direction: column; gap: 5px; padding: 8px 10px 9px;
+  border: 1px solid var(--border); border-top: 2px solid var(--accent-d); border-radius: var(--radius);
+  background: var(--panel); box-shadow: var(--shadow);
 }
 .ri-hd { display: flex; align-items: center; gap: 5px; }
-.ri-d { width: 7px; height: 7px; border-radius: 50%; background: #888; flex: 0 0 auto; }
-.ri-d.adj { background: #D97A21; }
-.ri-d.sen { background: #17957F; }
-.ri-hd b { font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ri-d { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; }
+.ri-d.adj { background: var(--k-adj); }
+.ri-d.sen { background: var(--k-sen); }
+.ri-hd b { flex: 1 1 auto; min-width: 0; font-size: var(--fs-b); font-weight: var(--fw-t); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ri-t {
-  flex: 0 0 auto; padding: 0 5px; border-radius: 8px; font-size: 9px; line-height: 14px;
-  background: var(--bar); color: var(--muted); border: 1px solid var(--border);
+  flex: 0 0 auto; padding: 0 6px; border-radius: 8px; white-space: nowrap;
+  font-size: var(--fs-s); line-height: 15px; color: var(--muted); background: var(--bar); border: 1px solid var(--border);
 }
-.ri-x {
-  margin-left: auto; flex: 0 0 auto; padding: 0 3px; border: 0; background: none; cursor: pointer;
-  pointer-events: auto;
-  font-family: inherit; font-size: 11px; color: var(--faint);
-}
+.ri-x { flex: 0 0 auto; margin-left: auto; padding: 0 3px; border: 0; background: none; cursor: pointer; pointer-events: auto; font-family: inherit; font-size: var(--fs-b); color: var(--faint); }
 .ri-x:hover { color: var(--red); }
-.ri-v { display: flex; align-items: baseline; gap: 3px; }
-.ri-v b { font-size: 19px; font-weight: 600; color: var(--accent-d); line-height: 1.1; }
-.ri-v i { font-style: normal; font-size: 10px; color: var(--faint); }
+.ri-v { display: flex; align-items: baseline; gap: 4px; }
+.ri-v b { font-size: 18px; font-weight: var(--fw-t); color: var(--accent-d); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ri-v i { font-size: var(--fs-s); color: var(--faint); }
 .ri-sp { width: 100%; height: 40px; }
 .ri-sp .sp-l { fill: none; stroke: var(--accent-d); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
-.ri-sp .sp-e { fill: var(--faint); font-size: 9px; text-anchor: middle; }
-.ri-r { display: flex; align-items: baseline; justify-content: space-between; font-size: 10px; }
-.ri-r em { font-style: normal; color: var(--faint); }
-.ri-r b { color: var(--muted); font-weight: 600; }
+.ri-sp .sp-e { fill: var(--faint); font-size: var(--fs-s); text-anchor: middle; }
+.ri-r { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: var(--fs-s); }
+.ri-r em { color: var(--faint); }
+.ri-r b { font-weight: var(--fw-m); color: var(--text); font-variant-numeric: tabular-nums; }
 
+/* ══════════ 节点通用 ══════════ */
 .rf-node {
-  position: absolute; box-sizing: border-box; border-radius: 4px;
+  position: absolute; box-sizing: border-box; border-radius: var(--radius);
   background: var(--panel); border: 1px solid var(--border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .10); font-size: 11px; color: var(--text); user-select: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .10); font-size: var(--fs-b); color: var(--text); user-select: none;
 }
-.rf-node::before {
-  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 4px 0 0 4px;
-}
+.rf-node::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: var(--radius) 0 0 var(--radius); }
 .rf-node.sel { border-color: var(--accent-d); box-shadow: 0 0 0 2px var(--accent-l); }
-.rf-node.act { box-shadow: 0 0 0 2px rgba(46, 139, 87, .45); }
+/* 兜底：卡片里的控件一律允许收缩到 0，避免全局 select/input { width: 100% } 撑破卡片 */
+.rf-node select, .rf-node input { min-width: 0; }
+.rf-node.act { box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 45%, transparent); }
 .rf-node.miss { opacity: .6; border-style: dashed; }
-
-/* 三类模块配色：可调=橙 / 传感=青 / 条件=紫 */
-.rf-node.adj::before { background: #D97A21; }
-.rf-node.adj .rf-hd { background: rgba(217, 122, 33, .13); }
-.rf-node.adj .rf-ic { color: #D97A21; }
-.rf-node.adj .rf-pt { border-color: #D97A21; }
-.rf-node.sen::before { background: #17957F; }
-.rf-node.sen .rf-hd { background: rgba(23, 149, 127, .13); }
-.rf-node.sen .rf-ic { color: #17957F; }
-.rf-node.sen .rf-pt { border-color: #17957F; }
-.rf-node.ifn::before { background: #7A5AA8; }
-.rf-node.ifn .rf-hd { background: rgba(122, 90, 168, .14); }
-.rf-node.ifn .rf-ic { color: #7A5AA8; }
-.rf-node.ifn .rf-pt { border-color: #7A5AA8; }
-
 .rf-hd {
-  display: flex; align-items: center; gap: 5px; height: 30px; padding: 0 4px 0 7px;
-  border-bottom: 1px solid var(--border); cursor: move; border-radius: 3px 3px 0 0;
+  display: flex; align-items: center; gap: 5px; height: 30px; padding: 0 4px 0 8px;
+  border-bottom: 1px solid var(--border); cursor: move; border-radius: var(--radius) var(--radius) 0 0;
 }
-.rf-ic { font-style: normal; font-size: 11px; flex: 0 0 auto; }
-.rf-nm {
-  flex: 1 1 auto; min-width: 0; font-size: 11px; font-weight: 600;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.rf-ut { font-style: normal; flex: 0 0 auto; font-size: 9px; color: var(--faint); }
-.rf-x {
-  flex: 0 0 auto; width: 14px; height: 14px; line-height: 12px; padding: 0;
-  font-size: 9px; color: var(--faint); background: none; border: 0; cursor: pointer; font-family: inherit;
-}
+.rf-ic { flex: 0 0 auto; font-size: var(--fs-b); }
+.rf-nm { flex: 1 1 auto; min-width: 0; font-size: var(--fs-b); font-weight: var(--fw-t); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rf-ut { flex: 0 0 auto; font-size: var(--fs-s); color: var(--faint); }
+.rf-x { flex: 0 0 auto; width: 14px; height: 14px; line-height: 12px; padding: 0; font-size: var(--fs-s); color: var(--faint); background: none; border: 0; cursor: pointer; font-family: inherit; }
 .rf-x:hover { color: var(--red); }
 
-/* ══════════ 可调 / 传感 主体 ══════════ */
-.rf-bd { display: flex; align-items: center; gap: 5px; padding: 5px 8px 0; }
-.rf-lb { font-style: normal; flex: 0 0 auto; font-size: 10px; color: var(--muted); }
-.rf-num {
-  flex: 1 1 auto; min-width: 0; padding: 2px 4px; font-size: 11px; font-family: var(--mono);
-  text-align: right; color: var(--text); background: var(--panel);
-  border: 1px solid var(--border); border-radius: 3px; outline: none;
-}
-.rf-num:focus { border-color: var(--accent2); }
-.rf-num.sm { width: 64px; flex: 0 0 auto; }
-.rf-u { font-style: normal; flex: 0 0 auto; font-size: 9.5px; color: var(--faint); }
-.rf-v { flex: 1 1 auto; font-size: 12px; font-weight: 600; color: var(--accent-d); text-align: right; }
-.rf-ft { display: flex; align-items: center; gap: 6px; padding: 3px 8px 5px; }
-.rf-hint { font-size: 9px; color: var(--faint); }
-.rf-warn { margin-left: auto; font-size: 9px; color: #C0562B; }
+/* 种类色只用在三处：左侧识别条 · 头部淡底 · 种类图标 */
+.rf-node.adj::before { background: var(--k-adj); }
+.rf-node.adj .rf-hd { background: color-mix(in srgb, var(--k-adj) 12%, transparent); }
+.rf-node.adj .rf-ic { color: var(--k-adj); }
+.rf-node.adj .rf-pt { border-color: var(--k-adj); }
+.rf-node.sen::before { background: var(--k-sen); }
+.rf-node.sen .rf-hd { background: color-mix(in srgb, var(--k-sen) 12%, transparent); }
+.rf-node.sen .rf-ic { color: var(--k-sen); }
+.rf-node.sen .rf-pt { border-color: var(--k-sen); }
+.rf-node.ifn::before { background: var(--k-if); }
+.rf-node.ifn .rf-hd { background: color-mix(in srgb, var(--k-if) 12%, transparent); }
+.rf-node.ifn .rf-ic { color: var(--k-if); }
+.rf-node.ifn .rf-pt { border-color: var(--k-if); }
+.rf-node.gate::before { background: var(--k-gate); }
+.rf-node.gate .rf-hd { background: color-mix(in srgb, var(--k-gate) 12%, transparent); }
+.rf-node.gate .rf-ic { color: var(--k-gate); font-weight: var(--fw-t); }
+.rf-node.gate .rf-pt { border-color: var(--k-gate); }
+.rf-node.loop::before { background: var(--k-loop); }
+.rf-node.loop .rf-hd { background: color-mix(in srgb, var(--k-loop) 12%, transparent); }
+.rf-node.loop .rf-ic { color: var(--k-loop); }
+.rf-node.loop .rf-pt { border-color: var(--k-loop); }
 
-/* ══════════ IF 分支 ══════════ */
+/* 可调 / 传感主体 */
+.rf-bd { display: flex; align-items: center; gap: 5px; padding: 4px 8px 0; }
+.rf-lb { flex: 0 0 auto; font-size: var(--fs-s); color: var(--muted); }
+.rf-num {
+  flex: 1 1 auto; min-width: 0; padding: 2px 4px; font-size: var(--fs-b); font-family: var(--mono);
+  font-variant-numeric: tabular-nums; text-align: right; color: var(--text);
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); outline: none;
+}
+.rf-num:focus { border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent-l); }
+.rf-num.sm { width: 60px; flex: 0 0 auto; }
+.rf-u { flex: 0 0 auto; font-size: var(--fs-s); color: var(--faint); }
+.rf-v { flex: 1 1 auto; font-size: var(--fs-b); font-weight: var(--fw-m); color: var(--accent-d); text-align: right; font-variant-numeric: tabular-nums; }
+.rf-ft { display: flex; align-items: center; gap: 6px; padding: 3px 8px 4px; }
+.rf-hint { font-size: var(--fs-s); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rf-warn { margin-left: auto; font-size: var(--fs-s); color: var(--yellow); white-space: nowrap; }
+
+/* 开始 / 结束：胶囊形端点（不显示种类色条） */
+.rf-node.flow { display: flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 20px; }
+.rf-node.flow::before { display: none; }
+.rf-fic { flex: 0 0 auto; font-size: var(--fs-s); }
+.rf-fnm { flex: 1 1 auto; min-width: 0; font-size: var(--fs-b); font-weight: var(--fw-t); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rf-node.start { border-color: color-mix(in srgb, var(--green) 50%, transparent); background: color-mix(in srgb, var(--green) 10%, transparent); }
+.rf-node.start .rf-fic { color: var(--green); }
+.rf-node.start .rf-pt { border-color: var(--green); }
+.rf-node.end { border-color: color-mix(in srgb, var(--red) 50%, transparent); background: color-mix(in srgb, var(--red) 10%, transparent); }
+.rf-node.end .rf-fic { color: var(--red); }
+.rf-node.end .rf-pt { border-color: var(--red); }
+
+/* IF 分支 */
 .rf-br {
   position: relative; box-sizing: border-box; height: 46px;
   display: flex; flex-direction: column; justify-content: center; gap: 2px;
-  padding: 0 8px 0 10px; border-top: 1px dashed var(--line);
+  padding: 0 8px 0 10px; border-top: 1px dashed var(--border);
 }
-.rf-br.act { background: rgba(46, 139, 87, .13); }
+.rf-br.act { background: color-mix(in srgb, var(--green) 12%, transparent); }
 .rf-br1 { display: flex; align-items: center; gap: 4px; }
 .rf-bt {
-  flex: 0 0 auto; font-size: 9.5px; padding: 0 4px; border-radius: 8px; line-height: 15px;
-  color: #7A5AA8; background: rgba(122, 90, 168, .14); border: 1px solid rgba(122, 90, 168, .35);
+  flex: 0 0 auto; padding: 0 5px; border-radius: 8px; font-size: var(--fs-s); line-height: 15px;
+  color: var(--k-if); border: 1px solid color-mix(in srgb, var(--k-if) 34%, transparent);
+  background: color-mix(in srgb, var(--k-if) 12%, transparent);
 }
 .rf-br.else .rf-bt { color: var(--muted); background: var(--bar); border-color: var(--border); }
 .rf-sel {
-  min-width: 0; padding: 1px 2px; font-size: 10.5px; font-family: inherit; color: var(--text);
-  background: var(--panel); border: 1px solid var(--border); border-radius: 3px; outline: none;
+  min-width: 0; padding: 1px 3px; font-size: var(--fs-s); font-family: inherit; color: var(--text);
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); outline: none;
 }
+.rf-sel:focus { border-color: var(--accent-d); }
 .rf-sel.src { flex: 1 1 auto; width: 60px; }
-.rf-sel.op { flex: 0 0 auto; width: 42px; text-align: center; }
-.rf-el { flex: 1 1 auto; font-size: 10px; color: var(--faint); }
-.rf-bx {
-  flex: 0 0 auto; width: 13px; height: 13px; line-height: 11px; padding: 0; font-size: 8.5px;
-  color: var(--faint); background: none; border: 0; cursor: pointer; font-family: inherit;
-}
-.rf-bx:hover { color: var(--red); }
+.rf-sel.op { flex: 0 0 auto; width: 44px; text-align: center; }
+.rf-el { flex: 1 1 auto; font-size: var(--fs-s); color: var(--faint); }
+.rf-bx { flex: 0 0 auto; width: 14px; height: 14px; line-height: 12px; padding: 0; font-size: var(--fs-s); color: var(--faint); background: none; border: 0; cursor: pointer; font-family: inherit; }
+.rf-bx:hover:not(:disabled) { color: var(--red); }
+.rf-bx:disabled { opacity: .4; cursor: not-allowed; }
 .rf-br2 { display: flex; align-items: center; gap: 6px; padding: 2px 0 0 2px; }
-.rf-tg {
-  font-size: 9.5px; color: var(--accent-d); overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap; max-width: 156px;
-}
+.rf-tg { font-size: var(--fs-s); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 156px; }
 .rf-tg.none { color: var(--faint); }
-.rf-sv { margin-left: auto; font-size: 9px; color: var(--faint); }
-.rf-nft {
-  box-sizing: border-box; height: 28px; display: flex; align-items: center;
-  padding: 0 8px 0 10px; border-top: 1px dashed var(--line);
-}
-.rf-add {
-  padding: 0; font-size: 10px; color: #7A5AA8; background: none;
-  border: 0; cursor: pointer; font-family: inherit;
-}
+.rf-sv { margin-left: auto; font-size: var(--fs-s); color: var(--faint); font-variant-numeric: tabular-nums; }
+.rf-nft { box-sizing: border-box; height: 28px; display: flex; align-items: center; padding: 0 8px 0 10px; border-top: 1px dashed var(--border); }
+.rf-add { padding: 0; font-size: var(--fs-s); color: var(--k-if); background: none; border: 0; cursor: pointer; font-family: inherit; }
 .rf-add:hover { text-decoration: underline; }
 
-/* ══════════ 端口 ══════════ */
+/* AND / OR 逻辑门：条件行（高度 = GATE_ROW）与出口标签 */
+.rf-gc {
+  box-sizing: border-box; height: 30px; display: flex; align-items: center; gap: 4px;
+  padding: 0 8px 0 10px; border-top: 1px dashed var(--border);
+}
+.rf-gt {
+  flex: 0 0 auto; padding: 0 5px; border-radius: 8px; font-size: var(--fs-s); line-height: 15px;
+  color: var(--k-gate); border: 1px solid color-mix(in srgb, var(--k-gate) 34%, transparent);
+  background: color-mix(in srgb, var(--k-gate) 12%, transparent);
+}
+/* width / min-width 必须显式写：main.css 里有全局 select { width: 100% }，
+   不覆盖的话这个下拉会按容器满宽撑开且 flex-shrink:0 不收缩，把标题挤没、卡片整体溢出。 */
+.rf-gop {
+  flex: 0 0 auto; width: 50px; min-width: 0; padding: 0 2px; font-size: var(--fs-s); font-family: var(--mono); font-weight: var(--fw-t);
+  color: var(--k-gate); background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); outline: none;
+}
+.rf-gop:focus { border-color: var(--accent-d); }
+.rf-bt.t {
+  color: var(--green); border-color: color-mix(in srgb, var(--green) 34%, transparent);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+}
+.rf-bt.f { color: var(--muted); background: var(--bar); border-color: var(--border); }
+
+/* 循环参数行 */
+.rf-lpr { display: flex; align-items: center; gap: 5px; padding: 5px 8px 0; }
+
+/* 端口 */
 .rf-pt {
-  position: absolute; width: 12px; height: 12px; border-radius: 50%;
-  background: var(--panel); border: 2px solid var(--muted); box-sizing: border-box;
-  cursor: crosshair; z-index: 2;
+  position: absolute; width: 12px; height: 12px; border-radius: 50%; box-sizing: border-box;
+  background: var(--panel); border: 2px solid var(--muted); cursor: crosshair; z-index: 2;
 }
 .rf-pt:hover { border-color: var(--accent-d); background: var(--accent-l); }
 .rf-pt.in { left: -7px; top: 50%; transform: translateY(-50%); }
 .rf-pt.out { right: -7px; top: 50%; transform: translateY(-50%); }
 
-/* ══════════ 执行 / 校验 / 日志 ══════════ */
-.rfe-run {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 8px;
-  border: 1px solid var(--border); border-top: 0; background: var(--panel-2);
-}
-.rf-chk { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); cursor: pointer; }
-.rf-chk input { accent-color: var(--accent-d); width: 12px; height: 12px; }
-.rf-lb2 { font-style: normal; font-size: 10.5px; color: var(--muted); }
-.rf-stat { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; color: var(--faint); }
-.rf-stat .dot { width: 7px; height: 7px; border-radius: 50%; background: #888; }
-.rf-stat.on { color: var(--green); }
-.rf-stat.on .dot { background: var(--green); animation: rfe-pulse 1s infinite; }
-@keyframes rfe-pulse { 50% { opacity: .35; } }
-
-.rfe-iss {
-  padding: 5px 8px 7px; border: 1px solid var(--border); border-top: 0;
-  background: rgba(188, 59, 48, .06);
-}
-.iss-h { font-size: 10px; font-weight: 600; color: var(--red); padding-bottom: 3px; }
-.iss-r { font-size: 10px; color: var(--muted); line-height: 1.6; }
-
-.rfe-log {
-  max-height: 132px; overflow-y: auto; padding: 5px 8px;
-  border: 1px solid var(--border); border-top: 0; background: var(--panel);
-}
-.lg-e { font-size: 10px; color: var(--faint); text-align: center; padding: 4px 0; }
-.lg-r { display: flex; gap: 8px; font-size: 10px; padding: 1px 0; }
+/* 校验 / 日志 */
+.rfe-iss { padding: 6px 10px 8px; border: 1px solid var(--border); border-top: 0; background: color-mix(in srgb, var(--red) 6%, transparent); }
+.iss-h { font-size: var(--fs-s); font-weight: var(--fw-t); color: var(--red); padding-bottom: 3px; }
+.iss-r { font-size: var(--fs-s); line-height: 1.6; color: var(--muted); }
+.rfe-log { max-height: 132px; overflow-y: auto; padding: 6px 10px; border: 1px solid var(--border); border-top: 0; background: var(--panel); }
+.lg-e { font-size: var(--fs-s); color: var(--faint); text-align: center; padding: 4px 0; }
+.lg-r { display: flex; gap: 8px; font-size: var(--fs-s); padding: 1px 0; }
 .lg-r .dim { flex: 0 0 auto; color: var(--faint); }
 .lg-t { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.mono { font-family: var(--mono); }
 </style>
 
 

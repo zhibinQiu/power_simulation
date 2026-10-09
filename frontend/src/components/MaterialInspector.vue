@@ -351,7 +351,7 @@ function onNote(val) { store.setMaterialAttr(mat.value.id, 'note', val) }
 
 <style scoped>
 /* 模块内部说明：不单独成模块，直接写在对应模块内容区顶部 */
-.sec-desc { font-size: 10.5px; line-height: 1.5; color: var(--muted); margin: 0 0 8px 0; padding: 0; }
+.sec-desc { font-size: 11px; line-height: 1.5; color: var(--muted); margin: 0 0 8px 0; padding: 0; }
 .mat-insp { display: flex; flex-direction: column; }
 .ash-sub-t { font-size: 11px; font-weight: 500; color: var(--green, #4f9d6b); margin: 10px 0 2px; padding-top: 8px; border-top: 1px dashed var(--line); }
 .ash-sub { padding: 4px 0 0 10px; }
@@ -374,10 +374,10 @@ function onNote(val) { store.setMaterialAttr(mat.value.id, 'note', val) }
 .pc-name:focus { border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent-l); outline: none; }
 .pc-ratio { display: inline-flex; align-items: center; gap: 3px; }
 .pc-ratio .num { width: 56px; }
-.pc-add { margin-top: 8px; width: 100%; border: 1px solid var(--accent2); background: transparent; color: var(--accent2); border-radius: 3px; padding: 6px; cursor: pointer; font-size: 11.5px; }
+.pc-add { margin-top: 8px; width: 100%; border: 1px solid var(--accent2); background: transparent; color: var(--accent2); border-radius: 3px; padding: 6px; cursor: pointer; font-size: 12px; }
 .pc-add:hover { background: var(--accent2); color: #fff; }
 .pc-ash { margin-top: 6px; }
-.pc-ash summary { font-size: 10.5px; color: var(--green, #4f9d6b); cursor: pointer; user-select: none; }
+.pc-ash summary { font-size: 11px; color: var(--green, #4f9d6b); cursor: pointer; user-select: none; }
 .pc-ash[open] summary { margin-bottom: 4px; }
 .pc-weighted { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); }
 .pc-w-title { font-size: 11px; font-weight: 500; color: var(--muted); margin-bottom: 4px; }

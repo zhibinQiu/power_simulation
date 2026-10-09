@@ -4,7 +4,7 @@
   "enterprise": "示例机房热控",
   "industry": "机房温控",
   "industryGroup": "其它",
-  "order": 5,
+  "order": 6,
   "ready": true,
   "icon": "database",
   "color": "#2f7fa0",

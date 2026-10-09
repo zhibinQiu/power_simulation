@@ -49,11 +49,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 .cd-head { display: flex; align-items: center; justify-content: space-between;
   padding: 12px 14px 10px; border-bottom: 1px solid var(--border); }
 .cd-title { font-size: 14px; font-weight: 700; letter-spacing: .5px; }
-.cd-body { padding: 18px 16px; font-size: 12.5px; line-height: 1.7; color: var(--muted); word-break: break-word;
+.cd-body { padding: 18px 16px; font-size: 12px; line-height: 1.7; color: var(--muted); word-break: break-word;
   white-space: pre-wrap; }
 .cd-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 0 14px 14px; }
-.cd-btn { min-width: 84px; padding: 7px 0; font-size: 12.5px; font-family: var(--ui); border-radius: 4px;
-  cursor: pointer; color: var(--text); background: var(--panel-2); border: 1px solid var(--border); }
+.cd-btn { min-width: var(--btn-min-w); min-height: var(--btn-h-lg); padding: 0 var(--btn-pad-x-lg); font-size: 12px; font-family: var(--ui); border-radius: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--text); background: var(--btn-bg); border: 1px solid var(--border); }
 .cd-btn:hover { border-color: var(--accent-d); }
 .cd-btn.primary { color: #fff; background: var(--accent); border-color: var(--accent); }
 .cd-btn.primary:hover { background: var(--accent-d); border-color: var(--accent-d); }

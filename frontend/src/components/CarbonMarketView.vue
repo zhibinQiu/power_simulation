@@ -510,7 +510,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
 .cm-card-grid div { display: flex; flex-direction: column; gap: 2px; }
 .cm-card-grid span { font-size: 10px; color: var(--muted); letter-spacing: .3px; }
 .cm-card-grid b {
-  font-size: 12.5px; font-weight: 500;
+  font-size: 12px; font-weight: 500;
   font-family: var(--mono); font-variant-numeric: tabular-nums;
 }
 .cm-src { font-weight: 500 !important; color: var(--accent-d); }
@@ -530,7 +530,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
 .cm-chart-ops { display: flex; align-items: center; gap: 6px; }
 .cm-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
 .cm-seg button, .cm-fc-btn {
-  padding: 3px 10px; font-size: 10.5px; cursor: pointer; border: none;
+  padding: 3px 10px; font-size: 11px; cursor: pointer; border: none;
   background: var(--panel-2); color: var(--muted);
   transition: background .12s, color .12s;
 }
@@ -604,7 +604,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
 .cm-range-scale { position: relative; height: 15px; margin-top: 1px; }
 .cm-range-tick {
   position: absolute; top: 0; transform: translateX(-50%);
-  font-size: 9px; color: var(--muted); white-space: nowrap;
+  font-size: 10px; color: var(--muted); white-space: nowrap;
   font-family: var(--mono); letter-spacing: .2px;
 }
 .cm-range-tick::before {

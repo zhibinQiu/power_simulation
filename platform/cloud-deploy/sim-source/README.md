@@ -54,8 +54,8 @@
 
 ```bash
 # 推荐（统一入口）
-bash platform/update.sh simsource start      # 后台启动（日志 /tmp/nengtan-sim-source.log）
-bash platform/update.sh simsource status    # restart / stop / logs / check
+./update.sh simsource start      # 后台启动（日志 /tmp/nengtan-sim-source.log）
+./update.sh simsource status    # restart / stop / logs / check
 
 # 等价直跑（前台，Ctrl+C 停止）
 python3 sim_source.py --config config.json
@@ -74,8 +74,8 @@ cd platform/cloud-deploy/middleware && python3 runner.py --config config.dev.jso
 ## 3. 服务器部署（可选，systemd）
 
 ```bash
-bash platform/update.sh simsource --server root@36.151.146.71 deploy   # 安装为 systemd 服务
-bash platform/update.sh simsource --server root@36.151.146.71 status
+./update.sh simsource --server root@36.151.146.71 deploy   # 安装为 systemd 服务
+./update.sh simsource --server root@36.151.146.71 status
 # 手工方式等价：
 mkdir -p /opt/nengtan-sim-source && cp sim_source.py config.json /opt/nengtan-sim-source/
 cp systemd/nengtan-sim-source.service /etc/systemd/system/

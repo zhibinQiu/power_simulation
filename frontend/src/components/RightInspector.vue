@@ -734,6 +734,9 @@ function fmt(n) {
 /* 总览指标卡：统一中性底色（与全局面板一致），不再按能耗/碳排区分彩色底，避免视觉杂乱；
  * 语义色仅保留在数值上（co2Color 强度警示），卡片本身一色到底 */
 .te-row { align-items: flex-start; padding-top: 9px; padding-bottom: 9px; }
+/* 首行紧贴模块标题：9px 上内边距是为「行间分隔线」留的呼吸位，首行上方没有分隔线，
+ * 若沿用会与 .cbody-in 的 4px 顶距叠加成 13px，明显比其它模块（标题下 4px）空 —— 即为「与上方间距过大」 */
+.te-row:first-child { padding-top: 2px; }
 /* 全厂总览：实时 / 日度 / 月度 / 年度 时段切换（紧凑分段条，激活金底墨字） */
 .plant-tabs {
   display: flex; gap: 2px; margin: 0 0 7px; padding: 2px;
@@ -747,32 +750,32 @@ function fmt(n) {
 }
 .plant-tab:hover { background: var(--panel-3); color: var(--text); }
 .plant-tab.on { background: var(--accent); color: var(--on-accent); font-weight: 600; }
-.plant-note { font-size: 9px; line-height: 1.5; color: var(--muted); margin: 0 0 6px; }
+.plant-note { font-size: 10px; line-height: 1.5; color: var(--muted); margin: 0 0 6px; }
 /* 同比 / 环比 对比行（日度 / 月度档） */
 .cmp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 8px; }
 .cmp-row .chip2 b { font-size: 12px; font-weight: 500; }
 .chip2 b.better { color: var(--green); }
 .chip2 b.worse { color: var(--red); }
 .chip2 b.flat { color: var(--muted); }
-.plant-foot { margin-top: 6px; font-size: 9px; line-height: 1.5; color: var(--muted); }
+.plant-foot { margin-top: 6px; font-size: 10px; line-height: 1.5; color: var(--muted); }
 /* 成本卡（可点击展开构成明细） */
 .chip2.tog { cursor: pointer; transition: border-color .15s, background .15s; }
 .chip2.tog:hover { border-color: var(--accent); }
 .chip2.tog.open { border-color: var(--accent); background: var(--accent-l, rgba(95,130,148,.08)); }
-.chip2.tog .caret { font-style: normal; font-size: 8px; margin-left: 2px; }
+.chip2.tog .caret { font-style: normal; font-size: 10px; margin-left: 2px; }
 .cost-detail { margin-top: 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel-2, rgba(0,0,0,.02)); padding: 5px 7px; }
-.cd-head { font-size: 9.5px; color: var(--accent2); margin-bottom: 4px; line-height: 1.5; }
+.cd-head { font-size: 10px; color: var(--accent2); margin-bottom: 4px; line-height: 1.5; }
 .cd-row { display: flex; align-items: baseline; gap: 6px; padding: 3px 0; font-size: 10px; }
 .cd-row + .cd-row { border-top: 1px dashed var(--line); }
-.cd-name { flex: 0 0 auto; font-size: 9.5px; color: #fff; border-radius: 3px; padding: 1px 5px; }
+.cd-name { flex: 0 0 auto; font-size: 10px; color: #fff; border-radius: 3px; padding: 1px 5px; }
 .cd-qty { flex: 1; min-width: 0; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cd-amt { flex: 0 0 auto; text-align: right; font-variant-numeric: tabular-nums; }
 .cd-amt b { font-weight: 600; }
 .cd-amt i, .cd-qty i { font-style: normal; color: var(--muted); }
 .cd-empty { justify-content: center; color: var(--muted); border-top: none !important; }
-.cd-note { margin-top: 4px; font-size: 9px; line-height: 1.5; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 4px; }
+.cd-note { margin-top: 4px; font-size: 10px; line-height: 1.5; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 4px; }
 /* 总排放展开：全国碳市场核算方法（多行公式说明） */
-.emi-detail .meth-line { font-size: 9.5px; line-height: 1.6; color: var(--text); padding: 2px 0; }
+.emi-detail .meth-line { font-size: 10px; line-height: 1.6; color: var(--text); padding: 2px 0; }
 .quota-bar {
   display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
   margin-top: 6px; padding: 5px 8px; background: var(--panel-2);
@@ -781,16 +784,16 @@ function fmt(n) {
 .quota-bar .qk { font-size: 10px; color: var(--muted); }
 .quota-bar b { font-size: 12px; }
 /* 产品 / 能源 / 碳排 分组小标题 */
-.sec { display: flex; align-items: center; gap: 5px; margin: 7px 0 3px; font-size: 9px; color: var(--muted); letter-spacing: .5px; }
+.sec { display: flex; align-items: center; gap: 5px; margin: 7px 0 3px; font-size: 10px; color: var(--muted); letter-spacing: .5px; }
 .sec .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 .sec .d-prod { background: #3f9d6b; }
 .sec .d-ene { background: #c9a33e; }
 .sec .d-co2 { background: #c0574a; }
 /* 展开区计算式行：序号标签 + 右对齐实测值（与能耗/排放展开共用） */
-.meth-line { display: flex; align-items: baseline; gap: 6px; font-size: 9.5px; line-height: 1.6; color: var(--text); padding: 2px 0; }
+.meth-line { display: flex; align-items: baseline; gap: 6px; font-size: 10px; line-height: 1.6; color: var(--text); padding: 2px 0; }
 .meth-line .ml { flex: 1; min-width: 0; }
 .meth-line .mval { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.meth-line.sub { font-size: 9px; color: var(--muted); border-top: 1px dashed var(--line); margin-top: 4px; padding-top: 4px; }
+.meth-line.sub { font-size: 10px; color: var(--muted); border-top: 1px dashed var(--line); margin-top: 4px; padding-top: 4px; }
 .rev-sel { width: 100%; height: 20px; }
 /* 预估碳成本展开：配额/碳价维护输入 */
 .carb-edit { display: flex; gap: 12px; flex-wrap: wrap; padding: 6px 0 4px; }

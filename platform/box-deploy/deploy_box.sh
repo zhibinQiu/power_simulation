@@ -130,9 +130,14 @@ deploy_mapper() {
   cat > "/etc/systemd/system/$MAPPER_SVC" <<EOF
 [Unit]
 Description=NengTan KubeEdge DMI Multi-Protocol Mapper (Modbus RTU/TCP, OPC-UA)
-After=network.target edgecore.service
+# nengtan-chirpstack：LoRa 设备订阅盒内 ChirpStack 的 MQTT(127.0.0.1:41884)，
+# 必须在 docker compose 容器起来之后再启动，否则冷启动时订阅失败、LoRa 设备无数据。
+After=network.target edgecore.service nengtan-chirpstack.service
+Wants=nengtan-chirpstack.service
 
 [Service]
+# DMI twin 上报节流（点位级消息会打满 edgecore 通道，见 box_mapper.py 注释）
+Environment=DMI_MIN_INTERVAL=15
 ExecStart=$PYTHON_BIN -u $DMI_DIR/box_mapper.py
 Restart=always
 RestartSec=5

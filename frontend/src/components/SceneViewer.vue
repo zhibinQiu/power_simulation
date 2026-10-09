@@ -316,7 +316,7 @@ onMounted(() => document.addEventListener('click', onBrightDocClick))
 .twin-bright-pop .twin-bp-title { font-size: 10px; color: var(--muted); letter-spacing: .5px; margin-bottom: 8px; }
 .twin-bright-pop .twin-bp-row { display: flex; align-items: center; gap: 6px; }
 .twin-bright-pop .twin-bp-range { flex: 1; min-width: 0; height: 4px; margin: 0; cursor: pointer; accent-color: var(--accent-d); }
-.twin-bright-pop .twin-bp-label { font-size: 9px; color: var(--faint); flex: 0 0 auto; }
+.twin-bright-pop .twin-bp-label { font-size: 10px; color: var(--faint); flex: 0 0 auto; }
 .twin-bright-pop .twin-bp-val { font-size: 10px; color: var(--muted); min-width: 30px; text-align: right; }
 .app.sim-dark .twin-bright-pop { background: var(--panel); border-color: var(--border); }
 .app.sim-dark .twin-bright-pop .twin-bp-title { color: var(--muted); }
@@ -326,7 +326,7 @@ onMounted(() => document.addEventListener('click', onBrightDocClick))
 /* 3D 小组子场景 · 左上角返回顶层浮层（工具栏在场景外部独立成行，不再遮挡，恢复默认左上角位置） */
 .group-scene-bar { position: absolute; top: 12px; left: 12px; z-index: 6; display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 10px; box-shadow: var(--shadow); }
 .gs-back {
-  display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px;
+  display: inline-flex; align-items: center; gap: 5px; height: var(--btn-h); padding: 0 var(--btn-pad-x);
   background: transparent; border: 1px solid var(--border); border-radius: var(--radius);
   cursor: pointer; color: var(--text); font-size: 11px; font-weight: 600; font-family: var(--ui);
   line-height: 1; white-space: nowrap;

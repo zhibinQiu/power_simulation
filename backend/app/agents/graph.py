@@ -210,7 +210,7 @@ async def worker_node(state: AgentState, agent, skill_names: List[str]) -> Dict[
     events: List[Dict[str, Any]] = []
     registry = get_registry()
     enabled_skills = [s for s in (skill_names or []) if (registry.get(s) is not None and registry.get(s).enabled)]
-    # LLM tool calling 需用 OpenAI function calling 格式（MCP inputSchema 格式会被拒绝）
+    # LLM tool calling 需用 OpenAI function calling 格式
     tools = [registry.get(n).to_openai_tool() for n in enabled_skills]
 
     msgs = [m for m in (state.get("messages") or []) if m.get("role") != "system"]

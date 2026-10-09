@@ -1,14 +1,19 @@
 <!-- ============ AI 群控（AGC）============
      两级结构：
        ① 模型库 —— 以卡片形式列出所有已设计的算法模型，支持新建（规则 / 强化学习 / 粒子群）
-       ② 编排   —— 进入某个模型后：左栏自上而下为「可调设备 → 传感设备」（可拖入画布），
+       ② 编排   —— 进入某个模型后：左栏为「模块列表」（规则模型：拖入 / 点击即建模块；
+                   强化学习 · 粒子群仍按可调 / 传感设备勾选配对回路），
                    右栏为该算法自己的编排体，右上角「运行」即按编排的算法执行。
      运行时不做整页的实时观测图表，改为点击左侧 / 画布 / 编排条上的任意模块查看它的实时值。
-     规则：可调（橙）· 传感（青）· 条件（紫），只有可调模块可以设定数值。 -->
+     规则：可调（橙）· 传感（青）· 条件（紫）· 逻辑门 AND/OR（紫青）· 循环（黄），只有可调模块可以设定数值。 -->
 <template>
   <div class="agc">
     <!-- ══════════ ① 模型库 ══════════ -->
     <section v-if="page === 'lib'" class="agc-lib">
+      <div class="lib-bar">
+        <span class="lib-ttl">{{ t('模型库') }}</span>
+        <span class="cnt">{{ designs.length }}</span>
+      </div>
       <p class="lib-tip">{{ t('每个模型是一套独立的群控算法：新建后进入编排，编排完成点右上角「运行」即按该算法执行；运行中点击任意模块可查看实时值。') }}</p>
 
       <div class="lib-grid">
@@ -19,17 +24,17 @@
             <span class="mc-tg" :class="m.alg">{{ algLabel(m.alg) }}</span>
           </div>
           <div class="mc-bd">
-            <div v-for="s in statOf(m)" :key="s.k" class="mc-st"><em>{{ s.k }}</em><b class="mono">{{ s.v }}</b></div>
+            <span v-for="s in statOf(m)" :key="s.k" class="mc-st"><em>{{ s.k }}</em><b class="mono">{{ s.v }}</b></span>
           </div>
           <div class="mc-ft">
-            <span class="mono dim">{{ shortTs(m.ts) }}</span>
+            <span v-if="isRunning(m.id)" class="mc-live"><i class="dot"></i>{{ t('运行中') }}</span>
+            <span class="mono mc-ts">{{ shortTs(m.ts) }}</span>
             <span class="mc-ops">
               <button class="lk" @click.stop="renameModel(m)">{{ t('重命名') }}</button>
               <button class="lk" @click.stop="dupModel(m)">{{ t('复制') }}</button>
               <button class="lk danger" @click.stop="delModel(m)">{{ t('删除') }}</button>
             </span>
           </div>
-          <i v-if="isRunning(m.id)" class="mc-live">{{ t('运行中') }}</i>
         </article>
 
         <button class="mcard new" @click="openNew">
@@ -53,16 +58,7 @@
         <span class="mc-tg" :class="cur.alg">{{ algLabel(cur.alg) }}</span>
         <span class="hd-sp"></span>
         <span class="ed-st" :class="{ on: running }"><i class="dot"></i>{{ runStateTxt }}</span>
-        <template v-if="cur.alg === 'rule'">
-          <em class="lb2">{{ t('周期') }}</em>
-          <select v-model.number="cur.period" class="sel xs" :disabled="running">
-            <option :value="1">1s</option>
-            <option :value="2">2s</option>
-            <option :value="5">5s</option>
-            <option :value="10">10s</option>
-          </select>
-        </template>
-        <button class="btn" :class="running ? 'stop' : 'primary'" :disabled="!canRun" :title="runTip" @click="toggleRun">
+        <button class="btn" :class="running ? 'danger' : 'primary'" :disabled="!canRun" :title="runTip" @click="toggleRun">
           {{ running ? t('停止') : t('运行') }}
         </button>
       </div>
@@ -70,15 +66,38 @@
       <div class="ed-bd">
         <!-- ─────── 左栏 ─────── -->
         <aside class="agc-aside">
-          <div class="agc-hd">
-            <span class="hd-sub mono">{{ selAdj.length }}{{ t('可调') }} · {{ selSen.length }}{{ t('传感') }}</span>
-            <span class="hd-sp"></span>
-            <span class="hd-sub">{{ t('勾选即在右侧编排画布生成模块') }}</span>
-          </div>
+          <!-- 规则模型：模块列表（拖入画布 / 点击加到画布） -->
+          <template v-if="isRule">
+            <section v-for="g in modGroups" :key="g.key" class="pnl">
+              <div class="pnl-hd" :class="{ col: modFold[g.key] }" @click="modFold[g.key] = !modFold[g.key]">
+                <i class="caret" :class="{ on: !modFold[g.key] }">▸</i>
+                <span class="ph-t">{{ g.title }}</span>
+                <em class="cnt mono">{{ g.items.length }}</em>
+              </div>
+              <div v-show="!modFold[g.key]" class="pnl-bd">
+                <p v-if="!g.items.length" class="emp">{{ t('当前场景没有可用设备') }}</p>
+                <div v-for="it in g.items" :key="it.key" class="mi" :class="'k-' + it.k"
+                     draggable="true" :title="t('拖入画布，或点击直接添加到画布')"
+                     @dragstart="onModDrag($event, it)" @click="addModFromLib(it)">
+                  <i class="mi-ic">{{ it.ico }}</i>
+                  <span class="mi-nm">{{ it.name }}<em>{{ it.desc }}</em></span>
+                  <b v-if="it.val" class="mono mi-v">{{ it.val }}<i>{{ it.unit }}</i></b>
+                </div>
+              </div>
+            </section>
+          </template>
+
+          <!-- 强化学习 / 粒子群：仍按设备勾选（RL 按勾选顺序与可调一一配对形成回路） -->
+          <template v-else>
+            <div class="agc-hd">
+              <span class="hd-sub mono">{{ selAdj.length }}{{ t('可调') }} · {{ selSen.length }}{{ t('传感') }}</span>
+              <span class="hd-sp"></span>
+              <span class="hd-sub">{{ t('勾选参与回路的设备') }}</span>
+            </div>
 
           <!-- ① 可调设备 -->
           <section class="pnl">
-            <div class="pnl-hd" @click="fold.adj = !fold.adj">
+            <div class="pnl-hd" :class="{ col: fold.adj }" @click="fold.adj = !fold.adj">
               <i class="caret" :class="{ on: !fold.adj }">▸</i>
               <span class="ph-t">{{ t('① 可调设备') }}</span>
               <em class="cnt mono">{{ selAdj.length }}/{{ adjList.length }}</em>
@@ -88,14 +107,12 @@
               </span>
             </div>
             <div v-show="!fold.adj" class="pnl-bd">
-              <p v-if="isRule" class="emp drag-tip">{{ t('规则控制：勾选即在右侧规则画布生成模块（可调可设定数值）。') }}</p>
               <p v-if="!adjList.length" class="emp">{{ t('当前场景没有可调设备（可调设备才能作为被控对象）。') }}</p>
               <div v-for="d in adjList" :key="d.id" class="dev" :class="{ on: has(selAdj, d.id) }">
                 <div class="dev-hd" @click="toggle(selAdj, d.id)">
                   <span class="cbx"><i v-if="has(selAdj, d.id)">✓</i></span>
                   <span class="nm">{{ d.label }}<em>{{ d.unitName }}</em></span>
                   <b class="mono val">{{ fmt(curSp(d.id)) }}<i>{{ spUnit(d.id) }}</i></b>
-                  <span v-if="boundSensors(d.id).length" class="tag pid" :title="t('已绑定传感设备，由 PID 自动调控')">PID</span>
                 </div>
                 <div v-if="has(selAdj, d.id)" class="dev-bd">
                   <div class="sp-row">
@@ -117,7 +134,7 @@
 
           <!-- ② 传感设备 -->
           <section class="pnl">
-            <div class="pnl-hd" @click="fold.sen = !fold.sen">
+            <div class="pnl-hd" :class="{ col: fold.sen }" @click="fold.sen = !fold.sen">
               <i class="caret" :class="{ on: !fold.sen }">▸</i>
               <span class="ph-t">{{ t('② 传感设备') }}</span>
               <em class="cnt mono">{{ selSen.length }}/{{ senList.length }}</em>
@@ -127,7 +144,7 @@
               </span>
             </div>
             <div v-show="!fold.sen" class="pnl-bd">
-              <p v-if="isRule" class="emp drag-tip">{{ t('规则控制：勾选即在右侧规则画布生成传感模块，作为条件判定的输入。') }}</p>
+              <p v-if="cur && cur.alg === 'rl'" class="emp drag-tip">{{ t('强化学习：按勾选顺序与「① 可调设备」一一配对形成控制回路（第 1 台传感配第 1 台可调）。') }}</p>
               <p v-if="!senList.length" class="emp">{{ t('当前场景没有传感设备。') }}</p>
               <div v-for="s in senList" :key="s.id" class="dev" :class="{ on: has(selSen, s.id) }">
                 <div class="dev-hd" @click="toggle(selSen, s.id)">
@@ -136,14 +153,7 @@
                   <b class="mono val">{{ fmt(liveOf(s.id)) }}<i>{{ s.unit || '' }}</i></b>
                 </div>
                 <div v-if="has(selSen, s.id)" class="dev-bd">
-                  <div class="row">
-                    <em>{{ t('绑定可调设备') }}</em>
-                    <select :value="bindOf[s.id] || ''" @change="setBind(s.id, $event.target.value)">
-                      <option value="">{{ t('未绑定（只显示读数）') }}</option>
-                      <option v-for="a in adjList" :key="a.id" :value="a.id">{{ a.label }} · {{ a.unitName }}</option>
-                    </select>
-                  </div>
-                  <template v-if="bindOf[s.id] && isLoopSensor(s.id)">
+                  <template v-if="isLoopSensor(s.id)">
                     <div class="row">
                       <em>{{ t('目标值') }}</em>
                       <input class="num" type="number" :value="targetOf(s.id)" :step="spStepS(s.id)" @change="setTarget(s.id, $event.target.value)" />
@@ -155,20 +165,16 @@
                       <span class="badge" :class="badgeCls(s.id)">{{ badgeTxt(s.id) }}</span>
                     </div>
                   </template>
-                  <div v-else-if="bindOf[s.id]" class="row rd">
-                    <em>{{ t('实时读数') }}</em>
-                    <b class="mono">{{ fmt(liveOf(s.id)) }}</b><i class="u">{{ s.unit || '' }}</i>
-                    <span class="hintx">{{ t('辅助观测（该可调设备已有主控传感设备）') }}</span>
-                  </div>
                   <div v-else class="row rd">
                     <em>{{ t('实时读数') }}</em>
                     <b class="mono">{{ fmt(liveOf(s.id)) }}</b><i class="u">{{ s.unit || '' }}</i>
-                    <span class="hintx">{{ t('未绑定：仅显示实时读数') }}</span>
+                    <span class="hintx">{{ t('未参与回路：仅显示实时读数') }}</span>
                   </div>
                 </div>
               </div>
             </div>
           </section>
+          </template>
         </aside>
 
         <!-- ─────── 右栏：该算法的编排体 ─────── -->
@@ -177,15 +183,9 @@
           <section v-if="isRule" class="card rg">
             <div class="card-hd">
               <span class="ct">{{ t('规则编排') }}</span>
-              <span class="cs">{{ t('可调 / 传感 → if-elif-else → 下游模块设置') }}</span>
-              <span class="ch-ops mono">
-                <span class="lg-i adj">■ {{ t('可调') }}</span>
-                <span class="lg-i sen">■ {{ t('传感') }}</span>
-                <span class="lg-i ifn">■ {{ t('条件') }}</span>
-              </span>
+              <span class="cs">{{ t('开始 → 可调 / 传感 → if / AND / OR → 下游模块 → 结束') }}</span>
             </div>
-            <RuleFlowEditor :key="cur.id" class="rf-fill" :graph="cur.graph" :running="running" :period="cur.period"
-                            @canvas-change="syncSelFromGraph" />
+            <RuleFlowEditor ref="rfRef" :key="cur.id" class="rf-fill" :graph="cur.graph" :running="running" :period="cur.period" />
           </section>
 
           <!-- 强化学习：训练控制台 + 奖励 + 版本 -->
@@ -200,7 +200,7 @@
                     <option :value="0.5">2s</option>
                     <option :value="0.2">5s</option>
                   </select>
-                  <button class="btn" :class="{ primary: !sampling, stop: sampling }" @click="toggleSample">
+                  <button class="btn" :class="{ primary: !sampling, danger: sampling }" @click="toggleSample">
                     {{ sampling ? t('停止采集') : t('开始采集') }}
                   </button>
                   <span class="tstate" :class="{ on: trainBusy }"><i class="dot"></i>{{ trainStateTxt }}</span>
@@ -208,7 +208,7 @@
               </div>
               <div class="bar">
                 <button class="btn primary" :disabled="trainBusy || !canTrain" @click="startTrain">{{ t('开始训练') }}</button>
-                <button class="btn stop" :disabled="!trainBusy" @click="stopTrain">{{ t('停止') }}</button>
+                <button class="btn danger" :disabled="!trainBusy" @click="stopTrain">{{ t('停止') }}</button>
                 <label class="chk" :title="t('对观测做滤波后再作为控制/训练输入')">
                   <input type="checkbox" v-model="useFilter" />{{ t('滤波') }}
                 </label>
@@ -278,7 +278,7 @@
                 </svg>
                 <div v-else class="cempty sm">
                   <p class="t1">{{ t('尚未训练') }}</p>
-                  <p class="t2">{{ t('绑定传感设备与可调设备形成回路后，点击「运行」，这里显示奖励随迭代的变化。') }}</p>
+                  <p class="t2">{{ t('勾选可调设备与传感设备形成回路后，点击「运行」，这里显示奖励随迭代的变化。') }}</p>
                 </div>
                 <div class="rw-ax" v-if="rwPath">
                   <span>1</span><span>{{ t('迭代') }} {{ curve.length }}</span>
@@ -376,6 +376,8 @@ import { ADJUSTABLE_MAP } from '../data/attachLibrary'
 import RuleFlowEditor from './RuleFlowEditor.vue'
 import PsoTuner from './PsoTuner.vue'
 import { t } from '../i18n'
+// 规则编排的「开始 / 结束」端点与通路判定：能否运行取决于是否形成「开始 → 结束」通路
+import { hasFlowPath, ensureFlowEnds } from '../utils/ruleFlow'
 
 const store = useSimStore()
 
@@ -456,10 +458,10 @@ function liveOf(id) {
 }
 function devName(id) { const d = findDev(id); return d ? (d.label || d.id) : (id || '—') }
 
-// ==================== 选择 / 绑定 ====================
+// ==================== 设备选择 ====================
+const cur = ref(null)                  // 当前编排中的模型
 const selAdj = ref([])                 // 已选可调设备 id
 const selSen = ref([])                 // 已选传感设备 id
-const bindOf = reactive({})            // 传感设备 id -> 可调设备 id（'' = 未绑定）
 const spOf = reactive({})              // 传感设备 id -> 目标值（PID 设定）
 const fold = reactive({ adj: false, sen: false, alg: false, hp: true })
 
@@ -468,90 +470,68 @@ function toggle(arr, id) {
   const i = arr.indexOf(id)
   if (i >= 0) arr.splice(i, 1)
   else arr.push(id)
-  applySelToGraph()   // 勾选变化 → 编排画布同步生成 / 移除模块
 }
-function pickAllAdj() { selAdj.value = adjList.value.map((d) => d.id); applySelToGraph() }
-function clearAdj() { selAdj.value = []; applySelToGraph() }
-function pickAllSen() { selSen.value = senList.value.map((d) => d.id); applySelToGraph() }
-function clearSen() { selSen.value = []; applySelToGraph() }
+function pickAllAdj() { selAdj.value = adjList.value.map((d) => d.id) }
+function clearAdj() { selAdj.value = [] }
+function pickAllSen() { selSen.value = senList.value.map((d) => d.id) }
+function clearSen() { selSen.value = [] }
 
-// ─────────── 左栏勾选 ⇄ 规则画布模块 ───────────
-// 规则编排不再靠拖拽：左栏勾选的设备自动成为画布上的模块，取消勾选即移除（含其连线）。
-// 反向：画布里新增（工具条 / 复制粘贴）或删除模块时，画布上报 canvas-change，左栏勾选随之同步。
-function mkDevNode(kind, devId) {
-  const d = findDev(devId) || {}
-  const ns = (cur.value && cur.value.graph && cur.value.graph.nodes) || []
-  const y0 = 40
-  let y = y0
-  for (const n of ns) if (n.kind === kind) y = Math.max(y, (Number(n.y) || 0) + 108)
-  if (y > 1500) y = y0 + (ns.filter((n) => n.kind === kind).length % 12) * 108
-  return {
-    id: kind + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-    kind,
-    devId,
-    label: d.label || devName(devId),
-    unit: kind === 'adj' ? (spUnit(devId) || d.unit || '') : (d.unit || ''),
-    unitName: d.unitName || '',
-    value: kind === 'adj' ? Number(curSp(devId) != null ? curSp(devId) : 0) : null,
-    x: kind === 'sen' ? 48 : 600,
-    y,
-  }
+// ─────────── 左栏模块列表 → 规则画布 ───────────
+// 规则编排由左栏「模块」列表驱动：拖到画布即在落点建模块，点击则加到视图中心。
+// 画布上增删模块不再反向同步任何勾选（勾选只用于「强化学习 / 粒子群」的回路配对）。
+const rfRef = ref(null)
+const modFold = reactive({ flow: false, logic: false, adj: false, sen: false })
+const modGroups = computed(() => [
+  {
+    key: 'flow',
+    title: t('流程'),
+    items: [
+      { key: 'flow-start', k: 'start', ico: '▶', name: t('开始'), desc: t('流程入口') },
+      { key: 'flow-end', k: 'end', ico: '■', name: t('结束'), desc: t('流程出口') },
+    ],
+  },
+  {
+    key: 'logic',
+    title: t('逻辑'),
+    items: [
+      { key: 'lg-if', k: 'if', ico: '⑃', name: t('条件判断'), desc: 'if / elif / else' },
+      { key: 'lg-and', k: 'gate', op: 'and', ico: '∧', name: 'AND', desc: t('全部条件满足') },
+      { key: 'lg-or', k: 'gate', op: 'or', ico: '∨', name: 'OR', desc: t('任一条件满足') },
+      { key: 'lg-loop', k: 'loop', ico: '↻', name: t('循环'), desc: t('重复执行下游') },
+    ],
+  },
+  {
+    key: 'adj',
+    title: t('可调模块'),
+    items: adjList.value.map((d) => ({
+      key: 'adj-' + d.id, k: 'adj', devId: d.id, ico: '⚙',
+      name: d.label || d.id, desc: d.unitName || '',
+      val: fmt(curSp(d.id)), unit: spUnit(d.id),
+    })),
+  },
+  {
+    key: 'sen',
+    title: t('传感模块'),
+    items: senList.value.map((d) => ({
+      key: 'sen-' + d.id, k: 'sen', devId: d.id, ico: '◉',
+      name: d.label || d.id, desc: d.unitName || '',
+      val: fmt(liveOf(d.id)), unit: d.unit || '',
+    })),
+  },
+])
+/** 拖起：把模块身份写进 dataTransfer（画布 drop 时按落点建模块） */
+function onModDrag(e, it) {
+  if (!e || !e.dataTransfer) return
+  const p = { k: it.k }
+  if (it.op) p.op = it.op
+  if (it.devId) p.devId = it.devId
+  e.dataTransfer.effectAllowed = 'copy'
+  e.dataTransfer.setData('text/plain', JSON.stringify(p))
 }
-/** 勾选 → 画布：补齐缺失模块，移除未勾选的模块 */
-function applySelToGraph() {
-  const m = cur.value
-  if (!m || m.alg !== 'rule') return
-  const g = m.graph
-  if (!g.nodes) g.nodes = []
-  if (!g.edges) g.edges = []
-  for (const id of selAdj.value) {
-    if (!g.nodes.some((n) => n.devId === id)) g.nodes.push(mkDevNode('adj', id))
-  }
-  for (const id of selSen.value) {
-    if (!g.nodes.some((n) => n.devId === id)) g.nodes.push(mkDevNode('sen', id))
-  }
-  for (let i = g.nodes.length - 1; i >= 0; i--) {
-    const n = g.nodes[i]
-    if (n.kind !== 'adj' && n.kind !== 'sen') continue
-    const set = n.kind === 'adj' ? selAdj.value : selSen.value
-    if (set.includes(n.devId)) continue
-    g.nodes.splice(i, 1)
-    for (let k = g.edges.length - 1; k >= 0; k--) {
-      if (g.edges[k].from === n.id || g.edges[k].to === n.id) g.edges.splice(k, 1)
-    }
-    for (const x of g.nodes) {
-      if (x.kind !== 'if') continue
-      for (const b of (x.branches || [])) if (b.src === n.id) b.src = ''
-    }
-  }
-}
-/** 画布 → 勾选：画布上增删模块（含撤销/重做）后，左栏勾选状态跟随 */
-function syncSelFromGraph() {
-  const m = cur.value
-  if (!m || m.alg !== 'rule') return
-  const ns = (m.graph && m.graph.nodes) || []
-  const a = []
-  const s = []
-  for (const n of ns) {
-    if (!n || !n.devId || !findDev(n.devId)) continue
-    if (n.kind === 'adj') { if (!a.includes(n.devId)) a.push(n.devId) }
-    else if (n.kind === 'sen') { if (!s.includes(n.devId)) s.push(n.devId) }
-  }
-  selAdj.value = a
-  selSen.value = s
-}
-function boundSensors(adjId) {
-  return selSen.value.filter((s) => bindOf[s] === adjId)
-}
-/** 绑定：自动给出合理目标值，并清理失效绑定 */
-function setBind(senId, adjId) {
-  bindOf[senId] = adjId || ''
-  if (adjId) {
-    const lv = liveOf(senId)
-    if (spOf[senId] == null && lv != null) spOf[senId] = Number((Math.abs(lv) * 1.05).toFixed(4))
-    if (!has(selAdj, adjId)) { selAdj.value.push(adjId); applySelToGraph() }
-  }
-  syncRuns()
+/** 点击：直接加到画布视图中心（与拖拽二选一，给不便拖拽的场景兜底） */
+function addModFromLib(it) {
+  if (!rfRef.value) return
+  rfRef.value.addModule({ k: it.k, op: it.op, devId: it.devId })
 }
 function setTarget(senId, v) {
   const n = Number(v)
@@ -565,21 +545,17 @@ function targetOf(senId) {
 }
 
 // ==================== 控制回路 ====================
-// 一个回路 = 一台可调设备 + 一台主控传感设备（其余绑定到同一可调设备的传感器作为辅助观测）
+// 一个回路 = 一台可调设备 + 一台传感设备，按左栏勾选顺序一一配对（不再单独维护绑定关系）
 const loops = computed(() => {
   const out = []
-  for (const adjId of selAdj.value) {
-    const sids = boundSensors(adjId)
-    if (!sids.length) continue
-    if (!findDev(adjId) || !findDev(sids[0])) continue
-    out.push({
-      key: adjId,
-      adjId,
-      senId: sids[0],
-      adjLabel: devName(adjId),
-      senLabel: devName(sids[0]),
-      aux: sids.slice(1),
-    })
+  // 规则控制由画布连线表达关系，不形成 PID 回路
+  if (cur.value && cur.value.alg === 'rule') return out
+  const n = Math.min(selAdj.value.length, selSen.value.length)
+  for (let i = 0; i < n; i++) {
+    const adjId = selAdj.value[i]
+    const senId = selSen.value[i]
+    if (!findDev(adjId) || !findDev(senId)) continue
+    out.push({ key: adjId, adjId, senId, adjLabel: devName(adjId), senLabel: devName(senId) })
   }
   return out
 })
@@ -1210,9 +1186,9 @@ function checkAuto() {
 }
 
 // ==================== 初始化 ====================
-// 首次拿到设备清单时给出合理默认：选第一台可调设备 + 同工序传感设备并自动绑定
+// 首次拿到设备清单时给出合理默认：选第一台可调设备 + 同工序传感设备
 let inited = false
-/** 默认回路：取第一台可调设备 + 同工序传感设备并自动绑定（force = 进入新模型时重新给默认值） */
+/** 默认选择：取第一台可调设备 + 同工序传感设备（force = 进入新模型时重新给默认值） */
 function autoPick(force) {
   if (inited && !force) return
   if (!adjList.value.length || !senList.value.length) return
@@ -1222,18 +1198,14 @@ function autoPick(force) {
   const same = senList.value.filter((s) => s.unitId && a.unitId && String(s.unitId) === String(a.unitId))
   const pool = same.length ? same : senList.value
   selSen.value = pool.slice(0, 3).map((s) => s.id)
-  for (const s of selSen.value) bindOf[s] = a.id
   syncRuns()
 }
 watch([() => adjList.value.length, () => senList.value.length], () => {
-  // 清理失效选择/绑定
+  // 清理失效选择
   const aids = adjList.value.map((d) => d.id)
   const sids = senList.value.map((d) => d.id)
   selAdj.value = selAdj.value.filter((id) => aids.includes(id))
   selSen.value = selSen.value.filter((id) => sids.includes(id))
-  for (const k of Object.keys(bindOf)) {
-    if (!sids.includes(k) || (bindOf[k] && !aids.includes(bindOf[k]))) delete bindOf[k]
-  }
   autoPick()
   syncRuns()
 }, { immediate: true })
@@ -1294,7 +1266,6 @@ function algLabel(id) { return algMeta(id).label }
 
 const page = ref('lib')            // lib = 模型库；edit = 编排
 const designs = ref([])
-const cur = ref(null)              // 当前编排中的模型
 const newOpen = ref(false)
 const newName = ref('')
 const newAlg = ref('rule')
@@ -1323,7 +1294,6 @@ function normalizeModel(m) {
     pso: { ...blankPso(), ...(mm.pso || {}) },
     selAdj: Array.isArray(mm.selAdj) ? mm.selAdj : [],
     selSen: Array.isArray(mm.selSen) ? mm.selSen : [],
-    bindOf: mm.bindOf && typeof mm.bindOf === 'object' ? { ...mm.bindOf } : {},
     spOf: mm.spOf && typeof mm.spOf === 'object' ? { ...mm.spOf } : {},
   }
 }
@@ -1390,16 +1360,20 @@ function seedDcExample() {
     period: 2,
     graph: {
       nodes: [
-        { id: 'sen_rack', kind: 'sen', devId: senId, label: '机柜温度传感器', unit: '℃', unitName: '算力设备', value: null, x: 80, y: 130 },
-        { id: 'if_temp', kind: 'if', x: 330, y: 100, branches: [
+        { id: 'nd_start', kind: 'start', x: 40, y: 150 },
+        { id: 'sen_rack', kind: 'sen', devId: senId, label: '机柜温度传感器', unit: '℃', unitName: '算力设备', value: null, x: 210, y: 130 },
+        { id: 'if_temp', kind: 'if', x: 460, y: 100, branches: [
           { id: 'b1', type: 'if', src: 'sen_rack', op: '>=', val: 50 },
           { id: 'b2', type: 'else', src: '', op: '>', val: 0 },
         ] },
-        { id: 'adj_pump', kind: 'adj', devId: adjId, label: '循环水泵变压器', unit: 'V', unitName: '冷却水', value: 24, x: 620, y: 60 },
+        { id: 'adj_pump', kind: 'adj', devId: adjId, label: '循环水泵变压器', unit: 'V', unitName: '冷却水', value: 24, x: 800, y: 60 },
+        { id: 'nd_end', kind: 'end', x: 980, y: 150 },
       ],
       edges: [
+        { id: 'e_st', from: 'nd_start', port: 'out', to: 'sen_rack' },
         { id: 'e_s2if', from: 'sen_rack', port: 'out', to: 'if_temp' },
         { id: 'e_if2adj', from: 'if_temp', port: 'b1', to: 'adj_pump' },
+        { id: 'e_en', from: 'adj_pump', port: 'out', to: 'nd_end' },
       ],
     },
     selAdj: [adjId],
@@ -1410,29 +1384,23 @@ function seedDcExample() {
   persist()
 }
 
-// —— 进入 / 退出编排：设备选择与绑定随模型存取 ——
+// —— 进入 / 退出编排：设备选择与目标值随模型存取 ——
 function loadSel(m) {
-  const kept = (m.selAdj && m.selAdj.length) || (m.selSen && m.selSen.length) || Object.keys(m.bindOf || {}).length
+  const kept = (m.selAdj && m.selAdj.length) || (m.selSen && m.selSen.length)
   selAdj.value = (m.selAdj || []).slice()
   selSen.value = (m.selSen || []).slice()
-  for (const k of Object.keys(bindOf)) delete bindOf[k]
   for (const k of Object.keys(spOf)) delete spOf[k]
-  Object.assign(bindOf, m.bindOf || {})
   Object.assign(spOf, m.spOf || {})
-  if (!kept) autoPick(true)
-  // 规则模型：勾选 ⇄ 画布模块对齐（画布已有模块但没勾选时，以画布为准回勾，避免误删模块）
-  if (m.alg === 'rule') {
-    const hasDevNode = (m.graph && m.graph.nodes || []).some((n) => n && (n.kind === 'adj' || n.kind === 'sen'))
-    if (hasDevNode && !selAdj.value.length && !selSen.value.length) syncSelFromGraph()
-    else applySelToGraph()
-  }
+  // 规则模型的模块由画布自己维护（左栏模块列表拖入），不参与设备勾选
+  if (m.alg !== 'rule' && !kept) autoPick(true)
+  // 存量编排可能没有「开始 / 结束」端点：进入编排时补齐，并把断开的两端自动接上
+  if (m.alg === 'rule') ensureFlowEnds(m.graph)
   syncRuns()
 }
-watch([selAdj, selSen, bindOf, spOf], () => {
+watch([selAdj, selSen, spOf], () => {
   if (!cur.value) return
   cur.value.selAdj = selAdj.value.slice()
   cur.value.selSen = selSen.value.slice()
-  cur.value.bindOf = { ...bindOf }
   cur.value.spOf = { ...spOf }
 }, { deep: true })
 // 模型的编排内容（规则图 / 粒子群参数 / 周期 / 名称）变更即落盘
@@ -1504,6 +1472,7 @@ function statOf(m) {
     return [
       { k: t('模块'), v: (m.graph.nodes || []).length },
       { k: t('连线'), v: (m.graph.edges || []).length },
+      { k: t('通路'), v: hasFlowPath(m.graph) ? t('已连通') : t('未连通') },
       { k: t('周期'), v: `${m.period || 2}s` },
     ]
   }
@@ -1525,7 +1494,8 @@ function statOf(m) {
 const canRun = computed(() => {
   const m = cur.value
   if (!m) return false
-  if (m.alg === 'rule') return (m.graph.nodes || []).length > 0
+  // 规则：必须形成「开始 → … → 结束」通路才允许执行
+  if (m.alg === 'rule') return hasFlowPath(m.graph)
   if (m.alg === 'pso') return (m.pso.vars || []).length > 0 && !!m.pso.senId
   return loops.value.length > 0
 })
@@ -1533,16 +1503,16 @@ const runTip = computed(() => {
   const m = cur.value
   if (!m) return ''
   if (canRun.value) return t('按当前编排运行；再点一次停止')
-  if (m.alg === 'rule') return t('请先把可调 / 传感设备拖入规则画布')
+  if (m.alg === 'rule') return t('请先用「开始 / 结束」模块把流程连通：开始 → 条件判断 / 可调设备 → 结束')
   if (m.alg === 'pso') return t('请先选择优化变量（可调设备）与优化目标（传感设备）')
-  return t('请先在左栏绑定可调设备与传感设备，形成控制回路')
+  return t('请先在左栏勾选可调设备与传感设备（按勾选顺序一一配对形成控制回路）')
 })
 const runStateTxt = computed(() => {
   const m = cur.value
   if (!m) return ''
   if (m.alg === 'rule') {
     if (running.value) return t('规则运行中')
-    return canRun.value ? t('就绪') : t('未编排')
+    return canRun.value ? t('就绪') : t('未连通')
   }
   if (m.alg === 'pso') return running.value ? t('寻优中') : t('待运行')
   if (trainBusy.value) return `${t('训练中')} ${iterN.value}/${maxIter.value}`
@@ -1575,307 +1545,321 @@ defineExpose({ startSample, stopSample, enter, back })
 </script>
 
 <style scoped>
-.agc { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.hd-sp { flex: 1 1 auto; }
+/* ══════════════ AI 群控（AGC）· 视觉规范 ══════════════
+   字号 4 档：13(--fs-h) · 12(--fs-t) · 11(--fs-b) · 10(--fs-s)
+   字重 3 档：400 正文 · 500(--fw-m) 数值 · 600(--fw-t) 标题
+   颜色 3 类：结构色 text·muted·faint
+             语义色 accent 强调 · green 正常 · yellow 警告 · red 报警
+             种类色 --k-adj 可调 · --k-sen 传感 · --k-if 条件 · --k-loop 循环
+   层级表达顺序：留白 > 结构色 > 字重 > 彩色（彩色只给「标题 / 关键数值 / 状态」） */
 
-/* ==================== ① 模型库 ==================== */
-.agc-lib { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 4px; }
-.lib-tip { margin: 0; font-size: 10.5px; line-height: 1.7; color: var(--muted); }
+.agc { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+/* 语义标签不再自带「默认加粗 / 斜体」的印刷样式，层级统一由字重令牌表达 */
+.agc b, .agc strong { font-weight: var(--fw-m); }
+.agc em, .agc i { font-style: normal; }
+.hd-sp { flex: 1 1 auto; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.grow { flex: 1 1 auto; }
+
+/* ══════════ 通用控件（对齐全局按钮 / 表单规范，本页不另立一套） ══════════ */
+.lk {
+  padding: 0; border: 0; background: none; cursor: pointer; font-family: inherit;
+  font-size: var(--fs-s); color: var(--muted);
+}
+.lk:hover { color: var(--accent-d); }
+.lk.danger:hover { color: var(--red); }
+
+.btn {
+  padding: 0 var(--btn-pad-x); min-height: var(--btn-h); display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-1);
+  font-family: inherit; font-size: var(--fs-b); font-weight: var(--fw-m); line-height: 1;
+  color: var(--text); background: var(--btn-bg); border: 1px solid transparent; border-radius: 2px;
+  cursor: pointer; white-space: nowrap;
+}
+.btn:hover:not(:disabled) { background: var(--btn-bg-hover); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { color: var(--on-accent); background: var(--accent); font-weight: var(--fw-t); }
+.btn.primary:hover:not(:disabled) { background: var(--accent-h); }
+.btn.danger { color: var(--red); }
+.btn.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--red) 14%, transparent); }
+.btn.ghost { background: var(--btn-bg); border-color: transparent; }
+.btn.ghost:hover:not(:disabled) { background: var(--btn-bg-hover); }
+
+.num, select, .sel, .mk-in {
+  padding: 3px 6px; font-size: var(--fs-b); color: var(--text); max-width: 100%;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); outline: none;
+}
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+select, .sel, .mk-in { font-family: inherit; }
+.num:focus, select:focus, .sel:focus, .mk-in:focus { border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent-l); }
+.num:disabled, select:disabled, .sel:disabled { opacity: .5; }
+.sel.xs { padding: 2px 4px; }
+.num.w56 { width: 62px; }
+.num.tm { width: 88px; text-align: center; }
+input[type='checkbox'] { width: auto; padding: 0; border: 0; }
+i.u { font-size: var(--fs-s); color: var(--faint); }
+@keyframes agc-pulse { 50% { opacity: .35; } }
+
+/* 徽标（算法标签 / 状态标签）：形状统一，只有语义色不同 */
+.mc-tg, .tag, .badge {
+  flex: 0 0 auto; padding: 0 6px; border-radius: 8px; white-space: nowrap;
+  font-size: var(--fs-s); line-height: 15px; color: var(--muted);
+  background: var(--bar); border: 1px solid var(--border);
+}
+.mc-tg.rule {
+  color: var(--k-adj); border-color: color-mix(in srgb, var(--k-adj) 34%, transparent);
+  background: color-mix(in srgb, var(--k-adj) 10%, transparent);
+}
+.mc-tg.rl {
+  color: var(--k-if); border-color: color-mix(in srgb, var(--k-if) 34%, transparent);
+  background: color-mix(in srgb, var(--k-if) 10%, transparent);
+}
+.mc-tg.pso {
+  color: var(--k-sen); border-color: color-mix(in srgb, var(--k-sen) 34%, transparent);
+  background: color-mix(in srgb, var(--k-sen) 10%, transparent);
+}
+.tag.on, .badge.ok {
+  color: var(--green); border-color: color-mix(in srgb, var(--green) 34%, transparent);
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+}
+.badge.busy { color: var(--accent-d); border-color: transparent; background: var(--accent-l); }
+.badge.na {
+  color: var(--red); border-color: color-mix(in srgb, var(--red) 34%, transparent);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+}
+
+/* ══════════ ① 模型库 ══════════ */
+.agc-lib { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding: 0 4px 0 8px; }
+.lib-bar { display: flex; align-items: baseline; gap: 8px; }
+.lib-ttl { font-size: var(--fs-t); font-weight: var(--fw-t); color: var(--text); }
+.lib-tip { margin: 0; max-width: 780px; font-size: var(--fs-s); line-height: 1.6; color: var(--faint); }
 .lib-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
   gap: 10px; align-content: start;
-  /* 卡片不贴左侧边缘：留出与右侧滚动条对称的呼吸位 */
-  padding-left: 6px;
 }
+
+/* 模型卡：VSCode 风扁平条目——统一 1px 边框、hover 换底 + 描边，无彩色竖条、无投影 */
 .mcard {
-  position: relative; display: flex; flex-direction: column; gap: 6px;
-  padding: 8px 10px 7px; text-align: left; font-family: inherit; cursor: pointer;
-  border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: 3px;
-  background: var(--panel); transition: border-color .12s, box-shadow .12s;
+  position: relative; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px;
+  text-align: left; font-family: inherit; cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel);
+  transition: background .12s, border-color .12s;
 }
-.mcard:hover { border-color: var(--accent2); box-shadow: 0 1px 6px rgba(0, 0, 0, .08); }
-.mcard.alg-rule { border-left-color: #D97A21; }
-.mcard.alg-rl { border-left-color: #7A5AA8; }
-.mcard.alg-pso { border-left-color: #17957F; }
-.mcard.live { box-shadow: 0 0 0 1px var(--accent-d) inset; }
-.mc-top { display: flex; align-items: center; gap: 6px; }
-.mc-ic { font-size: 13px; color: var(--accent-d); font-style: normal; }
+.mcard:hover { background: var(--panel-2); border-color: color-mix(in srgb, var(--accent-d) 42%, var(--border)); }
+.mcard:focus-visible { outline: none; border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent-l); }
+.mcard.live { border-color: color-mix(in srgb, var(--green) 45%, var(--border)); }
+.mc-top { display: flex; align-items: center; gap: 7px; }
+/* 算法标识由图标色块承载（取代原先的左侧彩色竖条） */
+.mc-ic {
+  flex: 0 0 auto; width: 20px; height: 20px; border-radius: 2px; font-size: var(--fs-b); line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--faint); background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.mcard.alg-rule .mc-ic { color: var(--k-adj); }
+.mcard.alg-rl .mc-ic { color: var(--k-if); }
+.mcard.alg-pso .mc-ic { color: var(--k-sen); }
 .mc-nm {
-  flex: 1 1 auto; min-width: 0; font-size: 11.5px; font-weight: 600; color: var(--text);
+  flex: 1 1 auto; min-width: 0; font-size: var(--fs-t); font-weight: var(--fw-t); color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.mc-tg {
-  flex: 0 0 auto; padding: 0 5px; border-radius: 8px; font-size: 9px; line-height: 14px;
-  background: var(--bar); color: var(--muted); border: 1px solid var(--border);
-}
-.mc-tg.rule { color: #D97A21; border-color: rgba(217, 122, 33, .5); background: rgba(217, 122, 33, .10); }
-.mc-tg.rl { color: #7A5AA8; border-color: rgba(122, 90, 168, .5); background: rgba(122, 90, 168, .10); }
-.mc-tg.pso { color: #17957F; border-color: rgba(23, 149, 127, .5); background: rgba(23, 149, 127, .10); }
-.mc-bd { display: flex; flex-direction: column; gap: 2px; }
-.mc-st { display: flex; align-items: baseline; justify-content: space-between; font-size: 10px; }
-.mc-st em { font-style: normal; color: var(--faint); }
-.mc-st b { font-size: 10.5px; color: var(--muted); font-weight: 600; }
-.mc-ft { display: flex; align-items: center; gap: 6px; padding-top: 3px; border-top: 1px dashed var(--line); }
-.mc-ft .dim { font-size: 9.5px; color: var(--faint); }
-.mc-ops { margin-left: auto; display: inline-flex; gap: 7px; }
+.mc-bd { display: flex; flex-wrap: wrap; gap: 2px 14px; }
+.mc-st { display: inline-flex; align-items: baseline; gap: 5px; }
+.mc-st em { font-size: var(--fs-s); color: var(--faint); }
+.mc-st b { font-size: var(--fs-b); font-weight: var(--fw-m); color: var(--muted); }
+.mc-ft { display: flex; align-items: center; gap: 8px; }
+.mc-ts { font-size: var(--fs-s); color: var(--faint); }
+.mc-live { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-s); color: var(--green); }
+.mc-live .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: agc-pulse 1s infinite; }
+.mc-ops { margin-left: auto; display: inline-flex; gap: 8px; }
+.mc-ops .lk { color: var(--faint); }
+.mcard:hover .mc-ops .lk { color: var(--muted); }
+.mc-ops .lk:hover { color: var(--accent-d); }
 .mc-ops .lk.danger:hover { color: var(--red); }
-.mc-live {
-  position: absolute; top: 6px; right: 8px; font-style: normal; font-size: 9px;
-  color: var(--green); background: rgba(46, 139, 87, .12); border-radius: 8px; padding: 0 5px;
-}
-.mcard.new {
-  align-items: center; justify-content: center; gap: 3px; min-height: 112px;
-  border-style: dashed; color: var(--muted); background: transparent;
-}
-.mcard.new .plus { font-size: 20px; line-height: 1; color: var(--accent-d); }
-.mcard.new .nt { font-size: 11.5px; font-weight: 600; color: var(--text); }
-.mcard.new .nd { font-size: 9.5px; color: var(--faint); }
+.mcard.new { align-items: center; justify-content: center; gap: 5px; min-height: 116px; border-style: solid; background: var(--btn-bg); }
+.mcard.new:hover { background: var(--btn-bg-hover); border-color: color-mix(in srgb, var(--accent-d) 55%, var(--border)); }
+.mcard.new .plus { font-size: 16px; line-height: 1; color: var(--faint); transition: color .12s; }
+.mcard.new .nt { font-size: var(--fs-t); font-weight: var(--fw-t); color: var(--muted); transition: color .12s; }
+.mcard.new .nd { font-size: var(--fs-s); color: var(--faint); }
+.mcard.new:hover .plus, .mcard.new:hover .nt { color: var(--accent-d); }
 .lib-empty { padding: 26px 0; text-align: center; }
-.lib-empty .t1 { margin: 0 0 4px; font-size: 12px; color: var(--muted); }
-.lib-empty .t2 { margin: 0; font-size: 10.5px; color: var(--faint); }
+.lib-empty .t1 { margin: 0 0 4px; font-size: var(--fs-t); color: var(--muted); }
+.lib-empty .t2 { margin: 0; font-size: var(--fs-s); color: var(--faint); }
 
-/* ==================== ② 编排 ==================== */
+/* ══════════ ② 编排 · 头部 ══════════ */
 .agc-edit { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .ed-top {
-  display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
-  padding: 5px 8px; border: 1px solid var(--border); border-radius: 3px; background: var(--panel);
+  display: flex; align-items: center; gap: 8px; flex: 0 0 auto; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel);
 }
-.ed-nm { font-size: 12.5px; color: var(--text); }
-.ed-st { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--muted); }
-.ed-st .dot { width: 7px; height: 7px; border-radius: 50%; background: #888; }
-.ed-st.on { color: var(--accent-d); }
-.ed-st.on .dot { background: var(--accent); animation: agc-pulse 1s infinite; }
+.ed-nm { font-size: var(--fs-t); font-weight: var(--fw-m); color: var(--text); }
+.ed-st { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-s); color: var(--faint); }
+.ed-st .dot, .tstate .dot { flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
+.ed-st.on { color: var(--green); }
+.ed-st.on .dot { background: var(--green); animation: agc-pulse 1s infinite; }
 .ed-bd { flex: 1 1 auto; min-height: 0; display: flex; gap: 12px; }
 
-/* ==================== 新建模型 ==================== */
-.mk-mask {
-  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
-  background: rgba(0, 0, 0, .38);
-}
-.mk-dlg {
-  width: 460px; max-width: calc(100vw - 40px); max-height: 88vh; overflow: auto;
-  display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 4px;
-  background: var(--panel); box-shadow: 0 8px 30px rgba(0, 0, 0, .25);
-}
-.mk-hd {
-  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
-  border-bottom: 1px solid var(--border); background: var(--panel-2);
-}
-.mk-hd b { font-size: 12.5px; color: var(--text); }
-.mk-x {
-  margin-left: auto; padding: 0 4px; border: 0; background: none; cursor: pointer;
-  font-family: inherit; font-size: 12px; color: var(--faint);
-}
-.mk-x:hover { color: var(--red); }
-.mk-bd { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
-.mk-f { display: flex; align-items: center; gap: 8px; }
-.mk-f em { font-style: normal; flex: 0 0 auto; font-size: 10.5px; color: var(--muted); }
-.mk-in {
-  flex: 1 1 auto; min-width: 0; padding: 3px 6px; font-size: 11.5px; font-family: inherit; color: var(--text);
-  background: var(--panel); border: 1px solid var(--border); border-radius: 3px; outline: none;
-}
-.mk-in:focus { border-color: var(--accent2); }
-.mk-t { font-size: 10.5px; color: var(--muted); }
-.mk-types { display: flex; flex-direction: column; gap: 6px; }
-.mk-tp {
-  display: grid; grid-template-columns: 24px 1fr; grid-template-rows: auto auto; gap: 0 8px;
-  padding: 6px 8px; text-align: left; cursor: pointer; font-family: inherit;
-  border: 1px solid var(--border); border-radius: 3px; background: var(--panel);
-}
-.mk-tp:hover { border-color: var(--accent2); }
-.mk-tp.on { border-color: var(--accent-d); background: var(--accent-l); }
-.mk-tp .tp-ic { grid-row: 1 / 3; align-self: center; font-style: normal; font-size: 15px; color: var(--accent-d); text-align: center; }
-.mk-tp b { font-size: 11.5px; color: var(--text); }
-.mk-tp span { font-size: 9.5px; color: var(--faint); }
-.mk-tp.rule .tp-ic { color: #D97A21; }
-.mk-tp.rl .tp-ic { color: #7A5AA8; }
-.mk-tp.pso .tp-ic { color: #17957F; }
-.mk-ft { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); }
-
-/* ==================== 左栏 ==================== */
+/* ══════════ ② 编排 · 左栏 ══════════ */
 .agc-aside {
-  flex: 0 0 336px; width: 336px; min-width: 0;
-  display: flex; flex-direction: column; gap: 8px;
-  overflow-y: auto; padding-right: 4px;
+  flex: 0 0 336px; width: 336px; min-width: 0; display: flex; flex-direction: column; gap: 10px;
+  overflow-y: auto; padding: 0 4px 0 8px;
 }
-.agc-hd { display: flex; align-items: center; gap: 6px; padding: 2px 0 4px; border-bottom: 1px solid var(--line); }
-.agc-hd b { font-size: 12.5px; color: var(--text); }
-.hd-sub { margin-left: auto; font-size: 10px; color: var(--faint); }
+.agc-hd { display: flex; align-items: center; gap: 6px; padding: 0 0 2px; }
+.hd-sub { margin-left: auto; font-size: var(--fs-s); color: var(--faint); }
 
-.pnl { border: 1px solid var(--border); border-radius: 3px; background: var(--panel); }
+.pnl { border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); overflow: hidden; }
 .pnl-hd {
-  display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px; cursor: pointer; user-select: none;
   background: var(--panel-2); border-bottom: 1px solid var(--border);
-  font-size: 11.5px; font-weight: 600; color: var(--text); cursor: pointer; user-select: none;
+  font-size: var(--fs-t); font-weight: var(--fw-t); color: var(--text);
 }
-.caret { font-style: normal; font-size: 9px; color: var(--faint); transition: transform .12s; display: inline-block; }
+.pnl-hd.col { border-bottom-color: transparent; }   /* 折叠时不要留一条悬空的横线 */
+.caret { font-size: var(--fs-s); color: var(--faint); transition: transform .12s; display: inline-block; }
 .caret.on { transform: rotate(90deg); }
-.ph-t { letter-spacing: .2px; }
-.cnt { font-style: normal; font-size: 9.5px; color: var(--faint); }
-.hd-ops { margin-left: auto; display: inline-flex; gap: 6px; }
-.lk {
-  padding: 0; border: 0; background: none; cursor: pointer;
-  font-size: 10px; color: var(--muted); font-family: inherit;
-}
-.lk:hover { color: var(--accent-d); text-decoration: underline; }
-.pnl-bd { padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 5px; }
-.emp { margin: 0; font-size: 10.5px; line-height: 1.6; color: var(--muted); }
-.emp.sm { font-size: 10px; color: var(--faint); }
+.cnt { font-size: var(--fs-s); font-weight: 400; color: var(--faint); }
+.hd-ops { margin-left: auto; display: inline-flex; gap: 8px; }
+.pnl-bd { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+.emp { margin: 0; font-size: var(--fs-s); line-height: 1.6; color: var(--faint); }
+.drag-tip { color: var(--muted); border-left: 2px solid var(--border); padding-left: 8px; }
 
-.dev { border: 1px solid transparent; border-radius: 3px; }
+/* 模块列表项：拖入画布即在落点建模块，点击则加到画布中心 */
+.mi {
+  display: flex; align-items: center; gap: 6px; padding: 4px 6px; cursor: grab;
+  border: 1px solid transparent; border-radius: var(--radius);
+}
+.mi:hover { background: var(--panel-2); border-color: var(--border); }
+.mi:active { cursor: grabbing; }
+.mi-ic { flex: 0 0 auto; width: 16px; text-align: center; font-size: var(--fs-b); color: var(--faint); }
+.mi-nm { flex: 1 1 auto; min-width: 0; font-size: var(--fs-b); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mi-nm em { font-size: var(--fs-s); color: var(--faint); margin-left: 5px; }
+.mi-v { flex: 0 0 auto; font-size: var(--fs-b); font-weight: var(--fw-m); color: var(--text); }
+.mi-v i { font-size: var(--fs-s); color: var(--faint); margin-left: 2px; }
+.mi.k-start .mi-ic { color: var(--green); }
+.mi.k-end .mi-ic { color: var(--red); }
+.mi.k-if .mi-ic { color: var(--k-if); }
+.mi.k-gate .mi-ic { color: color-mix(in srgb, var(--k-if) 52%, var(--k-sen)); font-weight: var(--fw-t); }
+.mi.k-loop .mi-ic { color: var(--k-loop); }
+.mi.k-adj .mi-ic { color: var(--k-adj); }
+.mi.k-sen .mi-ic { color: var(--k-sen); }
+
+.dev { border: 1px solid transparent; border-radius: var(--radius); }
 .dev.on { background: var(--panel-2); border-color: var(--border); }
-.dev-hd { display: flex; align-items: center; gap: 6px; padding: 3px 4px; cursor: pointer; }
+.dev-hd { display: flex; align-items: center; gap: 6px; padding: 4px 6px; cursor: pointer; }
 .cbx {
-  flex: 0 0 auto; width: 12px; height: 12px; border: 1px solid var(--border); border-radius: 2px;
+  flex: 0 0 auto; width: 13px; height: 13px; border: 1px solid var(--border); border-radius: 2px;
   background: var(--panel); display: inline-flex; align-items: center; justify-content: center;
-  font-size: 9px; line-height: 1; color: #fff;
+  font-size: var(--fs-s); line-height: 1; color: var(--on-accent);
 }
-.dev.on .cbx { background: var(--accent-d); border-color: var(--accent-d); }
-.dev-hd .nm { flex: 1 1 auto; min-width: 0; font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dev-hd .nm em { font-style: normal; font-size: 9.5px; color: var(--faint); margin-left: 5px; }
-.dev-hd .val { flex: 0 0 auto; font-size: 11px; color: var(--text); font-weight: 600; }
-.dev-hd .val i { font-style: normal; font-size: 9px; color: var(--faint); margin-left: 2px; }
-.tag {
-  flex: 0 0 auto; padding: 0 5px; border-radius: 8px; font-size: 9px; line-height: 14px;
-  background: var(--bar); color: var(--muted); border: 1px solid var(--border);
-}
-.tag.pid { color: var(--accent-d); border-color: var(--accent-d); background: var(--accent-l); }
-.tag.on { color: var(--green); border-color: var(--green); background: rgba(46,139,87,.10); }
-
-.dev-bd { padding: 2px 4px 5px 22px; display: flex; flex-direction: column; gap: 4px; }
+.dev.on .cbx { background: var(--accent); border-color: var(--accent); }
+.dev-hd .nm { flex: 1 1 auto; min-width: 0; font-size: var(--fs-b); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dev-hd .nm em { font-size: var(--fs-s); color: var(--faint); margin-left: 5px; }
+.dev-hd .val { flex: 0 0 auto; font-size: var(--fs-b); font-weight: var(--fw-m); color: var(--text); }
+.dev-hd .val i { font-size: var(--fs-s); color: var(--faint); margin-left: 2px; }
+.dev-bd { padding: 2px 6px 6px 25px; display: flex; flex-direction: column; gap: 6px; }
 .sp-row { display: flex; align-items: center; gap: 6px; }
 .rng { flex: 1 1 auto; min-width: 0; accent-color: var(--accent-d); height: 14px; }
 .rng:disabled { opacity: .5; }
-.sp-row .num { width: 66px; }
-.meta { display: flex; align-items: center; gap: 8px; font-size: 9.5px; color: var(--faint); flex-wrap: wrap; }
-.meta b { color: var(--muted); }
+.sp-row .num { width: 68px; }
 .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.row > em { font-style: normal; font-size: 10px; color: var(--muted); flex: 0 0 auto; }
+.row > em { font-size: var(--fs-s); color: var(--muted); flex: 0 0 auto; }
 .row select { flex: 1 1 auto; min-width: 0; }
-.row .num { width: 72px; }
-.row.st { gap: 10px; }
-.row.rd b { font-size: 11px; color: var(--text); }
-.hintx { font-size: 9.5px; color: var(--faint); }
-.kv { display: inline-flex; align-items: baseline; gap: 3px; }
-.kv em { font-style: normal; font-size: 9.5px; color: var(--faint); }
-.kv b { font-size: 10.5px; font-weight: 600; }
-.kv b.raw { color: #E07B39; }
-.kv b.ekf { color: #3AA655; }
-.badge { margin-left: auto; padding: 0 5px; border-radius: 8px; font-size: 9px; line-height: 14px; background: var(--bar); color: var(--muted); }
-.badge.ok { color: var(--green); background: rgba(46,139,87,.12); }
-.badge.busy { color: var(--accent-d); background: var(--accent-l); }
-.badge.na { color: var(--red); background: rgba(188,59,48,.10); }
-.badge.idle { color: var(--faint); }
+.row .num { width: 76px; }
+.row.st { gap: 12px; }
+.meta { display: flex; align-items: center; gap: 10px; font-size: var(--fs-s); color: var(--faint); flex-wrap: wrap; }
+.hintx { font-size: var(--fs-s); color: var(--faint); }
+.kv { display: inline-flex; align-items: baseline; gap: 4px; }
+.kv em { font-size: var(--fs-s); color: var(--faint); }
+.kv b { font-size: var(--fs-b); font-weight: var(--fw-m); color: var(--text); }
 
-.io { display: flex; flex-direction: column; gap: 3px; padding: 2px 0 4px; }
-.io-row { display: flex; gap: 6px; font-size: 10px; color: var(--muted); }
-.io-row em { font-style: normal; flex: 0 0 auto; color: var(--faint); }
-.io-row .warnx { color: var(--red); }
-.io-row .okx { color: var(--green); }
-
-/* ==================== 右栏 ==================== */
-.agc-main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 4px; }
-
-/* 规则控制：编排画布占据右栏主体 */
+/* ══════════ ② 编排 · 右栏 ══════════ */
+.agc-main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding-right: 4px; }
+.card { flex: 0 0 auto; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); }
 .card.rg { flex: 1 1 auto; min-height: 560px; }
-.rf-fill { flex: 1 1 auto; min-height: 0; }
-.rg .lg-i { font-size: 9.5px; margin-left: 6px; }
-.rg .lg-i.adj { color: #D97A21; }
-.rg .lg-i.sen { color: #17957F; }
-.rg .lg-i.ifn { color: #7A5AA8; }
-.drag-tip { color: var(--accent-d); border-left: 2px solid var(--accent-l); padding-left: 6px; }
-.rg-st { padding-top: 2px; }
-.rg-st .mono { font-size: 10px; color: var(--muted); }
-.card { flex: 0 0 auto; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 3px; background: var(--panel); }
 .card.grow { flex: 1 1 auto; min-height: 190px; }
-.card-hd {
-  display: flex; align-items: center; gap: 8px; padding: 5px 8px;
-  background: var(--panel-2); border-bottom: 1px solid var(--border);
-}
-.ct { font-size: 11.5px; font-weight: 600; color: var(--text); }
-.cs { font-size: 10px; color: var(--faint); }
+.rf-fill { flex: 1 1 auto; min-height: 0; }
+.card-hd { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--panel-2); border-bottom: 1px solid var(--border); }
+.ct { font-size: var(--fs-t); font-weight: var(--fw-t); color: var(--text); }
+.cs { font-size: var(--fs-s); color: var(--faint); }
 .ch-ops { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
-.ch-ops .rw { color: var(--accent-d); font-size: 11px; }
-.ch-ops .best { color: var(--green); font-size: 11px; }
-.ch-ops .dim { font-size: 10px; color: var(--faint); }
-.cempty { height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 0 24px; text-align: center; font-size: 10.5px; color: var(--faint); }
+.ch-ops .rw { font-size: var(--fs-b); font-weight: var(--fw-m); color: var(--accent-d); }
+.ch-ops .best { font-size: var(--fs-b); font-weight: var(--fw-t); color: var(--text); }
+.ch-ops .dim { font-size: var(--fs-s); color: var(--faint); }
+.cempty { height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 0 24px; text-align: center; }
 .cempty.sm { height: 150px; }
-.cempty .t1 { font-size: 11px; color: var(--muted); }
-.cempty .t2 { font-size: 10px; max-width: 460px; }
+.cempty .t1 { font-size: var(--fs-t); color: var(--muted); }
+.cempty .t2 { font-size: var(--fs-s); line-height: 1.6; color: var(--faint); max-width: 460px; }
 
-.btn {
-  padding: 2px 10px; font-size: 11px; font-family: inherit; color: var(--muted);
-  background: var(--panel); border: 1px solid var(--border); border-radius: 3px; cursor: pointer;
-}
-.btn:hover:not(:disabled) { border-color: var(--accent2); color: var(--accent-d); }
-.btn:disabled { opacity: .45; cursor: not-allowed; }
-.btn.primary { color: #fff; background: var(--accent-d); border-color: transparent; font-weight: 500; }
-.btn.primary:hover:not(:disabled) { filter: brightness(1.08); color: #fff; }
-.btn.stop { color: var(--red); border-color: var(--red); }
-.btn.ghost { background: transparent; }
-.btn.ghost:hover:not(:disabled) { background: var(--panel-2); }
+.bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; }
+.bar.mv { border-top: 1px solid var(--border); gap: 8px; }
+.sep { width: 1px; height: 14px; background: var(--border); }
+.lb2 { font-size: var(--fs-s); color: var(--muted); }
+.nx { font-size: var(--fs-s); color: var(--faint); font-variant-numeric: tabular-nums; }
+.chk { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-b); color: var(--muted); cursor: pointer; }
+.chk input { accent-color: var(--accent-d); width: 13px; height: 13px; }
+.tstate { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-s); color: var(--faint); }
+.tstate.on { color: var(--green); }
+.tstate.on .dot { background: var(--green); animation: agc-pulse 1s infinite; }
 
-.bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 7px 8px; }
-.bar.mv { border-top: 1px dashed var(--line); gap: 8px; }
-.sep { width: 1px; height: 14px; background: var(--line); }
-.lb2 { font-style: normal; font-size: 10.5px; color: var(--muted); }
-.nx { font-size: 10px; color: var(--faint); font-variant-numeric: tabular-nums; }
-.chk { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); cursor: pointer; }
-.chk input { accent-color: var(--accent-d); width: 12px; height: 12px; }
-.tstate { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted); }
-.tstate .dot { width: 7px; height: 7px; border-radius: 50%; background: #777; }
-.tstate.on { color: var(--accent-d); }
-.tstate.on .dot { background: var(--accent); animation: agc-pulse 1s infinite; }
-@keyframes agc-pulse { 50% { opacity: .35; } }
-
-.hp { padding: 2px 8px 8px; border-bottom: 1px dashed var(--line); display: flex; flex-direction: column; gap: 6px; }
-.hp-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.hp-row.obj { padding-top: 6px; border-top: 1px dotted var(--line); }
-.hp-row .lb { font-size: 10px; color: var(--muted); }
-.f { display: inline-flex; align-items: center; gap: 4px; }
-.f > em { font-style: normal; font-size: 9.5px; color: var(--faint); white-space: nowrap; }
-.num {
-  padding: 2px 4px; font-size: 11px; font-family: var(--mono); text-align: right; color: var(--text);
-  background: var(--panel); border: 1px solid var(--border); border-radius: 3px; outline: none;
-}
-.num:focus { border-color: var(--accent2); }
-.num:disabled { opacity: .55; }
-.num.w56 { width: 56px; }
-.num.tm { width: 84px; text-align: center; }
-select, .sel {
-  padding: 2px 4px; font-size: 11px; font-family: inherit; color: var(--text);
-  background: var(--panel); border: 1px solid var(--border); border-radius: 3px; outline: none; max-width: 100%;
-}
-.sel.xs { font-size: 10.5px; }
-.grow { flex: 1 1 auto; }
-i.u { font-style: normal; font-size: 9.5px; color: var(--faint); }
-.mono { font-family: var(--mono); }
+/* 超参数区：字段名 muted、单位 faint，不再出现第三种灰与额外强调色 */
+.hp { padding: 4px 10px 10px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.hp-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.hp-row.obj { padding-top: 8px; border-top: 1px solid var(--border); }
+.hp-row .lb { font-size: var(--fs-s); color: var(--muted); }
+.f { display: inline-flex; align-items: center; gap: 5px; }
+.f > em { font-size: var(--fs-s); color: var(--muted); white-space: nowrap; }
 
 /* 奖励曲线 */
-.rw-wrap { flex: 1 1 auto; min-height: 150px; display: flex; flex-direction: column; padding: 6px 8px 4px; }
+.rw-wrap { flex: 1 1 auto; min-height: 150px; display: flex; flex-direction: column; padding: 8px 10px 6px; }
 .rw-svg { width: 100%; flex: 1 1 auto; min-height: 110px; }
-.rw-svg .grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.rw-svg .base { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; opacity: .7; vector-effect: non-scaling-stroke; }
+.rw-svg .grid { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.rw-svg .base { stroke: var(--faint); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
 .rw-svg .cv { fill: none; stroke: var(--accent-d); stroke-width: 1.8; vector-effect: non-scaling-stroke; }
-.rw-ax { display: flex; justify-content: space-between; font-size: 9.5px; color: var(--faint); padding-top: 2px; }
+.rw-ax { display: flex; justify-content: space-between; font-size: var(--fs-s); color: var(--faint); padding-top: 2px; }
 
-/* 版本表 */
+/* 模型版本表 */
 .vtb { display: flex; flex-direction: column; }
-.vtr { display: grid; grid-template-columns: 60px 1.4fr 70px 60px 90px 70px; gap: 6px; align-items: center; padding: 4px 8px; font-size: 10.5px; color: var(--text); cursor: pointer; }
-.vtr.hd { background: var(--panel-2); color: var(--faint); font-size: 9.5px; cursor: default; border-bottom: 1px solid var(--border); }
+.vtr { display: grid; grid-template-columns: 64px 1.4fr 72px 56px 88px 72px; gap: 8px; align-items: center; padding: 5px 10px; font-size: var(--fs-b); color: var(--text); cursor: pointer; }
+.vtr.hd { background: var(--panel-2); border-bottom: 1px solid var(--border); font-size: var(--fs-s); color: var(--faint); cursor: default; }
 .vtr:not(.hd):hover { background: var(--panel-2); }
 .vtr.on { background: var(--sel); }
-.vtr.cur .mono { color: var(--green); }
 .vtr .dim { color: var(--faint); }
-.vtr .rw { color: var(--accent-d); }
-.vempty { padding: 10px 8px; font-size: 10.5px; color: var(--faint); text-align: center; }
-.vdim { border-top: 1px dashed var(--line); padding: 6px 8px 8px; }
-.vdim-h { font-size: 10px; color: var(--muted); padding-bottom: 4px; }
-.vrow { display: flex; align-items: baseline; gap: 6px; font-size: 10.5px; padding: 1px 0; }
+.vtr.cur .mono { color: var(--green); }
+.vempty { padding: 12px 10px; font-size: var(--fs-s); color: var(--faint); text-align: center; }
+.vdim { border-top: 1px solid var(--border); padding: 8px 10px 10px; }
+.vdim-h { font-size: var(--fs-s); color: var(--muted); padding-bottom: 5px; }
+.vrow { display: flex; align-items: baseline; gap: 6px; font-size: var(--fs-b); padding: 2px 0; }
 .vrow .rn {
-  flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%; text-align: center; line-height: 15px;
-  font-size: 9px; color: var(--accent-d); background: var(--bar); border: 1px solid var(--border);
+  flex: 0 0 auto; width: 16px; height: 16px; border-radius: 50%; text-align: center; line-height: 16px;
+  font-size: var(--fs-s); color: var(--accent-d); background: var(--bar); border: 1px solid var(--border);
 }
 .vrow .rl { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vrow .rp { margin-left: auto; color: var(--accent-d); font-size: 10px; }
+.vrow .rp { margin-left: auto; font-size: var(--fs-s); color: var(--accent-d); }
+
+/* ══════════ 新建模型 ══════════ */
+.mk-mask { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .38); }
+.mk-dlg {
+  width: 460px; max-width: calc(100vw - 40px); max-height: 88vh; overflow: auto; display: flex; flex-direction: column;
+  border: 1px solid var(--border); border-radius: 4px; background: var(--panel); box-shadow: 0 8px 30px rgba(0, 0, 0, .25);
+}
+.mk-hd { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--panel-2); border-bottom: 1px solid var(--border); }
+.mk-hd b { font-size: var(--fs-h); font-weight: var(--fw-t); color: var(--text); }
+.mk-x { margin-left: auto; padding: 0 4px; border: 0; background: none; cursor: pointer; font-family: inherit; font-size: var(--fs-t); color: var(--faint); }
+.mk-x:hover { color: var(--red); }
+.mk-bd { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.mk-f { display: flex; align-items: center; gap: 8px; }
+.mk-f em { flex: 0 0 auto; font-size: var(--fs-b); color: var(--muted); }
+.mk-t { font-size: var(--fs-s); color: var(--muted); }
+.mk-types { display: flex; flex-direction: column; gap: 6px; }
+.mk-tp {
+  display: grid; grid-template-columns: 26px 1fr; grid-template-rows: auto auto; gap: 0 10px;
+  padding: 8px 10px; text-align: left; cursor: pointer; font-family: inherit;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel);
+}
+.mk-tp:hover { background: var(--panel-2); }
+.mk-tp.on { border-color: var(--accent-d); background: var(--accent-l); }
+.mk-tp .tp-ic { grid-row: 1 / 3; align-self: center; font-size: 16px; text-align: center; color: var(--muted); }
+.mk-tp b { font-size: var(--fs-t); font-weight: var(--fw-t); color: var(--text); }
+.mk-tp span { font-size: var(--fs-s); color: var(--faint); }
+.mk-tp.rule .tp-ic { color: var(--k-adj); }
+.mk-tp.rl .tp-ic { color: var(--k-if); }
+.mk-tp.pso .tp-ic { color: var(--k-sen); }
+.mk-ft { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); }
 </style>

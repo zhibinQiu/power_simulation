@@ -8,7 +8,7 @@
 #       门户在全新服务器上的独立安装（systemd 常驻）用同目录 deploy.sh。
 #
 # 用法（仓库根任一路径执行均可，脚本自动定位门户目录）：
-#   bash platform/update.sh portal                     # 官网更新（推荐统一入口）
+#   ./update.sh portal                     # 官网更新（推荐统一入口）
 #   bash platform/portal-deploy/update.sh              # 直接调用
 #   bash platform/portal-deploy/update.sh -s root@192.168.1.50 -d /var/www/site
 #   QZB_SSH_PASS='<密码>' bash platform/portal-deploy/update.sh        # 无免密时用密码
@@ -23,7 +23,7 @@
 # ============================================================================
 set -euo pipefail
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-. "$SELF_DIR/../lib.sh"                                       # 公共库：servers.conf / ssh_run / rsync_run
+. "$SELF_DIR/../../lib.sh"                                    # 公共库（仓库根）：servers.conf / ssh_run / rsync_run
 SERVER="${HOME_SERVER:-${WEB_SSH:-root@43.161.194.75}}"      # 官网服务器（servers.conf WEB_SSH）
 REMOTE_DIR="${HOME_DIR:-${WEB_DIR:-/var/www/nengyousuan}}"   # 官网静态目录（servers.conf WEB_DIR）
 

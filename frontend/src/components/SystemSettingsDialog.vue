@@ -564,7 +564,7 @@ function resetDefaults() {
   store.setBrightness(0.95)
   store.setAutoRotate(false)
   if (store.fullscreenOn) store.toggleFullscreen()
-  if (!store.leftOpen) store.toggleLeft()
+  if (store.leftOpen) store.toggleLeft()   // 左栏默认折叠：恢复默认即收起
   if (!store.rightOpen) store.toggleRight()
   if (!store.bottomOpen) store.toggleBottom()
   if (!store.newsTickerOn) store.toggleNewsTicker()
@@ -618,7 +618,7 @@ function resetDefaults() {
 .ss-nav-item.on::before { content: ''; position: absolute; left: -8px; top: 22%; bottom: 22%; width: 3px; border-radius: 2px; background: var(--accent); }
 
 .ss-main { flex: 1; min-width: 0; overflow: auto; padding: 16px 18px 18px; }
-.ss-page-title { font-size: 15px; font-weight: 700; }
+.ss-page-title { font-size: var(--fs-h); font-weight: 700; }
 .ss-page-desc { font-size: 11px; color: var(--muted); margin: 3px 0 14px; }
 .ss-card { border: 1px solid var(--border); border-radius: 6px; background: var(--bar); overflow: hidden; }
 .ss-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
@@ -665,11 +665,11 @@ function resetDefaults() {
 .ss-btn:disabled { opacity: .5; cursor: not-allowed; }
 .ss-actions { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--border); }
 .ss-actions .sp { flex: 1; }
-.ss-btn { padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--bar); cursor: pointer; font-size: 12px; color: var(--text); }
+.ss-btn { padding: 0 var(--btn-pad-x-lg); min-height: var(--btn-h-lg); min-width: var(--btn-min-w); display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 6px; background: var(--btn-bg); cursor: pointer; font-size: 12px; color: var(--text); }
 .ss-btn:hover { border-color: var(--accent-d); }
 .ss-btn.primary { background: var(--accent); border-color: var(--accent-d); color: #fff; }
 .ss-btn.primary:hover { background: var(--accent-d); }
-.ss-btn.ghost { background: transparent; }
+.ss-btn.ghost { background: var(--btn-bg); }
 .sp { flex: 1; }
 /* ---- 场景资源包列表 ---- */
 .ss-pkg-group { border-top: 1px solid var(--border); padding-top: 2px; }

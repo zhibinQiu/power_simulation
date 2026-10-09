@@ -330,21 +330,21 @@ onMounted(loadAll)
 .om-flex { flex: 1; }
 .om-body { flex: 1; display: flex; min-height: 0; }
 .om-list { width: 320px; border-right: 1px solid var(--border); overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 4px; }
-.om-list-head { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; color: var(--faint); padding: 4px 6px; }
+.om-list-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--faint); padding: 4px 6px; }
 .om-add { width: 24px; height: 24px; border-radius: 4px; border: 1px solid var(--border); background: var(--panel-2); color: var(--accent); cursor: pointer; }
 .om-add:hover { border-color: var(--accent); }
-.om-item { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--text); cursor: pointer; font-size: 12.5px; text-align: left; }
+.om-item { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--text); cursor: pointer; font-size: 12px; text-align: left; }
 .om-item:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .om-item.on { background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .om-cat { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .om-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .om-rel { color: var(--accent); font-weight: 600; }
-.om-badge { font-style: normal; font-size: 9.5px; color: var(--faint); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+.om-badge { font-style: normal; font-size: 10px; color: var(--faint); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
 .om-badge.om-answer { color: #10b981; border-color: #10b981; }
 .om-editor { flex: 1; overflow: auto; padding: 16px 20px; }
 .om-empty { display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 13px; }
 .om-field { margin-bottom: 12px; }
-.om-field label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 5px; color: var(--text); }
+.om-field label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; color: var(--text); }
 .om-input { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel-2); color: var(--text); font-size: 13px; }
 .om-input:focus { outline: none; border-color: var(--accent); }
 /* 下拉选择框：全局 select 固定 height:22px 且 box-sizing:border-box，与 om-input 的 7px 垂直 padding 叠加后内容区仅剩约 6px，13px 文本被压扁裁切；改为高度自适应并保留右侧箭头空间 */
@@ -357,12 +357,12 @@ select.om-input {
 .om-ta { resize: vertical; font-family: inherit; line-height: 1.5; }
 .om-check { display: flex; align-items: center; gap: 8px; font-weight: 400 !important; cursor: pointer; }
 .om-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
-.om-btn { padding: 7px 16px; border-radius: 4px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); cursor: pointer; font-size: 12.5px; transition: all .15s; }
+.om-btn { padding: 0 var(--btn-pad-x-lg); min-height: var(--btn-h-lg); min-width: var(--btn-min-w); display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; border: 1px solid var(--border); background: var(--btn-bg); color: var(--text); cursor: pointer; font-size: 12px; transition: all .15s; }
 .om-btn:hover { border-color: var(--accent); color: var(--accent); }
 .om-danger:hover { border-color: #e5484d; color: #e5484d; }
 .om-graph-body { flex-direction: column; position: relative; }
 .om-legend { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
-.om-lg-item { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--faint); }
+.om-lg-item { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--faint); }
 .om-lg-item i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .om-hint { font-size: 11px; color: var(--faint); }
 .om-svg { flex: 1; width: 100%; cursor: grab; background:
@@ -370,12 +370,12 @@ select.om-input {
 .om-svg:active { cursor: grabbing; }
 .om-edge { stroke: color-mix(in srgb, var(--faint) 45%, transparent); stroke-width: 1.2; }
 .om-edge.sel { stroke: var(--accent); stroke-width: 2; }
-.om-edge-label { font-size: 9.5px; fill: var(--faint); text-anchor: middle; pointer-events: none; }
+.om-edge-label { font-size: 10px; fill: var(--faint); text-anchor: middle; pointer-events: none; }
 .om-node { cursor: grab; }
 .om-node circle { stroke: var(--panel); stroke-width: 2; opacity: .92; }
 .om-node circle.sel { stroke: var(--accent); stroke-width: 3; }
 .om-node-name { font-size: 11px; fill: var(--text); text-anchor: middle; pointer-events: none; }
-.om-node-info { position: absolute; left: 16px; bottom: 14px; max-width: 480px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; font-size: 12.5px; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+.om-node-info { position: absolute; left: 16px; bottom: 14px; max-width: 480px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
 .om-node-desc { display: block; color: var(--faint); margin-top: 4px; }
 .om-node-rels { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .om-rel-chip { font-size: 11px; padding: 3px 8px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--border); cursor: pointer; }

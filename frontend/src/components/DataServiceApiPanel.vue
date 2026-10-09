@@ -49,7 +49,7 @@ import { useSimStore } from '../stores/sim'
 import { t } from '../i18n'
 
 const store = useSimStore()
-const open = ref(true)          // 独立模块默认展开：接口清单是集成查阅入口，藏起来没人找得到
+const open = ref(false)         // 默认折叠：日常配置用不到，点标题展开才拉取（首屏更快、不占版面）
 const loading = ref(false)
 const err = ref('')             // 加载失败原因：空态必须给出可操作的提示，不能只写「暂无接口清单」
 const baseUrl = ref('')
@@ -89,7 +89,8 @@ async function copyApiCall(it) {
   }
 }
 
-onMounted(() => { if (open.value) load() })
+// 折叠态也拉一次：清单是自描述常量（极轻），头部要显示 baseUrl，且展开时能立刻有内容
+onMounted(() => { load() })
 </script>
 
 <style scoped>
@@ -129,7 +130,7 @@ onMounted(() => { if (open.value) load() })
   color: var(--fg, var(--text)); background: color-mix(in srgb, var(--muted) 16%, transparent); }
 .ds-api-m.get { color: var(--green); background: color-mix(in srgb, var(--green) 16%, transparent); }
 .ds-api-m.post { color: var(--accent, var(--blue)); background: color-mix(in srgb, var(--accent, var(--blue)) 16%, transparent); }
-.ds-api-path { font-size: 12.5px; font-weight: 400; }
+.ds-api-path { font-size: 12px; font-weight: 400; }
 .ds-api-ghd b { font-weight: 400; font-size: 13px; }
 .ds-api-params { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11px; color: var(--muted); }
 .ds-api-p.req { color: var(--fg, var(--text)); }

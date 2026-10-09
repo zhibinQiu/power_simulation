@@ -1,0 +1,1030 @@
+{
+  "format": "dictionary/1",
+  "scene": "thermal-power",
+  "materials": [
+    {
+      "id": "coal",
+      "name": "发电用原煤",
+      "cat": "燃料",
+      "unit": "t/h",
+      "color": "#4a4a4a",
+      "desc": "进厂原煤（收到基），经输煤皮带与给煤机送入磨煤机；入炉煤量 × 煤质参数（低位发热量 / 元素碳含量）即范围一燃料燃烧排放的活动数据。"
+    },
+    {
+      "id": "pulverized_coal",
+      "name": "煤粉",
+      "cat": "燃料",
+      "unit": "t/h",
+      "color": "#6b6257",
+      "desc": "原煤经中速磨研磨并干燥后的煤粉（细度 R90≈20%），由一次风送入炉膛燃烧器。"
+    },
+    {
+      "id": "combustion_air",
+      "name": "助燃风",
+      "cat": "介质",
+      "unit": "kNm³/h",
+      "color": "#5bb8e0",
+      "desc": "送风机提供的燃烧空气（含一次风与二次风），风煤比与氧量是燃烧效率与 NOx 生成的关键运行参数。"
+    },
+    {
+      "id": "feed_water",
+      "name": "锅炉给水",
+      "cat": "介质",
+      "unit": "t/h",
+      "color": "#3b9ee0",
+      "desc": "经除氧器除氧、给水泵升压与省煤器预热后送入锅炉的高压给水（超超临界约 28~30 MPa）。"
+    },
+    {
+      "id": "main_steam",
+      "name": "主蒸汽",
+      "cat": "介质",
+      "unit": "t/h",
+      "color": "#e05a5a",
+      "desc": "锅炉过热器出口的高温高压蒸汽（超超临界 25 MPa / 600 ℃），进入汽轮机高压缸做功；热电联产时一部分作为抽汽供热。"
+    },
+    {
+      "id": "exhaust_steam",
+      "name": "乏汽",
+      "cat": "介质",
+      "unit": "t/h",
+      "color": "#8fa8bd",
+      "desc": "汽轮机低压缸排汽（约 5 kPa 背压），进入凝汽器由循环冷却水凝结为凝结水。"
+    },
+    {
+      "id": "shaft_power",
+      "name": "轴功率",
+      "cat": "能量",
+      "unit": "MW",
+      "color": "#c9a227",
+      "desc": "汽轮机转子输出的机械功率，由发电机转换为电能；能量转换环节无直接排放。"
+    },
+    {
+      "id": "electricity",
+      "name": "上网电力",
+      "cat": "产品",
+      "unit": "MWh/h",
+      "color": "#f0c419",
+      "desc": "发电机输出并经主变升压上网的电能（机组出力），是本场景的主产品；厂用电由本机自供，扣减后为供电量。"
+    },
+    {
+      "id": "condensate",
+      "name": "凝结水",
+      "cat": "介质",
+      "unit": "t/h",
+      "color": "#6fa8d0",
+      "desc": "乏汽在凝汽器中凝结的凝结水，经凝结水泵、除氧器与给水泵回到锅炉，构成闭式汽水循环。"
+    },
+    {
+      "id": "cooling_water_supply",
+      "name": "循环水供水",
+      "cat": "介质",
+      "unit": "t/h",
+      "color": "#3b9ee0",
+      "desc": "冷却塔降温后由循环水泵送入凝汽器的低温冷却水，带走乏汽的汽化潜热。"
+    },
+    {
+      "id": "cooling_water_return",
+      "name": "循环水回水",
+      "cat": "介质",
+      "unit": "t/h",
+      "color": "#d4803a",
+      "desc": "在凝汽器中吸热升温后的循环水，回到冷却塔喷淋降温后循环使用（温升约 8~10 ℃）。"
+    },
+    {
+      "id": "flue_gas",
+      "name": "锅炉烟气",
+      "cat": "排放物",
+      "unit": "m³/h",
+      "color": "#8a7f72",
+      "desc": "炉膛燃烧产生的烟气（含 CO₂、NOx、SO₂、粉尘），依次经脱硝、除尘、脱硫净化后由烟囱外排。"
+    },
+    {
+      "id": "flue_gas_deno",
+      "name": "脱硝后烟气",
+      "cat": "排放物",
+      "unit": "m³/h",
+      "color": "#9a8b7c",
+      "desc": "经 SCR 脱硝（氨水/尿素作还原剂）脱除大部分 NOx 后的烟气。"
+    },
+    {
+      "id": "flue_gas_clean",
+      "name": "除尘后烟气",
+      "cat": "排放物",
+      "unit": "m³/h",
+      "color": "#a89a8c",
+      "desc": "经电除尘器/布袋除尘器脱除飞灰后的洁净烟气，粉尘浓度可降至 10 mg/m³ 以下。"
+    },
+    {
+      "id": "flue_gas_desul",
+      "name": "脱硫后净烟气",
+      "cat": "排放物",
+      "unit": "m³/h",
+      "color": "#b6ada0",
+      "desc": "经石灰石-石膏湿法脱硫脱除 SO₂ 后的净烟气，由烟囱排入大气（超低排放：SO₂≤35、NOx≤50、粉尘≤10 mg/m³）。"
+    },
+    {
+      "id": "emission",
+      "name": "大气排放物",
+      "cat": "排放物",
+      "unit": "m³/h",
+      "color": "#7d7d7d",
+      "desc": "经烟囱外排的净烟气；其中的 CO₂ 由燃料燃烧核算给出（范围一），污染物浓度由 CEMS 在线监测。"
+    },
+    {
+      "id": "bottom_ash",
+      "name": "底渣",
+      "cat": "固废",
+      "unit": "t/h",
+      "color": "#5f5f5f",
+      "desc": "炉膛底部排出的灰渣，可综合利用（水泥掺合料 / 筑路材料），不计入排放。"
+    },
+    {
+      "id": "fly_ash",
+      "name": "飞灰",
+      "cat": "固废",
+      "unit": "t/h",
+      "color": "#9c9c9c",
+      "desc": "电除尘器/布袋除尘器收集的粉煤灰，可综合利用（混凝土掺合料）；未综合利用部分为固废。"
+    },
+    {
+      "id": "limestone_slurry",
+      "name": "石灰石浆液",
+      "cat": "辅料",
+      "unit": "t/h",
+      "color": "#dcd6c4",
+      "desc": "脱硫吸收剂（石灰石粉制浆，CaCO₃ 含量约 90%），在吸收塔中与 SO₂ 反应生成石膏；其碳酸盐分解属工业过程排放（范围一）。"
+    },
+    {
+      "id": "ammonia",
+      "name": "脱硝还原剂",
+      "cat": "辅料",
+      "unit": "t/h",
+      "color": "#7fa9a0",
+      "desc": "SCR 脱硝用还原剂（氨水或尿素），喷入烟道把 NOx 还原为 N₂ 与 H₂O。"
+    },
+    {
+      "id": "gypsum",
+      "name": "脱硫石膏",
+      "cat": "副产品",
+      "unit": "t/h",
+      "color": "#e8e2d0",
+      "desc": "湿法脱硫的副产物（二水硫酸钙），可作建材原料；其形成过程固定了烟气中的硫，不产生 CO₂。"
+    },
+    {
+      "id": "heat_supply",
+      "name": "外供热量",
+      "cat": "产品",
+      "unit": "GJ/h",
+      "color": "#e08a3a",
+      "desc": "热电联产机组由汽轮机抽汽经热网换热器对外供应的热量（供热），按供热比分摊燃料后可扣减对应的发电排放。"
+    },
+    {
+      "id": "heating_steam",
+      "name": "供热抽汽",
+      "cat": "介质",
+      "unit": "t/h",
+      "color": "#d07070",
+      "desc": "汽轮机中压缸抽出的供热蒸汽，进入热网换热器加热热网循环水。"
+    },
+    {
+      "id": "ash_product",
+      "name": "综合利用灰渣",
+      "cat": "副产品",
+      "unit": "t/h",
+      "color": "#8b8378",
+      "desc": "底渣与飞灰经分选、磨细后作为水泥与混凝土掺合料、筑路材料外售综合利用，未利用部分按固废处置；灰渣中的未燃碳已在锅炉碳氧化率中扣除，不再计入排放。"
+    },
+    {
+      "id": "gypsum_product",
+      "name": "成品脱硫石膏",
+      "cat": "副产品",
+      "unit": "t/h",
+      "color": "#e8e2d0",
+      "desc": "脱硫石膏经旋流器浓缩与真空皮带脱水后的成品（二水硫酸钙，自由水≤10%），外售作水泥缓凝剂/石膏板原料；硫以硫酸钙形态固定，成盐过程不产生 CO₂。"
+    },
+    {
+      "id": "heat_return",
+      "name": "热网回水",
+      "cat": "介质",
+      "unit": "t/h",
+      "color": "#7ea3c4",
+      "desc": "热网循环水放热后回到热网换热站的回水，重新被抽汽加热后送出。"
+    }
+  ],
+  "products": [
+    {
+      "id": "electricity",
+      "name": "上网电力",
+      "unit": "MWh/h",
+      "color": "#f0c419",
+      "desc": "机组对外输出的电能（发电量 - 厂用电）。"
+    },
+    {
+      "id": "heat_supply",
+      "name": "外供热量",
+      "unit": "GJ/h",
+      "color": "#e08a3a",
+      "desc": "热电联产机组对外供热的热量（按供热比分摊燃料）。"
+    },
+    {
+      "id": "gypsum",
+      "name": "脱硫石膏",
+      "unit": "t/h",
+      "color": "#e8e2d0",
+      "desc": "湿法脱硫副产物，综合利用时可作为固碳/减排的辅助口径。"
+    }
+  ],
+  "processes": [
+    {
+      "type": "coal_handling",
+      "route": "main",
+      "name": "输煤制粉系统",
+      "desc": "第一部分·燃料制备：原煤经输煤皮带、给煤机进入中速磨煤机研磨干燥，由一次风把煤粉送入锅炉燃烧器。皮带秤/给煤机计量即入炉煤量（燃料燃烧排放的活动数据来源）；磨煤机与输煤系统电耗计入厂用电。",
+      "inputs": [
+        "coal"
+      ],
+      "outputs": [
+        "pulverized_coal"
+      ],
+      "mainOut": "pulverized_coal",
+      "params": [
+        {
+          "key": "power",
+          "label": "输煤与给煤机功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 10,
+          "step": 0.1,
+          "def": 0.6,
+          "ref": "输煤皮带 + 给煤机 + 碎煤机；磨煤机已作为系统内设备单列（见本系统小组）"
+        }
+      ]
+    },
+    {
+      "type": "boiler",
+      "route": "main",
+      "name": "锅炉系统",
+      "desc": "第二部分·燃烧与换热：煤粉在炉膛燃烧释放热量，把给水加热为高温高压主蒸汽；产生的高温烟气依次进入脱硝/除尘/脱硫净化。**本工序是全厂范围一直接排放的唯一来源**：入炉煤量 × 低位发热量 × 单位热值含碳量 × 碳氧化率 × 44/12。送/引风机、一次风机等辅机电耗计入厂用电。",
+      "inputs": [
+        "pulverized_coal",
+        "combustion_air",
+        "feed_water"
+      ],
+      "outputs": [
+        "main_steam",
+        "flue_gas",
+        "bottom_ash"
+      ],
+      "mainOut": "main_steam",
+      "params": [
+        {
+          "key": "coal_rate",
+          "label": "入炉煤量",
+          "unit": "t/h",
+          "min": 20,
+          "max": 400,
+          "step": 5,
+          "def": 235
+        },
+        {
+          "key": "power",
+          "label": "锅炉本体辅机功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 30,
+          "step": 0.5,
+          "def": 0.5,
+          "ref": "吹灰、火检冷却风机、除渣等本体负荷；送风机 / 引风机 / 一次风机已作为锅炉系统内设备单列"
+        }
+      ],
+      "emissions": [
+        {
+          "kind": "fuel",
+          "fuel": "coal",
+          "param": "coal_rate",
+          "label": "燃煤燃烧排放"
+        }
+      ]
+    },
+    {
+      "type": "steam_turbine",
+      "route": "main",
+      "name": "汽轮机系统",
+      "desc": "第三部分·热功转换：主蒸汽在高压缸/中压缸/低压缸中逐级膨胀做功，驱动发电机转子；排汽（乏汽）进入凝汽器。热电联产机组在中压缸抽出部分蒸汽供热（供热抽汽）。本工序无直接排放，仅有润滑油泵等微小厂用电。",
+      "inputs": [
+        "main_steam"
+      ],
+      "outputs": [
+        "exhaust_steam",
+        "shaft_power",
+        "heating_steam"
+      ],
+      "mainOut": "shaft_power",
+      "params": [
+        {
+          "key": "steam_rate",
+          "label": "主蒸汽流量",
+          "unit": "t/h",
+          "min": 300,
+          "max": 3200,
+          "step": 50,
+          "def": 1900
+        },
+        {
+          "key": "power",
+          "label": "辅机功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 5,
+          "step": 0.1,
+          "def": 0.3
+        }
+      ]
+    },
+    {
+      "type": "generator",
+      "route": "main",
+      "name": "发电系统",
+      "desc": "第四部分·发电上网：发电机把汽轮机轴功率转换为电能，经主变压器升压后送出（发电量 - 厂用电 = 上网电量）。本工序无直接排放，励磁与氢气冷却等辅助用电计入厂用电。",
+      "inputs": [
+        "shaft_power"
+      ],
+      "outputs": [
+        "electricity"
+      ],
+      "mainOut": "electricity",
+      "params": [
+        {
+          "key": "output",
+          "label": "发电功率",
+          "unit": "MW",
+          "min": 50,
+          "max": 1300,
+          "step": 10,
+          "def": 660
+        },
+        {
+          "key": "power",
+          "label": "辅助用电",
+          "unit": "MW",
+          "min": 0,
+          "max": 5,
+          "step": 0.1,
+          "def": 0.2
+        }
+      ]
+    },
+    {
+      "type": "condenser",
+      "route": "aux",
+      "auxGroup": "water",
+      "name": "凝汽系统",
+      "desc": "第五部分·冷端：乏汽在凝汽器中被循环冷却水冷凝为凝结水并建立真空背压，汽化潜热由循环水带走；真空度直接影响机组热效率。真空泵等辅机电耗计入厂用电。",
+      "inputs": [
+        "exhaust_steam",
+        "cooling_water_supply"
+      ],
+      "outputs": [
+        "condensate",
+        "cooling_water_return"
+      ],
+      "mainOut": "condensate",
+      "params": [
+        {
+          "key": "power",
+          "label": "真空系统功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 5,
+          "step": 0.1,
+          "def": 0.1,
+          "ref": "真空泵等；凝结水泵已作为凝汽系统内设备单列"
+        }
+      ]
+    },
+    {
+      "type": "cooling_tower",
+      "route": "aux",
+      "auxGroup": "water",
+      "name": "循环冷却水系统",
+      "desc": "第六部分·循环水散热：循环水回水在冷却塔内喷淋降温（温升带走的热量排向大气），再由循环水泵加压送入凝汽器，构成开式循环。循环水泵是厂用电大户（可变频调节），其电耗计入范围二。",
+      "inputs": [
+        "cooling_water_return"
+      ],
+      "outputs": [
+        "cooling_water_supply"
+      ],
+      "mainOut": "cooling_water_supply",
+      "params": [
+        {
+          "key": "power",
+          "label": "冷却塔风机功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 15,
+          "step": 0.1,
+          "def": 1.6,
+          "ref": "冷却塔风机；循环水泵已作为循环冷却水系统内设备单列"
+        }
+      ]
+    },
+    {
+      "type": "feedwater",
+      "route": "aux",
+      "auxGroup": "water",
+      "name": "给水除氧系统",
+      "desc": "第七部分·汽水回热：凝结水经凝结水泵、低压加热器、除氧器除氧后，由给水泵升压并经高压加热器与省煤器预热，作为锅炉给水回到锅炉（闭式循环）。电动给水泵是全厂最大的辅机负荷之一。",
+      "inputs": [
+        "condensate"
+      ],
+      "outputs": [
+        "feed_water"
+      ],
+      "mainOut": "feed_water",
+      "params": [
+        {
+          "key": "power",
+          "label": "除氧与给水辅助功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 30,
+          "step": 0.5,
+          "def": 0.5,
+          "ref": "除氧器及给水再循环等；给水泵已作为给水除氧系统内设备单列"
+        }
+      ]
+    },
+    {
+      "type": "denitration",
+      "route": "aux",
+      "auxGroup": "flue",
+      "name": "烟气脱硝系统",
+      "desc": "第八部分·烟气脱硝：在催化剂层喷入氨水/尿素作还原剂，把烟气中的 NOx 还原为 N₂ 与 H₂O，脱硝效率 80~90%。本工序排放为还原剂逸散（量级很小，本包不计），主要能耗为稀释风机与吹灰器电耗。",
+      "inputs": [
+        "flue_gas",
+        "ammonia"
+      ],
+      "outputs": [
+        "flue_gas_deno"
+      ],
+      "mainOut": "flue_gas_deno",
+      "params": [
+        {
+          "key": "reagent_rate",
+          "label": "还原剂耗量",
+          "unit": "t/h",
+          "min": 0,
+          "max": 5,
+          "step": 0.1,
+          "def": 0.6
+        },
+        {
+          "key": "power",
+          "label": "辅机功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 5,
+          "step": 0.1,
+          "def": 0.8
+        }
+      ]
+    },
+    {
+      "type": "dedust",
+      "route": "aux",
+      "auxGroup": "flue",
+      "name": "烟气除尘系统",
+      "desc": "第九部分·烟气除尘：电除尘器（或布袋除尘器）脱除烟气中的飞灰，出口粉尘可降至 10 mg/m³ 以下；收集的粉煤灰可综合利用。能耗为电场供电与振打/输灰系统电耗。",
+      "inputs": [
+        "flue_gas_deno"
+      ],
+      "outputs": [
+        "flue_gas_clean",
+        "fly_ash"
+      ],
+      "mainOut": "flue_gas_clean",
+      "params": [
+        {
+          "key": "power",
+          "label": "电场功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 8,
+          "step": 0.1,
+          "def": 1.6
+        }
+      ]
+    },
+    {
+      "type": "desulfurization",
+      "route": "aux",
+      "auxGroup": "flue",
+      "name": "烟气脱硫系统",
+      "desc": "第十部分·烟气脱硫：石灰石浆液在吸收塔中与烟气逆流接触，把 SO₂ 氧化固定为石膏。**本工序有工业过程排放**：脱硫剂中的碳酸钙在吸收过程中分解释放 CO₂（石灰石耗量 × CaCO₃ 含量 × 0.4395 tCO₂/t），计入范围一；浆液循环泵与氧化风机为厂用电负荷。",
+      "inputs": [
+        "flue_gas_clean",
+        "limestone_slurry"
+      ],
+      "outputs": [
+        "flue_gas_desul",
+        "gypsum"
+      ],
+      "mainOut": "flue_gas_desul",
+      "params": [
+        {
+          "key": "limestone_rate",
+          "label": "石灰石耗量",
+          "unit": "t/h",
+          "min": 0,
+          "max": 40,
+          "step": 0.5,
+          "def": 8
+        },
+        {
+          "key": "power",
+          "label": "脱硫辅助功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 20,
+          "step": 0.5,
+          "def": 0.3,
+          "ref": "石膏排出泵 / 吸收塔搅拌器等；浆液循环泵与氧化风机已作为脱硫系统内设备单列"
+        }
+      ],
+      "emissions": [
+        {
+          "kind": "carbonate",
+          "carbonate": "limestone",
+          "param": "limestone_rate",
+          "label": "脱硫剂碳酸盐分解排放"
+        }
+      ]
+    },
+    {
+      "type": "stack",
+      "route": "aux",
+      "auxGroup": "flue",
+      "name": "排烟系统",
+      "desc": "第十一部分·排放口：净化后的净烟气经烟囱排入大气，烟囱上装设 CEMS 在线监测（CO₂ 浓度 × 标态流量可直接测得排放，作为因子法的交叉校验）。本工序无排放源，仅为排放汇总展示点。",
+      "inputs": [
+        "flue_gas_desul"
+      ],
+      "outputs": [
+        "emission"
+      ],
+      "mainOut": "emission",
+      "params": [
+        {
+          "key": "power",
+          "label": "监测与辅助功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 2,
+          "step": 0.1,
+          "def": 0.1
+        }
+      ]
+    },
+    {
+      "type": "ash_handling",
+      "route": "aux",
+      "name": "除灰渣系统",
+      "desc": "第十二部分·固废物流：锅炉底渣经捞渣机/刮板输送机排出，除尘器捕集的飞灰由气力输灰（仓泵）送入灰库，两者经分选磨细后作为水泥、混凝土掺合料综合利用，未利用部分按一般固废处置。灰渣中的未燃碳已在锅炉碳氧化率（0.98）中扣除，本系统不产生碳排放，仅计输灰风机、气化风机与磨细机电耗。",
+      "inputs": [
+        "bottom_ash",
+        "fly_ash"
+      ],
+      "outputs": [
+        "ash_product"
+      ],
+      "mainOut": "ash_product",
+      "params": [
+        {
+          "key": "power",
+          "label": "除灰渣系统功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 5,
+          "step": 0.1,
+          "def": 1.2
+        }
+      ],
+      "auxGroup": "solid"
+    },
+    {
+      "type": "gypsum_handling",
+      "route": "aux",
+      "name": "石膏脱水系统",
+      "desc": "第十三部分·副产品物流：吸收塔排出的石膏浆液经旋流器浓缩、真空皮带脱水机脱水后得到成品脱硫石膏（自由水≤10%），送入石膏库外售作建材原料。石膏中的硫由烟气 SO₂ 固定而来，成盐过程不产生 CO₂；本系统仅计石膏排出泵、真空泵与脱水机电耗。",
+      "inputs": [
+        "gypsum"
+      ],
+      "outputs": [
+        "gypsum_product"
+      ],
+      "mainOut": "gypsum_product",
+      "params": [
+        {
+          "key": "power",
+          "label": "石膏脱水系统功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 5,
+          "step": 0.1,
+          "def": 0.6
+        }
+      ],
+      "auxGroup": "flue"
+    },
+    {
+      "type": "heat_net",
+      "route": "main",
+      "name": "热网换热系统",
+      "desc": "热电联产专用·对外供热：汽轮机抽汽在热网换热器中加热热网循环水，向热用户供出热量；供热比越高，分摊到发电侧的燃料与排放越少（热电分摊减排）。热网循环泵电耗计入厂用电。",
+      "inputs": [
+        "heating_steam",
+        "heat_return"
+      ],
+      "outputs": [
+        "heat_supply",
+        "condensate"
+      ],
+      "mainOut": "heat_supply",
+      "params": [
+        {
+          "key": "heat_rate",
+          "label": "外供热量",
+          "unit": "GJ/h",
+          "min": 0,
+          "max": 2000,
+          "step": 20,
+          "def": 500
+        },
+        {
+          "key": "power",
+          "label": "热网辅助功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 5,
+          "step": 0.1,
+          "def": 0.1,
+          "ref": "热网补水泵等；热网循环泵已作为热网换热系统内设备单列"
+        }
+      ]
+    },
+    {
+      "type": "tp_mill",
+      "route": "aux",
+      "name": "磨煤机",
+      "desc": "中速磨煤机（660MW 机组 6 台运行）：原煤在磨盘上研磨并由一次风干燥、分选后送入炉膛燃烧器。属制粉系统电耗主体（占比约 80%），出力随给煤量与通风量调节，是制粉单耗与厂用电率的优化对象。（本设备挂在其所属系统「输煤制粉系统」内部，进入该系统小组子场景可查看与调节。）",
+      "inputs": [],
+      "outputs": [],
+      "mainOut": null,
+      "auxGroup": "fuel",
+      "owner": "输煤制粉系统",
+      "params": [
+        {
+          "key": "power",
+          "label": "磨煤机功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 8,
+          "step": 0.1,
+          "def": 2.6,
+          "kind": "config",
+          "ref": "单台磨煤机（含分离器与加载油站）约 0.4~0.5 MW，660MW 机组 6 台运行合计约 2.5~3 MW"
+        },
+        {
+          "key": "coal_flow",
+          "label": "磨煤机出力",
+          "unit": "t/h",
+          "min": 10,
+          "max": 120,
+          "step": 5,
+          "def": 60,
+          "kind": "config",
+          "ref": "单台出力；6 台合计 ≈ 入炉煤量（255 t/h）"
+        }
+      ]
+    },
+    {
+      "type": "tp_fd_fan",
+      "route": "aux",
+      "name": "送风机",
+      "desc": "锅炉送风机（2 台，动叶可调/变频）：提供燃烧所需的二次风，克服风道与空预器阻力。风量随锅炉负荷与氧量调节，风机电耗与排烟氧量共同决定锅炉效率，是风烟系统节能的主要对象。（本设备挂在其所属系统「锅炉系统」内部，进入该系统小组子场景可查看与调节。）",
+      "inputs": [],
+      "outputs": [],
+      "mainOut": null,
+      "auxGroup": "air_flue",
+      "owner": "锅炉系统",
+      "params": [
+        {
+          "key": "power",
+          "label": "送风机功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 12,
+          "step": 0.1,
+          "def": 4.2,
+          "kind": "config",
+          "ref": "2 台合计约 4~5 MW（660MW 机组），随负荷与动叶开度变化"
+        },
+        {
+          "key": "air_flow",
+          "label": "送风量",
+          "unit": "kNm³/h",
+          "min": 200,
+          "max": 4000,
+          "step": 50,
+          "def": 1200,
+          "kind": "config",
+          "ref": "锅炉总风量的一部分，与入炉煤量按风煤比匹配"
+        }
+      ]
+    },
+    {
+      "type": "tp_id_fan",
+      "route": "aux",
+      "name": "引风机",
+      "desc": "锅炉引风机（2 台，变频）：维持炉膛负压、克服脱硝/除尘/脱硫全烟气系统阻力把烟气送至烟囱。是锅炉风烟系统最大电耗设备，变频改造与烟风阻力治理（空预器堵塞、烟道积灰）是主要节电手段。（本设备挂在其所属系统「锅炉系统」内部，进入该系统小组子场景可查看与调节。）",
+      "inputs": [],
+      "outputs": [],
+      "mainOut": null,
+      "auxGroup": "air_flue",
+      "owner": "锅炉系统",
+      "params": [
+        {
+          "key": "power",
+          "label": "引风机功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 15,
+          "step": 0.1,
+          "def": 5.3,
+          "kind": "config",
+          "ref": "2 台合计约 5~6 MW（660MW 机组），占风烟系统电耗一半以上"
+        },
+        {
+          "key": "flue_flow",
+          "label": "引风量",
+          "unit": "kNm³/h",
+          "min": 500,
+          "max": 5000,
+          "step": 50,
+          "def": 2400,
+          "kind": "config",
+          "ref": "与锅炉烟气量一致；烟气系统阻力↑ → 引风电耗↑"
+        }
+      ]
+    },
+    {
+      "type": "tp_pa_fan",
+      "route": "aux",
+      "name": "一次风机",
+      "desc": "一次风机（2 台）：提供磨煤机干燥与煤粉输送的一次风，风压需克服磨煤机与燃烧器阻力。风量随磨煤机出力与风煤比调节，其电耗随制粉系统运行台数变化。（本设备挂在其所属系统「锅炉系统」内部，进入该系统小组子场景可查看与调节。）",
+      "inputs": [],
+      "outputs": [],
+      "mainOut": null,
+      "auxGroup": "air_flue",
+      "owner": "锅炉系统",
+      "params": [
+        {
+          "key": "power",
+          "label": "一次风机功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 6,
+          "step": 0.1,
+          "def": 2.0,
+          "kind": "config",
+          "ref": "2 台合计约 1.8~2.5 MW（660MW 机组）"
+        },
+        {
+          "key": "pa_press",
+          "label": "一次风母管压力",
+          "unit": "kPa",
+          "min": 2,
+          "max": 30,
+          "step": 0.5,
+          "def": 12,
+          "kind": "config",
+          "ref": "一次风母管压力，需克服磨煤机与燃烧器阻力"
+        }
+      ]
+    },
+    {
+      "type": "tp_cond_pump",
+      "route": "aux",
+      "name": "凝结水泵",
+      "desc": "凝结水泵（2 台，一运一备，变频）：把凝汽器热井的凝结水升压送出，经除氧器与给水泵回到锅炉。变频调节可显著降低低负荷时的节流损失，是汽水循环的常规节电改造项。（本设备挂在其所属系统「凝汽系统」内部，进入该系统小组子场景可查看与调节。）",
+      "inputs": [],
+      "outputs": [],
+      "mainOut": null,
+      "auxGroup": "water",
+      "owner": "凝汽系统",
+      "params": [
+        {
+          "key": "power",
+          "label": "凝结水泵功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 2,
+          "step": 0.1,
+          "def": 0.4,
+          "kind": "config",
+          "ref": "单台约 0.4 MW（660MW 机组），变频改造后低负荷节电明显"
+        },
+        {
+          "key": "cond_flow",
+          "label": "凝结水流量",
+          "unit": "t/h",
+          "min": 300,
+          "max": 3000,
+          "step": 50,
+          "def": 1500,
+          "kind": "config",
+          "ref": "≈ 汽轮机排汽量（主蒸汽流量扣减抽汽与补水）"
+        }
+      ]
+    },
+    {
+      "type": "tp_circ_pump",
+      "route": "aux",
+      "name": "循环水泵",
+      "desc": "循环水泵（2 台，变频/双速）：把冷却塔降温后的循环水送入凝汽器带走乏汽潜热，是循环水系统的电耗主体（Q ∝ n、P ∝ n³）。泵组调速与凝汽器背压优化联动，可直接改善机组热耗。（本设备挂在其所属系统「循环冷却水系统」内部，进入该系统小组子场景可查看与调节。）",
+      "inputs": [],
+      "outputs": [],
+      "mainOut": null,
+      "auxGroup": "water",
+      "owner": "循环冷却水系统",
+      "params": [
+        {
+          "key": "power",
+          "label": "循环水泵功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 12,
+          "step": 0.1,
+          "def": 4.6,
+          "kind": "config",
+          "ref": "2 台合计约 4.5~5 MW（660MW 机组，90000 t/h 循环水量）"
+        },
+        {
+          "key": "water_flow",
+          "label": "循环水流量",
+          "unit": "t/h",
+          "min": 20000,
+          "max": 140000,
+          "step": 5000,
+          "def": 90000,
+          "kind": "config",
+          "ref": "循环倍率约 55~60 倍；流量↑ → 背压↓、机组热耗↓，但泵耗↑"
+        }
+      ]
+    },
+    {
+      "type": "tp_feed_pump",
+      "route": "aux",
+      "name": "给水泵",
+      "desc": "电动给水泵（2 台，变频/液耦）：把除氧水升压至超超临界压力（约 28~30 MPa）送入锅炉，是全厂单机容量最大的辅机，也是厂用电率最高的设备。给水压力随负荷变化，变频与最小流量再循环优化是核心节电方向。（本设备挂在其所属系统「给水除氧系统」内部，进入该系统小组子场景可查看与调节。）",
+      "inputs": [],
+      "outputs": [],
+      "mainOut": null,
+      "auxGroup": "water",
+      "owner": "给水除氧系统",
+      "params": [
+        {
+          "key": "power",
+          "label": "给水泵功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 25,
+          "step": 0.1,
+          "def": 13.5,
+          "kind": "config",
+          "ref": "2 台合计约 13~15 MW（660MW 机组），占厂用电约 30%"
+        },
+        {
+          "key": "feed_flow",
+          "label": "给水流量",
+          "unit": "t/h",
+          "min": 500,
+          "max": 3200,
+          "step": 50,
+          "def": 1900,
+          "kind": "config",
+          "ref": "≈ 主蒸汽流量（含减温水与排污）"
+        }
+      ]
+    },
+    {
+      "type": "tp_slurry_pump",
+      "route": "aux",
+      "name": "浆液循环泵",
+      "desc": "吸收塔浆液循环泵（3 台对应三层喷淋层）：把石灰石浆液循环喷淋与烟气逆流接触脱硫，是脱硫系统电耗主体。投运层数随入口 SO₂ 与负荷调节，是脱硫节能与超低排放协同的关键设备。（本设备挂在其所属系统「烟气脱硫系统」内部，进入该系统小组子场景可查看与调节。）",
+      "inputs": [],
+      "outputs": [],
+      "mainOut": null,
+      "auxGroup": "flue",
+      "owner": "烟气脱硫系统",
+      "params": [
+        {
+          "key": "power",
+          "label": "浆液循环泵功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 12,
+          "step": 0.1,
+          "def": 5.0,
+          "kind": "config",
+          "ref": "3 台全投约 5~6 MW（660MW 机组），单台约 1.7 MW"
+        },
+        {
+          "key": "slurry_flow",
+          "label": "浆液循环量",
+          "unit": "m³/h",
+          "min": 3000,
+          "max": 40000,
+          "step": 1000,
+          "def": 18000,
+          "kind": "config",
+          "ref": "按液气比与吸收塔截面确定；停运一层即显著节电"
+        }
+      ]
+    },
+    {
+      "type": "tp_oxi_fan",
+      "route": "aux",
+      "name": "氧化风机",
+      "desc": "氧化风机（罗茨/离心，2 台）：向吸收塔浆液池鼓入氧化空气，把亚硫酸钙氧化为石膏（CaSO₄·2H₂O）。风量按 SO₂ 脱除量化学计量供给，过量供给直接浪费电耗。（本设备挂在其所属系统「烟气脱硫系统」内部，进入该系统小组子场景可查看与调节。）",
+      "inputs": [],
+      "outputs": [],
+      "mainOut": null,
+      "auxGroup": "flue",
+      "owner": "烟气脱硫系统",
+      "params": [
+        {
+          "key": "power",
+          "label": "氧化风机功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 4,
+          "step": 0.1,
+          "def": 1.2,
+          "kind": "config",
+          "ref": "2 台合计约 1~1.4 MW，随入炉煤硫分与 SO₂ 脱除量变化"
+        },
+        {
+          "key": "oxi_flow",
+          "label": "氧化空气流量",
+          "unit": "Nm³/h",
+          "min": 1000,
+          "max": 20000,
+          "step": 500,
+          "def": 9000,
+          "kind": "config",
+          "ref": "按氧化需气量与浆液池容积确定"
+        }
+      ]
+    },
+    {
+      "type": "tp_heat_pump",
+      "route": "aux",
+      "name": "热网循环泵",
+      "desc": "热网循环泵（变频）：驱动热网循环水在热网换热器与热用户之间循环，把汽轮机抽汽的热量送出。其电耗随供热负荷与管网阻力变化，是热电联产供热侧的主要厂用电设备。（本设备挂在其所属系统「热网换热系统」内部，进入该系统小组子场景可查看与调节。）",
+      "inputs": [],
+      "outputs": [],
+      "mainOut": null,
+      "auxGroup": "heat",
+      "owner": "热网换热系统",
+      "params": [
+        {
+          "key": "power",
+          "label": "热网循环泵功率",
+          "unit": "MW",
+          "min": 0,
+          "max": 3,
+          "step": 0.1,
+          "def": 0.3,
+          "kind": "config",
+          "ref": "供热 500 GJ/h 时约 0.3~0.4 MW"
+        },
+        {
+          "key": "heat_flow",
+          "label": "热网循环水量",
+          "unit": "t/h",
+          "min": 1000,
+          "max": 20000,
+          "step": 500,
+          "def": 8000,
+          "kind": "config",
+          "ref": "按供热量与供回水温差（约 60~70 ℃）确定"
+        }
+      ]
+    }
+  ],
+  "method": {
+    "name": "燃料燃烧排放因子法 + 辅机耗电范围二 + 脱硫过程排放",
+    "note": "①范围一（直接排放）= 锅炉燃煤：入炉煤量(t/h) × 低位发热量(GJ/t) × 单位热值含碳量(tC/GJ) × 碳氧化率 × 44/12；+ 脱硫：石灰石耗量(t/h) × CaCO₃ 含量 × 0.4395 tCO₂/t。②范围二（间接排放指示）= 各工序辅机电功率(kW) × 电网排放因子(kgCO₂/kWh)，厂用电为自发自用，此处按外购电口径折算作指示量。③各工序可附加「电功率传感器」绑定数据源管理的实测功率点位，接入后优先按实测功率折碳；锅炉可附加「称重/皮带秤类」或直接在参数中调整入炉煤量，煤质变化改排放因子（factors.fuels）。"
+  }
+}

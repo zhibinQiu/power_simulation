@@ -713,7 +713,7 @@ onBeforeUnmount(clearPoll)
   min-width: 0;
 }
 .report-list .title {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
@@ -823,8 +823,8 @@ onBeforeUnmount(clearPoll)
 }
 .toc-item.lvl1 { padding-left: 8px; font-weight: 600; color: var(--text); }
 .toc-item.lvl2 { padding-left: 20px; }
-.toc-item.lvl3 { padding-left: 32px; font-size: 11.5px; }
-.toc-item.lvl4 { padding-left: 44px; font-size: 11.5px; }
+.toc-item.lvl3 { padding-left: 32px; font-size: 12px; }
+.toc-item.lvl4 { padding-left: 44px; font-size: 12px; }
 .preview .report-md {
   max-height: 420px;
   overflow: auto;
@@ -848,7 +848,7 @@ onBeforeUnmount(clearPoll)
    VS Code Markdown 预览风格：标题层级、表格、列表、引用、代码块 */
 .carbon-report-sidebar .report-md {
   color: var(--text);
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.75;
   word-break: break-word;
 }
@@ -872,8 +872,8 @@ onBeforeUnmount(clearPoll)
   border-bottom: 1px solid var(--line);
   padding-bottom: 4px;
 }
-.carbon-report-sidebar .report-md h3 { font-size: 13.5px; }
-.carbon-report-sidebar .report-md h4 { font-size: 12.5px; }
+.carbon-report-sidebar .report-md h3 { font-size: 13px; }
+.carbon-report-sidebar .report-md h4 { font-size: 12px; }
 .carbon-report-sidebar .report-md p { margin: 7px 0; }
 .carbon-report-sidebar .report-md strong { font-weight: 600; color: var(--text); }
 .carbon-report-sidebar .report-md em { color: var(--accent2); }
@@ -893,7 +893,7 @@ onBeforeUnmount(clearPoll)
 }
 .carbon-report-sidebar .report-md code {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 12px;
   background: var(--panel-3);
   padding: 1px 5px;
   border-radius: 3px;
@@ -905,7 +905,7 @@ onBeforeUnmount(clearPoll)
   border-radius: 4px;
   padding: 10px 12px;
   overflow: auto;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.6;
   margin: 8px 0;
 }
@@ -913,7 +913,7 @@ onBeforeUnmount(clearPoll)
   background: transparent;
   padding: 0;
   color: var(--text);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 .carbon-report-sidebar .report-md table {
   border-collapse: collapse;

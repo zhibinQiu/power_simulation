@@ -23,6 +23,13 @@
         </div>
         <div class="kv2-row"><span class="k">{{ t('电耗速率') }}</span><span class="v"><b>{{ fmt(energyKH) }}</b> <span class="u">kWh/h</span></span></div>
         <div class="kv2-row"><span class="k">{{ t('折碳总量（tCO₂/h）') }}</span><span class="v"><b>{{ fmt(tCO2H, 4) }}</b> <span class="u">tCO₂/h</span></span></div>
+        <!-- 范围一：燃料燃烧 / 工业过程（由资源包字典 emissions 声明，未声明的工序不显示） -->
+        <div v-if="directT > 0" class="kv2-row"><span class="k">{{ t('范围一 · 直接排放') }}</span><span class="v"><b>{{ fmt(directT, 4) }}</b> <span class="u">tCO₂/h</span></span></div>
+        <div v-for="d in directItems" :key="d.label" class="kv2-row">
+          <span class="k">{{ d.label }}<i class="u"> · {{ fmt(d.amount, 2) }} {{ d.unit || 't/h' }}</i></span>
+          <span class="v"><b>{{ fmt(d.co2, 4) }}</b> <span class="u">tCO₂/h</span></span>
+        </div>
+        <div v-if="directT > 0" class="kv2-row"><span class="k">{{ t('范围二 · 耗电间接排放') }}</span><span class="v"><b>{{ fmt(Math.max(0, tCO2H - directT), 4) }}</b> <span class="u">tCO₂/h</span></span></div>
       </div>
       <div class="pr-hint">{{ methodNote }}</div>
     </CollapseSection>
@@ -115,6 +122,13 @@ const carbonKgH = computed(() => {
   return powerKW.value * store._gridFactorKg()
 })
 const tCO2H = computed(() => carbonKgH.value / 1000)
+// 范围一直接排放（tCO₂/h）：由资源包字典 emissions 声明（燃料燃烧 / 工业过程），未声明则为 0
+const directT = computed(() => {
+  const b = blu.value
+  const v = b && b.co2_direct != null ? Number(b.co2_direct) : NaN
+  return isFinite(v) ? v : 0
+})
+const directItems = computed(() => (blu.value && Array.isArray(blu.value.directItems)) ? blu.value.directItems : [])
 
 const methodNote = computed(() => {
   const m = dict.value?.method

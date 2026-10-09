@@ -1,7 +1,6 @@
 """内置 Skills：查询设备、仿真、碳市场、排放因子等本系统能力。
 
-这些 Skill 使用 MCP Tool 的 JSON Schema 定义入参，既能被 LangGraph 智能体
-直接调用，也会通过 MCP Server（mcp_server.py）以 MCP 协议对外暴露。
+这些 Skill 使用 JSON Schema 定义入参，供 LangGraph 智能体直接调用。
 handler 均为同步函数，返回可 JSON 化的对象；SkillRegistry 统一转文本。
 
 注意：所有数据源模块延迟导入（函数体内），避免顶层循环依赖。

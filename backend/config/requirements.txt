@@ -10,6 +10,5 @@ pyyaml>=6.0
 # 知识库（LLM-WIKI）：文档解析
 pypdf>=4.0
 python-docx>=1.1
-# 多智能体架构（本析智擎）与 MCP 协议（Skills 双向接入）
+# 多智能体架构（本析智擎）
 langgraph>=1.0
-mcp>=2.0

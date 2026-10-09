@@ -398,14 +398,13 @@ function attachActive(it) {
 function onAttachClick(kind, it) {
   const sel = store.selectedFlowNode
   if (!store.editMode || !sel || sel.kind !== 'process') {
-    store.toast = t('请先在编排模式选中目标工艺设备节点，再点击绑定「{label}」（也可在右侧工艺属性面板「附加传感 / 可变设备」中添加）', { label: it.label })
+    store.toast = t('请先选中目标工艺节点')
     return
   }
   const att = store.addAttachToNode(sel.id, kind, it.type)
   if (!att) return
-  store.toast = kind === 'sensor'
-    ? t('已为工艺「{name}」添加传感「{label}」：数据源默认随机模拟值，可切换为固定值 / 数据源管理中的传感器设备 / 随可变设备联动', { name: sel.name || sel.type, label: it.label })
-    : t('已为工艺「{name}」添加可变设备「{label}」：其数值为设定值（只调工况、不参与取数）；实际功率请在「传感器」中添加电功率传感器', { name: sel.name || sel.type, label: it.label })
+  // 提示只报结果，不再复述后续操作（使用引导交给面板本身）
+  store.toast = t('已添加「{label}」', { label: att.label })
 }
 function onProcessClickFromType(type) {
   const t = PROCESS_MAP[type]
@@ -454,25 +453,25 @@ function toggleStratGroup(type) {
 function onPresetClick(s) {
   if (store.busy) return
   store.selectStrategy(s.id)
-  store.toast = t('已打开工艺流程优化策略「{name}」：点击底部「策略仿真」解析应用', { name: s.name || t('未命名') })
+  store.toast = t('已打开策略「{name}」', { name: s.name || t('未命名') })
 }
 // 点击 AI 优化模型：打开右侧「策略属性」训练面板（随实时数据后台定时训练、模型逐渐变优）
 function onAiClick(m) {
   if (store.busy) return
   store.selectStrategy(m.id)
-  store.toast = t('已打开 AI 优化模型「{name}」训练面板：可开始自动训练/训练一轮/应用最优参数', { name: m.name })
+  store.toast = t('已打开 AI 优化模型「{name}」', { name: m.name })
 }
 // 点击工艺策略（某工艺对应的绿色策略）：打开右侧「策略属性」面板（只读 + 启用/停用开关 + 查看工艺）
 function onGreenClick(g, gs) {
   if (store.busy) return
   store.selectGreenStrategy(g.type, gs.id)
-  store.toast = t('已打开策略「{name}」属性（所属工艺：{proc}）：可在右侧启用/停用该策略', { name: gs.name, proc: g.label })
+  store.toast = t('已打开策略「{name}」', { name: gs.name })
 }
 // 点击自定义策略（仿真模式下保存）：打开右侧「策略属性」面板（名称/数值调整可编辑，底部「策略仿真」按钮加载）
 function onCustomClick(s) {
   if (store.busy) return
   store.selectStrategy(s.id)
-  store.toast = t('已打开策略「{name}」属性：可编辑名称与数值调整，点击底部「策略仿真」加载进仿真模式', { name: s.name || t('未命名') })
+  store.toast = t('已打开策略「{name}」', { name: s.name || t('未命名') })
 }
 // 删除自定义策略（成功/失败反馈由 store.removeStrategy 统一给出）
 async function doRemoveStrategy(s) {
@@ -524,7 +523,7 @@ function onStratContext(e, s) {
 
 /* 分类计数徽章（VS Code badge：灰底圆角小数字） */
 .tch-count {
-  font-size: 9px; color: var(--muted); background: rgba(128,128,128,.12);
+  font-size: 10px; color: var(--muted); background: rgba(128,128,128,.12);
   min-width: 16px; height: 16px; padding: 0 5px; border-radius: 8px;
   font-weight: 500; line-height: 16px; text-align: center;
   flex: 0 0 auto; font-variant-numeric: tabular-nums;
@@ -547,7 +546,7 @@ function onStratContext(e, s) {
 .tch.sub2 .twisty { width: 14px; opacity: .5; }
 
 /* 策略来源标签（工艺流程优化 / 自定义） */
-.tc-tag { font-size: 9px; color: #fff; padding: 1px 5px; border-radius: 4px; white-space: nowrap; flex: 0 0 auto; }
+.tc-tag { font-size: 10px; color: #fff; padding: 1px 5px; border-radius: 4px; white-space: nowrap; flex: 0 0 auto; }
 .tc-tag.pre { background: var(--accent); }
 .tc-tag.saved { background: var(--green); }
 

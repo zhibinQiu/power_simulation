@@ -527,10 +527,6 @@ export default {
       return { text: text.replace(/\s{2,}/g, ' ').trim(), skills }
     },
     skillLabel(name) {
-      if (name.indexOf('__') >= 0) {
-        // mcp__server__tool → 显示 tool 名（第三方 MCP 技能）
-        return name.split('__').pop()
-      }
       return this._skillLabels[name] || name
     },
     agentName(id) {
@@ -1036,7 +1032,7 @@ export default {
   color: var(--accent-d);
 }
 .ai-logo svg { width: 17px; height: 17px; }
-.ai-title { font-size: 13.5px; font-weight: 700; color: var(--text); line-height: 1.2; }
+.ai-title { font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.2; }
 .ai-desc { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
 /* 空闲态首屏：大图标 + 标题 + 介绍（输入框上方） */
 .ai-hero {
@@ -1054,7 +1050,7 @@ export default {
 }
 .ai-hero .ai-logo svg { width: 30px; height: 30px; }
 .ai-hero-title { font-size: 20px; font-weight: 700; color: var(--text); line-height: 1.2; }
-.ai-hero-desc { font-size: 12.5px; color: var(--muted); line-height: 1.6; max-width: 560px; }
+.ai-hero-desc { font-size: 12px; color: var(--muted); line-height: 1.6; max-width: 560px; }
 .agent-inputbox {
   width: 100%;
   margin-top: 8px;
@@ -1147,14 +1143,14 @@ export default {
   border-radius: 12px;
   background: var(--accent-l);
   color: var(--accent-d);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all .15s;
 }
 .ai-agent-tag:hover { border-color: var(--accent-d); background: var(--accent-l); }
-.ai-agent-tag .ai-ae { font-size: 11.5px; }
-.ai-tag-arrow { font-size: 9px; color: var(--accent-d); opacity: .7; }
+.ai-agent-tag .ai-ae { font-size: 12px; }
+.ai-tag-arrow { font-size: 10px; color: var(--accent-d); opacity: .7; }
 /* 加号弹出菜单（fixed 全屏遮罩 + 两级菜单） */
 .ai-pickmask {
   position: fixed;
@@ -1216,7 +1212,7 @@ export default {
   border: none;
   border-radius: 6px;
   background: transparent;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--text);
   text-align: left;
   cursor: pointer;
@@ -1291,7 +1287,7 @@ export default {
 }
 .msg-meta { font-size: 11px; color: var(--faint); margin-bottom: 4px; }
 .msg-row.user .msg-meta { color: rgba(255, 255, 255, .75); text-align: right; }
-.msg-content { font-size: 13.5px; color: var(--text); line-height: 1.7; word-break: break-word; }
+.msg-content { font-size: 13px; color: var(--text); line-height: 1.7; word-break: break-word; }
 .msg-row.user .msg-content { color: #fff; white-space: pre-wrap; }
 .msg-content :deep(p) { margin: 4px 0; }
 .msg-content :deep(p:first-child) { margin-top: 0; }
@@ -1302,7 +1298,7 @@ export default {
 .msg-content :deep(ul), .msg-content :deep(ol) { margin: 4px 0; padding-left: 20px; }
 .msg-content :deep(li) { margin: 2px 0; }
 .msg-content :deep(code) {
-  font-family: var(--mono); font-size: 12.5px;
+  font-family: var(--mono); font-size: 12px;
   background: var(--panel-3); border-radius: 3px; padding: 1px 4px;
 }
 .msg-content :deep(pre) { background: var(--rail); color: #E6E6E6; border-radius: 8px; padding: 10px 12px; overflow-x: auto; margin: 6px 0; }
@@ -1313,7 +1309,7 @@ export default {
   content: attr(data-lang);
   position: absolute;
   top: 6px; right: 10px;
-  font-size: 10.5px;
+  font-size: 11px;
   letter-spacing: .5px;
   text-transform: uppercase;
   color: rgba(230, 230, 230, .45);
@@ -1341,7 +1337,7 @@ export default {
   pointer-events: none;
 }
 .msg-content :deep(.md-chart-err .md-chart-fallback) { display: none; }
-.msg-content :deep(table) { border-collapse: collapse; margin: 6px 0; font-size: 12.5px; }
+.msg-content :deep(table) { border-collapse: collapse; margin: 6px 0; font-size: 12px; }
 .msg-content :deep(th), .msg-content :deep(td) { border: 1px solid var(--border); padding: 4px 8px; }
 .msg-content :deep(th) { background: var(--panel-3); }
 .msg-content :deep(blockquote) { border-left: 3px solid var(--accent); padding-left: 10px; margin: 6px 0; color: var(--muted); }
@@ -1363,7 +1359,7 @@ export default {
   border-radius: 12px;
   background: var(--panel-2);
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 12px;
   cursor: pointer;
   transition: all .15s;
 }

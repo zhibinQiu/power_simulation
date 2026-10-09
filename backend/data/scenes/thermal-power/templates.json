@@ -1,0 +1,3270 @@
+[
+  {
+    "id": "coal",
+    "label": "燃煤发电机组模板",
+    "desc": "燃煤发电机组（纯凝）全流程：输煤与制粉 → 锅炉 → 汽轮机 → 发电机 → 凝汽器 → 冷却塔，给水与除氧把凝结水升压预热后送回锅炉构成闭式汽水循环；烟气侧为 脱硝 → 除尘 → 脱硫 → 烟囱。运行仿真实时折碳：范围一直接排放 = 锅炉入炉煤量 × 低位发热量 × 单位热值含碳量 × 碳氧化率 × 44/12 + 脱硫剂碳酸盐分解；范围二间接排放指示 = 各工序辅机功率 × 电网排放因子。各工序可附加电功率传感器并绑定数据源管理的采集设备点位，接入后按实测功率折碳，未接入时按包内功率参数（MW）估算。",
+    "icon": "flow",
+    "route": "coal",
+    "scheme": {
+      "nodes": [
+        {
+          "id": "n_tp_ch",
+          "kind": "process",
+          "type": "coal_handling",
+          "name": "输煤制粉系统",
+          "x": -560,
+          "y": 60,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 0.6
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_ch_coal",
+                "material": "coal"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_ch_pc",
+                "material": "pulverized_coal"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [],
+          "groupId": "g_tp_ch"
+        },
+        {
+          "id": "n_tp_mill",
+          "kind": "process",
+          "type": "tp_mill",
+          "name": "磨煤机",
+          "x": -680,
+          "y": 240,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 2.6,
+            "coal_flow": 60
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_mill_freq",
+              "kind": "adjustable",
+              "type": "frequency_converter",
+              "label": "磨煤机变频器",
+              "src": "fixed",
+              "param": null,
+              "def": 45
+            },
+            {
+              "uid": "att_tp_mill_current",
+              "kind": "sensor",
+              "type": "current_sensor",
+              "label": "磨煤机电流传感器",
+              "src": "attach",
+              "devRef": "att_tp_mill_freq",
+              "scale": {
+                "from": 45,
+                "to": 210
+              },
+              "param": null,
+              "def": 210
+            },
+            {
+              "uid": "att_tp_ch_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "磨煤机电功率传感器",
+              "src": "attach",
+              "param": null,
+              "def": 2600,
+              "devRef": "att_tp_mill_freq",
+              "scale": {
+                "from": 45,
+                "to": 2600
+              }
+            },
+            {
+              "uid": "att_tp_ch_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "磨煤机出口温度传感器",
+              "src": "sim",
+              "param": null,
+              "def": 75
+            }
+          ],
+          "groupId": "g_tp_ch"
+        },
+        {
+          "id": "n_tp_boiler",
+          "kind": "process",
+          "type": "boiler",
+          "name": "锅炉系统",
+          "x": -420,
+          "y": 60,
+          "count": 1,
+          "spec": "tp_660",
+          "params": {
+            "coal_rate": 255,
+            "power": 0.5
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_bo_pc",
+                "material": "pulverized_coal"
+              },
+              {
+                "id": "in_bo_air",
+                "material": "combustion_air"
+              },
+              {
+                "id": "in_bo_fw",
+                "material": "feed_water"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_bo_ms",
+                "material": "main_steam"
+              },
+              {
+                "id": "out_bo_fg",
+                "material": "flue_gas"
+              },
+              {
+                "id": "out_bo_ba",
+                "material": "bottom_ash"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_bo_ms_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "主蒸汽温度传感器",
+              "src": "sim",
+              "param": null,
+              "def": 600
+            },
+            {
+              "uid": "att_tp_bo_fg_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "排烟温度（空预器出口）传感器",
+              "src": "sim",
+              "param": null,
+              "def": 118
+            },
+            {
+              "uid": "att_tp_bo_o2",
+              "kind": "sensor",
+              "type": "o2_sensor",
+              "label": "烟气氧量分析仪",
+              "src": "sim",
+              "param": null,
+              "def": 3.5
+            }
+          ],
+          "groupId": "g_tp_boiler"
+        },
+        {
+          "id": "n_tp_fd_fan",
+          "kind": "process",
+          "type": "tp_fd_fan",
+          "name": "送风机",
+          "x": -540,
+          "y": 240,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 4.2,
+            "air_flow": 1200
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_fd_damper",
+              "kind": "adjustable",
+              "type": "damper_actuator",
+              "label": "送风机动叶调节",
+              "src": "fixed",
+              "param": null,
+              "def": 70
+            },
+            {
+              "uid": "att_tp_fd_flow",
+              "kind": "sensor",
+              "type": "air_flow_sensor",
+              "label": "送风机出口风量传感器",
+              "src": "attach",
+              "devRef": "att_tp_fd_damper",
+              "scale": {
+                "from": 70,
+                "to": 4200
+              },
+              "param": null,
+              "def": 4200
+            },
+            {
+              "uid": "att_tp_fd_current",
+              "kind": "sensor",
+              "type": "current_sensor",
+              "label": "送风机电流传感器",
+              "src": "sim",
+              "param": null,
+              "def": 240
+            },
+            {
+              "uid": "att_tp_fd_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "送风机电功率传感器",
+              "src": "attach",
+              "devRef": "att_tp_fd_damper",
+              "scale": {
+                "from": 70,
+                "to": 4200
+              },
+              "param": null,
+              "def": 4200
+            }
+          ],
+          "groupId": "g_tp_boiler"
+        },
+        {
+          "id": "n_tp_id_fan",
+          "kind": "process",
+          "type": "tp_id_fan",
+          "name": "引风机",
+          "x": -350,
+          "y": 240,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 5.3,
+            "flue_flow": 2400
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_id_freq",
+              "kind": "adjustable",
+              "type": "frequency_converter",
+              "label": "引风机变频器",
+              "src": "fixed",
+              "param": null,
+              "def": 45
+            },
+            {
+              "uid": "att_tp_id_current",
+              "kind": "sensor",
+              "type": "current_sensor",
+              "label": "引风机电流传感器",
+              "src": "attach",
+              "devRef": "att_tp_id_freq",
+              "scale": {
+                "from": 45,
+                "to": 320
+              },
+              "param": null,
+              "def": 320
+            },
+            {
+              "uid": "att_tp_id_vib",
+              "kind": "sensor",
+              "type": "vibration_sensor",
+              "label": "引风机振动传感器",
+              "src": "sim",
+              "param": null,
+              "def": 3.6
+            },
+            {
+              "uid": "att_tp_id_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "引风机电功率传感器",
+              "src": "attach",
+              "devRef": "att_tp_id_freq",
+              "scale": {
+                "from": 45,
+                "to": 5300
+              },
+              "param": null,
+              "def": 5300
+            }
+          ],
+          "groupId": "g_tp_boiler"
+        },
+        {
+          "id": "n_tp_pa_fan",
+          "kind": "process",
+          "type": "tp_pa_fan",
+          "name": "一次风机",
+          "x": -160,
+          "y": 240,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 2.0,
+            "pa_press": 12
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_pa_damper",
+              "kind": "adjustable",
+              "type": "damper_actuator",
+              "label": "一次风机入口风门",
+              "src": "fixed",
+              "param": null,
+              "def": 65
+            },
+            {
+              "uid": "att_tp_pa_press",
+              "kind": "sensor",
+              "type": "pressure_sensor",
+              "label": "一次风母管压力传感器",
+              "src": "sim",
+              "param": null,
+              "def": 12
+            },
+            {
+              "uid": "att_tp_pa_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "一次风机电功率传感器",
+              "src": "attach",
+              "devRef": "att_tp_pa_damper",
+              "scale": {
+                "from": 65,
+                "to": 2000
+              },
+              "param": null,
+              "def": 2000
+            }
+          ],
+          "groupId": "g_tp_boiler"
+        },
+        {
+          "id": "n_tp_st",
+          "kind": "process",
+          "type": "steam_turbine",
+          "name": "汽轮机系统",
+          "x": -280,
+          "y": 60,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "steam_rate": 1900,
+            "power": 0.3
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_st_ms",
+                "material": "main_steam"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_st_es",
+                "material": "exhaust_steam"
+              },
+              {
+                "id": "out_st_sp",
+                "material": "shaft_power"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_st_speed",
+              "kind": "sensor",
+              "type": "speed_sensor",
+              "label": "汽轮机转速传感器",
+              "src": "sim",
+              "param": null,
+              "def": 3000
+            },
+            {
+              "uid": "att_tp_st_vib",
+              "kind": "sensor",
+              "type": "vibration_sensor",
+              "label": "轴振传感器",
+              "src": "sim",
+              "param": null,
+              "def": 2.2
+            }
+          ]
+        },
+        {
+          "id": "n_tp_gen",
+          "kind": "process",
+          "type": "generator",
+          "name": "发电系统",
+          "x": -140,
+          "y": 60,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "output": 660,
+            "power": 0.2
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_gen_sp",
+                "material": "shaft_power"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_gen_el",
+                "material": "electricity"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_gen_curr",
+              "kind": "sensor",
+              "type": "current_sensor",
+              "label": "定子电流传感器",
+              "src": "sim",
+              "param": null,
+              "def": 21100
+            },
+            {
+              "uid": "att_tp_gen_volt",
+              "kind": "sensor",
+              "type": "voltage_sensor",
+              "label": "机端电压传感器",
+              "src": "sim",
+              "param": null,
+              "def": 20000
+            }
+          ]
+        },
+        {
+          "id": "n_tp_cd",
+          "kind": "process",
+          "type": "condenser",
+          "name": "凝汽系统",
+          "x": 0,
+          "y": 60,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 0.1
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_cd_es",
+                "material": "exhaust_steam"
+              },
+              {
+                "id": "in_cd_cws",
+                "material": "cooling_water_supply"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_cd_cd",
+                "material": "condensate"
+              },
+              {
+                "id": "out_cd_cwr",
+                "material": "cooling_water_return"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_cd_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "循环水出水温度传感器",
+              "src": "sim",
+              "param": null,
+              "def": 38
+            },
+            {
+              "uid": "att_tp_cd_vac",
+              "kind": "sensor",
+              "type": "pressure_sensor",
+              "label": "凝汽器背压传感器",
+              "src": "sim",
+              "param": null,
+              "def": 5
+            }
+          ],
+          "groupId": "g_tp_cd"
+        },
+        {
+          "id": "n_tp_cond_pump",
+          "kind": "process",
+          "type": "tp_cond_pump",
+          "name": "凝结水泵",
+          "x": -120,
+          "y": 240,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 0.4,
+            "cond_flow": 1500
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_cp_freq",
+              "kind": "adjustable",
+              "type": "frequency_converter",
+              "label": "凝结水泵变频器",
+              "src": "fixed",
+              "param": null,
+              "def": 42
+            },
+            {
+              "uid": "att_tp_cp_flow",
+              "kind": "sensor",
+              "type": "water_flow_sensor",
+              "label": "凝结水流量传感器",
+              "src": "attach",
+              "devRef": "att_tp_cp_freq",
+              "scale": {
+                "from": 42,
+                "to": 1500
+              },
+              "param": null,
+              "def": 1500
+            },
+            {
+              "uid": "att_tp_cp_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "凝结水泵电功率传感器",
+              "src": "attach",
+              "devRef": "att_tp_cp_freq",
+              "scale": {
+                "from": 42,
+                "to": 400
+              },
+              "param": null,
+              "def": 400
+            }
+          ],
+          "groupId": "g_tp_cd"
+        },
+        {
+          "id": "n_tp_ct",
+          "kind": "process",
+          "type": "cooling_tower",
+          "name": "循环冷却水系统",
+          "x": 140,
+          "y": 60,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 1.6
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_ct_cwr",
+                "material": "cooling_water_return"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_ct_cws",
+                "material": "cooling_water_supply"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_ct_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "冷却塔出水温度传感器",
+              "src": "sim",
+              "param": null,
+              "def": 28
+            }
+          ],
+          "groupId": "g_tp_ct"
+        },
+        {
+          "id": "n_tp_circ_pump",
+          "kind": "process",
+          "type": "tp_circ_pump",
+          "name": "循环水泵",
+          "x": 20,
+          "y": 240,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 4.6,
+            "water_flow": 90000
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_cp_press",
+              "kind": "sensor",
+              "type": "pressure_sensor",
+              "label": "循环水泵出口压力传感器",
+              "src": "sim",
+              "param": null,
+              "def": 320
+            },
+            {
+              "uid": "att_tp_ct_pump",
+              "kind": "adjustable",
+              "type": "pump_transformer",
+              "label": "循环水泵变压器",
+              "src": "fixed",
+              "param": null,
+              "def": 380
+            },
+            {
+              "uid": "att_tp_ct_flow",
+              "kind": "sensor",
+              "type": "water_speed_sensor",
+              "label": "循环水流速传感器",
+              "src": "attach",
+              "devRef": "att_tp_ct_pump",
+              "scale": {
+                "from": 380,
+                "to": 2.4
+              },
+              "param": null,
+              "def": 2.4
+            },
+            {
+              "uid": "att_tp_ct_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "循环水泵电功率传感器",
+              "src": "attach",
+              "devRef": "att_tp_ct_pump",
+              "scale": {
+                "from": 380,
+                "to": 4600
+              },
+              "param": null,
+              "def": 4600
+            }
+          ],
+          "groupId": "g_tp_ct"
+        },
+        {
+          "id": "n_tp_fw",
+          "kind": "process",
+          "type": "feedwater",
+          "name": "给水除氧系统",
+          "x": -420,
+          "y": 250,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 0.5
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_fw_cd",
+                "material": "condensate"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_fw_fw",
+                "material": "feed_water"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_fw_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "给水温度传感器",
+              "src": "sim",
+              "param": null,
+              "def": 280
+            }
+          ],
+          "groupId": "g_tp_fw"
+        },
+        {
+          "id": "n_tp_feed_pump",
+          "kind": "process",
+          "type": "tp_feed_pump",
+          "name": "给水泵",
+          "x": -540,
+          "y": 430,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 13.5,
+            "feed_flow": 1900
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_fwp_freq",
+              "kind": "adjustable",
+              "type": "frequency_converter",
+              "label": "给水泵变频器",
+              "src": "fixed",
+              "param": null,
+              "def": 45
+            },
+            {
+              "uid": "att_tp_fwp_current",
+              "kind": "sensor",
+              "type": "current_sensor",
+              "label": "给水泵电流传感器",
+              "src": "attach",
+              "devRef": "att_tp_fwp_freq",
+              "scale": {
+                "from": 45,
+                "to": 1450
+              },
+              "param": null,
+              "def": 1450
+            },
+            {
+              "uid": "att_tp_fwp_vib",
+              "kind": "sensor",
+              "type": "vibration_sensor",
+              "label": "给水泵振动传感器",
+              "src": "sim",
+              "param": null,
+              "def": 3.2
+            },
+            {
+              "uid": "att_tp_fw_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "给水泵电功率传感器",
+              "src": "attach",
+              "param": null,
+              "def": 13500,
+              "devRef": "att_tp_fwp_freq",
+              "scale": {
+                "from": 45,
+                "to": 13500
+              }
+            }
+          ],
+          "groupId": "g_tp_fw"
+        },
+        {
+          "id": "n_tp_dn",
+          "kind": "process",
+          "type": "denitration",
+          "name": "烟气脱硝系统",
+          "x": -300,
+          "y": -180,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "reagent_rate": 0.33,
+            "power": 0.8
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_dn_fg",
+                "material": "flue_gas"
+              },
+              {
+                "id": "in_dn_nh3",
+                "material": "ammonia"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_dn_fgd",
+                "material": "flue_gas_deno"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_dn_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "脱硝入口烟温传感器",
+              "src": "sim",
+              "param": null,
+              "def": 350
+            },
+            {
+              "uid": "att_tp_dn_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "脱硝辅机电功率传感器",
+              "src": "sim",
+              "param": null,
+              "def": 800
+            }
+          ]
+        },
+        {
+          "id": "n_tp_du",
+          "kind": "process",
+          "type": "dedust",
+          "name": "烟气除尘系统",
+          "x": -160,
+          "y": -180,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 1.6
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_du_fgd",
+                "material": "flue_gas_deno"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_du_fgc",
+                "material": "flue_gas_clean"
+              },
+              {
+                "id": "out_du_fa",
+                "material": "fly_ash"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_du_dust",
+              "kind": "sensor",
+              "type": "dust_sensor",
+              "label": "除尘器出口粉尘传感器",
+              "src": "sim",
+              "param": null,
+              "def": 8
+            },
+            {
+              "uid": "att_tp_du_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "电场电功率传感器",
+              "src": "sim",
+              "param": null,
+              "def": 1600
+            }
+          ]
+        },
+        {
+          "id": "n_tp_ds",
+          "kind": "process",
+          "type": "desulfurization",
+          "name": "烟气脱硫系统",
+          "x": -20,
+          "y": -180,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "limestone_rate": 8,
+            "power": 0.3
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_ds_fgc",
+                "material": "flue_gas_clean"
+              },
+              {
+                "id": "in_ds_ls",
+                "material": "limestone_slurry"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_ds_fgd2",
+                "material": "flue_gas_desul"
+              },
+              {
+                "id": "out_ds_gp",
+                "material": "gypsum"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_ds_level",
+              "kind": "sensor",
+              "type": "liquid_level_sensor",
+              "label": "吸收塔液位传感器",
+              "src": "sim",
+              "param": null,
+              "def": 5.5
+            }
+          ],
+          "groupId": "g_tp_ds"
+        },
+        {
+          "id": "n_tp_slurry_pump",
+          "kind": "process",
+          "type": "tp_slurry_pump",
+          "name": "浆液循环泵",
+          "x": -140,
+          "y": 0,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 5.0,
+            "slurry_flow": 18000
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_sp_current",
+              "kind": "sensor",
+              "type": "current_sensor",
+              "label": "浆液循环泵电流传感器",
+              "src": "attach",
+              "devRef": "att_tp_ds_pump",
+              "scale": {
+                "from": 45,
+                "to": 620
+              },
+              "param": null,
+              "def": 620
+            },
+            {
+              "uid": "att_tp_ds_pump",
+              "kind": "adjustable",
+              "type": "frequency_converter",
+              "label": "浆液循环泵变频器",
+              "src": "fixed",
+              "param": null,
+              "def": 45
+            },
+            {
+              "uid": "att_tp_ds_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "浆液循环泵电功率传感器",
+              "src": "attach",
+              "devRef": "att_tp_ds_pump",
+              "scale": {
+                "from": 45,
+                "to": 5000
+              },
+              "param": null,
+              "def": 5000
+            }
+          ],
+          "groupId": "g_tp_ds"
+        },
+        {
+          "id": "n_tp_oxi_fan",
+          "kind": "process",
+          "type": "tp_oxi_fan",
+          "name": "氧化风机",
+          "x": 50,
+          "y": 0,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 1.2,
+            "oxi_flow": 9000
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_of_freq",
+              "kind": "adjustable",
+              "type": "frequency_converter",
+              "label": "氧化风机变频器",
+              "src": "fixed",
+              "param": null,
+              "def": 40
+            },
+            {
+              "uid": "att_tp_of_flow",
+              "kind": "sensor",
+              "type": "gas_flow_sensor",
+              "label": "氧化空气流量传感器",
+              "src": "attach",
+              "devRef": "att_tp_of_freq",
+              "scale": {
+                "from": 40,
+                "to": 9000
+              },
+              "param": null,
+              "def": 9000
+            },
+            {
+              "uid": "att_tp_of_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "氧化风机电功率传感器",
+              "src": "attach",
+              "devRef": "att_tp_of_freq",
+              "scale": {
+                "from": 40,
+                "to": 1200
+              },
+              "param": null,
+              "def": 1200
+            }
+          ],
+          "groupId": "g_tp_ds"
+        },
+        {
+          "id": "n_tp_sk",
+          "kind": "process",
+          "type": "stack",
+          "name": "排烟系统",
+          "x": 120,
+          "y": -180,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 0.1
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_sk_fgd",
+                "material": "flue_gas_desul"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_sk_em",
+                "material": "emission"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_sk_o2",
+              "kind": "sensor",
+              "type": "o2_sensor",
+              "label": "净烟气氧量传感器",
+              "src": "sim",
+              "param": null,
+              "def": 4.8
+            },
+            {
+              "uid": "att_tp_sk_dust",
+              "kind": "sensor",
+              "type": "dust_sensor",
+              "label": "净烟气粉尘传感器",
+              "src": "sim",
+              "param": null,
+              "def": 2
+            },
+            {
+              "uid": "att_tp_sk_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "净烟气温度传感器",
+              "src": "sim",
+              "param": null,
+              "def": 48
+            }
+          ]
+        },
+        {
+          "id": "n_tp_ah",
+          "kind": "process",
+          "type": "ash_handling",
+          "name": "除灰渣系统",
+          "x": -320,
+          "y": -320,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 1.2
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_ah_ba",
+                "material": "bottom_ash"
+              },
+              {
+                "id": "in_ah_fa",
+                "material": "fly_ash"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_ah_ap",
+                "material": "ash_product"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_ah_level",
+              "kind": "sensor",
+              "type": "liquid_level_sensor",
+              "label": "灰库料位传感器",
+              "src": "sim",
+              "param": null,
+              "def": 6.5
+            },
+            {
+              "uid": "att_tp_ah_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "除灰渣系统电功率传感器",
+              "src": "sim",
+              "param": null,
+              "def": 1200
+            }
+          ]
+        },
+        {
+          "id": "n_tp_gy",
+          "kind": "process",
+          "type": "gypsum_handling",
+          "name": "石膏脱水系统",
+          "x": 120,
+          "y": -320,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 0.6
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_gy_gp",
+                "material": "gypsum"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_gy_prod",
+                "material": "gypsum_product"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_gy_level",
+              "kind": "sensor",
+              "type": "liquid_level_sensor",
+              "label": "石膏库料位传感器",
+              "src": "sim",
+              "param": null,
+              "def": 4.5
+            },
+            {
+              "uid": "att_tp_gy_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "石膏脱水电功率传感器",
+              "src": "sim",
+              "param": null,
+              "def": 600
+            }
+          ]
+        }
+      ],
+      "connections": [
+        {
+          "id": "c_tp_1",
+          "from": "n_tp_ch",
+          "fromPort": "out_ch_pc",
+          "to": "n_tp_boiler",
+          "toPort": "in_bo_pc",
+          "material": "pulverized_coal",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_2",
+          "from": "n_tp_boiler",
+          "fromPort": "out_bo_ms",
+          "to": "n_tp_st",
+          "toPort": "in_st_ms",
+          "material": "main_steam",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_3",
+          "from": "n_tp_st",
+          "fromPort": "out_st_sp",
+          "to": "n_tp_gen",
+          "toPort": "in_gen_sp",
+          "material": "shaft_power",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_4",
+          "from": "n_tp_st",
+          "fromPort": "out_st_es",
+          "to": "n_tp_cd",
+          "toPort": "in_cd_es",
+          "material": "exhaust_steam",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_5",
+          "from": "n_tp_ct",
+          "fromPort": "out_ct_cws",
+          "to": "n_tp_cd",
+          "toPort": "in_cd_cws",
+          "material": "cooling_water_supply",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_6",
+          "from": "n_tp_cd",
+          "fromPort": "out_cd_cwr",
+          "to": "n_tp_ct",
+          "toPort": "in_ct_cwr",
+          "material": "cooling_water_return",
+          "feedback": true
+        },
+        {
+          "id": "c_tp_7",
+          "from": "n_tp_cd",
+          "fromPort": "out_cd_cd",
+          "to": "n_tp_fw",
+          "toPort": "in_fw_cd",
+          "material": "condensate",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_8",
+          "from": "n_tp_fw",
+          "fromPort": "out_fw_fw",
+          "to": "n_tp_boiler",
+          "toPort": "in_bo_fw",
+          "material": "feed_water",
+          "feedback": true
+        },
+        {
+          "id": "c_tp_9",
+          "from": "n_tp_boiler",
+          "fromPort": "out_bo_fg",
+          "to": "n_tp_dn",
+          "toPort": "in_dn_fg",
+          "material": "flue_gas",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_10",
+          "from": "n_tp_dn",
+          "fromPort": "out_dn_fgd",
+          "to": "n_tp_du",
+          "toPort": "in_du_fgd",
+          "material": "flue_gas_deno",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_11",
+          "from": "n_tp_du",
+          "fromPort": "out_du_fgc",
+          "to": "n_tp_ds",
+          "toPort": "in_ds_fgc",
+          "material": "flue_gas_clean",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_12",
+          "from": "n_tp_ds",
+          "fromPort": "out_ds_fgd2",
+          "to": "n_tp_sk",
+          "toPort": "in_sk_fgd",
+          "material": "flue_gas_desul",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_13",
+          "from": "n_tp_boiler",
+          "fromPort": "out_bo_ba",
+          "to": "n_tp_ah",
+          "toPort": "in_ah_ba",
+          "material": "bottom_ash",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_14",
+          "from": "n_tp_du",
+          "fromPort": "out_du_fa",
+          "to": "n_tp_ah",
+          "toPort": "in_ah_fa",
+          "material": "fly_ash",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_15",
+          "from": "n_tp_ds",
+          "fromPort": "out_ds_gp",
+          "to": "n_tp_gy",
+          "toPort": "in_gy_gp",
+          "material": "gypsum",
+          "feedback": false
+        }
+      ],
+      "groups": [
+        {
+          "id": "g_tp_ch",
+          "name": "输煤制粉系统",
+          "x": -560,
+          "y": 60,
+          "members": [
+            "n_tp_ch",
+            "n_tp_mill"
+          ],
+          "inputs": [
+            {
+              "material": "coal"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "pulverized_coal"
+            }
+          ]
+        },
+        {
+          "id": "g_tp_boiler",
+          "name": "锅炉系统",
+          "x": -420,
+          "y": 60,
+          "members": [
+            "n_tp_boiler",
+            "n_tp_fd_fan",
+            "n_tp_id_fan",
+            "n_tp_pa_fan"
+          ],
+          "inputs": [
+            {
+              "material": "pulverized_coal"
+            },
+            {
+              "material": "combustion_air"
+            },
+            {
+              "material": "feed_water"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "main_steam"
+            },
+            {
+              "material": "flue_gas"
+            },
+            {
+              "material": "bottom_ash"
+            }
+          ]
+        },
+        {
+          "id": "g_tp_cd",
+          "name": "凝汽系统",
+          "x": 0,
+          "y": 60,
+          "members": [
+            "n_tp_cd",
+            "n_tp_cond_pump"
+          ],
+          "inputs": [
+            {
+              "material": "exhaust_steam"
+            },
+            {
+              "material": "cooling_water_supply"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "condensate"
+            },
+            {
+              "material": "cooling_water_return"
+            }
+          ]
+        },
+        {
+          "id": "g_tp_ct",
+          "name": "循环冷却水系统",
+          "x": 140,
+          "y": 60,
+          "members": [
+            "n_tp_ct",
+            "n_tp_circ_pump"
+          ],
+          "inputs": [
+            {
+              "material": "cooling_water_return"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "cooling_water_supply"
+            }
+          ]
+        },
+        {
+          "id": "g_tp_fw",
+          "name": "给水除氧系统",
+          "x": -420,
+          "y": 250,
+          "members": [
+            "n_tp_fw",
+            "n_tp_feed_pump"
+          ],
+          "inputs": [
+            {
+              "material": "condensate"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "feed_water"
+            }
+          ]
+        },
+        {
+          "id": "g_tp_ds",
+          "name": "烟气脱硫系统",
+          "x": -20,
+          "y": -180,
+          "members": [
+            "n_tp_ds",
+            "n_tp_slurry_pump",
+            "n_tp_oxi_fan"
+          ],
+          "inputs": [
+            {
+              "material": "flue_gas_clean"
+            },
+            {
+              "material": "limestone_slurry"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "flue_gas_desul"
+            },
+            {
+              "material": "gypsum"
+            }
+          ]
+        }
+      ],
+      "activeGroupId": null,
+      "structRev": 1
+    }
+  },
+  {
+    "id": "chp",
+    "label": "热电联产机组模板",
+    "desc": "热电联产（抽凝供热）机组：在燃煤发电机组流程基础上，汽轮机中压缸抽出部分蒸汽进入热网换热站，加热热网循环水对外供热；供热比越高，分摊到发电侧的燃料与排放越少。抽汽做功减少使发电出力略降（本模板 620 MW），入炉煤量随供热量增加。核算口径与燃煤机组一致：范围一为锅炉燃煤 + 脱硫过程排放，范围二为各辅机耗电；外供热量可在热电分摊中扣减对应排放。",
+    "icon": "flow",
+    "route": "chp",
+    "scheme": {
+      "nodes": [
+        {
+          "id": "n_tp_ch",
+          "kind": "process",
+          "type": "coal_handling",
+          "name": "输煤制粉系统",
+          "x": -560,
+          "y": 60,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 0.8
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_ch_coal",
+                "material": "coal"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_ch_pc",
+                "material": "pulverized_coal"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [],
+          "groupId": "g_tp_ch"
+        },
+        {
+          "id": "n_tp_mill",
+          "kind": "process",
+          "type": "tp_mill",
+          "name": "磨煤机",
+          "x": -680,
+          "y": 240,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 2.6,
+            "coal_flow": 60
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_mill_freq",
+              "kind": "adjustable",
+              "type": "frequency_converter",
+              "label": "磨煤机变频器",
+              "src": "fixed",
+              "param": null,
+              "def": 45
+            },
+            {
+              "uid": "att_tp_mill_current",
+              "kind": "sensor",
+              "type": "current_sensor",
+              "label": "磨煤机电流传感器",
+              "src": "attach",
+              "devRef": "att_tp_mill_freq",
+              "scale": {
+                "from": 45,
+                "to": 210
+              },
+              "param": null,
+              "def": 210
+            },
+            {
+              "uid": "att_tp_ch_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "磨煤机电功率传感器",
+              "src": "attach",
+              "param": null,
+              "def": 2600,
+              "devRef": "att_tp_mill_freq",
+              "scale": {
+                "from": 45,
+                "to": 2600
+              }
+            },
+            {
+              "uid": "att_tp_ch_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "磨煤机出口温度传感器",
+              "src": "sim",
+              "param": null,
+              "def": 75
+            }
+          ],
+          "groupId": "g_tp_ch"
+        },
+        {
+          "id": "n_tp_boiler",
+          "kind": "process",
+          "type": "boiler",
+          "name": "锅炉系统",
+          "x": -420,
+          "y": 60,
+          "count": 1,
+          "spec": "tp_660",
+          "params": {
+            "coal_rate": 267,
+            "power": 0.5
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_bo_pc",
+                "material": "pulverized_coal"
+              },
+              {
+                "id": "in_bo_air",
+                "material": "combustion_air"
+              },
+              {
+                "id": "in_bo_fw",
+                "material": "feed_water"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_bo_ms",
+                "material": "main_steam"
+              },
+              {
+                "id": "out_bo_fg",
+                "material": "flue_gas"
+              },
+              {
+                "id": "out_bo_ba",
+                "material": "bottom_ash"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_bo_ms_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "主蒸汽温度传感器",
+              "src": "sim",
+              "param": null,
+              "def": 600
+            },
+            {
+              "uid": "att_tp_bo_fg_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "排烟温度（空预器出口）传感器",
+              "src": "sim",
+              "param": null,
+              "def": 120
+            },
+            {
+              "uid": "att_tp_bo_o2",
+              "kind": "sensor",
+              "type": "o2_sensor",
+              "label": "烟气氧量分析仪",
+              "src": "sim",
+              "param": null,
+              "def": 3.6
+            }
+          ],
+          "groupId": "g_tp_boiler"
+        },
+        {
+          "id": "n_tp_fd_fan",
+          "kind": "process",
+          "type": "tp_fd_fan",
+          "name": "送风机",
+          "x": -540,
+          "y": 240,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 4.5,
+            "air_flow": 1200
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_fd_damper",
+              "kind": "adjustable",
+              "type": "damper_actuator",
+              "label": "送风机动叶调节",
+              "src": "fixed",
+              "param": null,
+              "def": 70
+            },
+            {
+              "uid": "att_tp_fd_flow",
+              "kind": "sensor",
+              "type": "air_flow_sensor",
+              "label": "送风机出口风量传感器",
+              "src": "attach",
+              "devRef": "att_tp_fd_damper",
+              "scale": {
+                "from": 70,
+                "to": 4200
+              },
+              "param": null,
+              "def": 4200
+            },
+            {
+              "uid": "att_tp_fd_current",
+              "kind": "sensor",
+              "type": "current_sensor",
+              "label": "送风机电流传感器",
+              "src": "sim",
+              "param": null,
+              "def": 240
+            },
+            {
+              "uid": "att_tp_fd_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "送风机电功率传感器",
+              "src": "attach",
+              "devRef": "att_tp_fd_damper",
+              "scale": {
+                "from": 70,
+                "to": 4500
+              },
+              "param": null,
+              "def": 4500
+            }
+          ],
+          "groupId": "g_tp_boiler"
+        },
+        {
+          "id": "n_tp_id_fan",
+          "kind": "process",
+          "type": "tp_id_fan",
+          "name": "引风机",
+          "x": -350,
+          "y": 240,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 5.5,
+            "flue_flow": 2400
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_id_freq",
+              "kind": "adjustable",
+              "type": "frequency_converter",
+              "label": "引风机变频器",
+              "src": "fixed",
+              "param": null,
+              "def": 45
+            },
+            {
+              "uid": "att_tp_id_current",
+              "kind": "sensor",
+              "type": "current_sensor",
+              "label": "引风机电流传感器",
+              "src": "attach",
+              "devRef": "att_tp_id_freq",
+              "scale": {
+                "from": 45,
+                "to": 320
+              },
+              "param": null,
+              "def": 320
+            },
+            {
+              "uid": "att_tp_id_vib",
+              "kind": "sensor",
+              "type": "vibration_sensor",
+              "label": "引风机振动传感器",
+              "src": "sim",
+              "param": null,
+              "def": 3.6
+            },
+            {
+              "uid": "att_tp_id_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "引风机电功率传感器",
+              "src": "attach",
+              "devRef": "att_tp_id_freq",
+              "scale": {
+                "from": 45,
+                "to": 5500
+              },
+              "param": null,
+              "def": 5500
+            }
+          ],
+          "groupId": "g_tp_boiler"
+        },
+        {
+          "id": "n_tp_pa_fan",
+          "kind": "process",
+          "type": "tp_pa_fan",
+          "name": "一次风机",
+          "x": -160,
+          "y": 240,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 2.0,
+            "pa_press": 12
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_pa_damper",
+              "kind": "adjustable",
+              "type": "damper_actuator",
+              "label": "一次风机入口风门",
+              "src": "fixed",
+              "param": null,
+              "def": 65
+            },
+            {
+              "uid": "att_tp_pa_press",
+              "kind": "sensor",
+              "type": "pressure_sensor",
+              "label": "一次风母管压力传感器",
+              "src": "sim",
+              "param": null,
+              "def": 12
+            },
+            {
+              "uid": "att_tp_pa_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "一次风机电功率传感器",
+              "src": "attach",
+              "devRef": "att_tp_pa_damper",
+              "scale": {
+                "from": 65,
+                "to": 2000
+              },
+              "param": null,
+              "def": 2000
+            }
+          ],
+          "groupId": "g_tp_boiler"
+        },
+        {
+          "id": "n_tp_st",
+          "kind": "process",
+          "type": "steam_turbine",
+          "name": "汽轮机系统（抽凝式）",
+          "x": -280,
+          "y": 60,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "steam_rate": 1950,
+            "power": 0.3
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_st_ms",
+                "material": "main_steam"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_st_es",
+                "material": "exhaust_steam"
+              },
+              {
+                "id": "out_st_sp",
+                "material": "shaft_power"
+              },
+              {
+                "id": "out_st_hs",
+                "material": "heating_steam"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_st_speed",
+              "kind": "sensor",
+              "type": "speed_sensor",
+              "label": "汽轮机转速传感器",
+              "src": "sim",
+              "param": null,
+              "def": 3000
+            },
+            {
+              "uid": "att_tp_st_vib",
+              "kind": "sensor",
+              "type": "vibration_sensor",
+              "label": "轴振传感器",
+              "src": "sim",
+              "param": null,
+              "def": 2.3
+            }
+          ]
+        },
+        {
+          "id": "n_tp_gen",
+          "kind": "process",
+          "type": "generator",
+          "name": "发电系统",
+          "x": -140,
+          "y": 60,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "output": 620,
+            "power": 0.2
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_gen_sp",
+                "material": "shaft_power"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_gen_el",
+                "material": "electricity"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_gen_curr",
+              "kind": "sensor",
+              "type": "current_sensor",
+              "label": "定子电流传感器",
+              "src": "sim",
+              "param": null,
+              "def": 19900
+            },
+            {
+              "uid": "att_tp_gen_volt",
+              "kind": "sensor",
+              "type": "voltage_sensor",
+              "label": "机端电压传感器",
+              "src": "sim",
+              "param": null,
+              "def": 20000
+            }
+          ]
+        },
+        {
+          "id": "n_tp_cd",
+          "kind": "process",
+          "type": "condenser",
+          "name": "凝汽系统",
+          "x": 0,
+          "y": 60,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 0.1
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_cd_es",
+                "material": "exhaust_steam"
+              },
+              {
+                "id": "in_cd_cws",
+                "material": "cooling_water_supply"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_cd_cd",
+                "material": "condensate"
+              },
+              {
+                "id": "out_cd_cwr",
+                "material": "cooling_water_return"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_cd_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "循环水出水温度传感器",
+              "src": "sim",
+              "param": null,
+              "def": 36.5
+            },
+            {
+              "uid": "att_tp_cd_vac",
+              "kind": "sensor",
+              "type": "pressure_sensor",
+              "label": "凝汽器背压传感器",
+              "src": "sim",
+              "param": null,
+              "def": 4.8
+            }
+          ],
+          "groupId": "g_tp_cd"
+        },
+        {
+          "id": "n_tp_cond_pump",
+          "kind": "process",
+          "type": "tp_cond_pump",
+          "name": "凝结水泵",
+          "x": -120,
+          "y": 240,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 0.4,
+            "cond_flow": 1500
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_cp_freq",
+              "kind": "adjustable",
+              "type": "frequency_converter",
+              "label": "凝结水泵变频器",
+              "src": "fixed",
+              "param": null,
+              "def": 42
+            },
+            {
+              "uid": "att_tp_cp_flow",
+              "kind": "sensor",
+              "type": "water_flow_sensor",
+              "label": "凝结水流量传感器",
+              "src": "attach",
+              "devRef": "att_tp_cp_freq",
+              "scale": {
+                "from": 42,
+                "to": 1500
+              },
+              "param": null,
+              "def": 1500
+            },
+            {
+              "uid": "att_tp_cp_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "凝结水泵电功率传感器",
+              "src": "attach",
+              "devRef": "att_tp_cp_freq",
+              "scale": {
+                "from": 42,
+                "to": 400
+              },
+              "param": null,
+              "def": 400
+            }
+          ],
+          "groupId": "g_tp_cd"
+        },
+        {
+          "id": "n_tp_ct",
+          "kind": "process",
+          "type": "cooling_tower",
+          "name": "循环冷却水系统",
+          "x": 140,
+          "y": 60,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 1.5
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_ct_cwr",
+                "material": "cooling_water_return"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_ct_cws",
+                "material": "cooling_water_supply"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_ct_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "冷却塔出水温度传感器",
+              "src": "sim",
+              "param": null,
+              "def": 28
+            }
+          ],
+          "groupId": "g_tp_ct"
+        },
+        {
+          "id": "n_tp_circ_pump",
+          "kind": "process",
+          "type": "tp_circ_pump",
+          "name": "循环水泵",
+          "x": 20,
+          "y": 240,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 4.3,
+            "water_flow": 90000
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_cp_press",
+              "kind": "sensor",
+              "type": "pressure_sensor",
+              "label": "循环水泵出口压力传感器",
+              "src": "sim",
+              "param": null,
+              "def": 320
+            },
+            {
+              "uid": "att_tp_ct_pump",
+              "kind": "adjustable",
+              "type": "pump_transformer",
+              "label": "循环水泵变压器",
+              "src": "fixed",
+              "param": null,
+              "def": 380
+            },
+            {
+              "uid": "att_tp_ct_flow",
+              "kind": "sensor",
+              "type": "water_speed_sensor",
+              "label": "循环水流速传感器",
+              "src": "attach",
+              "devRef": "att_tp_ct_pump",
+              "scale": {
+                "from": 380,
+                "to": 2.3
+              },
+              "param": null,
+              "def": 2.3
+            },
+            {
+              "uid": "att_tp_ct_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "循环水泵电功率传感器",
+              "src": "attach",
+              "devRef": "att_tp_ct_pump",
+              "scale": {
+                "from": 380,
+                "to": 4300
+              },
+              "param": null,
+              "def": 4300
+            }
+          ],
+          "groupId": "g_tp_ct"
+        },
+        {
+          "id": "n_tp_fw",
+          "kind": "process",
+          "type": "feedwater",
+          "name": "给水除氧系统",
+          "x": -420,
+          "y": 250,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 0.5
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_fw_cd",
+                "material": "condensate"
+              },
+              {
+                "id": "in_fw_cd2",
+                "material": "condensate"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_fw_fw",
+                "material": "feed_water"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_fw_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "给水温度传感器",
+              "src": "sim",
+              "param": null,
+              "def": 278
+            }
+          ],
+          "groupId": "g_tp_fw"
+        },
+        {
+          "id": "n_tp_feed_pump",
+          "kind": "process",
+          "type": "tp_feed_pump",
+          "name": "给水泵",
+          "x": -540,
+          "y": 430,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 14.0,
+            "feed_flow": 1900
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_fwp_freq",
+              "kind": "adjustable",
+              "type": "frequency_converter",
+              "label": "给水泵变频器",
+              "src": "fixed",
+              "param": null,
+              "def": 45
+            },
+            {
+              "uid": "att_tp_fwp_current",
+              "kind": "sensor",
+              "type": "current_sensor",
+              "label": "给水泵电流传感器",
+              "src": "attach",
+              "devRef": "att_tp_fwp_freq",
+              "scale": {
+                "from": 45,
+                "to": 1450
+              },
+              "param": null,
+              "def": 1450
+            },
+            {
+              "uid": "att_tp_fwp_vib",
+              "kind": "sensor",
+              "type": "vibration_sensor",
+              "label": "给水泵振动传感器",
+              "src": "sim",
+              "param": null,
+              "def": 3.2
+            },
+            {
+              "uid": "att_tp_fw_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "给水泵电功率传感器",
+              "src": "attach",
+              "param": null,
+              "def": 14000,
+              "devRef": "att_tp_fwp_freq",
+              "scale": {
+                "from": 45,
+                "to": 14000
+              }
+            }
+          ],
+          "groupId": "g_tp_fw"
+        },
+        {
+          "id": "n_tp_hn",
+          "kind": "process",
+          "type": "heat_net",
+          "name": "热网换热系统",
+          "x": -140,
+          "y": 250,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "heat_rate": 500,
+            "power": 0.1
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_hn_hs",
+                "material": "heating_steam"
+              },
+              {
+                "id": "in_hn_hr",
+                "material": "heat_return"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_hn_hs2",
+                "material": "heat_supply"
+              },
+              {
+                "id": "out_hn_cd",
+                "material": "condensate"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_hn_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "热网供水温度传感器",
+              "src": "sim",
+              "param": null,
+              "def": 110
+            },
+            {
+              "uid": "att_tp_hn_flow",
+              "kind": "sensor",
+              "type": "water_speed_sensor",
+              "label": "热网循环水流速传感器",
+              "src": "sim",
+              "param": null,
+              "def": 1.8
+            }
+          ],
+          "groupId": "g_tp_hn"
+        },
+        {
+          "id": "n_tp_heat_pump",
+          "kind": "process",
+          "type": "tp_heat_pump",
+          "name": "热网循环泵",
+          "x": -260,
+          "y": 430,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 0.3,
+            "heat_flow": 8000
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_hp_freq",
+              "kind": "adjustable",
+              "type": "frequency_converter",
+              "label": "热网循环泵变频器",
+              "src": "fixed",
+              "param": null,
+              "def": 42
+            },
+            {
+              "uid": "att_tp_hp_flow",
+              "kind": "sensor",
+              "type": "water_flow_sensor",
+              "label": "热网循环水流量传感器",
+              "src": "attach",
+              "devRef": "att_tp_hp_freq",
+              "scale": {
+                "from": 42,
+                "to": 8000
+              },
+              "param": null,
+              "def": 8000
+            },
+            {
+              "uid": "att_tp_hn_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "热网循环泵电功率传感器",
+              "src": "attach",
+              "param": null,
+              "def": 300,
+              "devRef": "att_tp_hp_freq",
+              "scale": {
+                "from": 42,
+                "to": 300
+              }
+            }
+          ],
+          "groupId": "g_tp_hn"
+        },
+        {
+          "id": "n_tp_dn",
+          "kind": "process",
+          "type": "denitration",
+          "name": "烟气脱硝系统",
+          "x": -300,
+          "y": -180,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "reagent_rate": 0.35,
+            "power": 0.8
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_dn_fg",
+                "material": "flue_gas"
+              },
+              {
+                "id": "in_dn_nh3",
+                "material": "ammonia"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_dn_fgd",
+                "material": "flue_gas_deno"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_dn_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "脱硝入口烟温传感器",
+              "src": "sim",
+              "param": null,
+              "def": 352
+            },
+            {
+              "uid": "att_tp_dn_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "脱硝辅机电功率传感器",
+              "src": "sim",
+              "param": null,
+              "def": 800
+            }
+          ]
+        },
+        {
+          "id": "n_tp_du",
+          "kind": "process",
+          "type": "dedust",
+          "name": "烟气除尘系统",
+          "x": -160,
+          "y": -180,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 1.6
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_du_fgd",
+                "material": "flue_gas_deno"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_du_fgc",
+                "material": "flue_gas_clean"
+              },
+              {
+                "id": "out_du_fa",
+                "material": "fly_ash"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_du_dust",
+              "kind": "sensor",
+              "type": "dust_sensor",
+              "label": "除尘器出口粉尘传感器",
+              "src": "sim",
+              "param": null,
+              "def": 8
+            },
+            {
+              "uid": "att_tp_du_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "电场电功率传感器",
+              "src": "sim",
+              "param": null,
+              "def": 1600
+            }
+          ]
+        },
+        {
+          "id": "n_tp_ds",
+          "kind": "process",
+          "type": "desulfurization",
+          "name": "烟气脱硫系统",
+          "x": -20,
+          "y": -180,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "limestone_rate": 8.4,
+            "power": 0.3
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_ds_fgc",
+                "material": "flue_gas_clean"
+              },
+              {
+                "id": "in_ds_ls",
+                "material": "limestone_slurry"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_ds_fgd2",
+                "material": "flue_gas_desul"
+              },
+              {
+                "id": "out_ds_gp",
+                "material": "gypsum"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_ds_level",
+              "kind": "sensor",
+              "type": "liquid_level_sensor",
+              "label": "吸收塔液位传感器",
+              "src": "sim",
+              "param": null,
+              "def": 5.6
+            }
+          ],
+          "groupId": "g_tp_ds"
+        },
+        {
+          "id": "n_tp_slurry_pump",
+          "kind": "process",
+          "type": "tp_slurry_pump",
+          "name": "浆液循环泵",
+          "x": -140,
+          "y": 0,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 5.3,
+            "slurry_flow": 18000
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_sp_current",
+              "kind": "sensor",
+              "type": "current_sensor",
+              "label": "浆液循环泵电流传感器",
+              "src": "attach",
+              "devRef": "att_tp_ds_pump",
+              "scale": {
+                "from": 45,
+                "to": 620
+              },
+              "param": null,
+              "def": 620
+            },
+            {
+              "uid": "att_tp_ds_pump",
+              "kind": "adjustable",
+              "type": "frequency_converter",
+              "label": "浆液循环泵变频器",
+              "src": "fixed",
+              "param": null,
+              "def": 46
+            },
+            {
+              "uid": "att_tp_ds_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "浆液循环泵电功率传感器",
+              "src": "attach",
+              "devRef": "att_tp_ds_pump",
+              "scale": {
+                "from": 46,
+                "to": 5300
+              },
+              "param": null,
+              "def": 5300
+            }
+          ],
+          "groupId": "g_tp_ds"
+        },
+        {
+          "id": "n_tp_oxi_fan",
+          "kind": "process",
+          "type": "tp_oxi_fan",
+          "name": "氧化风机",
+          "x": 50,
+          "y": 0,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 1.2,
+            "oxi_flow": 9000
+          },
+          "recipe": [],
+          "ports": {
+            "in": [],
+            "out": []
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_of_freq",
+              "kind": "adjustable",
+              "type": "frequency_converter",
+              "label": "氧化风机变频器",
+              "src": "fixed",
+              "param": null,
+              "def": 40
+            },
+            {
+              "uid": "att_tp_of_flow",
+              "kind": "sensor",
+              "type": "gas_flow_sensor",
+              "label": "氧化空气流量传感器",
+              "src": "attach",
+              "devRef": "att_tp_of_freq",
+              "scale": {
+                "from": 40,
+                "to": 9000
+              },
+              "param": null,
+              "def": 9000
+            },
+            {
+              "uid": "att_tp_of_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "氧化风机电功率传感器",
+              "src": "attach",
+              "devRef": "att_tp_of_freq",
+              "scale": {
+                "from": 40,
+                "to": 1200
+              },
+              "param": null,
+              "def": 1200
+            }
+          ],
+          "groupId": "g_tp_ds"
+        },
+        {
+          "id": "n_tp_sk",
+          "kind": "process",
+          "type": "stack",
+          "name": "排烟系统",
+          "x": 120,
+          "y": -180,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 0.1
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_sk_fgd",
+                "material": "flue_gas_desul"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_sk_em",
+                "material": "emission"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_sk_o2",
+              "kind": "sensor",
+              "type": "o2_sensor",
+              "label": "净烟气氧量传感器",
+              "src": "sim",
+              "param": null,
+              "def": 4.8
+            },
+            {
+              "uid": "att_tp_sk_dust",
+              "kind": "sensor",
+              "type": "dust_sensor",
+              "label": "净烟气粉尘传感器",
+              "src": "sim",
+              "param": null,
+              "def": 2
+            },
+            {
+              "uid": "att_tp_sk_temp",
+              "kind": "sensor",
+              "type": "temp_sensor",
+              "label": "净烟气温度传感器",
+              "src": "sim",
+              "param": null,
+              "def": 48
+            }
+          ]
+        },
+        {
+          "id": "n_tp_ah",
+          "kind": "process",
+          "type": "ash_handling",
+          "name": "除灰渣系统",
+          "x": -320,
+          "y": -320,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 1.2
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_ah_ba",
+                "material": "bottom_ash"
+              },
+              {
+                "id": "in_ah_fa",
+                "material": "fly_ash"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_ah_ap",
+                "material": "ash_product"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_ah_level",
+              "kind": "sensor",
+              "type": "liquid_level_sensor",
+              "label": "灰库料位传感器",
+              "src": "sim",
+              "param": null,
+              "def": 6.5
+            },
+            {
+              "uid": "att_tp_ah_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "除灰渣系统电功率传感器",
+              "src": "sim",
+              "param": null,
+              "def": 1200
+            }
+          ]
+        },
+        {
+          "id": "n_tp_gy",
+          "kind": "process",
+          "type": "gypsum_handling",
+          "name": "石膏脱水系统",
+          "x": 120,
+          "y": -320,
+          "count": 1,
+          "spec": "",
+          "params": {
+            "power": 0.6
+          },
+          "recipe": [],
+          "ports": {
+            "in": [
+              {
+                "id": "in_gy_gp",
+                "material": "gypsum"
+              }
+            ],
+            "out": [
+              {
+                "id": "out_gy_prod",
+                "material": "gypsum_product"
+              }
+            ]
+          },
+          "deviceBindings": [],
+          "attached": [
+            {
+              "uid": "att_tp_gy_level",
+              "kind": "sensor",
+              "type": "liquid_level_sensor",
+              "label": "石膏库料位传感器",
+              "src": "sim",
+              "param": null,
+              "def": 4.5
+            },
+            {
+              "uid": "att_tp_gy_power",
+              "kind": "sensor",
+              "type": "power_sensor",
+              "label": "石膏脱水电功率传感器",
+              "src": "sim",
+              "param": null,
+              "def": 600
+            }
+          ]
+        }
+      ],
+      "connections": [
+        {
+          "id": "c_tp_1",
+          "from": "n_tp_ch",
+          "fromPort": "out_ch_pc",
+          "to": "n_tp_boiler",
+          "toPort": "in_bo_pc",
+          "material": "pulverized_coal",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_2",
+          "from": "n_tp_boiler",
+          "fromPort": "out_bo_ms",
+          "to": "n_tp_st",
+          "toPort": "in_st_ms",
+          "material": "main_steam",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_3",
+          "from": "n_tp_st",
+          "fromPort": "out_st_sp",
+          "to": "n_tp_gen",
+          "toPort": "in_gen_sp",
+          "material": "shaft_power",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_4",
+          "from": "n_tp_st",
+          "fromPort": "out_st_es",
+          "to": "n_tp_cd",
+          "toPort": "in_cd_es",
+          "material": "exhaust_steam",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_5",
+          "from": "n_tp_ct",
+          "fromPort": "out_ct_cws",
+          "to": "n_tp_cd",
+          "toPort": "in_cd_cws",
+          "material": "cooling_water_supply",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_6",
+          "from": "n_tp_cd",
+          "fromPort": "out_cd_cwr",
+          "to": "n_tp_ct",
+          "toPort": "in_ct_cwr",
+          "material": "cooling_water_return",
+          "feedback": true
+        },
+        {
+          "id": "c_tp_7",
+          "from": "n_tp_cd",
+          "fromPort": "out_cd_cd",
+          "to": "n_tp_fw",
+          "toPort": "in_fw_cd",
+          "material": "condensate",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_8",
+          "from": "n_tp_fw",
+          "fromPort": "out_fw_fw",
+          "to": "n_tp_boiler",
+          "toPort": "in_bo_fw",
+          "material": "feed_water",
+          "feedback": true
+        },
+        {
+          "id": "c_tp_9",
+          "from": "n_tp_boiler",
+          "fromPort": "out_bo_fg",
+          "to": "n_tp_dn",
+          "toPort": "in_dn_fg",
+          "material": "flue_gas",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_10",
+          "from": "n_tp_dn",
+          "fromPort": "out_dn_fgd",
+          "to": "n_tp_du",
+          "toPort": "in_du_fgd",
+          "material": "flue_gas_deno",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_11",
+          "from": "n_tp_du",
+          "fromPort": "out_du_fgc",
+          "to": "n_tp_ds",
+          "toPort": "in_ds_fgc",
+          "material": "flue_gas_clean",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_12",
+          "from": "n_tp_ds",
+          "fromPort": "out_ds_fgd2",
+          "to": "n_tp_sk",
+          "toPort": "in_sk_fgd",
+          "material": "flue_gas_desul",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_13",
+          "from": "n_tp_st",
+          "fromPort": "out_st_hs",
+          "to": "n_tp_hn",
+          "toPort": "in_hn_hs",
+          "material": "heating_steam",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_14",
+          "from": "n_tp_hn",
+          "fromPort": "out_hn_cd",
+          "to": "n_tp_fw",
+          "toPort": "in_fw_cd2",
+          "material": "condensate",
+          "feedback": true
+        },
+        {
+          "id": "c_tp_15",
+          "from": "n_tp_boiler",
+          "fromPort": "out_bo_ba",
+          "to": "n_tp_ah",
+          "toPort": "in_ah_ba",
+          "material": "bottom_ash",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_16",
+          "from": "n_tp_du",
+          "fromPort": "out_du_fa",
+          "to": "n_tp_ah",
+          "toPort": "in_ah_fa",
+          "material": "fly_ash",
+          "feedback": false
+        },
+        {
+          "id": "c_tp_17",
+          "from": "n_tp_ds",
+          "fromPort": "out_ds_gp",
+          "to": "n_tp_gy",
+          "toPort": "in_gy_gp",
+          "material": "gypsum",
+          "feedback": false
+        }
+      ],
+      "groups": [
+        {
+          "id": "g_tp_ch",
+          "name": "输煤制粉系统",
+          "x": -560,
+          "y": 60,
+          "members": [
+            "n_tp_ch",
+            "n_tp_mill"
+          ],
+          "inputs": [
+            {
+              "material": "coal"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "pulverized_coal"
+            }
+          ]
+        },
+        {
+          "id": "g_tp_boiler",
+          "name": "锅炉系统",
+          "x": -420,
+          "y": 60,
+          "members": [
+            "n_tp_boiler",
+            "n_tp_fd_fan",
+            "n_tp_id_fan",
+            "n_tp_pa_fan"
+          ],
+          "inputs": [
+            {
+              "material": "pulverized_coal"
+            },
+            {
+              "material": "combustion_air"
+            },
+            {
+              "material": "feed_water"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "main_steam"
+            },
+            {
+              "material": "flue_gas"
+            },
+            {
+              "material": "bottom_ash"
+            }
+          ]
+        },
+        {
+          "id": "g_tp_cd",
+          "name": "凝汽系统",
+          "x": 0,
+          "y": 60,
+          "members": [
+            "n_tp_cd",
+            "n_tp_cond_pump"
+          ],
+          "inputs": [
+            {
+              "material": "exhaust_steam"
+            },
+            {
+              "material": "cooling_water_supply"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "condensate"
+            },
+            {
+              "material": "cooling_water_return"
+            }
+          ]
+        },
+        {
+          "id": "g_tp_ct",
+          "name": "循环冷却水系统",
+          "x": 140,
+          "y": 60,
+          "members": [
+            "n_tp_ct",
+            "n_tp_circ_pump"
+          ],
+          "inputs": [
+            {
+              "material": "cooling_water_return"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "cooling_water_supply"
+            }
+          ]
+        },
+        {
+          "id": "g_tp_fw",
+          "name": "给水除氧系统",
+          "x": -420,
+          "y": 250,
+          "members": [
+            "n_tp_fw",
+            "n_tp_feed_pump"
+          ],
+          "inputs": [
+            {
+              "material": "condensate"
+            },
+            {
+              "material": "condensate"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "feed_water"
+            }
+          ]
+        },
+        {
+          "id": "g_tp_hn",
+          "name": "热网换热系统",
+          "x": -140,
+          "y": 250,
+          "members": [
+            "n_tp_hn",
+            "n_tp_heat_pump"
+          ],
+          "inputs": [
+            {
+              "material": "heating_steam"
+            },
+            {
+              "material": "heat_return"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "heat_supply"
+            },
+            {
+              "material": "condensate"
+            }
+          ]
+        },
+        {
+          "id": "g_tp_ds",
+          "name": "烟气脱硫系统",
+          "x": -20,
+          "y": -180,
+          "members": [
+            "n_tp_ds",
+            "n_tp_slurry_pump",
+            "n_tp_oxi_fan"
+          ],
+          "inputs": [
+            {
+              "material": "flue_gas_clean"
+            },
+            {
+              "material": "limestone_slurry"
+            }
+          ],
+          "outputs": [
+            {
+              "material": "flue_gas_desul"
+            },
+            {
+              "material": "gypsum"
+            }
+          ]
+        }
+      ],
+      "activeGroupId": null,
+      "structRev": 1
+    }
+  }
+]

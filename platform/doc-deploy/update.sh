@@ -14,7 +14,7 @@
 #         ④ 健康自检
 #
 # 用法（仓库根任一路径执行均可，脚本自动定位仓库根）：
-#   bash platform/update.sh docs                        # 文档站更新（推荐统一入口）
+#   ./update.sh docs                        # 文档站更新（推荐统一入口）
 #   bash platform/doc-deploy/update.sh                  # 直接调用
 #
 # 服务器免密说明：默认 BatchMode=yes 走 SSH 密钥；未配置密钥时可用
@@ -22,8 +22,8 @@
 # ============================================================================
 set -euo pipefail
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# 公共库（platform/lib.sh）：仓库根 ROOT / servers.conf / ssh_run / rsync_run / 标准排除列表
-. "$SELF_DIR/../lib.sh"
+# 公共库（仓库根 lib.sh）：仓库根 ROOT / servers.conf / ssh_run / rsync_run / 标准排除列表
+. "$SELF_DIR/../../lib.sh"
 cd "$ROOT"
 
 SERVER="${DOC_SERVER:-${PLATFORM_SSH:-root@36.151.146.71}}"   # 文档站随平台同机（servers.conf PLATFORM_SSH）

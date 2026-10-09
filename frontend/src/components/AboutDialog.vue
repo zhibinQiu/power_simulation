@@ -121,7 +121,7 @@ onMounted(() => {
   padding: 18px 30px 22px; display: flex; flex-direction: column; align-items: center; text-align: center; }
 
 .ab-head { width: 100%; display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.ab-title { font-size: 15px; font-weight: 700; letter-spacing: 1px; }
+.ab-title { font-size: var(--fs-xl); font-weight: 700; letter-spacing: 1px; }
 
 .ab-logo { width: 72px; height: 72px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border);
   box-shadow: 0 6px 18px rgba(0,0,0,.18); display: flex; align-items: center; justify-content: center;
@@ -158,7 +158,7 @@ onMounted(() => {
   letter-spacing: 1px; color: var(--text); background: transparent; border: none; outline: none; }
 .lic-input:focus { box-shadow: none; }
 .lic-input:disabled { opacity: .6; }
-.lic-go { flex: none; min-width: 72px; padding: 8px 0; font-size: 13px; font-family: var(--ui); border-radius: 4px;
+.lic-go { flex: none; min-width: var(--btn-min-w); align-self: stretch; padding: 0 var(--btn-pad-x-lg); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-family: var(--ui); border-radius: 4px;
   cursor: pointer; color: #fff; background: var(--accent); border: 1px solid var(--accent); }
 .lic-go:hover:not(:disabled) { background: var(--accent-d); border-color: var(--accent-d); }
 .lic-go:disabled { opacity: .5; cursor: not-allowed; }
@@ -170,7 +170,7 @@ onMounted(() => {
 .lic-msg.err { color: var(--red); background: rgba(188,59,48,.10); }
 
 .ab-foot { margin-top: 18px; width: 100%; display: flex; justify-content: flex-end; }
-.ab-ok { min-width: 96px; padding: 7px 0; font-size: 13px; font-family: var(--ui); border-radius: 4px; cursor: pointer;
+.ab-ok { min-width: var(--btn-min-w); min-height: var(--btn-h-lg); padding: 0 var(--btn-pad-x-lg); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-family: var(--ui); border-radius: 4px; cursor: pointer;
   color: var(--accent-d); background: transparent; border: 1px solid var(--accent); }
 .ab-ok:hover { color: #fff; background: var(--accent); border-color: var(--accent-d); }
 </style>

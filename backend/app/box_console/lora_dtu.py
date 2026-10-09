@@ -20,6 +20,12 @@ cmd/{box}/config 下发（盒子 mapper 有 config/config_get 分支：写盘后
 历史故障（本模块存在的理由）：这段生成逻辑曾整体丢失，于是平台改从站号只写进本地配置
 与云端 CRD，盒子 config.json 的 polls 不更新 —— 下发数据里根本没有问帧，设备长期无数据
 且无任何报错（表现为"现场终端离线"）。这里把生成口径固化并用单测锁住。
+
+**Modbus（RTU/TCP）直连设备同样在这里生成下发条目**：盒子 mapper 的取数配置只有一份
+config.json，平台改了从站号 / 串口 / 采集周期却不同步给盒子，就会出现"平台上从站号是 1、
+盒子还在按站 3 采集"的分叉 —— 设备静默无数据且查不出原因（2026-09-28 zhileng-power 即
+此坑：平台从站号 1→3 后 6 天无数据，盒子 config.json 里仍然是 3）。所以非 LoRa 设备也
+随同一次 cmd/{box}/config 下发，按 name 合并、只覆盖平台在管的字段。
 """
 from __future__ import annotations
 
@@ -32,6 +38,9 @@ from .. import mqtt_source
 from ._shared import _load_devices
 
 LORA_PROTOCOLS = ("lora", "lorawan")
+# 平台 protocol -> 盒子直连采集（非 LoRa）；其余协议（opcua/cellular/蓝牙）盒子侧
+# 为现场定制配置，平台不做下发，避免覆盖现场手调的参数。
+DIRECT_PROTOCOLS = ("modbus",)
 DEFAULT_FPORT = 10
 
 
@@ -229,6 +238,193 @@ def _base_entry(dev: Dict[str, Any], snap: Optional[Dict[str, Any]]) -> Dict[str
     }
 
 
+# ---------------------------------------------------------------------------
+# Modbus 直连设备条目（RTU/TCP）：平台 comm 参数 -> 盒子 config.json 的条目
+# ---------------------------------------------------------------------------
+def _skip_reg_type(rt: Any) -> bool:
+    """线圈 / 离散输入不是采集点位：盒子采集只支持 FC3/FC4，线圈只能做可写点位。
+
+    若把 coil 留在 points 里，mapper 会按「非 input 即 FC3」去读线圈地址，读回的是
+    同名地址的保持寄存器（张冠李戴的假数据），所以生成采集点位时必须跳过。
+    """
+    s = str(rt or "").strip().lower()
+    return s in ("coil", "coilregister", "discreteinput", "discreteinputregister")
+
+
+def _modbus_points(dev: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """平台点位 -> mapper 采集点位（registerAddr/registerCount/type/scale/fc）。"""
+    out: List[Dict[str, Any]] = []
+    for p in dev.get("properties") or []:
+        if not isinstance(p, dict):
+            continue
+        name = str(p.get("name") or "").strip()
+        rt = p.get("registerType")
+        if not name or _skip_reg_type(rt):
+            continue
+        try:
+            reg = int(p.get("register", p.get("registerAddr", 0)) or 0)
+        except (TypeError, ValueError):
+            reg = 0
+        try:
+            scale = float(p.get("scale", 1) or 1)
+        except (TypeError, ValueError):
+            scale = 1.0
+        try:
+            limit = int(p.get("limit", 1) or 1)
+        except (TypeError, ValueError):
+            limit = 1
+        mtype = _mapper_type(p.get("type"))
+        count = max(_reg_width(mtype), limit)
+        if count >= 2 and mtype == "int16":
+            mtype = "int32"      # 两个寄存器的整数按 int32 解，与盒子既有配置同口径
+        out.append({
+            "property": name,
+            "registerAddr": reg,
+            "registerCount": count,
+            "type": mtype,
+            "scale": scale,
+            "fc": 4 if "input" in str(rt or "").lower() else 3,
+        })
+    return out
+
+
+def _modbus_writes(dev: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """平台可写点位（accessMode 含 w）-> 盒子 writes[]（mapper 写命令的唯一依据）。
+
+    盒子的写命令（cmd/{box}/cmd write）只在 config.json 的 writes[] 里按 property 找点位，
+    找不到就直接报「设备 X 未配置可写点位 Y」；而平台侧根本没有独立的 writes 字段 ——
+    可写性只体现在点位的 accessMode=rw，界面「写设定」下拉也是按它列的。所以这一步
+    必须由下发派生，否则界面能选、命令能发、盒子一律拒绝（2026-09-28 zhileng-power /
+    fengshan-power 写 voltage_set 全部失败即此坑）。
+
+    换算口径与 mapper write_device_value 一致：
+      * points 的 scale 是「原始值 × scale = 工程值」，writes 的 scale 是其倒数
+        「工程值 × scale = 原始值」（voltage_set scale 0.01 → 100，下发 12V 写 1200）；
+      * min/max 平台侧是工程值，mapper 按寄存器原始值校验，须按同一 scale 换算
+        （0~24V → 0~2400）；
+      * 线圈（FC5）只能写 coilAddr，保持寄存器（FC6）写 registerAddr；
+      * 输入寄存器只读，标了 rw 也不生成（写了必然失败）。
+    """
+    out: List[Dict[str, Any]] = []
+    for p in dev.get("properties") or []:
+        if not isinstance(p, dict):
+            continue
+        name = str(p.get("name") or "").strip()
+        if not name:
+            continue
+        if "w" not in str(p.get("accessMode") or "r").strip().lower():
+            continue
+        rt = str(p.get("registerType") or "").strip().lower()
+        if "input" in rt:
+            continue
+        try:
+            reg = int(p.get("register", p.get("registerAddr", 0)) or 0)
+        except (TypeError, ValueError):
+            reg = 0
+        try:
+            scale = float(p.get("scale", 1) or 1) or 1.0
+        except (TypeError, ValueError):
+            scale = 1.0
+        item: Dict[str, Any] = {"property": name}
+        if _skip_reg_type(rt) and "coil" in rt:
+            item["kind"] = "coil"
+            item["coilAddr"] = reg
+        else:
+            item["kind"] = "holding"
+            item["registerAddr"] = reg
+            item["scale"] = round(1.0 / scale, 6)
+            for k in ("min", "max"):
+                v = p.get(k)
+                if v in (None, ""):
+                    continue
+                try:
+                    item[k] = int(round(float(v) / scale))
+                except (TypeError, ValueError):
+                    pass
+        out.append(item)
+    return out
+
+
+def _merge_writes(base: Optional[List[Dict[str, Any]]],
+                  derived: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """可写点位合并：平台派生项优先（平台是可写性的配置源），盒子独有的手配项保留。"""
+    out = [dict(w) for w in (derived or [])]
+    have = {str(w.get("property")) for w in out}
+    for w in base or []:
+        if isinstance(w, dict) and str(w.get("property")) not in have:
+            out.append(dict(w))
+    return out
+
+
+def _interval_of(dev: Dict[str, Any]) -> float:
+    try:
+        return float(int(dev.get("collectCycle") or 5000) / 1000.0)
+    except (TypeError, ValueError):
+        return 5.0
+
+
+def _direct_entry(dev: Dict[str, Any], snap: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Modbus 直连设备的下发条目：以盒子现配置为底稿，只覆盖平台在管的通信参数。
+
+    点位沿用盒子上正在跑的那份（现场常按寄存器实际口径手工调过），盒子没有该条目
+    时才按平台点位生成 —— 与 LoRa 条目同一条保守口径。
+    """
+    entry = json.loads(json.dumps(snap)) if snap else {}
+    comm = dev.get("comm") or {}
+    name = str(dev.get("name") or "").strip()
+    entry["name"] = name
+    entry["namespace"] = str(dev.get("namespace") or "default")
+    entry["interval"] = _interval_of(dev)
+    is_tcp = str(comm.get("commType") or "serial").strip().lower() in (
+        "tcp", "modbus-tcp", "ethernet", "modbustcp")
+    entry["protocol"] = "modbus-tcp" if is_tcp else "modbus-rtu"
+    if is_tcp:
+        entry.pop("serial", None)
+        tcp = dict(entry.get("tcp") or {})
+        tcp["host"] = str(comm.get("tcpIP") or tcp.get("host") or "").strip()
+        try:
+            tcp["port"] = int(comm.get("tcpPort") or tcp.get("port") or 502)
+        except (TypeError, ValueError):
+            tcp["port"] = 502
+        entry["tcp"] = tcp
+    else:
+        entry.pop("tcp", None)
+        serial = dict(entry.get("serial") or {})
+        serial["port"] = str(comm.get("serialPort") or serial.get("port") or "").strip()
+        try:
+            serial["baudrate"] = int(comm.get("baudRate") or serial.get("baudrate") or 9600)
+        except (TypeError, ValueError):
+            serial["baudrate"] = 9600
+        try:
+            serial["databits"] = int(comm.get("dataBits") or serial.get("databits") or 8)
+        except (TypeError, ValueError):
+            serial["databits"] = 8
+        parity = str(comm.get("parity") or "").strip().lower() or \
+            str(serial.get("parity") or "none").strip().lower()
+        serial["parity"] = {"even": "E", "odd": "O"}.get(parity[:1], "N")
+        try:
+            serial["stopbits"] = int(comm.get("stopBits") or serial.get("stopbits") or 1)
+        except (TypeError, ValueError):
+            serial["stopbits"] = 1
+        entry["serial"] = serial
+    mb = dict(entry.get("modbus") or {})
+    try:
+        mb["slaveId"] = int(comm.get("slaveID", comm.get("slaveId")) or 1)
+    except (TypeError, ValueError):
+        mb["slaveId"] = 1
+    mb.setdefault("byteOrder", "1234")
+    entry["modbus"] = mb
+    entry["points"] = entry.get("points") or _modbus_points(dev)
+    # 可写点位：平台按 accessMode=rw 派生，盒子手配的独有项保留（写命令只认 writes[]）
+    entry["writes"] = _merge_writes(entry.get("writes"), _modbus_writes(dev))
+    # 平台上有的设备就采集（没有「停用」这一档，不想采就在平台上删除，三端同步）
+    entry["enabled"] = True
+    hwid = str(dev.get("hwId") or "").strip()
+    if hwid:
+        entry["hwId"] = hwid
+    return entry
+
+
 def build_patches(devices: Optional[List[Dict[str, Any]]] = None,
                   snapshot: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """生成要下发到盒子的设备条目 + 变更说明。
@@ -268,7 +464,24 @@ def build_patches(devices: Optional[List[Dict[str, Any]]] = None,
     for d in devices or []:
         if not isinstance(d, dict):
             continue
-        if str(d.get("protocol") or "").strip().lower() not in LORA_PROTOCOLS:
+        proto = str(d.get("protocol") or "").strip().lower()
+        if proto not in LORA_PROTOCOLS:
+            # Modbus 直连设备：平台改了从站号/串口/周期必须同步给盒子，否则平台与盒子
+            # 各采各的（平台显示"已配置"、盒子仍按旧从站号取数，设备静默无数据）。
+            if proto not in DIRECT_PROTOCOLS:
+                continue
+            name = str(d.get("name") or "").strip()
+            if not name:
+                continue
+            entry = _direct_entry(d, snap_by_name.get(name))
+            slave = int((entry.get("modbus") or {}).get("slaveId") or 0)
+            port = str((entry.get("serial") or {}).get("port") or
+                       (entry.get("tcp") or {}).get("host") or "")
+            changes.append("%s: %s %s 从站%d，%d 个点位，%d 个可写点位" % (
+                name, "TCP" if entry.get("protocol") == "modbus-tcp" else "RTU",
+                port, slave, len(entry.get("points") or []),
+                len(entry.get("writes") or [])))
+            patches.append(entry)
             continue
         name = str(d.get("name") or "").strip()
         lora = dict(d.get("lora") or {})
@@ -415,7 +628,8 @@ def push_lora_config(box: str = "", dry_run: bool = False, timeout: float = 8.0)
 
     if not patches and not remove:
         return {"ok": True, "box": box, "applied": False, "changes": [],
-                "note": "没有 LoRa 采集设备，无需下发", "plan": built["plan"]}
+                "note": "没有需要下发的采集设备（LoRa / Modbus），无需下发",
+                "plan": built["plan"]}
     if dry_run:
         return {"ok": True, "box": box, "dryRun": True, "changes": built["changes"],
                 "patches": built["patches"], "remove": sorted(set(remove)),

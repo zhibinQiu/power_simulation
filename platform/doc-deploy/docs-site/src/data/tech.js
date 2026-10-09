@@ -68,7 +68,7 @@ backend/
   │  ├─ api/                 # REST 路由（overview / devices / box_router / help / tsdb 等）
   │  ├─ services/            # 业务服务层（部署、报告、行情、优化等）
   │  └─ models.py            # 前后端数据契约（Pydantic）
-  ├─ config/                 # 统一配置目录：requirements.txt / run.sh / .env（LLM 密钥，不入库）/ strategies.json
+  ├─ config/                 # 统一配置目录：requirements.txt / .env（LLM 密钥，不入库）/ strategies.json
   └─ data/reports/           # 历史报告输出
 
 ## 三、数据流

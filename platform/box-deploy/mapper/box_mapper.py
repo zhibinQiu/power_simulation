@@ -151,6 +151,70 @@ SERVICES_INTERVAL = int(os.environ.get("SERVICES_INTERVAL", 30))
 # （盒子运行期无 IP、无法远程运维，必须全自动自愈，不依赖人工干预）
 HEALTH_INTERVAL = int(os.environ.get("HEALTH_INTERVAL", 30))
 
+# DMI twin 上报节流（2026-09-28 修复「断电上电后终端无法自动上线」）：
+# KubeEdge devicetwin 是「每个点位一条内部消息」，点位多 + 周期短会把 edgecore 的
+# twin 消息通道彻底打满（本机实测 33.6 条/秒、120s 溢出 1243 条）。通道满后 EdgeHub
+# 的云边同步消息排不进去 → 节点状态/心跳同步失败、device update 拿不到 ack →
+# 平台显示终端未就绪；断电上电时 edgecore 正要重新注册，通道一上来就被淹没，
+# 于是表现为「上电后一直上不了线」。
+# 平台在线判定与历史曲线走 MQTT data/#（保持实时），DMI twins 只需低频刷新。
+# 设为 0 可关闭节流（恢复旧的每轮全量上报）。
+DMI_MIN_INTERVAL = float(os.environ.get("DMI_MIN_INTERVAL", 15))
+# 值全部未变时的强制全量刷新间隔：保证云端 twins 不会因「值没变就不报」而永久不更新
+DMI_FORCE_INTERVAL = float(os.environ.get("DMI_FORCE_INTERVAL", 300))
+# 连续上报失败（设备未在边缘注册 / 被限流）达到该次数后，冷却一段时间不再尝试，
+# 避免对不存在的设备持续刷无效消息
+DMI_FAIL_MAX = int(os.environ.get("DMI_FAIL_MAX", 3))
+DMI_FAIL_COOLDOWN = float(os.environ.get("DMI_FAIL_COOLDOWN", 300))
+
+_DMI_STATE = {}
+_DMI_LOCK = threading.Lock()
+
+
+def _dmi_plan(name, twins):
+    """决定本轮 DMI 实际要上报的点位；返回 None 表示本轮跳过 DMI（MQTT 仍实时上报）。
+
+    - 优先只报**发生变化**的点位：像校准系数这类恒定值没必要每轮同步，
+      实测这一步就能把 13 点位的电源设备从每轮 13 条降到个位数。
+    - 距上次上报不足 DMI_MIN_INTERVAL 秒则跳过（控制消息节拍）。
+    - 值全部未变时，每 DMI_FORCE_INTERVAL 秒强制全量刷新一次。
+    """
+    if DMI_MIN_INTERVAL <= 0:
+        return twins
+    now = time.time()
+    with _DMI_LOCK:
+        st = _DMI_STATE.setdefault(name, {"last": 0.0, "fails": 0, "until": 0.0, "vals": {}})
+        if now < st.get("until", 0.0):
+            return None
+        vals = st["vals"]
+        changed = [t for t in twins if vals.get(t.propertyName) != t.reported.value]
+        age = now - st.get("last", 0.0)
+        if changed and age >= DMI_MIN_INTERVAL:
+            return changed
+        if not changed and age >= DMI_FORCE_INTERVAL:
+            return twins
+        return None
+
+
+def _dmi_done(name, ok, twins=None):
+    """记录一次 DMI 上报结果：成功刷新节拍并记住已上报的值，失败累加并冷却。"""
+    now = time.time()
+    with _DMI_LOCK:
+        st = _DMI_STATE.setdefault(name, {"last": 0.0, "fails": 0, "until": 0.0, "vals": {}})
+        # 失败也要刷新节拍，否则失败后会立刻重试，反而刷爆通道
+        st["last"] = now
+        if ok:
+            st["fails"] = 0
+            st["until"] = 0.0
+            if twins:
+                for t in twins:
+                    st["vals"][t.propertyName] = t.reported.value
+        else:
+            st["fails"] += 1
+            if st["fails"] >= DMI_FAIL_MAX:
+                st["until"] = now + DMI_FAIL_COOLDOWN
+                st["fails"] = 0
+
 
 def _load_devices(cfg):
     """读取设备列表。配置格式唯一：顶层 devices 数组（见 mapper/config.json 模板）。"""
@@ -1907,22 +1971,27 @@ def report_device(stub, device, values):
     ts = time.time()
     twins = _build_twins(device, values, ts * 1000)
     dmi_ok = False
-    if stub is not None and twins:
+    name = device.get("name")
+    # DMI 走节流 + 变化点位过滤：twin 消息按点位展开，全量实时上报会打满 edgecore
+    # 的 twin 通道（见 DMI_MIN_INTERVAL 注释）；MQTT 通道不受影响，始终实时。
+    dmi_twins = _dmi_plan(name, twins) if (stub is not None and twins) else None
+    if dmi_twins:
         try:
             stub.ReportDeviceStatus(pb.ReportDeviceStatusRequest(
-                deviceName=device.get("name"),
+                deviceName=name,
                 deviceNamespace=device.get("namespace", "default"),
                 reportedDevice=pb.DeviceStatus(
-                    twins=twins,
+                    twins=dmi_twins,
                     reportToCloud=True,
                     reportCycle=int(float(device.get("interval", 1.0)) * 1000),
                 ),
             ))
             dmi_ok = True
         except grpc.RpcError as e:
-            print("[warn] [%s] ReportDeviceStatus 失败: %s" % (device.get("name"), e))
+            print("[warn] [%s] ReportDeviceStatus 失败: %s" % (name, e))
         except Exception as e:
-            print("[warn] [%s] 上报异常: %s" % (device.get("name"), e))
+            print("[warn] [%s] 上报异常: %s" % (name, e))
+        _dmi_done(name, dmi_ok, dmi_twins)
     mqtt_ok = mqtt_publish_realtime(device, values, ts)
     if not mqtt_ok:
         # 仅缓存 MQTT 未送达的数据：MQTT 是带真实时间戳回填历史的通道，
@@ -1969,12 +2038,17 @@ def flush_cache(stub):
                     twins = _build_twins(device, props, rows[-1][0] * 1000)
                     if not twins:
                         continue
+                    # 同样走 DMI 节流 + 变化过滤：断连期间按批补传会瞬间灌入大量点位级消息
+                    twins = _dmi_plan(dev, twins)
+                    if not twins:
+                        continue
                     stub.ReportDeviceStatus(pb.ReportDeviceStatusRequest(
                         deviceName=dev,
                         deviceNamespace="default",
                         reportedDevice=pb.DeviceStatus(
                             twins=twins, reportToCloud=True, reportCycle=1000),
                     ))
+                    _dmi_done(dev, True, twins)
                 dmi_ok = True
             except grpc.RpcError as e:
                 dmi_ok = False

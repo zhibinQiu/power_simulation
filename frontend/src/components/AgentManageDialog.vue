@@ -142,7 +142,7 @@ onMounted(load)
 .am-mask { position: fixed; inset: 0; background: rgba(16,24,34,.5); z-index: 300; display: flex; align-items: center; justify-content: center; }
 .am-modal { width: 900px; max-width: 95vw; height: 80vh; background: var(--panel); color: var(--text); border-radius: 6px; border: 1px solid var(--border); display: flex; flex-direction: column; box-shadow: 0 18px 50px rgba(0,0,0,.35); overflow: hidden; }
 .am-head { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, var(--panel)), var(--panel)); }
-.am-title { font-weight: 700; font-size: 15px; letter-spacing: 1px; }
+.am-title { font-weight: 700; font-size: var(--fs-xl); letter-spacing: 1px; }
 .am-sub { flex: 1; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .am-body { flex: 1; display: flex; min-height: 0; }
 .am-list { width: 300px; border-right: 1px solid var(--border); overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
@@ -151,16 +151,16 @@ onMounted(load)
 .am-item.on { background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .am-emoji { font-size: 20px; line-height: 1.3; }
 .am-meta { flex: 1; min-width: 0; }
-.am-name { font-weight: 600; font-size: 13.5px; display: flex; align-items: center; gap: 6px; color: var(--text); }
+.am-name { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px; color: var(--text); }
 .am-badge { font-style: normal; font-size: 10px; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 4px; }
-.am-desc { display: block; font-size: 11.5px; color: var(--faint); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.am-new { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px; border: 1px dashed var(--border); border-radius: 6px; background: none; color: var(--accent); cursor: pointer; font-size: 13px; }
-.am-new:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.am-desc { display: block; font-size: 12px; color: var(--faint); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.am-new { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 var(--btn-pad-x-lg); min-height: var(--btn-h-lg); border: 1px solid transparent; border-radius: 6px; background: var(--btn-bg); color: var(--accent); cursor: pointer; font-size: 13px; }
+.am-new:hover { background: var(--btn-bg-hover); }
 .am-editor { flex: 1; overflow: auto; padding: 18px 22px; }
 .am-empty { display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 13px; }
 .am-field { margin-bottom: 16px; }
 .am-label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 6px; color: var(--text); }
-.am-hint { font-weight: 400; color: var(--faint); font-size: 11.5px; margin-left: 8px; }
+.am-hint { font-weight: 400; color: var(--faint); font-size: 12px; margin-left: 8px; }
 .am-row2 { display: flex; gap: 8px; }
 .am-emoji-input { width: 64px; text-align: center; }
 .am-input { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel-2); color: var(--text); font-size: 13px; }

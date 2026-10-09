@@ -27,6 +27,8 @@
           <div class="chip2"><span>{{ t('总功耗') }}</span><b>{{ fmt(totals.energy / 1000, 3) }}</b><i>MW</i></div>
           <div class="chip2"><span>{{ t('总碳排') }}</span><b>{{ fmt(totals.carbon) }}</b><i>kgCO₂/h</i></div>
           <div class="chip2"><span>{{ t('折碳总量') }}</span><b>{{ fmt(totals.carbon / 1000, 3) }}</b><i>tCO₂/h</i></div>
+          <div v-if="totals.direct > 0" class="chip2"><span>{{ t('范围一 · 直接排放') }}</span><b>{{ fmt(totals.direct, 3) }}</b><i>tCO₂/h</i></div>
+          <div v-if="totals.direct > 0" class="chip2"><span>{{ t('范围二 · 耗电间接排放') }}</span><b>{{ fmt(totals.indirect, 3) }}</b><i>tCO₂/h</i></div>
         </div>
         <div class="pr-hint">{{ methodHint }}</div>
       </CollapseSection>
@@ -72,8 +74,17 @@
           <div class="chip2"><span>{{ t('设定功率') }}</span><b>{{ fmt(packKwNow / 1000, 3) }}</b><i>MW</i></div>
           <div class="chip2"><span>{{ t('实时功耗') }}</span><b>{{ fmt(powerKwNow) }}</b><i>kW</i></div>
           <div class="chip2"><span>{{ t('实时碳排') }}</span><b>{{ fmt(carbonKgH, 3) }}</b><i>kgCO₂/h</i></div>
+          <div v-if="directT > 0" class="chip2"><span>{{ t('直接排放') }}</span><b>{{ fmt(directT, 3) }}</b><i>tCO₂/h</i></div>
         </div>
         <div class="kv2"><span>{{ t('折碳总量') }}</span><b>{{ fmt(carbonKgH / 1000, 4) }} <span class="u">tCO₂/h</span></b></div>
+        <template v-if="directT > 0">
+          <div class="kv2"><span>{{ t('范围一 · 直接排放') }}</span><b>{{ fmt(directT, 4) }} <span class="u">tCO₂/h</span></b></div>
+          <div v-for="d in directItems" :key="d.label" class="kv2">
+            <span>{{ d.label }}<i class="u"> · {{ fmt(d.amount, 2) }} {{ d.unit || 't/h' }}</i></span>
+            <b>{{ fmt(d.co2, 4) }} <span class="u">tCO₂/h</span></b>
+          </div>
+          <div class="kv2"><span>{{ t('范围二 · 耗电间接排放') }}</span><b>{{ fmt(Math.max(0, carbonKgH / 1000 - directT), 4) }} <span class="u">tCO₂/h</span></b></div>
+        </template>
         <div class="kv2"><span>{{ t('功率口径') }}</span><b>{{ powerSrcText }}</b></div>
         <div v-for="s in powerSources" :key="s.id" class="kv2">
           <span>{{ s.label }}<i class="u">{{ s.device ? ' · ' + s.device + (s.prop ? ' · ' + s.prop : '') : ' · ' + t(s.src === 'sim' ? '随机模拟值' : (s.src === 'device' ? '数据源管理设备' : '固定值')) }}</i></span>
@@ -126,7 +137,13 @@
           <div v-for="ag in attachGroups" :key="ag.kind" class="ports-col">
             <span class="pc-t">{{ ag.label }}（{{ t('已绑') }} {{ attachedOf(ag.kind).length }}）</span>
             <div v-for="att in attachedOf(ag.kind)" :key="att.uid" class="gio-row att-row">
-              <span class="att-lbl" :title="att.kind === 'sensor' ? (t('数据源：') + srcTextOf(att)) : t('设定值：只调运行工况，不参与取数')">{{ att.label }}</span>
+              <!-- 名称：默认按类型自动命名，点击即可改成业务名称（随方案持久化，设备树 / 数据分析同步） -->
+              <input v-if="nameEditUid === att.uid" :ref="setNameEditEl" class="att-lbl att-nm-in" :value="nmShow(att)"
+                     @input="onAttNameInput(att, $event.target.value)" @change="commitAttName(att, $event.target.value)"
+                     @blur="commitAttName(att, $event.target.value)" @keyup.enter="$event.target.blur()"
+                     @keyup.esc="cancelAttName(att)" />
+              <span v-else class="att-lbl editable" @click="startAttNameEdit(att)"
+                    :title="(att.kind === 'sensor' ? (t('数据源：') + srcTextOf(att)) : t('设定值：只调运行工况，不参与取数')) + '　' + t('点击修改名称')">{{ attLabelOf(att) }}</span>
               <!-- 传感器：当前读数 + 功率型标记（功率型 = 本工序折碳的功率来源）；
                    可变设备不取数——它的值就是设定值 -->
               <span v-if="att.kind === 'sensor'" class="att-rd" :title="t('当前读数（数据源：{src}）', { src: srcTextOf(att) })">
@@ -166,7 +183,7 @@
                 <optgroup v-if="att.kind === 'sensor' && attachedOf('adjustable').length"
                           :label="t('随附加可调设备联动')">
                   <option v-for="rk in attachedOf('adjustable')" :key="'lk' + rk.uid" :value="'attach::' + rk.uid">
-                    {{ t('随「{name}」变化', { name: rk.label }) }}
+                    {{ t('随「{name}」变化', { name: attLabelOf(rk) }) }}
                   </option>
                 </optgroup>
                 <optgroup v-if="att.src === 'param'" :label="t('工艺参数')">
@@ -193,6 +210,14 @@
                 <span class="api-tt">{{ it.label }}</span>
                 <span class="api-u">{{ ag.unitOf(it) }}</span>
               </button>
+            </div>
+            <!-- 选中类型后先填名称再确认：名称即该设备在资源管理器 / 数据分析中的显示名 -->
+            <div v-if="addDraft.kind === ag.kind" class="att-new-row">
+              <span class="att-nm-t">{{ t('名称') }}</span>
+              <input :ref="setNewNameEl" class="att-nm-in" v-model="addDraft.name" :placeholder="t('为该设备命名（留空用类型名）')"
+                     @keyup.enter="confirmAddAttach()" @keyup.esc="addDraft.kind = ''" />
+              <button class="att-nm-btn ok" :title="t('确定添加')" @click="confirmAddAttach()">{{ t('确定') }}</button>
+              <button class="att-nm-btn" :title="t('取消')" @click="addDraft.kind = ''">{{ t('取消') }}</button>
             </div>
           </div>
           <div class="pr-hint">{{ t('能碳口径：本工序附加的「电功率传感器（kW）」的读数即折碳功率来源（可绑定数据源管理的采集设备点位取实测值，或设为随可变设备联动）；可变设备的设定值只调运行工况、不参与折碳。') }}</div>
@@ -236,7 +261,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, reactive, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { t } from '../i18n'
 import CollapseSection from './CollapseSection.vue'
@@ -258,7 +283,12 @@ const groupMembers = computed(() => {
 // ---- 总览 ----
 const totals = computed(() => {
   const b = store.baseline?.totals || {}
-  return { carbon: Number(b.carbon) || 0, energy: Number(b.energy) || 0 }
+  return {
+    carbon: Number(b.carbon) || 0,
+    energy: Number(b.energy) || 0,
+    direct: Number(b.co2_direct) || 0,      // 范围一（燃料燃烧 / 工业过程）
+    indirect: Number(b.co2_indirect) || 0,  // 范围二（耗电折碳）
+  }
 })
 const methodHint = computed(() => {
   const m = dict.value?.method
@@ -340,6 +370,13 @@ const carbonKgH = computed(() => {
   if (u && isFinite(Number(u.carbon))) return Number(u.carbon)
   return powerKwNow.value * store._gridFactorKg()
 })
+// 范围一直接排放（tCO₂/h）：燃料燃烧 / 工业过程，由包内工序 emissions 声明计算（未声明则为 0）
+const directT = computed(() => {
+  const u = baseUnit.value
+  const v = u && u.co2_direct != null ? Number(u.co2_direct) : NaN
+  return isFinite(v) ? v : 0
+})
+const directItems = computed(() => (baseUnit.value && Array.isArray(baseUnit.value.directItems)) ? baseUnit.value.directItems : [])
 // 附加设备的当前读数：只有传感器取数（id = ext::节点::attUid，与设备树 / 详情面板同源）；
 // 可变设备不取数——它的值就是设定值。
 function sensorValOf(att) {
@@ -459,10 +496,52 @@ function onAttFactor(att, v) {
   delete fxDraft[att.uid]
   store.setAttachFactor(node.value.id, att.uid, v)
 }
+// 附加设备的显示名（实例 label > 模板类型名）
+function attLabelOf(att) {
+  const tp = attTplOf(att)
+  return att.label || (tp ? tp.label : att.type)
+}
+// 行内改名：默认只读展示，点击切换成输入框（遥测每帧刷新，边输入边预览、失焦/回车提交）
+const nameEditUid = ref('')
+// 用函数 ref 取 DOM：这些输入框位于 v-for 内，普通 ref 会被收集成数组
+const nameEditEl = ref(null)
+const setNameEditEl = (el) => { nameEditEl.value = el }
+const nmDraft = reactive({})
+const nmShow = (att) => (nmDraft[att.uid] != null ? nmDraft[att.uid] : attLabelOf(att))
+async function startAttNameEdit(att) {
+  nameEditUid.value = att.uid
+  await nextTick()
+  const el = nameEditEl.value
+  if (el) { el.focus(); el.select() }
+}
+function onAttNameInput(att, v) {
+  if (!node.value) return
+  nmDraft[att.uid] = v
+  store.renameAttach(node.value.id, att.uid, v, true)
+}
+function commitAttName(att, v) {
+  if (!node.value) return
+  delete nmDraft[att.uid]
+  store.renameAttach(node.value.id, att.uid, String(v == null ? '' : v).trim())
+  nameEditUid.value = ''
+}
+function cancelAttName(att) {
+  delete nmDraft[att.uid]
+  if (node.value) store.renameAttach(node.value.id, att.uid, attLabelOf(att))
+  nameEditUid.value = ''
+}
 // 添加面板：按钮展开 / 收起（切换工序节点时收起，避免残留展开态）
 const addOpen = ref('')
-function toggleAdd(kind) { addOpen.value = addOpen.value === kind ? '' : kind }
-watch(node, () => { addOpen.value = '' })
+// 待添加项：先选类型 → 填名称 → 确定（名称为该设备的业务显示名，可留空用类型名）
+const addDraft = reactive({ kind: '', type: '', name: '' })
+const newNameEl = ref(null)
+const setNewNameEl = (el) => { newNameEl.value = el }
+function toggleAdd(kind) {
+  if (addOpen.value === kind) { addOpen.value = ''; addDraft.kind = ''; return }
+  addOpen.value = kind
+  addDraft.kind = ''
+}
+watch(node, () => { addOpen.value = ''; addDraft.kind = ''; nameEditUid.value = '' })
 function linkRefSpOf(att) {
   const ref = linkRefOf(att)
   if (!ref) return 0
@@ -475,7 +554,7 @@ function linkTextOf(att) {
   const ref = linkRefOf(att)
   const s = att.scale || {}
   const ru = ref ? attUnitOf(ref) : ''
-  return t('随「{name}」联动', { name: ref ? ref.label : '—' }) + '：' + (s.from != null ? s.from : '—') + ' ' + ru
+  return t('随「{name}」联动', { name: ref ? attLabelOf(ref) : '—' }) + '：' + (s.from != null ? s.from : '—') + ' ' + ru
     + ' → ' + (s.to != null ? s.to : '—') + ' ' + attUnitOf(att)
 }
 function srcTextOf(att) {
@@ -487,18 +566,34 @@ function srcTextOf(att) {
   if (att.src === 'attach') return linkTextOf(att)
   return t(att.src === 'sim' ? '随机模拟值' : '固定值')
 }
-function onAddAttach(kind, type) {
+function onAddAttach(kind, type, name) {
   if (!type || !node.value) return
-  const att = store.addAttachToNode(node.value.id, kind, type)
+  const att = store.addAttachToNode(node.value.id, kind, type, name)
   if (!att) return
   store.toast = kind === 'sensor'
     ? t('已为工艺「{name}」添加传感「{label}」：数据源默认随机模拟值，可切换为固定值 / 数据源管理中的传感器设备 / 随可变设备联动', { name: node.value.name, label: att.label })
     : t('已为工艺「{name}」添加可变设备「{label}」：其数值为设定值（只调工况、不参与取数）；实际功率请在「传感器」中添加电功率传感器', { name: node.value.name, label: att.label })
 }
-// 从展开的模板清单中添加
-function pickAttach(kind, type) {
-  onAddAttach(kind, type)
+// 从展开的模板清单中选中类型：先填名称（默认「类型名 + 实例序号」，可直接改成业务名称）再确认
+async function pickAttach(kind, type) {
+  const n = node.value
+  if (!n) return
+  const tpl = (ATTACH_MAP[kind] || {})[type]
+  const base = tpl ? tpl.label : type
+  const same = (n.attached || []).filter((a) => a.type === type).length
+  addDraft.kind = kind
+  addDraft.type = type
+  addDraft.name = same ? `${base}${same + 1}` : base
   addOpen.value = ''
+  await nextTick()
+  const el = newNameEl.value
+  if (el) { el.focus(); el.select() }
+}
+function confirmAddAttach() {
+  const { kind, type, name } = addDraft
+  addDraft.kind = ''
+  if (!kind || !type) return
+  onAddAttach(kind, type, name)
 }
 function onAttSrc(att, v) {
   if (!node.value) return
@@ -534,7 +629,7 @@ const setpointUnit = computed(() => node.value?.range?.unit || '')
 .lrow.active { color: var(--accent-d); }
 .l-stack { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .l-tt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.l-sub { font-size: 10.5px; color: var(--muted); }
+.l-sub { font-size: 11px; color: var(--muted); }
 .l-trail { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .u { font-size: 10px; color: var(--muted); font-style: normal; }
 .empty { font-size: 11px; color: var(--muted); padding: 8px 0; }
@@ -548,25 +643,39 @@ const setpointUnit = computed(() => node.value?.range?.unit || '')
 .pc-dot.out { background: var(--accent2); }
 .param-row { margin-bottom: 8px; }
 .param-row:last-child { margin-bottom: 0; }
-.pr-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 11.5px; margin-bottom: 4px; }
+.pr-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; margin-bottom: 4px; }
 .pr-top b { color: var(--text); font-weight: 400; font-variant-numeric: tabular-nums; }
 .pr-val-wrap { display: inline-flex; align-items: center; gap: 6px; }
 .num { width: 100%; }
 .gio-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .att-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .att-lbl { flex: 1 1 56px; min-width: 0; font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 名称可点击编辑：悬停即提示，点击切换为输入框 */
+.att-lbl.editable { cursor: text; border-bottom: 1px dashed transparent; }
+.att-lbl.editable:hover { color: var(--accent-d); border-bottom-color: var(--accent-l); }
+.att-nm-in { flex: 1 1 64px; min-width: 0; font-size: 11px; padding: 2px 4px; border: 1px solid var(--accent-d);
+  border-radius: 2px; background: var(--input, var(--bg)); color: var(--text); }
+.att-nm-in:focus { outline: none; box-shadow: 0 0 0 1px var(--accent-l); }
+/* 添加时的名称行：名称 + 确定 / 取消 */
+.att-new-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.att-new-row .att-nm-in { flex: 1 1 auto; }
+.att-nm-t { flex: 0 0 auto; font-size: 11px; color: var(--muted); }
+.att-nm-btn { flex: 0 0 auto; font-size: 11px; padding: 2px 8px; cursor: pointer; color: var(--text);
+  border: 1px solid var(--border); background: var(--panel-2); border-radius: 2px; }
+.att-nm-btn:hover { border-color: var(--accent-d); color: var(--accent-d); }
+.att-nm-btn.ok { color: var(--accent-d); border-color: var(--accent-l); }
 .att-rd { flex: 0 0 auto; font-size: 10px; color: var(--accent-d); white-space: nowrap; }
 .att-rd b { font-weight: 400; font-variant-numeric: tabular-nums; }
-.att-kw { flex: 0 0 auto; font-size: 9.5px; color: #b26a00; border: 1px solid rgba(178,106,0,.45); border-radius: 2px; padding: 0 3px; }
+.att-kw { flex: 0 0 auto; font-size: 10px; color: #b26a00; border: 1px solid rgba(178,106,0,.45); border-radius: 2px; padding: 0 3px; }
 .att-src { flex: 1 1 92px; min-width: 66px; font-size: 11px; padding: 3px 4px; border: 1px solid var(--line); border-radius: 2px; background: var(--panel); color: var(--text); }
 .att-sp { flex: 0 0 auto; width: 64px; font-size: 11px; padding: 3px 4px; border: 1px solid var(--line); border-radius: 2px; background: var(--panel); color: var(--text); }
 .att-fx { flex: 0 0 auto; width: 48px; font-size: 11px; padding: 3px 4px; border: 1px dashed var(--line); border-radius: 2px; background: var(--panel); color: var(--text); }
 .att-add-row { display: flex; margin-top: 2px; }
 /* 添加按钮 + 模板清单（替代原「未选择即为空」的下拉，语义明确：先点按钮再选型） */
-.att-add-btn { flex: 1; font-size: 11px; padding: 4px 6px; cursor: pointer; color: var(--accent2);
-  border: 1px dashed var(--accent2); background: transparent; border-radius: 2px; }
-.att-add-btn:hover { background: rgba(95,130,148,.10); }
-.att-add-btn.on { border-style: solid; background: rgba(95,130,148,.14); }
+.att-add-btn { flex: 0 0 auto; font-size: 11px; padding: 0 var(--btn-pad-x); min-height: var(--btn-h); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--accent2);
+  border: 1px solid transparent; background: var(--btn-bg); border-radius: 2px; }
+.att-add-btn:hover { background: var(--btn-bg-hover); }
+.att-add-btn.on { background: rgba(95,130,148,.14); }
 .att-pick { margin-top: 4px; border: 1px solid var(--line); border-radius: 2px; background: var(--panel-3); max-height: 190px; overflow: auto; }
 .att-pick-hd { font-size: 10px; color: var(--muted); padding: 4px 6px; border-bottom: 1px solid var(--line); }
 .att-pick-item { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%;
@@ -574,6 +683,6 @@ const setpointUnit = computed(() => node.value?.range?.unit || '')
 .att-pick-item + .att-pick-item { border-top: 1px solid var(--line); }
 .att-pick-item:hover { background: rgba(95,130,148,.14); color: var(--accent-d); }
 .att-pick-item .api-u { font-size: 10px; color: var(--muted); }
-.del-node { margin-top: 10px; width: 100%; padding: 6px; font-size: 11.5px; color: #c0453c; background: transparent; border: 1px dashed rgba(192, 69, 60, 0.55); border-radius: 4px; cursor: pointer; }
+.del-node { margin-top: 10px; width: auto; align-self: flex-start; padding: 0 var(--btn-pad-x); min-height: var(--btn-h); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: #c0453c; background: var(--btn-bg); border: 1px solid rgba(192, 69, 60, 0.55); border-radius: 4px; cursor: pointer; }
 .del-node:hover { background: rgba(192, 69, 60, 0.08); }
 </style>

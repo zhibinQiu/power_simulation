@@ -1,0 +1,232 @@
+{
+  "schema": {
+    "coal_handling": [
+      {
+        "key": "power",
+        "label": "制粉系统功率",
+        "unit": "MW",
+        "min": 0,
+        "max": 10,
+        "step": 0.1,
+        "kind": "config",
+        "ref": "磨煤机+给煤机+输煤皮带额定（660MW 机组约 3~4 MW）"
+      }
+    ],
+    "boiler": [
+      {
+        "key": "coal_rate",
+        "label": "入炉煤量",
+        "unit": "t/h",
+        "min": 20,
+        "max": 400,
+        "step": 5,
+        "kind": "config",
+        "ref": "660MW 超超临界额定工况约 250~265 t/h：按本包原煤 20.9 GJ/t 折发电标煤耗 ~275 gce/kWh（毛效率 ~44.6%），换煤质须按热值等比折算"
+      },
+      {
+        "key": "power",
+        "label": "风机辅机功率",
+        "unit": "MW",
+        "min": 0,
+        "max": 30,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "送风机+引风机+一次风机合计（负荷越低、变频改造后越小）"
+      }
+    ],
+    "steam_turbine": [
+      {
+        "key": "steam_rate",
+        "label": "主蒸汽流量",
+        "unit": "t/h",
+        "min": 300,
+        "max": 3200,
+        "step": 50,
+        "kind": "config",
+        "ref": "660MW 超超临界约 1900 t/h"
+      },
+      {
+        "key": "power",
+        "label": "辅机功率",
+        "unit": "MW",
+        "min": 0,
+        "max": 5,
+        "step": 0.1,
+        "kind": "config",
+        "ref": "润滑油泵/盘车等辅助负荷"
+      }
+    ],
+    "generator": [
+      {
+        "key": "output",
+        "label": "发电功率",
+        "unit": "MW",
+        "min": 50,
+        "max": 1300,
+        "step": 10,
+        "kind": "config",
+        "ref": "机组铭牌出力（300/660/1000MW 级）"
+      },
+      {
+        "key": "power",
+        "label": "辅助用电",
+        "unit": "MW",
+        "min": 0,
+        "max": 5,
+        "step": 0.1,
+        "kind": "config",
+        "ref": "励磁/氢冷/控制等辅助负荷"
+      }
+    ],
+    "condenser": [
+      {
+        "key": "power",
+        "label": "真空系统功率",
+        "unit": "MW",
+        "min": 0,
+        "max": 5,
+        "step": 0.1,
+        "kind": "config",
+        "ref": "真空泵/凝结水泵辅助负荷"
+      }
+    ],
+    "cooling_tower": [
+      {
+        "key": "power",
+        "label": "循环水泵功率",
+        "unit": "MW",
+        "min": 0,
+        "max": 15,
+        "step": 0.1,
+        "kind": "config",
+        "ref": "循环水泵+冷却塔风机（变频改造的主要节电对象，P ∝ n³）；660MW 机额定约 6~7 MW，对应循环水量约 9 万 t/h、凝汽器温升约 10 ℃"
+      }
+    ],
+    "feedwater": [
+      {
+        "key": "power",
+        "label": "给水泵功率",
+        "unit": "MW",
+        "min": 0,
+        "max": 30,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "电动给水泵（汽动给水泵方案此项可大幅下降）"
+      }
+    ],
+    "denitration": [
+      {
+        "key": "reagent_rate",
+        "label": "还原剂耗量",
+        "unit": "t/h",
+        "min": 0,
+        "max": 5,
+        "step": 0.1,
+        "kind": "config",
+        "ref": "液氨（纯 NH₃）耗量口径：按入口 NOx 450 mg/Nm³、脱除至 50 mg/Nm³、NSR≈0.95 估算约 0.33 t/h；若喷尿素溶液按 1.7 倍折算（~0.56 t/h）"
+      },
+      {
+        "key": "power",
+        "label": "辅机功率",
+        "unit": "MW",
+        "min": 0,
+        "max": 5,
+        "step": 0.1,
+        "kind": "config",
+        "ref": "稀释风机/吹灰器/还原剂制备"
+      }
+    ],
+    "dedust": [
+      {
+        "key": "power",
+        "label": "电场功率",
+        "unit": "MW",
+        "min": 0,
+        "max": 8,
+        "step": 0.1,
+        "kind": "config",
+        "ref": "电除尘器电场供电+振打+输灰（高频电源改造可降耗）"
+      }
+    ],
+    "desulfurization": [
+      {
+        "key": "limestone_rate",
+        "label": "石灰石耗量",
+        "unit": "t/h",
+        "min": 0,
+        "max": 40,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "按钙硫比与入炉煤含硫量确定（660MW 机组约 7~9 t/h）"
+      },
+      {
+        "key": "power",
+        "label": "浆液循环泵功率",
+        "unit": "MW",
+        "min": 0,
+        "max": 20,
+        "step": 0.5,
+        "kind": "config",
+        "ref": "浆液循环泵+氧化风机（脱硫系统最大厂用电户）"
+      }
+    ],
+    "stack": [
+      {
+        "key": "power",
+        "label": "监测与辅助功率",
+        "unit": "MW",
+        "min": 0,
+        "max": 2,
+        "step": 0.1,
+        "kind": "config",
+        "ref": "CEMS 在线监测与伴热"
+      }
+    ],
+    "heat_net": [
+      {
+        "key": "heat_rate",
+        "label": "外供热量",
+        "unit": "GJ/h",
+        "min": 0,
+        "max": 2000,
+        "step": 20,
+        "kind": "config",
+        "ref": "热电联产对外供热量（供热比越高发电侧分摊排放越低）"
+      },
+      {
+        "key": "power",
+        "label": "热网循环泵功率",
+        "unit": "MW",
+        "min": 0,
+        "max": 5,
+        "step": 0.1,
+        "kind": "config",
+        "ref": "热网循环泵与补水泵"
+      }
+    ],
+    "ash_handling": [
+    {
+      "key": "power",
+      "label": "除灰渣系统功率",
+      "unit": "MW",
+      "min": 0,
+      "max": 5,
+      "step": 0.1,
+      "kind": "config",
+      "ref": "气力输灰(仓泵/气化风机)+捞渣机+灰库装卸与磨细（660MW 机组约 1~1.5 MW）"
+    }
+  ],
+  "gypsum_handling": [
+    {
+      "key": "power",
+      "label": "石膏脱水系统功率",
+      "unit": "MW",
+      "min": 0,
+      "max": 5,
+      "step": 0.1,
+      "kind": "config",
+      "ref": "石膏排出泵+旋流器+真空皮带脱水机（660MW 机组约 0.5~0.8 MW）"
+    }
+  ]
+  }
+}

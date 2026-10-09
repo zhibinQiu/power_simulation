@@ -305,18 +305,22 @@ def test_deploy_update_sh():
     for kw in ("rsync", "vite build", "--skip-build", "CLOUD_MAIN",
                "docker compose up -d", "服务器不自拉 git"):
         assert kw in script, f"update.sh(开发机模式) 缺少：{kw}"
-    # push 子命令：改完代码一键推送到 GitHub（调用仓库根 push.sh）
-    assert '"push"' in script and 'exec bash "$ROOT/push.sh"' in script
+    # push 子命令（兼容旧用法）：转发到仓库根统一入口 ./update.sh github
+    assert '"push"' in script and 'exec bash "$ROOT/update.sh" github' in script
     assert "代码入库推送" in script
     _check_bash_syntax(script)
-    # 仓库根 push.sh：纯 git 推送脚本（协作者通用），已从 bs-deploy/ 迁至仓库根
+    # 仓库根 update.sh：唯一更新入口（all = 同步所有位置；github = 推代码）
+    # push.sh 已删除，推送逻辑并入 update.sh，仓库根只保留 update.sh/deploy.sh/start.sh
     root_push = os.path.join(REPO_ROOT, "push.sh")
-    assert os.path.isfile(root_push), f"仓库根 push.sh 缺失：{root_push}"
-    push_script = open(root_push, encoding="utf-8").read()
-    assert push_script.startswith("#!/usr/bin/env bash")
-    assert 'cd "$(dirname "$0")"' in push_script      # 位于仓库根（git 根）
-    assert 'GIT_REMOTE="github"' in push_script and "git push" in push_script
-    _check_bash_syntax(push_script)
+    assert not os.path.exists(root_push), f"push.sh 已废弃应删除：{root_push}"
+    root_update = os.path.join(REPO_ROOT, "update.sh")
+    assert os.path.isfile(root_update), f"仓库根 update.sh 缺失：{root_update}"
+    update_script = open(root_update, encoding="utf-8").read()
+    assert update_script.startswith("#!/usr/bin/env bash")
+    assert 'GIT_REMOTE="github"' in update_script or '"github"' in update_script
+    assert "git push" in update_script and "step_github" in update_script
+    assert "all" in update_script and "step_cloud" in update_script
+    _check_bash_syntax(update_script)
 
 
 # ------------------------- 云端时序数据库（TDengine 历史查询） -------------------------

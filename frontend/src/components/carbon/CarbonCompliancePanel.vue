@@ -565,7 +565,7 @@ const gapClass = computed(() => {
   border: 1px solid var(--accent-l);
   background: var(--accent-l);
   color: var(--accent-d);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   height: 24px;
@@ -606,7 +606,7 @@ const gapClass = computed(() => {
 }
 .mini {
   background: var(--accent-l); border: 1px solid var(--accent-l); color: var(--accent-d);
-  font-size: 10.5px; padding: 2px 10px; border-radius: 5px; cursor: pointer; height: 22px;
+  font-size: 11px; padding: 2px 10px; border-radius: 5px; cursor: pointer; height: 22px;
   transition: border-color .15s;
 }
 .mini:hover { border-color: var(--accent-d); }
@@ -633,7 +633,7 @@ const gapClass = computed(() => {
   width: 2px;
   background: var(--accent);
 }
-.li-title { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.li-title { font-size: 12px; font-weight: 600; color: var(--text); }
 .li-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .ent-list .empty { color: var(--muted); font-size: 12px; text-align: center; cursor: default; }
 .detail {
@@ -657,19 +657,14 @@ const gapClass = computed(() => {
 }
 .stat .v.gap-pos { color: var(--red); }
 .stat .v.gap-neg { color: var(--green); }
-/* 二级页签：VS Code tab 顶部指示条风格 */
+/* 二级页签：激活态仅以文字色 + 背景区分（无主题色顶部横条） */
 .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 12px; flex-wrap: wrap; }
 .tabs button {
   position: relative; padding: 7px 12px; background: transparent; border: none;
   color: var(--muted); font-size: 12px; cursor: pointer; border-radius: 0;
 }
-.tabs button::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: transparent;
-}
 .tabs button:hover { color: var(--text); background: var(--panel-2); }
 .tabs button.active { color: var(--accent-d); font-weight: 600; background: var(--panel); }
-.tabs button.active::before { background: var(--accent); }
 .badge {
   display: inline-block; min-width: 16px; height: 16px; padding: 0 4px; margin-left: 5px;
   background: var(--red); color: #fff; border-radius: 999px; font-size: 10px; line-height: 16px; text-align: center;
@@ -689,7 +684,7 @@ const gapClass = computed(() => {
 .check input { width: auto; height: auto; margin: 0; flex-shrink: 0; }
 /* 表格：参照 cbx-table（紧凑 10.5px + 表头灰底 + 圆角边框容器） */
 table {
-  width: 100%; border-collapse: collapse; font-size: 10.5px;
+  width: 100%; border-collapse: collapse; font-size: 11px;
   border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
 }
 th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); }
