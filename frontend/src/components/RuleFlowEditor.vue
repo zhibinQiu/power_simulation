@@ -265,8 +265,7 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { DEVICE_MAP } from '../data/flowLibrary'
-// 附加可调设备的量程兜底（电源类按输出模式取：电压 V / 电流 A）
-import { ADJUSTABLE_MAP, attachSetpoint } from '../data/attachLibrary'
+import { ADJUSTABLE_MAP } from '../data/attachLibrary'
 import { t } from '../i18n'
 import { flowPath, isDevKind, isFlowKind, isGateKind, KIND_START, KIND_END } from '../utils/ruleFlow'
 
@@ -349,7 +348,7 @@ function spCfg(id) {
   const tm = d.type ? DEVICE_MAP[d.type] : null
   if (tm && tm.setpoint) return tm.setpoint
   const at = d.type ? ADJUSTABLE_MAP[d.type] : null
-  return at ? attachSetpoint(at, d.spMode) : null
+  return (at && at.setpoint) || null
 }
 function spMin(id) { const c = spCfg(id); return c ? Number(c.min) : 0 }
 function spMax(id) { const c = spCfg(id); return c ? Number(c.max) : 100 }

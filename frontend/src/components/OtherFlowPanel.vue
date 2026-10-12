@@ -152,10 +152,6 @@
               <span v-if="att.kind === 'sensor' && isPowerAtt(att)" class="att-kw"
                     :title="t('功率型传感器（kW）：其读数即本工序能碳核算的功率来源')">{{ t('折碳') }}</span>
               <template v-if="att.kind === 'adjustable'">
-                <select v-if="modesOf(att)" class="att-mode" :value="modesOf(att).cur" @change="onAttMode(att, $event.target.value)"
-                        :title="t('输出模式：电源类设备可按电压(V)或电流(A)设定，切换后量程与单位随之变化')">
-                  <option v-for="m in modesOf(att).list" :key="m.key" :value="m.key">{{ m.label }}（{{ m.unit }}）</option>
-                </select>
                 <input class="att-sp" type="number" :min="spOf(att).min" :max="spOf(att).max" :step="spOf(att).step || 1"
                        :value="spShow(att)" @input="onAttSpInput(att, $event.target.value)" @change="onAttSetpoint(att, $event.target.value)"
                        :title="t('设定值（{label}）：只用于调节运行工况，不参与取数；本工序实际功率请在「传感器」中添加电功率传感器', { label: spOf(att).label })" />
@@ -224,10 +220,6 @@
             <!-- 选中类型后先填名称再确认：名称即该设备在资源管理器 / 数据分析中的显示名 -->
             <div v-if="addDraft.kind === ag.kind" class="att-new-row">
               <span class="att-nm-t">{{ t('名称') }}</span>
-              <select v-if="addModes.length > 1" class="att-mode" v-model="addDraft.mode"
-                      :title="t('输出模式：电源类设备可按电压(V)或电流(A)设定，切换后量程与单位随之变化')">
-                <option v-for="m in addModes" :key="m.key" :value="m.key">{{ m.label }}（{{ m.unit }}）</option>
-              </select>
               <input :ref="setNewNameEl" class="att-nm-in" v-model="addDraft.name" :placeholder="t('为该设备命名（留空用类型名）')"
                      @keyup.enter="confirmAddAttach()" @keyup.esc="addDraft.kind = ''" />
               <button class="att-nm-btn ok" :title="t('确定添加')" @click="confirmAddAttach()">{{ t('确定') }}</button>
@@ -279,7 +271,7 @@ import { computed, reactive, ref, watch, onMounted, onBeforeUnmount, nextTick } 
 import { useSimStore } from '../stores/sim'
 import { t } from '../i18n'
 import CollapseSection from './CollapseSection.vue'
-import { ATTACH_GROUPS, ATTACH_MAP, attachUnit, attachPowerSensor, attachModes, attachSetpoint } from '../data/attachLibrary'
+import { ATTACH_GROUPS, ATTACH_MAP, attachUnit, attachPowerSensor } from '../data/attachLibrary'
 
 const store = useSimStore()
 
@@ -428,10 +420,7 @@ const attachGroups = ATTACH_GROUPS.map((g) => ({
   kind: g.key,
   label: g.label,
   items: g.items,
-  // 电源类可变设备支持多输出模式（V / A）：清单里把所有可选单位一并标出
-  unitOf: (it) => (g.key === 'sensor'
-    ? (it.measure ? it.measure.unit : '')
-    : (attachModes(it) ? attachModes(it).map((m) => m.unit).join(' / ') : (it.setpoint ? it.setpoint.unit : ''))),
+  unitOf: (it) => (g.key === 'sensor' ? (it.measure ? it.measure.unit : '') : (it.setpoint ? it.setpoint.unit : '')),
 }))
 const attachedOf = (kind) => (node.value ? (node.value.attached || []).filter((a) => a.kind === kind) : [])
 // 数据源下拉分组：数据源管理（能碳一体机）中已接入的传感器设备，组内为该设备的点位
@@ -450,41 +439,21 @@ const srcOf = (att) => {
 const linkRefOf = (att) => attachedOf('adjustable').find((a) => a.uid === att.devRef) || null
 const attUnitOf = (att) => {
   const tpl = (ATTACH_MAP[att.kind] || {})[att.type]
-  return tpl ? attachUnit(tpl, att.mode) : ''
+  return tpl ? attachUnit(tpl) : ''
 }
 const attTplOf = (att) => (ATTACH_MAP[att.kind] || {})[att.type] || null
-// 可选输出模式（电源类：电压 V / 电流 A）；单模式设备返回 null，不渲染模式下拉
-const modesOf = (att) => {
-  const tpl = attTplOf(att)
-  const ms = attachModes(tpl)
-  if (!ms || ms.length < 2) return null
-  const cur = (attachSetpoint(tpl, att.mode) || ms[0]).key
-  return { cur, list: ms }
-}
-function onAttMode(att, v) {
-  if (!node.value || !v) return
-  delete spDraft[att.uid]
-  const sp = store.setAttachMode(node.value.id, att.uid, v)
-  if (sp) {
-    store.toast = t('「{name}」输出模式已切换为{label}（{unit}）：量程 {min} – {max} {unit}，设定值重置为 {def} {unit}',
-      { name: attLabelOf(att), label: sp.label, unit: sp.unit, min: sp.min, max: sp.max, def: sp.def })
-  }
-}
 // 功率型传感器（kW）：其读数是本工序能碳核算的功率来源
 const isPowerAtt = (att) => attachPowerSensor(attTplOf(att))
 // 可变设备的设定值（只调工况，不取数）：store 设定优先，其次实例 def / 模板默认
-// 电源类按当前输出模式取量程与单位（电压 V / 电流 A）
 const spOf = (att) => {
   const tpl = attTplOf(att)
-  const sp = tpl ? attachSetpoint(tpl, att.mode) : null
-  return sp ? sp : { label: t('设定值'), unit: '', min: 0, max: 100, step: 1, def: 0 }
+  return (tpl && tpl.setpoint) ? tpl.setpoint : { label: t('设定值'), unit: '', min: 0, max: 100, step: 1, def: 0 }
 }
 function spValOf(att) {
   const id = node.value ? 'ext::' + node.value.id + '::' + att.uid : ''
   if (id && store.deviceSetpoints[id] != null) return Number(store.deviceSetpoints[id])
   const tpl = attTplOf(att)
-  const sp = tpl ? attachSetpoint(tpl, att.mode) : null
-  return Number(att.def != null ? att.def : (sp ? sp.def : 0))
+  return Number(att.def != null ? att.def : (tpl && tpl.setpoint ? tpl.setpoint.def : 0))
 }
 // 数字输入草稿：编辑期间显示草稿值，避免遥测刷新（读数 1Hz）触发重渲染把正在输入/删除的内容
 // 回冲成 store 值（表现为无法编辑删除）。@input 只更新草稿 + 本地预览（不写设备、不进历史），
@@ -587,12 +556,7 @@ function cancelAttName(att) {
 // 添加面板：按钮展开 / 收起（切换工序节点时收起，避免残留展开态）
 const addOpen = ref('')
 // 待添加项：先选类型 → 填名称 → 确定（名称为该设备的业务显示名，可留空用类型名）
-// mode 仅电源类多模式设备用（电压 V / 电流 A）
-const addDraft = reactive({ kind: '', type: '', name: '', mode: '' })
-const addModes = computed(() => {
-  const tpl = addDraft.type ? (ATTACH_MAP[addDraft.kind] || {})[addDraft.type] : null
-  return attachModes(tpl) || []
-})
+const addDraft = reactive({ kind: '', type: '', name: '' })
 const newNameEl = ref(null)
 const setNewNameEl = (el) => { newNameEl.value = el }
 function toggleAdd(kind) {
@@ -625,16 +589,13 @@ function srcTextOf(att) {
   if (att.src === 'attach') return linkTextOf(att)
   return t(att.src === 'sim' ? '随机模拟值' : '固定值')
 }
-function onAddAttach(kind, type, name, mode) {
+function onAddAttach(kind, type, name) {
   if (!type || !node.value) return
-  const att = store.addAttachToNode(node.value.id, kind, type, name, mode)
+  const att = store.addAttachToNode(node.value.id, kind, type, name)
   if (!att) return
-  const tpl = (ATTACH_MAP[kind] || {})[type]
-  const sp = tpl ? attachSetpoint(tpl, att.mode) : null
   store.toast = kind === 'sensor'
     ? t('已为工艺「{name}」添加传感「{label}」：数据源默认随机模拟值，可切换为固定值 / 数据源管理中的传感器设备 / 随可变设备联动', { name: node.value.name, label: att.label })
-    : t('已为工艺「{name}」添加可变设备「{label}」：按{label2}（{unit}）设定，量程 {min} – {max} {unit}；其数值为设定值（只调工况、不参与取数），实际功率请在「传感器」中添加电功率传感器',
-      { name: node.value.name, label: att.label, label2: sp ? sp.label : t('设定值'), unit: sp ? sp.unit : '', min: sp ? sp.min : 0, max: sp ? sp.max : 100 })
+    : t('已为工艺「{name}」添加可变设备「{label}」：其数值为设定值（只调工况、不参与取数）；实际功率请在「传感器」中添加电功率传感器', { name: node.value.name, label: att.label })
 }
 // 从展开的模板清单中选中类型：先填名称（默认「类型名 + 实例序号」，可直接改成业务名称）再确认
 async function pickAttach(kind, type) {
@@ -643,10 +604,8 @@ async function pickAttach(kind, type) {
   const tpl = (ATTACH_MAP[kind] || {})[type]
   const base = tpl ? tpl.label : type
   const same = (n.attached || []).filter((a) => a.type === type).length
-  const ms = attachModes(tpl)
   addDraft.kind = kind
   addDraft.type = type
-  addDraft.mode = ms ? ms[0].key : ''
   addDraft.name = same ? `${base}${same + 1}` : base
   addOpen.value = ''
   await nextTick()
@@ -654,10 +613,10 @@ async function pickAttach(kind, type) {
   if (el) { el.focus(); el.select() }
 }
 function confirmAddAttach() {
-  const { kind, type, name, mode } = addDraft
+  const { kind, type, name } = addDraft
   addDraft.kind = ''
   if (!kind || !type) return
-  onAddAttach(kind, type, name, mode)
+  onAddAttach(kind, type, name)
 }
 function onAttSrc(att, v) {
   if (!node.value) return
@@ -734,8 +693,6 @@ const setpointUnit = computed(() => node.value?.range?.unit || '')
 .att-src { flex: 1 1 92px; min-width: 66px; font-size: 11px; padding: 3px 4px; border: 1px solid var(--line); border-radius: 2px; background: var(--panel); color: var(--text); }
 .att-sp { flex: 0 0 auto; width: 64px; font-size: 11px; padding: 3px 4px; border: 1px solid var(--line); border-radius: 2px; background: var(--panel); color: var(--text); }
 .att-fx { flex: 0 0 auto; width: 48px; font-size: 11px; padding: 3px 4px; border: 1px dashed var(--line); border-radius: 2px; background: var(--panel); color: var(--text); }
-/* 输出模式（电源类的 电压 V / 电流 A）：虚线边框区别于数据源下拉 */
-.att-mode { flex: 0 0 auto; width: 92px; font-size: 11px; padding: 3px 4px; border: 1px solid var(--accent2); border-radius: 2px; background: var(--panel); color: var(--text); }
 .att-add-row { display: flex; margin-top: 2px; }
 /* 添加按钮 + 模板清单（替代原「未选择即为空」的下拉，语义明确：先点按钮再选型） */
 .att-add-btn { flex: 0 0 auto; font-size: 11px; padding: 0 var(--btn-pad-x); min-height: var(--btn-h); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--accent2);

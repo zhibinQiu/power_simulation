@@ -2762,8 +2762,4 @@ export default {
   // 附加传感 / 可变设备：已绑定采集设备但当前数据源列表里没有该点位时的占位选项
   '已绑定（当前数据源中无此点位）': 'Bound (point absent from the current data source)',
 
-  // 附加可变设备：电源类输出模式（电压 V / 电流 A）
-  '输出模式：电源类设备可按电压(V)或电流(A)设定，切换后量程与单位随之变化': 'Output mode: power-supply devices can be set by voltage (V) or current (A); range and unit change with the mode',
-  '「{name}」输出模式已切换为{label}（{unit}）：量程 {min} – {max} {unit}，设定值重置为 {def} {unit}': '「{name}」output mode switched to {label} ({unit}): range {min} – {max} {unit}, setpoint reset to {def} {unit}',
-  '已为工艺「{name}」添加可变设备「{label}」：按{label2}（{unit}）设定，量程 {min} – {max} {unit}；其数值为设定值（只调工况、不参与取数），实际功率请在「传感器」中添加电功率传感器': 'Added adjustable device 「{label}」 to process 「{name}」: set by {label2} ({unit}), range {min} – {max} {unit}; its value is a setpoint only (operating condition, no measurement) — add a power sensor (kW) for real power',
 }

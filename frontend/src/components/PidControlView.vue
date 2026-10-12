@@ -372,8 +372,7 @@ import { createPpoAgent, computeGae, standardize, randn } from '../utils/rl'
 import { DEVICE_MAP } from '../data/flowLibrary'
 import { api } from '../api/client'
 // 附加可调设备（变频器 / 半导体制冷电源…）不在工艺可调设备表内，量程兜底取通用附加设备库
-// （电源类按输出模式取量程：电压 V / 电流 A）
-import { ADJUSTABLE_MAP, attachSetpoint } from '../data/attachLibrary'
+import { ADJUSTABLE_MAP } from '../data/attachLibrary'
 import RuleFlowEditor from './RuleFlowEditor.vue'
 import PsoTuner from './PsoTuner.vue'
 import { t } from '../i18n'
@@ -408,7 +407,7 @@ function spCfg(id) {
   const tmpl = d.type ? DEVICE_MAP[d.type] : null
   if (tmpl && tmpl.setpoint) return tmpl.setpoint
   const at = d.type ? ADJUSTABLE_MAP[d.type] : null
-  return at ? attachSetpoint(at, d.spMode) : null
+  return (at && at.setpoint) || null
 }
 function spMin(id) { const c = spCfg(id); return c ? Number(c.min) : 0 }
 function spMax(id) { const c = spCfg(id); return c ? Number(c.max) : 100 }

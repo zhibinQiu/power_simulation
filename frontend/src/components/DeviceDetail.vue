@@ -164,8 +164,8 @@ const CalibrationWizard = defineAsyncComponent(() => import('./CalibrationWizard
 // 避免动态 import 偶发失败时弹窗静默打不开
 const TftAnalysisDialog = lazyDialog(() => import('./TftAnalysisDialog.vue'))
 import { getCoupling, deriveProcessOpParams, paramLabel, PROCESS_MAP, DEVICE_MAP } from '../data/flowLibrary'
-// 附加可调设备的设定范围兜底：类型取自通用附加设备库（如变频器 / 半导体制冷电源，电源类按输出模式取量程）
-import { ADJUSTABLE_MAP, attachSetpoint } from '../data/attachLibrary'
+// 附加可调设备的设定范围兜底：类型取自通用附加设备库（如变频器 / 半导体制冷电源）
+import { ADJUSTABLE_MAP } from '../data/attachLibrary'
 import { buildRealtimeTftParams } from '../utils/tft'
 
 const store = useSimStore()
@@ -185,7 +185,7 @@ const sp = computed(() => {
   if (t && t.setpoint) return t.setpoint
   if (meta.value.setpoint) return meta.value.setpoint
   const at = dev.value && ADJUSTABLE_MAP[dev.value.type]
-  return at ? attachSetpoint(at, dev.value.spMode) : null
+  return (at && at.setpoint) || null
 })
 // 喂给碳核算引擎的活动数据说明：优先设备自带，其次由耦合目标推断（可调设备无后端 feeds 字段）
 const feedsText = computed(() => {

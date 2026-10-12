@@ -208,7 +208,7 @@
 import { reactive, ref, computed, watch, nextTick } from 'vue'
 import { useSimStore, AI_MODELS } from '../stores/sim'
 import { MATERIALS, PRODUCTS, ROUTE_GROUPS, PROCESS_TEMPLATES, PROCESS_ADJUSTABLE, DEVICE_MAP, PROCESS_MAP } from '../data/flowLibrary'
-import { SENSOR_TEMPLATES, ADJUSTABLE_TEMPLATES, attachModes } from '../data/attachLibrary'
+import { SENSOR_TEMPLATES, ADJUSTABLE_TEMPLATES } from '../data/attachLibrary'
 import Icon from './Icon.vue'
 import { openContextMenu } from '../composables/contextMenu'
 import SearchPanel from './SearchPanel.vue'
@@ -386,8 +386,7 @@ function onProcessClick(t) { onProcessClickFromType(t.type) }
 // ===== 附加资源：传感器 / 可变设备（系统内置，可绑定到具体工艺设备）=====
 const attachGroups = [
   { kind: 'sensor', label: t('传感器'), items: SENSOR_TEMPLATES, unitOf: (it) => it.measure.unit },
-  // 电源类可变设备支持多输出模式（电压 V / 电流 A）：资源树里把所有可选单位一并标出
-  { kind: 'adjustable', label: t('可变设备'), items: ADJUSTABLE_TEMPLATES, unitOf: (it) => (attachModes(it) ? attachModes(it).map((m) => m.unit).join(' / ') : (it.setpoint ? it.setpoint.unit : '')) },
+  { kind: 'adjustable', label: t('可变设备'), items: ADJUSTABLE_TEMPLATES, unitOf: (it) => (it.setpoint ? it.setpoint.unit : '') },
 ]
 // 高亮：编辑态当前选中的工艺节点已绑定同类资源
 function attachActive(it) {

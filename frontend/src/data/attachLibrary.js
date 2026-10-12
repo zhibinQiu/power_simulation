@@ -91,21 +91,15 @@ export const ADJUSTABLE_TEMPLATES = [
   { type: 'frequency_converter', kind: 'adjustable', label: '变频器', unit: 'Hz',
     setpoint: { label: '输出频率', unit: 'Hz', min: 0, max: 60, step: 0.1, def: 40 },
     desc: '通用变频调速装置，调节电机 / 风机 / 泵的输出频率（0~60 Hz），设定值即当前运行工况。' },
-  // 循环水泵等泵组的专用变压器：设定值 = 输出电压（V）或输出电流（A）（电源类设备可选输出模式）。
+  // 循环水泵等泵组的专用变压器：只有一个量 —— 设定值 = 输出电压（V）。
   // 可变设备的值只用于「设定运行工况」，不做取数、不参与折碳；该泵组的实际有功功率要在
   // 「传感器」里添加电功率传感器并设置数据源（可设为随本设备联动），由传感器读数参与能碳核算。
   { type: 'pump_transformer', kind: 'adjustable', label: '循环水泵变压器', unit: 'V',
-    modes: [
-      { key: 'V', label: '输出电压', unit: 'V', min: 0, max: 660, step: 5, def: 380 },
-      { key: 'A', label: '输出电流', unit: 'A', min: 0, max: 150, step: 1, def: 60 },
-    ],
-    desc: '循环水泵（泵组）专用变压器，可按「输出电压 0~660 V」或「输出电流 0~150 A」设定（恒压 / 恒流两种输出模式）：电压↑ → 泵转速 / 流量↑、轴功率↑（泵类相似定律 P ∝ n³），是水系统降温强度与减排策略的作用对象。设定值只调运行工况，不直接参与折碳：本工序的实际有功功率请在「传感器」中添加电功率传感器（数据源可设为「随本设备联动」，电压↑ 则功率↑），核算以该传感器读数为依据。' },
+    setpoint: { label: '输出电压', unit: 'V', min: 0, max: 660, step: 5, def: 380 },
+    desc: '循环水泵（泵组）专用变压器，0~660 V 输出电压可调：电压↑ → 泵转速 / 流量↑、轴功率↑（泵类相似定律 P ∝ n³），是水系统降温强度与减排策略的作用对象。设定值只调运行工况，不直接参与折碳：本工序的实际有功功率请在「传感器」中添加电功率传感器（数据源可设为「随本设备联动」，电压↑ 则功率↑），核算以该传感器读数为依据。' },
   { type: 'rectifier', kind: 'adjustable', label: '整流器', unit: 'V',
-    modes: [
-      { key: 'V', label: '直流输出电压', unit: 'V', min: 0, max: 1200, step: 10, def: 400 },
-      { key: 'A', label: '直流输出电流', unit: 'A', min: 0, max: 600, step: 5, def: 200 },
-    ],
-    desc: '可控硅整流装置，直流输出可按电压（V）或电流（A）设定，用于直流传动、电解等调节场景。' },
+    setpoint: { label: '直流输出电压', unit: 'V', min: 0, max: 1200, step: 10, def: 400 },
+    desc: '可控硅整流装置，输出直流电压可调，用于直流传动等调节场景。' },
   { type: 'stabilizer', kind: 'adjustable', label: '稳压器', unit: 'V',
     setpoint: { label: '稳压输出', unit: 'V', min: 300, max: 500, step: 1, def: 380 },
     desc: '自动稳压装置，将配电电压稳定在设定输出值附近，调节后可改变工艺供电质量。' },
@@ -115,26 +109,18 @@ export const ADJUSTABLE_TEMPLATES = [
   { type: 'damper_actuator', kind: 'adjustable', label: '风门执行器', unit: '%',
     setpoint: { label: '风门开度', unit: '%', min: 0, max: 100, step: 1, def: 70 },
     desc: '风道风门执行机构，风门开度 0~100% 可调，用于鼓风 / 引风风量调节。' },
-  { type: 'variable_psu', kind: 'adjustable', label: '可变电源', unit: 'V',
-    modes: [
-      { key: 'V', label: '输出电压', unit: 'V', min: 0, max: 66000, step: 10, def: 10000 },
-      { key: 'A', label: '输出电流', unit: 'A', min: 0, max: 500, step: 5, def: 100 },
-    ],
-    desc: '可编程可变电源，可按输出电压（V）或输出电流（A）设定，用于配电 / 电解等环节的可变工况模拟。' },
+  // 可变电源按「输出量纲」分成两个模板：添加时选一种即可（电压档 / 电流档，
+  // 两者只是设定量的单位与量程不同，用法完全一致 —— 设定值只调运行工况，不参与取数）。
+  { type: 'variable_psu', kind: 'adjustable', label: '可变电源（电压）', unit: 'V',
+    setpoint: { label: '输出电压', unit: 'V', min: 0, max: 66000, step: 10, def: 10000 },
+    desc: '可编程可变电源（电压档），输出电压档位可调，用于配电 / 电解等环节的可变工况模拟。' },
+  { type: 'variable_psu_current', kind: 'adjustable', label: '可变电源（电流）', unit: 'A',
+    setpoint: { label: '输出电流', unit: 'A', min: 0, max: 500, step: 5, def: 100 },
+    desc: '可编程可变电源（电流档），输出电流 0~500 A 可调，用于恒流供电 / 电解等按电流调节工况的场景。' },
   { type: 'tec_psu', kind: 'adjustable', label: '半导体制冷电源', unit: 'V',
-    modes: [
-      { key: 'V', label: '制冷片供电电压', unit: 'V', min: 0, max: 60, step: 1, def: 48 },
-      { key: 'A', label: '制冷片供电电流', unit: 'A', min: 0, max: 20, step: 0.5, def: 8 },
-    ],
-    desc: '半导体制冷片（TEC）专用直流电源，可按「供电电压 0~60 V」或「供电电流 0~20 A」设定（恒压 / 恒流两种输出模式）：功率↑ → 制冷量↑（P ≈ U·I）同时耗电与散热负荷↑，是机房温控降温强度与减排策略的作用对象。设定值只调运行工况，不直接参与折碳：本工序的实际有功功率请在「传感器」中添加电功率传感器（数据源可设为「随本设备联动」，功率↑ 则读数↑），核算以该传感器读数为依据。' },
+    setpoint: { label: '制冷片供电电压', unit: 'V', min: 0, max: 60, step: 1, def: 48 },
+    desc: '半导体制冷片（TEC）专用直流电源，输出电压 0~60 V 连续可调：电压↑ → 制冷功率↑（P ≈ U²/R）同时耗电与散热负荷↑，是机房温控降温强度与减排策略的作用对象。设定值只调运行工况，不直接参与折碳：本工序的实际有功功率请在「传感器」中添加电功率传感器（数据源可设为「随本设备联动」，电压↑ 则功率↑），核算以该传感器读数为依据。' },
 ]
-
-// 电源类可调设备：modes[0] 为默认输出模式，setpoint 由它派生 ——
-// 这样既有的「type → tpl.setpoint」读取路径（量程 / 单位 / 默认值）完全不变，
-// 只需在需要区分模式的调用处传入实例 att.mode 取 attachSetpoint(tpl, mode)。
-for (const _t of ADJUSTABLE_TEMPLATES) {
-  if (!_t.setpoint && Array.isArray(_t.modes) && _t.modes.length) _t.setpoint = _t.modes[0]
-}
 
 export const SENSOR_MAP = Object.fromEntries(SENSOR_TEMPLATES.map((x) => [x.type, x]))
 export const ADJUSTABLE_MAP = Object.fromEntries(ADJUSTABLE_TEMPLATES.map((x) => [x.type, x]))
@@ -148,34 +134,15 @@ export const ATTACH_GROUPS = [
   { key: 'adjustable', label: '可变设备', items: ADJUSTABLE_TEMPLATES },
 ]
 
-// 输出模式：电源类可调设备可按不同量纲（电压 V / 电流 A）设定，modes 为可选模式列表
-// （modes[0] 即默认模式；未声明 modes 的设备返回 null，只有单一设定量）。
-export function attachModes(t) {
-  return (t && t.kind === 'adjustable' && Array.isArray(t.modes) && t.modes.length) ? t.modes : null
+// 附加设备模板的显示单位 / 默认感知数值 / 感知量标签
+export function attachUnit(t) {
+  return t.kind === 'sensor' ? t.measure.unit : t.setpoint.unit
 }
-// 取「当前输出模式」下的设定量定义（label / unit / min / max / step / def）：
-// mode 为空或不存在时回落默认模式（modes[0]），等价于旧的 tpl.setpoint。
-export function attachSetpoint(t, mode) {
-  if (!t) return null
-  const ms = attachModes(t)
-  if (!ms) return t.setpoint || null
-  return (mode ? ms.find((m) => m.key === mode) : null) || ms[0]
+export function attachDef(t) {
+  return t.kind === 'sensor' ? t.def : t.setpoint.def
 }
-// 附加设备模板的显示单位 / 默认感知数值 / 感知量标签（mode 可选：指定输出模式时按该模式取）
-export function attachUnit(t, mode) {
-  if (t.kind === 'sensor') return t.measure.unit
-  const sp = attachSetpoint(t, mode)
-  return sp ? sp.unit : ''
-}
-export function attachDef(t, mode) {
-  if (t.kind === 'sensor') return t.def
-  const sp = attachSetpoint(t, mode)
-  return sp ? sp.def : 0
-}
-export function attachMeasureLabel(t, mode) {
-  if (t.kind === 'sensor') return t.measure.label
-  const sp = attachSetpoint(t, mode)
-  return sp ? sp.label : ''
+export function attachMeasureLabel(t) {
+  return t.kind === 'sensor' ? t.measure.label : t.setpoint.label
 }
 // 功率型传感器（感知量单位为 kW，如电功率传感器的有功功率）：
 // 这类传感器附加到工序后，其读数即该工序能碳核算的功率来源（取代包内功率参数）。
