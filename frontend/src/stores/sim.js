@@ -9,7 +9,7 @@ import { PARK } from '../data/park'
 // 通用附加设备库（传感器 / 可变设备，所有场景可用）：
 // 与「工艺类型 → 典型可调设备」不同，附加设备是用户在某工艺节点上按需添加的，
 // 存于工艺节点 node.attached[]，运行态由 store 合成 ext::节点id::attUid 设备。
-import { SENSOR_MAP, ADJUSTABLE_MAP, ATTACH_MAP, attachUnit, attachDef, attachMeasureLabel, attachPowerSensor } from '../data/attachLibrary'
+import { SENSOR_MAP, ADJUSTABLE_MAP, ATTACH_MAP, attachUnit, attachDef, attachMeasureLabel, attachPowerSensor, attachModes, attachSetpoint } from '../data/attachLibrary'
 // 工艺静态业务数据：集中维护于独立数据模块 src/data/processMeta.js
 // （业务数据与代码逻辑分离），本 store 只负责仿真状态与交互逻辑；
 // 下方 re-export 保持既有组件 `import { ... } from '../stores/sim'` 兼容。
@@ -183,7 +183,9 @@ function _extDevice(node, unit, att, now, srcMap, setpoints) {
   if (!tpl) return null
   const extId = `ext::${node.id}::${att.uid}`
   const isSensor = tpl.kind === 'sensor'
-  const mUnit = isSensor ? tpl.measure.unit : tpl.setpoint.unit
+  // 电源类可调设备可按输出模式（电压 V / 电流 A）设定：单位与设定量名称按实例模式取
+  const mSp = isSensor ? null : attachSetpoint(tpl, att.mode)
+  const mUnit = isSensor ? tpl.measure.unit : (mSp ? mSp.unit : '')
   const reading = _attachReading(att, unit, now, srcMap, node, setpoints)
   const ref = att.src === 'attach' ? _attachRef(node, att) : null
   const srcNote = att.src === 'param' && att.param
@@ -206,7 +208,7 @@ function _extDevice(node, unit, att, now, srcMap, setpoints) {
     type: att.type,
     label: att.label || tpl.label,
     unit: mUnit,
-    measures: [{ key: 'val', label: isSensor ? tpl.measure.label : tpl.setpoint.label, unit: mUnit }],
+    measures: [{ key: 'val', label: isSensor ? tpl.measure.label : (mSp ? mSp.label : t('设定值')), unit: mUnit }],
     measured: reading,
     reading,
     // 读数标签 / 单位（仅传感器有读数；可变设备只有设定值）
@@ -216,7 +218,9 @@ function _extDevice(node, unit, att, now, srcMap, setpoints) {
     powerReading: isSensor && attachPowerSensor(tpl),
     metering: isSensor,
     adjustable: !isSensor,
-    setpoint: !isSensor ? (att.def != null ? att.def : tpl.setpoint.def) : null,
+    setpoint: !isSensor ? (att.def != null ? att.def : (mSp ? mSp.def : 0)) : null,
+    // 当前输出模式（电压 V / 电流 A…）：供编排 / 详情面板按模式取量程与单位
+    spMode: !isSensor ? (att.mode || (mSp && mSp.key) || null) : null,
     ext: true,
     attachKind: att.kind,
     src: att.src || 'fixed',
@@ -431,6 +435,8 @@ let _refreshTimer = null   // 刷新防抖定时器（模块级，避免进入�
 let _refreshSeq = 0       // 刷新序号：丢弃过期响应，避免旧请求覆盖新状态
 let _simSnapshot = null   // 仿真模式进入时的全量快照（模块级，避免进入响应式 state）
 let _schemePushTimer = null  // 编排方案同步到服务端的防抖定时器（模块级，避免进入响应式 state）
+let _schemePushPending = null // 待推送的编排存档（{ sceneId, data }）：防抖窗口内关页面时靠它补发
+let _designFlushBound = false // 页面隐藏/卸载的补发监听只绑一次
 let _simParamSnapshot = null  // 仿真进入时的参数快照（「仿真前 → 当前」变化展示用，模块级）
 const _snapParams = (model) => {  // 提取各工序参数：{ unitId: { key: val } }
   const out = {}
@@ -985,6 +991,7 @@ export const useSimStore = defineStore('sim', {
         if (!booted) await this.loadStrategies()
         this.ready = true
         this._bindAutosave()   // 编排编辑自动保存（任何场景通用）
+        this._bindDesignFlush() // 关页面 / 切后台时把编排存档补发到服务端
         this.notify('success', t('系统就绪'), t('数字孪生已载入 {units} 个工序、{flows} 条物流，实时链路与优化模型已就绪。', { units: this.model.units.length, flows: this.model.flows.length }))
         this._startFeed()
         // AI 优化模型：同步训练上下文并轮询状态（后台定时训练由后端调度，前端展示「逐渐变优」）
@@ -2682,11 +2689,36 @@ export const useSimStore = defineStore('sim', {
           _ovUnitV: 1,
           updatedAt: Date.now(),
         }
+        // 记下待推送内容：防抖窗口内若页面被关闭 / 切到后台，由 _flushScheme 立即补发
+        _schemePushPending = { sceneId: data.sceneId, data }
         clearTimeout(_schemePushTimer)
         _schemePushTimer = setTimeout(() => {
+          _schemePushPending = null
           api.designSave('flow', data.sceneId, data).catch(() => { /* 服务端不可用时保留 localStorage 兜底 */ })
         }, 800)
       } catch (e) { /* 忽略 */ }
+    },
+    // 立刻把待推送的编排存档发到服务端（keepalive，页面卸载后仍会发出）。
+    // 场景：配完附加传感 / 采集设备绑定就关页面 —— 防抖里那次 PUT 会被浏览器取消，
+    // 服务端存档停在旧版本，下次打开（或另一端实例）就「被还原」。
+    _flushScheme() {
+      try {
+        const p = _schemePushPending
+        if (!p) return
+        _schemePushPending = null
+        clearTimeout(_schemePushTimer)
+        api.designSaveNow('flow', p.sceneId, p.data).catch(() => { /* 卸载阶段失败：localStorage 兜底仍在 */ })
+      } catch (e) { /* 忽略 */ }
+    },
+    // 绑定「页面隐藏 / 卸载」补发：关闭标签页、刷新、切到后台都触发，保证服务端存档是最新的。
+    _bindDesignFlush() {
+      if (_designFlushBound) return
+      _designFlushBound = true
+      const flush = () => this._flushScheme()
+      window.addEventListener('pagehide', flush)
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') flush()
+      })
     },
     // 从服务端取回本场景的编排存档：与本地 localStorage 冲突时以**较新**的一份为准，
     // 使「开发机编排 → 文件同步 → 服务器打开」与「离线编辑后重新联网」两种场景都不丢改动。
@@ -2851,6 +2883,11 @@ export const useSimStore = defineStore('sim', {
             if (tpl.label) a.label = tpl.label
             // 量程 / 默认值随新类型走：旧类型（0~66000 V、Hz）与新口径完全不同，留旧值会带偏详情面板
             a.def = tpl.kind === 'sensor' ? tpl.def : (tpl.setpoint ? tpl.setpoint.def : a.def)
+            // 输出模式：新类型不支持旧模式时回落到其默认模式（如 V 型设备迁到无模式类型则清空）
+            if (tpl.kind !== 'sensor') {
+              const ms = attachModes(tpl)
+              a.mode = ms ? ((attachSetpoint(tpl, a.mode) || {}).key || ms[0].key) : null
+            }
             if (tpl.range) a.range = { ...tpl.range }
             if (tpl.scale) a.scale = { ...tpl.scale }
             a.src = tpl.kind === 'sensor' ? 'sim' : 'fixed'
@@ -2930,11 +2967,14 @@ export const useSimStore = defineStore('sim', {
     // 在资源管理器 / 设备树 / 数据分析中即出现相应设备。
     // name 为可选业务名称（如「1号泵出水温度」）；不传则按「类型名 + 实例序号」自动命名，
     // 且自动保证与同工序内其它附加设备不重名。
-    addAttachToNode(nodeId, kind, type, name) {
+    addAttachToNode(nodeId, kind, type, name, mode) {
       const node = this.scheme.nodes.find((n) => n.id === nodeId)
       if (!node) return null
       const tpl = _attachTpl(kind, type)
       if (!tpl) return null
+      // 电源类可调设备支持输出模式（如电压 V / 电流 A）：未指定取默认模式（modes[0]）
+      const ms = attachModes(tpl)
+      const sp = attachSetpoint(tpl, mode)
       const att = {
         uid: uid('a'),
         kind,
@@ -2946,7 +2986,8 @@ export const useSimStore = defineStore('sim', {
         param: null,       // src=param 时绑定的工艺数值参数 key
         device: null,      // src=device 时绑定的数据源管理设备名
         prop: null,        // src=device 时绑定的设备点位名
-        def: tpl.kind === 'sensor' ? tpl.def : (tpl.setpoint ? tpl.setpoint.def : null),
+        mode: ms ? (sp ? sp.key : ms[0].key) : null,   // 输出模式（仅多模式设备有效）
+        def: tpl.kind === 'sensor' ? tpl.def : (sp ? sp.def : null),
       }
       if (!node.attached) node.attached = []
       node.attached.push(att)
@@ -3028,6 +3069,36 @@ export const useSimStore = defineStore('sim', {
       att.scale = { from: Number.isFinite(f) && f ? f : 1, to: Number.isFinite(v) ? v : 0 }
       this._histCapture('sc_' + nodeId + uid('h'))
       this._saveScheme()
+    },
+    // 切换可变设备的输出模式（如电源的电压 V ⇄ 电流 A）：单位、量程、默认值随模式走，
+    // 设定值重置为该模式的默认值（两种模式量纲不同，沿用旧数值没有意义）。
+    // 联动在本设备上的传感器同步重新定标（读数锚点不变 → 切换瞬间读数保持不变）；
+    // 已绑定数据源写点位的会解除绑定（写点位与量纲绑定，换模式后写入会写错寄存器）。
+    setAttachMode(nodeId, uidToSet, mode) {
+      const node = this.scheme.nodes.find((n) => n.id === nodeId)
+      const att = node && Array.isArray(node.attached) ? node.attached.find((a) => a.uid === uidToSet) : null
+      if (!att || att.kind !== 'adjustable') return null
+      const tpl = _attachTpl(att.kind, att.type)
+      const sp = attachSetpoint(tpl, mode)
+      if (!sp) return null
+      att.mode = sp.key || mode
+      att.def = sp.def
+      const extId = `ext::${nodeId}::${uidToSet}`
+      this.deviceSetpoints = { ...this.deviceSetpoints, [extId]: Number(sp.def) }
+      // 已绑定采集设备写点位：量纲变了必须解绑，否则会把电流值写进电压寄存器
+      if (att.src === 'device') { att.src = 'fixed'; att.device = null; att.prop = null }
+      // 随本设备联动的传感器：读数锚点 to 不变，设定值锚点 from 改为新模式默认值（读数不跳变）
+      for (const s of (node.attached || [])) {
+        if (s === att || s.kind !== 'sensor' || s.src !== 'attach' || s.devRef !== uidToSet) continue
+        s.scale = { from: Number(sp.def) || 1, to: Number(s.scale && s.scale.to != null ? s.scale.to : s.def) || 0 }
+      }
+      this._histCapture('mod_' + nodeId + uid('h'))
+      this._saveScheme()
+      // 清掉该设备的陈旧遥测，避免旧量纲的采样值继续遮蔽新读数
+      delete this.deviceLive[extId]
+      delete this.deviceHistory[extId]
+      this._sampleAttachedDevices(Date.now() / 1000)
+      return sp
     },
     // 设置附加设备换算系数：读数 = 源值 × 系数（默认 1），
     // 用于系统模板单位与绑定传感器/采集设备实际度量不一致时的换算

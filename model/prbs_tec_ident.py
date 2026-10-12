@@ -78,16 +78,16 @@
 
 【用法】
     # 1) 只生成并自检序列（不接触硬件，推荐先跑一次）
-    python3 backend/tools/prbs_tec_ident.py --plan-only
+    python3 model/prbs_tec_ident.py --plan-only
 
     # 2) 空跑验证流程（模拟硬件，不写真实设备）
-    python3 backend/tools/prbs_tec_ident.py --dry-run --symbols 6 --ts 1 --out /tmp/dry.csv
+    python3 model/prbs_tec_ident.py --dry-run --symbols 6 --ts 1 --out /tmp/dry.csv
 
     # 3) 正式采集（默认 1000 点 / 83 min）
-    python3 backend/tools/prbs_tec_ident.py --out tec_prbs_run1.csv
+    python3 model/prbs_tec_ident.py --out tec_prbs_run1.csv
 
     # 4) 指定服务器上的平台实例
-    python3 backend/tools/prbs_tec_ident.py --platform http://36.151.146.71:40014
+    python3 model/prbs_tec_ident.py --platform http://36.151.146.71:40014
 
     运行时 Ctrl+C 会安全停机（电流置 0A）后再退出，已采数据不丢。
 仅依赖 Python 3 标准库，无需安装任何第三方包。

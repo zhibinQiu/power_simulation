@@ -2758,4 +2758,12 @@ export default {
   '在 DCS 上增开一台循环水泵（或提高循环水泵变频），并检查真空系统严密性与凝汽器管束结垢': 'On the DCS, start one more circulating-water pump (or raise its VFD output), and check vacuum system tightness and condenser tube fouling',
   '背压每降 1 kPa，机组热耗约降 1.0%、发电煤耗约降 2.5 gce/kWh': 'Every 1 kPa drop in back pressure cuts heat rate by about 1.0% and the coal rate by about 2.5 gce/kWh',
   '资源包已升级：补齐 {n} 个新增对象（进入对应系统小组可查看）': 'Resource package upgraded: {n} new object(s) added (open the corresponding system group to view them)',
+
+  // 附加传感 / 可变设备：已绑定采集设备但当前数据源列表里没有该点位时的占位选项
+  '已绑定（当前数据源中无此点位）': 'Bound (point absent from the current data source)',
+
+  // 附加可变设备：电源类输出模式（电压 V / 电流 A）
+  '输出模式：电源类设备可按电压(V)或电流(A)设定，切换后量程与单位随之变化': 'Output mode: power-supply devices can be set by voltage (V) or current (A); range and unit change with the mode',
+  '「{name}」输出模式已切换为{label}（{unit}）：量程 {min} – {max} {unit}，设定值重置为 {def} {unit}': '「{name}」output mode switched to {label} ({unit}): range {min} – {max} {unit}, setpoint reset to {def} {unit}',
+  '已为工艺「{name}」添加可变设备「{label}」：按{label2}（{unit}）设定，量程 {min} – {max} {unit}；其数值为设定值（只调工况、不参与取数），实际功率请在「传感器」中添加电功率传感器': 'Added adjustable device 「{label}」 to process 「{name}」: set by {label2} ({unit}), range {min} – {max} {unit}; its value is a setpoint only (operating condition, no measurement) — add a power sensor (kW) for real power',
 }

@@ -321,6 +321,22 @@ def test_deploy_update_sh():
     assert "git push" in update_script and "step_github" in update_script
     assert "all" in update_script and "step_cloud" in update_script
     _check_bash_syntax(update_script)
+    # macOS bash 3.2 + set -u：展开**空数组**（"${a[@]}"）会报 "a[@]: unbound variable"，
+    # 而 step_bs 的 args 在不带 --designs 时正是空的。因此每次展开前必须有 ${#args[@]} 守卫。
+    step_bs = update_script.split("step_bs()", 1)[1].split("\n}", 1)[0]
+    lines = step_bs.splitlines()
+    expansions = [i for i, ln in enumerate(lines) if '"${args[@]}"' in ln]
+    assert expansions, "step_bs 未见 args 展开（透传口径变了？请同步本断言）"
+    for i in expansions:
+        indent = len(lines[i]) - len(lines[i].lstrip())
+        # 守卫必须在该展开之前、且缩进更浅（即真正位于外层 if 体内）
+        guarded = any(
+            "${#args[@]} -gt 0" in prev and (len(prev) - len(prev.lstrip())) < indent
+            for prev in lines[:i]
+        )
+        assert guarded, (
+            f"step_bs 出现未受空数组守卫的展开：{lines[i].strip()}"
+        )
 
 
 # ------------------------- 云端时序数据库（TDengine 历史查询） -------------------------

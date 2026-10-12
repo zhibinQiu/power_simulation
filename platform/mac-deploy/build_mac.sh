@@ -60,15 +60,22 @@ case "$MODE" in
     ;;
 esac
 
-"${RUNPY[@]}" -m PyInstaller --noconfirm --clean --onedir \
-  --name SteelCarbonTwin \
-  --icon "$(pwd)/platform/mac-deploy/icon.icns" \
-  --collect-all uvicorn --collect-all websockets --collect-all webview \
-  --add-data "$(pwd)/frontend/dist:frontend/dist" \
-  --paths backend \
-  --specpath platform/mac-deploy \
-  "${EXTRA_ARGS[@]}" \
-  platform/mac-deploy/desktop_launcher.py
+# 把 PyInstaller 参数拼成一个必定非空的数组再执行：macOS bash 3.2 + set -u 下
+# 直接展开空数组（"${EXTRA_ARGS[@]}"）会报 "EXTRA_ARGS[@]: unbound variable"
+# （console 模式下 EXTRA_ARGS 就是空的），详情见仓库根 update.sh 的 step_bs 注释。
+PYI_ARGS=(
+  -m PyInstaller --noconfirm --clean --onedir
+  --name SteelCarbonTwin
+  --icon "$(pwd)/platform/mac-deploy/icon.icns"
+  --collect-all uvicorn --collect-all websockets --collect-all webview
+  --add-data "$(pwd)/frontend/dist:frontend/dist"
+  --paths backend
+  --specpath platform/mac-deploy
+)
+if [ ${#EXTRA_ARGS[@]} -gt 0 ]; then PYI_ARGS+=("${EXTRA_ARGS[@]}"); fi
+PYI_ARGS+=(platform/mac-deploy/desktop_launcher.py)
+
+"${RUNPY[@]}" "${PYI_ARGS[@]}"
 
 echo "[4/4] 完成！"
 case "$MODE" in

@@ -372,7 +372,8 @@ import { createPpoAgent, computeGae, standardize, randn } from '../utils/rl'
 import { DEVICE_MAP } from '../data/flowLibrary'
 import { api } from '../api/client'
 // 附加可调设备（变频器 / 半导体制冷电源…）不在工艺可调设备表内，量程兜底取通用附加设备库
-import { ADJUSTABLE_MAP } from '../data/attachLibrary'
+// （电源类按输出模式取量程：电压 V / 电流 A）
+import { ADJUSTABLE_MAP, attachSetpoint } from '../data/attachLibrary'
 import RuleFlowEditor from './RuleFlowEditor.vue'
 import PsoTuner from './PsoTuner.vue'
 import { t } from '../i18n'
@@ -407,7 +408,7 @@ function spCfg(id) {
   const tmpl = d.type ? DEVICE_MAP[d.type] : null
   if (tmpl && tmpl.setpoint) return tmpl.setpoint
   const at = d.type ? ADJUSTABLE_MAP[d.type] : null
-  return (at && at.setpoint) || null
+  return at ? attachSetpoint(at, d.spMode) : null
 }
 function spMin(id) { const c = spCfg(id); return c ? Number(c.min) : 0 }
 function spMax(id) { const c = spCfg(id); return c ? Number(c.max) : 100 }
@@ -1217,11 +1218,16 @@ onMounted(() => {
   if (versions.value.length) activeVer.value = versions.value[0].id
   scheduleNext()
   autoTimer = setInterval(checkAuto, 15000)
+  window.addEventListener('pagehide', flushDesigns)
+  document.addEventListener('visibilitychange', onVisHide)
 })
 onBeforeUnmount(() => {
   trainStop.value = true
   runId.value = ''
   stopSample()
+  flushDesigns()   // 切走视图也补发一次，避免防抖里的群控编排改动丢失
+  window.removeEventListener('pagehide', flushDesigns)
+  document.removeEventListener('visibilitychange', onVisHide)
   if (autoTimer) clearInterval(autoTimer)
   if (saveTimer) clearTimeout(saveTimer)
 })
@@ -1301,6 +1307,7 @@ let saveTimer = null
 // 编排存档场景键：AI 群控模型按场景分档（与流程编排同一口径，切场景不串档）
 function designScene() { return store.sceneId || 'steel' }
 let pushTimer = null
+let pushPending = null   // 待推送的群控存档：防抖窗口内关页面时靠它补发（keepalive）
 function persist() {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
@@ -1308,13 +1315,28 @@ function persist() {
   }, 200)
   // 同步到服务端（backend/data/designs/agc.json）：服务端存档是跨端真源，随代码同步到服务器实例
   try {
+    const scene = designScene()
+    pushPending = { scene, data: { designs: designs.value.slice(0, 50), updatedAt: Date.now() } }
     clearTimeout(pushTimer)
     pushTimer = setTimeout(() => {
-      api.designSave('agc', designScene(), { designs: designs.value.slice(0, 50), updatedAt: Date.now() })
-        .catch(() => { /* 服务端不可用时保留 localStorage 兜底 */ })
+      const p = pushPending
+      pushPending = null
+      if (!p) return
+      api.designSave('agc', p.scene, p.data).catch(() => { /* 服务端不可用时保留 localStorage 兜底 */ })
     }, 600)
   } catch (e) { /* 忽略 */ }
 }
+// 页面关闭 / 切后台时立刻补发：普通 fetch 会在卸载阶段被取消，keepalive 才能送达，
+// 否则「配完群控设备就关页面」时服务端仍是旧档，下次打开另一端实例会被还原。
+function flushDesigns() {
+  const p = pushPending
+  if (!p) return
+  pushPending = null
+  clearTimeout(pushTimer)
+  try { localStorage.setItem(DESIGNS_KEY, JSON.stringify((p.data && p.data.designs) || [])) } catch (e) { /* 忽略 */ }
+  api.designSaveNow('agc', p.scene, p.data).catch(() => { /* 卸载阶段失败：localStorage 兜底仍在 */ })
+}
+function onVisHide() { if (document.visibilityState === 'hidden') flushDesigns() }
 function loadDesigns() {
   try {
     const raw = localStorage.getItem(DESIGNS_KEY)

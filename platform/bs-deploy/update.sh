@@ -5,9 +5,10 @@
 # 用途（开发机执行，日常更新唯一通道）：
 #   本地构建前端/文档站产物 → rsync 源码到服务器 → 容器按需重建/热生效 → 健康检查
 #
-# 用法：bash platform/bs-deploy/update.sh [--server root@<主机>] [--skip-build] [--skip-config]
+# 用法：bash platform/bs-deploy/update.sh [--server root@<主机>] [--skip-build] [--skip-config] [--designs]
 #       （或统一入口：./update.sh bs，二者等价）
 #       --skip-config：本次**不**用本地 backend/config 覆盖服务器（默认每次都覆盖，见 [2/3]）
+#       --designs：本次**顺带**双向同步编排存档（默认不同步，见 [2/3]；日常走 ./update.sh designs）
 #   默认目标：71（root@36.151.146.71:/root/qzb/jianpai，Docker 源码卷挂载 + uvicorn --reload）
 #   说明：同步本地工作区（含未提交改动），改完即可上线；代码入库推送统一走仓库根入口
 #         ./update.sh github "提交信息" [--tag v1.0.0]（./update.sh all github ... = 全量同步 + 推送）。
@@ -37,11 +38,13 @@ IMAGE_NAME="ghcr.io/zhibinqiu/power_simulation:latest"
 # ---- 解析参数 ----
 RUN_BUILD=1
 SYNC_CONFIG=1
+SYNC_DESIGNS=0          # 编排存档默认不同步（用户口径：推送代码不带走编排，需 ./update.sh designs）
 while [ $# -gt 0 ]; do
   case "$1" in
     # 每个分支都必须 shift：漏掉会让 $# 不变 → while 死循环（进程 100% CPU 空转）
     --skip-build) RUN_BUILD=0; shift ;;
     --skip-config|--no-config) SYNC_CONFIG=0; shift ;;
+    --designs|--with-designs) SYNC_DESIGNS=1; shift ;;
     --server|--target) SERVER="${2:-$CLOUD_MAIN}"; shift 2 ;;
     *) echo "[error] 未知参数：${1}（-h 查看头部注释）" >&2; exit 1 ;;
   esac
@@ -88,7 +91,7 @@ EXTRA_EXCLUDES="--exclude=platform/doc-deploy/docs-site/node_modules
   --exclude=backend/data/reports/*** --exclude=backend/data/sessions.json
   --exclude=backend/data/carbon_compliance.json --exclude=backend/data/market_snapshot.json"
 # 显式 include 须先于排除规则（rsync「先匹配者生效」），防止后续新增宽泛排除误伤
-DATA_INCLUDES="--include=backend/knowledge/ --include=backend/knowledge/*** --include=backend/data/scenes/*** --include=backend/data/designs/***"
+DATA_INCLUDES="--include=backend/knowledge/ --include=backend/knowledge/*** --include=backend/data/scenes/***"
 # 覆盖前需要备份的服务器目录（本地为唯一真源，覆盖即生效，故先留回滚点）
 SYNC_DIRS="backend/config backend/data backend/knowledge"
 CFG_BACKUP_DIR=".devcfg-backup"
@@ -109,9 +112,27 @@ else
   echo "    · 本次跳过配置/数据同步（--skip-config），服务器 backend/config|data|knowledge 保持原样"
 fi
 
+# 编排存档（backend/data/designs/{flow,agc}.json）**默认不随代码推送同步**：
+# 它是用户在平台上编辑出来的运行期内容，本地 8010 与服务器 40014 各写各的一份，
+# 单向覆盖会把服务器上刚配好的编排（附加传感 / 采集设备绑定…）整体抹掉（表现即「编排被还原」）。
+# 因此默认整目录排除，两端各自保留；需要同步时显式执行（双向合并，两端收敛）：
+#   ./update.sh designs                    只同步编排，不构建、不动代码
+#   bash platform/bs-deploy/update.sh --designs   本次推送顺带合并并推送编排
+if [ "$SYNC_DESIGNS" = "1" ] && [ "$SYNC_CONFIG" = "1" ]; then
+  # 先排备份件、再 include（rsync「先匹配者生效」，顺序不可颠倒）
+  DESIGN_RULES="--exclude=backend/data/designs/*.bak.* --include=backend/data/designs/***"
+  bash "$SELF_DIR/sync_designs.sh" --server "$SERVER" --dir "$SERVER_DIR" --no-push \
+    || echo "    ⚠ 编排存档双向同步失败（不阻断推送，服务器存档保持原样）"
+else
+  # 放在既有 include 之后即可（本轮已无 designs 的 include，不会与之冲突）
+  DESIGN_RULES="--exclude=backend/data/designs/***"
+  echo "    · 本次不同步编排存档（流程编排 / AI 群控），两端各自保留；需同步请执行：./update.sh designs"
+fi
+
 echo "==> [2/3] rsync 源码 + 配置/数据 + 前端产物到服务器..."
 RSYNC_LOG="${TMPDIR:-/tmp}/nengtan-rsync-${BK_TS}.log"
 rsync_run $DATA_INCLUDES \
+  $DESIGN_RULES \
   $CFG_INCLUDES \
   "${LIB_EXCLUDE_COMMON[@]}" "${LIB_EXCLUDE_STATE[@]}" $EXTRA_EXCLUDES --itemize-changes \
   ./ "$SERVER:$SERVER_DIR/" | tee "$RSYNC_LOG"

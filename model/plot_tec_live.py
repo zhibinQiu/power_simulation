@@ -29,19 +29,19 @@
 
 【用法】
     # 实时盯采集（CSV 不存在也会等；每 2s 刷新）
-    python3 backend/tools/plot_tec_live.py tec_prbs_20260922_160000.csv
+    python3 model/plot_tec_live.py tec_prbs_20260922_160000.csv
 
     # 自动挑当前目录下最新的 tec_prbs_*.csv
-    python3 backend/tools/plot_tec_live.py --latest
+    python3 model/plot_tec_live.py --latest
 
     # 只看最近 20 分钟、每 5s 刷新
-    python3 backend/tools/plot_tec_live.py --latest --window 20 --refresh 5
+    python3 model/plot_tec_live.py --latest --window 20 --refresh 5
 
     # 无 GUI / 远程服务器上出一张静态图就退出
-    python3 backend/tools/plot_tec_live.py --latest --static --save /tmp/tec_run1.png
+    python3 model/plot_tec_live.py --latest --static --save /tmp/tec_run1.png
 
     # 实时模式同时定期把快照写到文件（每 30s 覆盖一次），随时可看
-    python3 backend/tools/plot_tec_live.py --latest --save /tmp/tec_live.png
+    python3 model/plot_tec_live.py --latest --save /tmp/tec_live.png
 
 依赖：matplotlib、pandas（仅本绘图脚本需要；采集脚本本身仍是纯标准库）。
 """

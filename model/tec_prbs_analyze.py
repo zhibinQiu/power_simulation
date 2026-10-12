@@ -3,7 +3,7 @@
 """TEC PRBS 实验数据分析与出图（方案.md 第 19 章图表复现脚本）。
 
 用法：
-    python3 backend/tools/tec_prbs_analyze.py
+    python3 model/tec_prbs_analyze.py
 输入：仓库根目录 tec_prbs_run.csv（prbs_tec_ident.py 采集）
 输出：方案.assets/fig1_prbs_response.png / fig2_static_nonlinearity.png / fig3_model_validation.png
 依赖：numpy、matplotlib
@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 plt.rcParams["font.sans-serif"] = ["PingFang SC", "Hiragino Sans GB", "Arial Unicode MS"]
 plt.rcParams["axes.unicode_minus"] = False
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 OUT = os.path.join(ROOT, "方案.assets")
 os.makedirs(OUT, exist_ok=True)
 
@@ -149,23 +149,25 @@ def report(name, best):
           % (name, d, d*TS, a, b, tau, K))
     print("  测试段一步预测 NRMSE=%.2f%%  R2=%.4f" % (nrmse*100, r2))
 
-report("慢通道 含初始段（对照）", fit_fopdt(cup, u, [air, env, wat], range(0, 13)))
-b_slow = fit_fopdt(cup[K0:], u[K0:], [air[K0:], env[K0:], wat[K0:]], range(0, 13))
+# DV 只取可测扰动（室温、热端冷却水），与方案 §2.1 的 m_k 口径一致；
+# zhileng-temp 不作为 DV，仅保留下面的快通道辨识供离线诊断（v3：不进入控制模型）。
+report("慢通道 含初始段（对照）", fit_fopdt(cup, u, [env, wat], range(0, 13)))
+b_slow = fit_fopdt(cup[K0:], u[K0:], [env[K0:], wat[K0:]], range(0, 13))
 report("慢通道 剔除初始段", b_slow)
-report("快通道 电流->风口", fit_fopdt(air[K0:], u[K0:], [], range(0, 9)))
+report("快通道 电流->风口（仅诊断）", fit_fopdt(air[K0:], u[K0:], [], range(0, 9)))
 
 sse, d2, th2, pred2, nrmse2, r2_2, ntr2, res2 = b_slow
 a2, b2 = th2[0], th2[1]
-print("  DV 系数：风口 %.4f  室温 %.4f  冷却水 %.4f  常数 %.3f"
-      % (th2[2], th2[3], th2[4], th2[5]))
+print("  DV 系数：室温 %.4f  冷却水 %.4f  常数 %.3f"
+      % (th2[2], th2[3], th2[4]))
 
 # 自由仿真（演示「一步拟合≠部署指标」）
 ysim = np.zeros(N - K0)
 ysim[0] = cup[K0]
 ud = np.concatenate([np.full(d2, u[K0]), u[K0: N - d2]])
 for k in range(N - K0 - 1):
-    ysim[k+1] = a2*ysim[k] + b2*ud[k] + th2[2]*air[K0+k] + th2[3]*env[K0+k] \
-               + th2[4]*wat[K0+k] + th2[5]
+    ysim[k+1] = a2*ysim[k] + b2*ud[k] + th2[2]*env[K0+k] \
+               + th2[3]*wat[K0+k] + th2[4]
 res_sim = cup[K0:] - ysim
 nrmse_sim = math.sqrt(np.mean(res_sim[ntr2:]**2)) / (np.max(cup[K0+ntr2:]) - np.min(cup[K0+ntr2:]))
 print("  自由仿真测试段 NRMSE=%.1f%%（对比一步预测：正式模型须用仿真误差准则 NLS 精修）"

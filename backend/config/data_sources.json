@@ -4,8 +4,7 @@
       "id": "box",
       "type": "box",
       "name": "能碳一体机",
-      "enabled": true,
-      "config": {}
+      "enabled": true
     },
     {
       "id": "steel_sim",

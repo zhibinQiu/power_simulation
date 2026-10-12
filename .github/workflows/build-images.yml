@@ -36,7 +36,6 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_BASE: ghcr.io/${{ github.repository }}
 
 jobs:
   build-push:
@@ -44,6 +43,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
+      # GHCR/Docker 镜像仓库名必须是**全小写**（大写会报
+      # "invalid tag: repository name must be lowercase"）。
+      # ${{ github.repository }} 原样是 zhibinQiu/power_simulation，含大写 Q，
+      # 必须小写化成 zhibinqiu/power_simulation；下划线是合法分隔符，保留。
+      - name: 解析镜像仓库名（强制小写）
+        id: image
+        run: |
+          BASE="$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          echo "base=${REGISTRY}/${BASE}" >> "$GITHUB_OUTPUT"
+          echo "镜像仓库：${REGISTRY}/${BASE}"
 
       - name: 提取版本号
         id: ver
@@ -73,8 +83,8 @@ jobs:
           file: platform/bs-deploy/Dockerfile
           push: true
           tags: |
-            ${{ env.IMAGE_BASE }}:latest
-            ${{ env.IMAGE_BASE }}:${{ steps.ver.outputs.tag }}
+            ${{ steps.image.outputs.base }}:latest
+            ${{ steps.image.outputs.base }}:${{ steps.ver.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -85,6 +95,6 @@ jobs:
           file: platform/bs-deploy/Dockerfile.docs
           push: true
           tags: |
-            ${{ env.IMAGE_BASE }}-docs:latest
+            ${{ steps.image.outputs.base }}-docs:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

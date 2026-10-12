@@ -102,6 +102,16 @@ export const api = {
   // 随 platform/bs-deploy/update.sh 同步到服务器（本地为真源）。localStorage 仅作离线兜底。
   designBucket: (bucket) => jget('/designs/' + encodeURIComponent(bucket)),
   designSave: (bucket, scene, data) => jput('/designs/' + encodeURIComponent(bucket), { scene, data }),
+  // 页面关闭 / 切到后台时立刻落库：普通 fetch 在卸载阶段会被浏览器直接取消，
+  // keepalive 让请求在页面销毁后仍由浏览器代为发出 —— 否则「配完附加传感就关页面」时
+  // 防抖（800ms）里的那次 PUT 会丢，服务端存档停在旧版本，下次打开又回到旧编排。
+  designSaveNow: (bucket, scene, data) =>
+    fetch(BASE + '/designs/' + encodeURIComponent(bucket), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scene, data }),
+      keepalive: true,
+    }).then((r) => r.json()),
   designDelete: (bucket, scene) =>
     fetch(BASE + '/designs/' + encodeURIComponent(bucket) + '/' + encodeURIComponent(scene),
       { method: 'DELETE' }).then((r) => r.json()),
