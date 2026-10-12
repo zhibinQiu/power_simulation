@@ -34,12 +34,14 @@
           </div>
           <span class="rdiv"></span>
           <div class="rbtns">
-            <!-- 编排无「保存」按钮：改动自动保存（本地存档 + 服务端 designs/flow），此处仅呈现保存状态。
-                 仿真模式下的编辑一律不落盘（退出仿真后恢复），故显式提示。 -->
-            <span class="rbtn autosave-tag" :class="{ on: store.autosaveState === 'saved', busy: store.autosaveState === 'saving' }"
-                  :title="store.simMode ? t('仿真模式下的改动不会保存，退出仿真后自动恢复') : t('编排改动自动保存（本地 + 服务端），无需手动保存')">
-              <Icon name="save"/><span>{{ autosaveLabel }}</span><i class="as-dot"></i>
-            </span>
+            <!-- 编排手动保存：改动只置「未保存」标记，点此按钮（或 Ctrl+S）才写入本地存档 + 服务端 designs/flow。
+                 仿真模式下的编辑一律不落盘（退出仿真后恢复），故禁用并显式提示。 -->
+            <button class="rbtn save-btn" :class="{ dirty: store.schemeDirty }"
+                    :disabled="store.simMode || !store.schemeDirty"
+                    @click="actions.saveScheme()"
+                    :title="store.simMode ? t('仿真模式下的改动不会保存，退出仿真后自动恢复') : (store.schemeDirty ? t('保存编排改动（本地存档 + 服务端）') : t('编排改动已保存'))">
+              <Icon name="save"/><span>{{ saveLabel }}</span><i v-if="store.schemeDirty" class="as-dot"></i>
+            </button>
           </div>
           <span class="rdiv"></span>
           <div class="rbtns">
@@ -161,11 +163,10 @@ const view = computed(() => {
   return 'twin'
 })
 
-// 编排自动保存状态文案（替代原「保存」按钮）：仿真态明确告知不落盘，避免误以为改动已保存
-const autosaveLabel = computed(() => {
+// 编排保存按钮文案：有改动时强调「未保存」，已保存时置灰
+const saveLabel = computed(() => {
   if (store.simMode) return t('仿真模式')
-  if (store.autosaveState === 'saving') return t('保存中…')
-  return store.autosaveState === 'saved' ? t('已自动保存') : t('自动保存')
+  return store.schemeDirty ? t('未保存') : t('已保存')
 })
 </script>
 
@@ -187,18 +188,13 @@ const autosaveLabel = computed(() => {
 .view-switch.on:hover { background: var(--accent-d); color: #fff; }
 .app.sim-dark .view-switch.on { background: var(--accent); border-color: transparent; }
 .app.sim-dark .view-switch.on:hover { background: var(--accent-d); }
-/* 编排自动保存状态标签（非按钮）：常驻显示保存态，圆点随状态变色（灰=待保存/绿=已保存/蓝=保存中） */
-.autosave-tag {
-  cursor: default; color: var(--muted); opacity: 0.85; user-select: none;
-}
-.autosave-tag:hover { background: transparent; color: var(--muted); }
-.autosave-tag.on { color: var(--green); }
-.autosave-tag.busy { color: var(--accent); }
+/* 编排「保存」按钮（手动保存）：无改动时置灰，有改动时主题色高亮 + 呼吸圆点 */
+.save-btn.dirty { color: var(--accent); border-color: var(--accent); }
+.save-btn.dirty:hover { background: var(--accent); color: #fff; border-color: transparent; }
+.app.sim-dark .save-btn.dirty:hover { background: var(--accent-d); color: #fff; }
 .as-dot {
   flex: 0 0 auto; width: 7px; height: 7px; margin-left: 5px;
-  border-radius: 50%; background: var(--muted); opacity: 0.55;
+  border-radius: 50%; background: var(--accent); opacity: 1; animation: as-blink 1s ease-in-out infinite;
 }
-.autosave-tag.on .as-dot { background: var(--green, #2f9e5f); opacity: 1; }
-.autosave-tag.busy .as-dot { background: var(--accent); opacity: 1; animation: as-blink 1s ease-in-out infinite; }
 @keyframes as-blink { 0%, 100% { opacity: 1 } 50% { opacity: 0.25 } }
 </style>

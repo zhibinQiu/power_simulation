@@ -30,6 +30,7 @@
             <span v-if="isRunning(m.id)" class="mc-live"><i class="dot"></i>{{ t('运行中') }}</span>
             <span class="mono mc-ts">{{ shortTs(m.ts) }}</span>
             <span class="mc-ops">
+              <button class="lk" :class="isRunning(m.id) ? 'danger' : 'run'" :disabled="!isRunning(m.id) && !canRunModel(m)" :title="isRunning(m.id) ? t('停止') : (canRunModel(m) ? t('启动') : runTipOf(m))" @click.stop="toggleModel(m)">{{ isRunning(m.id) ? t('停止') : t('启动') }}</button>
               <button class="lk" @click.stop="renameModel(m)">{{ t('重命名') }}</button>
               <button class="lk" @click.stop="dupModel(m)">{{ t('复制') }}</button>
               <button class="lk danger" @click.stop="delModel(m)">{{ t('删除') }}</button>
@@ -185,7 +186,7 @@
               <span class="ct">{{ t('规则编排') }}</span>
               <span class="cs">{{ t('开始 → 可调 / 传感 → if / AND / OR → 下游模块 → 结束') }}</span>
             </div>
-            <RuleFlowEditor ref="rfRef" :key="cur.id" class="rf-fill" :graph="cur.graph" :running="running" :period="cur.period" />
+            <RuleFlowEditor ref="rfRef" :key="cur.id" class="rf-fill" :graph="cur.graph" :running="running" :period="cur.period" :model-id="cur.id" />
           </section>
 
           <!-- 强化学习：训练控制台 + 奖励 + 版本 -->
@@ -438,8 +439,10 @@ function curSp(id) {
 function setSp(id, v) {
   const n = Number(v)
   if (!Number.isFinite(n)) return
-  // 统一入口：本地设定；编排中已绑定数据源设备可写点位的可变设备会自动下发写入
-  store.setExtSetpoint(id, Math.min(spMax(id), Math.max(spMin(id), n)))
+  const val = Math.min(spMax(id), Math.max(spMin(id), n))
+  // 编排编辑态（未运行）只改编排里的设定值、不下发到现场设备 —— 按约定「编排完成后点运行才生效」；
+  // 运行中改值则即时下发（force：同值也重发，便于现场设备被改动 / 重启后重新对齐）。
+  store.setExtSetpoint(id, val, running.value ? { force: true } : { localOnly: true })
 }
 /** 滑杆 / 数字框直调设定值（PID 自动调控时控件已禁用） */
 function onSpSlide(id, e) { setSp(id, e.target.value) }
@@ -1213,17 +1216,28 @@ watch([() => adjList.value.length, () => senList.value.length], () => {
 onMounted(() => {
   loadVers()
   loadDesigns()
-  pullDesigns()   // 服务端群控编排存档优先（本地为离线兜底）
+  pullDesigns().then(() => {
+    // 服务端不可用时的离线兜底：本地记的运行态（服务端拉到时以服务端为准）
+    if (runId.value) return
+    try {
+      const lr = localStorage.getItem(AGC_RUN_KEY) || ''
+      if (lr && designs.value.some((m) => m.id === lr)) resumeRun(lr)
+    } catch (e) { /* 忽略 */ }
+  })   // 服务端群控编排存档优先（本地为离线兜底）
   if (versions.value.length) activeVer.value = versions.value[0].id
   scheduleNext()
   autoTimer = setInterval(checkAuto, 15000)
+  // 服务端运行器状态轮询：规则执行在服务端（不依赖本页是否打开），本端只同步运行态与画布高亮
+  rtTimer = setInterval(pollRuntime, 2000)
+  pollRuntime()
   window.addEventListener('pagehide', flushDesigns)
   document.addEventListener('visibilitychange', onVisHide)
 })
 onBeforeUnmount(() => {
   trainStop.value = true
-  runId.value = ''
+  // 不清 runId：运行态是全局的，关掉本视图服务端仍在跑，下次进来仍应显示「运行中」
   stopSample()
+  if (rtTimer) { clearInterval(rtTimer); rtTimer = null }
   flushDesigns()   // 切走视图也补发一次，避免防抖里的群控编排改动丢失
   window.removeEventListener('pagehide', flushDesigns)
   document.removeEventListener('visibilitychange', onVisHide)
@@ -1274,10 +1288,13 @@ const designs = ref([])
 const newOpen = ref(false)
 const newName = ref('')
 const newAlg = ref('rule')
-const runId = ref('')              // 正在运行的模型 id
+// 正在运行的模型 id。运行态是全局状态：写进服务端群控存档（agc 桶的 running 字段），
+// 换电脑 / 重开浏览器打开仍是运行态，并由 sim store 的后台运行器继续按周期执行下发。
+const runId = ref('')
+const AGC_RUN_KEY = 'nengtan.agc.running.v1'
 
 const isRule = computed(() => !!cur.value && cur.value.alg === 'rule')
-/** 运行状态由父级（编排页右上角「运行」）统一下发，编排体自身不再各带开关 */
+/** 运行状态由父级（编排页右上角「运行」/ 模型库卡片「启动」）统一下发，编排体自身不再各带开关 */
 const running = computed(() => !!cur.value && runId.value === cur.value.id)
 function isRunning(id) { return !!id && runId.value === id }
 
@@ -1312,10 +1329,11 @@ function persist() {
   saveTimer = setTimeout(() => {
     try { localStorage.setItem(DESIGNS_KEY, JSON.stringify(designs.value.slice(0, 50))) } catch (e) { /* 忽略 */ }
   }, 200)
-  // 同步到服务端（backend/data/designs/agc.json）：服务端存档是跨端真源，随代码同步到服务器实例
+  // 同步到服务端（backend/data/designs/agc.json）：服务端存档是跨端真源，随代码同步到服务器实例。
+  // running 每次都取当前值（而非快照）—— 否则一次编辑保存会把刚切换的运行态覆盖回旧值。
   try {
     const scene = designScene()
-    pushPending = { scene, data: { designs: designs.value.slice(0, 50), updatedAt: Date.now() } }
+    pushPending = { scene, data: { designs: designs.value.slice(0, 50), updatedAt: Date.now(), running: runId.value ? [runId.value] : [] } }
     clearTimeout(pushTimer)
     pushTimer = setTimeout(() => {
       const p = pushPending
@@ -1344,18 +1362,27 @@ function loadDesigns() {
   } catch (e) { designs.value = [] }
   seedDcExample()
 }
-// 服务端存档优先（较新者胜出）：使开发机做好的群控编排能随代码同步到其它实例
+// 服务端为准：服务器实例是群控编排的权威侧，服务端有存档就无条件采用，
+// 本地 localStorage 只作离线兜底（不再按 ts 比对，否则两端永远不同步）
 async function pullDesigns() {
   try {
     const r = await api.designBucket('agc')
     const remote = (r && r.data) ? r.data[designScene()] : null
     const arr = remote && Array.isArray(remote.designs) ? remote.designs.filter((m) => m && m.id) : null
     if (!arr) return
-    // 本地有更新的改动（任一模型 ts 晚于远端存档时间）时保留本地，避免覆盖刚编辑完的编排
-    const localNewest = designs.value.reduce((mx, m) => Math.max(mx, Number((m && m.ts) || 0)), 0)
-    if (localNewest && Number(remote.updatedAt || 0) && localNewest > Number(remote.updatedAt)) return
     designs.value = arr.map(normalizeModel)
     try { localStorage.setItem(DESIGNS_KEY, JSON.stringify(designs.value.slice(0, 50))) } catch (e) { /* 忽略 */ }
+    // 运行态同样以服务端为准：换电脑 / 重开浏览器打开，运行中的策略在这里接着跑
+    const run = remote && (Array.isArray(remote.running)
+      ? remote.running
+      : (typeof remote.running === 'string' ? [remote.running] : []))
+    const rid = run.filter((id) => designs.value.some((m) => m.id === id))[0] || ''
+    // 同样跳过本地优先窗口：拉存档与拉运行器状态是两条链路，别让旧值把刚点的启停弹回去
+    if (rid !== runId.value && Date.now() >= runLocalUntil) {
+      if (runId.value) stopModel(runId.value, true)
+      if (rid) resumeRun(rid)
+    }
+    try { localStorage.setItem(AGC_RUN_KEY, runId.value || '') } catch (e) { /* 忽略 */ }
   } catch (e) { /* 服务端不可用时沿用 localStorage */ }
 }
 
@@ -1426,17 +1453,26 @@ watch([selAdj, selSen, spOf], () => {
 }, { deep: true })
 // 模型的编排内容（规则图 / 粒子群参数 / 周期 / 名称）变更即落盘
 watch(() => cur.value, (m) => { if (m) persist() }, { deep: true })
+// 运行中改周期：重启后台运行器，让新的执行周期立即生效
+watch(() => (cur.value ? Number(cur.value.period) || 2 : 0), () => {
+  const m = cur.value
+  if (m && isRunning(m.id) && m.alg === 'rule') { store.stopAgcRule(m.id); store.startAgcRule(m) }
+})
 
 function enter(m) {
   if (!m) return
-  // 只允许一个模型在运行：切到别的模型即停掉上一个（编排体卸载后定时器也随之失效）
-  if (runId.value && runId.value !== m.id) runId.value = ''
   cur.value = m
   page.value = 'edit'
   loadSel(m)
+  // 进入的正是运行中的强化学习模型：补上采样 / 训练（这类定时器只在编排页存活）
+  if (isRunning(m.id) && m.alg === 'rl') {
+    syncRuns()
+    startSample()
+    if (canTrain.value) startTrain()
+  }
 }
 function back() {
-  stopRun()
+  // 返回模型库不停策略：运行态是全局的，后台运行器继续按周期执行下发
   cur.value = null
   page.value = 'lib'
 }
@@ -1481,7 +1517,7 @@ function dupModel(m) {
 async function delModel(m) {
   const ok = await store.confirm({ title: t('删除模型'), message: t('删除后该模型的编排配置不可恢复，确认删除？'), danger: true })
   if (!ok) return
-  if (runId.value === m.id) runId.value = ''
+  if (runId.value === m.id) stopModel(m.id, true)
   designs.value = designs.value.filter((x) => x.id !== m.id)
   persist()
 }
@@ -1541,26 +1577,136 @@ const runStateTxt = computed(() => {
   if (curve.value.length) return `${t('已完成')} ${iterN.value} ${t('轮')}`
   return t('待运行')
 })
-function toggleRun() {
-  const m = cur.value
+// ─────────── 服务端运行器（策略在服务端常驻执行，本端只同步状态） ───────────
+// 规则执行由 backend/app/domain/scene/agc_runner.py 常驻线程承担：点「运行」后只要不手动停止
+// 就一直跑，关浏览器 / 换电脑都不影响。本端每 2s 拉一次状态：同步运行态（另一端启停也能看到）
+// 与最近一轮执行结果（画布高亮）。服务端运行器不可用时才退回本地执行（见 startModel）。
+let rtTimer = null
+const backendRunner = ref(false)
+// 本端刚改过运行态的「本地优先窗口」：存档推送后服务端运行器要 1~2s 才读到新值，
+// 这期间轮询拉回来的仍是旧态 —— 若直接回灌，界面会瞬间弹回「启动」，表现为「要点好几下才生效」。
+let runLocalUntil = 0
+function markRunLocal() { runLocalUntil = Date.now() + 5000 }
+/** 以服务端运行态为准同步本地显示（另一端点了启停，本端也跟着变） */
+function syncRunFromServer(ids) {
+  const id = (ids && ids.length) ? ids[0] : ''
+  if (id === runId.value) return
+  if (Date.now() < runLocalUntil) return                      // 本地优先窗口内：等服务端追上
+  if (id && !designs.value.some((m) => m.id === id)) return   // 属于其它场景的模型，不管
+  if (runId.value) store.stopAgcRule(runId.value)             // 本地兜底执行器让位给服务端
+  runId.value = id
+  try { localStorage.setItem(AGC_RUN_KEY, id) } catch (e) { /* 忽略 */ }
+}
+const zeroSeen = {}   // modelId -> 已处理过的归零时间戳（避免重复处理同一条）
+async function pollRuntime() {
+  try {
+    const r = await api.agcRuntime()
+    if (!r || !r.ok) { backendRunner.value = false; return }
+    backendRunner.value = !!r.online
+    if (r.last) store.agcLast = r.last
+    // 服务端停止某策略时会把它的设定值归零并下发；本端把界面上的值同步成 0
+    // （停止可能发生在另一端 / 浏览器没打开的时候，所以每次拉到新的归零记录都补一次）
+    for (const mid of Object.keys(r.zero || {})) {
+      const z = (r.zero || {})[mid]
+      if (!z || !z.ts || (zeroSeen[mid] || 0) >= z.ts) continue
+      zeroSeen[mid] = z.ts
+      for (const id of (z.devs || [])) store.setExtSetpoint(id, 0, { localOnly: true })
+    }
+    const ids = (r.running || []).map((x) => x && x.id).filter(Boolean)
+    syncRunFromServer(ids)
+  } catch (e) { backendRunner.value = false }   // 服务端不可用时沿用本地执行
+}
+
+/** 运行态是否可启动（模型库卡片按钮用，不依赖当前打开的模型） */
+function canRunModel(m) {
+  if (!m) return false
+  if (m.alg === 'rule') return hasFlowPath(m.graph)
+  if (m.alg === 'pso') return (m.pso.vars || []).length > 0 && !!m.pso.senId
+  return (m.selAdj || []).length > 0 && (m.selSen || []).length > 0
+}
+function runTipOf(m) {
+  if (!m) return ''
+  if (m.alg === 'rule') return t('请先用「开始 / 结束」模块把流程连通：开始 → 条件判断 / 可调设备 → 结束')
+  if (m.alg === 'pso') return t('请先选择优化变量（可调设备）与优化目标（传感设备）')
+  return t('请先在左栏勾选可调设备与传感设备（按勾选顺序一一配对形成控制回路）')
+}
+/** 运行态立刻落到服务端：启停是低频动作，不等 600ms 防抖，避免「点了运行但另一端看不到」 */
+function persistRunning() {
+  markRunLocal()   // 本端刚改过：先以本端为准，别被尚未追上的服务端旧存档弹回去
+  try { localStorage.setItem(AGC_RUN_KEY, runId.value || '') } catch (e) { /* 忽略 */ }
+  try {
+    const scene = designScene()
+    const data = { designs: designs.value.slice(0, 50), updatedAt: Date.now(), running: runId.value ? [runId.value] : [] }
+    // 已立即推送：清掉待发的防抖载荷，否则页面关闭时会再补发一份不带最新运行态的旧数据
+    pushPending = null
+    clearTimeout(pushTimer)
+    api.designSaveNow('agc', scene, data).catch(() => { /* 失败不影响本地运行态，下次编辑仍会带上 */ })
+  } catch (e) { /* 忽略 */ }
+}
+/** 启动：规则模型交给 store 的后台运行器（离开本页 / 关掉编排页也继续按周期执行下发） */
+function startModel(m) {
   if (!m) return
-  if (running.value) { stopRun(); return }
-  if (!canRun.value) return
+  if (runId.value && runId.value !== m.id) stopModel(runId.value, true)   // 同时只允许一个策略在运行
   runId.value = m.id
-  if (m.alg === 'rl') {
+  // 规则模型：服务端运行器在线时由它执行（关掉浏览器也照跑）；否则退回本地兜底执行
+  if (m.alg === 'rule') { if (!backendRunner.value) store.startAgcRule(m) }
+  else if (m.alg === 'rl') {
+    syncRuns()
+    startSample()
+    if (canTrain.value) startTrain()
+  }
+  persistRunning()
+}
+/** 停止即归零：流程里所有可调模块的设定值置 0（不留残余设定值）。
+ *  localOnly —— 服务端运行器在线时由它下发归零，本端只把界面上的设定值同步成 0；
+ *               否则本端直接下发，保证设备真的停下来。 */
+function zeroSetpoints(m, localOnly) {
+  const ids = (((m && m.graph) ? m.graph.nodes : null) || [])
+    .filter((n) => n && n.kind === 'adj' && n.devId)
+    .map((n) => n.devId)
+  for (const id of ids) {
+    store.setExtSetpoint(id, 0, localOnly ? { localOnly: true } : { silent: true, force: true })
+  }
+  return ids
+}
+/** 停止：quiet = 内部切换（由其它动作连带），不重复写服务端 */
+function stopModel(id, quiet) {
+  const m = id ? designs.value.find((x) => x.id === id) : cur.value
+  if (m && m.alg === 'rl') { stopTrain(); stopSample() }
+  store.stopAgcRule((m && m.id) || id || '')
+  // 停止后流程中所有涉及设定的值归零
+  if (m && m.alg === 'rule') zeroSetpoints(m, backendRunner.value)
+  runId.value = ''
+  if (!quiet) persistRunning()
+}
+/** 恢复服务端记录的运行态（打开页面 / 换端时） */
+function resumeRun(id) {
+  const m = designs.value.find((x) => x.id === id)
+  if (!m) return
+  runId.value = id
+  if (m.alg === 'rule') store.startAgcRule(m)
+  // 强化学习 / 粒子群的采样与训练定时器只在编排页存活：进页时补，见 enter()
+  else if (page.value === 'edit' && cur.value && cur.value.id === id && m.alg === 'rl') {
     syncRuns()
     startSample()
     if (canTrain.value) startTrain()
   }
 }
-function stopRun() {
+function toggleModel(m) {
+  if (!m) return
+  if (isRunning(m.id)) stopModel(m.id)
+  else if (canRunModel(m)) startModel(m)
+}
+function toggleRun() {
   const m = cur.value
   if (!m) return
-  if (m.alg === 'rl') { stopTrain(); stopSample() }
-  runId.value = ''
+  if (running.value) { stopModel(m.id); return }
+  if (!canRun.value) return
+  startModel(m)
 }
+function stopRun() { stopModel(runId.value) }
 /** 粒子群寻优结束（或被中断）由子面板回报 */
-function onPsoRun(v) { if (!v) runId.value = '' }
+function onPsoRun(v) { if (!v) stopModel(cur.value && cur.value.id) }
 
 defineExpose({ startSample, stopSample, enter, back })
 </script>
@@ -1667,7 +1813,32 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
 }
 .mcard:hover { background: var(--panel-2); border-color: color-mix(in srgb, var(--accent-d) 42%, var(--border)); }
 .mcard:focus-visible { outline: none; border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent-l); }
-.mcard.live { border-color: color-mix(in srgb, var(--green) 45%, var(--border)); }
+/* 运行中的卡片：绿色呼吸边框 + 外扩光环 + 顶部流光扫描，模型库里一眼看出哪个策略在跑 */
+.mcard.live {
+  overflow: hidden;
+  background: color-mix(in srgb, var(--green) 5%, var(--panel));
+  animation: agc-card-breathe 2.4s ease-in-out infinite;
+}
+/* 顶部流光：沿卡片上沿来回扫，表示策略在按周期持续执行 */
+.mcard.live::before {
+  content: ''; position: absolute; top: 0; left: 0; height: 2px; width: 36%;
+  background: linear-gradient(90deg, transparent, var(--green), transparent);
+  animation: agc-scan 2s linear infinite; pointer-events: none;
+}
+/* 外扩光环：与呼吸点同频，远看也能定位到运行中的那张卡 */
+.mcard.live::after {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+  animation: agc-ring 2.4s ease-out infinite;
+}
+@keyframes agc-card-breathe {
+  0%, 100% { border-color: color-mix(in srgb, var(--green) 32%, var(--border)); }
+  50% { border-color: color-mix(in srgb, var(--green) 82%, var(--border)); }
+}
+@keyframes agc-scan { from { transform: translateX(-110%); } to { transform: translateX(320%); } }
+@keyframes agc-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 42%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 7px transparent; }
+}
 .mc-top { display: flex; align-items: center; gap: 7px; }
 /* 算法标识由图标色块承载（取代原先的左侧彩色竖条） */
 .mc-ic {
@@ -1688,10 +1859,22 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
 .mc-st b { font-size: var(--fs-b); font-weight: var(--fw-m); color: var(--muted); }
 .mc-ft { display: flex; align-items: center; gap: 8px; }
 .mc-ts { font-size: var(--fs-s); color: var(--faint); }
-.mc-live { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-s); color: var(--green); }
-.mc-live .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: agc-pulse 1s infinite; }
+.mc-live {
+  display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-s); color: var(--green);
+  animation: agc-live-txt 2.4s ease-in-out infinite;
+}
+.mc-live .dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 55%, transparent);
+  animation: agc-pulse 1.2s ease-in-out infinite;
+}
+@keyframes agc-live-txt { 0%, 100% { opacity: .72; } 50% { opacity: 1; } }
 .mc-ops { margin-left: auto; display: inline-flex; gap: 8px; }
 .mc-ops .lk { color: var(--faint); }
+/* 模型库卡片上的「启动」：绿色，与卡片运行中的绿色呼吸点同一语义 */
+.mc-ops .lk.run { color: var(--green); font-weight: var(--fw-m); }
+.mc-ops .lk:disabled { opacity: .45; cursor: not-allowed; }
+.mc-ops .lk:disabled:hover { color: var(--faint); }
 .mcard:hover .mc-ops .lk { color: var(--muted); }
 .mc-ops .lk:hover { color: var(--accent-d); }
 .mc-ops .lk.danger:hover { color: var(--red); }

@@ -5,6 +5,8 @@ import { visiblePoll } from '../utils/poll'
 import { api, openFeed } from '../api/client'
 import { buildScheme, makeProcessNode, makeDeviceNode, makeMaterialNode, PROCESS_MAP, MATERIAL_MAP, PROCESS_ADJUSTABLE, DEVICE_MAP, DEVICE_COUPLE_REGISTRY, deriveProcessOpParams, materialFamily, loadCalibrations, registerSceneMaterials, NODE_NW, NODE_HEADER, NODE_PORT_Y0, NODE_GAP, nodeHeight, PROCESS_TEMPLATES, applySetpointResponse, migrateLegacyDevices, treeLayoutNodes } from '../data/flowLibrary'
 import { computeScheme } from '../flow/compute'
+// 规则执行器（纯函数）：AI 群控运行态策略由本 store 的后台运行器按周期执行时用它求值
+import { evalFlowGraph } from '../utils/ruleFlow'
 import { PARK } from '../data/park'
 // 通用附加设备库（传感器 / 可变设备，所有场景可用）：
 // 与「工艺类型 → 典型可调设备」不同，附加设备是用户在某工艺节点上按需添加的，
@@ -52,6 +54,20 @@ const uid = (p) => `${p}_${Date.now().toString(36)}${(_idc++).toString(36)}`
 // 数据源管理设备列表轮询：_boxSrcBusy 防并发重入，_boxSrcTimer 常驻定时器
 let _boxSrcBusy = false
 let _boxSrcTimer = null
+// 可变设备设定值「下发去重」：extId -> { v, ts }。
+// 规则 / 算法每轮都会调用设定入口，若不去重会按运行周期（默认 2s）持续往盒子发 cmd 写命令，
+// 形成命令风暴并反复改写现场状态。同值保持期内不再下发；失败则按较短间隔允许重试。
+const _extWriteLast = {}
+const _EXT_WRITE_KEEP_MS = 30000    // 下发成功后：同值 30s 内不重复下发
+const _EXT_WRITE_RETRY_MS = 10000   // 下发失败后：至少 10s 才重试（避免每轮重发）
+// 静默（自动执行）模式下失败提示的节流时间戳：extId -> ms
+const _extWriteErrAt = {}
+// ── AI 群控后台运行器 ──
+// 运行态（哪个模型在跑）由服务端存档保存，换电脑 / 重开浏览器拉到运行态后就在这里恢复执行，
+// 不再依赖「是否停留在编排页」——此前执行定时器挂在画布组件内，一离开编排页策略就停了。
+let _agcTimer = null
+let _agcModel = null      // 运行中的模型（持引用：编排改动即时生效）
+let _agcState = null      // 跨轮次状态（循环模块的挂起轮次）
 // 数值展示：保留 2 位小数并去掉末尾多余的 0
 const fmtNum = (v) => (v == null || isNaN(v) ? '—' : Number(v).toFixed(2).replace(/\.?0+$/, ''))
 
@@ -430,9 +446,8 @@ const cloneScheme = (scheme) => JSON.parse(JSON.stringify(scheme))
 let _refreshTimer = null   // 刷新防抖定时器（模块级，避免进入响应式 state）
 let _refreshSeq = 0       // 刷新序号：丢弃过期响应，避免旧请求覆盖新状态
 let _simSnapshot = null   // 仿真模式进入时的全量快照（模块级，避免进入响应式 state）
-let _schemePushTimer = null  // 编排方案同步到服务端的防抖定时器（模块级，避免进入响应式 state）
-let _schemePushPending = null // 待推送的编排存档（{ sceneId, data }）：防抖窗口内关页面时靠它补发
-let _designFlushBound = false // 页面隐藏/卸载的补发监听只绑一次
+let _schemeDirtyBound = false // 编排「改动检测」监听只绑一次（手动保存模式：只标脏，不落盘）
+let _simPrevDirty = false     // 进入仿真前的未保存标记：仿真态编辑不落盘，退出后应回到该状态
 let _simParamSnapshot = null  // 仿真进入时的参数快照（「仿真前 → 当前」变化展示用，模块级）
 const _snapParams = (model) => {  // 提取各工序参数：{ unitId: { key: val } }
   const out = {}
@@ -536,6 +551,9 @@ export const useSimStore = defineStore('sim', {
     deviceHistory: {},        // 各设备历史读数序列：devId -> [{t, v}]
     deviceLive: {},           // 各设备实时读数：devId -> number
     deviceSetpoints: {},      // 可调设备设定值覆盖：devId -> number（视图态/编辑态统一存储，驱动实时读数与碳引擎折算）
+    // ── AI 群控运行态 ──
+    agcRunId: '',             // 正在运行的群控模型 id（空 = 无）；由服务端存档恢复，跨端一致
+    agcLast: {},              // 运行器每轮结果：modelId -> { ts, ok, acts, nodes[], edges[], branch }（供画布高亮）
     deviceExtraSetpoints: {}, // 可调设备附加可调项（如鼓风机鼓风湿度）：devId -> { key: number }
     deviceMeta: {},           // 设备元数据（后端 /api/devices/history 的 meta）
     dvSources: [],            // 工况数据分析数据源：从左侧「场景」资源树拖入的设备（对象数组，跨视图保留；拖回场景即移除）
@@ -570,10 +588,10 @@ export const useSimStore = defineStore('sim', {
     selectedFlowId: null,   // 画布中选中的节点 id
     selectedGroupId: null,  // 画布中选中的小组 id
     flowBackId: null,       // 属性面板跳转来源工艺节点 id（主工艺→分支辅助工艺后，面板显示「返回」）
-    // 编排自动保存状态（编排无「保存」按钮，改动一律自动落盘）：
-    // idle 初始 / saving 检测到改动待落盘 / saved 已写入本地存档（服务端同步异步跟进）
-    autosaveState: 'idle',
-    autosaveAt: 0,          // 最近一次自动保存时间戳（ms），工具条据此显示「已自动保存」
+    // 编排保存状态：手动保存模式下，任何编辑只置 schemeDirty=true（不落盘），
+    // 由工具条「保存」按钮 / Ctrl+S 触发 saveScheme() 才写入本地存档 + 服务端 designs/flow。
+    schemeDirty: false,
+    schemeSavedAt: 0,       // 最近一次手动保存时间戳（ms）
 
     // ---- 编排画布视图变换（缩放/平移）：提升为单一真源，供顶栏「编排」工具条驱动 ----
     flowTf: { scale: 1, tx: 40, ty: 30 },
@@ -986,8 +1004,7 @@ export const useSimStore = defineStore('sim', {
         await this._runRefresh()  // 首屏立即重算（不走防抖），保证 KPI 就绪；非钢场景走本地静态核算
         if (!booted) await this.loadStrategies()
         this.ready = true
-        this._bindAutosave()   // 编排编辑自动保存（任何场景通用）
-        this._bindDesignFlush() // 关页面 / 切后台时把编排存档补发到服务端
+        this._bindSchemeDirty() // 编排改动检测（手动保存模式：只置「未保存」标记，不自动落盘）
         this.notify('success', t('系统就绪'), t('数字孪生已载入 {units} 个工序、{flows} 条物流，实时链路与优化模型已就绪。', { units: this.model.units.length, flows: this.model.flows.length }))
         this._startFeed()
         // AI 优化模型：同步训练上下文并轮询状态（后台定时训练由后端调度，前端展示「逐渐变优」）
@@ -1034,7 +1051,7 @@ export const useSimStore = defineStore('sim', {
             delete bfNode.params.sinter_ratio
             delete bfNode.params.pellet_ratio
             delete bfNode.params.lump_ratio
-            this._saveScheme()
+            this._saveScheme()   // 旧档格式迁移：一次性换算写回存档（非用户编辑，不属于自动保存）
           }
         }
         // 迁移：彻底移除历史方案中的旧 facility 节点（旧「工辅/设施」概念已删除，仅处理存量数据）
@@ -1816,6 +1833,7 @@ export const useSimStore = defineStore('sim', {
     // ---- 仿真模式：进入保存快照，退出恢复；仿真期间所有编辑不持久化 ----
     enterSim() {
       if (this.simMode) return
+      _simPrevDirty = this.schemeDirty   // 仿真态的一切改动都不落盘，退出仿真后未保存标记应回到此值
       this.simMode = true
       // 仿真模式：数字孪生场景环境自动切换为「虚空」
       if (this.envMode !== 'void') this.setEnvMode('void')
@@ -1891,6 +1909,9 @@ export const useSimStore = defineStore('sim', {
       }
       this.refresh()
       this.sceneRev++
+      // 恢复快照会改动 scheme（触发标脏 watch）：明确还原为进入仿真前的未保存标记
+      this.schemeDirty = _simPrevDirty
+      nextTick(() => { this.schemeDirty = _simPrevDirty })
       this.toast = t('已退出仿真模式，恢复仿真前状态')
     },
     // 一键把当前全部参数保存为策略（供仿真模式「保存策略」按钮调用）
@@ -2075,6 +2096,7 @@ export const useSimStore = defineStore('sim', {
         } else {
           await this._loadSteelSession()
         }
+        // 切场景按模板整体重建了方案：直接固化落盘（非编排编辑动作，避免跨场景存档错乱）
         this._saveScheme()
         // sceneVersion：左右面板（资源树 / 检视器）以它为 :key 重建，清空本地折叠态/档位等残留
         this.sceneVersion++
@@ -2568,8 +2590,9 @@ export const useSimStore = defineStore('sim', {
       // 收起右栏：编排态下右栏专为编排属性服务，退出后不留空面板占位；
       // 后续点选任意工序 / 设备 / 物料时由各自的 select* 自动重新展开
       this.rightOpen = keepAgent
-      this.toast = t('已应用编排方案，刷新孪生视图')
-      this._saveScheme()   // 持久化编排结果，刷新后保持最后一次编排状态
+      // 手动保存：完成编排（关闭编排标签）不再自动落盘，有未保存改动时明确提示
+      if (this.schemeDirty) this.showToast(t('已应用编排方案：改动尚未保存，点工具条「保存」后才会持久化'), 'warn')
+      else this.toast = t('已应用编排方案，刷新孪生视图')
       // sceneRev 的触发由 SceneViewer 的 flowEditing watch 统一管理，
       // 确保 DOM 可见 + resize 完成后再 rebuildScene，避免 canvas 0x0 导致相机投影矩阵 NaN
     },
@@ -2584,7 +2607,7 @@ export const useSimStore = defineStore('sim', {
       this.selectedFlowId = null
       this.selectedGroupId = null
       try { localStorage.setItem('sim.processRoute', route) } catch (e) {}
-      this._saveScheme()   // 持久化当前模板方案，刷新后保持
+      this._markDirty()      // 载入模板属于编辑：只置未保存标记，由「保存」按钮落盘
       // 切模板后必须重编译模型并重算（与 openProject 对齐）：否则 model / baseline 仍挂着
       // 旧模板的工艺节点 id，而新方案节点 id 已更换 —— 管道速率、设备树、KPI 会整片取不到值。
       this.compileSchemeToModel()
@@ -2595,24 +2618,34 @@ export const useSimStore = defineStore('sim', {
       if (this.editMode) this.flowZoomFit()
       this.toast = route === 'short' ? t('已载入短流程炼钢模板') : t('已载入长流程炼钢模板')
     },
-    // 编排自动保存（编排无「保存」按钮，这是唯一的保存入口）：
-    // 任何场景（钢铁 / 资源包）下的编辑（增删节点、连线、参数、设备设定、物料覆盖）
-    // 均防抖 400ms 写入本地存档 + 服务端 designs/flow，下次打开（刷新页面或切换场景后切回）
-    // 自动恢复最后一次编排结果；「应用到孪生场景与仿真计算」由完成编排（exitEdit）统一编译刷新。
-    _bindAutosave() {
-      if (this._autosaveBound) return
-      this._autosaveBound = true
-      let timer = null
+    // 手动保存：编排唯一落盘入口（工具条「保存」按钮 / Ctrl+S）。
+    // 本地存档 + 服务端 designs/flow 一次写入；未保存前刷新页面，改动按设计丢弃。
+    saveScheme() {
+      if (this.simMode) { this.showToast(t('仿真模式下的改动不会保存，退出仿真后自动恢复'), 'warn'); return false }
+      this._saveScheme()
+      this.showToast(t('编排已保存'), 'success')
+      return true
+    },
+    // 编排改动检测（替代原自动保存）：
+    // 任何场景（钢铁 / 资源包）下的编辑（增删节点、连线、参数、设备设定、物料覆盖）只置
+    // schemeDirty，由工具条「保存」按钮呈现「未保存」并落盘；此处绝不写入任何存档。
+    _bindSchemeDirty() {
+      if (_schemeDirtyBound) return
+      _schemeDirtyBound = true
       watch(
         () => [this.scheme, this.processRoute, this.materialOverrides, this.deviceSetpoints, this.deviceExtraSetpoints],
-        () => {
-          this.autosaveState = 'saving'   // 工具条即时反馈「保存中…」
-          clearTimeout(timer)
-          timer = setTimeout(() => this._saveScheme(), 400)
-        },
+        () => { this.schemeDirty = true },
         { deep: true },
       )
+      // 手动保存的配套保护：有未保存改动时关闭 / 刷新页面给浏览器原生二次确认（仿真态编辑本就不落盘，不提示）
+      window.addEventListener('beforeunload', (e) => {
+        if (!this.schemeDirty || this.simMode) return
+        e.preventDefault()
+        e.returnValue = ''
+      })
     },
+    // 标记「有未保存改动」：编辑类操作显式调用，避免只靠 watch 时的时序歧义
+    _markDirty() { this.schemeDirty = true },
     // 「文件 → 另存为场景…」：把当前场景（默认含当前编排方案快照）打包为可分发的 .ec 资源包下载。
     // 导出包为非内置分发包，重新导入后即回到当前编排态。
     async exportSceneAsPackage({ label, industry, version, vendor, product, withScheme = true } = {}) {
@@ -2650,8 +2683,9 @@ export const useSimStore = defineStore('sim', {
       this.deviceSetpoints = { ...sps, ...s2 }
       this.deviceExtraSetpoints = { ...esps, ...e2 }
     },
-    // 持久化当前编排方案：完成编排（exitEdit）、载入模板、清空画布、调节设备设定值时写入，
-    // 使刷新后保持最后一次编排结果，而不是回退到默认流程。
+    // 落盘当前编排方案（手动保存 / 场景切换 / 旧档迁移时调用）：
+    // 本地 localStorage + 服务端 designs/flow，使刷新后保持最后一次保存的编排结果。
+    // 编辑类操作一律不调用它 —— 编排改为手动保存后，只有点「保存」才落盘。
     _saveScheme() {
       if (this.simMode) return   // 仿真模式：一切编辑不持久化
       const payload = {
@@ -2666,66 +2700,23 @@ export const useSimStore = defineStore('sim', {
         updatedAt: Date.now(),   // 存档时间戳：服务端/本地两份冲突时取较新的一份
       }
       try { localStorage.setItem('sim.scheme', JSON.stringify(payload)) } catch (e) { /* localStorage 不可用时静默忽略 */ }
-      // 本地落盘即视为已保存（服务端同步为异步跟进，失败时本地存档兜底）
-      this.autosaveState = 'saved'
-      this.autosaveAt = Date.now()
-      this._pushScheme(payload)
+      // 服务端存档 backend/data/designs/flow.json 是跨端真源，随 platform/bs-deploy/update.sh 同步；
+      // 手动保存为显式动作，这里直接 PUT（不再防抖），接口不可用时静默降级为「仅本地存档」。
+      try { api.designSave('flow', payload.sceneId, payload).catch(() => {}) } catch (e) { /* 忽略 */ }
+      this.schemeDirty = false
+      this.schemeSavedAt = Date.now()
+      // 兜底：保存前若刚改过 scheme，深度 watch 的回调会在其后触发并重标脏 —— 这里再清一次
+      nextTick(() => { this.schemeDirty = false })
     },
-    // 编排方案同步到服务端（防抖 800ms）：服务端存档 backend/data/designs/flow.json 是跨端真源，
-    // 随 platform/bs-deploy/update.sh 同步到服务器；接口不可用时静默降级为「仅本地存档」。
-    _pushScheme(payload) {
-      try {
-        const data = payload || {
-          sceneId: this.sceneId || 'steel',
-          route: this.processRoute,
-          scheme: this.scheme,
-          materialOverrides: this.materialOverrides,
-          deviceSetpoints: this.deviceSetpoints,
-          deviceExtraSetpoints: this.deviceExtraSetpoints,
-          _ovUnitV: 1,
-          updatedAt: Date.now(),
-        }
-        // 记下待推送内容：防抖窗口内若页面被关闭 / 切到后台，由 _flushScheme 立即补发
-        _schemePushPending = { sceneId: data.sceneId, data }
-        clearTimeout(_schemePushTimer)
-        _schemePushTimer = setTimeout(() => {
-          _schemePushPending = null
-          api.designSave('flow', data.sceneId, data).catch(() => { /* 服务端不可用时保留 localStorage 兜底 */ })
-        }, 800)
-      } catch (e) { /* 忽略 */ }
-    },
-    // 立刻把待推送的编排存档发到服务端（keepalive，页面卸载后仍会发出）。
-    // 场景：配完附加传感 / 采集设备绑定就关页面 —— 防抖里那次 PUT 会被浏览器取消，
-    // 服务端存档停在旧版本，下次打开（或另一端实例）就「被还原」。
-    _flushScheme() {
-      try {
-        const p = _schemePushPending
-        if (!p) return
-        _schemePushPending = null
-        clearTimeout(_schemePushTimer)
-        api.designSaveNow('flow', p.sceneId, p.data).catch(() => { /* 卸载阶段失败：localStorage 兜底仍在 */ })
-      } catch (e) { /* 忽略 */ }
-    },
-    // 绑定「页面隐藏 / 卸载」补发：关闭标签页、刷新、切到后台都触发，保证服务端存档是最新的。
-    _bindDesignFlush() {
-      if (_designFlushBound) return
-      _designFlushBound = true
-      const flush = () => this._flushScheme()
-      window.addEventListener('pagehide', flush)
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') flush()
-      })
-    },
-    // 从服务端取回本场景的编排存档：与本地 localStorage 冲突时以**较新**的一份为准，
-    // 使「开发机编排 → 文件同步 → 服务器打开」与「离线编辑后重新联网」两种场景都不丢改动。
+    // 从服务端取回本场景的编排存档：**服务端为准**（服务器实例是编排的权威侧）。
+    // 只要服务端有该场景的存档就无条件采用 —— 本地 localStorage 仅作离线兜底，
+    // 不再按 updatedAt 比对（否则本地那份较新的旧档会盖住服务器上的编排，两端永远不同步）。
     async _pullScheme(sceneId) {
       try {
         const sid = sceneId || this.sceneId || 'steel'
         const r = await api.designBucket('flow')
         const remote = (r && r.data) ? r.data[sid] : null
         if (!remote || !this._schemeAccepted(remote, sid)) return null
-        const local = this._loadScheme()
-        if (local && local.updatedAt && remote.updatedAt && local.updatedAt > remote.updatedAt) return null
         return remote
       } catch (e) { return null }
     },
@@ -2917,7 +2908,7 @@ export const useSimStore = defineStore('sim', {
       this.deviceSetpoints = {}          // 新项目不带旧项目的设备设定
       this.deviceExtraSetpoints = {}
       this.selectedUnitId = null
-      this._saveScheme()                 // 持久化项目路线，刷新后保持
+      this._markDirty()                  // 新建项目属于编辑：只置未保存标记
       this.compileSchemeToModel()
       this.autoLayout()
       this.refresh()
@@ -2949,7 +2940,7 @@ export const useSimStore = defineStore('sim', {
       this.scheme = { nodes: [], connections: [], devices: [], groups: [], activeGroupId: null }
       this.selectedFlowId = null
       this.selectedGroupId = null
-      this._saveScheme()   // 持久化清空结果（空方案刷新后按流程路线重建默认，避免回退到旧方案）
+      this._markDirty()      // 清空画布属于编辑：只置未保存标记
     },
     // 从左栏拖入创建节点（kind: process|device|material）
     // ===== 附加设备（传感器 / 可变设备）：绑定 / 解除 / 数值来源 =====
@@ -2979,7 +2970,7 @@ export const useSimStore = defineStore('sim', {
       if (!node.attached) node.attached = []
       node.attached.push(att)
       this._histCapture('att_' + nodeId + uid('h'))
-      this._saveScheme()
+      this._markDirty()
       return att
     },
     removeAttachFromNode(nodeId, uidToRemove) {
@@ -2989,7 +2980,7 @@ export const useSimStore = defineStore('sim', {
       if (i < 0) return
       node.attached.splice(i, 1)
       this._histCapture('det_' + nodeId + uid('h'))
-      this._saveScheme()
+      this._markDirty()
       const extId = `ext::${nodeId}::${uidToRemove}`
       if (this.deviceDetailId === extId) this.deviceDetailId = null
     },
@@ -3004,7 +2995,7 @@ export const useSimStore = defineStore('sim', {
       const next = String(name == null ? '' : name).trim()
       att.label = _uniqueAttachName(node, next || (tpl ? tpl.label : att.type), uidToRename)
       if (!silent) this._histCapture('rnm_' + nodeId + uid('h'))
-      this._saveScheme()
+      this._markDirty()
       return att.label
     },
     // 设置附加设备的数值来源：
@@ -3038,7 +3029,7 @@ export const useSimStore = defineStore('sim', {
         att.scale = { from: Number.isFinite(refSp) && refSp ? refSp : 1, to: Number(toVal) || 0 }
       }
       this._histCapture('src_' + nodeId + uid('h'))
-      this._saveScheme()
+      this._markDirty()
       // 绑定变更立即生效：清掉该附加设备的陈旧遥测，让各界面 liveOf 落到现算读数
       // （否则 deviceLive 里绑定前按 sim/fixed 合成的旧值会永久遮蔽新绑定）
       const extId = `ext::${nodeId}::${uidToSet}`
@@ -3055,7 +3046,7 @@ export const useSimStore = defineStore('sim', {
       const v = Number(to)
       att.scale = { from: Number.isFinite(f) && f ? f : 1, to: Number.isFinite(v) ? v : 0 }
       this._histCapture('sc_' + nodeId + uid('h'))
-      this._saveScheme()
+      this._markDirty()
     },
     // 设置附加设备换算系数：读数 = 源值 × 系数（默认 1），
     // 用于系统模板单位与绑定传感器/采集设备实际度量不一致时的换算
@@ -3068,7 +3059,7 @@ export const useSimStore = defineStore('sim', {
       att.factor = isFinite(f) ? Math.round(f * 100) / 100 : 1
       // silent=输入过程实时预览：不记撤销历史（避免每个按键一条），失焦提交时才记
       if (!silent) this._histCapture('fx_' + nodeId + uid('h'))
-      this._saveScheme()
+      this._markDirty()
       this._sampleAttachedDevices(Date.now() / 1000)
     },
     // 按 extId（ext::节点id::attUid）反查附加设备与其节点
@@ -3102,19 +3093,130 @@ export const useSimStore = defineStore('sim', {
         return { ok: false, error: String((e && e.message) || e) }
       }
     },
-    // 可变设备设定值统一入口（编排面板 / AI 群控共用）：
-    // 先本地设定，若已绑定数据源设备的可写点位则自动下发写入（失败只提示，不回滚本地设定）
-    setExtSetpoint(extId, value) {
+    // 可变设备已绑定的可写点位（数值来源 = 数据源设备 且已选设备 + 点位），未绑定返回 null。
+    // 编排面板据此提示「运行会真实下发」，规则执行也据此决定是否发 cmd 写命令。
+    boundWriteOf(id) {
+      const hit = String(id || '').indexOf('ext::') === 0 ? this._attachByExtId(id) : null
+      const att = hit && hit.att
+      if (!att || att.src !== 'device' || !att.device || !att.prop) return null
+      return { device: att.device, prop: att.prop, box: this._boxOfDevice(att.device) }
+    },
+    _boxOfDevice(name) {
+      const d = (this.boxSourceDevices || []).find((x) => x.name === name)
+      return d ? (d.node || '') : ''
+    },
+    // 写入成功的乐观回写：把已确认落盘的设定值立刻回填到该数据源设备的点位读数上
+    // （等下一轮采集上报才刷新会有数十秒空窗，期间界面显示旧值，容易被误判为「没下发」）
+    applyWrittenPoint(deviceName, prop, value) {
+      const list = this.boxSourceDevices || []
+      const idx = list.findIndex((d) => d && d.name === deviceName)
+      if (idx < 0) return
+      const d = list[idx]
+      const v = Number(value)
+      if (!isFinite(v)) return
+      const props = (d.props || []).map((p) => (p && p.name === prop
+        ? { ...p, value: v, ts: Date.now() / 1000, invalid: false }
+        : p))
+      const next = list.slice()
+      next[idx] = { ...d, props }
+      this.boxSourceDevices = next
+      // 绑定该点位的附加设备读数同步刷新
+      try { this._sampleAttachedDevices(Date.now() / 1000) } catch (e) { /* 编排未就绪时忽略 */ }
+    },
+    // ─────────── AI 群控运行器 ───────────
+    // 规则模型的执行从画布组件上移到 store：运行态存在服务端存档里，换电脑 / 重开浏览器拉到
+    // running 就在这里恢复执行；页面切到哪、有没有打开编排页都不影响策略继续下发。
+    // 持有模型对象本身 —— 运行中改编排下一轮即按新编排执行（热更新）。
+    startAgcRule(model) {
+      const m = model
+      if (!m || !m.id || m.alg !== 'rule') return
+      if (this.agcRunId === m.id) return
+      if (this.agcRunId) this.stopAgcRule()      // 同时只允许一个策略在运行
+      this.agcRunId = m.id
+      _agcModel = m
+      _agcState = { pendLoops: [] }
+      this._agcTick()
+      _agcTimer = setInterval(() => this._agcTick(), Math.max(1, Number(m.period) || 2) * 1000)
+    },
+    stopAgcRule(id) {
+      if (id && this.agcRunId && this.agcRunId !== id) return
+      if (_agcTimer) { clearInterval(_agcTimer); _agcTimer = null }
+      _agcModel = null
+      _agcState = null
+      this.agcRunId = ''
+    },
+    _agcTick() {
+      const m = _agcModel
+      if (!m || !m.graph) return
+      const r = evalFlowGraph(m.graph, {
+        liveOf: (id) => this._agcLiveOf(id),
+        boundOf: (n) => (n && n.kind === 'adj' ? this.boundWriteOf(n.devId) : null),
+        state: _agcState || (_agcState = { pendLoops: [] }),
+      })
+      for (const a of r.acts) {
+        // 命中即写：既更新平台内部设定值，也把已绑定数据源可写点位的设备真实下发
+        if (a.write) this.setExtSetpoint(a.devId, a.value, { silent: true })
+      }
+      this.agcLast = {
+        ...(this.agcLast || {}),
+        [m.id]: {
+          ts: Date.now(),
+          ok: r.ok,
+          acts: r.acts,
+          nodes: Array.from(r.activeNodes || []),
+          edges: Array.from(r.activeEdges || []),
+          branch: r.branch || '',
+        },
+      }
+    },
+    _agcLiveOf(id) {
+      const lv = this.deviceLiveOf(id)
+      if (lv != null && Number.isFinite(Number(lv))) return Number(lv)
+      const h = this.deviceHistoryOf(id)
+      if (h && h.length && Number.isFinite(Number(h[h.length - 1].v))) return Number(h[h.length - 1].v)
+      return null
+    },
+    // 可变设备设定值统一入口（编排面板 / AI 群控规则执行共用）：
+    // 先本地设定，若已绑定数据源设备的可写点位则自动下发写入（失败只提示，不回滚本地设定）。
+    // opts.silent —— 规则 / 算法自动执行时用：不弹成功 toast，失败提示按 60s 节流。
+    // opts.force  —— 跳过去重强制下发（手动点击时用）。
+    // opts.localOnly —— 只改平台内设定值、不下发到现场设备（编排编辑态：改完要等点「运行」才生效）。
+    setExtSetpoint(extId, value, opts) {
       this.setDeviceSetpoint(extId, value)
-      const hit = this._attachByExtId(extId)
-      if (!hit || hit.att.src !== 'device' || !hit.att.device || !hit.att.prop) return
-      const { att } = hit
+      if (opts && opts.localOnly) return
+      const bound = this.boundWriteOf(extId)
+      if (!bound) return
+      const v = Number(value)
+      if (!isFinite(v)) return
+      const silent = !!(opts && opts.silent)
+      const force = !!(opts && opts.force)
+      const now = Date.now()
+      const last = _extWriteLast[extId]
+      // 去重：同值在保持期内不再下发（规则每轮都会走到这里，不去重就是命令风暴）
+      if (!force && last && last.v === v) {
+        const keep = last.ok ? _EXT_WRITE_KEEP_MS : _EXT_WRITE_RETRY_MS
+        if (now - last.ts < keep) return
+      }
+      _extWriteLast[extId] = { v, ts: now, ok: true }
       this.writeAttachBound(extId, value).then((r) => {
-        if (r && r.ok) {
-          this.showToast(t('已下发写点位 {dev} · {prop} = {v}', { dev: att.device, prop: att.prop, v: value }), 'success')
-        } else {
-          this.showToast(t('写点位下发失败') + '：' + ((r && r.error) || ''), 'error')
+        const ok = !!(r && r.ok)
+        _extWriteLast[extId] = { v, ts: Date.now(), ok }
+        if (ok) {
+          // 回执确认写入成功 → 立即回填读数：采集上报有周期（数十秒），不回填的话
+          // 界面会长时间停在旧值，表现为「明明下发成功，界面上还是旧值 / 像没下发」
+          this.applyWrittenPoint(bound.device, bound.prop, v)
+          if (!silent) {
+            this.showToast(t('已下发写点位 {dev} · {prop} = {v}', { dev: bound.device, prop: bound.prop, v }), 'success')
+          }
+          return
         }
+        const err = (r && r.error) || ''
+        if (!silent) { this.showToast(t('写点位下发失败') + '：' + err, 'error'); return }
+        // 静默（规则自动执行）：同一设备同一错误 60s 内只提示一次，避免每轮刷屏
+        const prev = _extWriteErrAt[extId]
+        if (prev && Date.now() - prev < 60000) return
+        _extWriteErrAt[extId] = Date.now()
+        this.showToast(`${bound.device}.${bound.prop} ${t('写点位下发失败')}：${err}`, 'error')
       })
     },
     // 加载「数据源管理」中的传感器设备（设备定义 + 实时读数），供附加设备绑定真实数据源
@@ -3574,7 +3676,7 @@ export const useSimStore = defineStore('sim', {
         const t = PROCESS_MAP[n.type]
         if (t) n.params = { ...Object.fromEntries((t.params || []).map((p) => [p.key, p.def])) }
       }
-      this._saveScheme()
+      this._markDirty()
     },
     // ---- 节点级参数范围 / 设备量程（内化「平台配置」为编排模式工艺属性，随方案持久化）----
     setFlowParamRange(id, key, patch) {
@@ -3590,7 +3692,7 @@ export const useSimStore = defineStore('sim', {
       if (!Object.keys(next).length) return
       const cur = (n.ranges && n.ranges[key]) || {}
       n.ranges = { ...(n.ranges || {}), [key]: { ...cur, ...next } }
-      this._saveScheme()
+      this._markDirty()
     },
     resetFlowParamRange(id, key) {
       this._histCapture('fr_' + id + key)
@@ -3600,7 +3702,7 @@ export const useSimStore = defineStore('sim', {
       delete next[key]
       if (Object.keys(next).length) n.ranges = next
       else delete n.ranges
-      this._saveScheme()
+      this._markDirty()
     },
     setFlowDeviceRange(id, patch) {
       this._histCapture('dr_' + id)
@@ -3614,13 +3716,13 @@ export const useSimStore = defineStore('sim', {
       }
       if (!Object.keys(next).length) return
       n.range = { ...(n.range || {}), ...next }
-      this._saveScheme()
+      this._markDirty()
     },
     resetFlowDeviceRange(id) {
       this._histCapture('dr_' + id)
       const n = this.scheme.nodes.find((x) => x.id === id)
       if (n && n.range) delete n.range
-      this._saveScheme()
+      this._markDirty()
     },
     setFlowRecipeRatio(id, idx, ratio) {
       this._histCapture('rr_' + id + idx)
@@ -3653,7 +3755,7 @@ export const useSimStore = defineStore('sim', {
       const r = n.recipe.find((x) => x.material === material)
       if (r) r.ratio = v
       else n.recipe.push({ material, ratio: v })
-      this._saveScheme()
+      this._markDirty()
     },
     bindDevice(nodeId, deviceId) {
       this._histCapture('bd_' + uid('h'))
@@ -3702,7 +3804,7 @@ export const useSimStore = defineStore('sim', {
         if (hit && hit.att && hit.att.kind === 'adjustable') hit.att.def = v
       }
       // 设备设定值现已桥接为高炉操作参数，需重算让后端权威仿真与 3D 热力同步
-      this._saveScheme()   // 设定值随方案持久化，刷新后不丢失
+      this._markDirty()      // 设定值随方案保存：手动保存模式下只置未保存标记
       this.refresh()
     },
     // 附加可调项设定（如鼓风机鼓风湿度）：devId + 可调项 key -> 数值
@@ -3727,7 +3829,7 @@ export const useSimStore = defineStore('sim', {
       const d = this.scheme.devices.find((x) => x.id === deviceId)
       if (d) d.extraSetpoints = { ...(d.extraSetpoints || {}), [key]: v }
       // 附加可调项（鼓风湿度）同样桥接为高炉操作参数（鼓风含湿），需重算同步
-      this._saveScheme()   // 设定值随方案持久化，刷新后不丢失
+      this._markDirty()      // 设定值随方案保存：手动保存模式下只置未保存标记
       this.refresh()
     },
     // ---- 编排画布视图变换（缩放/适配），单一真源，由顶栏「编排」工具条与画布滚轮共用 ----

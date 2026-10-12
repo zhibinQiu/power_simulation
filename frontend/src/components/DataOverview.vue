@@ -281,7 +281,6 @@
       <aside class="ov-aside">
         <div class="adv-head">
           <span class="adv-title">{{ t('实时调控建议') }}</span>
-          <span class="adv-tag" :class="{ sample: advice.sample }">{{ advice.sample ? t('示例') : t('实时') }}</span>
         </div>
         <div class="adv-scene">{{ t(advice.sceneLabel) }}</div>
         <div class="adv-kpis">
@@ -1091,10 +1090,6 @@ const vFit = {
 .adv-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .adv-title { font-size: var(--fs-xl); font-weight: 700; color: var(--ov-text); letter-spacing: 1px; }
 .adv-title::before { content: "▍"; color: var(--ov-accent); margin-right: 6px; }
-.adv-tag { flex: 0 0 auto; font-size: 11px; font-weight: 800; padding: 2px 8px; border: 1px solid var(--ov-ok); color: var(--ov-ok); background: var(--ov-ok-bg); }
-.adv-tag::before { content: "●"; margin-right: 4px; animation: breathe 2s ease-in-out infinite; }
-.adv-tag.sample { border-color: var(--ov-mid); color: var(--ov-mid); background: var(--ov-mid-bg); }
-.adv-tag.sample::before { animation: none; }
 .adv-scene { font-size: 12px; color: var(--ov-text-3); }
 .adv-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .adv-kpi { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; background: var(--ov-panel-2); border: 1px solid var(--ov-border); }
@@ -1107,17 +1102,14 @@ const vFit = {
 .adv-item {
   display: flex; flex-direction: column; gap: 5px;
   padding: 9px 10px; background: var(--ov-panel-2);
-  border: 1px solid var(--ov-border); border-left: 3px solid var(--ov-warn); border-radius: 0;
+  border: 1px solid var(--ov-border); border-radius: 0;
 }
-.adv-item.lv-high { border-left-color: var(--ov-ab); }
-.adv-item.lv-mid { border-left-color: var(--ov-mid); }
-.adv-item.lv-low { border-left-color: var(--ov-warn); }
 .adv-item.done { opacity: 0.48; }
 .ai-top { display: flex; align-items: center; gap: 7px; }
-.ai-lv { flex: 0 0 auto; font-size: 11px; font-weight: 800; padding: 1px 7px; border: 1px solid; background: var(--ov-mask); }
-.adv-item.lv-high .ai-lv { color: var(--ov-ab); border-color: var(--ov-ab); background: var(--ov-ab-bg); }
-.adv-item.lv-mid .ai-lv { color: var(--ov-mid); border-color: var(--ov-mid); background: var(--ov-mid-bg); }
-.adv-item.lv-low .ai-lv { color: var(--ov-warn); border-color: var(--ov-warn); background: var(--ov-warn-bg); }
+.ai-lv { flex: 0 0 auto; font-size: 11px; font-weight: 800; padding: 1px 6px; background: var(--ov-mask); }
+.adv-item.lv-high .ai-lv { color: var(--ov-ab); background: var(--ov-ab-bg); }
+.adv-item.lv-mid .ai-lv { color: var(--ov-mid); background: var(--ov-mid-bg); }
+.adv-item.lv-low .ai-lv { color: var(--ov-warn); background: var(--ov-warn-bg); }
 .ai-title { flex: 1 1 auto; min-width: 0; font-size: 13px; font-weight: 700; color: var(--ov-text); }
 .adv-item.done .ai-title { text-decoration: line-through; }
 .ai-row { display: flex; gap: 6px; font-size: 12px; line-height: 1.45; }
@@ -1125,16 +1117,16 @@ const vFit = {
 .ai-v { flex: 1 1 auto; min-width: 0; color: var(--ov-text-2); }
 .ai-row.act .ai-v { color: var(--ov-text); }
 .ai-row.gain .ai-v { color: var(--ov-ok); }
-.ai-cmp { display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: var(--ov-mask); border: 1px dashed var(--ov-border); }
-.ai-cmp i { font-style: normal; font-size: 11px; color: var(--ov-text-3); margin-right: 4px; }
-.ai-cmp b { font-family: ui-monospace, monospace; font-size: 15px; font-weight: 800; }
+.ai-cmp { display: flex; align-items: baseline; gap: 7px; font-size: 12px; }
+.ai-cmp i { font-style: normal; font-size: 11px; color: var(--ov-text-3); margin-right: 3px; }
+.ai-cmp b { font-family: ui-monospace, monospace; font-size: 14px; font-weight: 800; }
 .ai-cur b { color: var(--ov-ab); }
 .ai-cur em { font-style: normal; font-size: 11px; color: var(--ov-text-3); font-weight: 500; margin-left: 2px; }
-.ai-go b { color: var(--ov-ok); font-size: 13px; }
-.ai-ar { color: var(--ov-accent); font-size: 14px; }
+.ai-go b { color: var(--ov-ok); }
+.ai-ar { color: var(--ov-text-3); font-size: 13px; }
 .ai-btn {
   align-self: flex-start; min-height: 40px; padding: 0 14px; margin-top: 2px;
-  background: var(--ov-accent-soft); border: 1px solid var(--ov-border-ac); border-radius: 0;
+  background: transparent; border: 1px solid var(--ov-border); border-radius: 0;
   color: var(--ov-accent); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
   transition: transform .12s, background .12s; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }

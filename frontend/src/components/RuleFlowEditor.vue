@@ -82,6 +82,10 @@
           <div class="rf-ft">
             <span v-if="n.kind === 'adj'" class="rf-hint mono">{{ t('量程') }} {{ fmt(spMin(n.devId)) }} ~ {{ fmt(spMax(n.devId)) }}</span>
             <span v-else class="rf-hint">{{ t('只读，不可设定') }}</span>
+            <span v-if="n.kind === 'adj'" class="rf-bind" :class="{ on: !!boundOf(n) }"
+                  :title="boundOf(n) ? t('运行命中时会下发写入 {dev} · {prop}', { dev: boundOf(n).device, prop: boundOf(n).prop }) : t('未绑定数据源设备的可写点位：命中后只改变平台内的仿真设定值，现场设备不会动作')">
+              {{ boundOf(n) ? '⇄ ' + boundOf(n).device + '.' + boundOf(n).prop : t('仅仿真') }}
+            </span>
             <span v-if="!isLinked(n)" class="rf-warn">{{ t('未接入条件分支') }}</span>
           </div>
 
@@ -267,7 +271,7 @@ import { useSimStore } from '../stores/sim'
 import { DEVICE_MAP } from '../data/flowLibrary'
 import { ADJUSTABLE_MAP } from '../data/attachLibrary'
 import { t } from '../i18n'
-import { flowPath, isDevKind, isFlowKind, isGateKind, KIND_START, KIND_END } from '../utils/ruleFlow'
+import { flowPath, evalFlowGraph, isDevKind, isFlowKind, isGateKind, KIND_START, KIND_END } from '../utils/ruleFlow'
 
 const props = defineProps({
   // { nodes: [], edges: [] } —— 由父组件（模型）持有的响应式对象，本组件就地读写，持久化由父组件负责
@@ -275,6 +279,8 @@ const props = defineProps({
   // 运行状态由编排页右上角的「运行」按钮驱动，本组件不再自带运行开关
   running: { type: Boolean, default: false },
   period: { type: Number, default: 2 },
+  // 所属模型 id：用它在 store 里取后台运行器每轮的执行结果（高亮 / 日志）
+  modelId: { type: String, default: '' },
 })
 
 const store = useSimStore()
@@ -371,6 +377,8 @@ function liveOf(id) {
   return null
 }
 function isMissing(n) { return isDevKind(n.kind) && !findDev(n.devId) }
+/** 可调模块的写入去向：已绑定数据源设备的可写点位 → 命中时真实下发；未绑定 → 只改平台内仿真设定值 */
+function boundOf(n) { return n && n.kind === 'adj' ? store.boundWriteOf(n.devId) : null }
 
 // ─────────── 视图（平移 / 缩放） ───────────
 const view = reactive({ x: 0, y: 0, z: 1 })
@@ -762,7 +770,7 @@ function clearAll() {
   histBegin()
   nodes.value.splice(0, nodes.value.length)
   edges.value.splice(0, edges.value.length)
-  pendLoops.value = []   // 模块都没了，挂起的后续轮次一并作废
+  rfState.pendLoops = []   // 模块都没了，挂起的后续轮次一并作废
   selNode.value = ''
   selEdge.value = ''
   histCommit()
@@ -1052,216 +1060,86 @@ const issues = computed(() => {
   return out
 })
 
-// ─────────── 执行（由编排页右上角「运行」驱动） ───────────
+// ─────────── 执行（运行态由 sim store 的后台运行器驱动；本组件只做手动执行与结果呈现） ───────────
 const showLog = ref(false)
 const log = ref([])
 const lastActs = ref([])
 const activeNode = ref(new Set())
 const activeEdge = ref(new Set())
 const activeBranch = ref('')
-let runTimer = null
-// 「每轮间隔 > 0」的循环把后续轮次挂起到这里，下一次 tick 到期再跑：{ at, nodeId, round, total, gap }
-const pendLoops = ref([])
-/** 取出到期（且模块还在）的挂起轮次；模块已被删除的条目直接丢弃 */
-function takeDueLoops() {
-  if (!pendLoops.value.length) return []
-  const now = Date.now()
-  const due = []
-  const rest = []
-  for (const q of pendLoops.value) {
-    if (!nodes.value.some((x) => x.id === q.nodeId)) continue
-    if (q.at <= now) due.push(q)
-    else rest.push(q)
-  }
-  pendLoops.value = rest
-  return due
-}
+// 画布手动「执行一次」时的循环挂起状态（运行态的挂起轮次由后台运行器自己持有）
+const rfState = { pendLoops: [] }
 
-function cmp(a, op, b) {
-  const x = Number(a)
-  const y = Number(b)
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return false
-  switch (op) {
-    case '>': return x > y
-    case '>=': return x >= y
-    case '<': return x < y
-    case '<=': return x <= y
-    case '==': return Math.abs(x - y) < 1e-9
-    case '!=': return Math.abs(x - y) >= 1e-9
-    default: return false
-  }
-}
 function pushLog(txt) {
   log.value.unshift({ ts: Date.now(), txt })
   if (log.value.length > 40) log.value.length = 40
 }
-/** 执行一遍：从「开始」出发沿通路推进，IF 命中分支 → 写入下游可调设定值（传感仅观测）→ 继续往下串联 */
-function runOnce(withLog) {
-  const acts = []
-  const an = new Set()
-  const ae = new Set()
-  let ab = ''
-  const visited = new Set()
-  const onBr = (v) => { if (!ab) ab = v }
-  const fp = flow.value
-  if (!fp.ok) {
-    // 没有「开始 → … → 结束」通路：整条流程不执行（也就不产生任何写入）
-    pendLoops.value = []
-    lastActs.value = []
-    activeNode.value = an
-    activeEdge.value = ae
-    activeBranch.value = ''
-    if (withLog) pushLog(t('未形成「开始 → 结束」通路，本轮不执行'))
-    return []
-  }
-  // ① 到期的挂起轮次（循环模块「每轮间隔 > 0」时排在之后的 tick 执行）
-  for (const q of takeDueLoops()) {
-    const n = nodes.value.find((x) => x.id === q.nodeId)
-    if (!n || !fp.live.has(n.id)) continue
-    an.add(n.id)
-    acts.push({ write: false, txt: roundTxt(n, q.round, q.total) })
-    for (const e of edges.value.filter((x) => x.from === n.id)) {
-      advance(e, fp, 1, acts, an, ae, new Set([n.id]), onBr)
-    }
-    if (q.round < q.total) pendLoops.value.push({ ...q, at: Date.now() + q.gap * 1000, round: q.round + 1 })
-  }
-  for (const id of fp.starts) {
-    an.add(id)
-    for (const e of edges.value.filter((x) => x.from === id)) {
-      advance(e, fp, 0, acts, an, ae, visited, onBr)
-    }
-  }
-  for (const a of acts) {
-    if (a.write) store.setDeviceSetpoint(a.devId, a.value)
-  }
+/**
+ * 把一次执行结果落到画布（高亮 + 日志）：后台运行器与画布手动执行走同一入口。
+ */
+function applyResult(r, withLog) {
+  const acts = (r && r.acts) || []
   lastActs.value = acts
-  activeNode.value = an
-  activeEdge.value = ae
-  activeBranch.value = ab
-  if (withLog) {
-    if (!acts.length) pushLog(t('本轮无命中（检查判定来源与阈值）'))
-    else for (const a of acts) pushLog(a.txt)
-  }
-  return acts
-}
-/** 沿一条连线推进：只在「开始 → 结束」通路上前进，落在通路外的分支一律不执行 */
-function advance(e, fp, depth, acts, an, ae, visited, onBranch) {
-  if (depth > 24) return
-  const tgt = nodes.value.find((x) => x.id === e.to)
-  if (!tgt || !fp.live.has(tgt.id)) return
-  ae.add(e.id)
-  an.add(tgt.id)
-  if (tgt.kind === KIND_END) return
-  if (tgt.kind === 'if') {
-    evalIf(tgt, fp, depth, acts, an, ae, visited, onBranch)
+  activeNode.value = (r && r.activeNodes) || new Set()
+  activeEdge.value = (r && r.activeEdges) || new Set()
+  activeBranch.value = (r && r.branch) || ''
+  if (!withLog) return
+  if (!acts.length) {
+    pushLog(r && r.ok === false ? t('未形成「开始 → 结束」通路，本轮不执行') : t('本轮无命中（检查判定来源与阈值）'))
     return
   }
-  if (isGateKind(tgt.kind)) {
-    evalGate(tgt, fp, depth, acts, an, ae, visited, onBranch)
-    return
-  }
-  if (tgt.kind === 'loop') {
-    evalLoop(tgt, fp, depth, acts, an, ae, visited, onBranch)
-    return
-  }
-  if (!isDevKind(tgt.kind)) return
-  if (tgt.kind === 'adj') {
-    const v = Number(tgt.value)
-    if (Number.isFinite(v)) {
-      acts.push({ write: true, devId: tgt.devId, value: v, txt: `${tgt.label} ← ${t('写入')} ${fmt(v)}${tgt.unit || ''}` })
-    }
-  } else {
-    acts.push({ write: false, devId: tgt.devId, txt: `${tgt.label}（${t('仅观测，不写入')}）` })
-  }
-  // 继续往下串联
-  for (const nx of edges.value.filter((x) => x.from === tgt.id)) {
-    advance(nx, fp, depth + 1, acts, an, ae, visited, onBranch)
-  }
-}
-function evalIf(n, fp, depth, acts, an, ae, visited, onBranch) {
-  if (depth > 8 || visited.has(n.id)) return
-  visited.add(n.id)
-  let hit = null
-  for (const b of n.branches) {
-    if (b.type === 'else') continue
-    const s = srcNodeOf(n, b)
-    const v = s ? liveOf(s.devId) : null
-    if (v != null && cmp(v, b.op, b.val)) { hit = b; break }
-  }
-  if (!hit) hit = n.branches.find((b) => b.type === 'else') || null
-  if (!hit) return
-  onBranch(n.id + ':' + hit.id)
-  // 只推进命中分支，且下游必须仍在通路上（能走到「结束」）
-  for (const e of edges.value.filter((x) => x.from === n.id && x.port === hit.id)) {
-    advance(e, fp, depth, acts, an, ae, visited, onBranch)
-  }
+  for (const a of acts) pushLog(a.txt)
 }
 /**
- * AND / OR 逻辑门：逐条求值后归约 —— AND 全部成立 / OR 任一成立 → 走「满足」出口，否则走「不满足」。
- * 一条都取不到读数时按「不满足」处理（保守，避免误写入设定值）。
+ * 服务端运行器回传的是结构化动作（{ kind, nodeId, devId, value }），文案在这里按图补全：
+ * 既保持中英文都能翻译，也让「画布看到的」与「服务端实际执行的」是同一份结果。
  */
-function evalGate(n, fp, depth, acts, an, ae, visited, onBranch) {
-  if (depth > 8 || visited.has(n.id)) return
-  visited.add(n.id)
-  const or = n.op === 'or'
-  let ok = !or          // AND 从「真」起算（遇假即假）；OR 从「假」起算（遇真即真）
-  let any = false       // 是否至少有一条条件取到了读数
-  for (const c of n.conds || []) {
-    const s = condSrc(n, c)
-    const v = s ? liveOf(s.devId) : null
-    if (v == null || !Number.isFinite(Number(c.val))) continue
-    any = true
-    const r = cmp(v, c.op, c.val)
-    if (or) { if (r) { ok = true; break } }
-    else if (!r) { ok = false; break }
-  }
-  const hit = ok && any ? GATE_OUTS[0] : GATE_OUTS[1]
-  onBranch(n.id + ':' + hit.id)
-  acts.push({ write: false, txt: `${nodeName(n)} → ${hit.id === 't' ? t('满足') : t('不满足')}` })
-  // 只推进命中出口，且下游必须仍在通路上（能走到「结束」）
-  for (const e of edges.value.filter((x) => x.from === n.id && x.port === hit.id)) {
-    advance(e, fp, depth, acts, an, ae, visited, onBranch)
-  }
-}
-function roundTxt(n, i, total) {
-  return `${n.label || t('循环模块')} · ${t('第 {i}/{n} 轮', { i, n: total })}`
+function decorateActs(acts) {
+  return (acts || []).map((a) => {
+    const n = nodes.value.find((x) => x.id === a.nodeId)
+    if (a.kind === 'adj') {
+      const b = n ? boundOf(n) : null
+      const tail = b ? ` · ${t('下发')} ${b.device}.${b.prop}` : ` · ${t('仅仿真')}`
+      return { ...a, txt: `${nodeName(n)} ← ${t('写入')} ${fmt(a.value)}${(n && n.unit) || ''}${tail}` }
+    }
+    if (a.kind === 'sen') return { ...a, txt: `${nodeName(n)}（${t('仅观测，不写入')}）` }
+    if (a.kind === 'gate') return { ...a, txt: `${nodeName(n)} → ${a.hit === 't' ? t('满足') : t('不满足')}` }
+    if (a.kind === 'loop') return { ...a, txt: `${nodeName(n)} · ${t('第 {i}/{n} 轮', { i: a.round, n: a.total })}` }
+    return { ...a, txt: '' }
+  })
 }
 /**
- * 循环：把下游链路重复执行 times 轮。
- * 每轮用独立的 visited 起点（含本模块自身），保证循环体内的 IF 每轮都重新求值，
- * 同时用「已含自身」的副本防止 loop → loop 自环无限递归。
- * 间隔为 0 时同一轮 tick 内连续跑完；间隔 > 0 时把剩余轮次挂起到之后的 tick（见 takeDueLoops）。
+ * 执行一遍（画布「执行一次」用）：执行逻辑统一走 utils/ruleFlow 的 evalFlowGraph，
+ * 与后台运行器同源，避免出现「画布跑一遍和策略跑起来结果不一致」。
+ * 运行态由 sim store 的运行器按周期驱动，本组件不再自带定时器。
  */
-function evalLoop(n, fp, depth, acts, an, ae, visited, onBranch) {
-  if (depth > 8 || visited.has(n.id)) return
-  const times = loopTimes(n)
-  const gap = loopGap(n)
-  const seal = new Set(visited)
-  seal.add(n.id)
-  // 新一轮开始：清掉该模块旧的挂起轮次，避免主流程重复命中后越排越多
-  pendLoops.value = pendLoops.value.filter((q) => q.nodeId !== n.id)
-  for (let i = 1; i <= times; i++) {
-    if (i > 1 && gap > 0) {
-      pendLoops.value.push({ at: Date.now() + gap * 1000, nodeId: n.id, round: i, total: times, gap })
-      break
-    }
-    acts.push({ write: false, txt: roundTxt(n, i, times) })
-    for (const e of edges.value.filter((x) => x.from === n.id)) {
-      advance(e, fp, depth + 1, acts, an, ae, new Set(seal), onBranch)
-    }
+function runOnce(withLog) {
+  const r = evalFlowGraph(props.graph, { liveOf, boundOf, state: rfState })
+  for (const a of r.acts) {
+    // 统一入口：既写本地设定值（驱动仿真 / 碳核算），也把已绑定数据源可写点位的可变设备
+    // 经 cmd/{box}/cmd 真实下发。silent：自动执行不弹 toast，store 内按值变化去重避免命令风暴。
+    if (a.write) store.setExtSetpoint(a.devId, a.value, { silent: true })
   }
+  applyResult(r, !!withLog)
+  return r.acts
 }
-function startTimer() {
-  stopTimer()
-  runOnce(true)
-  runTimer = setInterval(() => runOnce(true), Math.max(1, Number(props.period) || 1) * 1000)
-}
-function stopTimer() {
-  if (runTimer) { clearInterval(runTimer); runTimer = null }
-  pendLoops.value = []   // 停止后不再补跑挂起的轮次，下次运行从第一轮重新开始
-}
-watch(() => props.running, (on) => { if (on) startTimer(); else stopTimer() }, { immediate: true })
-watch(() => props.period, () => { if (props.running) startTimer() })
+
+// 后台运行器（sim store）每轮的结果回写到画布：运行态下画布高亮的就是策略真正在跑的那一份结果。
+// 画布自身不再持有定时器 —— 否则一切换页面 / 关闭编排页，运行中的策略就停了。
+watch(
+  () => (props.modelId ? (store.agcLast || {})[props.modelId] : null),
+  (r) => {
+    if (!r) return
+    applyResult({
+      ok: r.ok,
+      acts: decorateActs(r.acts),
+      activeNodes: new Set(r.nodes || []),
+      activeEdges: new Set(r.edges || []),
+      branch: r.branch || '',
+    }, true)
+  },
+  { immediate: true },
+)
 
 // ─────────── 视图操作 ───────────
 function fitView() {
@@ -1355,7 +1233,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   stopAutoPan()
-  stopTimer()
+  // 画布不再自带定时器：运行态由 sim store 的后台运行器驱动（此处曾误留 stopTimer 调用，导致卸载报错）
   window.removeEventListener('mousemove', onWinMove)
   window.removeEventListener('mouseup', onWinUp)
   window.removeEventListener('keydown', onKey)
@@ -1527,6 +1405,9 @@ defineExpose({ runOnce, fitView, addModule })
 .rf-ft { display: flex; align-items: center; gap: 6px; padding: 3px 8px 4px; }
 .rf-hint { font-size: var(--fs-s); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rf-warn { margin-left: auto; font-size: var(--fs-s); color: var(--yellow); white-space: nowrap; }
+/* 可调模块的写入去向：绑定了可写点位 = 命中时真实下发（绿）；否则仅改平台内仿真设定值（灰） */
+.rf-bind { margin-left: auto; font-size: var(--fs-s); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rf-bind.on { color: var(--green); }
 
 /* 开始 / 结束：胶囊形端点（不显示种类色条） */
 .rf-node.flow { display: flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 20px; }

@@ -556,8 +556,9 @@ function onDrop(e) {
 }
 function onKey(e) {
   const tag = (e.target.tagName || '').toLowerCase()
+  const isTyping = tag === 'input' || tag === 'select' || tag === 'textarea'
   if (e.key === 'Delete' || e.key === 'Backspace') {
-    if (tag === 'input' || tag === 'select' || tag === 'textarea') return
+    if (isTyping) return
     // 优先删除选中的小组；组内子编排中则删除选中的成员节点
     if (store.selectedGroupId) { store.removeFlowGroup(store.selectedGroupId); return }
     if (store.selectedFlowId) store.removeFlowNode(store.selectedFlowId)
@@ -573,7 +574,8 @@ function onKey(e) {
       if (n) startRename(n)
     }
   }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+  // 重命名等输入态下不抢 Ctrl+D（否则会把按键吞掉并复制节点）
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd' && !isTyping) {
     e.preventDefault()
     if (store.selectedGroupId) {
       const g = store.scheme.groups.find((x) => x.id === store.selectedGroupId)

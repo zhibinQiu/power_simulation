@@ -9,7 +9,7 @@
       <div class="sf-body">
         <!-- ===== 新建场景：先选场景类别（四大控排 / 其它） ===== -->
         <template v-if="mode === 'new'">
-          <div class="sf-desc">{{ t('选择场景类别：平台将打开该类别下可用的场景资源包，并据此新建一份空白编排方案（当前场景的编排已自动保存，切回即用）。') }}</div>
+          <div class="sf-desc">{{ t('选择场景类别：平台将打开该类别下可用的场景资源包，并据此新建一份空白编排方案（编排为手动保存：切换场景前请先点工具条「保存」，否则未保存改动会丢失）。') }}</div>
           <div class="sf-cats">
             <button v-for="c in catGroups" :key="c.key" class="sf-cat" :class="{ on: pickedCat === c.key }" @click="pickedCat = c.key">
               <div class="c-top">

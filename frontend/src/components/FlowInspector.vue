@@ -507,7 +507,8 @@ function onAttSetpoint(att, v) {
   const n = Number(v)
   if (!isFinite(n)) return
   // 统一入口：本地设定；已绑定数据源设备可写点位时自动下发写入
-  store.setExtSetpoint('ext::' + node.value.id + '::' + att.uid, n)
+  // force：手动改值即时下发（同值也重发，便于现场设备重启后重新对齐）
+  store.setExtSetpoint('ext::' + node.value.id + '::' + att.uid, n, { force: true })
 }
 // 可变设备绑定数据源设备的可写点位（只列可写）：修改设定值时自动下发写设定
 const boxWritableGroups = computed(() => store.boxWritableGroups)

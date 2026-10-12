@@ -1,4 +1,5 @@
 // ============ 规则编排 · 开始 / 结束模块与「通路」判定 ============
+import { t } from '../i18n'
 // 执行语义（用户约定）：只有「开始 → … → 结束」形成通路的流程才可以执行；
 // 画布上没接进这条通路的模块只作展示，运行时不产生任何写入动作。
 //
@@ -111,6 +112,211 @@ export function flowPath(g) {
 
 /** 是否存在「开始 → … → 结束」通路（规则模型能否运行的判据） */
 export function hasFlowPath(g) { return flowPath(g).ok }
+
+// ============ 规则执行器（纯函数） ============
+// 与通路判定同源：只有落在「开始 → … → 结束」通路上的模块才会执行。
+// 画布（编辑 / 手动执行）与全局运行器（sim store，运行态策略在后台按周期跑）共用本函数，
+// 避免两处各写一套执行逻辑导致「画布预览与后台执行结果不一致」。
+
+function fmtVal(v) {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return '—'
+  const a = Math.abs(n)
+  return n.toLocaleString('zh-CN', { maximumFractionDigits: a >= 1000 ? 0 : a >= 10 ? 1 : 2 })
+}
+function loopTimesOf(n) {
+  const v = Math.round(Number(n && n.times))
+  return Number.isFinite(v) ? Math.min(999, Math.max(1, v)) : 1
+}
+function loopGapOf(n) {
+  const v = Number(n && n.gap)
+  return Number.isFinite(v) ? Math.min(3600, Math.max(0, v)) : 0
+}
+function cmpOp(a, op, b) {
+  const x = Number(a)
+  const y = Number(b)
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false
+  switch (op) {
+    case '>': return x > y
+    case '>=': return x >= y
+    case '<': return x < y
+    case '<=': return x <= y
+    case '==': return Math.abs(x - y) < 1e-9
+    case '!=': return Math.abs(x - y) >= 1e-9
+    default: return false
+  }
+}
+/** 分支判定来源：显式指定 > IF 模块的上游连线 > 无 */
+function srcOf(n, b, nodes, edges) {
+  if (b && b.src) {
+    const x = nodes.find((k) => k.id === b.src)
+    if (x && x.kind !== 'if') return x
+  }
+  const e = edges.find((x) => x.to === n.id)
+  if (!e) return null
+  const s = nodes.find((x) => x.id === e.from)
+  return s && s.kind !== 'if' ? s : null
+}
+/** 逻辑门条件来源：显式指定 > 上游连线 > 无（逻辑门不能再作为来源） */
+function condOf(n, c, nodes, edges) {
+  if (c && c.src) {
+    const x = nodes.find((k) => k.id === c.src)
+    if (x && !isGateKind(x.kind) && x.kind !== 'if') return x
+  }
+  const e = edges.find((x) => x.to === n.id)
+  if (!e) return null
+  const s = nodes.find((x) => x.id === e.from)
+  return s && !isGateKind(s.kind) && s.kind !== 'if' ? s : null
+}
+function nodeTitle(n) {
+  if (!n) return t('模块')
+  if (n.label) return n.label
+  if (n.kind === 'if') return t('条件判断')
+  if (isGateKind(n.kind)) return `${n.op === 'or' ? 'OR' : 'AND'} · ${t('逻辑')}`
+  if (n.kind === 'loop') return t('循环模块')
+  if (n.kind === KIND_START) return t('开始')
+  if (n.kind === KIND_END) return t('结束')
+  return t('模块')
+}
+
+/**
+ * 执行一遍规则图。
+ * @param graph {nodes, edges}
+ * @param ctx   { liveOf(devId), boundOf(node), state }
+ *   state —— 跨轮次状态（循环模块的挂起轮次），由调用方持有：后台运行器存自己的一份，
+ *            画布手动执行时传临时对象即可。
+ * @returns { ok, acts, activeNodes:Set, activeEdges:Set, branch }
+ *   acts[i].write —— true 表示需要写入设定值（可调模块），由调用方决定如何下发。
+ */
+export function evalFlowGraph(graph, ctx) {
+  const c = ctx || {}
+  const nodes = listOf(graph, 'nodes')
+  const edges = listOf(graph, 'edges')
+  const liveOf = typeof c.liveOf === 'function' ? c.liveOf : () => null
+  const boundOf = typeof c.boundOf === 'function' ? c.boundOf : () => null
+  const state = c.state || {}
+  if (!Array.isArray(state.pendLoops)) state.pendLoops = []
+
+  const fp = flowPath(graph)
+  const activeNodes = new Set()
+  const activeEdges = new Set()
+  const acts = []
+  let branch = ''
+  const onBranch = (v) => { if (!branch) branch = v }
+
+  // 没有「开始 → … → 结束」通路：整条流程不执行（也就不产生任何写入）
+  if (!fp.ok) {
+    state.pendLoops = []
+    return { ok: false, acts, activeNodes, activeEdges, branch: '' }
+  }
+
+  function advance(e, depth, visited) {
+    if (depth > 24) return
+    const tgt = nodes.find((x) => x.id === e.to)
+    if (!tgt || !fp.live.has(tgt.id)) return
+    activeEdges.add(e.id)
+    activeNodes.add(tgt.id)
+    if (tgt.kind === KIND_END) return
+    if (tgt.kind === 'if') { evalIf(tgt, depth, visited); return }
+    if (isGateKind(tgt.kind)) { evalGate(tgt, depth, visited); return }
+    if (tgt.kind === 'loop') { evalLoop(tgt, depth, visited); return }
+    if (!isDevKind(tgt.kind)) return
+    if (tgt.kind === 'adj') {
+      const v = Number(tgt.value)
+      if (Number.isFinite(v)) {
+        const b = boundOf(tgt)
+        const tail = b ? ` · ${t('下发')} ${b.device}.${b.prop}` : ` · ${t('仅仿真')}`
+        acts.push({
+          write: true, devId: tgt.devId, nodeId: tgt.id, value: v,
+          txt: `${nodeTitle(tgt)} ← ${t('写入')} ${fmtVal(v)}${tgt.unit || ''}${tail}`,
+        })
+      }
+    } else {
+      acts.push({ write: false, devId: tgt.devId, nodeId: tgt.id, txt: `${nodeTitle(tgt)}（${t('仅观测，不写入')}）` })
+    }
+    for (const nx of edges.filter((x) => x.from === tgt.id)) advance(nx, depth + 1, visited)
+  }
+
+  function evalIf(n, depth, visited) {
+    if (depth > 8 || visited.has(n.id)) return
+    visited.add(n.id)
+    let hit = null
+    for (const b of n.branches || []) {
+      if (b.type === 'else') continue
+      const s = srcOf(n, b, nodes, edges)
+      const v = s ? liveOf(s.devId) : null
+      if (v != null && cmpOp(v, b.op, b.val)) { hit = b; break }
+    }
+    if (!hit) hit = (n.branches || []).find((b) => b.type === 'else') || null
+    if (!hit) return
+    onBranch(n.id + ':' + hit.id)
+    for (const e of edges.filter((x) => x.from === n.id && x.port === hit.id)) advance(e, depth, visited)
+  }
+
+  function evalGate(n, depth, visited) {
+    if (depth > 8 || visited.has(n.id)) return
+    visited.add(n.id)
+    const or = n.op === 'or'
+    let ok = !or
+    let any = false
+    for (const cc of n.conds || []) {
+      const s = condOf(n, cc, nodes, edges)
+      const v = s ? liveOf(s.devId) : null
+      if (v == null || !Number.isFinite(Number(cc.val))) continue
+      any = true
+      const r = cmpOp(v, cc.op, cc.val)
+      if (or) { if (r) { ok = true; break } }
+      else if (!r) { ok = false; break }
+    }
+    const hitId = ok && any ? 't' : 'f'
+    onBranch(n.id + ':' + hitId)
+    acts.push({ write: false, nodeId: n.id, txt: `${nodeTitle(n)} → ${hitId === 't' ? t('满足') : t('不满足')}` })
+    for (const e of edges.filter((x) => x.from === n.id && x.port === hitId)) advance(e, depth, visited)
+  }
+
+  function evalLoop(n, depth, visited) {
+    if (depth > 8 || visited.has(n.id)) return
+    const times = loopTimesOf(n)
+    const gap = loopGapOf(n)
+    const seal = new Set(visited)
+    seal.add(n.id)
+    // 新一轮开始：清掉该模块旧的挂起轮次，避免主流程重复命中后越排越多
+    state.pendLoops = state.pendLoops.filter((q) => q.nodeId !== n.id)
+    for (let i = 1; i <= times; i++) {
+      if (i > 1 && gap > 0) {
+        state.pendLoops.push({ at: Date.now() + gap * 1000, nodeId: n.id, round: i, total: times, gap })
+        break
+      }
+      acts.push({ write: false, nodeId: n.id, txt: `${nodeTitle(n)} · ${t('第 {i}/{n} 轮', { i, n: times })}` })
+      for (const e of edges.filter((x) => x.from === n.id)) advance(e, depth + 1, new Set(seal))
+    }
+  }
+
+  // ① 到期的挂起轮次（循环模块「每轮间隔 > 0」时排在之后的 tick 执行）
+  const now = Date.now()
+  const due = []
+  const rest = []
+  for (const q of state.pendLoops) {
+    if (Number(q.at) <= now) due.push(q)
+    else rest.push(q)
+  }
+  state.pendLoops = rest
+  for (const q of due) {
+    const n = nodes.find((x) => x.id === q.nodeId)
+    if (!n || !fp.live.has(n.id)) continue
+    activeNodes.add(n.id)
+    acts.push({ write: false, nodeId: n.id, txt: `${nodeTitle(n)} · ${t('第 {i}/{n} 轮', { i: q.round, n: q.total })}` })
+    for (const e of edges.filter((x) => x.from === n.id)) advance(e, 1, new Set([n.id]))
+    if (q.round < q.total) state.pendLoops.push({ ...q, at: Date.now() + q.gap * 1000, round: q.round + 1 })
+  }
+  // ② 主流程：从每个「开始」出发沿通路推进
+  const visited = new Set()
+  for (const id of fp.starts) {
+    activeNodes.add(id)
+    for (const e of edges.filter((x) => x.from === id)) advance(e, 0, visited)
+  }
+  return { ok: true, acts, activeNodes, activeEdges, branch }
+}
 
 /**
  * 给存量编排补齐「开始 / 结束」端点，并把断开的两端自动接上：

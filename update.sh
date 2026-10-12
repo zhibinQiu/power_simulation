@@ -32,13 +32,12 @@
 # 目标地址集中配置在 platform/servers.conf（可用环境变量覆盖，见该文件）。
 # 单目标的附加参数直接透传，例：./update.sh bs --skip-build / --skip-config
 #
-# 编排存档（backend/data/designs/{flow,agc}.json）**默认不随任何推送同步**：
-#   它是用户在平台上编辑出来的运行期内容，本地 8010 与服务器 40014 各写各的一份，
-#   单向覆盖会把服务器上刚配好的编排（附加传感 / 采集设备绑定…）整体抹掉
-#   （表现即「编排被还原」）。
-#   需要同步时显式执行 ./update.sh designs（双向合并：按场景 updatedAt 取较新的一份，
-#   仅一侧有的场景并入另一侧，两端收敛；不构建、不动代码）；
-#   或给全量推送加 --designs（./update.sh all --designs）让本次顺带合并推送。
+# 编排存档（backend/data/designs/{flow,agc}.json）**默认每次推送都同步，且以服务器为准**：
+#   它是用户在平台上编辑出来的运行期内容，本地 8010 与服务器 40014 各写各的一份；
+#   服务器实例是权威侧 —— 先把服务器那一份合回本地（服务器有的场景覆盖本地），
+#   再随本次推送把合并结果推回服务器 → 两端收敛一致（本地独有的场景一并上到服务器）。
+#   单独同步（不构建、不动代码）：./update.sh designs
+#   本次推送不同步：./update.sh bs --no-designs
 #
 # 全新部署（第一次装机）走 ./deploy.sh，不在本脚本范围内。
 # ============================================================================
@@ -156,7 +155,7 @@ step_cloud() {
 step_middleware() {
   bash "$ROOT/platform/cloud-deploy/middleware/deploy_middleware.sh" sync --server "${PLATFORM_SSH:-root@36.151.146.71}"
 }
-# 编排存档双向同步：本地 ⇄ 服务器（按场景 updatedAt 取较新的一份，两端收敛）。
+# 编排存档同步：以服务器为准，把服务器上的编排合回本地再推回服务器（两端收敛）。
 # 独立成一个目标，便于只同步编排（不跑构建 / 不动代码）时单独执行。
 step_designs() { bash "$ROOT/platform/bs-deploy/sync_designs.sh"; }
 step_docs()    { bash "$ROOT/platform/doc-deploy/update.sh"; }

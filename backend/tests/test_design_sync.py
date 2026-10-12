@@ -6,9 +6,11 @@
 （表现为「刚配好的附加传感 / 采集设备绑定被还原」）。
 
 本测试锁定两件事：
-  1. platform/bs-deploy/designs_sync.py 的合并口径（按场景 updatedAt 较新者胜出，
-     仅一侧有的场景并入，写回前备份）；
-  2. 同步入口已接入 platform/bs-deploy/update.sh 与仓库根 update.sh（designs 目标）。
+  1. platform/bs-deploy/designs_sync.py 的合并口径（**服务器为准**：服务器有的场景
+     无条件覆盖本地，即使本地 updatedAt 更新；仅本地有的场景保留；写回前备份；
+     服务器存档缺失/损坏时不覆盖）；
+  2. 同步入口已接入 platform/bs-deploy/update.sh（默认每次推送都同步）与仓库根
+     update.sh（designs 目标）。
 """
 import json
 import os
@@ -57,23 +59,37 @@ def test_server_only_scene_merges_into_local(tmp_path):
     assert baks, "合并写回前必须备份本地存档"
 
 
-def test_newer_side_wins_per_scene(tmp_path):
-    """两端都有同一场景时取 updatedAt 较大的一份（谁最后编辑谁生效）。"""
+def test_server_wins_even_when_local_is_newer(tmp_path):
+    """服务器为准：服务器有的场景无条件覆盖本地，哪怕本地那份 updatedAt 更新。"""
     local = _write(str(tmp_path / "flow.json"), {
-        "a": {"sceneId": "a", "updatedAt": 3000, "scheme": {"nodes": [{"id": "n1"}]}},
+        "a": {"sceneId": "a", "updatedAt": 3000, "scheme": {"nodes": [{"id": "local-new"}]}},
         "b": {"sceneId": "b", "updatedAt": 1000, "scheme": {"nodes": [{"id": "n1"}]}},
     })
     remote = _write(str(tmp_path / "remote.json"), {
-        "a": {"sceneId": "a", "updatedAt": 2000, "scheme": {"nodes": [{"id": "old"}]}},
+        "a": {"sceneId": "a", "updatedAt": 2000, "scheme": {"nodes": [{"id": "server-old"}]}},
         "b": {"sceneId": "b", "updatedAt": 5000, "scheme": {"nodes": [{"id": "new"}]}},
     })
     rc, out = _run("flow", local, remote)
     assert rc == 0
     data = _read(local)
-    # a：本地较新 → 保留本地；b：服务器较新 → 采用服务器
-    assert data["a"]["scheme"]["nodes"][0]["id"] == "n1"
+    # a：本地时间更新也要被服务器覆盖；b：服务器更新同样采用服务器
+    assert data["a"]["scheme"]["nodes"][0]["id"] == "server-old"
     assert data["b"]["scheme"]["nodes"][0]["id"] == "new"
-    assert "保留本地" in out and "采用服务器" in out
+    assert "服务器为准" in out and "保留本地" not in out
+
+
+def test_newest_switch_keeps_local_when_local_is_newer(tmp_path):
+    """--newest 排障开关：退化为「较新者胜出」，此时本地较新的场景保留。"""
+    local = _write(str(tmp_path / "flow.json"), {
+        "a": {"sceneId": "a", "updatedAt": 3000, "scheme": {"nodes": [{"id": "local-new"}]}},
+    })
+    remote = _write(str(tmp_path / "remote.json"), {
+        "a": {"sceneId": "a", "updatedAt": 2000, "scheme": {"nodes": [{"id": "server-old"}]}},
+    })
+    rc, out = _run("flow", local, remote, "--newest")
+    assert rc == 0
+    assert _read(local)["a"]["scheme"]["nodes"][0]["id"] == "local-new"
+    assert "保留本地版本（较新）" in out
 
 
 def test_local_only_scene_kept_and_no_write_when_identical(tmp_path):
@@ -112,10 +128,10 @@ def test_dry_run_does_not_write(tmp_path):
 
 
 def test_sync_entry_wired_into_update_scripts():
-    """同步入口必须接进 bs-deploy/update.sh（--designs 时推送前合并）与仓库根 update.sh（designs 目标）。"""
+    """同步入口必须接进 bs-deploy/update.sh（推送前合回本地）与仓库根 update.sh（designs 目标）。"""
     assert os.path.isfile(SYNC_PY) and os.path.isfile(SYNC_SH)
     bs = open(os.path.join(BS_DEPLOY_DIR, "update.sh"), encoding="utf-8").read()
-    assert "sync_designs.sh" in bs, "bs-deploy/update.sh 需保留编排存档双向合并入口"
+    assert "sync_designs.sh" in bs, "bs-deploy/update.sh 需保留编排存档同步入口"
     assert "--no-push" in bs, "update.sh 内的合并结果由主 rsync 统一推送，不应重复传输"
     root = open(os.path.join(REPO_ROOT, "update.sh"), encoding="utf-8").read()
     assert "step_designs" in root and "designs|design) step_designs ;;" in root
@@ -124,20 +140,19 @@ def test_sync_entry_wired_into_update_scripts():
         assert rc.returncode == 0, f"{path} 语法错误：{rc.stderr}"
 
 
-def test_designs_not_synced_by_default():
-    """用户口径：推送代码（./update.sh all / bs）默认不带走编排存档，必须显式 --designs 或 ./update.sh designs。
+def test_designs_synced_by_default_and_server_wins():
+    """用户口径：编排要和服务端同步，且**以服务器为准** —— 默认每次推送都同步。
 
-    编排是运行期内容，本地与服务器各写各的；默认整目录排除，两端各自保留。
+    服务器是编排的权威侧：先把服务器那一份合回本地，再随本次 rsync 推回服务器（两端收敛）。
     """
     bs = open(os.path.join(BS_DEPLOY_DIR, "update.sh"), encoding="utf-8").read()
-    # 默认关闭：SYNC_DESIGNS=0，且排除规则必须真的出现在 rsync 规则变量里
-    assert "SYNC_DESIGNS=0" in bs
-    assert "--designs|--with-designs) SYNC_DESIGNS=1; shift ;;" in bs
-    assert '--exclude=backend/data/designs/***' in bs
+    # 默认开启：SYNC_DESIGNS=1，且 include 规则必须真的出现在 rsync 规则变量里
+    assert "SYNC_DESIGNS=1" in bs, "编排存档应默认随每次推送同步（服务器为准）"
+    assert "--no-designs|--skip-designs) SYNC_DESIGNS=0; shift ;;" in bs
+    assert "--include=backend/data/designs/***" in bs
     assert 'DESIGN_RULES' in bs and '$DESIGN_RULES' in bs
+    # 合并口径默认「服务器为准」（脚本里以 server_wins 表达，--newest 仅排障用）
+    sync_py = open(SYNC_PY, encoding="utf-8").read()
+    assert "server_wins" in sync_py and "--newest" in sync_py
     root = open(os.path.join(REPO_ROOT, "update.sh"), encoding="utf-8").read()
-    # 根目录入口：--designs 透传给 bs；未指定时提示手动同步
-    assert "DO_DESIGNS=0" in root
-    assert "--designs|--with-designs) DO_DESIGNS=1; shift ;;" in root
-    assert 'args+=("--designs")' in root
-    assert "./update.sh designs" in root
+    assert "./update.sh designs" in root and "step_designs" in root

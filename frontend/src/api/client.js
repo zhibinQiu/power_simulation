@@ -100,7 +100,8 @@ export const api = {
   // ---- 编排方案服务端存档（流程编排 flow / AI 群控编排 agc）----
   // 此前编排只存浏览器 localStorage，换实例即丢失；现落到后端 backend/data/designs/，
   // 随 platform/bs-deploy/update.sh 同步到服务器（本地为真源）。localStorage 仅作离线兜底。
-  designBucket: (bucket) => jget('/designs/' + encodeURIComponent(bucket)),
+  // AI 群控服务端运行器状态：哪些策略在运行、各策略最近一轮执行结果（执行在服务端，关掉浏览器也照跑）
+  agcRuntime: () => jget('/agc/runtime'),
   designSave: (bucket, scene, data) => jput('/designs/' + encodeURIComponent(bucket), { scene, data }),
   // 页面关闭 / 切到后台时立刻落库：普通 fetch 在卸载阶段会被浏览器直接取消，
   // keepalive 让请求在页面销毁后仍由浏览器代为发出 —— 否则「配完附加传感就关页面」时

@@ -64,6 +64,16 @@ def put_scene_design(bucket: str, payload: DesignPayload) -> Dict[str, Any]:
     return {"ok": True, "bucket": bucket, "scene": payload.scene, "data": data}
 
 
+@router.get("/api/agc/runtime")
+def get_agc_runtime() -> Dict[str, Any]:
+    """AI 群控服务端运行器状态：运行器是否在线、哪些模型在运行、各模型最近一轮执行结果。
+
+    前端据此展示「运行中」绿色标识与画布高亮 —— 执行发生在服务端，因此关掉浏览器也照跑。
+    """
+    from ..domain.scene import agc_runner
+    return agc_runner.runtime()
+
+
 @router.delete("/api/designs/{bucket}/{scene}")
 def delete_scene_design(bucket: str, scene: str) -> Dict[str, Any]:
     """删除某场景的编排存档（清空画布 / 删除编排模型时用）。"""

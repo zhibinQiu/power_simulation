@@ -62,6 +62,13 @@ async def _lifespan(app):
     #   cloud：云端 Broker（41883），能碳一体机盒子/云端 agent 推送；中间件把外部数据
     #          转换后也直发本 Broker（ext/# 上行空间 → data/ext-*），按前缀区分。
     mqtt_source.start()
+    # AI 群控：服务端常驻运行器 —— 策略点「运行」后只要没人手动停止就一直执行下发，
+    # 不依赖浏览器是否打开 / 是否停在编排页（运行态存在 designs/agc.json 的 running 字段）。
+    try:
+        from .domain.scene import agc_runner
+        agc_runner.start()
+    except Exception as _e:  # pragma: no cover
+        realtime.manager.notify("warn", "AI 群控运行器未启动", f"服务端常驻运行器启动失败：{_e}")
     # 统一数据源接入（box 能碳一体机 / external 经中间件接入的外部数据，见 app/data_sources/）：
     # 登记默认源、与中间件对账补注册。平台与中间件自身都不产生模拟数据。
     try:
@@ -80,6 +87,11 @@ async def _lifespan(app):
     # daemon 线程随进程结束亦可，显式停止更干净）
     try:
         data_sources.stop()
+    except Exception:  # pragma: no cover
+        pass
+    try:
+        from .domain.scene import agc_runner
+        agc_runner.stop()
     except Exception:  # pragma: no cover
         pass
 

@@ -10,16 +10,18 @@
     ② 下一次 update.sh 又用本地旧档把服务器上的新编排整体抹掉 ——
        表现为「刚配好的附加传感 / 采集设备绑定，刷新或推送后又被还原」。
 
-合并口径（可预测、不会静默丢档）：
-  以**场景（bucket 里的顶层 key）为粒度，取 updatedAt 较新的一份**：
-    · 仅服务器有的场景        → 并入本地（服务器上的新编排同步回开发机）
-    · 仅本地有的场景          → 保留（随 rsync 推到服务器）
-    · 两边都有                → updatedAt 大的那份胜出，另一份在写回前备份
-  updatedAt 由前端每次保存时写入（Date.now()），故「谁最后编辑谁生效」，
-  与前端 _pullScheme / pullDesigns 的「较新者胜出」口径完全一致。
+合并口径（**服务器为准**，可预测、不会静默丢档）：
+  服务器实例（40014）是编排的权威侧，开发机（8010）的编排一律向它对齐：
+    · 服务器有的场景          → **无条件采用服务器版本**（即使本地 updatedAt 更新）
+    · 仅本地有的场景          → 保留（随 rsync 推到服务器，让服务器也补上）
+  写回本地前先备份 <本地文件>.bak.<时间戳>，出错可回滚。
+  （另保留 --newest 开关：按场景 updatedAt 较新者胜出，仅排障时用。）
+
+  服务器存档缺失 / 为空 / 损坏时**不做任何覆盖**（按「无权威数据」处理，保持本地），
+  避免一次取档失败把开发机存档清空。
 
 用法：
-  python3 designs_sync.py <bucket> <本地文件> <服务器文件> [--dry-run]
+  python3 designs_sync.py <bucket> <本地文件> <服务器文件> [--dry-run] [--newest]
 退出码：0 = 无变更或有变更已合并；1 = 入参/文件异常。
 """
 from __future__ import annotations
@@ -59,8 +61,13 @@ def _fmt(ms: int) -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ms / 1000))
 
 
-def merge(local: dict, remote: dict):
-    """按场景粒度合并，返回 (merged, 变更说明列表)。"""
+def merge(local: dict, remote: dict, server_wins: bool = True):
+    """按场景粒度合并，返回 (merged, 变更说明列表)。
+
+    server_wins=True（默认）：服务器是权威侧，其有的场景一律覆盖本地；
+    server_wins=False：退化为「两端都有时取 updatedAt 较新的一份」（排障用）。
+    两种口径下「仅本地有的场景」都保留（不删本地独有的编排）。
+    """
     merged = dict(local)
     notes = []
     for scene, rv in (remote or {}).items():
@@ -69,22 +76,28 @@ def merge(local: dict, remote: dict):
             merged[scene] = rv
             notes.append(("并入本地（仅服务器有）", scene, _ts(rv)))
             continue
+        if rv == lv:
+            notes.append(("两端一致", scene, _ts(lv)))
+            continue
         rt, lt = _ts(rv), _ts(lv)
-        if rt > lt:
+        if server_wins:
+            merged[scene] = rv
+            notes.append(("采用服务器版本（服务器为准）", scene, rt))
+        elif rt > lt:
             merged[scene] = rv
             notes.append(("采用服务器版本（较新）", scene, rt))
-        elif lt > rt:
-            notes.append(("保留本地版本（较新）", scene, lt))
         else:
-            notes.append(("两端一致", scene, lt))
+            notes.append(("保留本地版本（较新）", scene, lt))
     return merged, notes
 
 
 def main(argv):
-    args = [a for a in argv[1:] if a != "--dry-run"]
+    flags = {"--dry-run", "--newest"}
+    args = [a for a in argv[1:] if a not in flags]
     dry = "--dry-run" in argv[1:]
+    newest = "--newest" in argv[1:]   # 排障用：改回「较新者胜出」口径
     if len(args) != 3:
-        print("用法：python3 designs_sync.py <bucket> <本地文件> <服务器文件> [--dry-run]", file=sys.stderr)
+        print("用法：python3 designs_sync.py <bucket> <本地文件> <服务器文件> [--dry-run] [--newest]", file=sys.stderr)
         return 1
     bucket, local_path, remote_path = args
     local = _load(local_path)
@@ -92,7 +105,7 @@ def main(argv):
     if not remote:
         print(f"    · {bucket}：服务器存档为空或缺失 → 保持本地版本（{len(local)} 个场景）")
         return 0
-    merged, notes = merge(local, remote)
+    merged, notes = merge(local, remote, server_wins=not newest)
     changed = merged != local
     for action, scene, ts in notes:
         print(f"    · {bucket}/{scene}：{action}（{_fmt(ts)}）")

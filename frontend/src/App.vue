@@ -233,6 +233,11 @@ function onToggleEdit() { if (store.editMode) store.exitEdit(); else store.enter
 function ensureEdit() { if (!store.editMode) store.enterEdit(); else store.activateView('flowEdit') }
 function loadExample(route) { ensureEdit(); store.loadTemplate(route) }
 function clearScheme() { ensureEdit(); store.clearScheme() }
+// 编排手动保存：改动实时反映在画布与孪生预览，但只有点「保存」才写入本地存档 + 服务端 designs/flow
+function saveScheme() {
+  if (!store.editMode) { store.showToast(t('编排保存仅在流程编排模式下可用'), 'info'); return }
+  store.saveScheme()
+}
 // 自动布局：主工艺沿水平中线成主干、工辅分列主干上下两侧（与 3D 孪生空间一致），布局后自动适配视图
 function autoLayoutScheme() { ensureEdit(); store.autoLayoutScheme(); store.flowZoomFit() }
 function addGroupBtn() { ensureEdit(); if (!store.addFlowGroup()) store.toast = t('新建小组失败。') }
@@ -330,7 +335,7 @@ function toggleAgent() { store.toggleAgent() }
 // 供命令窗口调用的孪生控制动作
 const twinActions = { onSimToggle, onResetView, onOverview, focusSel, onToggleEdit }
 // 供工具条调用的动作
-const ribbonActions = { onSimToggle, onToggleEdit, toggleAuto, onResetView, toggleOverview, toggleAgent, autoLayoutScheme, flowZoomBtn, flowFit, loadExample, clearScheme, closeView, dataRefresh, openAiModel, marketRefresh, marketSwitch, marketForecast, marketLedgerRefresh, carbonReport, marketInstrument, marketForecastOn, marketTabOn }
+const ribbonActions = { onSimToggle, onToggleEdit, toggleAuto, onResetView, toggleOverview, toggleAgent, saveScheme, autoLayoutScheme, flowZoomBtn, flowFit, loadExample, clearScheme, closeView, dataRefresh, openAiModel, marketRefresh, marketSwitch, marketForecast, marketLedgerRefresh, carbonReport, marketInstrument, marketForecastOn, marketTabOn }
 
 /* ---------------- 经典菜单条（文件 / 仿真 / 视图 / 编辑 / 工具 / 帮助；AI 已整体并入「工具」） ---------------- */
 const menus = computed(() => [
@@ -341,7 +346,7 @@ const menus = computed(() => [
     { label: t('打开场景…'), act: () => { sceneFileMode.value = 'open' } },
     { sep: true },
     // 「另存为场景…」：把当前场景（含当前编排方案快照）打包为可分发的 .ec 资源包
-    { label: t('另存为场景…'), accel: 'Ctrl+S', act: () => { sceneFileMode.value = 'saveAs' } },
+    { label: t('另存为场景…'), accel: 'Ctrl+Shift+S', act: () => { sceneFileMode.value = 'saveAs' } },
     { sep: true },
     { label: t('设置…'), act: () => { showSettings.value = true } },
   ] },
@@ -364,6 +369,8 @@ const menus = computed(() => [
   ] },
   { id: 'edit', label: t('编辑'), items: [
     { label: store.editMode ? t('完成编排') : t('进入流程编排'), act: onToggleEdit },
+    // 编排为手动保存：改动不会自动落盘，此处与工具条「保存」按钮同源（Ctrl+S）
+    { label: t('保存编排'), accel: 'Ctrl+S', hide: () => !store.editMode, disabled: () => !store.schemeDirty, act: () => saveScheme() },
     { sep: true },
     { label: t('撤销'), accel: 'Ctrl+Z', disabled: () => !store.canUndo, act: () => store.undo() },
     { label: t('重做'), accel: 'Ctrl+Y', disabled: () => !store.canRedo, act: () => store.redo() },
@@ -412,7 +419,7 @@ const menus = computed(() => [
     { label: t('宣传手册'), accel: 'F1', act: () => openDocsSite('promo') },
     { label: t('使用手册'), act: () => openDocsSite('manual') },
     { label: t('技术文档'), act: () => openDocsSite('tech') },
-    { label: t('快捷键'), act: () => pushCmd(t('快捷键：Ctrl+Enter 运行 · Ctrl+Z 撤销 · Ctrl+Y 重做 · F 聚焦工序 · 编排态 F2 重命名、Ctrl+D 复制、Del 删除 · 右键节点打开菜单。'),'out') },
+    { label: t('快捷键'), act: () => pushCmd(t('快捷键：Ctrl+Enter 运行 · Ctrl+S 保存编排（手动保存） · Ctrl+Shift+S 另存为场景 · Ctrl+Z 撤销 · Ctrl+Y 重做 · F 聚焦工序 · 编排态 F2 重命名、Ctrl+D 复制、Del 删除 · 右键节点打开菜单。'),'out') },
     { sep: true },
     { label: t('关于本平台'), act: onAbout },
   ] },
@@ -420,6 +427,8 @@ const menus = computed(() => [
 
 useGlobalShortcuts({
   store, onSimToggle, focusSel,
+  onSaveScheme: saveScheme,
+  onSaveAsScene: () => { sceneFileMode.value = 'saveAs' },
   onMenuEsc: () => topBarRef.value && topBarRef.value.closeMenus(),
   onTftAnalysis: () => {
     if (store.simMode) showTftAnalysis.value = true
