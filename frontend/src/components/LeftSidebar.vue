@@ -1,14 +1,35 @@
 <template>
   <aside class="sidebar">
-    <!-- 宽度拖拽手柄（右侧边缘） -->
-    <div class="sidebar-rsz" @mousedown.prevent="emit('rsz', $event)" :title="t('拖拽调整宽度')"></div>
+    <!-- 宽度拖拽手柄（右侧边缘，隐形热区） -->
+    <div class="sidebar-rsz" :class="{ dragging }" @mousedown.prevent="emit('rsz', $event)" :title="t('拖拽调整宽度')"></div>
     <div class="sidebar-head">
       <Icon :name="headIcon" :size="15" class="head-ic" />
       <span class="ttl">{{ headTitle }}</span>
+      <span class="sb-spacer"></span>
+      <!-- 面板显隐：勾选的面板自左栏顶部依次向下显示（资源管理器 → 资源 → 搜索） -->
+      <button class="sb-more" :title="t('选择要显示的面板')" @click.stop="onPanelMenu">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/>
+        </svg>
+      </button>
     </div>
 
-    <!-- ======== 资源管理器面板 ======== -->
-    <template v-if="store.activityView === 'explorer'">
+    <!-- ======== 面板区：按勾选顺序自上而下排列（资源管理器 / 资源 / 搜索） ======== -->
+    <div class="sb-secs">
+      <section v-for="p in panels" :key="p.id" class="sb-sec" :class="{ collapsed: secClosed[p.id] === true }">
+        <div class="sb-sec-hd" :title="p.title" @click="toggleSec(p.id)">
+          <span class="twisty sm" :class="{ open: secClosed[p.id] !== true }">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </span>
+          <span class="sb-sec-tt">{{ p.title }}</span>
+        </div>
+        <div class="sb-sec-bd" v-show="secClosed[p.id] !== true">
+
+    <!-- ======== 资源管理器面板：当前编排对应场景的资源树 ======== -->
+    <ScenePanel v-if="p.id === 'scene'" />
+
+    <!-- ======== 资源面板 ======== -->
+    <template v-else-if="p.id === 'explorer'">
     <!-- 三标签：工艺 / 物料 / 策略 -->
     <div class="tabbar">
       <div class="tab" :class="{ active: tab === 'process' }" @click="onTab('process')">
@@ -198,9 +219,11 @@
     </template>
 
     <!-- ======== 搜索面板：跨工艺/设备/物料/策略全局搜索 ======== -->
-    <SearchPanel v-else-if="store.activityView === 'search'" />
-    <!-- ======== 场景面板：当前编排对应场景的资源树 ======== -->
-    <ScenePanel v-else-if="store.activityView === 'scene'" />
+    <SearchPanel v-else-if="p.id === 'search'" />
+
+        </div>
+      </section>
+    </div>
   </aside>
 </template>
 
@@ -210,21 +233,70 @@ import { useSimStore, AI_MODELS } from '../stores/sim'
 import { MATERIALS, PRODUCTS, ROUTE_GROUPS, PROCESS_TEMPLATES, PROCESS_ADJUSTABLE, DEVICE_MAP, PROCESS_MAP } from '../data/flowLibrary'
 import { SENSOR_TEMPLATES, ADJUSTABLE_TEMPLATES } from '../data/attachLibrary'
 import Icon from './Icon.vue'
-import { openContextMenu } from '../composables/contextMenu'
+import { openContextMenu, ctxState } from '../composables/contextMenu'
 import SearchPanel from './SearchPanel.vue'
 import ScenePanel from './ScenePanel.vue'
 import { t } from '../i18n'
 
 const store = useSimStore()
 const emit = defineEmits(['rsz'])
-// 活动栏面板头部：标题/图标随当前活动面板切换（VS Code 式）
-const headMeta = {
-  explorer: { title: t('资源管理器'), icon: 'open' },
-  search: { title: t('搜索'), icon: 'search' },
-  scene: { title: t('场景'), icon: 'scene3d' },
+defineProps({ dragging: { type: Boolean, default: false } })
+// ===== 左栏面板：显隐由面板头右侧「⋯」菜单勾选，显示顺序固定（资源管理器 → 资源 → 搜索）=====
+const PANEL_ORDER = ['scene', 'explorer', 'search']
+const PANEL_META = {
+  scene: { key: '资源管理器', icon: 'scene3d' },
+  explorer: { key: '资源', icon: 'open' },
+  search: { key: '搜索', icon: 'search' },
 }
-const headTitle = computed(() => (headMeta[store.activityView] || headMeta.explorer).title)
-const headIcon = computed(() => (headMeta[store.activityView] || headMeta.explorer).icon)
+// 第一个模块（场景资源树）直接显示**当前场景名**（如「机房温控」）：左栏头部已经是「资源管理器」，
+// 模块标题再写一遍同名看不出这棵树属于哪个场景；场景名随 store 走，切场景后自动更新。
+const sceneTitle = computed(() => {
+  const sid = store.sceneId || 'steel'
+  const meta = (store.sceneIndex || []).find((x) => x.id === sid)
+  if (meta && meta.label) return meta.label
+  const pk = store.scenePack && store.scenePack.meta
+  if (pk && pk.label) return pk.label
+  const sc = (store.scenarios || []).find((s) => s.id === sid)   // 内置钢包：注册表还没拉到时兜底「钢铁」
+  return (sc && sc.label) || sid
+})
+// 已勾选面板（按固定顺序），面板头标题取第一个可见面板（默认「资源管理器」）
+const panels = computed(() => PANEL_ORDER
+  .filter((id) => !store.sidePanelOn || store.sidePanelOn[id] !== false)
+  .map((id) => ({ id, icon: PANEL_META[id].icon, title: id === 'scene' ? sceneTitle.value : t(PANEL_META[id].key) })))
+// 面板头是左栏容器标题，固定显示「资源管理器」（场景名由第一个模块标题承担，避免上下同名重复）
+const headTitle = computed(() => {
+  const p = panels.value[0]
+  if (!p) return t('资源管理器')
+  return p.id === 'scene' ? t('资源管理器') : p.title
+})
+const headIcon = computed(() => (panels.value[0] || { icon: 'scene3d' }).icon)
+// 面板区折叠态：点击面板标题行折叠/展开（三个面板同时显示时用得上）。
+// 「搜索」默认折叠——只留一行标题，需要时点开，不占用资源树的空间
+const secClosed = reactive({ search: true })
+function toggleSec(id) { secClosed[id] = secClosed[id] !== true }
+// 面板显隐菜单项：勾选态与「最后一个可见面板不可取消」都按当前状态实时生成，
+// 每次点击后用新数组刷新菜单（菜单是快照式 items，不刷新则勾号不变、最后一项仍可取消）
+function panelMenuItems() {
+  const on = (id) => !store.sidePanelOn || store.sidePanelOn[id] !== false
+  const count = PANEL_ORDER.filter(on).length
+  return PANEL_ORDER.map((id) => ({
+    label: t(PANEL_META[id].key),
+    icon: PANEL_META[id].icon,
+    checkable: true,
+    checked: on(id),
+    keepOpen: true,
+    disabled: on(id) && count <= 1,
+    action: () => {
+      store.toggleSidePanel(id)
+      ctxState.items = panelMenuItems()
+    },
+  }))
+}
+// 面板显隐菜单：在「⋯」按钮正下方弹出
+function onPanelMenu(e) {
+  const r = e.currentTarget.getBoundingClientRect()
+  openContextMenu(r.left, r.bottom + 4, panelMenuItems())
+}
 // 滚动条显隐：滚动时显示，停止滚动 2s 后自动隐藏
 const scrolling = ref(false)
 let scrollTimer = null
@@ -312,7 +384,7 @@ const tab = ref('process')
 
 // 全厂设备按「工艺类型」归类，拆成「计量设备 / 可调设备」两组，供资源浏览器逐工艺展开。
 // 已部署工序取真实设备（计量 + 合成可调）；未部署工序仍列出其「典型可调设备」，
-// 使左侧资源管理器与右侧属性面板（典型可调设备）保持一致，避免有的工艺在属性中可见、左侧却没有。
+// 使左侧资源面板与右侧属性面板（典型可调设备）保持一致，避免有的工艺在属性中可见、左侧却没有。
 const allDevices = computed(() => store.allDevices)
 const devByType = computed(() => {
   const m = {}
@@ -415,7 +487,7 @@ function onProcessClickFromType(type) {
   store.selectAssetType(type)
 }
 // 打开工辅设备详情（如从工序「可调设备」点击鼓风机）时，
-// 左侧资源管理自动跳转到「工辅」分组下的对应节点：切回工艺目录、展开分组并滚动定位
+// 左侧资源面板自动跳转到「工辅」分组下的对应节点：切回工艺目录、展开分组并滚动定位
 watch(() => store.deviceDetailId, async (id) => {
   if (!id) return
   const dd = store.deviceDetail
@@ -429,7 +501,7 @@ watch(() => store.deviceDetailId, async (id) => {
   document.getElementById('tree-leaf-' + dd.device.type)?.scrollIntoView({ block: 'nearest' })
 })
 
-// 资源管理器展开状态：工艺默认展开到工艺级别（二级：炼钢/工辅分组及其中工艺节点），
+// 资源面板展开状态：工艺默认展开到工艺级别（二级：炼钢/工辅分组及其中工艺节点），
 // 工艺节点下的设备子项、物料/策略分组默认折叠（少即是多）
 const expanded = reactive({
   process: false, g_steel: true, g_aux: true,
@@ -516,6 +588,37 @@ function onStratContext(e, s) {
 <style scoped>
 /* 面板头图标 */
 .head-ic { flex: 0 0 auto; color: var(--accent2); opacity: .9; }
+/* 面板头右侧占位：把「⋯」推到最右 */
+.sb-spacer { flex: 1; }
+/* 面板显隐按钮（⋯）：纯图标 ghost 常态隐形、hover 出底，与工具条图标按钮同度量 */
+.sb-more {
+  flex: 0 0 auto; width: 22px; height: 22px; display: grid; place-items: center;
+  background: transparent; color: var(--muted); border-radius: var(--r-sm);
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.sb-more:hover { background: var(--hover); color: var(--text); }
+.sb-more:active { transform: translateY(1px); }
+
+/* 面板区：勾选的面板自上而下依次排列，展开态等分高度、折叠态只留标题行 */
+.sb-secs { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.sb-sec {
+  flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+}
+.sb-sec.collapsed { flex: 0 0 auto; }
+/* 面板之间的分割线（场景 / 资源管理器 / 搜索 三块依次排列，用发丝线分清边界） */
+.sb-sec + .sb-sec { border-top: 1px solid var(--border); }
+.sb-sec-hd {
+  flex: 0 0 auto; height: 24px; display: flex; align-items: center; gap: var(--sp-2);
+  padding: 0 var(--pad-x); background: var(--head-bg); cursor: pointer; user-select: none;
+}
+/* 与面板头（--head-bg 同色）相邻，靠字号字重区分层级，不再加分隔线 */
+.sb-sec-tt {
+  font-size: var(--fs-body2); font-weight: 600; letter-spacing: .5px;
+  color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sb-sec-hd:hover .sb-sec-tt { color: var(--text); }
+.sb-sec-hd .twisty.sm { width: 12px; height: 12px; opacity: .6; }
+.sb-sec-bd { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 
 /* Tab 栏图标 */
 .tab svg { flex: 0 0 auto; opacity: .7; }

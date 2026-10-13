@@ -101,7 +101,7 @@
               <div v-if="revOpen && hasProduct" class="cost-detail rev-detail">
                 <div class="cd-head">{{ t('产品收益 = 产量 × 主产品销售单价（卡面收益随所选周期累计）') }}</div>
                 <div class="cd-row">
-                  <span class="cd-name" style="background:#3f9d6b">{{ t('主产品') }}</span>
+                  <span class="cd-name" style="background:var(--green)">{{ t('主产品') }}</span>
                   <span class="cd-qty">
                     <select class="q-in rev-sel" v-model="revMainId" :title="t('自动匹配产线终端产品，或手动指定')">
                       <option value="auto">{{ t('自动匹配（按产线终端工序）') }}</option>
@@ -135,9 +135,9 @@
               <div v-if="emiOpen" class="cost-detail emi-detail">
                 <div class="cd-head">{{ t('总排放（全国碳市场口径）= 直接排放（范围一）· 排放因子法') }}</div>
                 <div class="meth-line"><span class="ml">{{ t('① 直接排放（范围一）= 燃料燃烧 + 工业过程（各工序求和）') }}</span><i class="mval" :style="{ color: co2Color }">{{ fmt(emiDirectRate) }} tCO₂/h</i></div>
-                <div class="meth-line sub"><span class="ml">{{ t('① 明细：燃料燃烧 Σ 消耗量 × 低位发热量 × 单位热值含碳量 × 碳氧化率 × 44/12；工业过程：碳酸盐分解（石灰石 0.4395 / 白云石 0.4761 tCO₂/t）、电极消耗 3.663 tCO₂/t。焦化/烧结等中间工序燃料碳按碳流平衡转入下游不重复计入；副产煤气回收、余热发电外供做扣减。默认因子为国家/行业参考值，可在「排放因子」设置中替换。') }}</span></div>
-                <div class="meth-line"><span class="ml">{{ t('② 外购电间接排放（范围二）= 外购电 × 电网平均排放因子 0.5703（发电侧排放 · 不计入企业总排放）') }}</span><i class="mval">{{ fmt(emiIndirectRate) }} tCO₂/h</i></div>
-                <div class="cd-note">{{ t('全国碳市场（CEA）对钢铁企业的管控范围仅覆盖直接排放（范围一）——外购电的排放已在发电侧由电力行业承担配额，钢铁企业不重复计算，故卡面「总排放」与本处计算均不含范围二；如需按温室气体清单对外披露全口径，可在 ① 基础上另加 ②。') }}</div>
+                <div class="meth-line sub"><span class="ml">{{ t('① 燃料燃烧 = Σ 消耗量 × 低位发热量 × 单位热值含碳量 × 碳氧化率 × 44/12；工业过程 = 碳酸盐分解（石灰石 0.4395 / 白云石 0.4761 tCO₂/t）+ 电极消耗 3.663 tCO₂/t。中间工序燃料碳转入下游不重复计入；因子可在「排放因子」中替换。') }}</span></div>
+                <div class="meth-line"><span class="ml">{{ t('② 范围二 = 外购电 × 电网因子 0.5703（不计入企业总排放）') }}</span><i class="mval">{{ fmt(emiIndirectRate) }} tCO₂/h</i></div>
+                <div class="cd-note">{{ t('CEA 仅覆盖范围一直接排放，外购电排放由发电侧承担，故卡面「总排放」不含范围二；全口径披露可在 ① 基础上另加 ②。') }}</div>
                 <div class="meth-line"><span class="ml">{{ t('碳素利用：进入钢水/炉渣/捕集的碳 ÷ 输入碳') }}</span><i class="mval">{{ carbonUtilPct }}%</i></div>
                 <template v-if="isCmpPeriod">
                   <div class="cmp-row">
@@ -151,7 +151,7 @@
                   <span class="qk">{{ t('碳配额结余') }}（{{ t('企业年配额 − 本年 CEA 直接排放') }}）</span>
                   <b :class="quotaRemain.cls">{{ quotaRemain.text }}</b>
                 </div>
-                <div class="cd-note">{{ t('配额为企业当年经全国碳市场免费分配及有偿购得的配额量（CEA 仅覆盖直接排放范围一，不统计外购电范围二；默认值可在下方「预估碳成本」中维护）；结余为负表示超排，需购入配额履约。') }}</div>
+                <div class="cd-note">{{ t('配额为当年免费分配及有偿购得的配额量（仅范围一），默认值可在下方维护；结余为负即超排，需购入配额履约。') }}</div>
               </div>
               <!-- 能源成本展开：外购用量 × 单价 -->
               <div v-if="costOpen" class="cost-detail">
@@ -166,7 +166,7 @@
               </div>
               <!-- 预估碳成本展开：计算方式 (n − m) × 实时碳价（n/m 均按 CEA 范围一直接排放），配额/碳价可维护 -->
               <div v-if="carbOpen" class="cost-detail carb-detail">
-                <div class="cd-head">{{ t('预估碳成本 = (企业年配额 n − 到年底排放 m) × 实时碳价 p（n/m 均为范围一直接排放 · CEA）') }}</div>
+                <div class="cd-head">{{ t('预估碳成本 = (年配额 n − 到年底排放 m) × 实时碳价 p（均为范围一）') }}</div>
                 <div class="carb-edit">
                   <label>{{ t('企业年配额 n') }}<input class="q-in" v-model="quotaDraft" type="number" min="0" step="100000" :title="t('单位：tCO₂/年')" @change="onQuotaEdit" /></label>
                   <label>{{ t('实时碳价 p') }}<input class="q-in" v-model="priceDraft" type="number" min="0" step="0.0001" :title="t('单位：万元/tCO₂')" @change="onPriceEdit" /></label>
@@ -176,7 +176,7 @@
                   <span class="cd-qty">{{ row.v }}</span>
                   <span class="cd-amt"><b :class="row.cls || 'flat'">{{ row.a }}</b><i>{{ row.u }}</i></span>
                 </div>
-                <div class="cd-note">{{ t('m 按当前范围一直接排放速率 × 全年 8760 小时外推（即全厂维持当前运行水平到年底的 CEA 排放总量，为预测值）；n − m < 0 为超排缺口，缺口量 × 碳价即预估购碳支出；盈余则为配额结余，按碳价折算潜在交易收益。范围二（外购电）排放不纳入 CEA——其碳成本已体现于购电价且由发电企业承担配额，不重复计量。') }}</div>
+                <div class="cd-note">{{ t('m 按当前范围一速率 × 8760 小时外推；n − m < 0 为超排缺口，× 碳价即购碳支出；盈余为配额结余。范围二不纳入 CEA，不重复计量。') }}</div>
               </div>
             </div>
           </CollapseSection>
@@ -467,11 +467,11 @@ const carbDetail = computed(() => {
   const rows = [
     { k: t('CEA 直接排放速率（范围一）'), v: `${fmt(rate)} tCO₂/h`, a: '', u: '', color: '#3f6f9d' },
     { k: t('到年底排放 m（按当前直接速率外推）'), v: `${fmt(m)} tCO₂`, a: '', u: '', color: '#b4692f' },
-    { k: t('企业年配额 n'), v: `${fmt(n)} tCO₂`, a: '', u: '', color: '#3f9d6b' },
+    { k: t('企业年配额 n'), v: `${fmt(n)} tCO₂`, a: '', u: '', color: 'var(--green)' },
   ]
   rows.push(d < 0
-    ? { k: t('超排缺口 (n−m)'), v: `${fmt(-d)} tCO₂`, a: '', u: '', color: '#c0574a' }
-    : { k: t('配额盈余 (n−m)'), v: `${fmt(d)} tCO₂`, a: '', u: '', color: '#c9a33e' })
+    ? { k: t('超排缺口 (n−m)'), v: `${fmt(-d)} tCO₂`, a: '', u: '', color: 'var(--red)' }
+    : { k: t('配额盈余 (n−m)'), v: `${fmt(d)} tCO₂`, a: '', u: '', color: 'var(--yellow)' })
   rows.push({ k: t('实时碳价 p'), v: `${fmt(p)} 万元/tCO₂`, a: '', u: '', color: '#7a5fa8' })
   const amt = (d * p) / 1e4   // 万元（负=支出）
   rows.push({
@@ -502,7 +502,8 @@ const revOpen = ref(false)                                  // 产品收益卡�
 // 资源包场景（机房温控等：产物为冷冻供水/冷风等非产品物料）自动隐藏该组与产品收益卡。
 const PRODUCT_ID_SET = new Set((PRODUCTS || []).map((p) => p && p.id))
 const hasProduct = computed(() => {
-  const nodes = (store.scheme && store.scheme.nodes) || []
+  // 已应用方案口径：总览面板不随未保存的编排草稿变化
+  const nodes = ((store.appliedScheme || store.scheme) && (store.appliedScheme || store.scheme).nodes) || []
   for (const n of nodes) {
     if (!n || (n.kind && n.kind !== 'process')) continue
     const outs = (n.ports && n.ports.out) || []
@@ -761,7 +762,7 @@ function fmt(n) {
 /* 成本卡（可点击展开构成明细） */
 .chip2.tog { cursor: pointer; transition: border-color .15s, background .15s; }
 .chip2.tog:hover { border-color: var(--accent); }
-.chip2.tog.open { border-color: var(--accent); background: var(--accent-l, rgba(95,130,148,.08)); }
+.chip2.tog.open { border-color: var(--accent); background: var(--accent-l, var(--fill-1)); }
 .chip2.tog .caret { font-style: normal; font-size: 10px; margin-left: 2px; }
 .cost-detail { margin-top: 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel-2, rgba(0,0,0,.02)); padding: 5px 7px; }
 .cd-head { font-size: 10px; color: var(--accent2); margin-bottom: 4px; line-height: 1.5; }
@@ -783,12 +784,13 @@ function fmt(n) {
 }
 .quota-bar .qk { font-size: 10px; color: var(--muted); }
 .quota-bar b { font-size: 12px; }
-/* 产品 / 能源 / 碳排 分组小标题 */
+/* 产品 / 能源 / 碳排 分组小标题：仅用前导色点标识，不叠加全局 .sec 的主题色竖线 */
 .sec { display: flex; align-items: center; gap: 5px; margin: 7px 0 3px; font-size: 10px; color: var(--muted); letter-spacing: .5px; }
+.sec::before { display: none !important; }
 .sec .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
-.sec .d-prod { background: #3f9d6b; }
-.sec .d-ene { background: #c9a33e; }
-.sec .d-co2 { background: #c0574a; }
+.sec .d-prod { background: var(--text); }
+.sec .d-ene { background: var(--yellow); }
+.sec .d-co2 { background: var(--red); }
 /* 展开区计算式行：序号标签 + 右对齐实测值（与能耗/排放展开共用） */
 .meth-line { display: flex; align-items: baseline; gap: 6px; font-size: 10px; line-height: 1.6; color: var(--text); padding: 2px 0; }
 .meth-line .ml { flex: 1; min-width: 0; }
@@ -806,7 +808,7 @@ function fmt(n) {
 .q-in:focus { outline: none; border-color: var(--accent); }
 .carb-detail .cd-row b.worse { color: var(--red); font-weight: 700; }
 .carb-detail .cd-row b.better { color: var(--green); font-weight: 700; }
-.app.sim-dark .chip2.tog.open { background: rgba(95,130,148,.15); }
+.app.sim-dark .chip2.tog.open { background: var(--fill-2); }
 /* 直接/间接 图例：百分占比小注与色点间距 */
 .scope-legend em { font-style: normal; color: var(--muted); }
 .scope-legend .dot { margin-left: 0; }
@@ -822,6 +824,6 @@ function fmt(n) {
 }
 .sc-item span { font-size: 10px; color: var(--muted); }
 .sc-item b { font-size: 16px; font-variant-numeric: tabular-nums; }
-.sc-item b.good { color: var(--green, #2E8B57); }
+.sc-item b.good { color: var(--green, var(--green)); }
 .sc-item i { font-style: normal; font-size: 10px; color: var(--muted); }
 </style>

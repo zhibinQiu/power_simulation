@@ -463,7 +463,6 @@ onBeforeUnmount(clearPoll)
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
   background: var(--panel-2);
 }
 .header h3 {
@@ -570,7 +569,7 @@ onBeforeUnmount(clearPoll)
 }
 .tag.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   border-color: var(--accent-d);
 }
 .submit {
@@ -579,7 +578,7 @@ onBeforeUnmount(clearPoll)
   border: none;
   border-radius: 4px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -729,7 +728,7 @@ onBeforeUnmount(clearPoll)
   color: var(--accent-d);
   vertical-align: 1px;
 }
-.type-tag.market_brief { background: rgba(201, 154, 46, 0.15); color: #9a731f; }
+.type-tag.market_brief { background: var(--warn-l); color: var(--yellow); }
 .type-tag.policy_digest { background: rgba(95, 130, 148, 0.16); color: var(--accent2); }
 .report-list .meta {
   font-size: 11px;
@@ -798,7 +797,7 @@ onBeforeUnmount(clearPoll)
   color: var(--muted);
   padding: 0 8px 6px;
   text-transform: uppercase;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--line-soft);
   margin-bottom: 4px;
 }
 .toc-item {
@@ -863,13 +862,13 @@ onBeforeUnmount(clearPoll)
 }
 .carbon-report-sidebar .report-md h1 {
   font-size: 17px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--line-soft);
   padding-bottom: 6px;
   margin-top: 0;
 }
 .carbon-report-sidebar .report-md h2 {
   font-size: 15px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--line-soft);
   padding-bottom: 4px;
 }
 .carbon-report-sidebar .report-md h3 { font-size: 13px; }
@@ -936,7 +935,7 @@ onBeforeUnmount(clearPoll)
 .carbon-report-sidebar .report-md tr:nth-child(even) td { background: var(--panel-2); }
 .carbon-report-sidebar .report-md hr {
   border: none;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--line-soft);
   margin: 12px 0;
 }
 .carbon-report-sidebar .report-md a {

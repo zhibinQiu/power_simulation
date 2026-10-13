@@ -408,7 +408,15 @@ def delete_device(kind: str, name: str, namespace: str = "default",
         _save_devices(data)
         result["removed"] = removed
     if cloud:
-        result["cloud"] = _cloud_delete_crds(kind, name, namespace)
+        cr = _cloud_delete_crds(kind, name, namespace)
+        if not cr.get("ok"):
+            # 云端 CRD 没删掉就必须如实报失败：否则前端提示「已删除」而云端对象仍在，
+            # 之后每次刷新云端设备列表都会看到这台「已删除」的幽灵设备（本地/盒子已清、云端残留）。
+            cr["error"] = cr.get("error") or cr.get("stderr") or cr.get("stdout") or "云端 CRD 删除失败"
+            result["error"] = cr["error"]
+        result["cloud"] = cr
     result["box_sync"] = _stop_stale_polls(nodes)
-    result["ok"] = True
+    # 盒子不可达不阻断本地删除（历史行为，见 test_delete_box_failure_does_not_break_local）；
+    # 但云端 CRD 删除失败必须让调用方看到，避免「以为三端都删了，实际云端还留着」。
+    result["ok"] = not bool(result.get("cloud") and result["cloud"].get("ok") is False)
     return result

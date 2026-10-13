@@ -23,7 +23,7 @@
         </label>
         <label class="chd-f">
           <span>instance</span>
-          <input v-model="instance" :placeholder="t('默认与设备同名')" :title="t('MQTT 主题 data/{box}/{device}/{instance}/{property} 第 4 段，默认与设备同名')" />
+          <input v-model="instance" :placeholder="t('默认与设备同名')" :title="t('主题第 4 段 data/{box}/{device}/{instance}/{property}，默认与设备同名')" />
         </label>
         <label class="chd-f">
           <span>{{ t('时间范围') }}</span>
@@ -57,7 +57,7 @@
         </div>
       </div>
       <div v-else-if="!loading && !error" class="chd-empty">
-        {{ t('选择时间范围后点击「查询历史」。需云端已部署时序库（deploy_cloud.sh --tsdb-only）且设备有 data/ 读数持续写入。') }}
+        {{ t('选择时间范围后点「查询历史」（需云端已部署时序库且有 data/ 读数）。') }}
       </div>
     </div>
   </div>

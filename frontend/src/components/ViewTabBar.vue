@@ -9,8 +9,10 @@
       <span class="vw-t">{{ mainTitle }}</span>
     </button>
     <button v-for="id in store.openViews" :key="id" class="vw-tab" :class="{ on: store.activeViewId === id }"
-            @click="store.activateView(id)" :title="t(VIEW_TITLE[id] || id)">
+            @click="store.activateView(id)" :title="tabTip(id)">
       <span class="vw-t">{{ t(VIEW_TITLE[id] || id) }}</span>
+      <!-- 未保存改动标记（VS Code 风格）：标题右侧一个 *，点击标签即可切回去在工具条保存 / Ctrl+S -->
+      <i v-if="isDirty(id)" class="vw-star">*</i>
       <span class="vw-x" :title="id === 'flowEdit' ? t('完成编排并关闭') : t('关闭该窗口')" @click.stop="close(id)">✕</span>
     </button>
   </div>
@@ -28,15 +30,23 @@ const mainTitle = computed(() => (store.overviewOn ? t('HMI人机交互屏') : t
 
 // 关闭单个窗口：关闭后由 store 自动切到相邻标签（全部关闭则回到三维仿真）
 function close(id) { store.closeViewById(id) }
+
+// 有未保存改动的窗口（当前仅「流程编排」的手动保存方案会标脏）
+function isDirty(id) { return id === 'flowEdit' && store.schemeDirty }
+function tabTip(id) {
+  const name = t(VIEW_TITLE[id] || id)
+  return isDirty(id) ? name + ' · ' + t('有未保存的改动（Ctrl+S 保存）') : name
+}
 </script>
 
 <style scoped>
-/* 标签条：占用工具栏行（grid-area: toolbar），与 Ribbon 同高（--head-h 28px），
-   度量/字号/激活指示条与左栏分类 tab、底部面板页签完全一致（见 main.css 全局标签条） */
+/* 标签条：占用工具栏行（grid-area: toolbar），与 Ribbon 同高（--head-h 28px）；
+   度量/字号与左栏分类 tab、底部面板页签一致，但激活态不同 —— 本条与下方工具条同底融为一体，
+   不加主题色指示线（见 .vw-tab.on 与 main.css 页签激活指示的例外说明） */
 .vw-tabs {
   grid-area: toolbar;
   display: flex; align-items: stretch; height: var(--head-h);
-  background: var(--panel-2); border-bottom: 1px solid var(--border);
+  background: var(--panel-2); 
   border-left: 1px solid var(--border); border-right: 1px solid var(--border);
   overflow-x: auto; overflow-y: hidden; user-select: none;
 }
@@ -48,8 +58,13 @@ function close(id) { store.closeViewById(id) }
   background: transparent; border: none; border-right: 1px solid var(--border);
   cursor: pointer; white-space: nowrap; transition: background .12s, color .12s;
 }
-.vw-tab:hover { color: var(--text); background: var(--panel-3); }
-.vw-tab.on { color: var(--text); background: var(--panel); }
+.vw-tab:hover { color: var(--text); background: var(--hover); }
+/* 激活态：不加任何主题色指示条（底边/顶边均无），
+   只用与工具条（.ribbon）同色的面板白 --panel 铺底 —— 选中标签与下方工具条连成一片，
+   靠「底色 + 文字色 + 字重」三档中性区分，与标签条底 --panel-2 形成明暗层次 */
+.vw-tab.on { color: var(--text); background: var(--panel); font-weight: 500; }
+/* 已选中的标签悬停时不再叠灰（否则会与下方工具条断开，失去一体感） */
+.vw-tab.on:hover { color: var(--text); background: var(--panel); }
 .vw-t { overflow: hidden; text-overflow: ellipsis; }
 .vw-x {
   display: inline-flex; align-items: center; justify-content: center;
@@ -57,6 +72,8 @@ function close(id) { store.closeViewById(id) }
   color: var(--muted); opacity: .7;
 }
 .vw-x:hover { color: #fff; background: var(--red, #e5484d); opacity: 1; }
+/* 未保存标记：紧贴标题右侧，比标题字号略大以便一眼可见（不占额外宽度，✕ 位置不跳动） */
+.vw-star { flex: 0 0 auto; margin-left: -2px; font-size: var(--fs-h); font-style: normal; line-height: 1; color: inherit; }
 /* 固定标签（三维仿真）不带关闭按钮，左右留白与其它标签对齐 */
 .vw-scene { padding: 0 var(--sp-4); }
 </style>

@@ -244,7 +244,7 @@
 
       <div v-if="!nodes.length" class="rf-empty">
         <p class="t1">{{ t('从左侧「模块」列表拖入画布，或点击工具条按钮开始编排') }}</p>
-        <p class="t2">{{ t('规则逻辑：开始 → 传感/可调 → IF 条件或 AND/OR 逻辑 → 命中的出口 → 下游可调（自动写入设定值）或传感（仅观测）→ 结束；只有形成「开始 → 结束」通路的流程才会执行') }}</p>
+        <p class="t2">{{ t('规则逻辑：开始 → 传感/可调 → IF/AND/OR → 出口 → 下游可调（写设定值）或传感（观测）→ 结束；需形成「开始 → 结束」通路才会执行') }}</p>
       </div>
     </div>
 
@@ -1311,7 +1311,7 @@ defineExpose({ runOnce, fitView, addModule })
 .rf-e.tmp { stroke: var(--accent-d); stroke-dasharray: 5 4; }
 .rf-eg { cursor: pointer; pointer-events: all; }
 .rf-ebg { fill: var(--red); }
-.rf-ex { fill: #fff; font-size: var(--fs-s); text-anchor: middle; }
+.rf-ex { fill: var(--text); font-size: var(--fs-s); text-anchor: middle; }
 .rf-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 0 40px; text-align: center; pointer-events: none; }
 .rf-empty .t1 { font-size: var(--fs-t); color: var(--muted); }
 .rf-empty .t2 { font-size: var(--fs-s); line-height: 1.6; color: var(--faint); max-width: 520px; }
@@ -1358,9 +1358,10 @@ defineExpose({ runOnce, fitView, addModule })
 .rf-node select, .rf-node input { min-width: 0; }
 .rf-node.act { box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 45%, transparent); }
 .rf-node.miss { opacity: .6; border-style: dashed; }
-.rf-hd {
+.rf-hd {  background: var(--head-bg);
+
   display: flex; align-items: center; gap: 5px; height: 30px; padding: 0 4px 0 8px;
-  border-bottom: 1px solid var(--border); cursor: move; border-radius: var(--radius) var(--radius) 0 0;
+   cursor: move; border-radius: var(--radius) var(--radius) 0 0;
 }
 .rf-ic { flex: 0 0 auto; font-size: var(--fs-b); }
 .rf-nm { flex: 1 1 auto; min-width: 0; font-size: var(--fs-b); font-weight: var(--fw-t); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

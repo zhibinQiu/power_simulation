@@ -82,6 +82,29 @@ def test_delete_box_failure_does_not_break_local(mem_cfg, box_push, monkeypatch)
     assert "盒子不可达" in res["box_sync"]["nt001"]["error"]
 
 
+def test_delete_cloud_failure_is_not_silent(mem_cfg, box_push, monkeypatch):
+    """云端 CRD 删除失败必须如实报失败（ok=False + error）。
+
+    否则前端提示「已删除」而云端对象仍在，之后每次刷新云端设备列表都能看到这台
+    本地/盒子已清、云端残留的幽灵设备（10-12 的 shuibeng-power 即此类）。
+    注意 agent 失败时返回体只有 stderr、没有 error，这里一并把两者都覆盖到。
+    """
+    mem_cfg["data"]["devices"] = [_device("shuitong-temp")]
+    monkeypatch.setattr(dev_mod, "_cloud_delete_crds", lambda *a: {
+        "ok": False, "rc": 1, "stdout": "",
+        "stderr": "云端 agent 不可达（36.151.146.71:42083）：请确认云端 agent 已启动"})
+
+    res = dev_mod.delete_device("device", "shuitong-temp")
+
+    assert res["ok"] is False
+    assert res["cloud"]["ok"] is False
+    assert "云端 agent 不可达" in res["cloud"]["error"]
+    assert res["error"] == res["cloud"]["error"]
+    # 本地与盒子侧仍然照常完成（不因云端失败而回滚）
+    assert res["removed"]["devices"] == ["shuitong-temp"]
+    assert box_push["boxes"] == ["nt001"]
+
+
 def test_can_delete_crd_only(mem_cfg, box_push):
     """local=False 且 cloud=True：只删云端 CRD，本地配置保留，不打扰盒子。"""
     mem_cfg["data"]["devices"] = [_device("shuitong-temp")]

@@ -34,7 +34,7 @@ const close = () => store.toggleEnergyFlow()
   color: var(--text);
   user-select: none;
 }
-.ef-body { flex: 1 1 auto; padding: 14px; overflow: auto; }
+.ef-body { flex: 1 1 auto; padding: var(--pad-x); overflow: auto; }
 .ef-empty { text-align: center; color: var(--muted); font-size: 12px; padding: 60px 20px; }
-.ef-chart { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+.ef-chart { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-4); }
 </style>

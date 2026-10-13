@@ -40,7 +40,7 @@
         <div class="ai-hero">
           <div class="ai-logo"><Icon name="robot" /></div>
           <div class="ai-hero-title">{{ t('本析智擎') }}</div>
-          <div class="ai-hero-desc">{{ t('面向全行业的能碳智控助手：专业解答能碳指标、工艺策略与碳市场行情，支持知识库查询、设备数据、工艺仿真等能力。') }}</div>
+          <div class="ai-hero-desc">{{ t('能碳智控助手：解答能碳指标、工艺策略与碳市场行情，支持知识库查询与工艺仿真。') }}</div>
         </div>
         <div class="agent-inputbox">
           <div class="ai-inputrow">
@@ -997,7 +997,7 @@ export default {
 }
 .ai-hrow:hover .ai-hdel { opacity: 1; }
 .ai-hdel svg { width: 13px; height: 13px; }
-.ai-hdel:hover { color: #e5534b; background: rgba(229, 83, 75, .1); }
+.ai-hdel:hover { color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
 
 /* —— 空闲态：居中大输入框 —— */
 .agent-idle {
@@ -1233,7 +1233,7 @@ export default {
 .ai-pickopt.off { opacity: .5; cursor: not-allowed; }
 .ai-pickopt.off:hover { background: transparent; color: var(--text); }
 .ai-pickopt.off .ai-popt-name { color: var(--faint); }
-.ai-off-tag { font-style: normal; font-size: 10px; color: #c8a04a; }
+.ai-off-tag { font-style: normal; font-size: 10px; color: var(--yellow); }
 /* 顶栏「恢复铺满」按钮 */
 /* 浮动窗口背景遮罩由 .agent-view.float 自带 */
 
@@ -1320,7 +1320,7 @@ export default {
   height: 280px;
   margin: 8px 0;
   border-radius: 8px;
-  background: #0d1524;
+  background: var(--rail);
   border: 1px solid var(--border);
   overflow: hidden;
 }

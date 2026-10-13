@@ -26,21 +26,17 @@
         </template>
         <!-- ============ 流程编排态：编排工具 ============ -->
         <template v-else-if="view === 'edit'">
-          <div class="rbtns">
-            <button class="rbtn sim-btn" :class="{ on: store.simMode }" @click="actions.onSimToggle()"
-                    :title="store.simMode ? t('退出仿真') : t('运行仿真')">
-              <Icon :name="store.simMode ? 'stop' : 'run'" size="14"/>
-            </button>
-          </div>
-          <span class="rdiv"></span>
+          <!-- 仿真（运行/退出）按钮仅在三维仿真 · HMI 大屏下展示：编排画布不做仿真态切换
+               （编排态要进 / 退仿真仍可用「仿真」菜单或 Ctrl+Enter） -->
           <div class="rbtns">
             <!-- 编排手动保存：改动只置「未保存」标记，点此按钮（或 Ctrl+S）才写入本地存档 + 服务端 designs/flow。
-                 仿真模式下的编辑一律不落盘（退出仿真后恢复），故禁用并显式提示。 -->
-            <button class="rbtn save-btn" :class="{ dirty: store.schemeDirty }"
+                 仿真模式下的编辑一律不落盘（退出仿真后恢复），故禁用并显式提示。
+                 未保存状态不在按钮上呈现（无呼吸点 / 无状态文案），统一由「流程编排」页签标题右侧的 * 表示。 -->
+            <button class="rbtn save-btn"
                     :disabled="store.simMode || !store.schemeDirty"
                     @click="actions.saveScheme()"
-                    :title="store.simMode ? t('仿真模式下的改动不会保存，退出仿真后自动恢复') : (store.schemeDirty ? t('保存编排改动（本地存档 + 服务端）') : t('编排改动已保存'))">
-              <Icon name="save"/><span>{{ saveLabel }}</span><i v-if="store.schemeDirty" class="as-dot"></i>
+                    :title="store.simMode ? t('仿真模式下的改动不会保存，退出仿真后自动恢复') : t('保存编排改动（Ctrl+S，本地存档 + 服务端）')">
+              <Icon name="save"/><span>{{ t('保存') }}</span>
             </button>
           </div>
           <span class="rdiv"></span>
@@ -163,11 +159,6 @@ const view = computed(() => {
   return 'twin'
 })
 
-// 编排保存按钮文案：有改动时强调「未保存」，已保存时置灰
-const saveLabel = computed(() => {
-  if (store.simMode) return t('仿真模式')
-  return store.schemeDirty ? t('未保存') : t('已保存')
-})
 </script>
 
 <style scoped>
@@ -188,13 +179,5 @@ const saveLabel = computed(() => {
 .view-switch.on:hover { background: var(--accent-d); color: #fff; }
 .app.sim-dark .view-switch.on { background: var(--accent); border-color: transparent; }
 .app.sim-dark .view-switch.on:hover { background: var(--accent-d); }
-/* 编排「保存」按钮（手动保存）：无改动时置灰，有改动时主题色高亮 + 呼吸圆点 */
-.save-btn.dirty { color: var(--accent); border-color: var(--accent); }
-.save-btn.dirty:hover { background: var(--accent); color: #fff; border-color: transparent; }
-.app.sim-dark .save-btn.dirty:hover { background: var(--accent-d); color: #fff; }
-.as-dot {
-  flex: 0 0 auto; width: 7px; height: 7px; margin-left: 5px;
-  border-radius: 50%; background: var(--accent); opacity: 1; animation: as-blink 1s ease-in-out infinite;
-}
-@keyframes as-blink { 0%, 100% { opacity: 1 } 50% { opacity: 0.25 } }
+/* 编排「保存」按钮（手动保存）：未保存状态改由「流程编排」页签标题右侧的 * 标示，按钮本身不再做状态提示 */
 </style>

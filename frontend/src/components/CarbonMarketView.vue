@@ -505,7 +505,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
 .cm-vol { font-size: 10px; color: var(--muted); font-weight: 400; font-family: var(--ui); }
 .cm-card-grid {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
-  border-top: 1px solid var(--line); padding-top: 10px;
+  border-top: 1px solid var(--line-soft); padding-top: 10px;
 }
 .cm-card-grid div { display: flex; flex-direction: column; gap: 2px; }
 .cm-card-grid span { font-size: 10px; color: var(--muted); letter-spacing: .3px; }
@@ -550,7 +550,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
   flex: none;
   display: flex; flex-direction: column; gap: 2px;
   padding: 6px 14px 0;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--line-soft);
   user-select: none;
 }
 .cm-range-row { display: flex; align-items: center; gap: 10px; font-size: 11px; }
@@ -650,7 +650,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
   border: 1px solid var(--border);
   transition: background 0.4s;
 }
-.cm-ticker.flash { background: var(--accent-l); }
+.cm-ticker.flash { background: var(--fill-3); }
 .cm-ticker a { color: var(--accent-d); text-decoration: none; }
 .cm-ticker a:hover { text-decoration: underline; }
 .cm-ticker-dot {

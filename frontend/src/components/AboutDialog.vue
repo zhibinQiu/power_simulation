@@ -132,7 +132,7 @@ onMounted(() => {
 .ab-sub { margin-top: 5px; font-size: 12px; line-height: 1.6; color: var(--muted); }
 .ab-ver { margin-top: 12px; font-size: 12px; color: var(--accent-d); font-family: var(--mono); }
 
-.ab-divider { margin-top: 16px; width: 100%; border-top: 1px solid var(--border); }
+.ab-divider { margin-top: 16px; width: 100%; border-top: 1px solid var(--line-soft); }
 .ab-copy { margin-top: 12px; font-size: 12px; color: var(--faint); font-family: var(--mono); letter-spacing: .3px; }
 
 /* —— 平台激活区域（与平台整体风格统一） —— */

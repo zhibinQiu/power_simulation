@@ -176,7 +176,7 @@ async function runCmd() {
       try {
         const created = await store.saveCurrentAsStrategy(raw)
         store.pendingSaveStrategy = false
-        pushCmd(`${t('策略')}「${created?.name || raw}」${t('已保存，可在左侧「策略」资源管理中查看并编辑。')}`, 'guide')
+        pushCmd(`${t('策略')}「${created?.name || raw}」${t('已保存，可在左侧「资源 · 策略」中查看并编辑。')}`, 'guide')
       } catch (e) {
         pushCmd(`${t('保存失败')}：${e?.message || e}`, 'err')
       }

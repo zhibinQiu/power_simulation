@@ -5,7 +5,6 @@
           :title="t('产品未激活，点击在「关于本平台」中激活')">
       <span class="lic-tri">⚠</span> {{ t('产品未激活') }}
     </span>
-    <span class="st"><span class="feed-dot" :class="'feed-' + store.feedStatus"></span> {{ t('实时链路') }} <span class="v">{{ feedText }}</span></span>
     <span v-if="store.newsTickerOn" class="st spacer news-ticker" :title="t('市场快讯 · 中国煤炭交易网（ctctc.cn）')">
       <span class="news-scroll" v-if="newsItems.length">
         <span class="news-track" :style="{ '--news-dur': newsDur + 's' }">
@@ -94,8 +93,6 @@ function fmtTime(t) {
   const m = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}:\d{2})/.exec(String(t || ''))
   return m ? `${m[2]}-${m[3]} ${m[4]}` : String(t || '')
 }
-
-const feedText = computed(() => ({ open: t('已连接'), closed: t('已断开'), error: t('异常'), init: t('连接中…') }[store.feedStatus] || ''))
 
 function tickClock() {
   const d = new Date(); const p = (x) => String(x).padStart(2, '0')

@@ -4,11 +4,11 @@
        :style="{ '--cmd-h': store.bottomOpen ? cmdH + 'px' : '0px', '--lw': store.leftOpen ? lw + 'px' : '0px', '--rw': store.rightOpen ? rw + 'px' : '0px' }">
     <TopBar :menus="menus" ref="topBarRef" @export="onExport" @help="openDocsSite('promo')" @toggle-agent="toggleAgent" />
 
-    <!-- 最左侧活动栏（VS Code 式）：资源管理器 / 搜索 / 场景 / 连接 -->
+    <!-- 最左侧活动栏（VS Code 式）：资源管理器（左栏入口） / 资源管理 / 搜索 / 连接 -->
     <ActivityBar />
     <!-- 左侧栏：园区资产（工艺 / 设备 / 原料 / 策略）；收起时由 .left-collapsed 置列宽 0 + 裁切，实现平滑滑出。
          key 绑定「场景 id + 场景版本」：切换场景时强制重建，清空树折叠态 / 当前 tab 等本地状态，避免残留旧场景目录 -->
-    <LeftSidebar :key="'ls:' + store.sceneId + ':' + store.sceneVersion" @rsz="startLeftResize" />
+    <LeftSidebar :key="'ls:' + store.sceneId + ':' + store.sceneVersion" :dragging="lResizing" @rsz="startLeftResize" />
 
     <!-- 中间：主视图（3D 数字孪生 ⇄ HMI人机交互屏，二者对等、同一槽位） / 功能视图窗口（tab 化：
          流程编排、数据分析、AI群控、碳资产管理、全景碳核查、能流分析、数据源管理） -->
@@ -200,7 +200,7 @@ const showOntologyManage = ref(false)
 // 场景文件对话框模式：'' 关闭 | 'new' 新建场景 | 'open' 打开场景 | 'saveAs' 另存为场景
 const sceneFileMode = ref('')
 
-const { lw, rw, cmdH, resizing, startLeftResize, startRightResize, startResize } = usePanelSizes()
+const { lw, rw, cmdH, lResizing, resizing, startLeftResize, startRightResize, startResize } = usePanelSizes()
 
 /* ---------------- 动作 ---------------- */
 function pushCmd(t, k = 'out') { store.pushCmd(t, k) }
@@ -233,7 +233,8 @@ function onToggleEdit() { if (store.editMode) store.exitEdit(); else store.enter
 function ensureEdit() { if (!store.editMode) store.enterEdit(); else store.activateView('flowEdit') }
 function loadExample(route) { ensureEdit(); store.loadTemplate(route) }
 function clearScheme() { ensureEdit(); store.clearScheme() }
-// 编排手动保存：改动实时反映在画布与孪生预览，但只有点「保存」才写入本地存档 + 服务端 designs/flow
+// 编排手动保存：改动只反映在编排画布（草稿），点「保存」才写入本地存档 + 服务端 designs/flow，
+// 并同步为已应用方案 —— 3D 数字孪生 / 2D 工艺图 / KPI 自此才切换到新的编排内容
 function saveScheme() {
   if (!store.editMode) { store.showToast(t('编排保存仅在流程编排模式下可用'), 'info'); return }
   store.saveScheme()

@@ -320,10 +320,10 @@ onMounted(loadAll)
 <style scoped>
 .om-mask { position: fixed; inset: 0; background: rgba(16,24,34,.5); z-index: 300; display: flex; align-items: center; justify-content: center; }
 .om-modal { width: 980px; max-width: 96vw; height: 82vh; background: var(--panel); color: var(--text); border-radius: 6px; border: 1px solid var(--border); display: flex; flex-direction: column; box-shadow: 0 18px 50px rgba(0,0,0,.35); overflow: hidden; }
-.om-head { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, var(--panel)), var(--panel)); }
+.om-head { display: flex; align-items: center; gap: 12px; padding: 10px 14px;  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, var(--panel)), var(--panel)); }
 .om-title { font-weight: 700; font-size: 15px; letter-spacing: 1px; }
 .om-sub { flex: 1; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.om-tabs { display: flex; align-items: center; gap: 4px; padding: 8px 14px 0; border-bottom: 1px solid var(--border); }
+.om-tabs { display: flex; align-items: center; gap: 4px; padding: 8px 14px 0; border-bottom: 1px solid var(--line-soft); }
 .om-tab { padding: 8px 14px; border: none; background: none; color: var(--faint); cursor: pointer; font-size: 13px; border-bottom: 2px solid transparent; }
 .om-tab.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 .om-tab.om-reset { margin-left: auto; color: #e5484d; }
@@ -361,7 +361,7 @@ select.om-input {
 .om-btn:hover { border-color: var(--accent); color: var(--accent); }
 .om-danger:hover { border-color: #e5484d; color: #e5484d; }
 .om-graph-body { flex-direction: column; position: relative; }
-.om-legend { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.om-legend { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--line-soft); flex-wrap: wrap; }
 .om-lg-item { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--faint); }
 .om-lg-item i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .om-hint { font-size: 11px; color: var(--faint); }

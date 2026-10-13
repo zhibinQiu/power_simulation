@@ -141,7 +141,7 @@ onMounted(load)
 <style scoped>
 .am-mask { position: fixed; inset: 0; background: rgba(16,24,34,.5); z-index: 300; display: flex; align-items: center; justify-content: center; }
 .am-modal { width: 900px; max-width: 95vw; height: 80vh; background: var(--panel); color: var(--text); border-radius: 6px; border: 1px solid var(--border); display: flex; flex-direction: column; box-shadow: 0 18px 50px rgba(0,0,0,.35); overflow: hidden; }
-.am-head { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, var(--panel)), var(--panel)); }
+.am-head { display: flex; align-items: center; gap: 12px; padding: 10px 14px;  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, var(--panel)), var(--panel)); }
 .am-title { font-weight: 700; font-size: var(--fs-xl); letter-spacing: 1px; }
 .am-sub { flex: 1; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .am-body { flex: 1; display: flex; min-height: 0; }

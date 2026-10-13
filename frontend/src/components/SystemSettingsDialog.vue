@@ -297,7 +297,7 @@
                 <div class="ss-info">
                   <div class="ss-name">{{ t('知识库路径') }}</div>
                   <div class="ss-desc">
-                    {{ t('文件夹即知识库，支持多级目录；文档以 Markdown 存放，PDF/Word/TXT 上传后自动解析') }}
+                    {{ t('文件夹即知识库，支持多级目录；PDF/Word/TXT 上传后自动解析') }}
                   </div>
                 </div>
                 <input v-model.trim="kbForm.rootPath" class="ss-input" type="text" spellcheck="false"
@@ -398,8 +398,9 @@ const sceneGroups = computed(() => {
   return groups
 })
 const sceneIndexHint = computed(() => (store.sceneIndex.length ? '' : t('场景注册表为空：请确认后端可用，或导入 .ec 资源包')))
+// 切换场景 = 换一个工作区：整页重新加载（所有页面按新场景重建），且不自动打开任何功能视图标签
 async function openPkg(m) {
-  await store.openScene(m.id)
+  await store.openScene(m.id, { reload: true })
 }
 async function onPickPackage(e) {
   const f = e.target && e.target.files && e.target.files[0]
@@ -411,7 +412,7 @@ async function onPickPackage(e) {
       await store.refreshSceneIndex()
       const label = (res.scene && (res.scene.label || res.scene.industry || res.scene.id)) || ''
       store.toast = t('资源包导入成功') + (label ? t('：') + label : '')
-      if (res.scene && res.scene.id && res.scene.ready) await store.openScene(res.scene.id)
+      if (res.scene && res.scene.id && res.scene.ready) await store.openScene(res.scene.id, { reload: true })
     } else {
       store.toast = t('资源包导入失败：') + (res && res.error ? res.error : t('未知错误'))
     }
@@ -604,7 +605,8 @@ function resetDefaults() {
 .ss-mask { position: fixed; inset: 0; background: rgba(20,30,40,.42); display: flex; align-items: center; justify-content: center; z-index: 200; }
 .ss-modal { width: 780px; max-width: 94vw; height: min(600px, 86vh); display: flex; flex-direction: column; background: var(--panel);
   border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 18px 50px rgba(0,0,0,.28); font-family: var(--ui); color: var(--text); }
-.ss-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.ss-head { background: var(--head-bg);
+ display: flex; align-items: center; justify-content: space-between; padding: 12px 16px;  }
 .ss-title { font-size: 14px; font-weight: 700; letter-spacing: .5px; }
 
 /* 主体：左侧目录 + 右侧内容（高度由 .ss-modal 固定，切换标签时窗口尺寸不跳动） */
@@ -621,7 +623,7 @@ function resetDefaults() {
 .ss-page-title { font-size: var(--fs-h); font-weight: 700; }
 .ss-page-desc { font-size: 11px; color: var(--muted); margin: 3px 0 14px; }
 .ss-card { border: 1px solid var(--border); border-radius: 6px; background: var(--bar); overflow: hidden; }
-.ss-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.ss-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); }
 .ss-row:last-child { border-bottom: none; }
 .ss-info { min-width: 0; }
 .ss-name { font-size: 12px; font-weight: 600; }
@@ -650,9 +652,9 @@ function resetDefaults() {
 /* 数据源状态 */
 .ss-feed { gap: 6px; }
 .ss-feed-tx { font-size: 11px; color: var(--muted); }
-.ss-hint { font-size: 10px; color: var(--faint); padding: 8px 14px; border-top: 1px solid var(--border); }
+.ss-hint { font-size: 10px; color: var(--faint); padding: 8px 14px; border-top: 1px solid var(--line-soft); }
 /* AI 模型（LLM 配置）表单 */
-.ss-form-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.ss-form-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid var(--line-soft); }
 .ss-form-row:last-child { border-bottom: none; }
 .ss-input { width: 340px; max-width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); font-size: 12px; font-family: var(--ui); outline: none; transition: border-color .15s; }
 .ss-input:focus { border-color: var(--accent-d); }
@@ -663,7 +665,7 @@ function resetDefaults() {
 .ss-msg-lat { margin-left: auto; font-variant-numeric: tabular-nums; }
 .ss-llm-btns { display: flex; gap: 10px; margin-top: 14px; justify-content: flex-end; }
 .ss-btn:disabled { opacity: .5; cursor: not-allowed; }
-.ss-actions { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--border); }
+.ss-actions { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--line-soft); }
 .ss-actions .sp { flex: 1; }
 .ss-btn { padding: 0 var(--btn-pad-x-lg); min-height: var(--btn-h-lg); min-width: var(--btn-min-w); display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 6px; background: var(--btn-bg); cursor: pointer; font-size: 12px; color: var(--text); }
 .ss-btn:hover { border-color: var(--accent-d); }
@@ -672,7 +674,7 @@ function resetDefaults() {
 .ss-btn.ghost { background: var(--btn-bg); }
 .sp { flex: 1; }
 /* ---- 场景资源包列表 ---- */
-.ss-pkg-group { border-top: 1px solid var(--border); padding-top: 2px; }
+.ss-pkg-group { border-top: 1px solid var(--line-soft); padding-top: 2px; }
 .ss-pkg-group:first-of-type { border-top: none; }
 .ss-pkg-group-name { font-size: 10px; color: var(--faint); padding: 4px 14px 0; letter-spacing: 1px; opacity: .8; }
 .ss-pkg-row { display: flex; align-items: center; gap: 10px; padding: 7px 14px 7px 14px; border-radius: 6px; }

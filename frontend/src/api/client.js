@@ -195,8 +195,6 @@ export const api = {
   // ---- 统一数据源接入（能碳一体机 box / 外部数据源 external；模拟数据由独立服务
   //      sim-source 生成后经中间件 mqtt 适配器接入，与真实外部源同构）----
   dataSources: () => jget('/data-sources'),
-  // 数据服务接口清单：历史/实时查询与指令下发的对外接口（自描述，含调用示例）
-  dataSourceCatalog: () => jget('/data-sources/integration'),
   dataSourceToggle: (id, enabled) => jpost('/data-sources/toggle', { id, enabled }),
   dataSourceSave: (id, payload) => jpost('/data-sources/save', { id, ...payload }),
   dataSourceAdd: (payload) => jpost('/data-sources/add', payload),

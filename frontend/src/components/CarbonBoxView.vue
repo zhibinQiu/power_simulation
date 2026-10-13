@@ -4,65 +4,6 @@
     <!-- ============ VSCode 风格工作台 ============ -->
     <!-- 视图名标识栏（标题 + 云端状态）已上移到 App.vue 的 Ribbon 工具栏之上（与 TopBar 风格统一），此处仅承载工作区主体 -->
     <div class="cbx-workbench">
-      <!-- 侧边栏：资源树 -->
-      <aside class="cbx-sidebar">
-        <div class="cbx-side-head">
-          <b>{{ sideTitle }}</b>
-          <span class="cbx-side-count">{{ sideCount }}</span>
-        </div>
-        <div class="cbx-side-body">
-          <!-- 资源树：盒子节点 + 模型 + 设备（设备配置已并入通信拓扑图，无单独 tab） -->
-          <div class="cbx-tree">
-            <div class="cbx-tree-sec" @click="expanded.boxes = !expanded.boxes">
-              <span class="cbx-tree-arrow">{{ expanded.boxes ? '▾' : '▸' }}</span> {{ t('盒子节点') }}
-              <span class="cbx-tree-count">{{ topoBoxes.length }}</span>
-            </div>
-            <div v-show="expanded.boxes" class="cbx-tree-children">
-              <div v-for="b in topoBoxes" :key="b.name" class="cbx-tree-node">
-                <div class="cbx-tree-row" @click="expanded['box-' + b.name] = !expanded['box-' + b.name]">
-                  <span class="cbx-tree-arrow">{{ expanded['box-' + b.name] ? '▾' : '▸' }}</span>
-                  <span class="cbx-dot" :class="{ on: readyOk(b.ready) }"></span>
-                  <span class="cbx-tree-label" :title="b.name">{{ boxName(b) }}</span>
-                  <span class="cbx-tree-tag" :class="{ ok: readyOk(b.ready), err: b.ready === false }">{{ readyZh(b.ready) }}</span>
-                </div>
-                <div v-show="expanded['box-' + b.name]" class="cbx-tree-children">
-                  <div v-for="d in boxDevices(b)" :key="d.name" class="cbx-tree-leaf" @click="onDevClick(d)" :title="(d._cloud ? t('云端设备（点击查看实时）') : t('待下发设备（点击编辑配置）')) + '：' + d.name + (modelOf(d) ? '（' + t('模型') + ' ' + modelOf(d) + '）' : '')">
-                    <span class="cbx-dot" :class="{ on: d.state === 'online' }"></span><span class="cbx-tree-label">{{ d.name }}</span><span class="cbx-tree-tag" v-if="modelOf(d)">{{ modelOf(d) }}</span>
-                  </div>
-                  <div v-if="!boxDevices(b).length" class="cbx-tree-empty">{{ t('暂无设备') }}</div>
-                </div>
-              </div>
-              <div v-if="topoUnmounted.length" class="cbx-tree-node">
-                <div class="cbx-tree-row" @click="expanded.unmounted = !expanded.unmounted">
-                  <span class="cbx-tree-arrow">{{ expanded.unmounted ? '▾' : '▸' }}</span>
-                  <span class="cbx-tree-label">{{ t('未挂载') }}</span><span class="cbx-tree-count">{{ topoUnmounted.length }}</span>
-                </div>
-                <div v-show="expanded.unmounted" class="cbx-tree-children">
-                  <div v-for="d in topoUnmounted" :key="d.name" class="cbx-tree-leaf" @click="openDevRealtime(d)">{{ d.name }}</div>
-                </div>
-              </div>
-            </div>
-            <div class="cbx-tree-sec" @click="expanded.models = !expanded.models">
-              <span class="cbx-tree-arrow">{{ expanded.models ? '▾' : '▸' }}</span> {{ t('模型') }}
-              <span class="cbx-tree-count">{{ mergedModels.length }}</span>
-            </div>
-            <div v-show="expanded.models" class="cbx-tree-children">
-              <div v-for="m in mergedModels" :key="m.name" class="cbx-tree-leaf" @click="openEditModel(m)" :title="t('模型（点击修改点位）') + '：' + m.name">▦ {{ m.name }}<span class="cbx-tree-tag" v-if="modelPropCount(m)">{{ modelPropCount(m) }} {{ t('属性') }}</span></div>
-              <div v-if="!mergedModels.length" class="cbx-tree-empty">{{ t('暂无模型') }}</div>
-            </div>
-            <div class="cbx-tree-sec" @click="expanded.devs = !expanded.devs">
-              <span class="cbx-tree-arrow">{{ expanded.devs ? '▾' : '▸' }}</span> {{ t('设备') }}
-              <span class="cbx-tree-count">{{ mergedDevices.length }}</span>
-            </div>
-            <div v-show="expanded.devs" class="cbx-tree-children">
-              <div v-for="d in mergedDevices" :key="d.name" class="cbx-tree-leaf" @click="onDevClick(d)" :title="(d._cloud ? t('云端设备（点击查看实时）') : t('待下发设备（点击编辑配置）')) + '：' + d.name + (modelOf(d) ? '（' + t('模型') + ' ' + modelOf(d) + '）' : '')">
-                <span class="cbx-dot" :class="{ on: d.state === 'online' }"></span>{{ d.name }}<span class="cbx-tree-tag" v-if="modelOf(d)">{{ modelOf(d) }}</span>
-              </div>
-              <div v-if="!mergedDevices.length" class="cbx-tree-empty">{{ t('暂无设备') }}</div>
-            </div>
-          </div>
-        </div>
-      </aside>
       <!-- 主编辑区（单页：通信拓扑图 + 各功能区，无 tab） -->
       <main class="cbx-main">
         <div class="cbx-editor">
@@ -74,8 +15,6 @@
             <button class="cbx-caret" @click="toggleSec('overview')" :title="secFold.overview ? t('收起') : t('展开')">{{ secFold.overview ? '▾' : '▸' }}</button>
             <b class="cbx-sec-toggle" @click="toggleSec('overview')">{{ t('运行状态总览') }}</b>
           </div>
-          <!-- 区块介绍：展开后显示，标题栏只留标题与操作 -->
-          <div v-if="secFold.overview" class="cbx-sec-desc">{{ t('一眼式健康摘要：全绿即一切正常') }}</div>
           <div v-if="secFold.overview" class="cbx-hero-main">
             <div class="cbx-hero-verdict" :class="'tone-' + hero.tone">
               <span class="cbx-hero-ic">{{ hero.icon }}</span>
@@ -105,16 +44,13 @@
           <div v-if="secFold.overview && guideOpen" class="cbx-guide">
             <div class="cbx-guide-title">
               <b>{{ t('快速使用指引') }}</b>
-              <span class="cbx-guide-sub">{{ t('面向非技术人员的快速使用说明') }}</span>
               <span class="cbx-sec-spacer"></span>
               <button class="cbx-op cbx-xs" @click="closeGuide" :title="t('不再显示')">✕</button>
             </div>
             <ol class="cbx-guide-steps">
-              <li>{{ t('本页管理部署在车间现场的「边缘采集盒子」：盒子负责把现场电表 / 传感器等设备的数据采集后上传到云端，再展示到这里。') }}</li>
-              <li>{{ t('日常只需看顶部「运行状态」：全部为绿色说明一切正常，无需任何操作。') }}</li>
-              <li>{{ t('查看某台设备的最新读数：点击左侧「设备导航」或下方「采集设备」卡片中的设备名，即可打开实时曲线。') }}</li>
-              <li>{{ t('添加一台新设备：点击「＋ 设备」按提示填写即可；接入新盒子：点击「盒子接入」。') }}</li>
-              <li>{{ t('「证书与密钥 / 命令执行」等区块仅供专业维护排查，日常可忽略。') }}</li>
+              <li>{{ t('管理现场边缘采集盒子：采集电表 / 传感器数据上传云端，在此查看与配置。') }}</li>
+              <li>{{ t('日常只看顶部「运行状态」：全绿即一切正常，无需任何操作。') }}</li>
+              <li>{{ t('点设备名看读数；「＋ 设备」添加设备；「盒子接入」接入新盒子。') }}</li>
             </ol>
             <button class="cbx-op cbx-xs" style="margin-top:8px" @click="closeGuide">{{ t('知道了，不再显示') }}</button>
           </div>
@@ -125,7 +61,7 @@
              v-if="overview.cloud_source && overview.cloud_source !== 'live'">
           <template v-if="overview.cloud_source === 'stale'">{{ t('⚠ 云端推送已中断：当前节点/CloudCore 状态为过期缓存，非实时数据。') }}{{ overview.cloud_error }}</template>
           <template v-else-if="overview.cloud_source === 'degraded'">{{ t('⚠ 云端部分服务异常：以下云端数据可能为缓存或不完整。') }}</template>
-          <template v-else>{{ t('⚠ 云端不可达：以下云端数据不可用。请检查云端服务（cloud-agent / CloudHub 10002 / MQTT 41883）。') }}</template>
+          <template v-else>{{ t('⚠ 云端不可达，以下云端数据不可用。请检查 cloud-agent / CloudHub 10002 / MQTT 41883。') }}</template>
           <template v-if="overview.demo_note">{{ overview.demo_note }}</template>
         </div>
         <!-- ① 数据源接入（合并自原「工具 >> 数据源…」弹窗）：能碳一体机 + 外部数据源（含模拟数据）
@@ -139,7 +75,6 @@
             <span class="cbx-sec-spacer"></span>
             <button class="cbx-op primary cbx-xs" @click="openAddForm()">＋ {{ t('注册外部数据源') }}</button>
           </div>
-          <div v-if="secFold.sources" class="cbx-sec-desc">{{ t('能碳一体机（云端 Broker 订阅）与外部数据源统一在此接入；平台按 box 前缀自动区分一体机与外部源') }}</div>
           <div v-if="secFold.sources">
 
           <!-- 卡片网格：能碳一体机（默认来源）+ 各外部数据源 -->
@@ -161,7 +96,6 @@
                 <div class="ds-row"><span>{{ t('连接状态') }}</span>
                   <b :class="boxSt.connected ? 'ok' : 'err'">
                     {{ boxSt.connected ? '● ' + t('已连接') : (boxSt.connected === false ? '● ' + t('未连接') : '—') }}
-                    <template v-if="boxSt.message_count != null"> · {{ t('累计消息') }} {{ boxSt.message_count }}</template>
                   </b>
                 </div>
                 <div class="ds-row"><span>{{ t('订阅端点') }}</span>
@@ -173,9 +107,6 @@
                     :title="(ek === 'cloud' ? t('云端 Broker（一体机）') : t('中间件 Broker（外部数据）')) + '：' + ((es.host ? es.host + ':' + es.port : es.label || '—'))">
                     {{ ek === 'cloud' ? '☁ ' + t('云端') : '⇄ ' + t('中间件') }}
                   </i></template></span>
-                </div>
-                <div class="ds-row"><span>{{ t('设备读数') }}</span>
-                  <b>{{ boxSt.cloud_devices ?? 0 }} {{ t('台设备') }} · {{ boxSt.readings ?? 0 }} {{ t('条读数') }} · {{ boxSt.links ?? 0 }} {{ t('个关联') }}</b>
                 </div>
                 <div class="ds-row" v-if="boxLastMsg"><span>{{ t('最近消息') }}</span><b class="dim">{{ boxLastMsg }}</b></div>
                 <div class="ds-row" v-if="boxSt.broker_host"><span>{{ t('Broker') }}</span><b class="dim mono">{{ boxSt.broker_host }}:{{ boxSt.broker_port }}</b></div>
@@ -192,10 +123,10 @@
             </div>
 
             <!-- 内置源被删除后的恢复入口（内置源与外部源统一管理：可删、可恢复） -->
-            <div v-else class="ds-card ds-empty" @click="restoreBox">
+            <div v-else class="ds-card ds-empty" @click="restoreBox"
+                 :title="t('删除后不再采纳盒子上报数据。点击此处恢复并重新启用。')">
               <div class="ds-empty-ic">☁</div>
               <b>{{ t('能碳一体机（内置数据源）已删除') }}</b>
-              <p>{{ t('删除后平台不再采纳盒子上报数据（重启也不会自动补建）。点击此处恢复该内置数据源并重新启用。') }}</p>
               <button class="cbx-op cbx-xs">＋ {{ t('恢复内置数据源') }}</button>
             </div>
 
@@ -212,12 +143,11 @@
                   <i></i><span>{{ s.enabled ? t('启用') : t('停用') }}</span>
                 </label>
               </div>
-              <div class="ds-desc">{{ s.config.desc || (s.status && s.status.kind === 'external' ? t('外部数据源：数据先接入能碳一体机，由一体机上行到云端 ext/#，再经云端数据中间件转换为 data/ext-* 被平台识别') : '') }}</div>
+              <div class="ds-desc">{{ s.config.desc || (s.status && s.status.kind === 'external' ? t('外部数据源：先接入一体机，上行 ext/# 后由中间件转为 data/ext-*') : '') }}</div>
               <div class="ds-rows">
                 <div class="ds-row"><span>{{ t('运行状态') }}</span>
                   <b :class="s.status.running ? 'ok' : 'err'">
                     {{ s.status.running ? '● ' + t('采集运行中') : (s.status.mw_online === false ? '● ' + t('中间件未运行') : (s.status.mw_online ? '● ' + t('采集已停止') : '● ' + t('状态未知'))) }}
-                    <template v-if="s.status.received != null"> · {{ t('已收') }} {{ s.status.received }} {{ t('条') }}</template>
                   </b>
                 </div>
                 <div class="ds-row"><span>{{ t('平台取数') }}</span>
@@ -225,9 +155,7 @@
                     {{ s.status.active ? '● ' + t('数据实时到达') : (s.status.received ? t('最近数据已停 ' + agoText(s.status.last_at)) : t('尚未收到数据')) }}
                   </b>
                 </div>
-                <div class="ds-row" v-if="s.status.cloud_devices != null"><span>{{ t('设备读数') }}</span>
-                  <b>{{ s.status.cloud_devices }} {{ t('台设备') }}<template v-if="s.status.last_topic"> · <span class="mono dim">{{ s.status.last_topic }}</span></template></b>
-                </div>
+                <div class="ds-row" v-if="s.status.last_topic"><span>{{ t('最近主题') }}</span><b class="mono dim">{{ s.status.last_topic }}</b></div>
                 <div class="ds-row" v-if="s.status && s.status.note"><span>{{ t('提示') }}</span><b class="note">{{ s.status.note }}</b></div>
               </div>
               <div class="ds-ops">
@@ -239,10 +167,10 @@
             </div>
 
             <!-- 空态：无外部数据源时给出引导（含模拟数据注册入口） -->
-            <div v-if="!extSources.length" class="ds-card ds-empty" @click="openAddForm('mqtt')">
+            <div v-if="!extSources.length" class="ds-card ds-empty" @click="openAddForm('mqtt')"
+                 :title="t('外部 MQTT / 数据中台先接入一体机，上行 ext/# 后由中间件转为 data/ext-*。点击此处注册第一条。')">
               <div class="ds-empty-ic">⇄</div>
               <b>{{ t('尚无外部数据源') }}</b>
-              <p>{{ t('外部 MQTT / 数据中台 / 模拟数据源（独立服务 sim-source）等先接入能碳一体机，由一体机上行到云端 ext/#，再经云端数据中间件转换为 data/ext-* 进入平台订阅通道。点击此处注册第一条（外部 MQTT 类型）。') }}</p>
               <button class="cbx-op cbx-xs">＋ {{ t('注册外部数据源') }}</button>
             </div>
           </div>
@@ -252,7 +180,8 @@
             <div class="cbx-form-row">
               <b class="ds-form-title">{{ extForm.id ? t('编辑外部数据源') + '：' + extForm.id : t('注册外部数据源') }}</b>
               <span class="cbx-sec-spacer"></span>
-              <span class="ds-form-hint">{{ t('注册到数据中间件（type=') }}{{ extForm.adapter }}）；{{ t('模拟数据源（独立服务 sim-source）用「外部 MQTT」类型：Broker 127.0.0.1:41885，主题 steel/# 或 idc/#') }}</span>
+              <span class="ds-form-hint"
+                    :title="t('注册到数据中间件（type=') + extForm.adapter + '）；' + t('sim-source 用「外部 MQTT」类型：Broker 127.0.0.1:41885，主题 steel/# 或 idc/#')">{{ extForm.adapter }}</span>
             </div>
             <div class="cbx-form-row">
               <label>{{ t('名称') }}</label>
@@ -312,17 +241,12 @@
             <span class="cbx-sec-spacer"></span>
             <button class="cbx-op cbx-xs" @click="autoLayoutTopo()" :title="t('恢复自动布局，清除所有模块的手动拖拽位置')">{{ t('自动布局') }}</button>
           </div>
-          <div v-if="secFold.topo" class="cbx-sec-desc">
-            {{ t('按设备划分：每张卡片是一台设备（服务器 / 一体机 / 传感器 / 外部系统），卡内列出该设备上运行的服务；连线表示设备之间的数据通道') }}
-            <span class="cbx-sec-desc-extra">{{ t('拖动设备卡片可自定义布局，连线自动跟随') }}</span>
-          </div>
           <div v-if="secFold.topo">
-          <!-- 链路说明：能碳一体机是现场唯一接入点（下接传感器/仪表、后接外部数据系统），
-               一体机把收到的数据统一上报云端服务器；外部数据在云端经中间件（云端服务器内部服务）转换后交给平台 -->
+          <!-- 链路说明：完整路径见各条 title（悬浮查看），图上只保留方向 -->
           <div class="cbx-topo-legend">
-            <span class="leg"><i class="lg g"></i>{{ t('传感器链路：现场设备（传感器/仪表） —RS485/Modbus→ 能碳一体机 —MQTT data/#→ 云端服务器 → 平台服务器') }}</span>
-            <span class="leg"><i class="lg b"></i>{{ t('外部数据链路：外部数据系统（PLC/数据中台/模拟源）—以太网/OPC→ 能碳一体机 —MQTT ext/#→ 云端服务器（再由云端中间件转 data/ext-*）→ 平台服务器；云边管理通道 CloudHub :10002 双向') }}</span>
-            <span class="leg"><i class="lg r"></i>{{ t('平台下行：平台服务器 → 云端服务器（cloud-agent HTTP :42083，kubectl 下发 / 重启等写操作）') }}</span>
+            <span class="leg" :title="t('传感器链路：现场设备 —RS485/Modbus→ 一体机 —MQTT data/#→ 云端 → 平台')"><i class="lg g"></i>{{ t('传感器 → 一体机 → 云端 → 平台') }}</span>
+            <span class="leg" :title="t('外部数据链路：外部系统 —以太网/OPC→ 一体机 —MQTT ext/#→ 云端 → 平台；CloudHub :10002 双向管理')"><i class="lg b"></i>{{ t('外部数据 → 一体机 → 云端 → 平台') }}</span>
+            <span class="leg" :title="t('平台下行：平台 → 云端（cloud-agent HTTP :42083 写操作）')"><i class="lg r"></i>{{ t('平台 → 云端（下发指令）') }}</span>
           </div>
           <div ref="topoCanvasRef" class="cbx-topo cbx-topo-canvas">
             <div class="cbx-topo-lanes">
@@ -351,7 +275,7 @@
                       <a class="cbx-topo-svc-addr mono" :href="httpOpenUrl(platformHost, '/docs')" target="_blank" rel="noopener"
                          :title="t('点击在新标签页打开') + ' ' + platformHost + '/docs'" @click.stop>{{ platformHost }}</a>
                     </div>
-                    <div class="cbx-topo-svc" :title="t('数据接入：订阅云端 Broker 的 data/#（一体机上报 + 中间件转换后的外部数据）') + '\n' + (brokerAddr || '—') + '\n' + t('MQTT 地址无法在浏览器直接打开')">
+                    <div class="cbx-topo-svc" :title="t('数据接入：订阅云端 Broker data/#（一体机上报 + 中间件转换）') + '\n' + (brokerAddr || '—') + '\n' + t('MQTT 地址无法在浏览器直接打开')">
                       <span class="cbx-topo-svc-dot on"></span>
                       <span class="cbx-topo-svc-name">{{ t('数据接入') }}</span>
                       <span class="cbx-topo-svc-addr mono" :title="t('订阅') + ' ' + (brokerAddr || '—')">{{ brokerAddr || '—' }}</span>
@@ -370,19 +294,19 @@
                   <div class="cbx-topo-dev-hd">
                     <span class="cbx-topo-dev-ic">☁</span>
                     <div class="cbx-topo-dev-meta">
-                      <b class="cbx-topo-dev-title" :title="t('云端服务器：CloudCore / cloud-agent / MQTT Broker / 数据中间件均运行在本机')">{{ t('云端服务器') }}</b>
+                      <b class="cbx-topo-dev-title" :title="t('CloudCore / cloud-agent / MQTT Broker / 中间件均运行在本机')">{{ t('云端服务器') }}</b>
                       <span class="cbx-topo-dev-addr mono">{{ cloudCfg.host || '—' }}</span>
                     </div>
                     <span class="cbx-topo-mod-badge" :class="{ ok: agentStatusOk }">{{ agentStatusOk ? t('在线') : t('离线') }}</span>
                   </div>
                   <!-- 设备内服务：均运行在本机，彼此之间为进程内/本机通信，不占用系统连接图连接线 -->
                   <div class="cbx-topo-svcs">
-                    <div class="cbx-topo-svc" :title="t('云端 Broker :41883 —— 能碳一体机上报的唯一入口：传感器数据与外部数据系统数据都由一体机上报到本 Broker；外部数据先落在上行空间 ext/#，经云端数据中间件转换为 data/ext-* 后再由平台消费，按 box 前缀区分归属') + '\n' + (brokerAddr || '—') + '\n' + t('订阅') + ' ' + fmtNum(stats.subscriptions) + ' · ' + t('运行') + ' ' + fmtUptime(stats.uptime)">
+                    <div class="cbx-topo-svc" :title="t('云端 Broker :41883 —— 一体机上报唯一入口；外部数据先落 ext/#，经中间件转 data/ext-* 后由平台消费') + '\n' + (brokerAddr || '—') + '\n' + t('订阅') + ' ' + fmtNum(stats.subscriptions) + ' · ' + t('运行') + ' ' + fmtUptime(stats.uptime)">
                       <span class="cbx-topo-svc-dot on"></span>
                       <span class="cbx-topo-svc-name">{{ t('云端消息中心') }}</span>
                       <span class="cbx-topo-svc-addr mono" :title="brokerAddr || '—' + '\n' + t('MQTT 地址无法在浏览器直接打开')">{{ brokerAddr || '—' }}</span>
                       <span class="cbx-topo-svc-ops">
-                        <button class="cbx-op cbx-tiny" :disabled="!!restartingKey" @click="restartBroker()" :title="t('重启云端 MQTT Broker（nengtan-cloud-broker systemd 服务，短暂断连后自动重连）')">{{ restartingKey === 'systemd:nengtan-cloud-broker' ? '…' : '↻' }}</button>
+                        <button class="cbx-op cbx-tiny" :disabled="!!restartingKey" @click="restartBroker()" :title="t('重启云端 MQTT Broker（短暂断连后自动重连）')">{{ restartingKey === 'systemd:nengtan-cloud-broker' ? '…' : '↻' }}</button>
                       </span>
                     </div>
                     <div class="cbx-topo-svc" :class="{ off: !(overview.cloudcore && overview.cloudcore.phase === 'Running') }"
@@ -404,7 +328,7 @@
                       </span>
                     </div>
                     <div class="cbx-topo-svc" :class="{ off: mwChecked && !mwOnline }"
-                         :title="t('云端数据中间件：订阅云端 Broker 的上行空间 ext/#，把外部数据转换为标准主题 data/ext-* 后回写 Broker，平台按前缀识别归属；平台与中间件自身都不产生模拟数据') + '\n' + (mwAddr || '—')">
+                         :title="t('云端数据中间件：订阅 ext/#，转换为 data/ext-* 后回写 Broker（自身不产生数据）') + '\n' + (mwAddr || '—')">
                       <span class="cbx-topo-svc-dot" :class="{ on: mwOnline }"></span>
                       <span class="cbx-topo-svc-name">{{ t('数据中间件') }}</span>
                       <a class="cbx-topo-svc-addr mono" :href="httpOpenUrl(mwAddr, '/api/health')" target="_blank" rel="noopener"
@@ -413,7 +337,7 @@
                     </div>
                   </div>
                   <!-- 设备内部互联（本机通信，非系统级链路） -->
-                  <div class="cbx-topo-inner">{{ t('本机内部：CloudCore → Broker（cloud/# 状态推送）· 中间件 ⇄ Broker（ext/# ⇄ data/ext-*）· agent 本地 kubectl') }}</div>
+                  <div class="cbx-topo-inner">{{ t('本机内部：CloudCore → Broker（cloud/#）· 中间件 ⇄ Broker（ext/# ⇄ data/ext-*）· agent kubectl') }}</div>
                   <div class="cbx-topo-mod-ops">
                     <button class="cbx-op cbx-xs" @click="openBoxConfig" :title="t('配置云端 Broker 地址/账号与 agent Token/端口，保存后自动热更新重连')">⚙ {{ t('云端配置') }}</button>
                   </div>
@@ -421,7 +345,7 @@
               </div>
               <!-- 设备③：能碳一体机（每台一台设备，卡内为边缘运行时/采集服务/云端部署应用） -->
               <div class="cbx-topo-lane box-lane">
-                <div class="cbx-topo-lane-title">{{ t('能碳一体机') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openOnboard" :title="t('新盒子接入：生成 edgecore.yaml 配置。一体机同时承担两类接入：下接传感器/仪表、后接外部数据系统')">{{ t('盒子接入') }}</button></div>
+                <div class="cbx-topo-lane-title">{{ t('能碳一体机') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openOnboard" :title="t('新盒子接入：生成 edgecore.yaml。一体机下接传感器/仪表、后接外部数据系统')">{{ t('盒子接入') }}</button></div>
                 <div v-for="b in topoBoxes" :key="b.name" :ref="setBoxNodeRef(b.name)" class="cbx-topo-mod device box" :class="{ down: b.ready === false }">
                   <div class="cbx-topo-dev-hd">
                     <span class="cbx-topo-dev-ic">⬢</span>
@@ -441,13 +365,13 @@
                       <span class="cbx-topo-svc-type">{{ t('边缘运行时') }}</span>
                     </div>
                     <div class="cbx-topo-svc" :class="{ off: b.ready === false }"
-                         :title="t('设备采集服务：按协议采集传感器/仪表读数，经 DMI 与 MQTT 双通道上报（data/# 与 ext/#）') + '\n→ ' + (brokerAddr || '—')">
+                         :title="t('采集服务：按协议采集读数，经 DMI 与 MQTT 上报（data/# · ext/#）') + '\n→ ' + (brokerAddr || '—')">
                       <span class="cbx-topo-svc-dot" :class="{ on: b.ready !== false }"></span>
                       <span class="cbx-topo-svc-name">box-mapper</span>
                       <span class="cbx-topo-svc-addr mono" :title="t('上报') + ' ' + (brokerAddr || '—')">→ {{ brokerAddr || '—' }}</span>
                       <span class="cbx-topo-svc-type">{{ t('采集') }}</span>
                       <span class="cbx-topo-svc-ops">
-                        <button class="cbx-op cbx-tiny" :disabled="!!restartingKey || !edgeIpOk(b)" @click="restartMapper(b)" :title="edgeIpOk(b) ? t('重启该盒子上的 box-mapper systemd 服务（云端 agent 经 SSH 到边缘盒子执行 systemctl restart box-mapper）') : t('未配置盒子 IP 或探测不通，无法重启 Mapper（先点「配置」填写现场可达地址）')">{{ restartingKey === 'edge:box-mapper' ? '…' : '↻' }}</button>
+                        <button class="cbx-op cbx-tiny" :disabled="!!restartingKey || !edgeIpOk(b)" @click="restartMapper(b)" :title="edgeIpOk(b) ? t('重启该盒子的 box-mapper 服务（云端 agent 经 SSH 执行）') : t('未配置盒子 IP 或探测不通，无法重启 Mapper（先点「配置」填写现场可达地址）')">{{ restartingKey === 'edge:box-mapper' ? '…' : '↻' }}</button>
                       </span>
                     </div>
                     <!-- 云端部署到本机的应用/模型（盒子周期上报 state/{box}/services） -->
@@ -463,7 +387,7 @@
                     <div v-else class="cbx-topo-svc-empty">{{ t('暂无云端部署应用') }}</div>
                   </div>
                   <!-- 一体机是本链路的汇聚点：下接传感器/仪表、后接外部数据系统，统一上行云端 -->
-                  <div class="cbx-topo-inner">{{ t('本机汇聚：传感器/仪表 + 外部数据系统 → 统一 MQTT 上行云端（data/# · ext/#）') }}</div>
+                  <div class="cbx-topo-inner">{{ t('本机汇聚：传感器/仪表 + 外部数据 → 统一 MQTT 上行（data/# · ext/#）') }}</div>
                   <div class="cbx-topo-inner">{{ devCountOf(b.name) }} {{ t('台待下发') }} · {{ b.source === 'mqtt' ? t('MQTT 识别') : 'K8s Agent' }}<template v-if="b.roles && b.roles !== '—'"> · {{ roleZh(b.roles) }}</template></div>
                   <div class="cbx-topo-mod-ops">
                     <button class="cbx-op cbx-xs" @click="openBoxEdgeCfg(b)" :title="t('配置盒子显示名称 / 现场可达 IP / SSH 凭据（重启 Mapper 前必须配置且探测可达）')">{{ t('配置') }}</button>
@@ -482,7 +406,6 @@
                       <b class="cbx-topo-dev-title">{{ t('采集设备') }}</b>
                       <span class="cbx-topo-dev-addr">{{ t('边缘采集 MQTT :1883') }}</span>
                     </div>
-                    <span class="cbx-topo-mod-badge ok">{{ topoAllCloudDevs.length + topoAllLocalDevs.length + topoUnmounted.length }} {{ t('台') }}</span>
                   </div>
                   <div class="cbx-topo-devlist">
                     <div v-if="topoAllCloudDevs.length" class="cbx-topo-devgroup">
@@ -520,10 +443,10 @@
                   <div class="cbx-topo-dev-hd">
                     <span class="cbx-topo-dev-ic">🏭</span>
                     <div class="cbx-topo-dev-meta">
-                      <b class="cbx-topo-dev-title" :title="t('外部数据系统：PLC / 仪表 / 数据中台 / 第三方业务系统，经网线或工业总线接入能碳一体机，是「一体机后面一级」的数据来源；演示环境由独立服务 sim-source 模拟')">{{ t('外部数据系统') }}</b>
+                      <b class="cbx-topo-dev-title" :title="t('外部数据系统：PLC / 仪表 / 数据中台经网线或工业总线接入一体机；演示环境由 sim-source 模拟')">{{ t('外部数据系统') }}</b>
                       <span class="cbx-topo-dev-addr">{{ t('以太网 / 串口 / OPC') }} → {{ t('一体机') }} → ext/&lt;源&gt;/#</span>
                     </div>
-                    <span class="cbx-topo-mod-badge" :class="{ ok: extSources.some(s => s.enabled && s.status && s.status.active) }">{{ extSources.length }} {{ t('源') }}</span>
+                    <span class="cbx-topo-mod-badge" :class="{ ok: extSources.some(s => s.enabled && s.status && s.status.active) }">{{ extSources.some(s => s.enabled && s.status && s.status.active) ? t('采集中') : t('未采集') }}</span>
                   </div>
                   <div class="cbx-topo-devlist">
                     <div v-for="s in extSources" :key="s.id" class="cbx-topo-dev cloud" :class="{ on: s.status && s.status.active }" :title="s.name + '（' + s.config.box + '）' + t('：经一体机上行到云端，由数据中间件转换后进入平台') + '\n' + (extAddrOf(s) || '—')">
@@ -559,7 +482,8 @@
           <div class="cbx-sec-head">
             <button class="cbx-caret" @click="toggleSec('reslist')" :title="secFold.reslist ? t('收起') : t('展开')">{{ secFold.reslist ? '▾' : '▸' }}</button>
             <b class="cbx-sec-toggle" @click="toggleSec('reslist')">{{ t('资源列表') }}</b>
-            <span class="cbx-sec-hint res-hint">{{ topoBoxes.length }} {{ t('盒') }} · {{ mergedModels.length }} {{ t('模型') }} · {{ mergedDevices.length }} {{ t('设备') }}</span>
+            <!-- 数据统计统一在「运行状态总览」展示一次，此处不再重复计数 -->
+            <span class="cbx-sec-spacer"></span>
             <!-- 手动刷新：重新拉取三列数据 + 强制同步拉云端 CRD（用户主动点时才付 5s 超时代价） -->
             <button class="cbx-op cbx-xs" :disabled="resRefreshing" @click="refreshResources()"
                     :title="t('重新拉取盒子 / 模型 / 设备列表，并同步拉取云端最新 CRD 状态')">
@@ -569,7 +493,7 @@
           <div v-if="secFold.reslist" class="cbx-reslist">
             <!-- 盒子列表 -->
             <div id="cbx-res-box" class="cbx-rescol">
-              <div class="cbx-rescol-head">{{ t('盒子列表') }}<span class="cbx-rescol-n">{{ topoBoxes.length }}</span></div>
+              <div class="cbx-rescol-head">{{ t('盒子列表') }}</div>
               <div class="cbx-rescol-body">
                 <div v-for="b in topoBoxes" :key="b.name" class="cbx-resrow" @click="openDevRealtime({ name: b.name })" :title="t('盒子节点') + '：' + b.name">
                   <span class="cbx-dot" :class="{ on: readyOk(b.ready) }"></span>
@@ -582,7 +506,7 @@
             </div>
             <!-- 模型列表 -->
             <div class="cbx-rescol">
-              <div class="cbx-rescol-head">▦ {{ t('模型列表') }}<span class="cbx-rescol-n">{{ mergedModels.length }}</span></div>
+              <div class="cbx-rescol-head">▦ {{ t('模型列表') }}</div>
               <div class="cbx-rescol-body">
                 <div v-for="m in mergedModels" :key="m.name" class="cbx-resrow" @click="openEditModel(m)" :title="t('模型（点击修改点位）') + '：' + m.name">
                   <span class="cbx-res-name">{{ m.name }}</span>
@@ -595,8 +519,7 @@
             </div>
             <!-- 设备列表 -->
             <div id="cbx-res-dev" class="cbx-rescol">
-              <div class="cbx-rescol-head">◈ {{ t('设备列表') }}<span class="cbx-rescol-n">{{ mergedDevices.length }}</span>
-              </div>
+              <div class="cbx-rescol-head">◈ {{ t('设备列表') }}</div>
               <div class="cbx-rescol-body">
                 <div v-for="d in mergedDevices" :key="d.name" class="cbx-resrow" @click="onDevClick(d)" :title="(d._cloud ? t('云端设备（点击查看实时）') : t('待下发设备（点击编辑配置）')) + '：' + d.name + (modelOf(d) ? '（' + t('模型') + ' ' + modelOf(d) + '）' : '')">
                   <span class="cbx-dot" :class="{ on: d.state === 'online' }"></span>
@@ -604,10 +527,10 @@
                   <span class="cbx-res-tag" :class="{ ok: d.state === 'online', err: d.state === 'offline' }">{{ devStateZh(d) }}</span>
                   <span class="cbx-res-sub">{{ modelOf(d) || '—' }}<template v-if="d.node"> · {{ d.node }}</template><template v-else-if="d.protocol"> · {{ d.protocol }}</template><template v-if="slaveLabelOf(d)"> · {{ t('站') }}{{ slaveLabelOf(d) }}</template></span>
                   <span class="cbx-res-ops">
-                    <button class="cbx-op cbx-tiny" @click.stop="openEditDev(d)">✎ {{ t('配置') }}</button>
+                    <button class="cbx-op cbx-tiny" @click.stop="openEditDev(d)">{{ t('配置') }}</button>
                     <button v-if="d._cloud" class="cbx-op cbx-tiny" @click.stop="openCloudHistory(d)" :title="t('云端时序库（TDengine）历史读数曲线')">{{ t('历史') }}</button>
                     <!-- 采集设备没有「禁用」这一档：不想采集就删除，三端配置同步清除 -->
-                    <button class="cbx-op cbx-tiny danger" @click.stop="delDevice(d)" :title="t('删除该设备：平台本地配置 / 云端 CRD / 盒子取数配置三端同步清除')">🗑 {{ t('删除') }}</button>
+                    <button class="cbx-op cbx-tiny danger" @click.stop="delDevice(d)" :title="t('删除该设备：平台本地配置 / 云端 CRD / 盒子取数配置三端同步清除')">{{ t('删除') }}</button>
                   </span>
                 </div>
                 <div v-if="!mergedDevices.length" class="cbx-res-empty">{{ t('暂无设备') }}</div>
@@ -615,37 +538,12 @@
             </div>
           </div>
         </section>
-        <!-- ③ 证书与 Token 有效期（独立区块：云端 agent 实时采集云端 CA/服务证书与共享 token） -->
-        <section class="cbx-sec" v-if="(overview.certs || []).length || overview.token">
-          <div class="cbx-sec-head">
-            <button class="cbx-caret" @click="toggleSec('certs')" :title="secFold.certs ? t('收起') : t('展开')">{{ secFold.certs ? '▾' : '▸' }}</button>
-            <b class="cbx-sec-toggle" @click="toggleSec('certs')">{{ t('证书与密钥到期提醒') }}</b>
-          </div>
-          <div v-if="secFold.certs" class="cbx-sec-desc">
-            {{ t('仅专业维护人员查看') }}
-            <span class="cbx-sec-desc-extra">{{ t('剩余不足 30 天标红提醒') }}</span>
-          </div>
-          <div v-if="secFold.certs" class="cbx-certlist">
-            <div v-for="c in overview.certs || []" :key="c.cn" class="cbx-certrow">
-              <code>{{ c.cn }}</code>
-              <span class="cbx-cert-exp">{{ c.expires }}</span>
-              <span class="cbx-cert-days" :class="{ warn: (c.remain_days ?? 999) < 30 }">{{ c.remain_days ?? '—' }} {{ t('天') }}</span>
-            </div>
-            <div v-if="overview.token" class="cbx-certrow">
-              <code>token</code>
-              <span class="cbx-cert-exp">{{ overview.token.expires }}</span>
-              <span class="cbx-cert-days" :class="{ warn: (overview.token.remain_days ?? 999) < 30 }">{{ overview.token.remain_days ?? '—' }} {{ t('天') }}</span>
-            </div>
-          </div>
-        </section>
-
         <!-- ④-2 实时消息流（云端 Broker → 本平台；默认折叠，排查链路时再展开） -->
         <section class="cbx-sec">
           <div class="cbx-sec-head">
             <button class="cbx-caret" @click="toggleSec('msglog')" :title="secFold.msglog ? t('收起') : t('展开')">{{ secFold.msglog ? '▾' : '▸' }}</button>
             <b class="cbx-sec-toggle" @click="toggleSec('msglog')">{{ t('实时消息流') }}</b>
           </div>
-          <div v-if="secFold.msglog" class="cbx-sec-desc">{{ t('最近') }} {{ messages.length }} {{ t('条') }}</div>
           <div v-if="secFold.msglog" ref="msgLogRef" class="cbx-msglog">
             <div v-for="(m, i) in messages" :key="i" class="cbx-msgrow">
               <span class="cbx-msgtime">{{ fmtTime(m.t) }}</span>
@@ -660,15 +558,13 @@
         <section id="cbx-sec-cmd" class="cbx-sec">
           <div class="cbx-sec-head">
             <button class="cbx-caret" @click="toggleSec('cmd')" :title="secFold.cmd ? t('收起') : t('展开')">{{ secFold.cmd ? '▾' : '▸' }}</button>
-            <b class="cbx-sec-toggle" @click="toggleSec('cmd')">{{ t('命令执行') }}</b>
+            <b class="cbx-sec-toggle" @click="toggleSec('cmd')"
+               :title="t('仅供专业维护：下发读/写寄存器或 LoRaWAN 下行，结果等盒子回报')">{{ t('命令执行') }}</b>
             <span class="cbx-sec-spacer"></span>
             <span class="cbx-tabs">
               <button v-for="m in cmdModes" :key="m.k" class="cbx-tab" :class="{ active: cmdMode === m.k }" @click="switchCmdMode(m.k)">{{ t(m.l) }}</button>
             </span>
           </div>
-          <div v-if="secFold.cmd" class="cbx-sec-desc"
-               :title="t('仅供专业维护：向一体机下发读/写寄存器或 LoRaWAN 下行（如新接入传感器改从站地址/量程标定），执行结果等盒子回报')"
-          >{{ t('专业维护：下发读/写寄存器或 LoRaWAN 下行，结果等盒子回报') }}</div>
 
           <!-- 设备命令模式：选 盒子→设备→读/写 → 自动生成载荷 -->
           <div v-if="secFold.cmd && cmdMode === 'dev'" class="cbx-form">
@@ -687,7 +583,8 @@
               <select v-model="cmdForm.op" class="cbx-input cbx-sm" @change="onCmdOpChange">
                 <option v-for="o in cmdOpOptions" :key="o.k" :value="o.k">{{ t(o.l) }}</option>
               </select>
-              <span v-if="cmdDevMeta && !cmdDevMeta.isLora && !cmdDevMeta.isModbus && !cmdDevMeta.isCamera" class="cbx-sec-hint">{{ t('仅支持 Modbus / LoRaWAN / 摄像头设备，其余协议请用「原始消息」直接调 MQTT') }}</span>
+              <span v-if="cmdDevMeta && !cmdDevMeta.isLora && !cmdDevMeta.isModbus && !cmdDevMeta.isCamera" class="cbx-sec-hint warn-hint"
+                    :title="t('仅支持 Modbus / LoRaWAN / 摄像头设备，其余协议请用「原始消息」直接调 MQTT')">{{ t('该协议不支持，请用「原始消息」') }}</span>
             </div>
 
             <!-- LoRaWAN：读=主动取数，写=自定义下行 -->
@@ -704,7 +601,6 @@
                 <template v-if="cmdForm.op === 'write'">
                   <label>{{ t('端口') }}</label><input v-model="cmdForm.fPort" class="cbx-input cbx-num" placeholder="2"/>
                 </template>
-                <span class="cbx-sec-hint" v-if="cmdForm.op === 'read'">{{ t('读 = 下行取数一拍（设备需填了从站号才会下行轮询）并等终端回传') }}</span>
               </div>
             </template>
 
@@ -771,11 +667,9 @@
                      命令里不再填写本次上下限：未配置范围时平台拒绝下发，此处给出提示 -->
                 <template v-else>
                   <span v-if="addrRangeHint()" class="cbx-sec-hint">{{ addrRangeHint() }}</span>
-                  <span v-else class="cbx-sec-hint">{{ t('未配置安全范围：请先到设备配置（可写点位 / 可写属性）中设置上下限，平台拒绝无范围的设备写入') }}</span>
+                  <span v-else class="cbx-sec-hint warn-hint"
+                        :title="t('未配置安全范围：请先到设备配置（可写点位 / 可写属性）中设置上下限，平台拒绝无范围的设备写入')">{{ t('未配置安全范围，平台拒绝写入') }}</span>
                 </template>
-              </div>
-              <div v-if="cmdForm.op === 'read' && cmdForm.refMode === 'reg'" class="cbx-form-row">
-                <span class="cbx-sec-hint">{{ t('读任意寄存器不依赖点位配置：适合写设定前先确认传感器寄存器内容/默认从站。') }}</span>
               </div>
             </template>
 
@@ -797,31 +691,16 @@
             <div class="cbx-form-row">
               <label>{{ t('主题') }}</label><input v-model="pubForm.topic" class="cbx-input cbx-md" placeholder="data/box-001/device-1"/>
               <label>{{ t('载荷') }}</label><input v-model="pubForm.payload" class="cbx-input cbx-grow" placeholder='{"device":"device-1","value":88.8}'/>
-              <button class="cbx-op primary" @click="doPublish">{{ t('发布') }}</button>
-            </div>
-            <div class="cbx-form-row">
-              <span class="cbx-sec-hint">{{ t('data/# 发布可自检一体机上报链路并在「实时消息流」看到回显；cmd/{box}/# 为盒子命令主题（盒子 mapper 需支持对应命令）') }}</span>
+              <button class="cbx-op primary" @click="doPublish"
+                      :title="t('data/# 发布可自检上报链路；cmd/{box}/# 为盒子命令主题（mapper 需支持）')">{{ t('发布') }}</button>
             </div>
           </div>
 
         </section>
-
-        <!-- 数据服务接口（独立模块）：对外集成接口清单，见 DataServiceApiPanel.vue -->
-        <DataServiceApiPanel />
           </section>
         </div><!-- /cbx-editor -->
       </main>
     </div><!-- /cbx-workbench -->
-
-    <!-- 状态栏 -->
-    <footer class="cbx-statusbar">
-      <span class="cbx-st-item"><span class="cbx-dot" :class="{ on: overview.cloud_source === 'live' }"></span>{{ t('云端') }} {{ overview.cloud_source === 'live' ? t('在线') : (overview.cloud_source === 'stale' ? t('数据过期') : (overview.cloud_source === 'degraded' ? t('部分异常') : t('不可达'))) }}</span>
-      <span class="cbx-st-item">{{ t('模型') }} {{ devices.models?.length || 0 }} · {{ t('设备') }} {{ devices.devices?.length || 0 }}</span>
-      <span class="cbx-st-item">{{ t('消息') }} {{ messages.length }} {{ t('条') }}</span>
-      <span class="cbx-st-grow"></span>
-      <span class="cbx-st-item">{{ cloudCfg.host || '36.151.146.71' }}</span>
-      <span class="cbx-st-item">3s {{ t('自动刷新') }}</span>
-    </footer>
 
         <!-- 修改设备配置对话框（复用 create_device apply 做 upsert，本地 box_devices.json + 模型同步） -->
         <div v-if="editOpen" class="cbx-mask" @click.self="editOpen = false">
@@ -915,10 +794,7 @@
                   <label>{{ t('应用ID') }}</label><input v-model="editForm.lora.applicationID" class="cbx-input" style="width:70px" placeholder="1"/>
                   <label>DevEUI</label><input v-model="editForm.lora.devEUI" class="cbx-input" style="width:160px" placeholder="0011223344556677"/>
                   <label>{{ t('从站号') }}</label><input v-model.number="editForm.lora.slaveId" type="number" min="0" max="247" class="cbx-input" style="width:70px"
-                                                          :title="t('同一台 LoRa 透传 DTU 下挂多台 485 传感器时按此站号区分（如 env-temp 站2、shuitong-temp 站7）；0 = 被动上报，不下发问帧')"/>
-                </div>
-                <div class="cbx-form-row">
-                  <span class="cbx-sec-hint">{{ t('从站号：同一台 LoRa DTU 下挂多台 485 传感器时按此区分，0 表示被动上报（下行取数与解析按该站号拼帧）') }}</span>
+                                                          :title="t('同 DTU 下挂多台 485 传感器时按站号区分；0 = 被动上报，不下发问帧')"/>
                 </div>
                 <div class="cbx-form-row">
                   <label>AppKey</label><input v-model="editForm.lora.appKey" class="cbx-input" style="width:170px"/>
@@ -971,7 +847,7 @@
               <!-- 属性点位 -->
               <div class="cbx-sec-head" style="margin-top:8px">
                 <b>{{ t('属性点位') }}</b>
-                <button class="cbx-op" @click="addEditProp">＋ {{ t('添加') }}</button>
+                <button class="cbx-op cbx-xs" @click="addEditProp">＋ {{ t('添加') }}</button>
               </div>
               <div v-for="(p, i) in editForm.properties" :key="i" class="cbx-prop-row">
                 <input v-model="p.name" class="cbx-input" style="width:110px" :placeholder="t('属性名')"/>
@@ -1017,7 +893,7 @@
               <div v-if="editPreview" class="cbx-preview" style="margin-top:8px">
                 <div class="cbx-preview-head">
                   <b>{{ t('YAML 预览（') }}<code>{{ editPreviewMode }}</code>{{ t('）') }}</b>
-                  <button class="cbx-op" @click="copyEditYaml">{{ t('复制') }}</button>
+                  <button class="cbx-op cbx-xs" @click="copyEditYaml">{{ t('复制') }}</button>
                 </div>
                 <pre class="cbx-code">{{ editPreview }}</pre>
               </div>
@@ -1031,7 +907,7 @@
             <div class="cbx-dialog-head">
               <b>{{ t('实时数据：') }}<code>{{ devRtName }}</code></b>
               <span v-if="devRt" class="cbx-tag" :class="{ ok: devRt.state === 'reporting' }">{{ devRt.state === 'reporting' ? t('上报中') : t('离线') }}</span>
-              <span v-if="devRt" class="cbx-sec-hint">{{ t('节点') }} {{ devRt.node }} · {{ t('模型') }} {{ devRt.model }} · {{ t('每 3s 自动刷新') }}<template v-if="devRt.lastOnlineTime"> · {{ t('最后在线') }} {{ fmtAgo(devRt.lastOnlineTime) }}</template></span>
+              <span v-if="devRt" class="cbx-sec-hint">{{ t('节点') }} {{ devRt.node }} · {{ t('模型') }} {{ devRt.model }}</span>
               <button class="x-btn lg" @click="closeDevRealtime" :aria-label="t('关闭')">✕</button>
             </div>
             <!-- 串口摄像头图片面板（protocol=camera 的设备显示）：手动抓拍 + 最新图片 + 进度。
@@ -1114,23 +990,29 @@
                 <span class="cbx-rt-curlabel">{{ rtSelProp }}</span>
                 <b class="cbx-rt-curval">{{ rtCur.invalid ? t('无有效数据') : fmtPrimary(rtCur.reported) }}</b>
                 <span class="cbx-rt-unit">{{ rtCur.unit }}</span>
-                <span class="cbx-rt-upd">{{ t('更新于') }} {{ rtCur.timestamp ? fmtAgo(rtCur.timestamp) : '—' }} · {{ t('采样') }} {{ rtSeries.length }} {{ t('点') }}</span>
+                <span class="cbx-rt-upd">{{ t('更新于') }} {{ rtCur.timestamp ? fmtAgo(rtCur.timestamp) : '—' }}</span>
               </div>
 
               <!-- 全部属性一览（补充） -->
               <table class="cbx-table">
-                <thead><tr><th>{{ t('属性') }}</th><th>reported（{{ t('实时值') }}）</th><th>{{ t('单位') }}</th><th>timestamp</th><th>{{ t('采样点数') }}</th></tr></thead>
+                <thead><tr><th>{{ t('属性') }}</th><th>{{ t('实时值') }}</th><th>{{ t('单位') }}</th><th>{{ t('上报时间') }}</th></tr></thead>
                 <tbody>
                   <tr v-for="tp in devRt.twins" :key="tp.propertyName">
                     <td><code>{{ tp.propertyName }}</code></td>
                     <td class="val"><span :class="{ 'cbx-invalid': tp.invalid }">{{ tp.invalid ? t('无有效数据') : fmtPrimary(tp.reported) }}</span></td>
                     <td>{{ tp.unit || '' }}</td>
                     <td>{{ tp.timestamp ? fmtAgo(tp.timestamp) : '—' }}</td>
-                    <td>{{ (devRt.history[tp.propertyName] || []).length }}</td>
                   </tr>
                 </tbody>
               </table>
-              <p class="cbx-note">{{ t('读数双源融合：① 云端 twins（边缘 Mapper 实时同步）；② 盒子 MQTT 直报 data/#（平台订阅，时间戳更新时优先）。双源均无数据说明盒子侧采集或上报异常，可先确认概览「链路状态」cloud/crds 推送是否新鲜。盒子运行期无需 IP，数据由盒子主动上报。折线图为 3s 滑动窗口、最多 120 点；「无有效数据」多为传感器无信号或未标定。') }}</p>
+              <!-- 读数口径说明：默认只显示一个小问号，点击才展开注释，避免长文案常驻占版面 -->
+              <div class="cbx-rt-help">
+                <button class="cbx-help" :class="{ on: rtHelpOpen }" :aria-label="t('读数说明')"
+                        :title="t('点击查看读数说明')" @click="rtHelpOpen = !rtHelpOpen">?</button>
+                <div v-if="rtHelpOpen" class="cbx-help-pop">
+                  {{ t('读数双源融合：云端 twins + 盒子 MQTT data/#（时间戳新者优先）；均无数据多为传感器无信号或未标定。') }}
+                </div>
+              </div>
             </div>
             <!-- 双源融合脚注：摄像头设备同样显示（2026-10-12 用户要求加回）；
                  相比 cbx-rt 内版本去掉「折线图为 3s 滑动窗口」一句（摄像头对话框无曲线） -->
@@ -1143,7 +1025,7 @@
         <div v-if="onboardOpen" class="cbx-mask" @click.self="onboardOpen = false">
           <div class="cbx-dialog cbx-dialog-xl">
             <div class="cbx-dialog-head">
-              <b>{{ t('盒子一键接入（自解压脚本：box-deploy 采集包 + edgecore.yaml + rootCA + token）') }}</b>
+              <b>{{ t('盒子一键接入（box-deploy 采集包 + edgecore.yaml + rootCA + token）') }}</b>
               <button class="x-btn lg" @click="onboardOpen = false" :aria-label="t('关闭')">✕</button>
             </div>
             <div class="cbx-form">
@@ -1153,7 +1035,7 @@
                 <label>{{ t('盒子 IP（可选，远程一键时作为直达地址）') }}</label><input v-model="onboardForm.boxIP" class="cbx-input" placeholder="172.20.186.56"/>
                 <button class="cbx-op primary" :disabled="!onboardForm.cloudIP || onboardBusy" @click="doOnboard">{{ onboardBusy ? t('生成中…') : t('生成一键脚本') }}</button>
               </div>
-              <p class="cbx-note">{{ t('一键脚本内置 box-deploy 采集部署包（mapper + mosquitto + 云边协同断点续传，约 18 MB），盒子执行一条') }} <code>bash onboard_box.sh</code> {{ t('即完成：① EdgeCore 接入（keadm join）→ ② rootCA / edgecore.yaml 下发 → ③ 部署包解包 → ④ config.json 自动定制（boxId / broker）→ ⑤ 一键部署 → ⑥ 链路自检。幂等，可重复执行。') }}</p>
+              <p class="cbx-note">{{ t('脚本内置 box-deploy 采集部署包（mapper + mosquitto + 断点续传，约 18 MB）') }} <code>bash onboard_box.sh</code> {{ t('脚本内置 box-deploy 部署包（约 18 MB）：EdgeCore 接入 → 证书/配置下发 → 解包 → config.json 定制 → 部署 → 自检，幂等可重复执行。') }}</p>
             </div>
             <div v-if="onboardResult" class="cbx-onboard">
               <div class="cbx-kv">
@@ -1168,7 +1050,7 @@
                 <button class="cbx-op" :disabled="remoteRunning" @click="doOnboardRemote">{{ remoteRunning ? t('远程接入中…') : t('远程一键接入（云端 agent 推送执行）') }}</button>
               </div>
               <p class="cbx-note" v-if="onboardResult.script_hint">{{ onboardResult.script_hint }}</p>
-              <p class="cbx-note">{{ t('远程接入前提：① 平台 ⇄ 云端 agent 已配置（总览 → 配置）；② agent config.json 已配置 edge（盒子可达地址）。盒子无直达 IP 时请下载脚本后到现场执行。') }}</p>
+              <p class="cbx-note">{{ t('远程接入前提：已配置云端 agent 与盒子可达地址；无直达 IP 时下载脚本到现场执行。') }}</p>
               <div v-if="remoteSteps.length" class="cbx-remote-steps">
                 <div v-for="(s, i) in remoteSteps" :key="i" class="cbx-remote-step">
                   <b :class="s.ok ? 'ok' : 'fail'">{{ s.ok ? '✔' : '✘' }} {{ i + 1 }}. {{ s.name }}</b>
@@ -1193,13 +1075,13 @@
                   <p class="cbx-note">{{ t('「导出 box-config.json」：现场凭此配置 + 仓库脚本即可接入（放盒子') }} <code>/opt/weight-bridge/box-config.json</code>{{ t('，命令见下方）。') }}</p>
                 </div>
                 <div v-if="ghResult && ghResult.ok" class="cbx-kv">
-                  <div><span>{{ t('盒子现场命令（任意盒子 root 执行，自动拉部署包/证书/配置 + keadm join + 自检）') }}</span><code class="wrap">{{ ghResult.command }}</code></div>
+                  <div><span>{{ t('盒子现场命令（root 执行：拉部署包/证书/配置 + keadm join + 自检）') }}</span><code class="wrap">{{ ghResult.command }}</code></div>
                   <div v-if="ghResult.caHash"><span>{{ t('CA 指纹') }}</span><code class="wrap">{{ ghResult.caHash }}</code></div>
                 </div>
                 <div v-if="ghExport && ghExport.ok" class="cbx-kv">
-                  <div><span>{{ t('现场用法（配置文件已放盒子 /opt/weight-bridge/box-config.json 时，一条命令完成接入）') }}</span><code class="wrap">curl -fsSL {{ ghLauncherUrl }} | bash</code></div>
+                  <div><span>{{ t('现场用法（配置已放盒子 box-config.json 时，一条命令接入）') }}</span><code class="wrap">curl -fsSL {{ ghLauncherUrl }} | bash</code></div>
                   <div><span>{{ t('显式指定配置路径') }}</span><code class="wrap">curl -fsSL {{ ghLauncherUrl }} | bash -s -- -c /path/box-config.json</code></div>
-                  <div><span>{{ t('box-config.json 内容（保存到盒子 /opt/weight-bridge/box-config.json）') }}</span><pre class="cbx-code">{{ ghExport.content }}</pre></div>
+                  <div><span>{{ t('box-config.json 内容（保存到盒子 /opt/weight-bridge/）') }}</span><pre class="cbx-code">{{ ghExport.content }}</pre></div>
                   <div v-if="!ghExport.token_set" class="cbx-note">{{ t('token 留空：云端未取到共享 token，不影响部署 —— 脚本自动从仓库') }} <code>onboard/token</code> {{ t('拉取，也可手工填入。') }}</div>
                 </div>
                 <div v-if="ghResult && ghResult.files" class="cbx-remote-steps">
@@ -1207,11 +1089,11 @@
                     <b :class="f.ok ? 'ok' : 'fail'">{{ f.ok ? '✔' : '✘' }} {{ f.path }}（{{ (f.size / 1024 / 1024).toFixed(1) }} MB）</b>
                   </div>
                 </div>
-                <p class="cbx-note">{{ t('托管说明：平台将「引导脚本 + box-deploy 部署包 + edgecore.yaml + rootCA + token」同步至仓库') }} <code>onboard/</code> {{ t('目录（幂等覆盖）；edgecore.yaml 由盒子端按配置自动替换，token 重签后无需重推。仓库内含共享 token 与 rootCA，公开前请评估风险。盒子现场执行') }} <code>curl -fsSL {{ ghResult ? ghResult.launcher_url : '…' }} | bash</code> {{ t('即完成接入。') }}</p>
+                <p class="cbx-note">{{ t('托管说明：平台将引导脚本 + 部署包 + edgecore.yaml + rootCA + token 同步至仓库') }} <code>onboard/</code> {{ t('目录（幂等覆盖）；token 重签后无需重推。仓库含共享 token 与 rootCA，公开前请评估风险。盒子执行：') }} <code>curl -fsSL {{ ghResult ? ghResult.launcher_url : '…' }} | bash</code> {{ t('即完成接入。') }}</p>
               </details>
               <details class="cbx-details">
                 <summary>{{ t('高级：edgecore.yaml') }}</summary>
-                <div class="cbx-preview-head"><span></span><button class="cbx-op" @click="copyOnboard">{{ t('复制') }}</button></div>
+                <div class="cbx-preview-head"><span></span><button class="cbx-op cbx-xs" @click="copyOnboard">{{ t('复制') }}</button></div>
                 <pre class="cbx-code">{{ onboardResult.edgecore }}</pre>
               </details>
               <details class="cbx-details">
@@ -1302,10 +1184,7 @@
                   <label>{{ t('应用ID') }}</label><input v-model="form.lora.applicationID" class="cbx-input" style="width:70px" placeholder="1"/>
                   <label>DevEUI</label><input v-model="form.lora.devEUI" class="cbx-input" style="width:150px" placeholder="0011223344556677"/>
                   <label>{{ t('从站号') }}</label><input v-model.number="form.lora.slaveId" type="number" min="0" max="247" class="cbx-input" style="width:70px"
-                                                      :title="t('同一台 LoRa 透传 DTU 下挂多台 485 传感器时按此站号区分（如 env-temp 站2、shuitong-temp 站7）；0 = 被动上报，不下发问帧')"/>
-                </div>
-                <div class="cbx-form-row">
-                  <span class="cbx-sec-hint">{{ t('从站号：同一台 LoRa DTU 下挂多台 485 传感器时按此区分，0 表示被动上报（下行取数与解析按该站号拼帧）') }}</span>
+                                                      :title="t('同 DTU 下挂多台 485 传感器时按站号区分；0 = 被动上报，不下发问帧')"/>
                 </div>
                 <div class="cbx-form-row">
                   <label>AppKey</label><input v-model="form.lora.appKey" class="cbx-input" style="width:160px"/>
@@ -1357,7 +1236,7 @@
               <!-- 属性点位 -->
               <div class="cbx-sec-head" style="margin-top:8px">
                 <b>{{ t('属性点位') }}</b>
-                <button class="cbx-op" @click="addProp">＋ {{ t('添加') }}</button>
+                <button class="cbx-op cbx-xs" @click="addProp">＋ {{ t('添加') }}</button>
               </div>
               <div v-for="(p, i) in form.properties" :key="i" class="cbx-prop-row">
                 <input v-model="p.name" class="cbx-input" style="width:110px" :placeholder="t('属性名')"/>
@@ -1403,7 +1282,7 @@
               <div v-if="preview" class="cbx-preview">
                 <div class="cbx-preview-head">
                   <b>{{ t('YAML 预览') }}</b>
-                  <button class="cbx-op" @click="copyPreview">{{ t('复制') }}</button>
+                  <button class="cbx-op cbx-xs" @click="copyPreview">{{ t('复制') }}</button>
                 </div>
                 <pre class="cbx-code">{{ preview }}</pre>
               </div>
@@ -1416,7 +1295,6 @@
           <div class="cbx-dialog cbx-dialog-lg">
             <div class="cbx-dialog-head">
               <b>{{ t('新建模型（DeviceModel）') }}</b>
-              <span class="cbx-sec-hint">{{ t('保存后可在「设备接入」中选择该模型') }}</span>
               <button class="x-btn lg" @click="modelCreateOpen = false" :aria-label="t('关闭')">✕</button>
             </div>
             <div class="cbx-form">
@@ -1438,7 +1316,7 @@
               </div>
               <div class="cbx-sec-head" style="margin-top:8px">
                 <b>{{ t('属性点位') }}</b>
-                <button class="cbx-op" @click="addModelProp">＋ {{ t('添加') }}</button>
+                <button class="cbx-op cbx-xs" @click="addModelProp">＋ {{ t('添加') }}</button>
               </div>
               <div v-for="(p, i) in modelForm.properties" :key="i" class="cbx-prop-row">
                 <input v-model="p.name" class="cbx-input" style="width:110px" :placeholder="t('属性名')"/>
@@ -1483,7 +1361,7 @@
               <div v-if="modelPreview" class="cbx-preview">
                 <div class="cbx-preview-head">
                   <b>{{ t('YAML 预览') }}</b>
-                  <button class="cbx-op" @click="copyModelPreview">{{ t('复制') }}</button>
+                  <button class="cbx-op cbx-xs" @click="copyModelPreview">{{ t('复制') }}</button>
                 </div>
                 <pre class="cbx-code">{{ modelPreview }}</pre>
               </div>
@@ -1514,7 +1392,7 @@
             <label>{{ t('Agent Token') }}</label><input v-model="boxCfg.agent_token" class="cbx-input" style="flex:1" :placeholder="t('与云端 install_agent.sh --token 一致')"/>
             <label>{{ t('命名空间') }}</label><input v-model="boxCfg.namespace" class="cbx-input" style="width:110px" placeholder="default"/>
           </div>
-          <div class="cbx-form-hint">{{ t('云端部署 cloud-agent 后填写此处的 Token/端口（安装命令见「一键下发」区块），保存即生效：概览/CRD/日志经 MQTT 长连接实时推送，下发/删除/回写走 HTTP，全程无需 SSH。') }}</div>
+          <div class="cbx-form-hint">{{ t('部署 cloud-agent 后填写 Token/端口，保存即生效：读走 MQTT 推送、写走 HTTP，无需 SSH。') }}</div>
           <div class="cbx-form-row">
             <button class="cbx-op primary" :disabled="boxCfgSaving" @click="saveBoxConfig">{{ boxCfgSaving ? t('保存中…') : t('保存并重连') }}</button>
             <button class="cbx-op" @click="boxCfgOpen = false">{{ t('取消') }}</button>
@@ -1547,7 +1425,7 @@
             <label>{{ t('密钥') }}</label><input v-model="edgeCfg.key" class="cbx-input" style="flex:1" :placeholder="t('/root/.ssh/id_rsa（可选）')"/>
           </div>
           <div class="cbx-form-hint">{{ t('盒子运行期无直达 IP；此处为部署/现场运维时可达地址（现场内网 / 手机热点 / frp）。') }}<br/>
-            {{ t('IP 为空或 SSH 探测不通时，「重启 Mapper」等 SSH 操作将被拒绝。保存后自动探测连通性。') }}</div>
+            {{ t('IP 为空或 SSH 不通时「重启 Mapper」等操作将被拒绝。') }}</div>
           <div class="cbx-form-row">
             <button class="cbx-op primary" :disabled="edgeCfgSaving" @click="saveEdgeCfg">{{ edgeCfgSaving ? t('保存中…') : t('保存并探测') }}</button>
             <button class="cbx-op" :disabled="edgeCfgChecking" @click="checkEdgeCfg()">{{ edgeCfgChecking ? t('探测中…') : '∿ ' + t('仅探测') }}</button>
@@ -1607,16 +1485,12 @@ import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
 import { t } from '../i18n'
 import { visiblePoll } from '../utils/poll'
-import DataServiceApiPanel from './DataServiceApiPanel.vue'
 // 云端时序历史查询弹窗（TDengine）：异步分包，点开才加载
 const CloudHistoryDialog = defineAsyncComponent(() => import('./CloudHistoryDialog.vue'))
 
 const store = useSimStore()
 
-// ---- 单页布局（设备配置已并入通信拓扑图，无 tab）----
-const expanded = reactive({ boxes: true, models: true, devs: true, unmounted: false })
-const sideTitle = t('设备导航')
-const sideCount = computed(() => `${topoBoxes.value?.length || 0} ${t('盒')} · ${mergedModels.value.length} ${t('模型')} · ${mergedDevices.value.length} ${t('设备')}`)
+// ---- 单页布局（设备导航侧栏已移除：盒子/模型/设备统一在「资源列表」区块）----
 
 // 合并界面：原「数据概览」+「设备管理」二合一（云端设备关联 / 边缘节点 / twins 实时值 / CloudHub 端口已移除）
 
@@ -1627,10 +1501,9 @@ const sideCount = computed(() => `${topoBoxes.value?.length || 0} ${t('盒')} ·
 const sourcesResp = reactive({ sources: [], middleware: {} })
 const sourcesLoading = ref(false)
 const mwChecked = ref(false)          // 是否已探测过中间件（得到过确定结果）
-// 数据服务接口清单已独立为单独模块：见 DataServiceApiPanel.vue（命令执行区块之后）
 // 各区块折叠态（true=展开）：默认只展开常用区块，折叠区块不渲染 DOM（首屏更快）
 const secFold = ref({ overview: true, sources: false, topo: false, reslist: true,
-  certs: false, msglog: false, cmd: true })
+  msglog: false, cmd: true })
 function toggleSec(k) {
   secFold.value = { ...secFold.value, [k]: !secFold.value[k] }
 }
@@ -1681,14 +1554,14 @@ const localFieldTpls = {
     { name: 'topics', label: t('订阅主题'), type: 'array', required: true,
       desc: t('JSON 数组。中间件订阅外部主题后，将每条消息转投给平台（前缀化发布）') },
     { name: 'fieldMap', label: t('字段映射（可选）'), type: 'json',
-      desc: t('把外部消息字段映射为平台标准字段（v/device/value/t），如 {"value":"reading"}') },
+      desc: t('映射外部消息字段到平台标准字段（v/device/value/t）') },
     { name: 'device', label: t('默认设备 id（可选）'),
       placeholder: t('外部消息无 device 字段时使用') },
   ],
   sim: [
     { name: 'interval', label: t('发布间隔（秒）'), kind: 'num', default: '2' },
     { name: 'devices', label: t('模拟设备（可选 JSON）'), type: 'json',
-      desc: t('留空时平台将自动注入默认示例设备；格式 [{id,name,properties:[{name,base,amplitude,noise,period,unit}]}]') },
+      desc: t('留空时自动注入默认示例设备；格式 [{id,name,properties:[…]}]') },
   ],
 }
 async function loadAdapterTypes() {
@@ -2149,19 +2022,19 @@ function restartBroker() {
     { kind: 'systemd', name: 'nengtan-cloud-broker' },
     'MQTT Broker',
     t('确认重启云端 MQTT Broker（nengtan-cloud-broker）？') + '\n' +
-    t('将短暂断开边缘盒子与平台的 MQTT 长连接，约数秒后自动重连，请确认当前无正在进行的下发/上报操作。')
+    t('将短暂断开盒子与平台的 MQTT 连接，数秒后自动重连。')
   )
 }
 function restartMapper(b) {
   if (!edgeIpOk(b)) {
-    store.showToast(t('未配置盒子 IP 或探测不通，无法重启 Mapper。请先点击「配置」填写现场可达地址（内网 IP / 跳板机 / frp）并保存。'), 'warn')
+    store.showToast(t('未配置盒子 IP 或探测不通，无法重启 Mapper。请先「配置」填写可达地址并保存。'), 'warn')
     return
   }
   return restartCloud(
     { kind: 'edge', name: 'box-mapper' },
     'box-mapper（' + boxName(b) + '）',
     t('确认重启边端盒子「') + boxName(b) + t('」的 box-mapper 服务？') + '\n' +
-    t('云端 agent 将经 SSH 到边缘盒子执行 systemctl restart box-mapper（需已在盒子卡片「配置」中填写现场可达地址且探测通过）。') + '\n' +
+    t('云端 agent 经 SSH 到盒子执行 systemctl restart box-mapper（需已配置可达地址且探测通过）。') + '\n' +
     t('注意：盒子处于现场内网/无直达 IP 时云端 SSH 无法直达，该操作会失败，需现场运维重启。')
   )
 }
@@ -2419,9 +2292,19 @@ async function delDevice(d) {
     await unbindCloud(d.cloudDevice || name)   // 清理该云端身份可能残留的关联，避免留悬空绑定
     const bs = (r.box_sync || {})[d.node || ''] || {}
     const cs = r.cloud || {}
-    const ok = r.ok !== false && cs.ok !== false
-    let msg = t('设备') + ` ${name} ` + t('已删除')
-    if (!ok) msg += '：' + (cs.error || bs.error || bs.note || t('云端不可达'))
+    const cloudFailed = cs.ok === false
+    const ok = r.ok !== false && !cloudFailed
+    let msg
+    if (ok) {
+      msg = t('设备') + ` ${name} ` + t('已删除')
+    } else if (cloudFailed) {
+      // 本地与盒子已清，但云端 CRD 仍在：不说明白的话用户会以为删干净了，
+      // 而云端设备列表里这台「幽灵设备」会一直显示下去。
+      msg = t('设备') + ` ${name} ` + t('已从平台与盒子清除，但云端 CRD 未删除') + '：' +
+        (cs.error || t('云端不可达')) + '。' + t('云端列表仍会显示该设备，请确认云端服务可达后重新删除')
+    } else {
+      msg = t('设备') + ` ${name} ` + t('已删除') + '：' + (bs.error || bs.note || t('云端不可达'))
+    }
     store.showToast(msg, ok ? 'success' : 'warn')
     await loadDevices()
     await loadCloudCrd(true)
@@ -2489,7 +2372,7 @@ async function exportBoxConfig() {
   try {
     const r = await api.boxConfigExport(onboardForm.cloudIP, onboardForm.hostname)
     ghExport.value = r
-    store.showToast(r.ok ? t('已生成 box-config.json：复制内容保存到盒子 /opt/weight-bridge/box-config.json 即可') : (r.error || t('导出失败')), r.ok ? 'success' : 'error')
+    store.showToast(r.ok ? t('已生成 box-config.json：保存到盒子 /opt/weight-bridge/ 即可') : (r.error || t('导出失败')), r.ok ? 'success' : 'error')
   } catch (e) { store.showToast(t('导出失败') + '：' + (e.message || e), 'error') }
   finally { ghExportBusy.value = false }
 }
@@ -2569,7 +2452,7 @@ async function loadMessages() {
   } catch (e) {}
 }
 async function doPublish() {
-  if (!pubForm.topic.trim()) { store.showToast(t('请先填写主题（建议 data/box-xxx/device-xxx 格式，发布后可在「实时消息流」看到回显，data/# 会同时刷新设备实时数据）'), 'warn'); return }
+  if (!pubForm.topic.trim()) { store.showToast(t('请先填写主题（建议 data/box-xxx/device-xxx 格式，data/# 会刷新设备实时数据）'), 'warn'); return }
   try {
     const r = await api.boxPublish(pubForm.topic, pubForm.payload)
     store.showToast(r.ok
@@ -2682,14 +2565,6 @@ const mergedDevices = computed(() => {
   return [...map.values()]
 })
 // 盒子下设备合并（云端真实 + 本地待下发，同名合并，云端优先带状态）
-function boxDevices(b) {
-  const map = new Map()
-  ;(b.cloudDevices || []).forEach((d) => map.set(d.name, { ...d, _cloud: true }))
-  ;(b.devices || []).forEach((d) => {
-    if (!map.has(d.name)) map.set(d.name, { ...d, _cloud: false, state: d.data_online ? 'online' : null })
-  })
-  return [...map.values()]
-}
 // 展示辅助：模型名、属性数、设备状态中文
 function modelOf(d) { return d.model || d.modelName || '' }
 function modelPropCount(m) {
@@ -3233,7 +3108,7 @@ function renderTopoLinks() {
     text.setAttribute('text-anchor', 'middle')
     text.setAttribute('fill', 'var(--text)')
     text.setAttribute('font-size', '10px')
-    text.setAttribute('font-weight', '500')
+    text.setAttribute('font-weight', '400')
     text.setAttribute('style', 'paint-order: stroke; stroke: var(--panel); stroke-width: 3px; stroke-linejoin: round')
     text.textContent = l.label
     g.appendChild(text)
@@ -3490,6 +3365,7 @@ const devRtName = ref('')
 const devRt = computed(() => rtDevices.value.find((x) => x.name === devRtName.value) || null)
 const rtSel = ref('')        // 当前选中的属性
 const rtHover = ref(-1)      // 悬停采样点 index
+const rtHelpOpen = ref(false) // 读数口径说明（小问号注释）展开态
 const rtChartEl = ref(null)
 let stopRtPoll = null
 async function refreshDevRt() {
@@ -3500,6 +3376,7 @@ function openDevRealtime(d) {
   devRtOpen.value = true
   rtSel.value = ''
   rtHover.value = -1
+  rtHelpOpen.value = false
   refreshDevRt()
   if (stopRtPoll) stopRtPoll()
   stopRtPoll = visiblePoll(refreshDevRt, 3000)
@@ -3517,6 +3394,7 @@ function closeDevRealtime() {
   devRtOpen.value = false
   devRtName.value = ''
   rtHover.value = -1
+  rtHelpOpen.value = false
   if (stopRtPoll) { stopRtPoll(); stopRtPoll = null }
   if (stopCamPoll) { stopCamPoll(); stopCamPoll = null }
 }
@@ -3736,12 +3614,12 @@ const hero = computed(() => {
   const loaded = !!(cs || (overview.value.nodes || []).length || overview.value.broker)
   const b = heroBox.value, d = heroDev.value
   if (!loaded) return { tone: 'mute', icon: '·', title: t('正在获取运行状态…'), desc: t('正在加载云端与设备状态，请稍候…') }
-  if (cs === 'unreachable') return { tone: 'err', icon: '✕', title: t('无法连接云端服务器'), desc: t('本页显示的云端状态与设备数据可能不是最新。请先确认云端服务器是否开机、网络是否正常，必要时联系系统维护人员。') }
-  if (cs === 'degraded') return { tone: 'warn', icon: '⚠', title: t('云端部分服务异常'), desc: t('云端个别服务未完全就绪，部分数据可能不完整或为缓存，一般会随系统运行自动恢复；如持续异常请联系维护人员。') }
+  if (cs === 'unreachable') return { tone: 'err', icon: '✕', title: t('无法连接云端服务器'), desc: t('云端状态与设备数据可能不是最新，请检查云端服务器与网络。') }
+  if (cs === 'degraded') return { tone: 'warn', icon: '⚠', title: t('云端部分服务异常'), desc: t('云端个别服务未就绪，部分数据可能为缓存，一般会自动恢复。') }
   if (cs === 'stale') return { tone: 'warn', icon: '⚠', title: t('云端数据推送中断'), desc: t('设备状态已较长时间未更新，可能是云端服务或网络异常，请稍候；持续异常请联系系统维护人员。') }
   if (b.n && b.bad) return { tone: 'warn', icon: '⚠', title: t('有盒子未就绪'), desc: t('有 {n} 台盒子未就绪（共 {m} 台）。可点击上方「盒子在线」卡片查看「盒子列表」。', { n: b.bad, m: b.n }) }
   if (d.n && d.on === 0 && d.off > 0) return { tone: 'warn', icon: '⚠', title: t('有设备离线未上报'), desc: t('有 {n} 台设备离线未上报（共 {m} 台）。可点击上方「设备上传中」卡片查看「设备列表」。', { n: d.off, m: d.n }) }
-  if (!b.n && !d.n) return { tone: 'mute', icon: '·', title: t('尚未接入设备'), desc: t('本页将展示现场盒子和设备的运行状态。请点击「＋ 设备」添加第一台采集设备，或点击「盒子接入」部署边缘盒子。') }
+  if (!b.n && !d.n) return { tone: 'mute', icon: '·', title: t('尚未接入设备'), desc: t('请点击「＋ 设备」添加第一台采集设备，或点「盒子接入」部署边缘盒子。') }
   const parts = [t('云端在线')]
   if (b.n) parts.push(t('{x} 台盒子就绪', { x: b.ok + '/' + b.n }))
   if (d.n) parts.push(t('{x} 台设备正在上报数据', { x: d.on + '/' + d.n }))
@@ -4089,7 +3967,7 @@ function composeCmdPayload() {
       // 可写属性的 min·max），命令本身不携带上下限；未配置范围一律拒绝
       const r = addrWriteRange(cmdForm.addr, cmdForm.wKind)
       if (!r) {
-        throw new Error(t('裸写寄存器缺少安全范围：请在设备配置中为该可写点位/属性设置上下限（平台拒绝无范围的设备写入，防止超限损伤设备）'))
+        throw new Error(t('缺少安全范围：请为该可写点位设置上下限（平台拒绝无范围写入）'))
       }
       if (r.min != null && v < r.min) throw new Error(t('写入值 {v} 低于下限 {min}（{src}）', { v, min: r.min, src: r.source }))
       if (r.max != null && v > r.max) throw new Error(t('写入值 {v} 高于上限 {max}（{src}）', { v, max: r.max, src: r.source }))
@@ -4177,7 +4055,7 @@ function pollCmdAck(rid, box) {
       cmdPending.value = null
       cmdResult.value = {
         ok: null,
-        message: t('超时未收到盒子回报：请确认盒子在线，且 mapper 为支持读/写/LoRa 命令的新版本（旧版会回报「未知命令」失败）'),
+        message: t('超时未收到盒子回报：请确认盒子在线且 mapper 支持读/写/LoRa 命令'),
         detailText: '',
         ts: Math.floor(Date.now() / 1000),
       }
@@ -4218,70 +4096,25 @@ onUnmounted(stopCmdPoll)
   -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
 }
 .cbx-view code, .cbx-view pre { font-family: var(--mono, "Cascadia Code", "JetBrains Mono", Menlo, "SF Mono", Monaco, Consolas, monospace); }
-/* 字体层级（本视图统一标准）：层次一律由「字号 + 颜色」承担，字重只用两级 ——
-   L1 区块标题 14px / 500（页面唯一的加重层）
-   L2 弹窗标题、列表列头 13~13.5px / 500
-   L3 卡片标题 / 分组标题 12.5~15px / 400（比正文大一号即可，不再加粗）
-   L4 正文 12px / 400      L5 辅助说明 10~11px / 400（--muted / --faint）
+/* 字体层级（本视图统一标准）：层次一律由「字号 + 颜色」承担，字重只保留一档加重 ——
+   L1 模块标题 14px / 500（.cbx-sec-head b）      L2 弹窗标题 13px / 500（.cbx-dialog-head b）
+   L3 卡片标题 / 分组标题 12.5~15px / 400   L4 正文 12px / 400   L5 辅助说明 10~11px / 400
    除 L1、L2 外一律 400：状态值靠语义色（绿/红/蓝）区分，不靠字重。 */
+/* 字重收敛：全局 button 默认 500、<b>/<strong> 默认加粗，本视图统一压回 400
+   （primary / danger 按钮同样不再加粗），仅模块标题与弹窗标题保留加重（见下方对应规则）。 */
+.cbx-view b, .cbx-view strong, .cbx-view button { font-weight: 400; }
 /* ---- 主体 ---- */
-.cbx-body { flex: 1 1 auto; padding: 12px 14px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
+.cbx-body { flex: 1 1 auto; padding: var(--pad-x); overflow: auto; display: flex; flex-direction: column; gap: var(--sp-3); }
 .cbx-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: stretch; }
 
 /* ==================== VSCode 工作台骨架 ==================== */
 /* 视图名标识栏（标题 + 云端状态徽章）已上移到 App.vue（Ribbon 工具栏之上），
-   工作台内仅承载侧边栏 + 主编辑区 + 底部状态栏 */
+   工作台内仅承载主编辑区 + 底部状态栏（资源导航已并入「资源列表」区块） */
 
-/* 工作台主体：侧边栏资源树 + 主编辑区 */
+/* 工作台主体：主编辑区（侧边栏资源树已移除） */
 .cbx-workbench { display: flex; flex: 1 1 auto; min-height: 0; }
 .cbx-dot { width: 6px; height: 6px; border-radius: 2px; background: var(--faint); flex: none; display: inline-block; }
 .cbx-dot.on { background: var(--green); }
-/* 侧边栏（Sidebar）：树形资源导航 */
-.cbx-sidebar {
-  display: flex; flex-direction: column; flex: none;
-  width: 250px; min-width: 210px; max-width: 320px;
-  background: var(--panel-2);
-  border-right: 1px solid var(--border);
-  overflow: hidden;
-}
-.cbx-side-head {
-  display: flex; align-items: center; gap: 6px; flex: none;
-  padding: 6px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: .6px;
-  color: var(--muted); border-bottom: 1px solid var(--border);
-}
-.cbx-side-count { margin-left: auto; font-size: 10px; color: var(--faint); font-variant-numeric: tabular-nums; }
-.cbx-side-body { flex: 1 1 auto; overflow: auto; padding: 6px 0 12px; }
-/* 树节点 */
-.cbx-tree-sec {
-  display: flex; align-items: center; gap: 5px;
-  padding: 5px 10px; font-size: 12px; font-weight: 400; color: var(--text);
-  cursor: pointer; user-select: none; white-space: nowrap;
-}
-.cbx-tree-sec:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.cbx-tree-arrow { font-size: 10px; color: var(--faint); width: 10px; flex: none; }
-.cbx-tree-count { margin-left: auto; font-size: 10px; color: var(--faint); font-variant-numeric: tabular-nums; }
-.cbx-tree-children { padding-left: 8px; }
-.cbx-tree-node { margin: 0; }
-.cbx-tree-row {
-  display: flex; align-items: center; gap: 5px;
-  padding: 4px 10px 4px 16px; font-size: 12px; cursor: pointer;
-  color: var(--text); white-space: nowrap;
-}
-.cbx-tree-row:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.cbx-tree-label { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.cbx-tree-tag {
-  margin-left: auto; flex: none; font-size: 10px; padding: 0;
-  color: var(--faint); white-space: nowrap;
-}
-.cbx-tree-tag.ok { color: var(--green); }
-.cbx-tree-leaf {
-  display: flex; align-items: center; gap: 5px;
-  padding: 4px 10px 4px 26px; font-size: 12px; cursor: pointer;
-  color: var(--text); white-space: nowrap;
-}
-.cbx-tree-leaf:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.cbx-tree-leaf .cbx-tree-label { flex: 1; }
-.cbx-tree-empty { padding: 6px 26px; font-size: 11px; color: var(--faint); }
 /* 区块头部工具按钮（flex 撑开） */
 .cbx-sec-spacer { flex: 1 1 auto; }
 
@@ -4291,45 +4124,43 @@ onUnmounted(stopCmdPoll)
   display: flex; align-items: stretch; flex: none;
   height: 33px; padding: 0 6px;
   background: var(--bar, var(--panel-3));
-  border-bottom: 1px solid var(--border);
   gap: 2px; overflow-x: auto;
 }
 .cbx-tab {
   display: flex; align-items: center; flex: none;
   padding: 0 14px; font-size: 12px; color: var(--muted);
   cursor: pointer; user-select: none; white-space: nowrap;
-  border-top: 1px solid transparent;
+  border-radius: 3px;
   position: relative;
   transition: background .12s, color .12s;
 }
 .cbx-tab:hover { color: var(--text); }
+/* 选中态 = 更深的底（比所在分区条 --bar 再压暗一档），未选中透出分区条底色：
+   深浅方向与「选中即下沉」一致，两套主题都靠 color-mix 自动适配 */
 .cbx-tab.active {
-  background: var(--panel-2); color: var(--text);
+  background: color-mix(in srgb, var(--bar, var(--panel-3)) 82%, #000);
+  color: var(--text);
 }
 .cbx-tab-grow { flex: 1 1 auto; }
 .cbx-editor { flex: 1 1 auto; overflow: hidden; position: relative; }
 .cbx-page {
   position: absolute; inset: 0; overflow: auto;
-  /* 四边统一留白：外层区块卡片（运行状态总览 / 数据源接入 / 系统连接图…）
-     与父容器编辑区保持明显边距，避免顶到左右上下边界 */
-  padding: 18px 24px; display: flex; flex-direction: column; gap: 10px;
+  /* 四边留白收紧：内容区贴近父容器，仅保留一圈呼吸位（原 18/24 过宽，显得内容被挤在中间） */
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 10px;
 }
 
 /* ---- 资源列表（拓扑图下方：盒子 / 模型 / 设备三列并排） ---- */
-/* 计数提示紧跟区块标题（默认 .cbx-sec-hint 的 margin-left:auto 会把它推到最右），右侧留给刷新按钮 */
-.cbx-sec-hint.res-hint { margin-left: 6px; }
 /* 刷新按钮图标：进行中匀速旋转，给出「正在拉取」的即时反馈 */
 @keyframes cbx-ref-spin { to { transform: rotate(360deg); } }
 .cbx-ref-ic { display: inline-block; line-height: 1; }
 .cbx-ref-ic.spin { animation: cbx-ref-spin .8s linear infinite; }
 .cbx-reslist { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .cbx-rescol { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--panel); }
-.cbx-rescol-head { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text); padding: 8px 10px; background: var(--bar, var(--panel-3)); border-bottom: 1px solid var(--border); }
-.cbx-rescol-n { margin-left: auto; font-size: 11px; font-weight: 400; color: var(--faint); }
+/* 列头靠 bar 底色与列表区分，不再叠一条分隔线 */
+.cbx-rescol-head { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 400; color: var(--text); padding: 8px 10px 8px; background: var(--bar, var(--panel-3)); }
 .cbx-rescol-body { display: flex; flex-direction: column; max-height: 248px; overflow-y: auto; }
 .cbx-resrow { display: flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
 .cbx-resrow:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.cbx-resrow + .cbx-resrow { border-top: 1px dashed var(--border); }
 .cbx-res-name { flex: 0 1 auto; font-size: 12px; font-weight: 400; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cbx-res-tag { flex: none; font-size: 10px; padding: 0; color: var(--faint); }
 .cbx-res-tag.ok { color: var(--green); }
@@ -4337,19 +4168,8 @@ onUnmounted(stopCmdPoll)
 .cbx-res-tag.local { color: var(--accent-d); }
 .cbx-res-sub { flex: 1 1 auto; min-width: 0; font-size: 11px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
 .cbx-res-ops { display: inline-flex; gap: 2px; flex: none; }
-.cbx-res-ops .cbx-op.cbx-tiny { padding: 1px 5px; font-size: 10px; min-height: 16px; }
 .cbx-res-empty { padding: 14px 10px; font-size: 11px; color: var(--faint); text-align: center; }
 
-/* 状态栏（Status Bar）：底部细条，左侧状态 + 右侧信息 */
-.cbx-statusbar {
-  display: flex; align-items: center; gap: 14px; flex: none;
-  height: 24px; padding: 0 10px;
-  background: var(--bar, var(--panel-3));
-  border-top: 1px solid var(--border);
-  font-size: 11px; color: var(--muted);
-}
-.cbx-statusbar .cbx-st-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-.cbx-statusbar .cbx-st-grow { flex: 1 1 auto; }
 /* ---- 工具栏（VSCode 命令条） ---- */
 .cbx-toolbar {
   display: flex; align-items: center; gap: 6px; padding: 5px 10px;
@@ -4361,7 +4181,8 @@ onUnmounted(stopCmdPoll)
 .cbx-toolbar-msg { margin-left: auto; font-size: 10px; color: var(--muted); }
 /* ---- 面板（VSCode 风格：方角 + 标题分隔线 + 统一标题字号） ---- */
 .cbx-sec { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; }
-.cbx-sec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+/* 标题与内容靠间距区分：区块自身已有卡片边框，标题下不再重复画分隔线 */
+.cbx-sec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 /* L1 区块标题：全页唯一的加重层，其余层级靠字号区分 */
 .cbx-sec-head b { font-size: 14px; font-weight: 500; flex: none; letter-spacing: .2px; }
 /* 区块折叠：三角按钮 + 标题本身都可点；折叠时内容不渲染（v-if），首屏更轻 */
@@ -4373,12 +4194,10 @@ onUnmounted(stopCmdPoll)
 .cbx-sec-head .cbx-op { margin-left: auto; }
 .cbx-sec-head .cbx-tag { margin-left: auto; }
 .cbx-sec-sub { color: var(--muted); font-size: 10px; }
+/* 行内提示：默认弱化，异常提示（warn-hint）用警示色但仍保持小字 */
 .cbx-sec-hint { margin-left: auto; font-size: 10px; color: var(--muted); }
-/* 区块介绍：标题栏只留标题与操作，说明文字统一放这里（展开后才渲染）*/
-.cbx-sec-desc { color: var(--muted); font-size: 11px; line-height: 1.6; margin-bottom: 8px; }
-.cbx-sec-desc-extra { margin-left: 8px; font-size: 10px; color: var(--faint); }
-/* 字重收敛：仅侧栏列头与指引标题保留 500，其余（命令结果 / 部署步骤 / 键值）一律 400 */
-.cbx-side-head b, .cbx-guide-title b { font-weight: 500; }
+.cbx-sec-hint.warn-hint { color: var(--orange, var(--yellow)); }
+/* 命令结果 / 部署步骤 / 键值 / 指引标题：字重一律 400（统一由顶部字重收敛规则保证） */
 .cbx-deploy-bar {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 10px; margin-bottom: 8px;
   background: var(--panel-2); border: 1px solid var(--border); border-radius: 3px; font-size: 11px;
@@ -4432,12 +4251,12 @@ onUnmounted(stopCmdPoll)
 }
 .cbx-yaml-head {
   display: flex; align-items: center; justify-content: space-between; padding: 6px 10px;
-  background: var(--panel-3, var(--panel-2)); font-size: 12px; border-bottom: 1px solid var(--border);
+  background: var(--panel-3, var(--panel-2)); font-size: 12px; 
 }
 .cbx-yaml-tools { display: flex; gap: 6px; }
 .cbx-yaml {
   margin: 0; padding: 10px 12px; max-height: 260px; overflow: auto; flex: 1 1 auto;
-  background: var(--rail, #0F172A); color: #E8ECF2;
+  background: var(--rail, #1F2023); color: #E6E7E9;
   font: 11px/1.6 var(--mono, "Cascadia Code", Menlo, monospace); white-space: pre;
 }
 /* ---- 标签（VSCode badge 风格，语义色跟随主题） ---- */
@@ -4470,7 +4289,7 @@ onUnmounted(stopCmdPoll)
 /* ---- 表格（VSCode 树视图风格：统一行高、hover 高亮、无网格竖线） ---- */
 .cbx-table { width: 100%; border-collapse: collapse; font-size: 11px; }
 .cbx-table th, .cbx-table td {
-  text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border);
+  text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line-soft);
   vertical-align: middle; font-variant-numeric: tabular-nums;
 }
 .cbx-table th {
@@ -4478,7 +4297,7 @@ onUnmounted(stopCmdPoll)
   background: var(--panel-3, var(--panel-2)); letter-spacing: .3px;
 }
 .cbx-table tbody tr { transition: background .1s; }
-.cbx-table tbody tr:hover td { background: var(--accent-l); }
+.cbx-table tbody tr:hover td { background: var(--hover); }
 .cbx-table tbody tr:last-child td { border-bottom: none; }
 .cbx-table td code {
   background: var(--panel-2); border: 1px solid var(--border); border-radius: 3px;
@@ -4528,8 +4347,7 @@ onUnmounted(stopCmdPoll)
 .cbx-hero-stat.tone-err b { color: var(--red); }
 .cbx-hero-stat.tone-mute b { color: var(--faint); }
 .cbx-guide { margin-top: 10px; padding: 10px 12px; background: var(--panel-2); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: 8px; }
-.cbx-guide-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--accent-d); margin-bottom: 6px; }
-.cbx-guide-sub { font-size: 11px; font-weight: 400; color: var(--muted); }
+.cbx-guide-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 400; color: var(--accent-d); margin-bottom: 6px; }
 .cbx-guide-steps { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; }
 .cbx-guide-steps li { font-size: 12px; color: var(--text); line-height: 1.7; }
 .cbx-empty {
@@ -4557,7 +4375,7 @@ onUnmounted(stopCmdPoll)
   display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
   font-size: 12px; color: var(--accent2); font-weight: 400; letter-spacing: .2px;
 }
-.cbx-group-box { background: var(--accent-l); border-radius: 4px; padding: 1px 8px; }
+.cbx-group-box { background: var(--fill-2); border-radius: var(--r); padding: 1px 8px; }
 .cbx-group-count { font-size: 10px; color: var(--faint); font-weight: 400; }
 .cbx-row {
   display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 3px;
@@ -4611,13 +4429,18 @@ onUnmounted(stopCmdPoll)
 .cbx-op:active:not(:disabled) { background: var(--sel); }
 .cbx-op:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
 .cbx-op:disabled { opacity: .4; cursor: not-allowed; }
-.cbx-op.primary { color: var(--on-accent); background: var(--accent); border-color: transparent; font-weight: 600; }
+.cbx-op.primary { color: var(--on-accent); background: var(--accent); border-color: transparent; }
 .cbx-op.primary:hover:not(:disabled) { background: var(--accent-h); color: var(--on-accent); }
 .cbx-op.danger { color: var(--red); background: var(--btn-bg); border-color: transparent; }
 .cbx-op.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); }
 .cbx-op.cbx-xs { padding: 0 var(--btn-pad-x-sm); font-size: 10px; min-height: var(--btn-h-sm); }
-/* 弹窗操作行：同一组按钮统一弹窗档（28px 高 / 左右 12px / 最小宽 76px），高宽对齐 */
-.cbx-mask .cbx-form-row .cbx-op { min-height: var(--btn-h-lg); padding: 0 var(--btn-pad-x-lg); min-width: var(--btn-min-w); }
+/* 行内微操作档（表格操作列 / 服务行 ↻）：比紧凑档再小一号，两个场景尺寸一致 */
+.cbx-op.cbx-tiny { padding: 0 5px; font-size: 10px; min-height: 16px; line-height: 16px; }
+/* 操作行按钮（弹窗底部 / 页内表单 / 命令执行 / 一键接入）统一弹窗档：
+   28px 高 / 左右 12px / 最小宽 76px，同组按钮高宽对齐；
+   显式标记为 cbx-xs / cbx-tiny 的紧凑按钮不受影响 */
+.cbx-form-row .cbx-op:not(.cbx-xs):not(.cbx-tiny),
+.cbx-onboard-actions .cbx-op { min-height: var(--btn-h-lg); padding: 0 var(--btn-pad-x-lg); min-width: var(--btn-min-w); }
 /* 图标按钮（VSCode 工具栏风格：无边框、hover 底色、线性图标居中） */
 .cbx-op.cbx-ic {
   display: inline-flex; align-items: center; justify-content: center;
@@ -4638,8 +4461,8 @@ onUnmounted(stopCmdPoll)
 .cbx-preview-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
 .cbx-preview-head b { font-size: 11px; color: var(--muted); }
 .cbx-code {
-  background: var(--rail, #0F172A); border: 1px solid var(--border); border-radius: 4px;
-  color: #D5D3CB; font-size: 10px; line-height: 1.6; padding: 10px 12px;
+  background: var(--rail, #1F2023); border: 1px solid var(--border); border-radius: 4px;
+  color: #DFE0E2; font-size: 10px; line-height: 1.6; padding: 10px 12px;
   overflow: auto; max-height: 300px; white-space: pre;
 }
 /* ---- 盒子一键接入 ---- */
@@ -4647,8 +4470,8 @@ onUnmounted(stopCmdPoll)
 .cbx-onboard-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .cbx-remote-steps { display: flex; flex-direction: column; gap: 6px; }
 .cbx-remote-step { border: 1px solid var(--border); border-radius: 4px; background: var(--panel-2); padding: 6px 10px; }
-.cbx-remote-step b.ok { color: #34c759; }
-.cbx-remote-step b.fail { color: #ff453a; }
+.cbx-remote-step b.ok { color: var(--green); }
+.cbx-remote-step b.fail { color: var(--red); }
 .cbx-details { border: 1px solid var(--border); border-radius: 4px; background: var(--panel-2); padding: 6px 10px; }
 .cbx-details summary { cursor: pointer; color: var(--muted); font-size: 11px; user-select: none; }
 /* ---- 实时数据 ---- */
@@ -4666,23 +4489,23 @@ onUnmounted(stopCmdPoll)
 /* 日志区固定白色背景（终端风格深色底已按需求移除），文字统一用深色系保证可读 */
 .cbx-msglog {
   display: flex; flex-direction: column; gap: 2px;
-  max-height: 220px; overflow: auto; background: #fff;
+  max-height: 220px; overflow: auto; background: var(--panel);
   border: 1px solid var(--border); border-radius: 3px; padding: 6px 8px;
   color: #23303d;
 }
-.cbx-msgrow { display: flex; align-items: center; gap: 8px; font-size: 10px; padding: 1px 4px; border-radius: 2px; color: #23303d; }
+.cbx-msgrow { display: flex; align-items: center; gap: 8px; font-size: 10px; padding: 1px 4px; border-radius: 2px; color: var(--text); }
 .cbx-msgrow:hover { background: rgba(0,0,0,.05); }
-.cbx-msgtime { color: #8b95a1; flex: none; font-variant-numeric: tabular-nums; }
+.cbx-msgtime { color: var(--faint); flex: none; font-variant-numeric: tabular-nums; }
 .cbx-msg-topic {
-  flex: none; color: #1f6fc4; background: rgba(31,111,196,.1);
-  border: 1px solid rgba(31,111,196,.28); border-radius: 3px; padding: 0 5px;
+  flex: none; color: var(--accent-d); background: var(--accent-l);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent); border-radius: 3px; padding: 0 5px;
 }
-.cbx-msg-payload { color: #23303d; opacity: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cbx-msg-payload { color: var(--text); opacity: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* ---- 接入指引 ---- */
 .cbx-guide-flow { display: flex; align-items: stretch; gap: 10px; margin: 8px 0; flex-wrap: wrap; }
 .cbx-flow-node {
   flex: 1 1 0; min-width: 130px; text-align: center; font-size: 12px; font-weight: 400;
-  background: var(--accent-l); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  background: var(--fill-2); border: 1px solid var(--border);
   border-radius: 4px; padding: 10px 8px;
 }
 .cbx-flow-node span { display: block; font-size: 10px; color: var(--muted); font-weight: 400; margin-top: 4px; }
@@ -4721,9 +4544,10 @@ onUnmounted(stopCmdPoll)
 }
 .cbx-dialog-lg { width: 780px; max-width: 94vw; }
 .cbx-dialog-xl { width: 920px; max-width: 96vw; }
-.cbx-dialog-head {
+.cbx-dialog-head {  background: var(--head-bg);
+
   display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
-  padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  padding-bottom: 10px; 
 }
 .cbx-dialog-head b { font-size: 13px; font-weight: 500; letter-spacing: .2px; }  /* L2 弹窗标题 */
 .cbx-dialog-head .cbx-op { margin-left: auto; }
@@ -4746,31 +4570,31 @@ onUnmounted(stopCmdPoll)
   position: relative; overflow: hidden;
   background: var(--panel-2);
   border: 1px solid var(--border); border-radius: 4px; padding: 8px 9px 9px;
-  box-shadow: 0 1px 2px rgba(15,23,42,.05);
+  box-shadow: 0 1px 2px rgba(0,0,0,.05);
   transition: transform .16s ease, box-shadow .16s ease, border-color .12s;
   cursor: grab; touch-action: none;
 }
-.cbx-topo-mod.dragging { cursor: grabbing; box-shadow: 0 10px 30px rgba(15,23,42,.32); }
+.cbx-topo-mod.dragging { cursor: grabbing; box-shadow: 0 10px 30px rgba(0,0,0,.28); }
 .cbx-topo-mod-ph { visibility: hidden; }
 .cbx-topo-canvas { min-height: 700px; }
-.cbx-topo-legend { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 6px 10px; margin-bottom: 10px; border: 1px solid var(--line, #2b3652); border-radius: 8px; background: rgba(255,255,255,.015); }
-.cbx-topo-legend .leg { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #8a94a6; line-height: 1.7; }
+.cbx-topo-legend { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 6px 10px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--fill-1); }
+.cbx-topo-legend .leg { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); line-height: 1.7; }
 .cbx-topo-legend i.lg { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.cbx-topo-legend i.g { background: var(--green); }
+.cbx-topo-legend i.g { background: var(--text); }
 .cbx-topo-legend i.b { background: var(--accent); }
 .cbx-topo-legend i.r { background: var(--red); }
 .cbx-topo-mod::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); }
 .cbx-topo-mod.platform::before { background: var(--accent); }
 .cbx-topo-mod.agent::before { background: var(--yellow); }
-.cbx-topo-mod.cloudcore::before { background: #5b8def; }
+.cbx-topo-mod.cloudcore::before { background: var(--accent); }
 .cbx-topo-mod.broker::before { background: var(--accent2); }
-.cbx-topo-mod.box::before { background: var(--green); }
+.cbx-topo-mod.box::before { background: var(--muted); }
 .cbx-topo-mod.devgroup::before { background: var(--orange, #f59e0b); }
-.cbx-topo-mod.mw::before { background: #7c5cff; }
+.cbx-topo-mod.mw::before { background: var(--faint); }
 .cbx-topo-mod.extsrc::before { background: var(--accent); }
 /* 外部数据系统列（一体机后面一级），宽度与设备端列一致便于对齐 */
 .cbx-topo-lane.extsrc-lane { flex: 0 1 212px; }
-.cbx-topo-mod:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(15,23,42,.08), 0 12px 26px rgba(15,23,42,.13); }
+.cbx-topo-mod:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,.08), 0 12px 26px rgba(0,0,0,.12); }
 .cbx-topo-mod.down { opacity: .75; }
 .cbx-topo-mod-head { display: flex; align-items: center; gap: 6px; }
 .cbx-topo-mod-name {
@@ -4781,10 +4605,9 @@ onUnmounted(stopCmdPoll)
 .cbx-topo-mod-badge.ok { color: var(--green); border-color: color-mix(in srgb, var(--green) 45%, var(--border)); }
 .cbx-topo-mod-sub { font-size: 10px; color: var(--muted); margin-top: 4px; line-height: 1.55; }
 .cbx-topo-mod-ops { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
-.cbx-topo-mod-ops .cbx-op.cbx-xs { padding: 2px 7px; font-size: 10px; min-height: 18px; }
 /* 盒子卡片：当前运行的服务/模型（云端部署，盒子周期上报） */
 .cbx-topo-svcs { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; max-height: 88px; overflow: auto; }
-.cbx-topo-svc { display: flex; align-items: center; gap: 5px; font-size: 10px; background: rgba(0,0,0,.25); border-radius: 3px; padding: 2px 6px; }
+.cbx-topo-svc { display: flex; align-items: center; gap: 5px; font-size: 10px; background: var(--fill-2); border-radius: var(--r-sm); padding: 2px 6px; }
 .cbx-topo-svc-dot { flex: none; width: 6px; height: 6px; border-radius: 1px; background: var(--faint); }
 .cbx-topo-svc-dot.on { background: var(--green); }
 .cbx-topo-svc-name { color: var(--text); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -4797,10 +4620,10 @@ a.cbx-topo-svc-addr { color: var(--accent2); opacity: .95; text-decoration: none
 a.cbx-topo-svc-addr:hover { text-decoration: underline; opacity: 1; }
 /* 服务行微操作（重启 Broker/CloudCore/agent/box-mapper 等） */
 .cbx-topo-svc-ops { display: inline-flex; gap: 2px; flex: none; margin-left: 4px; }
-.cbx-topo-svc-ops .cbx-op.cbx-tiny { padding: 0 4px; font-size: 10px; min-height: 15px; line-height: 15px; }
 /* 设备内部通信说明（本机进程间通信，不占系统级连线） */
+/* 说明文字与上方服务行靠间距 + 弱化字号区分，不画分隔线 */
 .cbx-topo-inner {
-  margin-top: 6px; padding-top: 5px; border-top: 1px dashed var(--border);
+  margin-top: 6px; padding-top: 5px;
   font-size: 10px; color: var(--faint); line-height: 1.5;
 }
 /* 设备卡（系统连接图的基本单元）：头部为设备标识，卡内列表为运行在该设备上的服务 */
@@ -4810,7 +4633,7 @@ a.cbx-topo-svc-addr:hover { text-decoration: underline; opacity: 1; }
 .cbx-topo-dev-ic {
   flex: none; width: 20px; height: 20px; border-radius: 4px; font-size: 11px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: rgba(255,255,255,.06); border: 1px solid var(--border);
+  background: var(--fill-2); border: 1px solid var(--border);
 }
 .cbx-topo-dev-meta { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 .cbx-topo-dev-title {
@@ -4834,24 +4657,13 @@ a.cbx-topo-svc-addr:hover { text-decoration: underline; opacity: 1; }
 :global(.cbx-topo-svg-link.blue) { stroke: var(--accent); }
 @keyframes cbx-topo-flow { to { stroke-dashoffset: -11; } }
 :global(.cbx-topo-svg-label text) { font-size: 10px; font-weight: 400; fill: var(--text); paint-order: stroke; stroke: var(--panel); stroke-width: 3px; stroke-linejoin: round; }
-/* 证书与 Token 有效期（独立区块） */
-.cbx-certlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; }
-.cbx-certrow {
-  display: flex; align-items: center; gap: 10px;
-  padding: 7px 12px; font-size: 11px;
-  border: 1px solid var(--border); border-radius: 3px; background: var(--panel-2);
-}
-.cbx-certrow code { color: var(--accent2); font-size: 11px; font-weight: 400; flex: none; }
-.cbx-cert-exp { color: var(--muted); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cbx-cert-days { flex: none; color: var(--green); font-weight: 400; font-variant-numeric: tabular-nums; }
-.cbx-cert-days.warn { color: var(--red); }
 .cbx-topo-box { display: flex; flex-direction: column; gap: 6px; }
 .cbx-topo-devlist { border-left: 2px solid var(--border); margin-left: 12px; padding-left: 10px; display: flex; flex-direction: column; gap: 4px; }
 .cbx-topo-unmounted { border-left-color: color-mix(in srgb, var(--yellow) 50%, transparent); }
 .cbx-topo-devgroup { display: flex; flex-direction: column; gap: 3px; }
 .cbx-topo-devlabel { font-size: 10px; color: var(--faint); margin-top: 3px; }
 .cbx-topo-dev { display: flex; align-items: center; gap: 6px; font-size: 11px; cursor: pointer; padding: 2px 3px; border-radius: 2px; transition: background .12s; flex-wrap: wrap; row-gap: 3px; }
-.cbx-topo-dev:hover { background: var(--accent-l); }
+.cbx-topo-dev:hover { background: var(--hover); }
 .cbx-topo-dev.cloud .cbx-topo-dev-dot { background: var(--accent); }
 .cbx-topo-dev.cloud.on .cbx-topo-dev-dot { background: var(--green); }
 .cbx-topo-dev.pending { border: 1px solid color-mix(in srgb, var(--red) 45%, transparent); padding: 1px 4px; border-radius: 3px; }
@@ -4897,6 +4709,23 @@ a.cbx-topo-svc-addr:hover { text-decoration: underline; opacity: 1; }
 }
 .cbx-rt-tip-t { color: var(--muted); }
 .cbx-rt-tip-v { color: var(--accent-d); font-weight: 400; font-variant-numeric: tabular-nums; }
+/* 读数口径说明：小问号 + 点击展开的注释气泡（注释默认收起，保持版面干净） */
+.cbx-rt-help { position: relative; display: flex; align-items: center; }
+.cbx-help {
+  flex: none; width: 16px; height: 16px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--panel-2);
+  color: var(--muted); font-size: 10px; line-height: 1; cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.cbx-help:hover { color: var(--text); border-color: var(--muted); background: var(--panel-3); }
+.cbx-help.on { color: var(--accent-d); border-color: var(--accent); }
+.cbx-help-pop {
+  position: absolute; left: 22px; bottom: 50%; transform: translateY(50%);
+  max-width: 340px; padding: 7px 10px; z-index: 6;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  font-size: 11px; line-height: 1.7; color: var(--muted);
+}
 .cbx-rt-currow { display: flex; align-items: baseline; gap: 8px; font-size: 12px; padding: 0 2px; }
 .cbx-rt-curlabel { color: var(--muted); font-size: 10px; }
 .cbx-rt-curval { color: var(--accent-d); font-size: 22px; font-weight: 400; font-variant-numeric: tabular-nums; line-height: 1; }
@@ -4945,7 +4774,6 @@ a.cbx-topo-svc-addr:hover { text-decoration: underline; opacity: 1; }
 .ds-row b.err { color: var(--red); }
 .ds-row b.dim, .ds-row .dim, .ds-desc { color: var(--muted); }
 .ds-row b.note { color: #b58900; font-weight: 400; }
-/* 数据服务接口清单的样式随模块迁到 DataServiceApiPanel.vue（独立模块自带 scoped 样式） */
 .ds-endps { display: inline-flex; gap: 6px; }
 .ds-ep { font-size: 11px; padding: 1px 7px; border-radius: 9px; border: 1px solid var(--border); }
 .ds-ep.on { color: var(--green); border-color: color-mix(in srgb, var(--green) 55%, var(--border)); }

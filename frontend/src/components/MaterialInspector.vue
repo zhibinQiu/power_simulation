@@ -2,7 +2,7 @@
   <div class="mat-insp">
     <template v-if="mat">
       <CollapseSection :title="t('物料属性 · ') + (mat ? mat.name : '')" tone="blue" :show-more="false">
-      <p class="sec-desc">{{ t('该类物料可作为原料或中间产物：在「编辑流程」中从左侧拖入画布生成源节点，再从输出端口连入工艺输入端口。') }}</p>
+      <p class="sec-desc">{{ t('可作为原料或中间产物：在「编辑流程」中拖入画布生成源节点，再连到工艺输入端口。') }}</p>
       <div class="card">
         <div class="kv2"><span>{{ t('类别') }}</span><b>{{ mat.cat }}</b></div>
         <div class="kv2"><span>{{ t('单位') }}</span><b>{{ mat.unit }}</b></div>
@@ -18,7 +18,7 @@
             <span class="num-unit">万元/{{ mat.unit }}</span>
           </span>
         </div>
-        <div class="pr-hint">{{ t('全厂总览「成本 = 外购用量 × 单价（万元/单位）」：本物料当前为行业参考价，可按采购合同调整；保存后实时联动全厂成本与当日/当月/当年累计。') }}</div>
+        <div class="pr-hint">{{ t('成本 = 外购用量 × 单价；当前为行业参考价，可按合同调整，保存后联动全厂成本。') }}</div>
         <button v-if="isPriceOverride" class="reset" @click="resetPrice">{{ t('恢复库默认价') }}</button>
       </div>
       </CollapseSection>
@@ -32,7 +32,7 @@
             <span class="num-unit">万元/{{ mat.unit }}</span>
           </span>
         </div>
-        <div class="pr-hint">{{ t('本物料为行业参考价，可按市场行情调整；收益 = 产品产量 × 销售单价 − 外购成本（外购成本见「全厂总览 → 成本」），售价保存后为后续收益核算提供依据。') }}</div>
+        <div class="pr-hint">{{ t('本物料为行业参考价，可按行情调整；收益 = 产量 × 售价 − 外购成本，保存后用于收益核算。') }}</div>
         <button v-if="isSalePriceOverride" class="reset" @click="resetSalePrice">{{ t('恢复库默认价') }}</button>
       </div>
       </CollapseSection>
@@ -69,7 +69,7 @@
             <span class="num-unit">tC/GJ</span>
           </span>
         </div>
-        <div class="pr-hint">{{ t('燃烧排放 = 用量 × NCV（低位发热量） × CC（单位热值含碳量） × 3.667；编辑后应用于全部仿真与 3D 孪生。') }}</div>
+        <div class="pr-hint">{{ t('燃烧排放 = 用量 × NCV × CC × 3.667；编辑后应用于全部仿真与 3D 孪生。') }}</div>
       </div>
       </CollapseSection>
 
@@ -120,7 +120,7 @@
 
       <CollapseSection v-if="mat.id === 'pulverized_coal'" :title="t('喷吹煤粉 · 配煤混合（N 种煤）')" tone="green" :show-more="false">
       <div class="card">
-        <div class="pr-hint">{{ t('喷吹煤粉由多种煤按设定比例混合磨制。设置每种煤的占比与成分，系统按质量分数加权折算有效成分，联动 TFT / 置换比 RR / CO₂ / 炉渣碱度。默认混合（无烟煤/烟煤各 50%）加权 == 原单一煤粉值，数值中性。') }}</div>
+        <div class="pr-hint">{{ t('喷吹煤粉按设定比例混合磨制；系统按质量分数加权折算有效成分，联动 TFT / RR / CO₂ / 碱度。默认混合为数值中性。') }}</div>
 
         <div class="pc-coal" v-for="(b, i) in coalBlend" :key="b.id">
           <div class="pc-coal-head">
@@ -279,12 +279,12 @@ function resetComp() { store.clearMaterialComp(mat.value.id) }
 const compHint = computed(() => {
   if (!mat.value || !compFields.value) return ''
   const id = mat.value.id
-  if (id === 'coke') return t('干基工业分析典型值（FC+A+V≈100%）；灰分组成为灰分内部构成（各项之和≈100%），焦灰中 CaO/SiO₂/MgO/Al₂O₃ 全部入渣，参与炉渣二元碱度计算。')
-  if (id === 'coal') return t('炼焦煤工业分析+元素分析典型值（FC+V+A+M≈100%）；灰分组成为灰分内部构成，用于焦炭灰分溯源与配煤参考。')
-  if (id === 'pulverized_coal') return t('喷吹煤粉（PCI）成分典型值；元素碳 C / 氢 H 驱动置换比与 TFT 计算（与 tft.js 默认值对齐）；灰分组成为灰分内部构成，煤灰入渣参与炉渣二元碱度计算。')
-  if (id === 'limestone') return t('石灰石（熔剂）典型成分；CaO 为炉渣碱度的主要外源，入炉受热分解 CaCO₃→CaO+CO₂（LOI≈42% 为分解失重，亦为熔剂碳排放来源）。')
-  if (id === 'iron_ore') return t('天然块矿典型成分；SiO₂/Al₂O₃ 脉石为酸性物来源，入炉比例与品位共同影响渣量与炉渣二元碱度。')
-  return t('化学成分（质量分数 %）典型值；TFe 品位与碱度（CaO/SiO₂）用于炉料结构与渣量对标，烧结/球团成分参与炉渣二元碱度计算。')
+  if (id === 'coke') return t('干基工业分析典型值（FC+A+V≈100%）；灰分构成各项之和≈100%，焦灰全部入渣参与碱度计算。')
+  if (id === 'coal') return t('炼焦煤工业+元素分析典型值（FC+V+A+M≈100%）；灰分构成用于灰分溯源与配煤参考。')
+  if (id === 'pulverized_coal') return t('喷吹煤粉（PCI）成分典型值；C / H 驱动置换比与 TFT 计算；煤灰入渣参与碱度计算。')
+  if (id === 'limestone') return t('石灰石典型成分；CaO 为碱度主要外源，受热分解 CaCO₃→CaO+CO₂（LOI≈42% 即熔剂碳排放来源）。')
+  if (id === 'iron_ore') return t('天然块矿典型成分；SiO₂/Al₂O₃ 脉石影响渣量与碱度。')
+  return t('化学成分典型值（%）；TFe 品位与碱度用于炉料结构与渣量对标，并参与碱度计算。')
 })
 
 // ---- 喷吹煤粉配煤混合编辑器（N 种煤）----
@@ -359,7 +359,7 @@ function onNote(val) { store.setMaterialAttr(mat.value.id, 'note', val) }
 .num-row { margin-top: 6px; }
 .note-input { width: auto; flex: 1; min-width: 0; }
 .used-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
-.used-row + .used-row { border-top: 1px solid var(--line); }
+.used-row + .used-row { border-top: 1px solid var(--line-soft); }
 .ur-name { font-size: 11px; }
 .ur-tag { font-size: 10px; padding: 1px 8px; border-radius: 3px; }
 .ur-tag.in { color: var(--accent2); border: 1px solid rgba(95,130,148,.4); background: rgba(95,130,148,.10); }

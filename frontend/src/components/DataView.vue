@@ -151,7 +151,7 @@
         </div>
         <div class="dv-chart-foot" v-if="(chartRows.length || compareSeries.length) && chartOverlay !== 'list'">
           <span v-if="selDevs.length === 1">{{ t('区间') }} {{ fmtTime(chartRows[0].t) }} → {{ fmtTime(chartRows[chartRows.length - 1].t) }} · {{ t('采样') }} {{ chartRows.length }} {{ t('点') }}</span>
-          <span v-else>{{ t('说明：归一化模式把各设备 min-max 缩放到 0~100%，消除量纲差异以便对比趋势形态；原始值模式按各设备真实量纲同图。') }}</span>
+          <span v-else>{{ t('归一化按 min-max 缩放到 0~100% 便于比趋势；原始值按真实量纲同图。') }}</span>
         </div>
       </div>
 
@@ -880,7 +880,6 @@ defineExpose({ close, refresh })
   display: flex; align-items: center; gap: 12px;
   padding: 7px 14px;
   background: var(--bar);
-  border-bottom: 1px solid var(--border);
   flex: 0 0 auto;
   color: var(--muted); font-size: 11px;
   flex-wrap: wrap;
@@ -896,12 +895,12 @@ defineExpose({ close, refresh })
 .dv-src { padding: 2px 10px; font-size: 11px; line-height: 16px; color: var(--muted); background: transparent; border: none; cursor: pointer; }
 .dv-src + .dv-src { border-left: 1px solid var(--border); }
 .dv-src:hover { color: var(--text); }
-.dv-src.on { background: var(--accent-l); color: var(--accent-d); font-weight: 500; }
+.dv-src.on { background: var(--fill-3); color: var(--text); font-weight: 500; }
 /* ---- 时间段选择 ---- */
 .dv-time { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; border: 1px solid var(--border); border-radius: 5px; padding: 1px 4px; background: var(--panel); }
 .dv-tq { padding: 2px 6px; font-size: 11px; line-height: 16px; color: var(--muted); background: transparent; border: none; cursor: pointer; border-radius: 3px; }
 .dv-tq:hover { color: var(--text); }
-.dv-tq.on { background: var(--accent-l); color: var(--accent-d); font-weight: 500; }
+.dv-tq.on { background: var(--fill-3); color: var(--text); font-weight: 500; }
 .dv-ti {
   padding: 1px 4px; font-size: 11px; color: var(--text);
   background: var(--panel-3); border: 1px solid var(--border); border-radius: 4px;
@@ -913,12 +912,12 @@ defineExpose({ close, refresh })
 .dv-mode { padding: 2px 10px; font-size: 11px; line-height: 16px; color: var(--muted); background: transparent; border: none; cursor: pointer; }
 .dv-mode + .dv-mode { border-left: 1px solid var(--border); }
 .dv-mode:hover:not(:disabled) { color: var(--text); }
-.dv-mode.on { background: var(--accent-l); color: var(--accent-d); font-weight: 500; }
+.dv-mode.on { background: var(--fill-3); color: var(--text); font-weight: 500; }
 .dv-mode:disabled { opacity: .4; cursor: not-allowed; }
 /* ---- 视图切换 tab（统一工具栏） ---- */
-.dv-view-bar { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 10px 12px 0; }
+.dv-view-bar { flex: 0 0 auto; display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--pad-x) 0; }
 /* ---- 折线图 / 聚类 公共容器 ---- */
-.dv-chart-wrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 12px 16px 6px; background: var(--panel); }
+.dv-chart-wrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: var(--pad-x) var(--pad-x) var(--sp-2); background: var(--panel); }
 .dv-chart-toolbar { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; }
 .dv-chart-title { font-size: 12px; color: var(--text); font-weight: 500; }
 .dv-chart-actions { display: flex; align-items: center; gap: 8px; }
@@ -989,7 +988,7 @@ defineExpose({ close, refresh })
 .dv-cluster-chart { flex: 0 0 auto; }
 .dv-cluster-feat { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 2px; }
 .dv-cluster-feat th, .dv-cluster-feat td {
-  padding: 3px 8px; border-bottom: 1px solid var(--line);
+  padding: 3px 8px; border-bottom: 1px solid var(--line-soft);
   text-align: right; white-space: nowrap;
 }
 .dv-cluster-feat th:first-child, .dv-cluster-feat td:first-child { text-align: left; }
@@ -998,20 +997,19 @@ defineExpose({ close, refresh })
 /* ---- 表格 ---- */
 .dv-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .dv-table th, .dv-table td {
-  padding: 5px 12px; border-bottom: 1px solid var(--line);
+  padding: 5px 12px; border-bottom: 1px solid var(--line-soft);
   text-align: left; white-space: nowrap;
 }
 .dv-table th {
   position: sticky; top: 0; z-index: 2;
   background: var(--panel-3); color: var(--muted);
   font-weight: 500; font-size: 11px;
-  border-bottom: 1px solid var(--border);
 }
 .dv-table th em { font-style: normal; color: var(--faint); }
 .dv-table .idx { width: 46px; color: var(--faint); text-align: right; }
 .dv-table .num { text-align: right; }
 .dv-table .mono { font-family: var(--mono); }
-.dv-table tbody tr:hover { background: var(--accent-l); }
+.dv-table tbody tr:hover { background: var(--hover); }
 .dv-table .up { color: var(--red); }
 .dv-table .down { color: var(--green); }
 .dv-table .empty { text-align: center; color: var(--faint); padding: 40px 0; }

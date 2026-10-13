@@ -13,8 +13,10 @@
       <div class="lib-bar">
         <span class="lib-ttl">{{ t('模型库') }}</span>
         <span class="cnt">{{ designs.length }}</span>
+        <!-- 群控策略属于具体的场景资源包：明确标出当前场景，避免把别场景的策略当成自己的 -->
+        <span class="lib-scene">{{ t('场景') }} · {{ sceneLabel }}</span>
       </div>
-      <p class="lib-tip">{{ t('每个模型是一套独立的群控算法：新建后进入编排，编排完成点右上角「运行」即按该算法执行；运行中点击任意模块可查看实时值。') }}</p>
+      <p class="lib-tip">{{ t('每个模型是一套群控算法：编排完成后点右上角「运行」；运行中点击模块可看实时值。') }}</p>
 
       <div class="lib-grid">
         <article v-for="m in designs" :key="m.id" class="mcard" :class="['alg-' + m.alg, { live: isRunning(m.id) }]" @click="enter(m)">
@@ -1217,10 +1219,10 @@ onMounted(() => {
   loadVers()
   loadDesigns()
   pullDesigns().then(() => {
-    // 服务端不可用时的离线兜底：本地记的运行态（服务端拉到时以服务端为准）
+    // 服务端不可用时的离线兜底：只认本场景本地记的运行态（服务端拉到时以服务端为准）
     if (runId.value) return
     try {
-      const lr = localStorage.getItem(AGC_RUN_KEY) || ''
+      const lr = localStorage.getItem(runKey(designScene())) || ''
       if (lr && designs.value.some((m) => m.id === lr)) resumeRun(lr)
     } catch (e) { /* 忽略 */ }
   })   // 服务端群控编排存档优先（本地为离线兜底）
@@ -1273,7 +1275,12 @@ function fullTs(ts) {
 
 // ==================== ① 模型库（算法模型清单） ====================
 // 一个模型 = 一套独立的群控算法（规则 / 强化学习 / 粒子群），各自保存自己的编排与设备选择。
+// **群控编排绑定到场景资源包**：服务端 designs/agc.json 以 sceneId 分档，本地兜底也必须带
+// 场景后缀（DESIGNS_KEY + '::<scene>'）。历史上这里只用了一个全局键，于是「上一场景留在本地
+// 暂存里的模型」会出现在下一个场景（该场景服务端暂无存档 / 拉档失败时兜底接管），用户一编辑
+// 就被存成新场景的策略 —— 钢铁、火电场景里冒出「机房温控」群控策略就是这么串过来的。
 const DESIGNS_KEY = 'nengtan.agc.designs.v1'
+function designsKey(scene) { return DESIGNS_KEY + '::' + (scene || 'steel') }
 const ALG_TYPES = [
   { id: 'rule', ico: '⌥', label: t('规则'), desc: t('if-elif-else 阈值编排，直观可控') },
   { id: 'rl', ico: '◈', label: t('强化学习'), desc: t('PPO 在线辨识 + 策略寻优') },
@@ -1291,7 +1298,9 @@ const newAlg = ref('rule')
 // 正在运行的模型 id。运行态是全局状态：写进服务端群控存档（agc 桶的 running 字段），
 // 换电脑 / 重开浏览器打开仍是运行态，并由 sim store 的后台运行器继续按周期执行下发。
 const runId = ref('')
+// 同样按场景分键：运行态归场景所有，切场景时旧场景的策略必须停下来
 const AGC_RUN_KEY = 'nengtan.agc.running.v1'
+function runKey(scene) { return AGC_RUN_KEY + '::' + (scene || 'steel') }
 
 const isRule = computed(() => !!cur.value && cur.value.alg === 'rule')
 /** 运行状态由父级（编排页右上角「运行」/ 模型库卡片「启动」）统一下发，编排体自身不再各带开关 */
@@ -1322,18 +1331,28 @@ function normalizeModel(m) {
 let saveTimer = null
 // 编排存档场景键：AI 群控模型按场景分档（与流程编排同一口径，切场景不串档）
 function designScene() { return store.sceneId || 'steel' }
+// 当前场景资源包的显示名：模型库里标出「属于哪个场景」，群控策略与场景一一对应
+const sceneLabel = computed(() => {
+  const sid = store.sceneId || 'steel'
+  const meta = (store.sceneIndex || []).find((x) => x.id === sid)
+  if (meta && meta.label) return meta.label
+  const pk = store.scenePack && store.scenePack.meta
+  if (pk && pk.label) return pk.label
+  const sc = (store.scenarios || []).find((s) => s.id === sid)   // 内置钢包：注册表还没拉到时兜底「钢铁」
+  return (sc && sc.label) || sid
+})
 let pushTimer = null
 let pushPending = null   // 待推送的群控存档：防抖窗口内关页面时靠它补发（keepalive）
 function persist() {
+  const scene = designScene()
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
-    try { localStorage.setItem(DESIGNS_KEY, JSON.stringify(designs.value.slice(0, 50))) } catch (e) { /* 忽略 */ }
+    try { localStorage.setItem(designsKey(scene), JSON.stringify(designs.value.slice(0, 50))) } catch (e) { /* 忽略 */ }
   }, 200)
   // 同步到服务端（backend/data/designs/agc.json）：服务端存档是跨端真源，随代码同步到服务器实例。
   // running 每次都取当前值（而非快照）—— 否则一次编辑保存会把刚切换的运行态覆盖回旧值。
   try {
-    const scene = designScene()
-    pushPending = { scene, data: { designs: designs.value.slice(0, 50), updatedAt: Date.now(), running: runId.value ? [runId.value] : [] } }
+    pushPending = { scene, data: { scene, designs: designs.value.slice(0, 50), updatedAt: Date.now(), running: runId.value ? [runId.value] : [] } }
     clearTimeout(pushTimer)
     pushTimer = setTimeout(() => {
       const p = pushPending
@@ -1350,13 +1369,14 @@ function flushDesigns() {
   if (!p) return
   pushPending = null
   clearTimeout(pushTimer)
-  try { localStorage.setItem(DESIGNS_KEY, JSON.stringify((p.data && p.data.designs) || [])) } catch (e) { /* 忽略 */ }
+  try { localStorage.setItem(designsKey(p.scene), JSON.stringify((p.data && p.data.designs) || [])) } catch (e) { /* 忽略 */ }
   api.designSaveNow('agc', p.scene, p.data).catch(() => { /* 卸载阶段失败：localStorage 兜底仍在 */ })
 }
 function onVisHide() { if (document.visibilityState === 'hidden') flushDesigns() }
 function loadDesigns() {
+  // 本地兜底只读**本场景**那一档
   try {
-    const raw = localStorage.getItem(DESIGNS_KEY)
+    const raw = localStorage.getItem(designsKey(designScene()))
     const arr = raw ? JSON.parse(raw) : []
     designs.value = Array.isArray(arr) ? arr.filter((m) => m && m.id).map(normalizeModel) : []
   } catch (e) { designs.value = [] }
@@ -1365,13 +1385,23 @@ function loadDesigns() {
 // 服务端为准：服务器实例是群控编排的权威侧，服务端有存档就无条件采用，
 // 本地 localStorage 只作离线兜底（不再按 ts 比对，否则两端永远不同步）
 async function pullDesigns() {
+  const scene = designScene()
   try {
     const r = await api.designBucket('agc')
-    const remote = (r && r.data) ? r.data[designScene()] : null
+    // 只取本场景那一档：服务端按 sceneId 分档，别的场景的策略与本场景无关
+    const remote = (r && r.data) ? r.data[scene] : null
     const arr = remote && Array.isArray(remote.designs) ? remote.designs.filter((m) => m && m.id) : null
-    if (!arr) return
+    if (!arr) {
+      // 服务端本场景无存档：以本场景的本地兜底为准（designs 已是 loadDesigns 读到的本场景内容），
+      // 绝不沿用其它场景留在本机的旧档
+      return
+    }
     designs.value = arr.map(normalizeModel)
-    try { localStorage.setItem(DESIGNS_KEY, JSON.stringify(designs.value.slice(0, 50))) } catch (e) { /* 忽略 */ }
+    try {
+      localStorage.setItem(designsKey(scene), JSON.stringify(designs.value.slice(0, 50)))
+      // 迁移收尾：旧版全局键已不再使用且内容是「最后编辑过的那个场景」的，清掉避免日后误读
+      localStorage.removeItem(DESIGNS_KEY)
+    } catch (e) { /* 忽略 */ }
     // 运行态同样以服务端为准：换电脑 / 重开浏览器打开，运行中的策略在这里接着跑
     const run = remote && (Array.isArray(remote.running)
       ? remote.running
@@ -1382,9 +1412,25 @@ async function pullDesigns() {
       if (runId.value) stopModel(runId.value, true)
       if (rid) resumeRun(rid)
     }
-    try { localStorage.setItem(AGC_RUN_KEY, runId.value || '') } catch (e) { /* 忽略 */ }
-  } catch (e) { /* 服务端不可用时沿用 localStorage */ }
+    try { localStorage.setItem(runKey(scene), runId.value || '') } catch (e) { /* 忽略 */ }
+  } catch (e) { /* 服务端不可用时沿用本场景 localStorage 兜底 */ }
 }
+
+// ── 切场景：群控编排是场景资源包的一部分，必须整档换掉 ──
+// 群控策略引用的设备是本场景特有的可调 / 传感设备（如 dc-thermal 的 ext::n_dc_* ），
+// 换场景后继续显示旧场景的模型，用户一编辑就会被存成新场景的策略（正是此前串档的根因）。
+let sceneSeq = 0                  // 连续切场景时只认最后一次（避免旧请求后到覆盖新场景清单）
+watch(() => store.sceneId, async (nid, oid) => {
+  if (!nid || nid === oid) return
+  const seq = ++sceneSeq
+  flushDesigns()                  // pending 里带着旧场景 id：先把旧场景的改动按旧场景落库
+  if (runId.value) { stopModel(runId.value, true); runId.value = '' }
+  cur.value = null                // 退出旧场景模型的编排
+  page.value = 'lib'
+  loadDesigns()                   // 新场景的本地兜底
+  await pullDesigns()             // 再以服务端（新场景那一档）覆盖
+  if (seq !== sceneSeq) return    // 期间又切了场景：交给那一次的处理收尾
+})
 
 // ==================== 内置示例：机房温控「机柜超温 → 降泵压」 ====================
 // 首次在机房热控场景打开本视图时自动给出一个可直接运行的示例编排（只种一次，
@@ -1595,7 +1641,7 @@ function syncRunFromServer(ids) {
   if (id && !designs.value.some((m) => m.id === id)) return   // 属于其它场景的模型，不管
   if (runId.value) store.stopAgcRule(runId.value)             // 本地兜底执行器让位给服务端
   runId.value = id
-  try { localStorage.setItem(AGC_RUN_KEY, id) } catch (e) { /* 忽略 */ }
+  try { localStorage.setItem(runKey(designScene()), id) } catch (e) { /* 忽略 */ }
 }
 const zeroSeen = {}   // modelId -> 已处理过的归零时间戳（避免重复处理同一条）
 async function pollRuntime() {
@@ -1612,7 +1658,11 @@ async function pollRuntime() {
       zeroSeen[mid] = z.ts
       for (const id of (z.devs || [])) store.setExtSetpoint(id, 0, { localOnly: true })
     }
-    const ids = (r.running || []).map((x) => x && x.id).filter(Boolean)
+    // 只认本场景在跑的策略：服务端运行器同时跑着各场景的模型，别把别人的运行态显示到本场景
+    const scene = designScene()
+    const ids = (r.running || [])
+      .filter((x) => x && x.id && (!x.scene || x.scene === scene))
+      .map((x) => x.id)
     syncRunFromServer(ids)
   } catch (e) { backendRunner.value = false }   // 服务端不可用时沿用本地执行
 }
@@ -1633,10 +1683,10 @@ function runTipOf(m) {
 /** 运行态立刻落到服务端：启停是低频动作，不等 600ms 防抖，避免「点了运行但另一端看不到」 */
 function persistRunning() {
   markRunLocal()   // 本端刚改过：先以本端为准，别被尚未追上的服务端旧存档弹回去
-  try { localStorage.setItem(AGC_RUN_KEY, runId.value || '') } catch (e) { /* 忽略 */ }
+  const scene = designScene()
+  try { localStorage.setItem(runKey(scene), runId.value || '') } catch (e) { /* 忽略 */ }
   try {
-    const scene = designScene()
-    const data = { designs: designs.value.slice(0, 50), updatedAt: Date.now(), running: runId.value ? [runId.value] : [] }
+    const data = { scene, designs: designs.value.slice(0, 50), updatedAt: Date.now(), running: runId.value ? [runId.value] : [] }
     // 已立即推送：清掉待发的防抖载荷，否则页面关闭时会再补发一份不带最新运行态的旧数据
     pushPending = null
     clearTimeout(pushTimer)
@@ -1798,6 +1848,8 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
 .agc-lib { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding: 0 4px 0 8px; }
 .lib-bar { display: flex; align-items: baseline; gap: 8px; }
 .lib-ttl { font-size: var(--fs-t); font-weight: var(--fw-t); color: var(--text); }
+/* 场景归属标记：群控策略随场景资源包走，明确写在这里避免跨场景误用 */
+.lib-scene { margin-left: auto; font-size: var(--fs-s); color: var(--faint); white-space: nowrap; }
 .lib-tip { margin: 0; max-width: 780px; font-size: var(--fs-s); line-height: 1.6; color: var(--faint); }
 .lib-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
@@ -1912,7 +1964,7 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
 .pnl { border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); overflow: hidden; }
 .pnl-hd {
   display: flex; align-items: center; gap: 6px; padding: 6px 10px; cursor: pointer; user-select: none;
-  background: var(--panel-2); border-bottom: 1px solid var(--border);
+  background: var(--panel-2); 
   font-size: var(--fs-t); font-weight: var(--fw-t); color: var(--text);
 }
 .pnl-hd.col { border-bottom-color: transparent; }   /* 折叠时不要留一条悬空的横线 */
@@ -1979,7 +2031,7 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
 .card.rg { flex: 1 1 auto; min-height: 560px; }
 .card.grow { flex: 1 1 auto; min-height: 190px; }
 .rf-fill { flex: 1 1 auto; min-height: 0; }
-.card-hd { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--panel-2); border-bottom: 1px solid var(--border); }
+.card-hd { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--panel-2);  }
 .ct { font-size: var(--fs-t); font-weight: var(--fw-t); color: var(--text); }
 .cs { font-size: var(--fs-s); color: var(--faint); }
 .ch-ops { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
@@ -1992,7 +2044,7 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
 .cempty .t2 { font-size: var(--fs-s); line-height: 1.6; color: var(--faint); max-width: 460px; }
 
 .bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; }
-.bar.mv { border-top: 1px solid var(--border); gap: 8px; }
+.bar.mv { border-top: 1px solid var(--line-soft); gap: 8px; }
 .sep { width: 1px; height: 14px; background: var(--border); }
 .lb2 { font-size: var(--fs-s); color: var(--muted); }
 .nx { font-size: var(--fs-s); color: var(--faint); font-variant-numeric: tabular-nums; }
@@ -2003,9 +2055,9 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
 .tstate.on .dot { background: var(--green); animation: agc-pulse 1s infinite; }
 
 /* 超参数区：字段名 muted、单位 faint，不再出现第三种灰与额外强调色 */
-.hp { padding: 4px 10px 10px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.hp { padding: 4px 10px 10px; border-bottom: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 8px; }
 .hp-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.hp-row.obj { padding-top: 8px; border-top: 1px solid var(--border); }
+.hp-row.obj { padding-top: 8px; border-top: 1px solid var(--line-soft); }
 .hp-row .lb { font-size: var(--fs-s); color: var(--muted); }
 .f { display: inline-flex; align-items: center; gap: 5px; }
 .f > em { font-size: var(--fs-s); color: var(--muted); white-space: nowrap; }
@@ -2021,13 +2073,13 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
 /* 模型版本表 */
 .vtb { display: flex; flex-direction: column; }
 .vtr { display: grid; grid-template-columns: 64px 1.4fr 72px 56px 88px 72px; gap: 8px; align-items: center; padding: 5px 10px; font-size: var(--fs-b); color: var(--text); cursor: pointer; }
-.vtr.hd { background: var(--panel-2); border-bottom: 1px solid var(--border); font-size: var(--fs-s); color: var(--faint); cursor: default; }
+.vtr.hd { background: var(--panel-2);  font-size: var(--fs-s); color: var(--faint); cursor: default; }
 .vtr:not(.hd):hover { background: var(--panel-2); }
 .vtr.on { background: var(--sel); }
 .vtr .dim { color: var(--faint); }
 .vtr.cur .mono { color: var(--green); }
 .vempty { padding: 12px 10px; font-size: var(--fs-s); color: var(--faint); text-align: center; }
-.vdim { border-top: 1px solid var(--border); padding: 8px 10px 10px; }
+.vdim { border-top: 1px solid var(--line-soft); padding: 8px 10px 10px; }
 .vdim-h { font-size: var(--fs-s); color: var(--muted); padding-bottom: 5px; }
 .vrow { display: flex; align-items: baseline; gap: 6px; font-size: var(--fs-b); padding: 2px 0; }
 .vrow .rn {
@@ -2043,7 +2095,7 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
   width: 460px; max-width: calc(100vw - 40px); max-height: 88vh; overflow: auto; display: flex; flex-direction: column;
   border: 1px solid var(--border); border-radius: 4px; background: var(--panel); box-shadow: 0 8px 30px rgba(0, 0, 0, .25);
 }
-.mk-hd { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--panel-2); border-bottom: 1px solid var(--border); }
+.mk-hd { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--panel-2);  }
 .mk-hd b { font-size: var(--fs-h); font-weight: var(--fw-t); color: var(--text); }
 .mk-x { margin-left: auto; padding: 0 4px; border: 0; background: none; cursor: pointer; font-family: inherit; font-size: var(--fs-t); color: var(--faint); }
 .mk-x:hover { color: var(--red); }
@@ -2065,5 +2117,6 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
 .mk-tp.rule .tp-ic { color: var(--k-adj); }
 .mk-tp.rl .tp-ic { color: var(--k-if); }
 .mk-tp.pso .tp-ic { color: var(--k-sen); }
-.mk-ft { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); }
+.mk-ft { background: var(--head-bg);
+ display: flex; justify-content: flex-end; gap: 8px; padding: 10px 12px;  }
 </style>

@@ -43,7 +43,7 @@
           </div>
           <button class="add" @click="addGroupIo(group.id, 'outputs')">＋ {{ t('输出项') }}</button>
         </div>
-        <div class="pr-hint">{{ t('小组对外输入/输出用于外部画布连线（如热风炉+鼓风机小组对外输出热风）。双击成员卡片可修改其端口物料。') }}</div>
+        <div class="pr-hint">{{ t('小组对外输入/输出用于外部画布连线；双击成员卡片可改其端口物料。') }}</div>
       </div>
       </CollapseSection>
 
@@ -153,7 +153,7 @@
           </div>
           <button class="add" @click="addNodePort('out')">＋ {{ t('输出项') }}</button>
         </div>
-        <div class="pr-hint">{{ t('输入配比（1 = 100%）用于工艺输入物料构成与优化（如提高球团比降焦比）；每个输入/输出端口可连接多个节点，同一种类只能出现一次。') }}</div>
+        <div class="pr-hint">{{ t('输入配比（1 = 100%）用于输入物料构成与优化；每端口可连多个节点，同一种类只出现一次。') }}</div>
       </div>
       </CollapseSection>
 
@@ -226,7 +226,7 @@
       <div class="pr-hint">
         R₂ = ΣCaO / ΣSiO₂ = {{ slagInfo.caoTotal.toFixed(1) }} / {{ slagInfo.sio2Total.toFixed(1) }}；
         R₃ = (CaO+MgO)/SiO₂ = ({{ slagInfo.caoTotal.toFixed(1) }}+{{ slagInfo.mgoTotal.toFixed(1) }}) / {{ slagInfo.sio2Total.toFixed(1) }}。
-        {{ t('成分来源：烧结/球团/块矿脉石 + 焦炭/煤粉灰分（物料面板「详细化学成分 → 灰分组成」）+ 熔剂(石灰石)；MgO 主要来自熔剂与灰分、Al₂O₃ 主要来自矿脉石与煤灰。炉料成分与入炉比修改后实时联动。') }}
+        {{ t('成分来源：矿脉石 + 焦炭/煤粉灰分 + 熔剂；MgO 主要来自熔剂与灰分、Al₂O₃ 来自脉石与煤灰。改动实时联动。') }}
       </div>
       </div>
       </CollapseSection>
@@ -234,7 +234,7 @@
       <!-- ===== 附加传感 / 可变设备：传感器负责取数，可变设备只做设定 ===== -->
       <CollapseSection :title="t('附加传感 / 可变设备')" tone="blue" :show-more="false">
       <div class="card">
-        <div class="pr-hint">{{ t('绑定方向：工序 ← 传感。传感器负责取数，数据源可选：固定值 / 随机模拟值 / 数据源管理中已接入的传感器设备（按点位取实时读数）/ 随本工序可变设备联动（读数随其设定值线性变化）；其中的电功率传感器（kW）即本工序能碳核算的功率来源。可变设备只有设定值，仅用于调节运行工况、不参与取数——其实际功率请在「传感器」中添加电功率传感器设置。') }}</div>
+        <div class="pr-hint">{{ t('绑定方向：工序 ← 传感。数据源可选固定值 / 随机模拟 / 已接入传感器点位 / 随可变设备联动；电功率传感器（kW）即本工序核算的功率来源，可变设备设定值只调工况。') }}</div>
         <div v-for="ag in attachGroups" :key="ag.kind" class="ports-col">
           <span class="pc-t">{{ ag.label }}（已绑 {{ attachedOf(ag.kind).length }}）</span>
           <div v-for="att in attachedOf(ag.kind)" :key="att.uid" class="gio-row att-row">
@@ -300,13 +300,13 @@
               </optgroup>
             </select>
             <input v-if="att.kind === 'sensor'" class="att-fx" type="number" step="0.01" :value="fxShow(att)" @input="onAttFxInput(att, $event.target.value)" @change="onAttFactor(att, $event.target.value)"
-                   :title="t('换算系数：读数 = 源值 × 系数（系统单位与传感器实际度量不一致时换算用，默认 1，最多两位小数）')" />
+                   :title="t('换算系数：读数 = 源值 × 系数（默认 1，最多两位小数）')" />
             <span v-if="att.src === 'attach'" class="u" :title="t('联动换算：读数 = 设定值 × 读数锚点 / 设定值锚点，绑定瞬间读数保持不变')">{{ linkTextOf(att) }}</span>
             <button v-if="att.src === 'attach'" class="x-btn" :title="t('按当前设定值 / 读数重新标定联动锚点')"
                     @click="store.setAttachLinkScale(node.id, att.uid, linkRefSpOf(att), att.def)">⟲</button>
             <button class="x-btn danger" :title="t('解除绑定')" @click="store.removeAttachFromNode(node.id, att.uid)">✕</button>
           </div>
-          <div v-if="!attachedOf(ag.kind).length" class="pr-hint att-empty">{{ t('未绑定：点下方按钮添加，或在左侧资源管理「传感器 / 可变设备」目录中点击条目直接绑定') }}</div>
+          <div v-if="!attachedOf(ag.kind).length" class="pr-hint att-empty">{{ t('未绑定：点下方按钮添加，或在左侧「资源」面板「传感器 / 可变设备」目录中点击条目直接绑定') }}</div>
           <!-- 添加：按钮展开模板清单（语义明确，不用「未选择即为空」的下拉） -->
           <div class="att-add-row">
             <button class="att-add-btn" :class="{ on: addOpen === ag.kind }" @click="toggleAdd(ag.kind)">
@@ -321,7 +321,7 @@
               <span class="api-u">{{ ag.unitOf(it) }}</span>
             </button>
           </div>
-          <!-- 选中类型后先填名称再确认：名称即该设备在资源管理器 / 数据分析中的显示名 -->
+          <!-- 选中类型后先填名称再确认：名称即该设备在资源 / 数据分析中的显示名 -->
           <div v-if="addDraft.kind === ag.kind" class="att-new-row">
             <span class="att-nm-t">{{ t('名称') }}</span>
             <input :ref="setNewNameEl" class="att-nm-in" v-model="addDraft.name" :placeholder="t('为该设备命名（留空用类型名）')"
@@ -332,8 +332,6 @@
         </div>
       </div>
       </CollapseSection>
-
-      <button class="del-node" @click="store.removeFlowNode(node.id)">{{ t('删除该工序节点') }}</button>
     </template>
 
     <!-- 设备节点 -->
@@ -861,7 +859,7 @@ function bindToProcess(pid) {
 .slag-tbl-t { font-size: 11px; font-weight: 500; color: var(--green, #4f9d6b); margin: 10px 0 4px; }
 .slag-tbl { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
 .slag-tr { display: grid; grid-template-columns: 1.6fr 0.7fr 0.75fr 0.75fr 0.75fr 0.75fr; font-size: 11px; padding: 3px 8px; }
-.slag-tr + .slag-tr { border-top: 1px solid var(--line); }
+.slag-tr + .slag-tr { border-top: 1px solid var(--line-soft); }
 .slag-th { color: var(--muted); font-size: 11px; background: rgba(0,0,0,.02); }
 .slag-sum { font-weight: 500; background: rgba(0,0,0,.02); }
 .slag-neg { color: #b04a3a; }
@@ -888,7 +886,7 @@ function bindToProcess(pid) {
 .att-nm-btn.ok { color: var(--accent-d); border-color: var(--accent-l); }
 .att-rd { flex: 0 0 auto; font-size: 10px; color: var(--accent-d); white-space: nowrap; }
 .att-rd b { font-weight: 400; font-variant-numeric: tabular-nums; }
-.att-kw { flex: 0 0 auto; font-size: 10px; color: #b26a00; border: 1px solid rgba(178,106,0,.45); border-radius: 2px; padding: 0 3px; }
+.att-kw { flex: 0 0 auto; font-size: 10px; color: var(--yellow); border: 1px solid rgba(178,106,0,.45); border-radius: 2px; padding: 0 3px; }
 .att-src { flex: 1 1 92px; min-width: 66px; font-size: 11px; padding: 3px 4px; border: 1px solid var(--border); border-radius: 2px; background: var(--panel); color: var(--text); }
 .att-sp { flex: 0 0 auto; width: 64px; font-size: 11px; padding: 3px 4px; border: 1px solid var(--border); border-radius: 2px; background: var(--panel); color: var(--text); }
 .att-fx { flex: 0 0 auto; width: 48px; font-size: 11px; padding: 3px 4px; border: 1px dashed var(--border); border-radius: 2px; background: var(--panel); color: var(--text); }
@@ -897,13 +895,14 @@ function bindToProcess(pid) {
 .att-add-btn { flex: 0 0 auto; font-size: 11px; padding: 0 var(--btn-pad-x); min-height: var(--btn-h); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--accent2);
   border: 1px solid transparent; background: var(--btn-bg); border-radius: 2px; }
 .att-add-btn:hover { background: var(--btn-bg-hover); }
-.att-add-btn.on { background: rgba(95,130,148,.14); }
+.att-add-btn.on { background: var(--fill-2); }
 .att-pick { margin-top: 4px; border: 1px solid var(--border); border-radius: 2px; background: var(--panel-3); max-height: 190px; overflow: auto; }
-.att-pick-hd { font-size: 10px; color: var(--muted); padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.att-pick-hd { background: var(--head-bg);
+ font-size: 10px; color: var(--muted); padding: 4px 6px;  }
 .att-pick-item { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%;
   font-size: 11px; padding: 4px 6px; cursor: pointer; color: var(--text); background: transparent; border: 0; text-align: left; }
-.att-pick-item + .att-pick-item { border-top: 1px solid var(--line); }
-.att-pick-item:hover { background: rgba(95,130,148,.14); color: var(--accent-d); }
+.att-pick-item + .att-pick-item { border-top: 1px solid var(--line-soft); }
+.att-pick-item:hover { background: var(--fill-2); color: var(--accent-d); }
 .att-pick-item .api-u { font-size: 10px; color: var(--muted); }
 .att-empty { color: var(--muted); }
 .recipe-row { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
@@ -913,7 +912,7 @@ function bindToProcess(pid) {
 .ports-col + .ports-col { margin-top: 10px; }
 .pc-t { font-size: 10px; color: var(--accent2); font-weight: 400; display: block; margin-bottom: 4px; }
 .pc { display: block; font-size: 11px; color: var(--text); padding: 2px 0; }
-.pc + .pc { border-top: 1px solid var(--line); }
+.pc + .pc { border-top: 1px solid var(--line-soft); }
 /* 工序标题行 + 多实例切换 */
 .sec-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .inst-switch { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); }
@@ -923,8 +922,8 @@ function bindToProcess(pid) {
 /* 被工辅驱动的参数 */
 .pr-val-wrap { display: inline-flex; align-items: center; gap: 6px; }
 /* 属性面板返回条（主工艺 → 分支辅助工艺跳转后出现） */
-.flow-back-bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; margin-bottom: 8px; border: 1px dashed var(--accent); border-radius: 4px; background: rgba(37, 99, 235, 0.08); cursor: pointer; user-select: none; color: var(--accent-d); font-size: 11px; font-weight: 600; }
-.flow-back-bar:hover { background: rgba(37, 99, 235, 0.16); }
+.flow-back-bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; margin-bottom: 8px; border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 4px; background: var(--fill-2); cursor: pointer; user-select: none; color: var(--accent-d); font-size: 11px; font-weight: 600; }
+.flow-back-bar:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .fb-arrow { font-size: 14px; line-height: 1; }
 /* 小组：名称行 / 输入输出设定行 */
 .gname-in { width: 100%; border: 1px solid var(--line); background: var(--input, var(--bg)); color: var(--text); border-radius: 3px; padding: 2px 6px; font-size: 11px; }

@@ -133,7 +133,7 @@
 
         <!-- 决策变量：策略模型（强化学习 / 遗传算法 / 粒子群）——参与寻优的工艺参数 -->
         <CollapseSection :title="t('决策变量')" v-if="strategy.id !== 'ai::seq' && !isClu" tone="teal" :show-more="false">
-          <div class="note">{{ t('参与寻优的工艺参数（默认中间视图勾选设备对应的工艺参数，可手动增删；未选择的参数保持当前设定值，不参与寻优）。') }}</div>
+          <div class="note">{{ t('参与寻优的工艺参数（可手动增删；未选择的参数保持当前设定值）。') }}</div>
           <div v-if="decisionList.length" class="dv-list">
             <div v-for="row in decisionList" :key="row.dkey" class="dv-tag">
               <span class="dv-main">
@@ -157,7 +157,7 @@
           <div class="set-block">
             <div class="set-row">
               <span class="set-label">{{ t('目标方向') }}</span>
-              <label class="chk" :title="t('勾选后表示所选目标指标越低越好（算法朝最小化方向寻优）；取消勾选则视为越高越好（对目标取负参与寻优）')">
+              <label class="chk" :title="t('勾选 = 该指标越低越好；取消 = 越高越好（对目标取负寻优）')">
                 <input type="checkbox" :checked="objNeg" :disabled="store.busy" @change="onObjNeg" />
                 <span>{{ t('取负值（该指标越低越好）') }}</span>
               </label>
@@ -170,7 +170,7 @@
                 </optgroup>
               </select>
             </div>
-            <div class="note">{{ t('优化算法将朝着所选指标的方向搜索最优参数组合：勾选「取负值」= 该指标越低越好；取消 = 该指标越高越好（如产量、设备利用率）。') }}</div>
+            <div class="note">{{ t('算法按所选指标方向搜索最优参数：勾选「取负值」= 越低越好，取消 = 越高越好。') }}</div>
           </div>
         </CollapseSection>
 
@@ -190,8 +190,8 @@
                 <option v-for="k in 5" :key="k" :value="k">{{ k }}</option>
               </select>
             </div>
-            <div class="note">{{ t('聚类工况识别将按所选算法对最近 10 分钟工况快照自动划分典型运行工况（低/中/高负荷），只输出工况识别结果，不直接下发参数。') }}</div>
-            <div class="note">{{ t('「分组簇数」用于工况数据分析视图的多设备聚类分组（0=自动选择最佳分组数），修改后数据视图自动重新分析。') }}</div>
+            <div class="note">{{ t('按所选算法对最近 10 分钟快照划分典型工况（低/中/高负荷），只输出识别结果、不下发参数。') }}</div>
+            <div class="note">{{ t('「分组簇数」用于多设备聚类分组（0 = 自动），修改后数据视图自动重新分析。') }}</div>
           </div>
         </CollapseSection>
 
@@ -217,12 +217,12 @@
                 <option v-for="t in ftOptions" :key="t.id" :value="t.id">{{ t(t.label) }}<template v-if="t.unit">（{{ t.unit }}）</template></option>
               </select>
             </div>
-            <div class="note">{{ t('预测对象只能选择一个：从当前流程设备中选取（默认中间视图第一个勾选设备），且不能与「影响变量」重复。') }}</div>
+            <div class="note">{{ t('预测对象只能选一个（默认第一个勾选设备），且不能与「影响变量」重复。') }}</div>
           </div>
         </CollapseSection>
 
         <CollapseSection :title="t('影响变量')" v-if="strategy.id === 'ai::seq'" tone="teal" :show-more="false">
-          <div class="note">{{ t('选择参与预测的监测设备指标（默认中间视图勾选设备，可手动增删；不勾选任意项 = 全部设备参与预测；已选为预测对象的设备自动剔除）。') }}</div>
+          <div class="note">{{ t('参与预测的设备指标（可手动增删；不勾选 = 全部参与；预测对象自动剔除）。') }}</div>
           <div v-if="impactRows.length" class="dv-list">
             <label v-for="row in impactRows" :key="row.id" class="dv-row chk">
               <input type="checkbox" :checked="impactSet[row.id]" :disabled="store.busy" @change="onImpactToggle(row.id, $event.target.checked)" />
@@ -237,7 +237,7 @@
 
         <!-- 聚类工况识别：聚类特征变量 -->
         <CollapseSection :title="t('聚类特征')" v-if="isClu" tone="teal" :show-more="false">
-          <div class="note">{{ t('选择参与工况聚类的监测设备指标（默认中间视图勾选设备，可手动增删；不勾选任意项 = 全部设备参与聚类）。') }}</div>
+          <div class="note">{{ t('参与聚类的设备指标（可手动增删；不勾选 = 全部参与）。') }}</div>
           <div v-if="featureRows.length" class="dv-list">
             <label v-for="row in featureRows" :key="row.id" class="dv-row chk">
               <input type="checkbox" :checked="featureSet[row.id]" :disabled="store.busy" @change="onFeatureToggle(row.id, $event.target.checked)" />
@@ -312,8 +312,8 @@
 
         <CollapseSection :title="t('工作机制')" tone="gray" :show-more="false">
           <div class="note" v-if="isClu">
-            {{ t('实时传感器数据持续采集 → 构造最近 10 分钟「工况快照」（特征设备归一化读数 + 全厂负荷因子）→') }}
-            {{ t('按所选聚类算法（K-Means / DBSCAN / 层次聚类）自动划分典型运行工况簇 → 输出各工况占比与代表负荷。') }}
+            {{ t('实时采集 → 构造最近 10 分钟工况快照（特征读数 + 全厂负荷因子）→') }}
+            {{ t('按所选算法（K-Means / DBSCAN / 层次）划分工况簇 → 输出占比与代表负荷。') }}
             {{ t('聚类结果随数据滚动更新，用于辅助制定分工况调节策略，不直接下发参数。') }}
           </div>
           <div class="note" v-else>
@@ -374,12 +374,12 @@
             </div>
             <div class="note" v-if="fitMethodInfo">{{ fitMethodInfo }}</div>
           </div>
-          <div class="note">{{ t('拟合对象只能选择一个：从当前流程设备中选取（默认中间视图第一个勾选设备），且不能与「拟合变量」重复。') }}</div>
+          <div class="note">{{ t('拟合对象只能选一个（默认第一个勾选设备），且不能与「拟合变量」重复。') }}</div>
         </CollapseSection>
 
         <!-- 拟合变量：参与拟合的设备序列（默认中间视图勾选，可手动增删；空 = 全部设备） -->
         <CollapseSection :title="t('拟合变量')" tone="teal" :show-more="false">
-          <div class="note">{{ t('参与拟合的监测设备序列（默认中间视图勾选设备，可手动增删；未指定任意项 = 全部设备参与拟合；已选为拟合对象的设备自动剔除）。') }}</div>
+          <div class="note">{{ t('参与拟合的设备序列（可手动增删；未指定 = 全部参与；拟合对象自动剔除）。') }}</div>
           <div v-if="fitVarList.length" class="dv-list">
             <div v-for="row in fitVarList" :key="row.id" class="dv-tag">
               <span class="dv-main">
@@ -438,7 +438,7 @@
         <CollapseSection :title="t('工作机制')" tone="gray" :show-more="false">
           <div class="note">
             {{ t('实时传感器数据持续采集 → 取最近样本窗口的目标序列（全厂工况负荷或指定设备指标）→') }}
-            {{ t('按所选方法（多项式 / 指数 / 对数 / 幂函数）做最小二乘曲线拟合 → 输出拟合方程与 R² 拟合优度，') }}
+            {{ t('按所选方法（多项式 / 指数 / 对数 / 幂函数）最小二乘拟合 → 输出方程与 R²，') }}
             {{ t('并绘制「实际值 + 拟合曲线（含外推）」对比图。拟合仅用于建模分析，不直接下发参数。') }}
           </div>
         </CollapseSection>

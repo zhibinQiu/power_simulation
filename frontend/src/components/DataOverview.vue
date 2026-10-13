@@ -1,5 +1,5 @@
 <template>
-  <div class="data-overview" :class="'ov-' + theme" v-fit>
+  <div class="data-overview" :class="['ov-' + theme, { fs: store.fullscreenOn }]" v-fit>
     <!-- 顶部状态栏（各页面常驻） -->
     <header class="ov-head">
       <div class="ov-title">
@@ -508,7 +508,8 @@ const tickerItems = computed(() => {
 
 // ---------- 年度碳排放 ----------
 const carbon = computed(() => {
-  const t = store.schemeTotals || {}
+  // 已应用方案口径：HMI 大屏不受未保存的编排草稿影响（保存后才更新）
+  const t = store.appliedTotals || {}
   const co2h = t.co2_total || 0
   const direct = t.co2_direct || 0
   const indirect = t.co2_indirect || 0
@@ -677,45 +678,52 @@ const vFit = {
    - 直角硬边工业风（无圆角），正文 ≥ 12px、弱文本 ≥ 11px、触控目标 ≥ 40px
    ===================================================================== */
 .data-overview {
-  /* ----- 深色主题（默认）：冷蓝黑金属风，与平台深色主题（#0F172A 系 + 科技蓝）一致 ----- */
-  --ov-bg1: #0C1424;            /* 背景渐变起（冷蓝黑） */
-  --ov-bg2: #0A101E;            /* 背景渐变止（冷蓝黑） */
-  --ov-panel: #131C2E;          /* 卡片/面板（冷蓝黑） */
-  --ov-panel-2: #1A2438;        /* 次级卡片 */
-  --ov-panel-3: #233048;        /* 三级底/输入 */
-  --ov-border: #32435F;         /* 边框（冷蓝灰） */
-  --ov-border-ac: rgba(96, 165, 250, 0.38);  /* 强调边框（科技蓝） */
-  --ov-text: #EAF0FA;           /* 主文字（冷白） */
-  --ov-text-2: #A8B6CC;         /* 次要文字 */
-  --ov-text-3: #8291AC;         /* 弱文字 */
-  --ov-faint: #64738E;          /* 更弱 */
-  --ov-accent: #4DA3FF;         /* 强调/操作色（平台科技蓝 #2563EB 亮化） */
-  --ov-accent-soft: rgba(77, 163, 255, 0.12);   /* 强调浅底 */
-  --ov-num: #7EC8FF;            /* 数字高亮（亮科技蓝） */
-  --ov-ok: #34D399;             /* 正常（工控绿） */
+  /* ----- 深色主题（默认）：VSCode 中性石墨灰，与平台深色主题同源 -----
+     配色口径与主框架一致：中性灰阶承担全部结构与层次，主题色（--accent）只做强调/操作，
+     颜色仅承担语义：绿=正常 · 红=报警 · 橙=警告 · 蓝=提示 · 灰=停机。 */
+  --ov-bg1: #17181B;            /* 背景渐变起（中性石墨） */
+  --ov-bg2: #101113;            /* 背景渐变止 */
+  --ov-panel: #1F2023;          /* 卡片/面板 */
+  --ov-panel-2: #26272B;        /* 次级卡片 */
+  --ov-panel-3: #2F3035;        /* 三级底/输入 */
+  --ov-border: rgba(255, 255, 255, .09);   /* 边框（中性发丝线） */
+  --ov-border-ac: rgba(255, 255, 255, .18); /* 强调边框（中性，不用色相） */
+  --ov-text: #E6E7E9;           /* 主文字（近白） */
+  --ov-text-2: #A9ACB1;         /* 次要文字 */
+  --ov-text-3: #85888D;         /* 弱文字 */
+  --ov-faint: #65686D;          /* 更弱 */
+  --ov-accent: var(--accent);   /* 强调/操作色 = 平台主题色（随设置切换） */
+  --ov-accent-soft: var(--accent-l);        /* 强调浅底 */
+  --ov-num: var(--accent-d);    /* 数字高亮（主题色可读版） */
+  --ov-ok: var(--ov-text-2);   /* 正常（中性）：正常态不高亮，把注意力留给异常 */
   --ov-ab: #F26D5E;             /* 异常（报警红） */
   --ov-mid: #F0912E;            /* 一般/警告（工控橙） */
-  --ov-warn: #5AA9E6;           /* 提示（信息蓝） */
+  --ov-warn: var(--ov-text-3); /* 提示（中性） */
   --ov-st: #6E7883;             /* 停机/离线（中性灰） */
   --ov-mask: rgba(255, 255, 255, 0.05);  /* 内嵌遮罩 */
   /* 语义色透明底（浅/深主题各自定义，避免 color-mix 兼容问题） */
-  --ov-ok-bg: rgba(52, 211, 153, 0.12);
+  --ov-ok-bg: rgba(255, 255, 255, 0.07);
   --ov-ab-bg: rgba(242, 109, 94, 0.12);
   --ov-mid-bg: rgba(240, 145, 46, 0.12);
-  --ov-warn-bg: rgba(90, 169, 230, 0.12);
+  --ov-warn-bg: rgba(255, 255, 255, 0.06);
   --ov-st-bg: rgba(110, 120, 131, 0.14);
-  --ov-ac-bg: rgba(77, 163, 255, 0.16);
+  --ov-ac-bg: rgba(127, 127, 127, 0.16);
   --ov-ab-soft: rgba(242, 109, 94, 0.08);   /* 报警脉冲弱 */
   --ov-ab-soft2: rgba(242, 109, 94, 0.18);  /* 报警脉冲强 */
-  /* 金属质感：面板顶部冷蓝高光线 + 微渐变 */
-  --ov-meta: linear-gradient(180deg, rgba(205, 228, 255, 0.06), rgba(205, 228, 255, 0) 48%);
+  /* 层次质感：面板顶部中性高光线 + 微渐变 */
+  --ov-meta: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 48%);
 
   position: absolute; inset: 0;
   display: flex; flex-direction: column;
+  /* 非全屏时顶部留足与平台工具栏的呼吸间距，全屏下恢复紧凑沉浸 */
+  padding: clamp(12px, 2.2vw, 22px) clamp(12px, 2.2vw, 22px) clamp(10px, 1.6vw, 16px);
+  gap: clamp(10px, 1.2vw, 14px);
+}
+.data-overview.fs {
   padding: clamp(8px, 1.6vw, 16px) clamp(10px, 2vw, 20px) clamp(10px, 1.6vw, 16px);
   gap: clamp(8px, 1vw, 12px);
   background:
-    radial-gradient(120% 85% at 50% -12%, rgba(77, 163, 255, 0.13), transparent 55%),
+    radial-gradient(120% 85% at 50% -12%, rgba(255, 255, 255, 0.05), transparent 55%),
     linear-gradient(180deg, var(--ov-bg1) 0%, var(--ov-bg2) 100%);
   color: var(--ov-text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -729,32 +737,32 @@ const vFit = {
 
 /* ----- 浅色主题（冷白，科技蓝强调，与平台浅色主题一致，手动切换） ----- */
 .data-overview.ov-light {
-  --ov-bg1: #EEF1F6;
-  --ov-bg2: #F6F8FB;
+  --ov-bg1: #EEEFF1;
+  --ov-bg2: #F7F8F9;
   --ov-panel: #FFFFFF;
-  --ov-panel-2: #F1F4F9;
-  --ov-panel-3: #E4E9F2;
-  --ov-border: #C7D0DE;
-  --ov-border-ac: rgba(37, 99, 235, 0.35);
-  --ov-text: #1C2433;
-  --ov-text-2: #3F4A5E;
-  --ov-text-3: #626F85;
-  --ov-faint: #8B96A8;
-  --ov-accent: #2563EB;
-  --ov-accent-soft: rgba(37, 99, 235, 0.10);
-  --ov-num: #1D6FD8;
-  --ov-ok: #1E8E5A;
+  --ov-panel-2: #F5F6F7;
+  --ov-panel-3: #EAEBED;
+  --ov-border: rgba(0, 0, 0, .12);
+  --ov-border-ac: rgba(0, 0, 0, .22);
+  --ov-text: #1E1F22;
+  --ov-text-2: #4A4D52;
+  --ov-text-3: #6C6F75;
+  --ov-faint: #94979D;
+  --ov-accent: var(--accent);
+  --ov-accent-soft: var(--accent-l);
+  --ov-num: var(--accent-d);
+  --ov-ok: var(--ov-text-2);
   --ov-ab: #C4402F;
   --ov-mid: #C05A12;
-  --ov-warn: #2E6DA4;
+  --ov-warn: var(--ov-text-3);
   --ov-st: #79828D;
-  --ov-mask: rgba(28, 36, 51, 0.04);
-  --ov-ok-bg: rgba(30, 142, 90, 0.10);
+  --ov-mask: rgba(0, 0, 0, 0.04);
+  --ov-ok-bg: rgba(0, 0, 0, 0.07);
   --ov-ab-bg: rgba(196, 64, 47, 0.10);
   --ov-mid-bg: rgba(192, 90, 18, 0.10);
-  --ov-warn-bg: rgba(46, 109, 164, 0.10);
+  --ov-warn-bg: rgba(0, 0, 0, 0.05);
   --ov-st-bg: rgba(121, 130, 141, 0.12);
-  --ov-ac-bg: rgba(37, 99, 235, 0.12);
+  --ov-ac-bg: rgba(0, 0, 0, 0.06);
   --ov-ab-soft: rgba(196, 64, 47, 0.06);
   --ov-ab-soft2: rgba(196, 64, 47, 0.14);
   --ov-meta: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0) 50%);
@@ -810,8 +818,10 @@ const vFit = {
 .kpi {
   position: relative; display: flex; align-items: center; gap: 13px;
   min-height: 88px; padding: 13px 15px; text-align: left;
-  background: var(--ov-panel);
-  border: 1px solid var(--ov-border); border-radius: 0;
+  background: color-mix(in srgb, var(--ov-panel) 88%, transparent);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  border: 1px solid var(--ov-border); border-radius: var(--r);
   cursor: pointer; color: inherit; font-family: inherit;
   transition: transform .12s, border-color .12s, box-shadow .12s;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
@@ -859,8 +869,10 @@ const vFit = {
 .module {
   display: flex; flex-direction: column; gap: 10px;
   min-height: 172px; padding: 13px 15px 11px; text-align: left;
-  background: var(--ov-panel);
-  border: 1px solid var(--ov-border); border-radius: 0;
+  background: color-mix(in srgb, var(--ov-panel) 88%, transparent);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  border: 1px solid var(--ov-border); border-radius: var(--r);
   cursor: pointer; color: inherit; font-family: inherit;
   transition: transform .12s, border-color .12s, box-shadow .12s;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
@@ -1171,7 +1183,7 @@ const vFit = {
 .data-overview .adv-item,
 .data-overview .adv-kpi {
   background-image: var(--ov-meta);
-  box-shadow: inset 0 1px 0 rgba(208, 230, 255, 0.07), 0 1px 3px rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 3px rgba(0, 0, 0, 0.22);
 }
 .data-overview.ov-light .kpi,
 .data-overview.ov-light .module,
@@ -1194,9 +1206,9 @@ const vFit = {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
-/* 标题金属渐变文字（深色主题；浅色主题恢复普通文字色） */
+/* 标题：中性亮银渐变文字（深色主题；浅色主题恢复普通文字色） */
 .data-overview .ov-title-text:not(.sub) {
-  background: linear-gradient(180deg, #F2F7FF 0%, #9FC0EE 100%);
+  background: linear-gradient(180deg, #FFFFFF 0%, #A9ACB1 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .data-overview.ov-light .ov-title-text:not(.sub) { background: none; color: var(--ov-text); }

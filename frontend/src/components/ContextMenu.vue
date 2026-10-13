@@ -5,6 +5,8 @@
         <div v-if="it.sep" class="ctx-sep"></div>
         <div v-else class="ctx-item" :class="{ disabled: it.disabled, danger: it.danger }"
              @click="onItem(it)" @mouseenter="hover = i" @mouseleave="hover = -1">
+          <!-- 勾选态（面板显隐一类的开关项）：占位固定，未勾选时不占文字位置 -->
+          <span class="ctx-tick" v-if="it.checkable"><Icon v-if="it.checked" name="check" :size="13" /></span>
           <span class="ctx-ic" v-if="it.icon"><Icon :name="it.icon" :size="14" /></span>
           <span class="ctx-tx">{{ it.label }}</span>
           <span class="ctx-acc" v-if="it.accel">{{ it.accel }}</span>
@@ -26,7 +28,8 @@ const menuStyle = reactive({ left: '0px', top: '0px' })
 
 function onItem(it) {
   if (it.disabled) return
-  closeContextMenu()
+  // keepOpen：开关类菜单项（如左栏面板显隐）点完不关闭，便于连续勾选
+  if (!it.keepOpen) closeContextMenu()
   if (it.action) it.action()
 }
 
@@ -77,11 +80,12 @@ onBeforeUnmount(() => {
   display: flex; align-items: center; gap: 8px; padding: 6px 10px;
   border-radius: 5px; cursor: pointer; white-space: nowrap;
 }
-.ctx-item:hover:not(.disabled) { background: var(--accent-l); }
+.ctx-item:hover:not(.disabled) { background: var(--hover); }
 .ctx-item.disabled { color: var(--faint); cursor: default; }
 .ctx-item.danger { color: var(--red); }
 .ctx-item.danger:hover:not(.disabled) { background: rgba(199,90,82,.12); }
 .ctx-ic { width: 15px; height: 15px; display: grid; place-items: center; color: var(--accent2); flex: 0 0 auto; }
+.ctx-tick { width: 13px; height: 15px; display: grid; place-items: center; color: var(--accent-d); flex: 0 0 auto; }
 .ctx-item.danger .ctx-ic { color: var(--red); }
 .ctx-tx { flex: 1; }
 .ctx-acc { color: var(--muted); font-size: 10px; font-family: var(--mono); margin-left: 18px; }

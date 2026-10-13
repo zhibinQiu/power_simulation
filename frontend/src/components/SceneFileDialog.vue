@@ -9,7 +9,7 @@
       <div class="sf-body">
         <!-- ===== 新建场景：先选场景类别（四大控排 / 其它） ===== -->
         <template v-if="mode === 'new'">
-          <div class="sf-desc">{{ t('选择场景类别：平台将打开该类别下可用的场景资源包，并据此新建一份空白编排方案（编排为手动保存：切换场景前请先点工具条「保存」，否则未保存改动会丢失）。') }}</div>
+          <div class="sf-desc">{{ t('选择场景类别：将打开该类别可用的资源包并新建空白编排（切换场景前请先「保存」）。') }}</div>
           <div class="sf-cats">
             <button v-for="c in catGroups" :key="c.key" class="sf-cat" :class="{ on: pickedCat === c.key }" @click="pickedCat = c.key">
               <div class="c-top">
@@ -47,7 +47,7 @@
 
         <!-- ===== 另存为场景：把当前场景（含编排快照）打包为 .ec 下载 ===== -->
         <template v-else>
-          <div class="sf-desc">{{ t('把当前场景（默认含当前编排方案快照）另存为可分发的 .ec 资源包；导出包为非内置分发包，重新导入后即回到当前编排态。') }}</div>
+          <div class="sf-desc">{{ t('把当前场景另存为可分发的 .ec 资源包（含编排快照，重新导入即回到当前编排态）。') }}</div>
           <label class="sf-field">
             <span>{{ t('场景名称') }}</span>
             <input v-model="form.label" class="sf-input" :placeholder="t('例如：某钢厂 · 长流程场景')" />
@@ -186,8 +186,9 @@ async function onOk() {
         store.toast = t('已新建场景「{label}」', { label: sceneLabel(c.meta) })
       }
     } else if (props.mode === 'open') {
+      // 打开场景 = 切换工作区：整页重新加载（所有页面按新场景重建），不自动打开任何功能视图标签
       const id = pickedScene.value
-      const ok = await store.openScene(id)
+      const ok = await store.openScene(id, { reload: true })
       if (!ok) return
     } else {
       const f = form.value
@@ -216,7 +217,7 @@ async function onOk() {
 .sf-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--line, #2c333d); }
 .sf-title { font-size: 13px; font-weight: 600; }
 .sf-x { border: 0; background: transparent; color: var(--muted, #8b95a3); font-size: 16px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 3px; }
-.sf-x:hover { color: var(--text, #e6ebf2); background: rgba(255, 255, 255, 0.06); }
+.sf-x:hover { color: var(--text, #e6ebf2); background: var(--hover); }
 .sf-body { padding: 12px; overflow: auto; }
 .sf-desc { font-size: 12px; color: var(--muted, #8b95a3); line-height: 1.7; margin-bottom: 10px; }
 .sf-cats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -227,15 +228,15 @@ async function onOk() {
 .c-badge { font-size: 10px; color: var(--muted, #8b95a3); border: 1px solid var(--line, #2c333d); border-radius: 8px; padding: 1px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46%; }
 .c-badge.ok { color: var(--accent2, #4f9d6b); border-color: rgba(79, 157, 107, 0.5); }
 .c-desc { font-size: 11px; color: var(--muted, #8b95a3); line-height: 1.6; }
-.sf-warn { margin-top: 10px; font-size: 11px; color: #d08a3a; line-height: 1.7; }
+.sf-warn { margin-top: 10px; font-size: 11px; color: var(--yellow); line-height: 1.7; }
 .sf-link { border: 0; background: transparent; color: var(--accent-d, #d8b45c); font-size: 11px; cursor: pointer; padding: 0 2px; text-decoration: underline; }
 .sf-group + .sf-group { margin-top: 10px; }
 .sf-gname { font-size: 10px; color: var(--accent2, #4f9d6b); margin-bottom: 4px; }
 .sf-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; }
-.sf-row:hover { background: rgba(255, 255, 255, 0.04); }
+.sf-row:hover { background: var(--hover); }
 .sf-row.on { border-color: var(--accent, #c9a33e); background: rgba(201, 163, 62, 0.08); }
 .sf-row.cur { cursor: default; opacity: 0.75; }
-.sf-dot { width: 6px; height: 6px; border-radius: 50%; background: #6b7480; flex: 0 0 auto; }
+.sf-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; }
 .sf-dot.on { background: var(--accent2, #4f9d6b); }
 .sf-main { flex: 1; min-width: 0; }
 .sf-name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -252,6 +253,6 @@ async function onOk() {
 .sf-busy { flex: 1; font-size: 11px; color: var(--muted, #8b95a3); }
 .sf-btn { font-size: 12px; padding: 0 var(--btn-pad-x-lg); min-height: var(--btn-h-lg); min-width: var(--btn-min-w); display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 3px; background: var(--btn-bg, var(--panel-3, #2c333d)); color: var(--text, #e6ebf2); cursor: pointer; }
 .sf-btn:hover { background: var(--btn-bg-hover, #3a3f47); }
-.sf-btn.primary { background: var(--accent, #c9a33e); border-color: var(--accent, #c9a33e); color: #1a1a1a; }
+.sf-btn.primary { background: var(--accent, #c9a33e); border-color: var(--accent, #c9a33e); color: var(--on-accent); }
 .sf-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

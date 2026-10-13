@@ -57,11 +57,11 @@ onMounted(load)
 <style scoped>
 .sm-mask { position: fixed; inset: 0; background: rgba(16,24,34,.5); z-index: 300; display: flex; align-items: center; justify-content: center; }
 .sm-modal { width: 720px; max-width: 94vw; height: 72vh; background: var(--panel); color: var(--text); border-radius: 6px; border: 1px solid var(--border); display: flex; flex-direction: column; box-shadow: 0 18px 50px rgba(0,0,0,.35); overflow: hidden; }
-.sm-head { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, var(--panel)), var(--panel)); }
+.sm-head { display: flex; align-items: center; gap: 12px; padding: 10px 14px;  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, var(--panel)), var(--panel)); }
 .sm-title { font-weight: 700; font-size: var(--fs-xl); letter-spacing: 1px; }
 .sm-sub { flex: 1; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sm-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.sm-toolbar { display: flex; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.sm-toolbar { display: flex; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line-soft); }
 .sm-count { font-size: 12px; color: var(--faint); }
 .sm-flex { flex: 1; }
 .sm-btn { padding: 5px 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel-2); color: var(--text); cursor: pointer; font-size: 12px; transition: all .15s; }

@@ -575,6 +575,9 @@ export const useSimStore = defineStore('sim', {
     mqttSource: null,
     // ---- 左侧活动栏（VS Code 式）与多数据源管理 ----
     activityView: 'scene',      // 活动面板：'explorer' 资源 | 'search' 搜索 | 'scene' 场景（默认打开「场景」；AI 群控为独立视图，不占用活动面板）
+    // 左栏各面板的显示开关（面板头右侧「⋯」菜单勾选）：scene 资源管理器 / explorer 资源 / search 搜索。
+    // 勾选的面板按固定顺序（资源管理器 → 资源 → 搜索）自上而下依次显示在左栏中。
+    sidePanelOn: { scene: true, explorer: true, search: true },
     dataSources: [],            // 多数据源列表，每个含 { id,type,url,interval,name,enabled,mapping }
     activeDataSourceId: 'sim',  // 当前活动数据源 id（状态栏/指令区使用的活动源）
     sourceStatus: {},           // 各数据源连接状态：sourceId -> 'init'|'open'|'closed'|'error'
@@ -585,6 +588,11 @@ export const useSimStore = defineStore('sim', {
     // ---- 编辑态：节点编排方案 ----
     editMode: false,        // 是否处于流程编辑态（中间区显示节点画布）
     scheme: { nodes: [], connections: [], devices: [], groups: [], activeGroupId: null }, // 流程编排方案（groups：工艺设备小组；activeGroupId：当前子编排组 id）
+    // 「已应用方案」：最近一次落盘（或显式载入）的编排快照，是 3D 数字孪生 / 2D 工艺图 / KPI / 设备树
+    // 等所有「非编排界面」的唯一数据源（model 由它编译而来）。
+    // 编排画布里改的是 scheme（草稿），未保存前绝不影响 appliedScheme —— 即未保存的编排不会泄漏到孪生。
+    // 只有 saveScheme()（保存）或显式载入项目/模板/场景时才会同步 appliedScheme 并重新编译 model。
+    appliedScheme: null,
     selectedFlowId: null,   // 画布中选中的节点 id
     selectedGroupId: null,  // 画布中选中的小组 id
     flowBackId: null,       // 属性面板跳转来源工艺节点 id（主工艺→分支辅助工艺后，面板显示「返回」）
@@ -611,7 +619,7 @@ export const useSimStore = defineStore('sim', {
 
     // 左侧「原料」库选中查看（属性/配置），两栏联动
     selectedMaterialId: null,   // 选中的物料库 id
-    // 左侧资源管理器：浏览态选中（只看属性，不改动产线）
+    // 左侧资源面板：浏览态选中（只看属性，不改动产线）
     selectedAssetType: null,    // 选中的工艺类型（PROCESS_TEMPLATES.type）-> 仅用于左侧目录高亮；面板始终为实例面板
     materialOverrides: {},      // 物料属性覆盖：matId -> { carbon, density, moisture, composition:{...}, blend:[{id,name,ratio,comp:{...}}] }（随方案持久化）
     // 碳市场参数（localStorage 独立持久化，非随方案）：企业年度碳配额（全国碳市场分配，免费+有偿，tCO₂/年，默认 2000 万吨）与实时碳价（元/t，默认 100，可按行情维护）
@@ -681,7 +689,8 @@ export const useSimStore = defineStore('sim', {
       return s.baseline.units.find((u) => u.id === s.selectedUnitId) || null
     },
     // 某工序实例实际连线绑定的工辅类型（由编排画布中的物料连线决定，含上游链路传递）
-    linkedAuxOfUnit: (s) => (unitId) => linkedAuxTypesFor(s.scheme, unitId),
+    // 以「已应用方案」为准：未保存的草稿连线不算实际绑定（与 model / 孪生保持一致口径）
+    linkedAuxOfUnit: (s) => (unitId) => linkedAuxTypesFor(s.appliedScheme || s.scheme, unitId),
     resultForView: (s) => s.strategy || s.baseline,
     liveUnit: (s) => (id) => (s.live && s.live.units ? s.live.units.find((u) => u.id === id) : null),
     // 某工序的内置监测设备（含实时读数），来自 baseline 仿真结果附带
@@ -730,7 +739,10 @@ export const useSimStore = defineStore('sim', {
         const parts = devId.split('::')
         const nid = parts[1]
         const auid = parts[2]
-        const node = ((s.scheme && s.scheme.nodes) || []).find((x) => x.id === nid)
+        // 已应用方案优先（未保存的草稿设备不应在设备树/详情里出现），
+        // 但编排中刚添加、尚未保存的附加设备要能打开详情，故以 scheme 兜底。
+        const node = ((s.appliedScheme && s.appliedScheme.nodes) || []).find((x) => x.id === nid)
+          || ((s.scheme && s.scheme.nodes) || []).find((x) => x.id === nid)
         const att = node && (node.attached || []).find((a) => a.uid === auid)
         if (!att) return null
         const u = ((s.baseline && s.baseline.units) || []).find((x) => x.id === nid)
@@ -762,8 +774,9 @@ export const useSimStore = defineStore('sim', {
     linkedAuxDeviceOf: (s) => (auxType) => {
       const units = (s.baseline && s.baseline.units) || []
       const unitIds = new Set(units.map((u) => u.id))
-      const nodes = (s.scheme && s.scheme.nodes) || []
-      const conns = (s.scheme && s.scheme.connections) || []
+      const ap = s.appliedScheme || s.scheme
+      const nodes = (ap && ap.nodes) || []
+      const conns = (ap && ap.connections) || []
       const nodeById = {}
       for (const n of nodes) nodeById[n.id] = n
       for (const c of conns) {
@@ -863,10 +876,11 @@ export const useSimStore = defineStore('sim', {
         }
       }
       // 附加设备（传感器 / 可变设备）：挂在具体工艺节点 node.attached[] 上，
-      // 附加后该工艺在资源管理器 / 设备树 / 数据分析中即出现对应设备（数值来源可按需解析）
+      // 附加后该工艺在资源 / 设备树 / 数据分析中即出现对应设备（数值来源可按需解析）
       const srcMap = _boxSrcMap(s)
       const nowMs = Date.now()
-      for (const n of (s.scheme && s.scheme.nodes) || []) {
+      // 附加设备取「已应用方案」：编排中新增/改名的附加设备保存后才会进入设备树与数据分析
+      for (const n of ((s.appliedScheme || s.scheme) && (s.appliedScheme || s.scheme).nodes) || []) {
         for (const att of (n.attached || [])) {
           const u = ((s.baseline && s.baseline.units) || []).find((x) => x.id === n.id)
           const dev = _extDevice(n, u, att, nowMs, srcMap, s.deviceSetpoints)
@@ -897,7 +911,9 @@ export const useSimStore = defineStore('sim', {
       .map((d) => ({ name: d.name, node: d.node, state: d.state, writes: d.writes })),
     // 某工艺节点可绑定的「数值来源」候选：工艺自身数值参数 + 固定值 + 模拟（供附加设备绑定下拉）
     attachSourceOptions: (s) => (nodeId) => {
-      const node = ((s.scheme && s.scheme.nodes) || []).find((n) => n.id === nodeId)
+      // 已应用方案优先，编排中新增（未保存）的节点以 scheme 兜底，保证编辑态下拉可用
+      const node = ((s.appliedScheme && s.appliedScheme.nodes) || []).find((n) => n.id === nodeId)
+        || ((s.scheme && s.scheme.nodes) || []).find((n) => n.id === nodeId)
       if (!node) return []
       const opts = [
         { value: 'sim', label: '模拟数据（缓变）' },
@@ -921,6 +937,9 @@ export const useSimStore = defineStore('sim', {
     selectedGroup: (s) => (s.selectedGroupId ? s.scheme.groups.find((g) => g.id === s.selectedGroupId) || null : null),
     schemeResult: (s) => computeScheme(s.scheme, s.factors, s.factorsDefault, s.materialOverrides),
     schemeTotals: (s) => computeScheme(s.scheme, s.factors, s.factorsDefault, s.materialOverrides).totals,
+    // 「已应用方案」口径的估算总量：供 HMI 大屏等**非编排界面**使用 ——
+    // 未保存的编排草稿不得改变这些界面的读数（保存后 appliedScheme 同步才会跟着变）。
+    appliedTotals: (s) => computeScheme(s.appliedScheme || s.scheme, s.factors, s.factorsDefault, s.materialOverrides).totals,
     // 撤销/重做可用性
     canUndo: (s) => s.historyPast.length > 0,
     canRedo: (s) => s.historyFuture.length > 0,
@@ -967,7 +986,11 @@ export const useSimStore = defineStore('sim', {
       try {
         loadCalibrations()   // 启动即恢复本厂标定耦合（localStorage），否则用默认机理/经验系数
         this._loadDataSource() // 恢复上次设置的实时数据源（平台 MQTT 实时 / 自定义 WS / HTTP）
+        this._consumeReloadKeep()   // 切场景重载：把左栏开合状态带过这一次重载（仅一次性）
         this._startMqttPolling() // 定时拉取 MQTT 数据源状态（连接状态/订阅主题/最近消息）
+        // 场景注册表（/api/scenes）：首屏即拉取 —— 左栏第一个模块标题、AI 群控的场景标记
+        // 都要用场景**显示名**；此前只由「设置 → 场景」/「打开场景」弹窗拉取，首屏会退化成场景 id
+        await this.refreshSceneIndex()
         // 「数据源管理」中的传感器设备：附加设备绑定真实读数的数据源候选（首次加载 + 常驻轮询）
         this.loadBoxSourceDevices()
         this._startBoxSourcePolling()
@@ -1079,6 +1102,7 @@ export const useSimStore = defineStore('sim', {
         // 附加设备（ext::节点id::attUid）不在 scheme.devices 里，其设定值/写入值只能来自存档的
         // deviceSetpoints —— 缺这一段则刷新后附加传感 / 可变设备的调节值全部回落到模板默认值。
         this._restoreSetpoints(saved)
+        this._syncAppliedScheme()   // 恢复的存档即最终态：同步为已应用方案后再编译
         this.compileSchemeToModel()
         this.autoLayout()
       } else {
@@ -1113,9 +1137,12 @@ export const useSimStore = defineStore('sim', {
       //    写入被服务工艺的目标参数（与 compileSchemeToModel 的驱动折算段一致，见 flows 段）。
       //    此前 refresh 路径缺失此步——用户在仿真中调热风炉「送风温度」等工辅参数后，
       //    不会传导到高炉 hot_blast_temp，后端读到旧风温，碳排/能耗对比自然无变化。
-      const nodeById = Object.fromEntries((this.scheme.nodes || []).map((n) => [n.id, n]))
+      // 驱动连线以「已应用方案」为准：model 由 appliedScheme 编译而来，未保存的草稿连线
+      // 不能参与折算（否则保存前刷新就会按草稿驱动已生效的工序参数）。
+      const src = this.appliedScheme || this.scheme
+      const nodeById = Object.fromEntries((src.nodes || []).map((n) => [n.id, n]))
       const unitById = Object.fromEntries(units.map((u) => [u.id, u]))
-      for (const c of (this.scheme.connections || [])) {
+      for (const c of (src.connections || [])) {
         const f = nodeById[c.from], t = nodeById[c.to]
         const ft = f && PROCESS_MAP[f.type]
         if (!ft || !ft.drives) continue
@@ -1140,7 +1167,7 @@ export const useSimStore = defineStore('sim', {
         if (!reg) continue
         // 工辅类设备须由编排连线绑定才桥接其设定值（未连线即未绑定、不生效）；
         // 非工辅可调设备（变频/除尘风机等）照常桥接。
-        const linkedAux = new Set(linkedAuxTypesFor(this.scheme, u.id))
+        const linkedAux = new Set(linkedAuxTypesFor(src, u.id))
         const devs = Object.keys(reg)
           .filter((dt) => {
             const pm = PROCESS_MAP[dt]
@@ -1512,6 +1539,18 @@ export const useSimStore = defineStore('sim', {
       // 不再互斥删除——两者是"基准+增量"的互补关系。
       params[key] = num
       u.params = params
+      // 参数改动同步写回编排方案（草稿）：保存时 model 由方案整体重编译，
+      // 不写回的话「改完参数再保存」会把这次改动冲掉（仿真模式的编辑本就不落盘，不写回）。
+      // 不置 schemeDirty：属性面板调参沿用「不落盘、不标脏」的既有行为（刷新页面回到方案值），
+      // 写回方案只是为了保证本次改动在后续保存方案时不被重编译冲掉。
+      if (!this.simMode) {
+        const n = ((this.scheme && this.scheme.nodes) || []).find((x) => x.id === id)
+        if (n) n.params = { ...(n.params || {}), [key]: num }
+        // 已应用方案同步写一份：非钢场景 10s 一轮的 _otherSceneRefresh 会按已应用方案重编译 model，
+        // 只写草稿的话这次调参会在下一轮被冲掉。
+        const an = ((this.appliedScheme && this.appliedScheme.nodes) || []).find((x) => x.id === id)
+        if (an) an.params = { ...(an.params || {}), [key]: num }
+      }
       this.refresh(); this.autoLayout()
     },
     // 点击场景中设备/节点（3D 模型旁小铭牌、2D 工艺图设备卡片等）：选中该工序实例并聚焦。
@@ -1537,7 +1576,7 @@ export const useSimStore = defineStore('sim', {
       this.inspectorView = 'auto'
       this.rightOpen = true
     },
-    // 左侧资源管理器：浏览选中（只读查看属性 / 实时数据，不修改产线）。
+    // 左侧资源面板：浏览选中（只读查看属性 / 实时数据，不修改产线）。
     // 同时清除策略选中：否则先查看策略属性后再点工艺/物料/工序/设备等时，
     // inspectorMode 中 selectedStrategyId 优先级高于其它选中，右侧面板会一直停在策略属性。
     _clearBrowse() { this.selectedAssetType = null; this.selectedStrategyId = null },
@@ -1695,7 +1734,7 @@ export const useSimStore = defineStore('sim', {
     },
     // 激活视图：id 为空（null）表示切回三维仿真场景；未打开则先打开
     activateView(id) {
-      if (!id) { this.activeViewId = null; return }
+      if (!id) { this._activateView(null); return }
       if (!this.openViews.includes(id)) { this.openView(id); return }
       this._activateView(id)
     },
@@ -1708,12 +1747,18 @@ export const useSimStore = defineStore('sim', {
       // 编排中：先走 exitEdit 应用方案并关闭编排 tab，避免只清列表导致编辑态残留
       if (this.editMode) this.exitEdit()
       this.openViews = []; this.activeViewId = null
+      this.rightOpen = false; this.grpRightBackup = null
     },
     _activateView(id) {
-      // AI 群控：内容区改为「训练前测试 | 训练相关设定」左右两栏，训练属性面板已内嵌右栏 → 进入时备份并收起外部系统右栏
-      if (id === 'aiGroup') {
+      // 页面切换纪律：进入任一功能视图时，原页面的右侧属性面板自动收起（避免跨页面残留
+      // 选中态与面板，保证「当前页面 = 唯一侧重点」）；回到三维主视图时再恢复收起前的状态。
+      // AI 群控的「训练相关设定」已内嵌其视图右栏，同样适用此规则。
+      if (id) {
         if (this.grpRightBackup == null) this.grpRightBackup = this.rightOpen
         this.rightOpen = false
+      } else if (this.grpRightBackup != null) {
+        this.rightOpen = this.grpRightBackup
+        this.grpRightBackup = null
       }
       this.activeViewId = id
       // 数据分析 / AI群控 的数据源来自左侧「场景」资源树 → 仅把左栏定位到场景面板，
@@ -1745,7 +1790,14 @@ export const useSimStore = defineStore('sim', {
     // 开启时回到主视图槽位（功能视图窗口保持打开，点其标签可再切回）
     toggleOverview() {
       this.overviewOn = !this.overviewOn
-      if (this.overviewOn) this.activeViewId = null
+      if (this.overviewOn) {
+        if (this.grpRightBackup == null) this.grpRightBackup = this.rightOpen
+        this.rightOpen = false
+        this.activeViewId = null
+      } else if (this.grpRightBackup != null) {
+        this.rightOpen = this.grpRightBackup
+        this.grpRightBackup = null
+      }
     },
     // AI 群控视图入口（活动栏 / 顶栏 AI 菜单共用）：
     // 参数优化训练面板已内嵌于群控视图右侧栏（训练相关设定，GA/PSO/RL 顶部可切换）；
@@ -1932,7 +1984,7 @@ export const useSimStore = defineStore('sim', {
       }
       const created = await api.createStrategy(sname, `仿真模式保存的当前参数快照 · ${new Date().toLocaleString()}`, sname, ops)
       await this.loadStrategies()
-      this.toast = t('策略「{name}」已保存，可在策略资源管理中查看', { name: sname })
+      this.toast = t('策略「{name}」已保存，可在「资源 · 策略」中查看', { name: sname })
       return created
     },
     // 更新已保存策略（名称/描述/原文/操作），调 PUT /api/strategies/{sid}
@@ -1983,15 +2035,15 @@ export const useSimStore = defineStore('sim', {
     //  - 水泥/化工/有色 → 未安装引导（对应行业 .ec 资源包安装后可在此打开）
     async setScenario(id) {
       if (id === this.scenario && id === 'steel' && this.sceneId === 'steel') return
-      if (id === 'steel') { await this.openScene('steel'); return }
+      if (id === 'steel') { await this.openScene('steel', { reload: true }); return }
       if (id === 'other') {
         const meta = this._readySceneOfGroup('其它')
-        if (meta) await this.openScene(meta.id)
+        if (meta) await this.openScene(meta.id, { reload: true })
         else this.toast = t('「其它」分组暂无已安装的资源包：请先在场景设置中「导入资源包」安装 .ec 文件（系统内置示例：机房热控）')
         return
       }
       const meta = this.sceneIndex.find((x) => x.id === id)
-      if (meta && meta.ready) { await this.openScene(meta.id); return }
+      if (meta && meta.ready) { await this.openScene(meta.id, { reload: true }); return }
       const label = (meta && meta.label) || (this.scenarios.find((s) => s.id === id) || {}).label || id
       this.toast = t('「{label}」行业资源包尚未安装：可通过「导入资源包」安装对应 .ec 定制包后打开（当前内置：钢铁、机房热控示例）', { label })
     },
@@ -2014,8 +2066,11 @@ export const useSimStore = defineStore('sim', {
     },
     // 打开场景资源包：卸载当前流程状态 → 装载包数据 → 重建编排方案/模型/资源视图。
     // 返回是否成功；失败不改变当前场景。
-    async openScene(sceneId) {
+    // opts.reload = true：切换场景后整页重新加载（用户手动切换场景的口径，见 _reloadWorkspace）。
+    // 启动装载（init / restoreLastScene）不传，避免开机就多刷一次页面。
+    async openScene(sceneId, opts) {
       if (!sceneId) return false
+      const wantReload = !!(opts && opts.reload)
       const sameMode = this.sceneMode === (sceneId === 'steel' ? 'steel' : 'other')
       if (sceneId === this.sceneId && sameMode) return true
       let meta = this.sceneIndex.find((x) => x.id === sceneId)
@@ -2030,6 +2085,9 @@ export const useSimStore = defineStore('sim', {
       // 先退出仿真/编排，避免在切换过程中触发旧场景的后端刷新
       if (this.simMode) this.exitSim()
       if (this.editMode) this.exitEdit()
+      // 切换场景 = 换了一个页面：收起右侧属性面板并丢弃恢复备份，避免旧场景的选中态残留
+      this.rightOpen = false
+      this.grpRightBackup = null
       this.sceneBusy = true
       try {
         const pkg = await api.getSceneResource(sceneId)
@@ -2080,6 +2138,12 @@ export const useSimStore = defineStore('sim', {
         this.simOps = []
         this.simCurrent = null
         this.strategies = []
+        // ── AI 群控：群控策略属于具体的场景资源包（引用的可调 / 传感设备是本场景特有的），
+        // 切场景时停掉本端执行器并清空运行态与最近一轮结果，避免把上一场景的「运行中」带过来。
+        // 服务端运行器仍按各场景自己存档里的 running 继续执行（互不干扰）。
+        if (this.agcRunId) this.stopAgcRule()
+        this.agcRunId = ''
+        this.agcLast = {}
         this.selectedUnitId = null
         this.selectedGroupId = null
         this.selectedFlowId = null
@@ -2088,6 +2152,8 @@ export const useSimStore = defineStore('sim', {
         this.selectedStrategyId = null
         this.selectedAssetType = null
         this.inspectorView = 'auto'
+        // 切场景是显式载入：方案即最终态，同步为已应用方案后再编译
+        this._syncAppliedScheme()
         // 编译模型并按场景模式刷新（其它场景走本地静态核算，不请求钢铁碳引擎）
         this.compileSchemeToModel()
         if (!isSteel) {
@@ -2101,6 +2167,9 @@ export const useSimStore = defineStore('sim', {
         // sceneVersion：左右面板（资源树 / 检视器）以它为 :key 重建，清空本地折叠态/档位等残留
         this.sceneVersion++
         try { localStorage.setItem('sim.sceneId', sceneId) } catch (e) { /* localStorage 不可用时忽略 */ }
+        // 手动切换场景：整页重新加载 —— 后续的 sceneVersion++ / nextTick / 3D 重建都不必再做，
+        // 重载后由 init 的 _bootSceneId 直接装载新场景，一次到位（见 _reloadWorkspace）。
+        if (wantReload) { this._reloadWorkspace(); return true }
         // 3D 重建延后一帧：等面板按新 key 挂载、容器尺寸稳定后再 buildModel，
         // 避免 canvas 0x0 导致相机投影矩阵 NaN（与 exitEdit 的处理口径一致）
         await nextTick()
@@ -2116,6 +2185,30 @@ export const useSimStore = defineStore('sim', {
       } finally {
         this.sceneBusy = false
       }
+    },
+    // 切换场景后整页重新加载：**所有页面**都按新场景重建（左侧资源树 / 右侧检视器 /
+    // 功能视图窗口 / 3D 数字孪生），不留任何上一场景的界面状态。
+    // 重载后 openViews 为空 —— 不会自动打开任何功能视图标签，停在三维孪生主视图。
+    // 场景 id 已写入 localStorage sim.sceneId，重载后由 init 的 _bootSceneId 直接装载该场景，
+    // 不会二次切换、也不会先闪一下默认场景。
+    _reloadWorkspace() {
+      try {
+        // 只带过「这一次」重载：左栏默认折叠，切场景重载不该把用户已展开的左栏折回去。
+        // 普通刷新（F5）不写这个键，仍保持「每次启动左栏折叠」的默认口径。
+        localStorage.setItem('sim.reloadKeep', JSON.stringify({ leftOpen: !!this.leftOpen, ts: Date.now() }))
+      } catch (e) { /* localStorage 不可用时忽略 */ }
+      try { window.location.reload() } catch (e) { /* 非浏览器环境忽略 */ }
+    },
+    // 消费「切场景重载」留下的一次性状态（读完即删；超过 10s 视为过期，不生效）
+    _consumeReloadKeep() {
+      try {
+        const raw = localStorage.getItem('sim.reloadKeep')
+        if (!raw) return
+        localStorage.removeItem('sim.reloadKeep')
+        const s = JSON.parse(raw) || {}
+        if (Date.now() - (s.ts || 0) > 10000) return
+        if (s.leftOpen) this.leftOpen = true
+      } catch (e) { /* 忽略 */ }
     },
     // 启动恢复：自动打开上次退出前打开的场景（localStorage sim.sceneId，随 openScene 写入）。
     // 场景已卸载 / 资源包未就绪时保持默认场景并给出提示，不阻断启动流程。
@@ -2280,6 +2373,15 @@ export const useSimStore = defineStore('sim', {
     },
     // ---- 左侧活动栏面板切换 ----
     setActivityView(v) { this.activityView = v },
+    // ---- 左栏面板显隐（面板头「⋯」菜单勾选）：全关时左栏为空，故调用方至少保留一个 ----
+    toggleSidePanel(id) {
+      if (!this.sidePanelOn || !(id in this.sidePanelOn)) return
+      this.sidePanelOn[id] = !this.sidePanelOn[id]
+    },
+    setSidePanel(id, on) {
+      if (!this.sidePanelOn || !(id in this.sidePanelOn)) return
+      this.sidePanelOn[id] = !!on
+    },
     // ---- 多数据源管理（连接面板 / 数据源对话框共用） ----
     // 新建数据源（返回新 id，供表单跳转）
     addDataSource(ds) {
@@ -2554,7 +2656,10 @@ export const useSimStore = defineStore('sim', {
       if (!this.scheme || !this.scheme.nodes || this.scheme.nodes.length === 0) {
         const route = this.processRoute || 'short'
         this.scheme = this._buildSceneScheme(route)
+        // 首次进入编排、方案为空时以默认方案兜底：这属于「显式载入」而非编辑，同步为已应用方案
+        this._syncAppliedScheme()
       }
+      if (!this.appliedScheme) this._syncAppliedScheme()   // 兜底：已应用快照缺失时以当前方案为基准
       // 保证小组容器字段存在（存量方案/旧 localStorage 可能缺失）
       if (!this.scheme.groups) this.scheme.groups = []
       if (this.scheme.activeGroupId == null) this.scheme.activeGroupId = null
@@ -2573,10 +2678,10 @@ export const useSimStore = defineStore('sim', {
       this.openView('flowEdit')
     },
     exitEdit() {
-      this.compileSchemeToModel()
-      this.autoLayout()
-      this.refresh()
+      // 退出编排**不应用**未保存的草稿：3D 孪生 / KPI / 设备树仍显示上次保存的方案。
+      // 编排改动生效的唯一出口是 saveScheme()（保存）→ _applyScheme()，见 appliedScheme 说明。
       this.scheme.activeGroupId = null   // 退出编排后 3D 孪生回到顶层场景
+      if (this.appliedScheme) this.appliedScheme.activeGroupId = null
       // 先置非编辑态再关 tab：closeViewById('flowEdit') 依赖此标志区分「完成编排」与「普通关闭」
       this.editMode = false
       // 退出编排后右侧「编排属性」面板失去承载对象：彻底清空选中（回到总览），
@@ -2591,7 +2696,8 @@ export const useSimStore = defineStore('sim', {
       // 后续点选任意工序 / 设备 / 物料时由各自的 select* 自动重新展开
       this.rightOpen = keepAgent
       // 手动保存：完成编排（关闭编排标签）不再自动落盘，有未保存改动时明确提示
-      if (this.schemeDirty) this.showToast(t('已应用编排方案：改动尚未保存，点工具条「保存」后才会持久化'), 'warn')
+      // 未保存的改动也不会应用到孪生 —— 孪生仍显示上次保存的方案，保存后才按新编排更新
+      if (this.schemeDirty) this.showToast(t('编排改动尚未保存：数字孪生仍显示上次保存的方案，点工具条「保存」后生效'), 'warn')
       else this.toast = t('已应用编排方案，刷新孪生视图')
       // sceneRev 的触发由 SceneViewer 的 flowEditing watch 统一管理，
       // 确保 DOM 可见 + resize 完成后再 rebuildScene，避免 canvas 0x0 导致相机投影矩阵 NaN
@@ -2608,21 +2714,20 @@ export const useSimStore = defineStore('sim', {
       this.selectedGroupId = null
       try { localStorage.setItem('sim.processRoute', route) } catch (e) {}
       this._markDirty()      // 载入模板属于编辑：只置未保存标记，由「保存」按钮落盘
-      // 切模板后必须重编译模型并重算（与 openProject 对齐）：否则 model / baseline 仍挂着
-      // 旧模板的工艺节点 id，而新方案节点 id 已更换 —— 管道速率、设备树、KPI 会整片取不到值。
-      this.compileSchemeToModel()
-      this.autoLayout()
-      this.refresh()
-      this.sceneRev++
+      // 载入模板是编辑动作：不重编译 model，孪生 / 设备树 / KPI 仍显示旧模板，
+      // 点「保存」后由 _applyScheme() 统一重编译（否则未保存的换模板会直接改掉孪生）。
       // 编排模式下载入模板后自动适配视图：新方案分行排布，让画布尽量占满屏幕
       if (this.editMode) this.flowZoomFit()
       this.toast = route === 'short' ? t('已载入短流程炼钢模板') : t('已载入长流程炼钢模板')
     },
     // 手动保存：编排唯一落盘入口（工具条「保存」按钮 / Ctrl+S）。
     // 本地存档 + 服务端 designs/flow 一次写入；未保存前刷新页面，改动按设计丢弃。
+    // 保存同时是「编排生效」的时刻：把当前方案固化为已应用方案并重编译 model，
+    // 3D 数字孪生 / 2D 工艺图 / KPI / 设备树自此才切换到新编排（未保存前一律保持旧方案）。
     saveScheme() {
       if (this.simMode) { this.showToast(t('仿真模式下的改动不会保存，退出仿真后自动恢复'), 'warn'); return false }
       this._saveScheme()
+      this._applyScheme()
       this.showToast(t('编排已保存'), 'success')
       return true
     },
@@ -2699,7 +2804,14 @@ export const useSimStore = defineStore('sim', {
         _ovUnitV: 1,   // 价格口径标记：v1 起 price/salePrice 统一为「万元/单位」（旧版存的是元/单位）
         updatedAt: Date.now(),   // 存档时间戳：服务端/本地两份冲突时取较新的一份
       }
-      try { localStorage.setItem('sim.scheme', JSON.stringify(payload)) } catch (e) { /* localStorage 不可用时静默忽略 */ }
+      try { localStorage.setItem(this._schemeKey(payload.sceneId), JSON.stringify(payload)) } catch (e) { /* localStorage 不可用时静默忽略 */ }
+      // 旧版是「所有场景共用一个 sim.scheme 键」：本场景专属键已写好，旧键若不是本场景内容就清掉，
+      // 避免 _loadScheme 回落时把别场景的旧档当成当前场景的兜底（串档的老入口）。
+      try {
+        const oldRaw = localStorage.getItem('sim.scheme')
+        const old = oldRaw ? JSON.parse(oldRaw) : null
+        if (old && old.sceneId && old.sceneId !== payload.sceneId) localStorage.removeItem('sim.scheme')
+      } catch (e) { /* 忽略 */ }
       // 服务端存档 backend/data/designs/flow.json 是跨端真源，随 platform/bs-deploy/update.sh 同步；
       // 手动保存为显式动作，这里直接 PUT（不再防抖），接口不可用时静默降级为「仅本地存档」。
       try { api.designSave('flow', payload.sceneId, payload).catch(() => {}) } catch (e) { /* 忽略 */ }
@@ -2720,13 +2832,23 @@ export const useSimStore = defineStore('sim', {
         return remote
       } catch (e) { return null }
     },
+    // 本地兜底存档也按场景分键（'sim.scheme::<sceneId>'）：共用一个键时，在 A 场景编辑、
+    // 切到 B 场景会把 A 的兜底冲掉，B 又读不到自己的存档。旧版单键仍作一次性回落读取，
+    // 但内容必须过 _schemeAccepted 的场景归属校验（旧档带 sceneId 才认）。
+    _schemeKey(sid) { return 'sim.scheme::' + (sid || this.sceneId || 'steel') },
     _loadScheme() {
+      let d = null
       try {
-        const raw = localStorage.getItem('sim.scheme')
-        if (!raw) return null
-        const d = JSON.parse(raw)
-        return this._schemeAccepted(d, this.sceneId || 'steel') ? d : null
-      } catch (e) { return null }
+        const raw = localStorage.getItem(this._schemeKey())
+        d = raw ? JSON.parse(raw) : null
+      } catch (e) { d = null }
+      if (!d) {
+        try {
+          const raw = localStorage.getItem('sim.scheme')
+          d = raw ? JSON.parse(raw) : null
+        } catch (e) { d = null }
+      }
+      return this._schemeAccepted(d, this.sceneId || 'steel') ? d : null
     },
     // 编排存档可用性校验：结构完整性 + 场景隔离。
     // 说明：此处**只做能否恢复的结构判定**，不做业务口径判定 —— 机房温控曾经在这里按
@@ -2895,6 +3017,7 @@ export const useSimStore = defineStore('sim', {
     // 用于首屏默认流程（短流程）。与 exitEdit 的「完成编排」走同一套编译/布局逻辑，保证两模式一致。
     _setDefaultRoute(route) {
       this.scheme = buildScheme(route)
+      this._syncAppliedScheme()
       this.compileSchemeToModel()
       this.autoLayout()
     },
@@ -2909,6 +3032,8 @@ export const useSimStore = defineStore('sim', {
       this.deviceExtraSetpoints = {}
       this.selectedUnitId = null
       this._markDirty()                  // 新建项目属于编辑：只置未保存标记
+      // 打开项目是显式载入（非编排编辑）：新方案立即生效，同步为已应用方案
+      this._syncAppliedScheme()
       this.compileSchemeToModel()
       this.autoLayout()
       this.refresh()
@@ -2946,7 +3071,7 @@ export const useSimStore = defineStore('sim', {
     // ===== 附加设备（传感器 / 可变设备）：绑定 / 解除 / 数值来源 =====
     // 在某工艺节点上添加一个附加设备（kind: sensor / adjustable，type 取附加库模板 type），
     // 实例存入工艺节点 node.attached[]（随方案持久化）；运行态 id 合成为 ext::节点id::attUid，
-    // 在资源管理器 / 设备树 / 数据分析中即出现相应设备。
+    // 在资源 / 设备树 / 数据分析中即出现相应设备。
     // name 为可选业务名称（如「1号泵出水温度」）；不传则按「类型名 + 实例序号」自动命名，
     // 且自动保证与同工序内其它附加设备不重名。
     addAttachToNode(nodeId, kind, type, name) {
@@ -3448,6 +3573,7 @@ export const useSimStore = defineStore('sim', {
       const g = this.scheme.groups.find((x) => x.id === id)
       if (!g) return
       this.scheme.activeGroupId = id
+      if (this.appliedScheme) this.appliedScheme.activeGroupId = id   // 3D 小组子场景按已应用方案同步
       this.selectedFlowId = null
       this.selectedUnitId = null
       this.deviceDetailId = null
@@ -3465,6 +3591,7 @@ export const useSimStore = defineStore('sim', {
     exitGroup() {
       if (!this.scheme.activeGroupId) return
       this.scheme.activeGroupId = null
+      if (this.appliedScheme) this.appliedScheme.activeGroupId = null
       this.selectedFlowId = null
       this.selectedUnitId = null
       this.deviceDetailId = null
@@ -3863,7 +3990,7 @@ export const useSimStore = defineStore('sim', {
         return ((dir === 'in' ? g.inputs : g.outputs) || []).length
       }
       const cnt = Math.max(cntOf('in'), cntOf('out'), 1)
-      const h = NODE_HEADER + (NODE_PORT_Y0 - 7) + (cnt - 1) * NODE_GAP + 16 + 12
+      const h = NODE_HEADER + (NODE_PORT_Y0 - 7) + (cnt - 1) * NODE_GAP + 16 + 8
       return { x, y, w: NODE_NW, h }
     },
     // 适配视图：把所有可见内容（普通节点 + 折叠后的小组卡片）缩放居中显示，
@@ -3904,13 +4031,31 @@ export const useSimStore = defineStore('sim', {
         canvasH: this.flowCanvasH || 0,
       })
     },
+    // 将「已应用方案」固化：把当前 scheme 深拷贝为 appliedScheme。
+    // 仅在「编排已保存」或「显式载入项目 / 模板 / 场景」时调用 —— 这两类时刻 scheme 即最终态，
+    // 之后 3D 孪生 / 2D 工艺图 / KPI / 设备树都以它为基准编译，未保存的草稿不会泄漏过去。
+    _syncAppliedScheme() {
+      this.appliedScheme = JSON.parse(JSON.stringify(this.scheme || { nodes: [], connections: [], devices: [], groups: [], activeGroupId: null }))
+    },
+    // 应用当前编排方案：同步已应用快照 → 重编译 model → 重布局 → 重算 → 触发 3D 重建。
+    // 这是「编排改动反映到孪生」的唯一出口（保存时调用），编排过程中的编辑一律不调用它。
+    _applyScheme() {
+      this._syncAppliedScheme()
+      this.compileSchemeToModel()
+      this.autoLayout()
+      this.refresh()
+      this.sceneRev++     // 3D 孪生按新方案重建（编辑态下由 SceneViewer 的 flowEditing watch 兜底）
+    },
     // 将编排方案编译为现有仿真 model（工序=工艺节点，物流=连接），供 3D 孪生重绘
     // 注意：后端碳引擎仅识别标准工艺类型，故"公用/节能"节点(煤气发电/余热/CCUS)不纳入 3D 仿真，
     // 其减碳作用在编辑态前端估算中已计入。
+    // 编译源恒为 **已应用方案 appliedScheme**（而非正在编辑的 scheme 草稿）：
+    // 编排未保存时 model 必须保持上次保存的样子，否则 3D 孪生 / KPI 会被未保存的草稿改掉。
     compileSchemeToModel() {
+      const src = this.appliedScheme || this.scheme
       // 通用资源包场景（其它分组）：包内 scheme 直译为单位模型（无钢字典语义）
-      if (this.sceneMode !== 'steel') return this._compileOtherScheme()
-      const procs = this.scheme.nodes.filter((n) => n.kind === 'process' && PROCESS_MAP[n.type] && PROCESS_MAP[n.type].route !== 'util')
+      if (this.sceneMode !== 'steel') return this._compileOtherScheme(src)
+      const procs = src.nodes.filter((n) => n.kind === 'process' && PROCESS_MAP[n.type] && PROCESS_MAP[n.type].route !== 'util')
       const procIds = new Set(procs.map((n) => n.id))
       const units = procs.map((n) => ({
         id: n.id,
@@ -3938,7 +4083,7 @@ export const useSimStore = defineStore('sim', {
       // 工艺间连线按「物料匹配」校验：连接物料必须由源工艺产出、且为目标工艺所需，
       // 过滤掉冗余/错误的连线（如 烧结机→球团、球团→焦炉 这类没有对应物料流的边），
       // 保证 3D 孪生只绘制真实存在的物料管道。
-      const nodeById = Object.fromEntries((this.scheme.nodes || []).map((n) => [n.id, n]))
+      const nodeById = Object.fromEntries((src.nodes || []).map((n) => [n.id, n]))
       const flowOk = (c) => {
         const f = nodeById[c.from], t = nodeById[c.to]
         const ft = f && PROCESS_MAP[f.type], tt = t && PROCESS_MAP[t.type]
@@ -3946,7 +4091,7 @@ export const useSimStore = defineStore('sim', {
         const m = c.material
         return !!m && (ft.outputs || []).includes(m) && (tt.inputs || []).includes(m)
       }
-      const flows = this.scheme.connections
+      const flows = (src.connections || [])
         .filter((c) => procIds.has(c.from) && procIds.has(c.to) && flowOk(c))
         .map((c) => ({ id: c.id, from_unit: c.from, to_unit: c.to, material: c.material, rate: 1000 }))
       // 驱动连线折算：工辅（鼓风机/热风炉/引风机…）经物料连线把自身运行参数
@@ -3981,7 +4126,7 @@ export const useSimStore = defineStore('sim', {
         units,
         flows,
         // 小组元信息（id/name），供 3D 数字孪生以聚合模型方式呈现小组
-        groups: (this.scheme.groups || []).map((g) => ({ id: g.id, name: g.name || '设备小组' })),
+        groups: (src.groups || []).map((g) => ({ id: g.id, name: g.name || '设备小组' })),
       }
     },
 
@@ -3991,9 +4136,10 @@ export const useSimStore = defineStore('sim', {
     // 主/辅归属来自包字典的 route（'main' 主流程 / 'aux' 辅助系统）与 auxGroup
     // （辅助系统分组，如火电的 water 汽水循环 / flue 烟气治理），供 3D 场景把辅助流程
     // 排到主流程两侧（与钢铁「工辅在两侧」同一套布局口径，见 scene.js _layoutProcessUnits）。
-    _compileOtherScheme() {
-      const nodes = (this.scheme && this.scheme.nodes) || []
-      const conns = (this.scheme && this.scheme.connections) || []
+    _compileOtherScheme(srcOverride) {
+      const src = srcOverride || this.appliedScheme || this.scheme
+      const nodes = (src && src.nodes) || []
+      const conns = (src && src.connections) || []
       const procSet = new Set(nodes.filter((n) => n.kind === 'process').map((n) => n.id))
       const dictProcs = (this.sceneCtx && Array.isArray(this.sceneCtx.processes)) ? this.sceneCtx.processes : []
       const dictOf = (type) => dictProcs.find((p) => p && p.type === type) || null
@@ -4031,7 +4177,7 @@ export const useSimStore = defineStore('sim', {
       this.model = {
         units,
         flows,
-        groups: (this.scheme.groups || []).map((g) => ({ id: g.id, name: g.name || '设备小组' })),
+        groups: (src.groups || []).map((g) => ({ id: g.id, name: g.name || '设备小组' })),
       }
     },
 

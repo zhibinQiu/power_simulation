@@ -150,7 +150,7 @@
                 <div class="co2-tip">{{ (co2.level && co2.level.desc) || t('国标口径：CO₂ = (入炉碳AD×NCV×CC − 铁水溶碳 − 渣带碳) × 44.009/12.011 + 熔剂分解；炉尘碳计入排放。') }}</div>
               </div>
               
-              <div class="cond-tip">{{ t('可调参数：风温 / 富氧率 / 风量 / 喷煤比 / 焦比。风温与富氧为升温主力；喷煤以氢代碳可减碳但压低 TFT，需富氧/风温补偿。煤比偏离基准 130 kg/t 时焦比按 Δ焦比=−RR×Δ煤比 联动（RR≈0.89）；富氧每 +1% 允许多喷 15 kg/t 煤粉再联动降焦比。') }}<b>{{ t('焦比为独立设定') }}</b>{{ t('：拖动只改焦比本身，不反推煤比。') }}</div>
+              <div class="cond-tip">{{ t('可调参数：风温 / 富氧率 / 风量 / 喷煤比 / 焦比。风温与富氧为升温主力；喷煤减碳但压低 TFT，需补偿。焦比按 Δ焦比=−RR×Δ煤比 联动（RR≈0.89）；富氧每 +1% 可多喷 15 kg/t 煤粉。') }}<b>{{ t('焦比为独立设定') }}</b>{{ t('：拖动只改焦比本身，不反推煤比。') }}</div>
             </div>
 
             <div class="tad-sec-title">{{ t('相对基准变化') }} <span class="sec-sub">{{ t('基准＝打开弹窗时工况') }}</span></div>
@@ -170,7 +170,7 @@
                 <span class="d-v mono">{{ fmt1(delta.co2.base) }} → {{ fmt1(delta.co2.cur) }} kg/tHM</span>
                 <span class="d-delta mono" :class="delta.co2.cls">{{ delta.co2.txt }}</span>
               </div>
-              <div class="d-foot">{{ t('Δ 与 Δ% 均按每吨铁水折算：焦比/喷煤比 kg/tHM，CO₂ kg CO₂/tHM（不受铁水产量影响）。基准固定为打开弹窗时的工况，当前随滑块实时预览。') }}</div>
+              <div class="d-foot">{{ t('Δ 与 Δ% 均按每吨铁水折算（kg/tHM）；基准为打开弹窗时的工况，当前随滑块预览。') }}</div>
             </div>
 
 <!-- 炉渣碱度 R₂：随炉料配比/燃料比（含富氧置换联动）/物料详细化学成分实时联动，滑块预览同步刷新 -->
@@ -715,17 +715,17 @@ const note = computed(() => {
   const span = (a.max - a.min) || 1
   const slope = (t1 - t0) / span
   if (a.key === 'wind_rate' && spread < 5) {
-    text = t('曲线近水平：风量↑同时放大供氧与 N2 稀释，两通道抵消，TFT 对风量不敏感——风量用于调节产量，不宜作为温度/减碳调节手段。')
+    text = t('风量↑同时放大供氧与 N2 稀释，TFT 对风量不敏感；风量宜用于调节产量。')
   } else if (a.key === 'hot_blast_temp') {
     text = t('曲线{趋势}（每 +10℃ 约 TFT {v}℃）：{desc}', { 趋势: slope > 0 ? t('线性上升') : t('下降'), v: (slope * 10).toFixed(0), desc: t('热风温度直接注入鼓风显热（分子），是最便宜、零碳排放的升温手段，为联动降焦腾出减碳空间。') })
   } else if (a.key === 'o2_flow') {
-    text = t('曲线{趋势}（纯氧流量↑→富氧率派生↑）：{desc}', { 趋势: slope > 0 ? t('上升') : t('下降'), desc: t('纯氧不含 N2，注入主风管压缩 N2 分母并提升供氧，同时富氧每升高约 1% 允许多喷 15 kg/t 煤粉（富氧升温 → 燃烧带容纳更多煤粉），经置换联动降焦；煤粉热解吸热会抵消部分 TFT 增益，注意纯氧由空分供给、其电耗计入间接排放。') })
+    text = t('曲线{趋势}（纯氧流量↑→富氧率派生↑）：{desc}', { 趋势: slope > 0 ? t('上升') : t('下降'), desc: t('纯氧不含 N2，提升供氧并允许多喷煤粉（每 +1% 约 15 kg/t），经置换联动降焦；煤粉热解吸热抵消部分 TFT 增益，空分电耗计入间接排放。') })
   } else if (a.key === 'coke_rate') {
-    text = t('曲线{趋势}（每 +10 kg/tFe 约 TFT {v}℃）：{desc}', { 趋势: slope > 0 ? t('线性上升') : t('下降'), v: (slope * 10).toFixed(0), desc: t('焦比是风口碳的直接来源，焦比↑ → 燃烧放热↑ → TFT↑，CO₂排放同步线性↑。降焦是最直接的减碳路径，但需风温/富氧/喷煤补偿热量缺口——本轴为独立设定，仅焦比变动、煤比冻结不反推。') })
+    text = t('曲线{趋势}（每 +10 kg/tFe 约 TFT {v}℃）：{desc}', { 趋势: slope > 0 ? t('线性上升') : t('下降'), v: (slope * 10).toFixed(0), desc: t('焦比↑ → 放热↑ → TFT↑、CO₂ 线性↑。降焦是最直接的减碳路径，但需风温/富氧/喷煤补偿热量；本轴独立设定，煤比冻结不反推。') })
   } else if (a.key === 'coal_inj') {
     text = t('曲线{趋势}（每 +10 kg/tFe 约 TFT {v}℃）：{desc}', { 趋势: slope < 0 ? t('缓降') : t('上升'), v: (slope * 10).toFixed(0), desc: t('喷煤替代焦炭可减碳，但热解吸热与产 H2O 稀释压低 TFT，需风温/富氧补偿。') })
   }else if(a.key == 'blast_humidity'){
-    text = t('曲线{趋势}（每+1g/Nm³ TFT 约下降 {v}℃）：{desc}', { 趋势: slope < 0 ? t('线性上升') : t('上升'), v: (6).toFixed(0), desc: t('鼓风湿度上升会带来高炉内部反应H2的比例上升，可以一定程度降低直接还原度，但是收益抵不过水分解的吸热损失，因此要尽量减少。') })
+    text = t('曲线{趋势}（每+1g/Nm³ TFT 约下降 {v}℃）：{desc}', { 趋势: slope < 0 ? t('线性上升') : t('上升'), v: (6).toFixed(0), desc: t('鼓风湿度↑ 提高炉内 H2 比例、略降直接还原度，但水分解吸热损失更大，应尽量减少。') })
   } else {
     text = t('该轴全范围 TFT 变化 {v}℃。', { v: spread.toFixed(1) })
   }
@@ -754,8 +754,8 @@ const advices = computed(() => {
   } else {
     list.push({ level: 'g', text: t('当前 TFT {v}℃ 处于合规区间，可安全实施节能减碳。', { v: cur.value.tft.toFixed(0) }) })
   }
-  list.push({ level: 'g', text: t('① 风温打满：热风温度提到上限，鼓风显热免费顶替焦炭放热，焦比联动下降、创造减碳空间（成本最低、零碳排放）。') })
-  list.push({ level: 'g', text: t('② 用 TFT 空间换碳：提高喷煤比（置换焦炭）或提升风温/富氧联动降低焦比，TFT 随之回落，扣到下限即减碳极限。') })
+  list.push({ level: 'g', text: t('① 风温打满：鼓风显热顶替焦炭放热，焦比联动下降，创造减碳空间（零成本）。') })
+  list.push({ level: 'g', text: t('② 用 TFT 空间换碳：提喷煤比或风温/富氧联动降焦比，TFT 回落至下限即减碳极限。') })
   list.push({ level: 'g', text: t('③ 富氧兜底：喷煤受限时，提高富氧率压缩 N2 分母，释放新一轮提煤/降焦空间。') })
   list.push({ level: 'g', text: t('④ 监控闭环：全程盯 TFT 状态，达到下限即停手——TFT 下限就是该工况的碳排最优解。') })
   return list
@@ -881,7 +881,6 @@ function fmt1(v) {
 .tad-titlebar {
   display: flex; align-items: center; gap: 9px; flex: none;
   background: var(--bar); padding: 0 8px 0 13px; height: 36px;
-  border-bottom: 1px solid var(--border);
   cursor: move; user-select: none;
 }
 .tad-titlebar:active { cursor: grabbing; }
@@ -1017,7 +1016,7 @@ function fmt1(v) {
 }
 .cond-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px;
-  border-top: 1px solid var(--border); padding-top: 6px;
+  border-top: 1px solid var(--line-soft); padding-top: 6px;
 }
 .cg-item { display: flex; justify-content: space-between; gap: 6px; font-size: 11px; }
 .cg-k { color: var(--faint); white-space: nowrap; }
@@ -1029,7 +1028,7 @@ function fmt1(v) {
 
 /* ---- CO2 排放卡（随配料比联动） ---- */
 .cond-co2 {
-  border-top: 1px solid var(--border); padding-top: 6px;
+  border-top: 1px solid var(--line-soft); padding-top: 6px;
   display: flex; flex-direction: column; gap: 5px;
 }
 .co2-main { display: flex; align-items: baseline; gap: 6px; }
@@ -1046,7 +1045,7 @@ function fmt1(v) {
 
 /* ---- 炉渣碱度 R₂ 卡（随炉料配比/燃料比/物料成分实时联动） ---- */
 .cond-slag {
-  border-top: 1px solid var(--border); padding-top: 6px;
+  border-top: 1px solid var(--line-soft); padding-top: 6px;
   display: flex; flex-direction: column; gap: 5px;
 }
 .slag-val { font-size: 20px; font-weight: 700; color: var(--text); line-height: 1; }
@@ -1061,7 +1060,7 @@ function fmt1(v) {
 .slag-tr {
   display: grid; grid-template-columns: 1.4fr 0.7fr 0.7fr 0.7fr 0.7fr 0.7fr; gap: 6px;
   padding: 3px 7px; color: var(--muted);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line-soft);
 }
 .slag-tr:last-child { border-bottom: none; }
 .slag-tr span:nth-child(n+2) { text-align: right; font-variant-numeric: tabular-nums; }
@@ -1072,7 +1071,7 @@ function fmt1(v) {
 /* ---- 右栏标题（平台分区小标题风格） ---- */
 .tad-sec-title {
   flex: none; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
-  color: var(--muted); padding-bottom: 5px; border-bottom: 1px solid var(--border);
+  color: var(--muted); padding-bottom: 5px; border-bottom: 1px solid var(--line-soft);
 }
 .tad-sec-title .sec-sub {
   font-size: 10px; color: var(--faint); font-weight: 400; letter-spacing: 0.2px;
@@ -1100,9 +1099,9 @@ function fmt1(v) {
 .tad-table { width: 100%; border-collapse: collapse; flex: none; font-size: 11px; }
 .tad-table th {
   text-align: left; padding: 4px 8px; color: var(--faint); font-weight: 600;
-  border-bottom: 1px solid var(--border); white-space: nowrap;
+  border-bottom: 1px solid var(--line-soft); white-space: nowrap;
 }
-.tad-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); color: var(--text); white-space: nowrap; }
+.tad-table td { padding: 5px 8px; border-bottom: 1px solid var(--line-soft); color: var(--text); white-space: nowrap; }
 .tad-table tbody tr { cursor: pointer; }
 .tad-table tbody tr:hover { background: var(--accent-l); }
 .tad-table tr.on td { background: var(--sel); color: var(--text); }
@@ -1141,7 +1140,6 @@ function fmt1(v) {
   flex: none; display: flex; align-items: center; gap: 9px;
   height: 24px; padding: 0 10px;
   background: var(--bar); color: var(--muted); font-size: 11px;
-  border-top: 1px solid var(--border);
   user-select: none; letter-spacing: 0.2px;
 }
 .tad-statusbar .sb-left { font-weight: 600; color: var(--text); }

@@ -41,28 +41,35 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <style scoped>
-.cd-mask { position: fixed; inset: 0; background: rgba(20,30,40,.42); display: flex;
-  align-items: center; justify-content: center; z-index: 300; }
-.cd-modal { width: 400px; max-width: 92vw; background: var(--panel); border: 1px solid var(--border);
-  border-radius: 4px; box-shadow: 0 18px 50px rgba(0,0,0,.3); font-family: var(--ui); color: var(--text);
+/* 确认对话框 = 全平台「确认 / 取消」形态样板：
+   弹窗 --r-lg 圆角 + 玻璃阴影；标题 L1(--fs-dialog)/600；正文 L4(--fs-body)/1.7/次要色；
+   底部按钮「取消（次级）在左 → 确认（主色）或删除（危险）在最右」，弹窗档 28px 等宽。 */
+.cd-modal { width: 420px; max-width: 92vw; background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: var(--glass-shadow-lg); font-family: var(--ui); color: var(--text);
   padding: 0; overflow: hidden; }
-.cd-head { display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 14px 10px; border-bottom: 1px solid var(--border); }
-.cd-title { font-size: 14px; font-weight: 700; letter-spacing: .5px; }
-.cd-body { padding: 18px 16px; font-size: 12px; line-height: 1.7; color: var(--muted); word-break: break-word;
+.cd-head { background: var(--head-bg);
+ display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+  padding: 0 var(--pad-x); height: 46px;  }
+.cd-title { font-size: var(--fs-dialog); font-weight: var(--fw-t); letter-spacing: .2px; }
+.cd-body { padding: var(--sp-5) var(--pad-x); font-size: var(--fs-body); line-height: 1.7; color: var(--muted); word-break: break-word;
   white-space: pre-wrap; }
-.cd-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 0 14px 14px; }
-.cd-btn { min-width: var(--btn-min-w); min-height: var(--btn-h-lg); padding: 0 var(--btn-pad-x-lg); font-size: 12px; font-family: var(--ui); border-radius: 4px;
-  display: inline-flex; align-items: center; justify-content: center;
-  cursor: pointer; color: var(--text); background: var(--btn-bg); border: 1px solid var(--border); }
-.cd-btn:hover { border-color: var(--accent-d); }
-.cd-btn.primary { color: #fff; background: var(--accent); border-color: var(--accent); }
-.cd-btn.primary:hover { background: var(--accent-d); border-color: var(--accent-d); }
-.cd-btn.primary.danger { background: var(--red); border-color: var(--red); }
-.cd-btn.primary.danger:hover { background: #b0352c; border-color: #b0352c; }
+.cd-foot { display: flex; justify-content: flex-end; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--pad-x) var(--pad-x); }
+.cd-btn { min-width: var(--btn-min-w); min-height: var(--btn-h-lg); padding: 0 var(--btn-pad-x-lg);
+  font-size: var(--fs-body); font-family: var(--ui); font-weight: 500; line-height: 1; border-radius: var(--r);
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  cursor: pointer; color: var(--text); background: var(--btn-bg); border: 1px solid transparent;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease),
+              box-shadow var(--dur) var(--ease), transform var(--dur-fast) var(--ease); }
+.cd-btn:hover { background: var(--btn-bg-hover); box-shadow: var(--shadow); }
+.cd-btn:active { transform: translateY(1px); }
+.cd-btn.primary { color: var(--on-accent); background: var(--accent); font-weight: 600; }
+.cd-btn.primary:hover { background: var(--accent-h); color: var(--on-accent); box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 32%, transparent); }
+.cd-btn.primary:active { background: var(--accent-d); }
+.cd-btn.primary.danger { background: var(--red); color: #fff; }
+.cd-btn.primary.danger:hover { background: color-mix(in srgb, var(--red) 86%, #000); color: #fff; box-shadow: 0 2px 8px color-mix(in srgb, var(--red) 30%, transparent); }
 
-.cd-fade-enter-active, .cd-fade-leave-active { transition: opacity .14s ease; }
-.cd-fade-enter-active .cd-modal, .cd-fade-leave-active .cd-modal { transition: transform .14s ease; }
+.cd-fade-enter-active, .cd-fade-leave-active { transition: opacity var(--dur) var(--ease); }
+.cd-fade-enter-active .cd-modal, .cd-fade-leave-active .cd-modal { transition: transform var(--dur-slow) var(--ease-out), opacity var(--dur) var(--ease); }
 .cd-fade-enter-from, .cd-fade-leave-to { opacity: 0; }
-.cd-fade-enter-from .cd-modal, .cd-fade-leave-to .cd-modal { transform: scale(.94); }
+.cd-fade-enter-from .cd-modal, .cd-fade-leave-to .cd-modal { transform: translateY(6px) scale(.985); opacity: 0; }
 </style>

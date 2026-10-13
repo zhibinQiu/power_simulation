@@ -576,8 +576,8 @@ const gapClass = computed(() => {
   transition: border-color .15s, background .15s, color .15s;
 }
 .btn:hover { border-color: var(--accent-d); color: var(--accent-d); }
-.btn.primary { background: var(--accent); border-color: var(--accent-d); color: #fff; font-weight: 600; }
-.btn.primary:hover { background: var(--accent-d); border-color: var(--accent-d); color: #fff; }
+.btn.primary { background: var(--accent); border-color: var(--accent-d); color: var(--on-accent); font-weight: 600; }
+.btn.primary:hover { background: var(--accent-d); border-color: var(--accent-d); color: var(--on-accent); }
 .btn.danger { background: rgba(188, 59, 48, 0.1); border-color: rgba(188, 59, 48, 0.3); color: var(--red); }
 .btn.danger:hover { border-color: var(--red); background: rgba(188, 59, 48, 0.18); color: var(--red); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -602,7 +602,7 @@ const gapClass = computed(() => {
 .ent-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 8px 12px; font-size: 11px; color: var(--muted); font-weight: 600;
-  border-bottom: 1px solid var(--border); background: var(--panel-2);
+   background: var(--panel-2);
 }
 .mini {
   background: var(--accent-l); border: 1px solid var(--accent-l); color: var(--accent-d);
@@ -610,7 +610,7 @@ const gapClass = computed(() => {
   transition: border-color .15s;
 }
 .mini:hover { border-color: var(--accent-d); }
-.ent-form { padding: 10px 12px; display: grid; gap: 6px; border-bottom: 1px solid var(--border); }
+.ent-form { padding: 10px 12px; display: grid; gap: 6px; border-bottom: 1px solid var(--line-soft); }
 .ent-form input, .ent-form select, .form-grid input, .form-grid select {
   padding: 4px 8px; background: var(--panel-2);
   border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 11px; outline: none;
@@ -658,7 +658,7 @@ const gapClass = computed(() => {
 .stat .v.gap-pos { color: var(--red); }
 .stat .v.gap-neg { color: var(--green); }
 /* 二级页签：激活态仅以文字色 + 背景区分（无主题色顶部横条） */
-.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 12px; flex-wrap: wrap; }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line-soft); margin-bottom: 12px; flex-wrap: wrap; }
 .tabs button {
   position: relative; padding: 7px 12px; background: transparent; border: none;
   color: var(--muted); font-size: 12px; cursor: pointer; border-radius: 0;
@@ -687,7 +687,7 @@ table {
   width: 100%; border-collapse: collapse; font-size: 11px;
   border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
 }
-th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line-soft); }
 tbody tr:last-child td { border-bottom: none; }
 th { color: var(--muted); font-weight: 500; font-size: 10px; background: var(--panel-2); letter-spacing: .3px; }
 tbody tr:hover td { background: var(--panel-2); }
@@ -708,7 +708,7 @@ tbody tr:hover td { background: var(--panel-2); }
 .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .plan { padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); }
 .plan h4 { margin: 0 0 10px; font-size: 13px; color: var(--text); }
-.plan.conservative { border-top: 3px solid #4a86d6; }
+.plan.conservative { border-top: 3px solid var(--accent); }
 .plan.balanced { border-top: 3px solid var(--accent); }
 .plan.aggressive { border-top: 3px solid var(--yellow); }
 .plan-nums { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); margin-bottom: 10px; }

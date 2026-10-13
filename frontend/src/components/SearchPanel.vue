@@ -62,7 +62,7 @@ const filtering = computed(() => kw.value.trim() !== '' || onlyScene.value)
 const open = reactive({})
 function toggle(key) { open[key] = open[key] === false ? true : false }
 
-// 滚动条显隐（与左侧资源管理器一致）
+// 滚动条显隐（与左侧资源面板一致）
 const scrolling = ref(false)
 let scrollTimer = null
 function onScroll() {

@@ -98,7 +98,7 @@
           </div>
 
           <div class="cc-tip">
-            {{ t('切换提示：选择核算标准后，返回“能碳总览”页面，碳排放核算边界和顶部CO₂总量将按所选标准重新计算呈现。') }}
+            {{ t('选择核算标准后，「能碳总览」的核算边界与 CO₂ 总量按新标准重算。') }}
           </div>
         </div>
       </template>
@@ -304,7 +304,7 @@ const close = () => store.toggleCarbonCalc()
   color: var(--text);
   user-select: none;
 }
-.cc-body { flex: 1 1 auto; padding: 14px; overflow: auto; }
+.cc-body { flex: 1 1 auto; padding: var(--pad-x); overflow: auto; }
 .cc-empty { text-align: center; color: var(--muted); font-size: 12px; padding: 60px 20px; }
 
 /* ===== 测算口径切换：实时 / 年度（月度下拉） ===== */
@@ -351,7 +351,7 @@ const close = () => store.toggleCarbonCalc()
 .cc-card-hint { font-size: 10px; color: var(--muted); }
 
 /* ===== 明细区 ===== */
-.cc-detail { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+.cc-detail { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--pad-x); }
 .cc-detail-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .cc-detail-icon { width: 34px; height: 34px; border-radius: 6px; flex: none;
   display: flex; align-items: center; justify-content: center;
@@ -369,7 +369,7 @@ const close = () => store.toggleCarbonCalc()
 /* ===== 明细表格 ===== */
 .cc-table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 6px; }
 .cc-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.cc-table th, .cc-table td { padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.cc-table th, .cc-table td { padding: 6px 10px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
 .cc-table th { background: var(--panel-2); color: var(--muted); font-weight: 600; position: sticky; top: 0; }
 .cc-table tr:last-child td { border-bottom: none; }
 .cc-table tbody tr:hover td { background: var(--panel-2); }

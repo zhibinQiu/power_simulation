@@ -171,7 +171,7 @@ function onDrop(e) {
   user-select: none;
 }
 .chead:hover .drag-grip { opacity: .7; }
-.drag-grip:hover { opacity: 1; background: var(--accent-l); color: var(--accent-d); }
+.drag-grip:hover { opacity: 1; background: var(--hover); color: var(--text); }
 .drag-grip:active { cursor: grabbing; }
 .chead-actions { display: inline-flex; align-items: center; gap: 4px; }
 /* 包豪斯化：内容区用 grid 行轨道 0fr→1fr 实现平滑展开/折叠动画 */

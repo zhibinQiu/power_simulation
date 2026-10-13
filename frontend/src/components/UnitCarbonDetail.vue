@@ -134,7 +134,7 @@
         v-model="layout.state.open[sid]"
         @drop="layout.move($event.from, $event.to, $event.position)"
       >
-        <p class="sec-desc">{{ t('高炉炉渣二元碱度估算：R₂ = ΣCaO / ΣSiO₂（入渣氧化物，kg/tFe）。随炉料配比、燃料比（含富氧置换联动）与物料详细化学成分实时变化。') }}</p>
+        <p class="sec-desc">{{ t('二元碱度估算：R₂ = ΣCaO / ΣSiO₂（入渣氧化物，kg/tFe），随炉料配比与燃料比实时变化。') }}</p>
         <div class="card">
           <div class="kv2 slag-r2-row">
             <span>{{ t('二元碱度 R₂（CaO/SiO₂）') }}</span>
@@ -175,7 +175,7 @@
           <div class="pr-hint">
             {{ t('R₂ = ΣCaO / ΣSiO₂') }} = {{ slagInfo.caoTotal.toFixed(1) }} / {{ slagInfo.sio2Total.toFixed(1) }}；
             {{ t('R₃ = (CaO+MgO)/SiO₂') }} = ({{ slagInfo.caoTotal.toFixed(1) }}+{{ slagInfo.mgoTotal.toFixed(1) }}) / {{ slagInfo.sio2Total.toFixed(1) }}。
-            {{ t('成分来源：烧结/球团/块矿脉石 + 焦炭/煤粉灰分（物料「详细化学成分 → 灰分组成」）+ 熔剂(石灰石)；MgO 主要来自熔剂与灰分、Al₂O₃ 主要来自矿脉石与煤灰。') }}
+            {{ t('成分来源：矿脉石 + 焦炭/煤粉灰分 + 熔剂；MgO 主要来自熔剂与灰分、Al₂O₃ 来自脉石与煤灰。') }}
           </div>
         </div>
       </CollapseSection>
@@ -269,7 +269,7 @@
           </div>
           <!-- 自然语言输入 -->
           <div class="strategy-prompt">
-            <textarea v-model="strategyText" :placeholder="t('用自然语言描述此工序的减排策略，例如：\n• 将电炉电弧炉供电煤耗从 0.38 降至 0.25 吨标煤/吨\n• 启用焦炉煤气制氢技术\n• 增加转炉余热回收率至 85%\n系统将自动解析并生成优化方案。')"
+            <textarea v-model="strategyText" :placeholder="t('用自然语言描述此工序的减排策略，例如：\n• 将电弧炉供电煤耗从 0.38 降至 0.25 吨标煤/吨\n• 转炉余热回收率提至 85%\n系统将自动解析并生成方案。')"
                       class="strategy-input"></textarea>
             <div class="strategy-actions">
               <button class="btn btn-accent" @click="runStrategy" :disabled="store.parsing || store.busy">
@@ -397,7 +397,9 @@ function openTftAnalysis() {
 const ioNode = computed(() => {
   const id = unit.value && unit.value.id
   if (!id) return null
-  return (store.scheme && store.scheme.nodes || []).find((n) => n.id === id) || null
+  // 编排态看草稿、运行态看已应用方案：未保存的编排不改动工序详情（保存后才同步）
+  const src = store.flowEditing ? store.scheme : (store.appliedScheme || store.scheme)
+  return ((src && src.nodes) || []).find((n) => n.id === id) || null
 })
 const ioCtx = computed(() => {
   const n = ioNode.value
@@ -460,7 +462,7 @@ const adjustable = computed(() => {
 const relatedDevices = computed(() => {
   const u = unit.value
   if (!u) return []
-  const scheme = store.scheme
+  const scheme = store.flowEditing ? store.scheme : (store.appliedScheme || store.scheme)
   return store.linkedAuxOfUnit(u.id).map((dt) => {
     const d = buildDevRow(dt, u)
     // 同类型工辅在编排中聚为小组（多台）时，显示为「××机组」；
@@ -530,13 +532,14 @@ function fmtNum(n) { return Number(n).toLocaleString('zh-CN', { maximumFractionD
 .bal-item b { font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .bal-item i { font-size: 10px; color: var(--muted); font-style: normal; }
 .ledger { font-size: 11px; }
-.ledger-head { display: flex; align-items: center; padding: 4px 2px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+.ledger-head { background: var(--head-bg);
+ display: flex; align-items: center; padding: 4px 2px;  color: var(--muted); font-size: 10px; }
 .ledger-head span:nth-child(1) { flex: 1; }
 .ledger-head span:nth-child(2) { width: 78px; text-align: right; }
 .ledger-head span:nth-child(3) { width: 42%; }
 .ledger-body { display: flex; flex-direction: column; }
 .ltr { padding: 5px 2px; }
-.ltr + .ltr { border-top: 1px solid var(--line); }
+.ltr + .ltr { border-top: 1px solid var(--line-soft); }
 .ltr-top { display: flex; align-items: center; gap: 8px; }
 .ltr-top .it { flex: 1; font-weight: 400; }
 .ltr-top .num { width: 78px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text); }
@@ -555,7 +558,7 @@ function fmtNum(n) { return Number(n).toLocaleString('zh-CN', { maximumFractionD
 /* 空态提示 */
 .empty-tip { padding: 14px 10px; text-align: center; color: var(--muted); font-size: 12px; }
 .empty-tip .sub { font-size: 11px; margin-top: 4px; opacity: .75; }
-/* 可调设备列表：与资源管理视图一致（.lrow 等为全局样式） */
+/* 可调设备列表：与资源面板一致（.lrow 等为全局样式） */
 .list-card { padding: 2px 8px; }
 /* 厂内实例切换条 */
 .inst-switch { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
@@ -592,7 +595,7 @@ function fmtNum(n) { return Number(n).toLocaleString('zh-CN', { maximumFractionD
 .slag-tbl-t { font-size: 11px; font-weight: 500; color: var(--green, #4f9d6b); margin: 10px 0 4px; }
 .slag-tbl { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
 .slag-tr { display: grid; grid-template-columns: 1.6fr 0.7fr 0.75fr 0.75fr 0.75fr 0.75fr; font-size: 11px; padding: 3px 8px; }
-.slag-tr + .slag-tr { border-top: 1px solid var(--line); }
+.slag-tr + .slag-tr { border-top: 1px solid var(--line-soft); }
 .slag-th { color: var(--muted); font-size: 11px; background: rgba(0,0,0,.02); }
 .slag-sum { font-weight: 500; background: rgba(0,0,0,.02); }
 .slag-neg { color: #b04a3a; }

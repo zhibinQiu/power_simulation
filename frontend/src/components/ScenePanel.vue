@@ -4,7 +4,7 @@
     <!-- 场景资源树：工序 → 设备（实时读数） -->
     <div class="scn-body tree" @scroll="onScroll" :class="{ scrolling }">
       <div v-if="!units.length" class="empty-hint">
-        {{ t('场景暂无部署工序。') }}<br/>{{ t('可从「资源管理器」把工艺拖入编排画布完成部署。') }}
+        {{ t('场景暂无部署工序。') }}<br/>{{ t('可从「资源」把工艺拖入编排画布完成部署。') }}
       </div>
       <div v-for="u in units" :key="u.id" class="tnode">
         <div class="tch sub" :class="{ active: store.selectedUnitId === u.id }"
@@ -120,7 +120,7 @@ function onDropBack(e) {
 .scn-wrap.drop-back { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-l); }
 .scn-body { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 6px 12px; }
 .scn-body.scrolling { scrollbar-width: thin; }
-/* 工序行字体与资源管理器中对应工艺/物料条目（.tc-tt）保持一致：12px / 400 / 字距 .08px，
+/* 工序行字体与资源面板中对应工艺/物料条目（.tc-tt）保持一致：12px / 400 / 字距 .08px，
    覆盖全局 .tch.sub .tch-tt 的 500 字重与 .15px 字距，避免同一工艺词在两棵树的观感差异 */
 .scn-body .tch.sub .tch-tt { font-weight: 400; letter-spacing: .08px; }
 .empty-hint { padding: 14px 10px; color: var(--faint); font-size: 12px; line-height: 1.7; }

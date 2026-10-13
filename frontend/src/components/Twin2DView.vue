@@ -231,8 +231,10 @@ function relayout() {
   //   2) 详细的辅助设备(aux)作为「外挂节点」，不再占主链列位 —— 每台 aux 沿其
   //      非 feedback 正向服务链锚定到被服务的主工艺设备，挂在主设备正下方；
   //      同链辅助(供氧→鼓风机→热风炉→高炉)纵向续排成「服务通道」，连线竖直短接。
-  const raw = store.scheme && store.scheme.nodes ? store.scheme.nodes : []
-  const rawC = store.scheme && store.scheme.connections ? store.scheme.connections : []
+  // 2D 工艺图与 3D 孪生同一口径：只读「已应用方案」，编排里未保存的草稿不改动画面
+  const ap = store.appliedScheme || store.scheme
+  const raw = ap && ap.nodes ? ap.nodes : []
+  const rawC = ap && ap.connections ? ap.connections : []
   const ns = JSON.parse(JSON.stringify(raw)).filter((n) => n && n.kind === 'process')
   const cs = JSON.parse(JSON.stringify(rawC)).filter((c) => c && c.from && c.to)
   let byId = new Map(ns.map((n) => [n.id, n]))
@@ -1382,8 +1384,8 @@ const CARD_SCAN = 8       // 兜底避让的扫描步长
 const CARD_SCAN_MAX = 480 // 兜底避让的扫描范围（需大于一台设备盒宽，才能横越到设备外侧）
 const CARD_SIDE_MIN = 64  // 竖直线卡片开始横向绕开相邻设备的阈值（小于此值只沿管道方向让位）
 // 速率数值配色：实时遥测读数用深色（可信度最高），仿真/工况回退值用灰色弱化。
-const CARD_VAL_LIVE = '#2b3a4a'
-const CARD_VAL_SIM = '#96a1ad'
+const CARD_VAL_LIVE = 'var(--text)'
+const CARD_VAL_SIM = 'var(--muted)'
 // 文字宽度估算：SVG 无自动排版，中文按 1em、西文数字按 0.56em 估算，用于定卡片宽度。
 function estTextW(s, fs) {
   let w = 0
@@ -1719,25 +1721,27 @@ onBeforeUnmount(() => {
 // 视图 transform 现在由 JS 直接写 DOM（不经过 Vue），若世界节点因数据变化被重建，
 // 属性会丢失 —— 每次更新后补写一次（一次 setAttribute，开销可忽略）。
 onUpdated(applyView)
-watch(() => store.scheme, () => relayout(), { deep: true })
+// 只跟随「已应用方案」：编排草稿（未保存）不触发 2D 重排，保存后 appliedScheme 更新才重画
+watch(() => store.appliedScheme, () => relayout(), { deep: true })
 </script>
 
 <style scoped>
 .twin2d {
   position: absolute; inset: 0;
   display: flex; flex-direction: column;
-  background: #f2f4f6;
+  background: var(--bg);
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   user-select: none;
 }
 /* —— 适配按钮（画布右下角悬浮） —— */
 .t2d-fit {
   position: absolute; right: 12px; bottom: 12px; z-index: 3;
-  border: 1px solid #cdd5dd; background: #fff; color: #33475b;
-  border-radius: 4px; font-size: 12px; padding: 4px 12px; cursor: pointer;
-  box-shadow: 0 1px 4px rgba(20, 40, 60, 0.12);
+  border: 1px solid var(--border); background: var(--glass-bg-strong); color: var(--muted);
+  backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-radius: var(--r); font-size: 12px; padding: 4px 12px; cursor: pointer;
+  box-shadow: var(--glass-shadow);
 }
-.t2d-fit:hover { border-color: #2c6e9e; color: #2c6e9e; }
+.t2d-fit:hover { border-color: var(--accent-d); color: var(--accent-d); }
 /* —— 画布 —— */
 .t2d-canvas {
   position: relative; flex: 1; overflow: hidden;
@@ -1773,25 +1777,25 @@ watch(() => store.scheme, () => relayout(), { deep: true })
 /* —— 设备节点 —— */
 .t2d-node { cursor: pointer; }
 .t2d-node .t2d-fig { transition: filter 0.15s; }
-.t2d-node:hover .t2d-fig { filter: drop-shadow(0 2px 6px rgba(44, 110, 158, 0.35)); }
-.t2d-node.on .t2d-fig { filter: drop-shadow(0 0 8px rgba(196, 127, 23, 0.45)); }
+.t2d-node:hover .t2d-fig { filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.28)); }
+.t2d-node.on .t2d-fig { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 55%, transparent)); }
 /* 名称浮签 */
 .t2d-name {
-  font-size: 12px; font-weight: 700; fill: #2b4a6e; letter-spacing: 0.02em;
+  font-size: 12px; font-weight: 700; fill: var(--text); letter-spacing: 0.02em;
   paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round;
 }
-.t2d-node.aux .t2d-name { fill: #5a6a78; font-weight: 600; }
-.t2d-node.on .t2d-name { fill: #c47f17; }
+.t2d-node.aux .t2d-name { fill: var(--muted); font-weight: 600; }
+.t2d-node.on .t2d-name { fill: var(--accent-d); }
 /* 主工艺底部悬浮实时 KPI */
 .t2d-kpis {
   font-size: 10px; font-family: -apple-system, "Consolas", monospace;
   paint-order: stroke; stroke: rgba(242, 244, 246, 0.9); stroke-width: 3px; stroke-linejoin: round;
 }
-.t2d-kpi-c { fill: #9a4d33; font-weight: 700; }
-.t2d-kpi-e { fill: #33475b; }
-.t2d-kpi-sep { fill: #8a97a5; }
+.t2d-kpi-c { fill: var(--text); font-weight: 700; }
+.t2d-kpi-e { fill: var(--text); }
+.t2d-kpi-sep { fill: var(--faint); }
 .t2d-empty {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  color: #8a97a5; font-size: 14px; background: #f2f4f6;
+  color: var(--faint); font-size: 14px; background: var(--bg);
 }
 </style>

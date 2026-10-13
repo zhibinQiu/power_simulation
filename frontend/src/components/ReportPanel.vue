@@ -366,7 +366,7 @@ async function copy() {
   flex: 1; padding: 5px 0; font-size: 11px; border: 1px solid var(--line);
   border-radius: 3px; background: transparent; color: var(--muted); cursor: pointer;
 }
-.rp-tabs button.active { background: var(--accent); border-color: var(--accent-d); color: #fff; font-weight: 600; }
+.rp-tabs button.active { background: var(--accent); border-color: var(--accent-d); color: var(--on-accent); font-weight: 600; }
 .rp-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 10px 12px; }
 .rp-empty { margin: 24px 6px; text-align: center; color: var(--muted); font-size: 11px; line-height: 1.8; }
 .rp-center { margin: 32px 6px; text-align: center; color: var(--muted); font-size: 11px; line-height: 1.8; }
@@ -379,17 +379,17 @@ async function copy() {
 .rp-err-msg { font-size: 11px; word-break: break-all; margin: 4px 0 10px; }
 .rp-btn {
   padding: 4px 10px; font-size: 11px; border: 1px solid var(--line); border-radius: 3px;
-  background: #fff; color: var(--text); cursor: pointer;
+  background: var(--panel); color: var(--text); cursor: pointer;
 }
 .rp-btn:hover { border-color: var(--accent2); color: var(--accent2); }
-.rp-btn.primary { background: var(--accent); border-color: var(--accent-d); color: #fff; }
-.rp-btn.primary:hover { opacity: 0.88; color: #fff; }
+.rp-btn.primary { background: var(--accent); border-color: var(--accent-d); color: var(--on-accent); }
+.rp-btn.primary:hover { opacity: 0.88; color: var(--on-accent); }
 .rp-btn.danger { color: var(--red); border-color: var(--red); }
-.rp-btn.danger:hover { background: var(--red); color: #fff; }
-.rp-toolbar { display: flex; align-items: center; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.rp-btn.danger:hover { background: var(--red); color: var(--on-accent); }
+.rp-toolbar { display: flex; align-items: center; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line-soft); }
 .rp-badge { font-size: 10px; padding: 2px 8px; border-radius: 3px; font-weight: 600; white-space: nowrap; }
-.rp-badge.llm { background: #e3f2fd; color: #0a58ca; border: 1px solid #0d6efd; }
-.rp-badge.template { background: #f0f0f0; color: var(--muted); border: 1px solid var(--line); }
+.rp-badge.llm { background: var(--accent-l); color: var(--accent-d); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.rp-badge.template { background: var(--fill-2); color: var(--muted); border: 1px solid var(--border); }
 .rp-link { font-size: 11px; color: var(--accent-d); text-decoration: none; margin-left: auto; }
 .rp-link:hover { text-decoration: underline; }
 .rp-meta-line { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0 4px; font-size: 10px; color: var(--muted); }
@@ -481,9 +481,9 @@ async function copy() {
 .report-panel .rp-scroll th { background: var(--panel-2); font-weight: 600; }
 .report-panel .rp-scroll blockquote { margin: 6px 0; padding: 6px 10px; border-left: 3px solid var(--accent); background: rgba(13, 110, 253, 0.06); color: var(--muted); border-radius: 0 6px 6px 0; }
 .report-panel .rp-scroll code { background: var(--panel-2); padding: 1px 4px; border-radius: 3px; font-size: 11px; }
-.report-panel .rp-scroll pre.rp-code { background: #1e2530; color: #d8e0ea; padding: 10px; border-radius: 3px; overflow: auto; font-size: 11px; }
+.report-panel .rp-scroll pre.rp-code { background: var(--rail); color: #DFE0E2; padding: 10px; border-radius: 3px; overflow: auto; font-size: 11px; }
 .report-panel .rp-scroll pre.rp-code code { background: transparent; color: inherit; padding: 0; }
 .report-panel .rp-scroll ul, .report-panel .rp-scroll ol { margin: 6px 0; padding-left: 20px; }
 .report-panel .rp-scroll li { margin: 3px 0; }
-.report-panel .rp-scroll hr { border: none; border-top: 1px solid var(--line); margin: 10px 0; }
+.report-panel .rp-scroll hr { border: none; border-top: 1px solid var(--line-soft); margin: 10px 0; }
 </style>

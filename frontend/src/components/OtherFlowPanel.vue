@@ -197,7 +197,7 @@
                 </optgroup>
               </select>
               <input v-if="att.kind === 'sensor'" class="att-fx" type="number" step="0.01" :value="fxShow(att)" @input="onAttFxInput(att, $event.target.value)" @change="onAttFactor(att, $event.target.value)"
-                     :title="t('换算系数：读数 = 源值 × 系数（系统单位与传感器实际度量不一致时换算用，默认 1，最多两位小数）')" />
+                     :title="t('换算系数：读数 = 源值 × 系数（默认 1，最多两位小数）')" />
               <span v-if="att.src === 'attach'" class="u" :title="t('联动换算：读数 = 设定值 × 读数锚点 / 设定值锚点，绑定瞬间读数保持不变')">{{ linkTextOf(att) }}</span>
               <button v-if="att.src === 'attach'" class="x-btn" :title="t('按当前设定值 / 读数重新标定联动锚点')"
                       @click="store.setAttachLinkScale(node.id, att.uid, linkRefSpOf(att), att.def)">⟲</button>
@@ -217,7 +217,7 @@
                 <span class="api-u">{{ ag.unitOf(it) }}</span>
               </button>
             </div>
-            <!-- 选中类型后先填名称再确认：名称即该设备在资源管理器 / 数据分析中的显示名 -->
+            <!-- 选中类型后先填名称再确认：名称即该设备在资源 / 数据分析中的显示名 -->
             <div v-if="addDraft.kind === ag.kind" class="att-new-row">
               <span class="att-nm-t">{{ t('名称') }}</span>
               <input :ref="setNewNameEl" class="att-nm-in" v-model="addDraft.name" :placeholder="t('为该设备命名（留空用类型名）')"
@@ -226,7 +226,7 @@
               <button class="att-nm-btn" :title="t('取消')" @click="addDraft.kind = ''">{{ t('取消') }}</button>
             </div>
           </div>
-          <div class="pr-hint">{{ t('能碳口径：本工序附加的「电功率传感器（kW）」的读数即折碳功率来源（可绑定数据源管理的采集设备点位取实测值，或设为随可变设备联动）；可变设备的设定值只调运行工况、不参与折碳。') }}</div>
+          <div class="pr-hint">{{ t('能碳口径：附加的「电功率传感器（kW）」读数即折碳功率来源；可变设备设定值只调工况、不参与折碳。') }}</div>
         </div>
       </CollapseSection>
 
@@ -648,7 +648,7 @@ const setpointUnit = computed(() => node.value?.range?.unit || '')
 .ofp-desc { font-weight: 400; font-size: 11px; color: var(--muted); line-height: 1.6; text-align: right; }
 .ofp-tip { color: var(--accent-d); }
 .lrow { display: flex; align-items: center; gap: 8px; padding: 7px 2px; font-size: 12px; cursor: pointer; }
-.lrow + .lrow { border-top: 1px solid var(--line); }
+.lrow + .lrow { border-top: 1px solid var(--line-soft); }
 .lrow.click:hover { color: var(--accent-d); }
 .lrow.active { color: var(--accent-d); }
 .l-stack { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
@@ -662,7 +662,7 @@ const setpointUnit = computed(() => node.value?.range?.unit || '')
 .ports-col + .ports-col { margin-top: 10px; }
 .pc-t { font-size: 10px; color: var(--accent2); font-weight: 400; display: block; margin-bottom: 4px; }
 .pc { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text); padding: 3px 0; }
-.pc + .pc { border-top: 1px solid var(--line); }
+.pc + .pc { border-top: 1px solid var(--line-soft); }
 .pc-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green, #4f9d6b); flex: 0 0 auto; }
 .pc-dot.out { background: var(--accent2); }
 .param-row { margin-bottom: 8px; }
@@ -701,10 +701,11 @@ const setpointUnit = computed(() => node.value?.range?.unit || '')
 .att-add-btn:hover { background: var(--btn-bg-hover); }
 .att-add-btn.on { background: rgba(95,130,148,.14); }
 .att-pick { margin-top: 4px; border: 1px solid var(--line); border-radius: 2px; background: var(--panel-3); max-height: 190px; overflow: auto; }
-.att-pick-hd { font-size: 10px; color: var(--muted); padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.att-pick-hd { background: var(--head-bg);
+ font-size: 10px; color: var(--muted); padding: 4px 6px;  }
 .att-pick-item { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%;
   font-size: 11px; padding: 4px 6px; cursor: pointer; color: var(--text); background: transparent; border: 0; text-align: left; }
-.att-pick-item + .att-pick-item { border-top: 1px solid var(--line); }
+.att-pick-item + .att-pick-item { border-top: 1px solid var(--line-soft); }
 .att-pick-item:hover { background: rgba(95,130,148,.14); color: var(--accent-d); }
 .att-pick-item .api-u { font-size: 10px; color: var(--muted); }
 .del-node { margin-top: 10px; width: auto; align-self: flex-start; padding: 0 var(--btn-pad-x); min-height: var(--btn-h); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: #c0453c; background: var(--btn-bg); border: 1px solid rgba(192, 69, 60, 0.55); border-radius: 4px; cursor: pointer; }

@@ -110,11 +110,15 @@ export const MATERIAL_FAMILY = {
 export function materialFamily(id) { return MATERIAL_FAMILY[id] || id }
 
 // 编排节点几何（FlowEditor 与 store 共用，避免放大/缩小时高度计算漂移）
-export const NODE_NW = 196, NODE_HEADER = 32, NODE_PORT_Y0 = 46, NODE_GAP = 24
+// 标题栏紧凑化：HEADER 22（标题 .nh 锁 22px 高 / 11px 字）· 首个端口圆心偏移 PORT_Y0-7=29
+// NEST_H：工艺卡底部独立一行的碳排估值（不再与端口区叠放）
+export const NODE_NW = 196, NODE_HEADER = 22, NODE_PORT_Y0 = 36, NODE_GAP = 24, NODE_NEST_H = 18
 export function nodeHeight(n) {
   if (n.kind === 'device') return NODE_HEADER + 56
   const cnt = n.kind === 'material' ? 1 : Math.max(n.ports.in.length, n.ports.out.length, 1)
-  return NODE_HEADER + (NODE_PORT_Y0 - 7) + (cnt - 1) * NODE_GAP + 16 + 12
+  const nest = n.kind === 'process' ? NODE_NEST_H : 0
+  // 16=端口行高，8=端口区下边距（碳排行自带 border-top 作为视觉分隔，此处不必再留大空白）
+  return NODE_HEADER + (NODE_PORT_Y0 - 7) + (cnt - 1) * NODE_GAP + 16 + 8 + nest
 }
 
 // 终端产品（用于资产浏览器「产品」标签）：钢材 / 连铸坯 / 精炼钢水
@@ -459,7 +463,7 @@ export const PROCESS_TEMPLATES = [
 export const PROCESS_MAP = Object.fromEntries(PROCESS_TEMPLATES.map((t) => [t.type, t]))
 // 工艺分组：炼钢(长/短流程统一) + 工辅（鼓风机/热风炉等辅助生产工序）。
 // util(煤气发电/余热回收/碳捕集)类属节能减碳范畴，统一在「策略」中展示，
-// 不纳入左侧工艺资源管理树，仅保留模板供 3D 孪生与策略引用。
+// 不纳入左侧工艺资源树，仅保留模板供 3D 孪生与策略引用。
 export const ROUTE_GROUPS = {
   steel: PROCESS_TEMPLATES.filter((t) => t.route === 'steel'),
   // 工辅分组仅含工辅路线工艺（鼓风机/热风炉/引风机等辅助生产工序），不含公用/节能减碳（煤气发电/余热回收/碳捕集）

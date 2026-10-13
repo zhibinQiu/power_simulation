@@ -30,7 +30,7 @@
     </div>
 
     <!-- 3D 小组子场景：左上角返回顶层浮层（非编辑态下点击小组标签进入） -->
-    <div v-if="!store.flowEditing && store.scheme.activeGroupId" class="group-scene-bar">
+    <div v-if="!store.flowEditing && appliedActiveGroupId" class="group-scene-bar">
       <button type="button" class="gs-back" @click="store.exitGroup()">{{ t('← 返回顶层') }}</button>
       <span class="gs-title">▦ {{ groupSceneName }}</span>
     </div>
@@ -50,7 +50,7 @@
     <div v-if="!ok" class="scene-fallback">
       <div class="fb-title">{{ t('3D 场景无法初始化') }}</div>
       <div class="fb-msg">{{ lastErr || t('当前环境不支持 WebGL，无法渲染 3D 场景。') }}</div>
-      <div class="fb-hint">{{ t('请使用支持 WebGL 的现代浏览器（Chrome / Edge / Firefox），并确认未禁用“硬件加速”。') }}</div>
+      <div class="fb-hint">{{ t('请使用支持 WebGL 的浏览器（Chrome / Edge / Firefox）并开启硬件加速。') }}</div>
       <button class="fb-retry" type="button" @click="retry">{{ t('重试') }}</button>
     </div>
   </div>
@@ -78,6 +78,11 @@ function paused() {
   return view2D.value || store.flowEditing || store.overviewOn || !!store.activeViewId || document.hidden
 }
 
+// 3D 数字孪生只读「已应用方案」：编排画布里的草稿（未保存）不得改动画面，
+// 只有点「保存」后 store 同步 appliedScheme + sceneRev++ 才会重建为新的编排内容。
+const applied = computed(() => store.appliedScheme || store.scheme)
+const appliedActiveGroupId = computed(() => applied.value.activeGroupId || null)
+
 // 2D/3D 视图切换：2D 视图是全新画布（独立工艺流程图），切换时暂停/恢复 3D 渲染循环
 function toggleView2D() {
   view2D.value = !view2D.value
@@ -93,7 +98,7 @@ function rebuildScene() {
   if (!scene || !store.ready || !store.model || !store.model.units || !store.model.units.length) return
   try {
     // 非编辑态下若处于某小组子场景（activeGroupId），3D 场景以该小组子场景模式重建
-    const gid = (!store.flowEditing && store.scheme.activeGroupId) ? store.scheme.activeGroupId : null
+    const gid = (!store.flowEditing && appliedActiveGroupId.value) ? appliedActiveGroupId.value : null
     scene.buildModel(store.model, store.resultForView, gid ? { groupScene: gid } : undefined)
     scene.setAutoRotate(store.autoRotate)
   } catch (e) {
@@ -191,13 +196,13 @@ watch(() => [store.sceneId, store.sceneVersion], async () => {
 })
 
 // 3D 小组子场景：进入/退出时同步视角（进入适配小组布局，返回播放全景动画）
-watch(() => store.scheme.activeGroupId, (gid) => {
+watch(() => appliedActiveGroupId.value, (gid) => {
   if (!scene || store.flowEditing) return
   if (gid) scene.focusScene()
   else scene.resetView()
 })
 const groupSceneName = computed(() => {
-  const g = (store.scheme.groups || []).find((x) => x.id === store.scheme.activeGroupId)
+  const g = (applied.value.groups || []).find((x) => x.id === appliedActiveGroupId.value)
   return g ? g.name : t('设备小组')
 })
 
@@ -295,36 +300,48 @@ onMounted(() => document.addEventListener('click', onBrightDocClick))
 .twin-tool-btn {
   display: flex; align-items: center; justify-content: center;
   width: 30px; height: 30px; padding: 0;
-  background: var(--panel);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid var(--glass-stroke);
+  box-shadow: var(--glass-shadow);
   border-radius: var(--radius);
   cursor: pointer; color: var(--text);
-  box-shadow: var(--shadow);
   transition: background .12s, color .12s, transform .12s;
 }
 /* UI 规则：hover/选中态背景非白色，不再绘制边框（border 透明保留占位） */
-.twin-tool-btn:hover { background: var(--panel-3); color: var(--accent-d); border-color: transparent; }
+.twin-tool-btn:hover { background: var(--hover); color: var(--accent-d); border-color: transparent; }
 .twin-tool-btn:active { transform: translateY(0); }
 .twin-tool-btn.on { background: var(--accent); color: var(--on-accent); border-color: transparent; }
 .twin-tool-btn.on:hover { background: var(--accent-h); color: var(--on-accent); }
 /* 亮度弹层：从底部工具组向上弹出 */
 .twin-bright-pop {
   position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); min-width: 190px; z-index: 90;
-  background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: var(--shadow); padding: 9px 11px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid var(--glass-stroke);
+  box-shadow: var(--glass-shadow);
+  color: var(--text); border-radius: var(--radius); padding: 9px 11px;
 }
 .twin-bright-pop .twin-bp-title { font-size: 10px; color: var(--muted); letter-spacing: .5px; margin-bottom: 8px; }
 .twin-bright-pop .twin-bp-row { display: flex; align-items: center; gap: 6px; }
 .twin-bright-pop .twin-bp-range { flex: 1; min-width: 0; height: 4px; margin: 0; cursor: pointer; accent-color: var(--accent-d); }
 .twin-bright-pop .twin-bp-label { font-size: 10px; color: var(--faint); flex: 0 0 auto; }
 .twin-bright-pop .twin-bp-val { font-size: 10px; color: var(--muted); min-width: 30px; text-align: right; }
-.app.sim-dark .twin-bright-pop { background: var(--panel); border-color: var(--border); }
+.app.sim-dark .twin-bright-pop { background: var(--glass-bg-strong); border-color: var(--glass-stroke); }
 .app.sim-dark .twin-bright-pop .twin-bp-title { color: var(--muted); }
 .app.sim-dark .twin-bright-pop .twin-bp-label { color: var(--faint); }
 .app.sim-dark .twin-bright-pop .twin-bp-val { color: var(--text); }
 
 /* 3D 小组子场景 · 左上角返回顶层浮层（工具栏在场景外部独立成行，不再遮挡，恢复默认左上角位置） */
-.group-scene-bar { position: absolute; top: 12px; left: 12px; z-index: 6; display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 10px; box-shadow: var(--shadow); }
+.group-scene-bar { position: absolute; top: 12px; left: 12px; z-index: 6; display: flex; align-items: center; gap: 10px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid var(--glass-stroke);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius); padding: 6px 10px; }
 .gs-back {
   display: inline-flex; align-items: center; gap: 5px; height: var(--btn-h); padding: 0 var(--btn-pad-x);
   background: transparent; border: 1px solid var(--border); border-radius: var(--radius);
@@ -332,7 +349,7 @@ onMounted(() => document.addEventListener('click', onBrightDocClick))
   line-height: 1; white-space: nowrap;
   transition: background .1s, color .1s, border-color .1s;
 }
-.gs-back:hover { background: var(--panel-3); color: var(--text); border-color: var(--accent-d); }
+.gs-back:hover { background: var(--hover); color: var(--text); border-color: var(--accent-d); }
 .gs-back:active { background: var(--sel); }
 .gs-title { font-size: 12px; font-weight: 600; color: var(--text); }
 

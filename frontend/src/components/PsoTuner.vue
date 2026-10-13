@@ -77,7 +77,7 @@
           <b>{{ b.label }}</b><span class="mono">{{ fmt(b.v) }}{{ b.unit }}</span>
         </div>
       </div>
-      <p class="pso-tip">{{ t('在线寻优会逐代把候选设定值写入可调设备，运行期间请勿同时手动改设定值；点「停止」可随时中断并保留当前最优。') }}</p>
+      <p class="pso-tip">{{ t('在线寻优会逐代写入候选设定值，运行期间请勿手动改；点「停止」可中断并保留最优。') }}</p>
     </div>
   </div>
 </template>

@@ -44,8 +44,8 @@
       </div>
       <!-- 附加的可变设备：设定值只调工况、不参与取数；原话术（设定值直接折算电耗）仅适用于流程内可调设备 -->
       <div class="note">{{ dev.ext
-        ? t('该数值为设定值：只用于调节运行工况（如电压↑ → 泵速 / 制冷量↑），不参与取数也不直接参与折碳；本工序的实际功率请在「传感器」中添加电功率传感器设置（其数据源可设为随本设备联动）。')
-        : t('输入框中的数值即为当前设定值（工况值），仿真计算以此为准；调节后经碳引擎折算为运行电耗 / 间接排放，估算随之更新。') }}</div>
+        ? t('该数值为设定值：只调运行工况，不参与取数；实际功率请在「传感器」中添加电功率传感器。')
+        : t('输入框数值即当前设定值（工况值），仿真以此为准，调节后估算随之更新。') }}</div>
     </div>
 
     <!-- 功率型传感器（电功率传感器 kW）：其读数是所属工序能碳核算的功率来源。
@@ -235,7 +235,7 @@ function onExtraSetpoint(key, v) { if (dev.value) store.setDeviceExtraSetpoint(d
 // CEMS 说明性内容移入命令行窗口（避免面板冗余提示）：选中 CEMS 设备时推送一次
 watch(info, (v) => {
   if (v && v.device && v.device.type === 'cems') {
-    store.toast = t('CEMS（烟气连续排放监测系统）直接测得 CO₂ 排放（点源直接监测法），用于与因子法交叉校验；并非所有烟囱都需安装，主体核算仍以活动数据 × 因子为准。')
+    store.toast = t('CEMS 直接测得 CO₂（点源监测法），用于与因子法交叉校验；主体核算仍以活动数据 × 因子为准。')
   }
 }, { immediate: true })
 
@@ -339,7 +339,7 @@ const rtNote = computed(() => {
   const d = dev.value
   if (!d) return ''
   // 功率型传感器即本工序的核算功率来源；可变设备的设定值只调工况、不参与折碳
-  const base = t('本传感器量测有功功率（kW），其读数即所属工序能碳核算的功率来源：可变设备（如变压器 / 变频电源）的设定值只调运行工况，不作为核算数据。')
+  const base = t('本传感器量测有功功率（kW），其读数即本工序核算的功率来源；可变设备设定值只调工况。')
   return base + (d.src === 'device'
     ? t('已绑定数据源管理设备「{name}」，实测功率进入所属工序的能碳核算（范围二折碳）。', { name: (d.device || '—') + (d.prop ? ' · ' + d.prop : '') })
     : t('当前未接入实测（来源：{src}），折碳按该传感器读数计算；把数据源设为「数据源管理设备」并绑定有功功率点位后即为实测功率。', { src: rtSrcText.value }))
@@ -368,8 +368,8 @@ function f(n) { return n == null ? '—' : Number(n).toLocaleString('zh-CN', { m
 .live-dot { width: 6px; height: 6px; border-radius: 2px; background: var(--accent); }
 .trend-foot { display: flex; gap: 14px; flex-wrap: wrap; font-size: 10px; color: var(--muted); margin-top: 6px; }
 .trend-foot b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 400; }
-.feeds { margin-top: 6px; font-size: 11px; line-height: 1.5; color: var(--accent2); background: rgba(95,130,148,.10);
-  border: 1px solid rgba(95,130,148,.28); border-radius: 3px; padding: 5px 8px; }
+.feeds { margin-top: 6px; font-size: 11px; line-height: 1.5; color: var(--accent2); background: var(--fill-2);
+  border: 1px solid var(--stroke); border-radius: 3px; padding: 5px 8px; }
 .note .hl { color: var(--accent2); font-weight: 400; }
 
 /* 可调设备设定调节：统一使用全局 .param-row / .pr-top / .num / .pr-hint */
@@ -380,10 +380,10 @@ function f(n) { return n == null ? '—' : Number(n).toLocaleString('zh-CN', { m
 .couple-box { background: var(--panel-2); border: 1px solid var(--border); border-radius: 3px; padding: 6px 9px; margin-top: 6px; }
 .couple-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cb-badge { font-size: 10px; font-weight: 400; padding: 2px 7px; border-radius: 3px; color: #fff; letter-spacing: .3px; }
-.cb-badge.m { background: #2f7d4f; }      /* 机理：绿（确定物理） */
-.cb-badge.e { background: #b5852a; }      /* 经验：琥珀 */
-.cb-badge.d { background: #0860A8; }      /* 数据：钢蓝（已标定） */
-.cb-badge.u { background: #888; }          /* 未标定 */
+.cb-badge.m { background: var(--green); }      /* 机理：绿（确定物理） */
+.cb-badge.e { background: var(--yellow); }      /* 经验：琥珀 */
+.cb-badge.d { background: var(--accent-d); }      /* 数据：钢蓝（已标定） */
+.cb-badge.u { background: var(--faint); }          /* 未标定 */
 .cb-target { font-size: 11px; color: var(--muted); }
 .cb-target b { color: var(--text); font-weight: 400; }
 .cb-val { margin-left: auto; font-size: 13px; color: var(--accent-d); font-variant-numeric: tabular-nums; }
@@ -400,7 +400,7 @@ function f(n) { return n == null ? '—' : Number(n).toLocaleString('zh-CN', { m
 .cb-row > b { font-variant-numeric: tabular-nums; font-weight: 400; }
 .cb-row > b i { font-size: 10px; color: var(--muted); font-style: normal; }
 .cb-note { font-size: 10px; line-height: 1.6; margin: 8px 0 0; }
-.cb-note.data { color: var(--accent2); background: rgba(95,130,148,.10); border: 1px solid rgba(95,130,148,.28);
+.cb-note.data { color: var(--accent2); background: var(--fill-2); border: 1px solid var(--stroke);
   border-radius: 3px; padding: 5px 8px; }
 /* 高炉数值仿真分析入口按钮（随 TFT 策略面板展示） */
 .tft-entry-btn { display: inline-flex; align-items: center; justify-content: center; width: auto; margin-top: 8px; padding: 0 var(--btn-pad-x); min-height: var(--btn-h); font-size: 11px; text-align: center;

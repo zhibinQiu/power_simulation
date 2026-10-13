@@ -101,7 +101,11 @@
             <span class="devtag" :class="n.metering ? 'tag-met' : 'tag-adj'">{{ n.metering ? t('计量·只读') : t('可调·') + (n.setpoint ?? '—') }}</span>
           </div>
         </div>
-        <div v-if="estOf(n.id) && n.kind === 'process'" class="nest">≈ {{ fmtCo2(estOf(n.id).co2) }} tCO₂/h</div>
+        <!-- 碳排估值：独占底部一行（不再浮在端口区上遮挡出入端口），无结果时保留占位行以稳定卡高 -->
+        <div v-if="n.kind === 'process'" class="nest">
+          <em>{{ t('碳排') }}</em>
+          <span class="nest-v"><b class="mono">{{ estOf(n.id) ? fmtCo2(estOf(n.id).co2) : '—' }}</b><i>tCO₂/h</i></span>
+        </div>
       </div>
     </div>
 
@@ -139,7 +143,7 @@
 
     <div v-if="!visibleNodes.length" class="flow-empty">
       <template v-if="store.scheme.activeGroupId">{{ t('该小组内暂无设备。从左侧拖入设备卡片归入本组，或双击小组卡片从外部画布把设备拖进来。') }}</template>
-      <template v-else>{{ t('画布为空。从左侧「主工艺线 / 设备 / 原料」拖入节点，或点击顶部工具条「编排 → 长流程模板 / 短流程模板」一键载入。') }}</template>
+      <template v-else>{{ t('画布为空。从左侧拖入节点，或用「编排 → 长/短流程模板」一键载入。') }}</template>
     </div>
   </div>
 </template>
@@ -147,7 +151,8 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useSimStore } from '../stores/sim'
-import { MATERIALS, MATERIAL_MAP, PROCESS_MAP, DEVICE_MAP, materialFamily } from '../data/flowLibrary'
+import { MATERIALS, MATERIAL_MAP, PROCESS_MAP, DEVICE_MAP, materialFamily, nodeHeight,
+  NODE_NW as NW, NODE_HEADER as HEADER, NODE_PORT_Y0 as PORT_Y0, NODE_GAP as GAP } from '../data/flowLibrary'
 import DeviceGlyph from './DeviceGlyph.vue'
 import { openContextMenu } from '../composables/contextMenu'
 import { t } from '../i18n'
@@ -155,7 +160,7 @@ import { t } from '../i18n'
 const store = useSimStore()
 const canvasEl = ref(null)
 const W = 4000, H = 3000
-const NW = 196, HEADER = 32, PORT_Y0 = 46, GAP = 24
+/* 几何常量取自 flowLibrary（与 store 排布 / 自动布局同源，避免两处漂移） */
 
 const drag = ref(null)          // {type:'node'|'pan'|'connect'|'group', ...}
 const tempConn = ref(null)      // {x,y} 画布坐标
@@ -198,12 +203,8 @@ const vpStyle = computed(() => ({
   transformOrigin: '0 0', width: W + 'px', height: H + 'px', position: 'absolute', top: '0', left: '0',
 }))
 
-function nodeH(n) {
-  if (n.kind === 'device') return HEADER + 56
-  // 端口为绝对定位，节点高度需容纳：头部 + 端口基准偏移 + 各端口间距 + 端口高 + 下边距
-  const cnt = n.kind === 'material' ? 1 : Math.max(n.ports.in.length, n.ports.out.length, 1)
-  return HEADER + (PORT_Y0 - 7) + (cnt - 1) * GAP + 16 + 12
-}
+// 工艺节点高度与 store 自动布局同源：已含底部碳排估算行（NODE_NEST_H）
+function nodeH(n) { return nodeHeight(n) }
 function nodeStyle(n) {
   return { left: n.x + 'px', top: n.y + 'px', width: NW + 'px', minHeight: nodeH(n) + 'px' }
 }
@@ -234,7 +235,7 @@ function groupBox(g) {
     y = g.y - 26
   }
   const cnt = Math.max(groupPorts(g, 'in').length, groupPorts(g, 'out').length, 1)
-  const h = HEADER + (PORT_Y0 - 7) + (cnt - 1) * GAP + 16 + 12
+  const h = HEADER + (PORT_Y0 - 7) + (cnt - 1) * GAP + 16 + 8
   return { x, y, w: NW, h }
 }
 function groupStyle(g) {
@@ -284,9 +285,9 @@ function portStyle(n, dir, i) {
 function portPos(n, dir, portId) {
   const arr = dir === 'in' ? n.ports.in : n.ports.out
   const i = arr.findIndex((p) => p.id === portId)
-  // 锚点取圆点中心：x 在框内(8px+半径)，y 对齐实际圆点中心(头部约32 + 端口基准39 + 半径~5.5)
+  // 锚点取圆点中心：x 在框内(8px+半径)，y 对齐实际圆点中心(头部 22 + 端口基准 29 + 半径~5.5)
   const x = dir === 'in' ? n.x + 13 : n.x + NW - 13
-  const y = n.y + 76 + i * GAP
+  const y = n.y + 56 + i * GAP
   return { x, y }
 }
 function hashCode(s) { let h = 0; for (let i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0 } return Math.abs(h) }
@@ -683,7 +684,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .flow-canvas { position: absolute; inset: 0; overflow: hidden; background:
-  radial-gradient(circle at 1px 1px, rgba(0,90,158,.08) 1px, transparent 0) 0 0 / 22px 22px,
+  radial-gradient(circle at 1px 1px, rgba(0,0,0,.09) 1px, transparent 0) 0 0 / 22px 22px,
   var(--bg); cursor: grab; }
 .flow-canvas:active { cursor: grabbing; }
 .viewport { }
@@ -709,7 +710,7 @@ onBeforeUnmount(() => {
   box-shadow: var(--shadow); z-index: 1; cursor: grab; user-select: none; overflow: hidden; }
 .fgroup:active { cursor: grabbing; }
 .fgroup:hover { border-color: var(--yellow); }
-.fgroup.sel { border-color: var(--accent2); box-shadow: 0 0 0 1px rgba(26,127,212,.5); }
+.fgroup.sel { border-color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
 .fgroup .gname { flex: 1; font-size: 12px; white-space: normal; word-break: break-all; line-height: 1.35;
   overflow: hidden; cursor: pointer; }
 .fgroup .gname-in { flex: 1; min-width: 0; font-size: 12px; background: var(--input, var(--bg)); color: var(--text);
@@ -718,25 +719,34 @@ onBeforeUnmount(() => {
   color: var(--muted); font-size: 11px; line-height: 1.8; text-align: center; pointer-events: none; }
 /* 子编排面包屑：小组内返回/标题提示 */
 .group-crumb { position: absolute; top: 12px; left: 12px; z-index: 25; display: flex; align-items: center; gap: 10px;
-  background: rgba(255,255,255,.92); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; box-shadow: var(--shadow); }
+  background: var(--glass-bg-strong); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--border); border-radius: var(--r-md); padding: 5px 10px; box-shadow: var(--glass-shadow); }
 .group-crumb .crumb-back { font-size: 12px; padding: 3px 9px; }
 .group-crumb .crumb-name { font-size: 12px; font-weight: 600; color: var(--accent2); }
 .group-crumb .crumb-hint { font-size: 10px; color: var(--muted); }
-.fnode { position: absolute; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px;
+/* 卡片为纵向 flex：端口区吃掉剩余空间，碳排行因此始终贴在卡片最底部
+   （节点高度由 min-height 撑出，行内元素若不撑开会悬在中间） */
+.fnode { position: absolute; display: flex; flex-direction: column;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px;
   box-shadow: var(--shadow); user-select: none; }
-.fnode.sel { border-color: var(--accent2); box-shadow: 0 0 0 1px rgba(26,127,212,.5); }
+.fnode.sel { border-color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
 .fnode.device { border-style: dashed; }
 .fnode.material { border-color: var(--green); }
 /* 小组（同设备多台）：黄色描边标记 */
 .fnode.grouped { border: 2px solid var(--yellow); border-style: dashed; }
 .fnode.grouped:hover { box-shadow: 0 0 0 1px rgba(230,184,0,.55); }
-.ncount { font-size: 10px; font-weight: 700; color: #57410a; background: var(--yellow);
+.ncount { font-size: 10px; font-weight: 700; color: var(--on-accent); background: var(--yellow);
   border-radius: 4px; padding: 1px 5px; flex: 0 0 auto; }
-.nh { display: flex; align-items: center; gap: 7px; padding: 7px 9px; cursor: move; border-bottom: 1px solid var(--line); }
-.nh .nhd { width: 9px; height: 9px; border-radius: 3px; flex: 0 0 auto; }
-.nname { flex: 1; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-.nname-in { flex: 1; min-width: 0; font-size: 12px; background: var(--bg); color: var(--text); border: 1px solid var(--accent); border-radius: 4px; padding: 1px 5px; outline: none; }
-.nbody { position: relative; padding: 6px 0; }
+/* 标题栏高度锁死为 HEADER(22px)：排布锚点（PORT_Y0 / portPos）按此常量换算，不可由 padding 撑高 */
+.nh { display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; cursor: move; border-bottom: 1px solid var(--line-soft); }
+.nh .nhd { width: 8px; height: 8px; border-radius: 2px; flex: 0 0 auto; }
+/* 删除按钮全局为 22×22（会撑高标题），此处压到 14×14 与紧凑标题配套；
+   必须同时清掉全局 button 的 min-height（--btn-h 24px），否则实际高度仍被顶到 24px、冒出标题行 */
+.nh .x-btn { width: 14px; height: 14px; min-height: 14px; padding: 0; font-size: 9px; }
+.nh .ncount { font-size: 9px; padding: 0 4px; line-height: 14px; }
+.nname { flex: 1; min-width: 0; font-size: 11px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.nname-in { flex: 1; min-width: 0; font-size: 11px; line-height: 16px; padding: 0 4px; background: var(--bg); color: var(--text); border: 1px solid var(--accent); border-radius: 4px; outline: none; }
+.nbody { position: relative; flex: 1 1 auto; padding: 6px 0; }
 .addport { position: absolute; right: 6px; top: 3px; font-size: 12px; line-height: 1; color: var(--muted);
   cursor: pointer; padding: 2px 4px; z-index: 3; border: 1px solid transparent; border-radius: 4px; }
 .addport:hover { color: var(--accent-d); border-color: var(--border); background: var(--panel-2); }
@@ -756,17 +766,27 @@ onBeforeUnmount(() => {
   border: 1px solid var(--border); border-radius: 4px; box-shadow: var(--shadow); }
 .devbox { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
 .devtag { font-size: 10px; color: var(--muted); }
-.nest { position: absolute; right: 8px; bottom: 4px; font-size: 10px; color: var(--muted); font-family: ui-monospace, monospace; }
+/* 碳排估值行：卡片最底部一行（flex 纵向布局 + margin-top:auto 兜底），不再浮在端口区上遮挡出入端口 */
+.nest {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 6px;
+  flex: 0 0 auto; height: 18px; margin-top: auto; padding: 0 9px; border-top: 1px solid var(--line-soft);
+  font-size: 10px; color: var(--muted); background: var(--panel); border-radius: 0 0 3px 3px;
+}
+.nest em { flex: 0 0 auto; font-style: normal; color: var(--faint); }
+.nest-v { flex: 0 0 auto; display: flex; align-items: baseline; gap: 3px; }
+.nest b { font-weight: 500; color: var(--accent2); font-variant-numeric: tabular-nums; }
+.nest i { font-style: normal; color: var(--faint); }
 .port-pop { position: absolute; z-index: 30; background: var(--panel); border: 1px solid var(--accent2); border-radius: 8px;
   padding: 8px; width: 200px; box-shadow: var(--shadow); }
 .pp-t { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
 .pp-dir { display: flex; gap: 4px; margin-bottom: 6px; }
 .pp-dir button { flex: 1; padding: 3px 0; font-size: 11px; }
-.pp-dir button.on { background: var(--accent); color: #fff; border-color: var(--accent-d); }
+.pp-dir button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent-d); }
 .pp-btns { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .pp-btns button { padding: 4px 8px; font-size: 12px; }
 .flow-legend { position: absolute; bottom: 12px; left: 12px; display: flex; gap: 14px; align-items: center; z-index: 20;
-  background: rgba(255,255,255,.9); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 10px; color: var(--muted); box-shadow: var(--shadow); }
+  background: var(--glass-bg-strong); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--border); border-radius: var(--r-md); padding: 5px 10px; font-size: 10px; color: var(--muted); box-shadow: var(--glass-shadow); }
 .flow-legend .ln { display: inline-block; width: 18px; height: 0; border-top: 2px solid var(--green); vertical-align: middle; margin-right: 4px; }
 .flow-legend .ln.gas { border-top: 3px dashed var(--gas); }
 .flow-empty { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); max-width: 460px; text-align: center;
