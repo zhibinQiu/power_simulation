@@ -69,3 +69,15 @@ backend/config/github_config.json
 .pytest_cache/
 .codebuddy/
 **/.vite/
+
+# ===== IDE =====
+.vscode/
+.idea/
+
+# ===== Python 虚拟环境 =====
+.venv/
+# ===== 其他 =====
+*.md
+*.jpg
+.pytest_cache/
+backend/data/camera/

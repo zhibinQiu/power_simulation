@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from . import _shared
+from . import _shared, camera_assembler
 from ._shared import (BROKER_STATS, CLOUD_DEVICES, MESSAGE_LOG, MESSAGE_LOG_MAX,
                       READINGS, REPLAY_HISTORY, REPLAY_HISTORY_MAX, _LOCK,
                       _MAIN_PROPS, _PRIMARY_KEYS, _STATE, cloud_agent)
@@ -132,6 +132,21 @@ def _record_message(msg) -> None:
             return
         if isinstance(data, dict):
             _record_box_state(topic, data)
+        return
+
+    # image/#：摄像头图片分片（盒子 -> 平台重组器）。纪律：
+    #   - 一律不进 READINGS/CLOUD_DEVICES/补传历史（payload 是 JSON 但会污染数值缓存）；
+    #   - meta 记消息日志（审计用，量小），fragment 不记（36 条/张会刷屏消息流）。
+    if topic.startswith("image/"):
+        try:
+            data = json.loads(payload)
+        except Exception:
+            return
+        if not isinstance(data, dict):
+            return
+        if topic.rstrip("/").endswith("/meta"):
+            _log_msg(topic, payload)
+        camera_assembler.handle_image_message(topic, data)
         return
 
     _log_msg(topic, payload)

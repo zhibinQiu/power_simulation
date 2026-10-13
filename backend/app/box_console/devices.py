@@ -57,6 +57,7 @@ def _device_fingerprint(d: Dict[str, Any]) -> str:
         json.dumps(d.get("bluetooth") or {}, sort_keys=True),
         json.dumps(d.get("lora") or {}, sort_keys=True),
         json.dumps(d.get("cellular") or {}, sort_keys=True),
+        json.dumps(d.get("camera") or {}, sort_keys=True),
         json.dumps(props),
     ]
     return json.dumps(parts, ensure_ascii=False, sort_keys=True)
@@ -136,6 +137,7 @@ def _device_yaml_kwargs(d: Dict[str, Any]) -> Dict[str, Any]:
         "bluetooth": d.get("bluetooth") or {},
         "lora": d.get("lora") or {},
         "cellular": d.get("cellular") or {},
+        "camera": d.get("camera") or {},
         "cloudDevice": d.get("cloudDevice") or "",
         "hwId": d.get("hwId") or "",
     }
@@ -258,6 +260,7 @@ def create_device(p: Dict[str, Any]) -> Dict[str, Any]:
         "bluetooth": p.get("bluetooth") or {},
         "lora": p.get("lora") or {},
         "cellular": p.get("cellular") or {},
+        "camera": p.get("camera") or {},
         "properties": props_for_sync,
         "yaml": yamls["device"], "created_at": int(time.time()),
         "status": "reporting",
@@ -323,7 +326,7 @@ def update_model(p: Dict[str, Any]) -> Dict[str, Any]:
         "modelName": name, "deviceName": name + "-model-preview", "namespace": namespace,
         "nodeName": "edge-node", "collectCycle": 1000, "protocol": protocol,
         "properties": props, "comm": {}, "opcua": {}, "bluetooth": {},
-        "lora": {}, "cellular": {},
+        "lora": {}, "cellular": {}, "camera": {},
     })
     if mode == "dryRun":
         return {"ok": True, "mode": "dryRun", "yamls": {"model": yamls["model"]}}

@@ -687,7 +687,7 @@
               <select v-model="cmdForm.op" class="cbx-input cbx-sm" @change="onCmdOpChange">
                 <option v-for="o in cmdOpOptions" :key="o.k" :value="o.k">{{ t(o.l) }}</option>
               </select>
-              <span v-if="cmdDevMeta && !cmdDevMeta.isLora && !cmdDevMeta.isModbus" class="cbx-sec-hint">{{ t('仅支持 Modbus / LoRaWAN 设备，其余协议请用「原始消息」直接调 MQTT') }}</span>
+              <span v-if="cmdDevMeta && !cmdDevMeta.isLora && !cmdDevMeta.isModbus && !cmdDevMeta.isCamera" class="cbx-sec-hint">{{ t('仅支持 Modbus / LoRaWAN / 摄像头设备，其余协议请用「原始消息」直接调 MQTT') }}</span>
             </div>
 
             <!-- LoRaWAN：读=主动取数，写=自定义下行 -->
@@ -705,6 +705,19 @@
                   <label>{{ t('端口') }}</label><input v-model="cmdForm.fPort" class="cbx-input cbx-num" placeholder="2"/>
                 </template>
                 <span class="cbx-sec-hint" v-if="cmdForm.op === 'read'">{{ t('读 = 下行取数一拍（设备需填了从站号才会下行轮询）并等终端回传') }}</span>
+              </div>
+            </template>
+
+            <!-- 串口摄像头：抓拍（命令驱动，约 30~60s，整事务持 485 总线锁） -->
+            <template v-if="cmdDevMeta && cmdDevMeta.isCamera">
+              <div class="cbx-form-row">
+                <label>{{ t('尺寸档') }}</label>
+                <select v-model="cmdForm.camSize" class="cbx-input cbx-sm">
+                  <option value="1">1 · 160x120（{{ t('默认，最稳') }}）</option>
+                  <!-- 80x60（size=0）档已移除：SVL130w A 版协议尺寸码从 1 起步（1=160x120 为最小档），
+                       平台曾自定义的 0 档真机固件不认识，下发会被摄像头错误应答拒绝（2026-10-12 实测） -->
+                </select>
+                <span class="cbx-sec-hint">{{ t('抓拍约 30~60s：盒子取图后经 image/# 分片回传，平台重组落盘；拍图间隔 ≥15s，期间 Modbus 采集排队不丢数；图片在设备「实时数据」对话框查看') }}</span>
               </div>
             </template>
 
@@ -826,6 +839,7 @@
                   <option value="bluetooth">Bluetooth</option>
                   <option value="lora">{{ t('LoRaWAN（LoRa 网关）') }}</option>
                   <option value="cellular">{{ t('5G/4G 模块自监控') }}</option>
+                  <option value="camera">{{ t('串口摄像头') }}</option>
                 </select>
               </div>
               <div class="cbx-form-row">
@@ -923,6 +937,24 @@
                   <label>{{ t('蜂窝网卡') }}</label><input v-model="editForm.cellular.iface" class="cbx-input" style="width:90px" placeholder="wwan0"/>
                 </div>
               </template>
+              <!-- 串口摄像头协议参数（A 版协议 camId 寻址；与 Modbus 共用 485 总线锁） -->
+              <template v-else-if="editForm.protocol === 'camera'">
+                <div class="cbx-form-row">
+                  <label>{{ t('串口') }}</label><input v-model="editForm.comm.serialPort" class="cbx-input" style="width:140px" placeholder="/dev/ttyRS485"/>
+                  <label>{{ t('波特率') }}</label><input v-model.number="editForm.comm.baudRate" type="number" class="cbx-input" style="width:90px"/>
+                  <label>{{ t('摄像头 ID') }}</label><input v-model.number="editForm.camera.camId" type="number" class="cbx-input" style="width:70px" placeholder="1"/>
+                  <label>{{ t('尺寸档') }}</label>
+                  <select v-model="editForm.camera.size" class="cbx-select">
+                    <option value="1">1 · 160x120（{{ t('默认，最稳') }}）</option>
+                    <!-- 80x60（size=0）档已移除：SVL130w A 版协议尺寸码从 1 起步（1=160x120 为最小档），
+                         平台曾自定义的 0 档真机固件不认识，下发会被摄像头错误应答拒绝（2026-10-12 实测） -->
+                  </select>
+                  <label>{{ t('分包大小') }}</label><input v-model.number="editForm.camera.packet" type="number" class="cbx-input" style="width:80px" placeholder="512"/>
+                </div>
+                <div class="cbx-form-row">
+                  <span class="cbx-sec-hint">{{ t('命令驱动抓拍（不在周期采集内读图）：平台「手动抓拍」→ 盒子取图 → MQTT 分片回传重组；与 Modbus 采集共用 485 总线锁，拍图间隔 ≥15s') }}</span>
+                </div>
+              </template>
 
               </template>
               <!-- 属性点位：设备已绑定模型时点位由模型承载；仅模型本体或未绑模型的设备在此编辑 -->
@@ -1002,7 +1034,40 @@
               <span v-if="devRt" class="cbx-sec-hint">{{ t('节点') }} {{ devRt.node }} · {{ t('模型') }} {{ devRt.model }} · {{ t('每 3s 自动刷新') }}<template v-if="devRt.lastOnlineTime"> · {{ t('最后在线') }} {{ fmtAgo(devRt.lastOnlineTime) }}</template></span>
               <button class="x-btn lg" @click="closeDevRealtime" :aria-label="t('关闭')">✕</button>
             </div>
-            <div v-if="devRt && devRt.twins && devRt.twins.length" class="cbx-rt">
+            <!-- 串口摄像头图片面板（protocol=camera 的设备显示）：手动抓拍 + 最新图片 + 进度。
+                 精简说明（2026-10-12 用户要求）：历史缩略图列表已移除，只保留最新一张抓拍；
+                 删除图片入口随之取消（后端 20 张自动清理 + REST DELETE /api/box/camera/{dev}/images/{id} 仍可用）；
+                 twin chips/实时曲线/属性表对摄像头设备隐藏（见下方 cbx-rt 的 !devRtIsCamera 条件） -->
+            <div v-if="devRtIsCamera" class="cbx-cam">
+              <div class="cbx-cam-head">
+                <b>{{ t('摄像头图片') }}</b>
+                <select v-model="camSize" class="cbx-input cbx-sm" :title="t('尺寸档（仅支持小图，大图分片量大已禁用）')">
+                  <option value="1">1 · 160x120（{{ t('默认，最稳') }}）</option>
+                  <!-- 80x60（size=0）档已移除：SVL130w A 版协议尺寸码从 1 起步（1=160x120 为最小档），
+                       平台曾自定义的 0 档真机固件不认识，下发会被摄像头错误应答拒绝（2026-10-12 实测） -->
+                </select>
+                <button class="cbx-op primary" :disabled="camBusy" @click="doCapture">{{ camBusy ? t('下发中…') : t('手动抓拍') }}</button>
+                <span v-if="camAssembling" class="cbx-sec-hint">
+                  {{ t('接收中') }} {{ camAssembling.received }}/{{ camAssembling.total }} {{ t('片') }}<template v-if="camAssembling.resendRounds"> · {{ t('补发第 {n} 轮', { n: camAssembling.resendRounds }) }}</template>
+                </span>
+                <span v-else class="cbx-sec-hint">{{ t('抓拍约 30~60s，面板每 5s 自动刷新；拍图间隔 ≥15s') }}</span>
+              </div>
+              <div v-if="camLatest" class="cbx-cam-latest">
+                <img :src="camLatestUrl" :alt="camLatest.imageId" @click="camPreview = camLatestUrl"/>
+                <div class="cbx-cam-meta">
+                  <div><b>{{ t('最新图片') }}</b>：<code>{{ camLatest.imageId }}</code></div>
+                  <div>{{ fmtTime(camLatest.ts) }} · {{ camLatest.bytes }} B · {{ camLatest.packets }} {{ t('片') }}<template v-if="camLatest.badCrc"> · {{ t('校验失败 {n} 包', { n: camLatest.badCrc }) }}</template></div>
+                  <div v-if="!camLatest.jpegOk" class="cbx-cam-warn">{{ t('JPEG 校验异常') }}：{{ camLatest.jpegNote }}</div>
+                </div>
+              </div>
+              <div v-if="!camLatest" class="cbx-empty">{{ t('暂无图片：点击「手动抓拍」拍第一张') }}</div>
+              <!-- 点击放大预览 -->
+              <div v-if="camPreview" class="cbx-mask" style="z-index:60" @click.self="camPreview = ''">
+                <img :src="camPreview" class="cbx-cam-zoom" @click="camPreview = ''"/>
+              </div>
+            </div>
+            <!-- twin chips/曲线/属性表：摄像头设备隐藏（只看最新一张抓拍图，见上方图片面板精简注释） -->
+            <div v-if="!devRtIsCamera && devRt && devRt.twins && devRt.twins.length" class="cbx-rt">
               <!-- 属性切换 -->
               <div class="cbx-rt-tabs">
                 <button v-for="tp in devRt.twins" :key="tp.propertyName"
@@ -1067,7 +1132,10 @@
               </table>
               <p class="cbx-note">{{ t('读数双源融合：① 云端 twins（边缘 Mapper 实时同步）；② 盒子 MQTT 直报 data/#（平台订阅，时间戳更新时优先）。双源均无数据说明盒子侧采集或上报异常，可先确认概览「链路状态」cloud/crds 推送是否新鲜。盒子运行期无需 IP，数据由盒子主动上报。折线图为 3s 滑动窗口、最多 120 点；「无有效数据」多为传感器无信号或未标定。') }}</p>
             </div>
-            <div v-else class="cbx-empty">{{ t('该设备暂无实时上报数据（设备可能未下发云端，或边缘未上报）。') }}</div>
+            <!-- 双源融合脚注：摄像头设备同样显示（2026-10-12 用户要求加回）；
+                 相比 cbx-rt 内版本去掉「折线图为 3s 滑动窗口」一句（摄像头对话框无曲线） -->
+            <p v-if="devRtIsCamera" class="cbx-note">{{ t('读数双源融合：① 云端 twins（边缘 Mapper 实时同步）；② 盒子 MQTT 直报 data/#（平台订阅，时间戳更新时优先）。双源均无数据说明盒子侧采集或上报异常，可先确认概览「链路状态」cloud/crds 推送是否新鲜。盒子运行期无需 IP，数据由盒子主动上报；「无有效数据」多为传感器无信号或未标定。') }}</p>
+            <div v-else-if="!devRtIsCamera" class="cbx-empty">{{ t('该设备暂无实时上报数据（设备可能未下发云端，或边缘未上报）。') }}</div>
           </div>
         </div>
 
@@ -1170,6 +1238,7 @@
                   <option value="bluetooth">Bluetooth</option>
                   <option value="lora">{{ t('LoRaWAN（LoRa 网关）') }}</option>
                   <option value="cellular">{{ t('5G/4G 模块自监控') }}</option>
+                  <option value="camera">{{ t('串口摄像头') }}</option>
                 </select>
               </div>
               <div class="cbx-form-row">
@@ -1253,6 +1322,24 @@
                   <label>{{ t('波特率') }}</label><input v-model.number="form.cellular.baudRate" type="number" class="cbx-input" style="width:90px"/>
                   <label>APN</label><input v-model="form.cellular.apn" class="cbx-input" style="width:100px" placeholder="cmnet"/>
                   <label>{{ t('蜂窝网卡') }}</label><input v-model="form.cellular.iface" class="cbx-input" style="width:90px" placeholder="wwan0"/>
+                </div>
+              </template>
+              <!-- 串口摄像头协议参数（A 版协议 camId 寻址；与 Modbus 共用 485 总线锁） -->
+              <template v-else-if="form.protocol === 'camera'">
+                <div class="cbx-form-row">
+                  <label>{{ t('串口') }}</label><input v-model="form.comm.serialPort" class="cbx-input" style="width:130px" placeholder="/dev/ttyRS485"/>
+                  <label>{{ t('波特率') }}</label><input v-model.number="form.comm.baudRate" type="number" class="cbx-input" style="width:90px"/>
+                  <label>{{ t('摄像头 ID') }}</label><input v-model.number="form.camera.camId" type="number" class="cbx-input" style="width:70px" placeholder="1"/>
+                  <label>{{ t('尺寸档') }}</label>
+                  <select v-model="form.camera.size" class="cbx-select">
+                    <option value="1">1 · 160x120（{{ t('默认，最稳') }}）</option>
+                    <!-- 80x60（size=0）档已移除：SVL130w A 版协议尺寸码从 1 起步（1=160x120 为最小档），
+                         平台曾自定义的 0 档真机固件不认识，下发会被摄像头错误应答拒绝（2026-10-12 实测） -->
+                  </select>
+                  <label>{{ t('分包大小') }}</label><input v-model.number="form.camera.packet" type="number" class="cbx-input" style="width:80px" placeholder="512"/>
+                </div>
+                <div class="cbx-form-row">
+                  <span class="cbx-sec-hint">{{ t('命令驱动抓拍（不在周期采集内读图）：保存并下发后，在「实时数据」对话框手动抓拍；图片经 MQTT 分片回传重组，拍图间隔 ≥15s') }}</span>
                 </div>
               </template>
 
@@ -1341,6 +1428,7 @@
                   <option value="bluetooth">Bluetooth</option>
                   <option value="lora">{{ t('LoRaWAN（LoRa 网关）') }}</option>
                   <option value="cellular">{{ t('5G/4G 模块自监控') }}</option>
+                  <option value="camera">{{ t('串口摄像头') }}</option>
                 </select>
                 <label>{{ t('命名空间') }}</label><input v-model="modelForm.namespace" class="cbx-input" style="width:110px" placeholder="default"/>
               </div>
@@ -1855,6 +1943,8 @@ const form = reactive({
   // slaveId：LoRa 从站号——同一台 LoRa 透传 DTU 下挂多台 485 传感器时，靠它区分设备（0=被动上报，不下发问帧）
   lora: { broker: '127.0.0.1', port: 41884, applicationID: '1', devEUI: '', appKey: '', region: 'CN470', dataRate: 'SF7BW125', slaveId: 0 },
   cellular: { serialPort: '/dev/ttyUSB2', baudRate: 115200, apn: 'cmnet', iface: 'wwan0' },
+  // 串口摄像头：camId=A 版协议设备 ID（总线寻址），size=尺寸档（仅 0/1 小图），packet=分包大小
+  camera: { camId: 1, size: '1', packet: 512 },
   properties: [{ name: 'value', type: 'float', accessMode: 'r', registerType: 'holdingRegister', register: 0, scale: 1, unit: '' }],
 })
 const preview = ref('')
@@ -2771,6 +2861,11 @@ function devAddrOf(dev) {
     return [link, sl].filter(Boolean).join(' · ')
   }
   if (proto === 'cellular') return String((src.cellular || {}).serialPort || '').trim()
+  if (proto === 'camera') {
+    const port = String((src.comm || {}).serialPort || '').trim()
+    const camId = (src.camera || {}).camId
+    return [port, camId != null && camId !== '' ? 'camId=' + camId : ''].filter(Boolean).join(' · ')
+  }
   return ''
 }
 // 外部数据源的接入地址：MQTT 源取 Broker 地址:端口（params 既有扁平键也有嵌套结构）
@@ -3206,6 +3301,7 @@ const editForm = reactive({
   bluetooth: { macAddress: 'AA:BB:CC:DD:EE:FF' },
   lora: { broker: '127.0.0.1', port: 41884, applicationID: '1', devEUI: '', appKey: '', region: 'CN470', dataRate: 'SF7BW125', slaveId: 0 },
   cellular: { serialPort: '/dev/ttyUSB2', baudRate: 115200, apn: 'cmnet', iface: 'wwan0' },
+  camera: { camId: 1, size: '1', packet: 512 },
   properties: [],
 })
 async function openEditDev(d) {
@@ -3250,6 +3346,10 @@ async function openEditDev(d) {
   editForm.cellular.baudRate = cellular.baudRate || 115200
   editForm.cellular.apn = cellular.apn || 'cmnet'
   editForm.cellular.iface = cellular.iface || 'wwan0'
+  const cam = src.camera || {}
+  editForm.camera.camId = cam.camId != null ? cam.camId : 1
+  editForm.camera.size = cam.size != null ? String(cam.size) : '1'
+  editForm.camera.packet = cam.packet != null ? cam.packet : 512
   editForm.properties.splice(0, editForm.properties.length, ...(src.properties || []).map((p) => ({ ...p })))
   editOpen.value = true
 }
@@ -3403,12 +3503,73 @@ function openDevRealtime(d) {
   refreshDevRt()
   if (stopRtPoll) stopRtPoll()
   stopRtPoll = visiblePoll(refreshDevRt, 3000)
+  // 摄像头设备：附带图片面板（5s 轮询图片索引与重组进度）
+  camImages.value = []
+  camAssembling.value = null
+  camPreview.value = ''
+  if (devRtIsCamera.value) {
+    refreshCameraImages()
+    if (stopCamPoll) stopCamPoll()
+    stopCamPoll = visiblePoll(refreshCameraImages, 5000)
+  }
 }
 function closeDevRealtime() {
   devRtOpen.value = false
   devRtName.value = ''
   rtHover.value = -1
   if (stopRtPoll) { stopRtPoll(); stopRtPoll = null }
+  if (stopCamPoll) { stopCamPoll(); stopCamPoll = null }
+}
+
+// ---- 串口摄像头图片面板（devRt 对话框内，protocol=camera 的设备显示）----
+// 链路：手动抓拍 -> cmd/{box}/camera -> 盒子取图 -> image/# 分片 -> 平台重组落盘；
+// 面板轮询 /box/camera/{device}/images 拿索引与重组进度（已收/总包数）。
+const devRtIsCamera = computed(() => {
+  if (!devRtName.value) return false
+  const local = (devices.value.devices || []).find((x) => x.name === devRtName.value)
+  const proto = String((local && local.protocol) || '').toLowerCase()
+  return ['camera', 'cam', 'svl130w'].includes(proto)
+})
+const camImages = ref([])        // 图片索引（最新在前，含失败记录）
+const camAssembling = ref(null)  // 重组进行中的第一张 {received,total,resendRounds}
+const camBusy = ref(false)
+const camSize = ref('1')
+const camPreview = ref('')       // 点击放大预览的图片 URL
+let stopCamPoll = null
+const camLatest = computed(() => camImages.value.find((x) => x.status === 'completed' && x.file) || null)
+const camLatestUrl = computed(() => (camLatest.value ? camImgUrl(camLatest.value) : ''))
+function camImgUrl(img) { return api.boxCameraImageUrl(devRtName.value, img.imageId) }
+async function refreshCameraImages() {
+  if (!devRtIsCamera.value) return
+  try {
+    const r = await api.boxCameraImages(devRtName.value)
+    camImages.value = r.images || []
+    camAssembling.value = (r.assembling || [])[0] || null
+  } catch (e) { /* 轮询失败下轮重试 */ }
+}
+async function doCapture() {
+  if (camBusy.value) return
+  camBusy.value = true
+  try {
+    const r = await api.boxCameraCapture(devRtName.value, '', camSize.value)
+    if (r.ok) {
+      store.showToast(t('抓拍已下发（约 30~60s），完成后自动刷新'), 'success')
+      setTimeout(refreshCameraImages, 3000)
+    } else {
+      store.showToast(t('抓拍下发失败') + '：' + (r.error || r.detail || ''), 'error')
+    }
+  } catch (e) {
+    store.showToast(t('抓拍下发失败') + '：' + (e.message || e), 'error')
+  } finally {
+    camBusy.value = false
+  }
+}
+async function delCameraImage(img) {
+  try {
+    const r = await api.boxCameraDeleteImage(devRtName.value, img.imageId)
+    if (r.ok) { store.showToast(t('图片已删除'), 'success'); refreshCameraImages() }
+    else store.showToast(t('删除失败') + '：' + (r.error || r.detail || ''), 'error')
+  } catch (e) { store.showToast(t('删除失败') + '：' + (e.message || e), 'error') }
 }
 
 // ---- 折线图数据与坐标计算 ----
@@ -3605,6 +3766,7 @@ const cmdForm = reactive({
   addr: '', dtype: 'uint16', fc: '3', scale: '',
   wKind: 'holding', value: '',
   loraKind: 'hex', loraData: '', fPort: '2',
+  camSize: '1',   // 摄像头尺寸档：仅 1=160x120（A 版协议最小档；0/80x60 真机不存在，大图分片量大，均拒绝）
 })
 const cmdSending = ref(false)
 const cmdPending = ref(null)   // { rid, box }
@@ -3654,18 +3816,20 @@ const cmdDevMeta = computed(() => {
   const proto = String((local && local.protocol) || (cloud && protoOfDev(cloud)) || '').toLowerCase()
   const isLora = ['lora', 'lorawan'].includes(proto)
   const isModbus = ['modbus', 'modbus-rtu', 'rtu', 'modbus-tcp', 'tcp'].includes(proto)
+  const isCamera = ['camera', 'cam', 'svl130w'].includes(proto)
   const props = (local && Array.isArray(local.properties) ? local.properties : []).filter((x) => x && x.name)
   // 可写点位 = 设备手工配置的 writes[] + 设备模型中标为可写（accessMode=rw）的属性
   // （模型可写属性在下发盒子时会自动派生为可写点位，见后端 to_mapper_device）
   const writes = writablePointsOf(local)
   // LoRa 设备的从站号在 lora.slaveId（同一 DTU 下多台 485 传感器靠它区分），Modbus 在 comm.slaveID
   const slave = isLora ? ((local && local.lora && local.lora.slaveId) || '') : ((local && local.comm && local.comm.slaveID) || '')
-  return { name, local, cloud, proto, isLora, isModbus, props, writes, slave }
+  return { name, local, cloud, proto, isLora, isModbus, isCamera, props, writes, slave }
 })
 const cmdOpOptions = computed(() => {
   const m = cmdDevMeta.value
   if (m && m.isLora) return [{ k: 'read', l: '读（下行取数）' }, { k: 'write', l: '写设定（下行）' }]
   if (m && m.isModbus) return [{ k: 'read', l: '读寄存器' }, { k: 'write', l: '写设定' }]
+  if (m && m.isCamera) return [{ k: 'capture', l: '抓拍（拍照回传）' }]
   return [{ k: 'read', l: '读' }, { k: 'write', l: '写设定' }]
 })
 // 设备可写点位：手工配置的 writes[] + 设备模型中具备可写能力（accessMode=rw）的属性。
@@ -3851,10 +4015,13 @@ function composeCmdPayload() {
   const name = cmdForm.device
   if (!box || !name) throw new Error(t('请先选择盒子与设备'))
   const m = cmdDevMeta.value
-  if (!m || (!m.isLora && !m.isModbus)) throw new Error(t('该设备协议暂不支持设备命令（仅 Modbus / LoRaWAN），请用「原始消息」直发 MQTT'))
+  if (!m || (!m.isLora && !m.isModbus && !m.isCamera)) throw new Error(t('该设备协议暂不支持设备命令（仅 Modbus / LoRaWAN / 摄像头），请用「原始消息」直发 MQTT'))
   // 从站号（slaveId）不随命令下发：它属于设备配置，盒子按配置里的站号寻址，
   // 避免命令临时指定站号把值写到同一总线上的另一台设备。
   const base = { box, device: name }
+  // 摄像头抓拍：盒子 CameraReader 整事务持 485 总线锁执行 H/R/E/F（30~60s），
+  // 图片经 image/# 分片回传平台重组；尺寸档仅 0/1（大图两侧拒绝）
+  if (m.isCamera) return { ...base, cmd: 'capture', resolution: cmdForm.camSize || '1' }
   if (m.isLora) {
     if (cmdForm.op === 'read') return { ...base, cmd: 'read' }
     const down = { ...base, cmd: 'down' }
@@ -3977,7 +4144,8 @@ async function execCmd() {
 // 命令回报轮询：盒子经 state/{box}/cmd 回报带 request_id 的事件，平台 /box/apps 聚合返回
 function pollCmdAck(rid, box) {
   const meta = cmdDevMeta.value
-  const deadline = (meta && meta.isLora) ? 20000 : 12000
+  // 摄像头抓拍是 30~60s 长事务（H/R/E/F 全流程 + 分片发布），回报超时放宽到 100s
+  const deadline = (meta && meta.isCamera) ? 100000 : (meta && meta.isLora) ? 20000 : 12000
   const t0 = Date.now()
   const tick = async () => {
     if (!cmdPending.value || cmdPending.value.rid !== rid) return
@@ -4811,4 +4979,19 @@ a.cbx-topo-svc-addr:hover { text-decoration: underline; opacity: 1; }
 .ds-switch input:checked + i::after { left: 16px; }
 .ds-switch span { color: var(--muted); }
 .ds-switch input:checked + i + span { color: var(--green); }
+/* 摄像头图片面板（devRt 对话框内） */
+.cbx-cam { padding: 10px 14px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--border); }
+.cbx-cam-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cbx-cam-latest { display: flex; gap: 12px; align-items: flex-start; }
+.cbx-cam-latest img { width: 240px; border: 1px solid var(--border); border-radius: 6px; cursor: zoom-in; image-rendering: pixelated; }
+.cbx-cam-meta { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+.cbx-cam-warn { color: var(--red); }
+.cbx-cam-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.cbx-cam-item { position: relative; width: 96px; display: flex; flex-direction: column; gap: 3px; }
+.cbx-cam-item img { width: 96px; height: 72px; object-fit: cover; border: 1px solid var(--border); border-radius: 4px; cursor: zoom-in; image-rendering: pixelated; }
+.cbx-cam-item.bad { opacity: .75; }
+.cbx-cam-failed { width: 96px; height: 72px; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--red); border-radius: 4px; color: var(--red); font-size: 12px; }
+.cbx-cam-ts { font-size: 10px; color: var(--muted); }
+.cbx-cam-item .cbx-tiny { position: absolute; top: 2px; right: 2px; }
+.cbx-cam-zoom { max-width: 86vw; max-height: 86vh; margin: 7vh auto; display: block; border: 1px solid var(--border); border-radius: 8px; cursor: zoom-out; image-rendering: pixelated; background: #000; }
 </style>

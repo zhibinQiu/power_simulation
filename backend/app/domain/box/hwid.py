@@ -45,6 +45,15 @@ def hwid_of(dev: Dict[str, Any]) -> str:
         slave = str(lora.get("slaveId") or lora.get("slaveID") or "").strip()
         return slug(f"lora-{eui}" + (f"-s{slave}" if slave not in ("", "0") else ""))
 
+    # 串口摄像头（须先于 comm 的 Modbus 分支判断：摄像头也用 serialPort 通信参数，
+    # 但它的「从站地址」是 A 版协议 camId，与 Modbus 从站号是两套独立地址空间）
+    if proto.startswith("camera") or proto in ("cam", "svl130w"):
+        cam = dev.get("camera") or {}
+        port_name = str(comm.get("serialPort") or cam.get("port") or "") \
+            .rstrip("/").split("/")[-1]
+        if port_name:
+            return slug(f"cam-{port_name}-id{cam.get('camId', 1)}")
+
     if comm:
         slave = comm.get("slaveID", comm.get("slaveId"))
         ctype = str(comm.get("commType") or "").strip().lower()

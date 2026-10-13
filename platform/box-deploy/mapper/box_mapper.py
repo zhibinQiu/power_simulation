@@ -17,6 +17,8 @@
       - opcua        ：以太网（asyncua，需离线装 wheel；未安装时该设备自动告警跳过）
       - lora         ：LoRaWAN（多从站轮询：逐站下发 Modbus 问帧、按站号收应答）
       - cellular     ：5G/4G 模块自监控（AT 命令采信号/ICCID/注册态 + 蜂窝接口计数差分算速率）
+      - camera       ：串口摄像头（智景 SVL130w A 版协议；命令驱动抓拍，图片经 MQTT
+                       image/# 分片直发，盒子不拼图不落盘；与 Modbus 共用 485 总线锁）
   * 实时双源：DMI twins + MQTT data/# 独立直报，任一通道可用平台即可拿到实时数据
   * 自愈：DMI 健康检查周期性重注册，edgecore/CloudHub 重启、dmi.sock 重建后自动恢复
     （盒子运行期无 IP、无法远程运维，全自动恢复不依赖人工干预）
@@ -141,6 +143,8 @@ MQTT_CMD_ACK_TOPIC = MQTT_CFG.get("cmdAckTopic", "state/{box}/deploy")
 MQTT_SERVICES_TOPIC = MQTT_CFG.get("servicesTopic", "state/{box}/services")
 # 生效配置摘要上报主题（三端配置一致性校验：指纹/版本/设备清单）
 MQTT_CONFIG_TOPIC = MQTT_CFG.get("configTopic", "state/{box}/config")
+# 摄像头图片分片主题（盒子 -> 平台）：image/{box}/{device}/meta|fragment（qos=1）
+MQTT_IMAGE_TOPIC_TPL = MQTT_CFG.get("imageTopic", "image/{box}/{device}/{part}")
 
 # 云端部署的应用/模型安装根目录（子目录 = 应用名）
 APP_ROOT = os.environ.get("APP_ROOT", CFG.get("apps", {}).get("dir", "/opt/box-apps"))
@@ -251,7 +255,7 @@ _RUNTIME = {"version": 0, "cfg": None, "devices": [], "applied_ts": 0.0,
             "fingerprint": "", "source": "file"}
 
 _CONFIG_FP_KEYS = ("name", "protocol", "interval", "enabled", "serial", "tcp", "modbus",
-                   "points", "writes", "opcua", "lora", "cellular")
+                   "points", "writes", "opcua", "lora", "cellular", "camera")
 
 
 def config_fingerprint(devices):
@@ -449,6 +453,11 @@ def decode_regs(data: bytes, dtype: str, byte_order: str = "2143"):
 # ---------------------------------------------------------------------------
 class SimpleSerial:
     def __init__(self, port, baud, data, parity, stop):
+        # pty（模拟串口/测试）判定：macOS 上 pty 的 tcdrain() 是已知系统缺陷——
+        # Darwin pty 驱动不实现输出 drain 等待，写后永不返回。真串口（/dev/ttyRS485、
+        # /dev/ttyUSB*）必须保留 tcdrain 保证字节发完再切 RS485 方向；pty 无此需求。
+        # 注意大小写：真串口是 /dev/ttyS0（大写 S），macOS pty 是 /dev/ttys001（小写 s）。
+        self.is_pty = "/dev/ttys" in port or "/dev/pts/" in port
         self.fd = os.open(port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
         fl = fcntl.fcntl(self.fd, fcntl.F_GETFL)
         fcntl.fcntl(self.fd, fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
@@ -503,7 +512,8 @@ class SimpleSerial:
         self._set_lines(False, True)
         time.sleep(0.001)
         os.write(self.fd, data)
-        termios.tcdrain(self.fd)
+        if not self.is_pty:          # Darwin pty 上 tcdrain 永不返回（见 __init__ 注释）
+            termios.tcdrain(self.fd)
         time.sleep(0.001)
         self._set_lines(False, False)
 
@@ -1696,6 +1706,425 @@ class CellularReader:
             self.ser = None
 
 
+# ---------------------------------------------------------------------------
+# 串口摄像头 Reader（智景 SVL130w，A 版协议 U/# 帧，固件 XY-Y-01）
+#
+# 协议实现移植自 camera_capture.py（抓包逆向验证版）：
+#   H 拍图 -> R 帧报图片大小/包数 -> E 逐包取 -> F 数据帧（带累加和校验）。
+# 与 Modbus 设备共存同一 485 总线的纪律（详见《摄像头接入方案.md》）：
+#   - 与 ModbusRtuReader 拿同一把 _port_lock(port)、同一个 _SERIAL_POOL 共享句柄；
+#   - 一次抓拍（H->R->E×N）整事务持锁，期间 Modbus 采集排队——其失败退避
+#     （5s→60s）+ SQLite 断点续传兜底，数据不丢；
+#   - 摄像头是纯命令驱动设备：抓拍/补发由 cmd 线程触发；read_all() 只回内部
+#     运行状态，绝不触碰总线；
+#   - 图片不在盒子拼接/落盘：每取回一包立即经 MQTT image/# 分片直发（qos=1），
+#     平台侧重组、FFD8/FFD9 校验、落盘；
+#   - Z 协议（无 ID、32 字节前导码）仅限产线调试/部署探测，不进本生产链路。
+# ---------------------------------------------------------------------------
+AU_HEAD, AU_TAIL, AU_ERR, AU_DATA = 0x55, 0x23, 0x3F, 0x46
+AU_SIZE_NAMES = {"0": "80x60", "1": "160x120", "2": "320x240", "3": "640x480",
+                 "4": "1280x720", "5": "1280x960"}
+# 仅支持小图档位（默认 1=160x120，约 36 片/张）：size>=2 单张 200~400 片，
+# Broker 分片压力与 paho 队列溢出风险大（方案列为受限配置），两侧直接拒绝。
+CAM_SUPPORTED_SIZES = ("0", "1")
+CAM_MIN_INTERVAL = 15.0     # 拍图间隔下限（固件疲劳约束）
+CAM_CMD_GAP = 2.0           # 总线命令间隔下限
+CAM_PKT_GAP = 0.15          # 取包间隔
+CAM_PKT_REST_EVERY = 10     # 每 10 包静置 1s
+CAM_PKT_TIMEOUT = 4.0       # 单包超时
+CAM_PKT_RETRY = 3           # 单包重试次数
+CAM_TX_TIMEOUT = 120.0      # 整事务持锁上限（到点强制放锁判失败）
+CAM_FATIGUE_REST = 15.0     # 连续失败后静置（固件自愈）并清缓冲断点续取一次
+CAM_PROBE_LOCK_WAIT = 5.0   # K 探测拿总线锁的等待上限：同总线多台 Modbus 高频轮询时
+                            # 锁竞争激烈（真机实测 0.5s 会被反复挤占饿死）；超过仍拿
+                            # 不到（抓拍持锁/总线极端繁忙）本轮跳过上报
+
+
+class CameraError(Exception):
+    pass
+
+
+class CameraTimeout(CameraError):
+    pass
+
+
+def _au_frame(cmd, cam_id, payload=b""):
+    return bytes([AU_HEAD, ord(cmd), cam_id & 0xFF]) + payload + bytes([AU_TAIL])
+
+
+def _au_pop_ack(buf, cmd, cam_id):
+    """缓冲头部切出 'U <cmd> <id> #' 应答（4 字节）。"""
+    if len(buf) >= 4 and buf[0] == AU_HEAD and buf[1] == cmd \
+            and buf[2] == cam_id and buf[3] == AU_TAIL:
+        del buf[:4]
+        return True
+    return False
+
+
+def _au_pop_err(buf, cam_id):
+    """切出错误应答 'U ? <id> #'（摄像头拒绝执行当前命令）。"""
+    if len(buf) >= 4 and buf[0] == AU_HEAD and buf[1] == AU_ERR \
+            and buf[2] == cam_id and buf[3] == AU_TAIL:
+        del buf[:4]
+        return True
+    return False
+
+
+def _au_pop_rframe(buf, cam_id):
+    """切出 R 帧（10 字节）：55 52 id <大小4B LE> <包数2B LE> 23。"""
+    if len(buf) >= 10 and buf[0] == AU_HEAD and buf[1] == ord("R") \
+            and buf[2] == cam_id and buf[9] == AU_TAIL:
+        total = int.from_bytes(buf[3:7], "little")
+        packs = int.from_bytes(buf[7:9], "little")
+        del buf[:10]
+        return total, packs
+    return None
+
+
+def _au_pop_dataframe(buf, cam_id):
+    """切出 F 帧：55 46 id <包号2B> <包长2B> <数据N> <校验2B>（总长 9+N）。"""
+    if len(buf) < 7:
+        return None
+    if not (buf[0] == AU_HEAD and buf[1] == AU_DATA and buf[2] == cam_id):
+        return None
+    pack_no = int.from_bytes(buf[3:5], "little")
+    pack_len = int.from_bytes(buf[5:7], "little")
+    total = 9 + pack_len
+    if len(buf) < total:
+        return None
+    data = bytes(buf[7:7 + pack_len])
+    chk = int.from_bytes(buf[7 + pack_len:total], "little")
+    calc = sum(buf[:7 + pack_len]) & 0xFFFF
+    del buf[:total]
+    return pack_no, data, chk == calc
+
+
+def _au_resync(buf, cam_id):
+    """失同步时丢弃垃圾字节，但**保留头部疑似合法帧的部分**：
+    若 buf 头部是 55 xx <id>（可能是未到齐的应答/F 帧），原样保留等更多数据。
+    ⚠️ 不能无脑切到「下一个 0x55」——JPEG 数据里天然含 0x55，
+    未到齐的 F 帧会被误切掉头，永远拼不齐（此 bug 曾致第 3 包必死）。"""
+    if len(buf) < 3:
+        return                      # 可能是帧头开头，保留
+    if buf[0] == AU_HEAD and buf[2] == cam_id:
+        return                      # 头部像合法帧，保留等到齐
+    i = buf.find(bytes([AU_HEAD]), 1)
+    if i > 0:
+        del buf[:i]
+    elif len(buf) > 4096:
+        buf.clear()
+
+
+class CameraReader:
+    """串口摄像头（命令驱动）：capture()/resend() 由 cmd 线程调用；read_all() 仅回状态。"""
+
+    def __init__(self, d):
+        self.d = d or {}
+        self.name = str(self.d.get("name") or "camera")
+        scfg = self.d.get("serial") or {}
+        ccfg = self.d.get("camera") or {}
+        self.port = scfg.get("port") or ccfg.get("port")
+        # 串口参数与 Modbus 设备同结构（serial 块）；仅 camera 块给了参数时回退用它
+        self.serial_cfg = dict(scfg) if scfg else {
+            "port": self.port, "baudrate": int(ccfg.get("baudRate", 9600)),
+            "databits": 8, "parity": "N", "stopbits": 1}
+        self.cam_id = int(ccfg.get("camId", 1))
+        self.size = str(ccfg.get("size", "1"))
+        self.packet = int(ccfg.get("packet", 512))
+        self.ser = None
+        self._lock = _port_lock(self.port) if self.port else threading.Lock()
+        self._last_cmd_ts = 0.0
+        self._last_capture_ts = 0.0
+        self._image_count = 0
+        self._stat_ok = 0
+        self._stat_total = 0
+        self._last_image = None   # {"imageId","totalSize","totalPackets","ts"}
+        self._light_state = 0     # 补光灯当前状态（K 探测「设为原状态」用；本系统不开灯，恒 0）
+
+    def connect(self):
+        if not self.port:
+            raise ValueError("摄像头设备 %s 未配置串口（serial.port）" % self.name)
+        self.ser = _shared_serial(self.port, self.serial_cfg)
+
+    def read_all(self):
+        # 每拍先做硬件在线探测（2026-10-12 起，替代原「不触总线纯内存读」）：
+        # 平台 data_online=「120s 窗口内有数据」，故探测结果直接映射在线显示——
+        #   - 锁忙（抓拍整事务持锁中）：返回 {} 本轮静默跳过（采集循环对空值不进退避，
+        #     上次成功上报仍在 120s 窗口内保活；抓拍 ~30s 最多跳 1 拍，无离线风险）；
+        #   - 拿到锁且摄像头给出任何协议帧应答（含错误应答——固件可能拒 K，但应答本身
+        #     即证明硬件在总线上）：在线，照报状态；
+        #   - 拿到锁但超时静默：抛 IOError → 采集循环退避停报（5s→60s）→ 平台 120s
+        #     显示离线，与 Modbus/温度计掉线同一机制；插回后探测通过自动恢复。
+        # 遥测键（2026-10-12 裁减后）：仅 last_capture_ts（唯一有信息量的遥测）+
+        # last_image（字符串，走 DMI twins，不进 MQTT data/# 数值主题）。
+        # 锁等待 CAM_PROBE_LOCK_WAIT：同总线上多台 Modbus 设备高频轮询时锁竞争
+        # 激烈（真机实测 0.5s 超时会被反复挤占导致永远探测不到）；超时仍拿不到
+        # （抓拍整事务持锁 / 总线极端繁忙）才本轮跳过。
+        if not self._lock.acquire(timeout=CAM_PROBE_LOCK_WAIT):
+            return {}
+        try:
+            online = self._probe_online()
+        finally:
+            self._lock.release()
+        if not online:
+            raise IOError("摄像头 K 探测无应答（camId=%d 掉线/接线/供电）" % self.cam_id)
+        return {"last_capture_ts": float(self._last_capture_ts),
+                "last_image": str((self._last_image or {}).get("imageId") or "")}
+
+    def _probe_online(self, timeout=3.0):
+        """K 探测：补光灯「设为原状态」（无副作用）验证摄像头硬件在总线上。
+
+        返回 True=在线（收到任何协议帧应答）/ False=超时静默。调用方须已持锁。
+        Z 版 ver 无 ID 寻址（多机共线全员应答撞车），A 版无版本查询——K 是
+        A 版命令集中代价最小的带寻址探测（参考《A版协议命令手册》K 补光灯 1/0）。
+        """
+        self._cmd_gap_wait()   # 与抓拍命令同样遵守 2s 命令间隔纪律（A 版固件疲劳特性）
+        try:
+            self._ensure_ser().drain()   # 清掉总线上迟到的 Modbus 应答/噪声
+        except Exception:
+            pass
+        self._write(_au_frame("K", self.cam_id, bytes([self._light_state & 0xFF])))
+        buf = bytearray()
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            chunk = self._read(256, 0.3)
+            if chunk:
+                buf += chunk
+            # 正常应答 'U K id #' 或错误应答 'U ? id #' 都算在线（应答即证明硬件在）
+            if _au_pop_ack(buf, ord("K"), self.cam_id) or _au_pop_err(buf, self.cam_id):
+                return True
+            _au_resync(buf, self.cam_id)
+        return False
+
+    def close(self):
+        # 共享串口由 _SERIAL_POOL 统一管理（Modbus 侧引用计数），这里只断开引用
+        self.ser = None
+
+    # ---------------- 串口收发（OSError 重建共享连接） ----------------
+    def _ensure_ser(self):
+        if self.ser is None:
+            self.connect()
+        return self.ser
+
+    def _write(self, data):
+        try:
+            self._ensure_ser().write(data)
+        except OSError:
+            _reset_serial(self.port)
+            self.ser = _shared_serial(self.port, self.serial_cfg)
+            self.ser.write(data)
+        self._last_cmd_ts = time.time()
+
+    def _read(self, n, timeout):
+        try:
+            return self._ensure_ser().read(n, timeout)
+        except OSError:
+            _reset_serial(self.port)
+            self.ser = _shared_serial(self.port, self.serial_cfg)
+            return b""
+
+    def _cmd_gap_wait(self):
+        gap = CAM_CMD_GAP - (time.time() - self._last_cmd_ts)
+        if gap > 0:
+            time.sleep(gap)
+
+    # ---------------- A 版协议事务 ----------------
+    def _fetch_packet(self, pack_no, timeout=None):
+        """取一包：UE -> UE# 应答 + UF 数据帧。返回 (数据, 校验OK)。
+        timeout=None 时取 CAM_PKT_TIMEOUT——必须运行时读全局（默认值参数会在
+        模块导入时固化，测试 monkeypatch 将无效）。"""
+        if timeout is None:
+            timeout = CAM_PKT_TIMEOUT
+        self._cmd_gap_wait()
+        self._write(_au_frame("E", self.cam_id, struct.pack("<H", pack_no)))
+        buf = bytearray()
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            chunk = self._read(4096, 0.3)
+            if chunk:
+                buf += chunk
+            if _au_pop_err(buf, self.cam_id):
+                raise CameraError("摄像头返回错误应答（取第 %d 包被拒绝）" % pack_no)
+            _au_pop_ack(buf, ord("E"), self.cam_id)
+            frame = _au_pop_dataframe(buf, self.cam_id)
+            if frame:
+                no, data, ok = frame
+                if no != pack_no:
+                    raise CameraTimeout("包号不符（期望 %d 实到 %d）" % (pack_no, no))
+                return data, ok
+            _au_resync(buf, self.cam_id)
+        raise CameraTimeout("第 %d 包接收超时" % pack_no)
+
+    def _publish_fragment(self, image_id, no, total, data, crc_ok):
+        return mqtt_publish_image_fragment(self.name, {
+            "imageId": image_id, "packetNo": no, "totalPackets": total,
+            "packetLen": len(data), "crcOk": bool(crc_ok),
+            "data": base64.b64encode(data).decode("ascii")})
+
+    def _publish_meta(self, image_id, total_size, pack_count, size, trigger,
+                      req_id, status, **extra):
+        meta = {"imageId": image_id, "camId": self.cam_id,
+                "totalSize": int(total_size or 0), "totalPackets": int(pack_count or 0),
+                "timestamp": time.time(), "triggerSource": trigger, "status": status,
+                "size": str(size), "hwId": str(self.d.get("hwId") or "")}
+        if req_id:
+            meta["reqId"] = str(req_id)
+        meta.update(extra)
+        return mqtt_publish_image_meta(self.name, meta)
+
+    def capture(self, size=None, trigger="manual", req_id=""):
+        """整事务持锁抓拍：H -> R -> E/F 逐包取回并立即分片直发（qos=1）。
+        返回 {ok, message, imageId?, totalSize?, totalPackets?, badCrc?, cost?}。"""
+        size = str(size or self.size or "1")
+        if size not in CAM_SUPPORTED_SIZES:
+            return {"ok": False, "message": "不支持的分辨率档位 size=%s（%s）：仅支持 size=%s "
+                    "小图；大图单张 200~400 片分片，Broker 压力风险大（方案列为受限配置）"
+                    % (size, AU_SIZE_NAMES.get(size, "?"), "/".join(CAM_SUPPORTED_SIZES))}
+        since = time.time() - self._last_capture_ts
+        if self._last_capture_ts and since < CAM_MIN_INTERVAL:
+            return {"ok": False, "message": "抓拍过于频繁：拍图间隔需 ≥%.0fs（距上次 %.1fs，固件疲劳约束）"
+                    % (CAM_MIN_INTERVAL, since)}
+        if not _mqtt_connected():
+            return {"ok": False, "message": "MQTT 未连接云端 Broker，无法传输图片分片（未触发拍照）"}
+        if not self._lock.acquire(timeout=5):
+            return {"ok": False, "message": "485 总线忙（其它设备采集中），请稍后重试"}
+        image_id = "%s-%d" % (self.name, int(time.time() * 1000))
+        self._stat_total += 1
+        t0 = time.time()
+        try:
+            return self._capture_locked(image_id, size, trigger, req_id, t0)
+        except CameraError as e:
+            self._publish_meta(image_id, 0, 0, size, trigger, req_id,
+                               status="failed", message=str(e))
+            return {"ok": False, "message": str(e), "imageId": image_id}
+        except Exception as e:  # noqa: BLE001
+            self._publish_meta(image_id, 0, 0, size, trigger, req_id,
+                               status="failed", message="抓拍异常: %s" % e)
+            return {"ok": False, "message": "抓拍异常: %s" % e, "imageId": image_id}
+        finally:
+            self._lock.release()
+
+    def _capture_locked(self, image_id, size, trigger, req_id, t0):
+        # ---- 1. H 拍图：等 UH# 应答 + UR 帧（图片大小/包数） ----
+        self._cmd_gap_wait()
+        try:
+            self._ensure_ser().drain()   # 清掉总线上迟到的 Modbus 应答/噪声
+        except Exception:
+            pass
+        self._write(_au_frame("H", self.cam_id,
+                              size.encode() + struct.pack("<H", self.packet)))
+        buf = bytearray()
+        deadline = time.time() + 8
+        total_size = pack_count = None
+        while time.time() < deadline:
+            chunk = self._read(4096, 0.3)
+            if chunk:
+                buf += chunk
+            if _au_pop_err(buf, self.cam_id):
+                raise CameraError("摄像头返回错误应答（拍图命令被拒绝：camId=%d 不对？）"
+                                  % self.cam_id)
+            _au_pop_ack(buf, ord("H"), self.cam_id)
+            r = _au_pop_rframe(buf, self.cam_id)
+            if r:
+                total_size, pack_count = r
+                break
+            _au_resync(buf, self.cam_id)
+        if pack_count is None:
+            raise CameraTimeout("未收到 R 帧（camId=%d/波特率/接线/固件疲劳，静置 15s 再试）"
+                                % self.cam_id)
+        print("[info] [%s] 抓拍开始 imageId=%s：图片 %d 字节 / %d 包（size=%s %s，分包 %d）"
+              % (self.name, image_id, total_size, pack_count, size,
+                 AU_SIZE_NAMES.get(size, "?"), self.packet))
+        self._publish_meta(image_id, total_size, pack_count, size, trigger, req_id,
+                           status="started")
+        # ---- 2. E/F 逐包取回，取回一包立即分片直发（盒子不拼图、不落盘） ----
+        bad_crc = 0
+        for no in range(1, pack_count + 1):
+            if time.time() - t0 > CAM_TX_TIMEOUT:
+                raise CameraError("整事务超时 %.0fs 上限，强制放锁（已发 %d/%d 包）"
+                                  % (CAM_TX_TIMEOUT, no - 1, pack_count))
+            pkt = None
+            for attempt in range(CAM_PKT_RETRY):
+                try:
+                    pkt = self._fetch_packet(no)
+                    break
+                except CameraTimeout:
+                    if attempt < CAM_PKT_RETRY - 1:
+                        time.sleep(CAM_CMD_GAP)   # 重试间隔遵守总线命令间隔纪律（可注入）
+            if pkt is None:
+                print("[warn] [%s] %s 第 %d 包连续失败，静置 %.0fs 清缓冲后断点续取..."
+                      % (self.name, image_id, no, CAM_FATIGUE_REST))
+                time.sleep(CAM_FATIGUE_REST)
+                try:
+                    self._ensure_ser().drain()
+                except Exception:
+                    pass
+                pkt = self._fetch_packet(no)   # 再失败异常上抛，整图判失败
+            data, crc_ok = pkt
+            if not self._publish_fragment(image_id, no, pack_count, data, crc_ok):
+                raise CameraError("分片发布失败（MQTT 断连/队列溢出），整图判失败（已发 %d/%d 包）"
+                                  % (no - 1, pack_count))
+            if not crc_ok:
+                bad_crc += 1
+            if no % 10 == 0 or no == pack_count:
+                print("[info] [%s] %s 分片进度 %d/%d" % (self.name, image_id, no, pack_count))
+            time.sleep(CAM_PKT_GAP)
+            if no % CAM_PKT_REST_EVERY == 0 and no < pack_count:
+                time.sleep(1.0)   # 每 10 包小憩，防固件疲劳
+        cost = time.time() - t0
+        self._last_image = {"imageId": image_id, "totalSize": total_size,
+                            "totalPackets": pack_count, "ts": time.time()}
+        self._last_capture_ts = time.time()
+        self._image_count += 1
+        self._stat_ok += 1
+        self._publish_meta(image_id, total_size, pack_count, size, trigger, req_id,
+                           status="completed", badCrc=bad_crc, cost=round(cost, 1))
+        return {"ok": True,
+                "message": "抓拍完成：%d 包 / %d 字节（校验失败 %d 包，%.1fs）"
+                           % (pack_count, total_size, bad_crc, cost),
+                "imageId": image_id, "totalSize": total_size, "totalPackets": pack_count,
+                "badCrc": bad_crc, "cost": round(cost, 1)}
+
+    def resend(self, image_id, packet_nos):
+        """免重拍补发缺片：摄像头内部缓存仍是最近一次抓拍的图，按包号重取重发。
+        无该图上下文（设备重启/又拍过新图）时返回失败，平台判废该图。"""
+        if not self._last_image or self._last_image.get("imageId") != str(image_id):
+            return {"ok": False, "message": "盒子侧无该图上下文（最近一次抓拍为 %s），无法免重拍补发"
+                    % ((self._last_image or {}).get("imageId") or "无")}
+        total = int(self._last_image.get("totalPackets") or 0)
+        nos = set()
+        for n in (packet_nos or []):
+            try:
+                nos.add(int(n))
+            except (TypeError, ValueError):
+                continue
+        nos = sorted(n for n in nos if 1 <= n <= total)
+        if not nos:
+            return {"ok": False, "message": "缺片包号列表为空或越界（total=%d）" % total}
+        if not _mqtt_connected():
+            return {"ok": False, "message": "MQTT 未连接云端 Broker，无法补发分片"}
+        if not self._lock.acquire(timeout=5):
+            return {"ok": False, "message": "485 总线忙，请稍后重试"}
+        try:
+            sent = []
+            for no in nos:
+                data, crc_ok = self._fetch_packet(no)
+                if not self._publish_fragment(str(image_id), no, total, data, crc_ok):
+                    raise CameraError("补发分片发布失败（MQTT 断连/队列溢出）")
+                sent.append(no)
+                time.sleep(CAM_PKT_GAP)
+            print("[info] [%s] %s 补发 %d 片: %s" % (self.name, image_id, len(sent),
+                                                      ",".join(map(str, sent))))
+            return {"ok": True, "message": "已补发 %d 片：%s" % (len(sent), ",".join(map(str, sent))),
+                    "imageId": str(image_id), "resent": sent}
+        except CameraError as e:
+            return {"ok": False, "message": str(e), "imageId": str(image_id)}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "message": "补发异常: %s" % e, "imageId": str(image_id)}
+        finally:
+            self._lock.release()
+
+
 def _make_reader(d):
     proto = (d.get("protocol") or "modbus-rtu").lower()
     if proto in ("modbus", "modbus-rtu", "rtu"):
@@ -1708,7 +2137,9 @@ def _make_reader(d):
         return LoraReader(d)
     if proto in ("cellular", "5g", "4g", "lte"):
         return CellularReader(d)
-    raise ValueError("未知协议: %s（支持 modbus-rtu / modbus-tcp / opcua / lora / cellular）" % proto)
+    if proto in ("camera", "cam", "svl130w"):
+        return CameraReader(d)
+    raise ValueError("未知协议: %s（支持 modbus-rtu / modbus-tcp / opcua / lora / cellular / camera）" % proto)
 
 
 # ---------------------------------------------------------------------------
@@ -1941,6 +2372,40 @@ def mqtt_publish_replay(rows):
         except Exception:
             break
     return ok > 0
+
+
+def _mqtt_publish_image(device, part, payload):
+    """摄像头图片 meta/分片发布（image/{box}/{device}/meta|fragment，qos=1）。
+
+    断连/队列溢出返回 False：调用方（CameraReader）据此整图判失败——
+    宁可判失败重拍，也不要发出注定拼不齐的残图。
+    """
+    if not MQTT_ENABLED:
+        return False
+    cli = _mqtt_client()
+    if cli is None:
+        return False
+    body = dict(payload)
+    body.setdefault("box", MQTT_BOX)
+    body.setdefault("device", device)
+    topic = MQTT_IMAGE_TOPIC_TPL.format(box=MQTT_BOX, device=device, part=part)
+    try:
+        info = cli.publish(topic, json.dumps(body), qos=1)
+        # rc 非 0（如 MQTT_ERR_QUEUE_SIZE 队列已满）说明消息根本没进队列
+        if getattr(info, "rc", 0) not in (0, None):
+            return False
+        info.wait_for_publish(1.0)
+        return True
+    except Exception:
+        return False
+
+
+def mqtt_publish_image_meta(device, meta):
+    return _mqtt_publish_image(device, "meta", meta)
+
+
+def mqtt_publish_image_fragment(device, frag):
+    return _mqtt_publish_image(device, "fragment", frag)
 
 
 def _build_twins(device, values, ts_ms):
@@ -2480,20 +2945,30 @@ def write_device_value(device_name, prop, value):
         return False, "写入失败: %s" % e
 
 
-# LoRa 活跃 reader 注册表：命令按需取数/自定义下行需要取实时连接（采集线程 connect 成功后注册）
+# 活跃 reader 注册表：命令按需取数/自定义下行/摄像头抓拍需要取实时连接
+# （采集线程 connect 成功后注册，退出时注销）
 _LORA_READER_REG = {}
-_LORA_READER_LOCK = threading.Lock()
+_CAMERA_READER_REG = {}
+_ACTIVE_READER_LOCK = threading.Lock()
 
 
 def _register_active_reader(name, reader):
-    if isinstance(reader, LoraReader):
-        with _LORA_READER_LOCK:
+    with _ACTIVE_READER_LOCK:
+        if isinstance(reader, LoraReader):
             _LORA_READER_REG[str(name)] = reader
+        elif isinstance(reader, CameraReader):
+            _CAMERA_READER_REG[str(name)] = reader
 
 
 def _unregister_active_reader(name):
-    with _LORA_READER_LOCK:
+    with _ACTIVE_READER_LOCK:
         _LORA_READER_REG.pop(str(name), None)
+        _CAMERA_READER_REG.pop(str(name), None)
+
+
+def _active_camera_reader(name):
+    with _ACTIVE_READER_LOCK:
+        return _CAMERA_READER_REG.get(str(name))
 
 
 # ---------------------------------------------------------------------------
@@ -2678,7 +3153,7 @@ def write_device_raw(device_name, addr=None, kind="holding", value=None,
 
 def _active_reader(name):
     """取活跃 LoRa reader（按需主动取数/自定义下行时需要实时连接）。"""
-    with _LORA_READER_LOCK:
+    with _ACTIVE_READER_LOCK:
         return _LORA_READER_REG.get(str(name))
 
 
@@ -2770,6 +3245,69 @@ def _run_device_io_cmd(payload):
     print("[info] 设备命令执行%s: cmd=%s device=%s -> %s"
           % ("成功" if ok else "失败", cmd, device, message))
     _cmd_ack(payload, ok, message, detail)
+
+
+def _get_camera_reader(device):
+    """取摄像头 Reader：优先采集线程里已 connect 的活跃实例（保留抓拍节流/补发上下文），
+    否则按「运行期生效配置」临时构建（仅供本次命令使用）。"""
+    r = _active_camera_reader(device)
+    if r is not None:
+        return r, None
+    d = _find_device_cfg(device)
+    if d is None:
+        return None, "设备不存在: %s" % device
+    if str(d.get("protocol") or "").lower() not in ("camera", "cam", "svl130w"):
+        return None, "设备 %s 不是摄像头（protocol=%s）" % (device, d.get("protocol"))
+    try:
+        r = CameraReader(d)
+        r.connect()
+        return r, None
+    except Exception as e:  # noqa: BLE001
+        return None, "摄像头初始化失败: %s" % e
+
+
+def camera_capture_cmd(device, resolution=None, req_id=""):
+    r, err = _get_camera_reader(device)
+    if r is None:
+        return False, err, {"device": device}
+    res = r.capture(size=resolution, trigger="manual", req_id=req_id)
+    ok = bool(res.pop("ok", False))
+    message = str(res.pop("message", ""))
+    res["device"] = device
+    return ok, message, res
+
+
+def camera_resend_cmd(device, image_id, packet_nos):
+    r, err = _get_camera_reader(device)
+    if r is None:
+        return False, err, {"device": device}
+    res = r.resend(image_id, packet_nos)
+    ok = bool(res.pop("ok", False))
+    message = str(res.pop("message", ""))
+    res["device"] = device
+    return ok, message, res
+
+
+def _run_camera_cmd(payload):
+    """摄像头命令异步执行线程体：抓拍是 30~60s 长事务，绝不阻塞 MQTT 消息循环。"""
+    cmd = str(payload.get("cmd") or "").lower()
+    device = str(payload.get("device") or payload.get("name") or "")
+    try:
+        if cmd in ("capture", "camera_capture", "snap"):
+            ok, message, detail = camera_capture_cmd(
+                device, resolution=payload.get("resolution"),
+                req_id=payload.get("req_id") or payload.get("request_id") or "")
+        elif cmd in ("resend", "camera_resend"):
+            ok, message, detail = camera_resend_cmd(
+                device, payload.get("imageId"), payload.get("packetNos"))
+        else:
+            ok, message, detail = False, "未知摄像头命令: %s" % cmd, None
+    except Exception as e:  # noqa: BLE001
+        ok, message, detail = False, "摄像头命令执行异常: %s" % e, None
+    print("[info] 摄像头命令执行%s: cmd=%s device=%s -> %s"
+          % ("成功" if ok else "失败", cmd, device, message))
+    _cmd_ack(payload, ok, message, detail)
+
 
 
 def _apply_config_cmd(payload):
@@ -2907,6 +3445,11 @@ def _on_cmd_message(client, userdata, msg):
     elif cmd in ("list", "services"):
         ok, message = True, "ok"
         detail = {"services": _list_services()}
+    elif cmd in ("capture", "camera_capture", "snap", "resend", "camera_resend"):
+        # 摄像头抓拍/缺片补发：30~60s 长事务（整事务持 485 总线锁），
+        # 独立线程执行后回报，避免阻塞 MQTT 消息循环拖垮实时上报。
+        threading.Thread(target=_run_camera_cmd, args=(payload,), daemon=True).start()
+        return
     elif cmd in ("set", "write", "read", "get", "poll", "down", "downlink"):
         # 设备 IO 命令（写设定值、裸写/读寄存器、LoRa 下行与主动取数）。
         # 串口读最长约 1s、LoRa 下行等回报最长 dl_timeout，放独立线程执行后再回报，
@@ -3068,6 +3611,10 @@ def collector(device, stop_event):
     name = device.get("name", "?")
     proto = device.get("protocol", "modbus-rtu")
     interval = float(device.get("interval", 1.0))
+    if str(proto).lower() in ("camera", "cam", "svl130w"):
+        # 摄像头是事件型设备：read_all() 只回内部状态不触总线，低频上报即可；
+        # 抓拍/补发纯命令驱动（cmd 线程），不走本周期采集。
+        interval = max(interval, 30.0)
     points = device.get("points", [])
     print("[info] [%s] 采集线程启动: protocol=%s interval=%.1fs points=%d" % (
         name, proto, interval, len(points)))
@@ -3086,7 +3633,7 @@ def collector(device, stop_event):
         try:
             reader = _make_reader(device)
             reader.connect()
-            if isinstance(reader, LoraReader):
+            if isinstance(reader, (LoraReader, CameraReader)):
                 _register_active_reader(name, reader)
             if fail_streak:
                 print("[info] [%s] 采集恢复正常，重试频率回到 %.1fs" % (name, interval))
@@ -3153,7 +3700,7 @@ def main():
     global _MAPPER_SERVER
     print("[info] 标准 KubeEdge DMI 多协议 mapper 启动: name=%s version=%s registerProtocol=%s" % (
         MAPPER_NAME, MAPPER_VERSION, MAPPER_PROTOCOL))
-    print("[info] 设备数=%d 协议支持: modbus-rtu / modbus-tcp / opcua / lora / cellular%s" % (
+    print("[info] 设备数=%d 协议支持: modbus-rtu / modbus-tcp / opcua / lora / cellular / camera%s" % (
         len(current_devices()), "" if _ASYNCUA_OK else "（asyncua 未安装，opcua 设备将跳过）"))
     _MAPPER_SERVER = serve_mapper_service()
 

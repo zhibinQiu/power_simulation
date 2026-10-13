@@ -5,7 +5,8 @@
 - OpcuaDeviceYamlRenderer：     OPC-UA（节点浏览）；
 - BluetoothDeviceYamlRenderer： BLE（特征 UUID）；
 - LoraDeviceYamlRenderer：      LoRaWAN（网关桥接，DevEUI/AppKey + 从站问帧轮询）；
-- CellularDeviceYamlRenderer：  5G/4G 模块自监控（AT 命令信号/ICCID/速率）。
+- CellularDeviceYamlRenderer：  5G/4G 模块自监控（AT 命令信号/ICCID/速率）；
+- CameraDeviceYamlRenderer：    串口摄像头（智景 SVL130w A 版协议，camId/尺寸档/分包）。
 
 新增协议：继承 DeviceYamlRenderer 并实现 render_config_data（及可选 render_visitor），
 再向 DeviceYamlFactory 注册即可，设备管理业务无需改动。
@@ -321,6 +322,33 @@ class CellularDeviceYamlRenderer(DeviceYamlRenderer):
         )
 
 
+class CameraDeviceYamlRenderer(DeviceYamlRenderer):
+    """串口摄像头（智景 SVL130w，A 版协议 U/# 帧）：camId 寻址 + 尺寸档 + 分包大小。
+
+    摄像头与 Modbus 设备共用 485 总线：串口参数沿用 comm（serialPort/baudRate），
+    摄像头专属参数（camId/size/packet）在 camera 块。盒子 box_mapper CameraReader
+    命令驱动抓拍，图片经 MQTT image/# 分片直发（不在 twins 里传图）。
+    """
+
+    protocol = "camera"
+
+    def render_config_data(self, p: Dict[str, Any], visitors_txt: str) -> str:
+        comm = p.get("comm", {})
+        cam = p.get("camera", {})
+        return (
+            "  protocol:\n"
+            f"    protocolName: {KUBEEDGE_PROTOCOL_NAME}\n"
+            "    configData:\n"
+            f"        serialPort: \"{_yaml_esc(comm.get('serialPort', '/dev/ttyRS485'))}\"\n"
+            f"        baudRate: {int(comm.get('baudRate', 9600))}\n"
+            f"        camId: {int(cam.get('camId', 1))}\n"
+            f"        size: \"{_yaml_esc(cam.get('size', '1'))}\"\n"
+            f"        packet: {int(cam.get('packet', 512))}\n"
+            "        visitors:\n"
+            f"{visitors_txt}\n"
+        )
+
+
 # ---------------------------------------------------------------------------
 # 工厂（注册表模式）：新增协议在此注册一行即可
 # ---------------------------------------------------------------------------
@@ -335,6 +363,7 @@ class DeviceYamlFactory:
         BluetoothDeviceYamlRenderer.protocol: BluetoothDeviceYamlRenderer,
         LoraDeviceYamlRenderer.protocol: LoraDeviceYamlRenderer,
         CellularDeviceYamlRenderer.protocol: CellularDeviceYamlRenderer,
+        CameraDeviceYamlRenderer.protocol: CameraDeviceYamlRenderer,
     }
 
     @classmethod

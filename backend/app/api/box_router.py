@@ -13,10 +13,13 @@ caHash）、实时数据（云端 MQTT 真实链路 + agent 回写 Device.status
 from __future__ import annotations
 
 import asyncio
+import os
 import time
+import uuid
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from .. import box_console
@@ -92,6 +95,7 @@ class BoxDeviceRequest(BaseModel):
     bluetooth: Dict[str, Any] = Field(default_factory=dict)  # bluetooth: {macAddress}
     lora: Dict[str, Any] = Field(default_factory=dict)    # lora: {broker, applicationID, devEUI, appKey...}
     cellular: Dict[str, Any] = Field(default_factory=dict)   # cellular: {serialPort, baudRate, apn, iface}
+    camera: Dict[str, Any] = Field(default_factory=dict)     # camera: {camId, size, packet}
     cloudDevice: str = ""                                  # 可选：绑定云端识别设备 id（实时匹配优先）
     origName: str = ""                                     # 编辑时携带原设备名：改名场景后端据此移除旧记录（避免残留旧设备）
     properties: List[Dict[str, Any]] = Field(default_factory=list)
@@ -583,3 +587,81 @@ def box_stats():
 def box_publish(req: BoxPublishRequest):
     """发测试消息（向云端 Broker 发布，供仪表盘调试）。"""
     return box_console.publish_test(req.model_dump())
+
+
+# ------------------------- 串口摄像头（抓拍指令 / 图片存取） -------------------------
+
+# 摄像头支持的分辨率档位：仅 size=1（160x120）。
+# 注意：SVL130w A 版协议尺寸码从 1 起步（1=160x120 为最小档），平台曾自定义的
+# 0=80x60 档真机固件不认识——下发后摄像头回错误应答拒绝执行（2026-10-12 真机实测），
+# 故从支持列表移除。大图（size>=2）单张 200~400 片分片，Broker 消息量与 paho 队列
+# 风险大（方案列为受限配置），同样拒绝。
+CAMERA_SUPPORTED_RESOLUTIONS = ("1",)
+
+
+class BoxCameraCaptureRequest(BaseModel):
+    box: str = ""                      # 目标盒子；留空按设备记录 node 解析
+    resolution: str = "1"              # 尺寸档：仅 1=160x120（A 版协议最小档，0 档真机不存在）
+
+
+def _camera_box_of(device_id: str, box: str = "") -> str:
+    """解析摄像头所属盒子（下发 cmd 主题用）：显式指定优先，否则按设备记录 node。"""
+    if (box or "").strip():
+        return box.strip()
+    for d in (box_console._load_devices().get("devices") or []):  # noqa: SLF001
+        if str(d.get("name")) == device_id:
+            return str(d.get("node") or "").strip() or "nt001"
+    return "nt001"
+
+
+@router.post("/box/camera/{device_id}/capture")
+def box_camera_capture(device_id: str, req: BoxCameraCaptureRequest):
+    """手动抓拍：经 MQTT cmd/{box}/camera 下发 capture 指令 -> 盒子 CameraReader 执行
+    H/R/E/F 全流程（整事务持 485 总线锁），逐片经 image/# 分片回传；平台重组、
+    FFD8/FFD9 校验、落盘后 WebSocket 事件通知前端。
+
+    立即返回「已受理」：抓拍 30~60s 不等结果；进度轮询 GET .../images 的
+    assembling 字段（已收/总包数），执行回报见盒子命令回执 state/{box}/deploy。"""
+    resolution = str(req.resolution or "1")
+    if resolution not in CAMERA_SUPPORTED_RESOLUTIONS:
+        raise HTTPException(
+            status_code=400,
+            detail="不支持的分辨率档位 size=%s：仅支持 %s（1=160x120 为 A 版协议最小档，"
+                   "0/80x60 档真机不存在；大图分片量大，Broker 压力风险）"
+                   % (resolution, "/".join(CAMERA_SUPPORTED_RESOLUTIONS)))
+    box = _camera_box_of(device_id, req.box)
+    req_id = uuid.uuid4().hex[:12]
+    res = mqtt_source.publish("cmd/%s/camera" % box, {
+        "cmd": "capture", "device": device_id, "resolution": resolution,
+        "req_id": req_id, "request_id": req_id})
+    if not res.get("ok"):
+        raise HTTPException(status_code=502,
+                            detail="抓拍指令下发失败：%s" % (res.get("error") or "Broker 不可达"))
+    return {"ok": True, "reqId": req_id, "box": box, "topic": res.get("topic"),
+            "note": "抓拍已受理（约 30~60s）：完成/失败经 WebSocket 事件通知，"
+                    "进度轮询 GET /api/box/camera/%s/images 的 assembling 字段" % device_id}
+
+
+@router.get("/box/camera/{device_id}/images")
+def box_camera_images(device_id: str):
+    """图片列表（索引，最新在前，含失败记录）+ 重组进行中的抓拍进度（已收/总包数）。"""
+    return {"ok": True,
+            "images": mqtt_source.camera_list_images(device_id),
+            "assembling": mqtt_source.camera_list_assembling(device_id)}
+
+
+@router.get("/box/camera/{device_id}/images/{image_id}")
+def box_camera_image(device_id: str, image_id: str):
+    """读取单张图片（JPEG 字节流）。"""
+    path = mqtt_source.camera_image_path(device_id, image_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="图片不存在或已超期清理")
+    return FileResponse(path, media_type="image/jpeg", filename=os.path.basename(path))
+
+
+@router.delete("/box/camera/{device_id}/images/{image_id}")
+def box_camera_image_delete(device_id: str, image_id: str):
+    """删除图片（文件 + 索引条目）。"""
+    if not mqtt_source.camera_delete_image(device_id, image_id):
+        raise HTTPException(status_code=404, detail="图片不存在")
+    return {"ok": True}

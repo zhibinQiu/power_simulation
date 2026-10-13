@@ -153,6 +153,28 @@
         { "property": "rx_rate", "kind": "rx_rate" },
         { "property": "tx_rate", "kind": "tx_rate" }
       ]
+    },
+    {
+      "name": "camera-485-1",
+      "namespace": "default",
+      "protocol": "camera",
+      "interval": 30.0,
+      "enabled": false,
+      "serial": {
+        "port": "/dev/ttyRS485",
+        "baudrate": 9600,
+        "databits": 8,
+        "parity": "N",
+        "stopbits": 1
+      },
+      "camera": {
+        "camId": 1,
+        "size": "1",
+        "packet": 512
+      },
+      "points": [
+        { "property": "last_capture_ts" }
+      ]
     }
   ]
 }

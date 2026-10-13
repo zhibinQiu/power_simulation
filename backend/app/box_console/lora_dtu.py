@@ -41,6 +41,12 @@ LORA_PROTOCOLS = ("lora", "lorawan")
 # 平台 protocol -> 盒子直连采集（非 LoRa）；其余协议（opcua/cellular/蓝牙）盒子侧
 # 为现场定制配置，平台不做下发，避免覆盖现场手调的参数。
 DIRECT_PROTOCOLS = ("modbus",)
+CAMERA_PROTOCOLS = ("camera", "cam", "svl130w")
+# 摄像头状态点位（与盒子 CameraReader.read_all() 上报键一致；事件型设备，状态低频上报）。
+# 2026-10-12 裁减：仅保留 last_capture_ts（最近抓拍时间，唯一有信息量的遥测；
+# 其 30s 周期上报同时维持设备在线判定——data_online 只看数据新鲜度不看点位）。
+# ok/total/image_count 统计点已删（恒累计值无新意，图片计数以后端 index.json 为准）。
+CAM_STATUS_PROPS = ("last_capture_ts",)
 DEFAULT_FPORT = 10
 
 
@@ -542,8 +548,60 @@ def build_patches(devices: Optional[List[Dict[str, Any]]] = None,
         changes.append("%s: %s" % (name, what))
         patches.append(entry)
 
+    # 摄像头设备：命令驱动抓拍（不进 LoRa 轮询体系），完整条目按 name 合并下发；
+    # 盒子 CameraReader 据此建 camId/尺寸档/分包配置，与 Modbus 采集共用 485 总线锁。
+    for d in devices or []:
+        if not isinstance(d, dict):
+            continue
+        if str(d.get("protocol") or "").strip().lower() not in CAMERA_PROTOCOLS:
+            continue
+        name = str(d.get("name") or "").strip()
+        patches.append(_camera_entry(d, snap_by_name.get(name)))
+        cam = d.get("camera") or {}
+        changes.append("%s: 摄像头 camId=%d size=%s（命令驱动抓拍，image/# 分片直发）" % (
+            name, int(cam.get("camId") or 1), str(cam.get("size") or "1")))
+
     return {"patches": patches, "changes": changes, "plan": pl, "remove": remove,
             "snapshot": bool(snapshot)}
+
+
+def _camera_entry(dev: Dict[str, Any], snap: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """摄像头设备的盒子下发条目：serial 块与 Modbus 同构（共用 _SERIAL_POOL/_port_lock），
+    camera 块为 A 版协议参数（camId/尺寸档/分包）。以盒子现配置为底稿保住现场定制。"""
+    entry = json.loads(json.dumps(snap)) if snap else {}
+    comm = dev.get("comm") or {}
+    cam = dev.get("camera") or {}
+    try:
+        interval = float(int(dev.get("collectCycle") or 30000) / 1000.0)
+    except (TypeError, ValueError):
+        interval = 30.0
+    parity = str(comm.get("parity") or "N").strip().upper()[:1] or "N"
+    if parity not in ("N", "E", "O"):
+        parity = "N"
+    entry.update({
+        "name": str(dev.get("name") or "").strip(),
+        "namespace": str(dev.get("namespace") or "default"),
+        "protocol": "camera",
+        "interval": max(interval, 30.0),
+        "serial": {
+            "port": str(comm.get("serialPort") or "/dev/ttyRS485"),
+            "baudrate": int(comm.get("baudRate") or 9600),
+            "databits": int(comm.get("dataBits") or 8),
+            "parity": parity,
+            "stopbits": int(comm.get("stopBits") or 1),
+        },
+        "camera": {
+            "camId": int(cam.get("camId") or 1),
+            "size": str(cam.get("size") or "1"),
+            "packet": int(cam.get("packet") or 512),
+        },
+        "points": [{"property": p} for p in CAM_STATUS_PROPS],
+        "enabled": True,
+    })
+    hwid = str(dev.get("hwId") or "").strip()
+    if hwid:
+        entry["hwId"] = hwid
+    return entry
 
 
 # ---------------------------------------------------------------------------
@@ -606,14 +664,18 @@ def push_lora_config(box: str = "", dry_run: bool = False, timeout: float = 8.0)
     patches = built["patches"]
 
     # 盒子侧要删掉的条目 = 代采成员（build_patches 给出）+ 盒子里还留着、但平台已
-    # 没有的 LoRa 条目（平台上删掉的设备 / 改名前的旧名）。一律删除而非停采。
+    # 没有的 LoRa/摄像头条目（平台上删掉的设备 / 改名前的旧名）。一律删除而非停采。
+    # 其它协议（modbus 等现场手工配置）不动。
     wanted = {str(p.get("name") or "") for p in patches}
     remove = list(built.get("remove") or [])
     for d in snapshot:
-        if not isinstance(d, dict) or not (d.get("lora") or {}):
+        if not isinstance(d, dict):
             continue
         name = str(d.get("name") or "")
-        if name and name not in wanted and name not in remove:
+        if not name or name in wanted or name in remove:
+            continue
+        proto = str(d.get("protocol") or "").strip().lower()
+        if (d.get("lora") or {}) or proto in LORA_PROTOCOLS or proto in CAMERA_PROTOCOLS:
             remove.append(name)
     if remove:
         built["changes"].append("盒子删除条目：%s（平台上没有对应设备 / 由主设备代采）"
@@ -628,7 +690,7 @@ def push_lora_config(box: str = "", dry_run: bool = False, timeout: float = 8.0)
 
     if not patches and not remove:
         return {"ok": True, "box": box, "applied": False, "changes": [],
-                "note": "没有需要下发的采集设备（LoRa / Modbus），无需下发",
+                "note": "没有需要下发的采集设备（LoRa / Modbus / 摄像头），无需下发",
                 "plan": built["plan"]}
     if dry_run:
         return {"ok": True, "box": box, "dryRun": True, "changes": built["changes"],

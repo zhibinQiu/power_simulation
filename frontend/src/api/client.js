@@ -181,6 +181,14 @@ export const api = {
   // LoRa 透传 DTU 多从站问帧：平台从站号 -> 盒子 lora.polls（改完从站号下发即生效）
   boxLoraPlan: () => jget('/box/lora/plan'),
   boxLoraSync: (payload) => jpost('/box/lora/sync', payload),
+  // 串口摄像头：抓拍指令（受理制，约 30~60s）/ 图片索引 + 重组进度 / 单图 URL / 删除
+  boxCameraCapture: (deviceId, box = '', resolution = '1') =>
+    jpost('/box/camera/' + encodeURIComponent(deviceId) + '/capture', { box, resolution }),
+  boxCameraImages: (deviceId) => jget('/box/camera/' + encodeURIComponent(deviceId) + '/images'),
+  boxCameraImageUrl: (deviceId, imageId) =>
+    BASE + '/box/camera/' + encodeURIComponent(deviceId) + '/images/' + encodeURIComponent(imageId),
+  boxCameraDeleteImage: (deviceId, imageId) =>
+    fetch(BASE + '/box/camera/' + encodeURIComponent(deviceId) + '/images/' + encodeURIComponent(imageId), { method: 'DELETE' }).then(r => r.json()),
   // 云端 Broker 配置（前端配置化：能碳一体机管理 -> 总览 -> 云端数据链路「配置」，免手工编辑 mqtt.yaml）
   boxConfig: () => jget('/box/config'),
   boxConfigSave: (payload) => jpost('/box/config', payload),

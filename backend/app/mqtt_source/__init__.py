@@ -55,6 +55,15 @@ from .ingest import (  # noqa: E402
     _gc_expired, _log_msg, _record_message, _record_replay, take_replay,
 )
 
+# 摄像头图片重组（image/# 分片 -> 落盘 + 索引 + 查询）
+from .camera_assembler import (  # noqa: E402
+    delete_image as camera_delete_image,
+    image_path as camera_image_path,
+    handle_image_message,
+    list_assembling as camera_list_assembling,
+    list_images as camera_list_images,
+)
+
 # 发布与查询
 from .publish import (  # noqa: E402
     broker_stats, get_status, publish,
