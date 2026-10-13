@@ -271,8 +271,8 @@ const headTitle = computed(() => {
 })
 const headIcon = computed(() => (panels.value[0] || { icon: 'scene3d' }).icon)
 // 面板区折叠态：点击面板标题行折叠/展开（三个面板同时显示时用得上）。
-// 「搜索」默认折叠——只留一行标题，需要时点开，不占用资源树的空间
-const secClosed = reactive({ search: true })
+// 「资源」「搜索」默认折叠——只留一行标题，需要时再点开，不挤占场景资源树的空间
+const secClosed = reactive({ explorer: true, search: true })
 function toggleSec(id) { secClosed[id] = secClosed[id] !== true }
 // 面板显隐菜单项：勾选态与「最后一个可见面板不可取消」都按当前状态实时生成，
 // 每次点击后用新数组刷新菜单（菜单是快照式 items，不刷新则勾号不变、最后一项仍可取消）
