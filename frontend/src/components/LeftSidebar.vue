@@ -617,7 +617,7 @@ function onStratContext(e, s) {
   color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .sb-sec-hd:hover .sb-sec-tt { color: var(--text); }
-.sb-sec-hd .twisty.sm { width: 12px; height: 12px; opacity: .6; }
+.sb-sec-hd .twisty.sm { width: 12px; height: 12px; }
 .sb-sec-bd { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 
 /* Tab 栏图标 */
@@ -646,7 +646,7 @@ function onStratContext(e, s) {
    避免同一工艺词在三个树中字号、颜色与字重不一 */
 .tch.sub2 { padding-left: 0; height: 24px; gap: 6px; }
 .tch.sub2 .tch-tt { font-size: 12px; font-weight: 400; letter-spacing: .08px; color: var(--text); }
-.tch.sub2 .twisty { width: 14px; opacity: .5; }
+.tch.sub2 .twisty { width: 14px; }
 
 /* 策略来源标签（工艺流程优化 / 自定义） */
 .tc-tag { font-size: 10px; color: #fff; padding: 1px 5px; border-radius: 4px; white-space: nowrap; flex: 0 0 auto; }

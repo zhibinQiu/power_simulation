@@ -1,5 +1,5 @@
 <template>
-  <div class="app" :class="{ 'left-collapsed': !store.leftOpen, 'right-collapsed': !store.rightOpen, 'bottom-collapsed': !store.bottomOpen, 'sim-dark': store.simMode || themeMode === 'dark', 'fullscreen-on': store.fullscreenOn }"
+  <div class="app" :class="{ 'left-collapsed': !store.leftOpen, 'right-collapsed': !store.rightOpen, 'bottom-collapsed': !store.bottomOpen, 'sim-dark': store.simMode || themeMode === 'dark', 'fullscreen-on': store.fullscreenOn, 'welcome-on': store.welcomeOn }"
        :data-accent="accent"
        :style="{ '--cmd-h': store.bottomOpen ? cmdH + 'px' : '0px', '--lw': store.leftOpen ? lw + 'px' : '0px', '--rw': store.rightOpen ? rw + 'px' : '0px' }">
     <TopBar :menus="menus" ref="topBarRef" @export="onExport" @help="openDocsSite('promo')" @toggle-agent="toggleAgent" />
@@ -15,6 +15,10 @@
     <!-- SceneViewer 首次进入数字孪生视图时懒加载（three.js ~500KB 不进首屏关键路径），
          加载后保持挂载，不销毁 WebGL 上下文，切换速度与原先一致 -->
     <main class="stage">
+      <!-- 工程选择（欢迎页）：启动后先停在这里，左栏保留，内容区做工程选择；
+           打开 / 新建工程后由 store.welcomeOn = false 进入主界面。 -->
+      <WelcomeView v-if="store.welcomeOn" @new-scene="sceneFileMode = 'new'" @open-scene="sceneFileMode = 'open'" />
+      <template v-else>
       <!-- 主视图槽位：HMI人机交互屏与 3D 数字孪生对等，二者互斥切换且都不产生 tab -->
       <SceneViewer v-if="sceneMounted" v-show="!store.activeViewId && !store.overviewOn" />
       <DataOverview v-if="store.overviewOn" v-show="!store.activeViewId" />
@@ -48,19 +52,22 @@
           </div>
         </div>
       </section>
+      </template>
     </main>
 
     <!-- 顶栏下方一行：tab 模式（有功能视图窗口，含流程编排）显示视图标签条，工具栏已移入对应 tab 内部；
-         非 tab 模式（纯三维仿真，无打开窗口）显示原工具条 -->
-    <ViewTabBar v-if="tabMode" />
-    <RibbonToolbar v-else :actions="ribbonActions" />
+         非 tab 模式（纯三维仿真，无打开窗口）显示原工具条。欢迎页（未打开工程）无工具条。 -->
+    <template v-if="!store.welcomeOn">
+      <ViewTabBar v-if="tabMode" />
+      <RibbonToolbar v-else :actions="ribbonActions" />
+    </template>
 
     <!-- 右侧栏：上下文检视器；收起时由 .right-collapsed 置列宽 0 + 裁切，实现平滑滑出。
          同样按场景 key 重建：切换场景后总览档位 / 累计积分 / 展开态等本地状态一并重置 -->
-    <RightInspector :key="'ri:' + store.sceneId + ':' + store.sceneVersion" @rsz="startRightResize" />
+    <RightInspector v-if="!store.welcomeOn" :key="'ri:' + store.sceneId + ':' + store.sceneVersion" @rsz="startRightResize" />
 
     <!-- 下侧栏：命令控制台；非数字孪生视图默认收起，可由顶栏按钮重新展开（底部状态栏始终保留） -->
-    <CommandConsole :actions="twinActions" :resizing="resizing" :start-resize="startResize" ref="consoleRef" />
+    <CommandConsole v-if="!store.welcomeOn" :actions="twinActions" :resizing="resizing" :start-resize="startResize" ref="consoleRef" />
 
     <StatusBar />
 
@@ -100,6 +107,7 @@ import LeftSidebar from './components/LeftSidebar.vue'
 import ActivityBar from './components/ActivityBar.vue'
 import RightInspector from './components/RightInspector.vue'
 import ViewTabBar from './components/ViewTabBar.vue'
+import WelcomeView from './components/WelcomeView.vue'
 import { usePanelSizes } from './composables/usePanelSizes'
 import { useGlobalShortcuts } from './composables/useGlobalShortcuts'
 import { openAuditDialog } from './stores/audit'
@@ -183,6 +191,15 @@ watch(() => [store.leftOpen, store.rightOpen, store.bottomOpen], () => markPanel
 
 // 3D 场景挂载标记：首次加载后保持 true，避免卸载 WebGL 上下文（切换视图速度不受影响）
 const sceneMounted = ref(false)
+// 空闲时挂载 3D 场景 chunk：欢迎页（未打开工程）阶段不加载 three.js，首屏只渲染 UI 框架
+const mountSceneIdle = () => {
+  if (sceneMounted.value) return
+  const mountScene = () => { sceneMounted.value = true }
+  if (window.requestIdleCallback) window.requestIdleCallback(mountScene, { timeout: 1500 })
+  else setTimeout(mountScene, 300)
+}
+// 欢迎页 → 主界面时再挂载 3D（欢迎页阶段不加载）；在 onMounted 内注册，卸载时注销
+let stopWelcomeWatch = null
 const topBarRef = ref(null)
 const consoleRef = ref(null)
 // 视图组件引用：供各视图工具栏（RibbonToolbar）调用其内部动作（刷新行情 / 刷新数据等）
@@ -345,6 +362,8 @@ const menus = computed(() => [
     { label: t('新建场景'), act: () => { sceneFileMode.value = 'new' } },
     // 「打开场景…」：按行业分组列出场景注册表（内置包 + 已安装 .ec），选择后切换
     { label: t('打开场景…'), act: () => { sceneFileMode.value = 'open' } },
+    // 「返回工程选择」：退回启动时的工程选择欢迎页（当前工程保持装载，再打开即回到原工程）
+    { label: t('返回工程选择'), act: () => store.backToWelcome() },
     { sep: true },
     // 「另存为场景…」：把当前场景（含当前编排方案快照）打包为可分发的 .ec 资源包
     { label: t('另存为场景…'), accel: 'Ctrl+Shift+S', act: () => { sceneFileMode.value = 'saveAs' } },
@@ -438,26 +457,27 @@ useGlobalShortcuts({
 })
 
 onMounted(async () => {
-  // 3D 场景懒加载：默认视图即数字孪生。挂载时机刻意放在**首屏数据就绪之后**——
+  // 3D 场景懒加载：挂载时机刻意放在**首屏数据就绪之后**（见 mountSceneIdle）——
   // 此前在 onMounted 开头就挂载，TwinScene 的构造（渲染器/环境/地表）与 store.init、waitReady、
   // 首屏 Vue 渲染抢同一条主线程，模型刚建好又要跟着 ready/sceneRev/场景恢复连做 2~3 次全量重建，
   // 首页加载那几秒正是掉帧最明显的时候。延后挂载后场景一次成型，重建次数也降到最少。
-  const mountScene = () => { sceneMounted.value = true }
-  store.init()
+  store.init()   // 内部首件事即判定是否停在「工程选择」欢迎页（_loadWelcomeState）
   // 启动提示不再推入命令行（底部命令只保留用户输入交互与直接反馈，少即是多）
-  // 无宣传页：初始化完成后直接进入主界面（保留已保存方案，不重建覆盖）
   await store.waitReady()
-  // 自动恢复上次退出前打开的场景（随 openScene 持久化到 localStorage）；
-  // 未恢复（首次启动 / 场景已卸载 / 资源包未就绪）时按默认场景走原启动流程
-  const restored = await store.restoreLastScene()
-  store.entered = true
-  if (!restored) {
-    store.refresh()
-    store.sceneRev++
+  // 停在欢迎页：不做场景恢复 / 不加载 3D（工程尚未选定），由 WelcomeView 接管内容区
+  if (!store.welcomeOn) {
+    // 自动恢复上次退出前打开的场景（随 openScene 持久化到 localStorage）；
+    // 未恢复（首次启动 / 场景已卸载 / 资源包未就绪）时按默认场景走原启动流程
+    const restored = await store.restoreLastScene()
+    store.entered = true
+    if (!restored) {
+      store.refresh()
+      store.sceneRev++
+    }
+    mountSceneIdle()
   }
-  // 首屏数据与 UI 都已就绪，等浏览器空闲再加载 3D 场景 chunk（加载后常驻，切换视图不受影响）
-  if (window.requestIdleCallback) window.requestIdleCallback(mountScene, { timeout: 1500 })
-  else setTimeout(mountScene, 300)
+  // 欢迎页 → 主界面：此刻才加载 3D 场景 chunk（欢迎页阶段不加载 three.js，首屏更轻）
+  stopWelcomeWatch = watch(() => store.welcomeOn, (on) => { if (!on) mountSceneIdle() })
   // 首屏渲染完成且浏览器空闲后，预取常用视图 chunk：兼顾首屏轻量与后续视图切换的响应速度
   // （defineAsyncComponent 的 loader 拉取模块后即被缓存，再次打开无需重新请求）
   const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 4000))
@@ -474,6 +494,7 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => {
   if (panelAnimTimer) { clearTimeout(panelAnimTimer); panelAnimTimer = null }
+  if (stopWelcomeWatch) { stopWelcomeWatch(); stopWelcomeWatch = null }
   document.body.classList.remove('panel-animating')
 })
 </script>

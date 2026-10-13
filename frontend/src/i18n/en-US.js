@@ -1249,7 +1249,6 @@ export default {
   '（节点设定渣比': '(node-set slag ratio ',
   '，交叉校验用）': ', for cross-checking)',
   '成分来源：矿脉石 + 焦炭/煤粉灰分 + 熔剂；MgO 主要来自熔剂与灰分、Al₂O₃ 来自脉石与煤灰。改动实时联动。': 'Composition sources: sinter/pellet/lump gangue + coke/PCI ash (Materials panel "Detailed Chemistry → Ash Composition") + flux (limestone); MgO mainly from flux and ash, Al₂O₃ mainly from ore gangue and coal ash. Updates live with burden chemistry and charging ratio changes.',
-  '删除该工序节点': 'Delete This Process Node',
   // 附加传感 / 可变设备：数据源下拉（固定值 / 随机模拟值 / 数据源管理中的传感器设备）
   '固定值': 'Fixed Value',
   '随机模拟值': 'Random Simulated Value',
@@ -2793,5 +2792,25 @@ export default {
 
   // 页签标题右侧的未保存标记（VS Code 风格 *）
   '有未保存的改动（Ctrl+S 保存）': 'Unsaved changes (Ctrl+S to save)',
+
+  // 工程选择（启动欢迎页）
+  '能优算·工业能碳智控平台': 'NengYouSuan · Industrial Energy & Carbon Intelligent Control Platform',
+  '选择工程以开始：新建场景、打开本地工程包，或从最近的工程继续。': 'Pick a project to start: create a scene, open a local package, or continue from a recent project.',
+  '新建场景…': 'New Scene…',
+  '打开文件夹…': 'Open Folder…',
+  '选择行业类别，新建空白编排方案': 'Choose an industry category and create a blank layout',
+  '导入本地 .ec 工程资源包并打开': 'Import a local .ec project package and open it',
+  '从已安装的工程列表中选择': 'Choose from the installed projects',
+  '暂无可用工程：请先新建场景，或导入 .ec 工程资源包。': 'No project available: create a scene or import an .ec project package first.',
+  '「{label}」资源包尚未就绪：请先通过「打开文件夹…」导入该工程的 .ec 资源包': 'Package "{label}" is not ready: import its .ec package via "Open Folder…" first',
+  '正在导入工程包…': 'Importing project package…',
+  '导入工程包失败：': 'Failed to import project package: ',
+  '工程包已导入：请在「打开场景…」中选择该工程': 'Package imported: select the project in "Open Scene…"',
+  '从最近列表移除': 'Remove from recent list',
+  '请先打开工程：在内容区新建或打开场景': 'Open a project first: create or open a scene in the content area',
+  '返回工程选择': 'Back to Project Picker',
+  '分钟前': 'minutes ago',
+  '小时前': 'hours ago',
+  '天前': 'days ago',
 
 }

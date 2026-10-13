@@ -363,6 +363,9 @@ body.panel-dragging .app { transition: none; }
 /* 底栏（命令行窗口 + 状态条）收起：仅隐藏命令行窗口，蓝色系统状态条保留；行高 0 + 内容裁剪实现平滑收起 */
 .app.bottom-collapsed { grid-template-rows: 30px 28px 1fr 0 22px; }
 .app.bottom-collapsed .cmdwin { visibility: hidden; pointer-events: none; transition: visibility .22s; }
+/* 工程选择（欢迎页）：未打开工程时中间内容区整块给欢迎页，
+   工具条行 / 右侧检视器 / 底部命令行都不占位（右栏与命令行由 App 直接不渲染，这里只收列宽行高） */
+.app.welcome-on { --rw: 0px; grid-template-rows: 30px 0 minmax(0, 1fr) 0 22px; }
 
 /* ============ 功能视图窗口（tab 化） ============
    功能视图（流程编排 / 数据分析 / AI群控 / 碳资产管理 / 全景碳核查 / 能流分析 / 能碳一体机管理）；
@@ -669,16 +672,17 @@ body.panel-dragging .app { transition: none; }
 }
 .tch.hdr:hover { background: transparent; color: var(--text); }
 .tch.hdr .tch-tt { font-size: var(--fs-s); font-weight: 600; letter-spacing: .6px; color: inherit; }
-.tch.hdr .twisty { width: 14px; opacity: .5; }
+.tch.hdr .twisty { width: 14px; }
 .tch.hdr .tch-count { opacity: .8; }
 
-/* Twisty 箭头（VS Code chevron：横向闭合、旋转 90° 展开） */
+/* Twisty 箭头（VS Code chevron：横向闭合、旋转 90° 展开）
+   资源树折叠/展开按钮统一近黑色（--text 浅色主题下即 #1E1F22），不降透明度；深色主题随 --text 反相，保证可读 */
 .twisty {
   width: 16px; height: 20px; display: grid; place-items: center;
-  color: var(--muted); flex: 0 0 auto; cursor: pointer;
-  opacity: .6; transition: transform .15s ease, opacity .15s, color .15s;
+  color: var(--text); flex: 0 0 auto; cursor: pointer;
+  opacity: 1; transition: transform .15s ease;
 }
-.twisty:hover { opacity: 1; color: var(--text); }
+.twisty:hover { opacity: 1; }
 .twisty.open { transform: rotate(90deg); }
 .twisty svg { display: block; }
 

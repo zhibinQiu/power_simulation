@@ -257,8 +257,6 @@
                      :value="spShow(att)" @input="onAttSpInput(att, $event.target.value)" @change="onAttSetpoint(att, $event.target.value)"
                      :title="t('设定值（{label}）：只用于调节运行工况，不参与取数；本工序实际功率请在「传感器」中添加电功率传感器', { label: spOf(att).label })" />
               <span class="u">{{ spOf(att).unit }}</span>
-              <input class="att-fx" type="number" step="0.01" :value="fxShow(att)" @input="onAttFxInput(att, $event.target.value)" @change="onAttFactor(att, $event.target.value)"
-                     :title="t('换算系数：读数 = 源值 × 系数（系统单位与设备实际度量不一致时换算用，默认 1，最多两位小数）')" />
               <select class="att-src" :value="writeSrcOf(att)" @change="onAttWriteSrc(att, $event.target.value)"
                       :title="t('绑定数据源设备的可写点位：修改设定值时自动下发写入（仅列出具有可写权限的点位）')">
                 <option value="">{{ t('不绑定写点位') }}</option>
@@ -271,6 +269,8 @@
                   <option :value="boundFallback[att.uid].value">{{ boundFallback[att.uid].label }}</option>
                 </optgroup>
               </select>
+              <input class="att-fx" type="number" step="0.01" :value="fxShow(att)" @input="onAttFxInput(att, $event.target.value)" @change="onAttFactor(att, $event.target.value)"
+                     :title="t('换算系数：读数 = 源值 × 系数（系统单位与设备实际度量不一致时换算用，默认 1，最多两位小数）')" />
             </template>
             <select v-if="att.kind === 'sensor'" class="att-src" :value="srcOf(att)" @change="onAttSrc(att, $event.target.value)">
               <option value="fixed">{{ t('固定值') }}</option>

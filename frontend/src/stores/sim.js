@@ -484,6 +484,11 @@ export const useSimStore = defineStore('sim', {
     _confirmResolver: null, // confirm() 挂起的 Promise resolve
     scenario: 'steel',           // 当前仿真场景行业（四大控排 + 其它）：steel 钢铁(默认) / cement 水泥 / chemical 化工 / nonferrous 有色 / other 其它(资源包场景)
     processRoute: 'short',       // 当前流程：短流程(默认) / 长流程；数字孪生默认展示短流程。资源包场景下为包内模板 id（如 cool）
+    // —— 工程选择（欢迎页）——
+    // welcomeOn = true 表示尚未打开工程：中间内容区显示「工程选择」欢迎页（左栏保留），
+    // 只有用户新建 / 打开工程后才进入主界面（本次会话内刷新不再回欢迎页，见 _loadWelcomeState）。
+    welcomeOn: true,
+    recentScenes: [],            // 最近打开的工程：[{ id, label, industry, ts }]，localStorage sim.recentScenes 持久化
     // —— 场景 / 资源包（.ec）状态 ——
     sceneId: 'steel',            // 当前打开的场景资源包 id（steel = 平台内置钢包）
     sceneMode: 'steel',          // 'steel' = 钢铁碳引擎场景（后端仿真全能力）；'other' = 通用资源包场景（编排 → 孪生展示，本地静态核算）
@@ -984,6 +989,7 @@ export const useSimStore = defineStore('sim', {
     clearNotifications() { this.notifications = [] },
     async init() {
       try {
+        this._loadWelcomeState()   // 是否停在「工程选择」欢迎页 + 最近工程列表（同步，先于任何场景装载）
         loadCalibrations()   // 启动即恢复本厂标定耦合（localStorage），否则用默认机理/经验系数
         this._loadDataSource() // 恢复上次设置的实时数据源（平台 MQTT 实时 / 自定义 WS / HTTP）
         this._consumeReloadKeep()   // 切场景重载：把左栏开合状态带过这一次重载（仅一次性）
@@ -1028,7 +1034,8 @@ export const useSimStore = defineStore('sim', {
         if (!booted) await this.loadStrategies()
         this.ready = true
         this._bindSchemeDirty() // 编排改动检测（手动保存模式：只置「未保存」标记，不自动落盘）
-        this.notify('success', t('系统就绪'), t('数字孪生已载入 {units} 个工序、{flows} 条物流，实时链路与优化模型已就绪。', { units: this.model.units.length, flows: this.model.flows.length }))
+        // 停在欢迎页时不必播报「系统就绪」：工程尚未打开，等用户选完工程进入主界面再提示
+        if (!this.welcomeOn) this.notify('success', t('系统就绪'), t('数字孪生已载入 {units} 个工序、{flows} 条物流，实时链路与优化模型已就绪。', { units: this.model.units.length, flows: this.model.flows.length }))
         this._startFeed()
         // AI 优化模型：同步训练上下文并轮询状态（后台定时训练由后端调度，前端展示「逐渐变优」）
         this.syncOptimizerContext().then(() => this.refreshOptimizers())
@@ -1042,6 +1049,8 @@ export const useSimStore = defineStore('sim', {
     // 仅当它是**非钢资源包且已就绪**时返回其 id；钢包 / 未安装 / 不可用时返回 null（走原钢铁默认启动）。
     // 目的：让资源包场景（机房温控等）在初始化阶段一次装载到位，避免先按钢铁初始化再切换。
     async _bootSceneId() {
+      // 欢迎页（未打开工程）：不自动装载上次场景，等用户在工程选择里显式打开
+      if (this.welcomeOn) return null
       let last = null
       try { last = localStorage.getItem('sim.sceneId') } catch (e) { return null }
       if (!last || last === 'steel' || last === this.sceneId) return null
@@ -1702,7 +1711,15 @@ export const useSimStore = defineStore('sim', {
       this.setFactors({ ...(this.factors || {}), fuels })
     },
     // 三栏布局控制
-    toggleLeft() { this.leftOpen = !this.leftOpen },
+    // 左栏（资源管理器）依赖具体工程：未打开工程时一律不展开（覆盖活动栏 / 顶栏 / 系统设置等所有入口），
+    // 只在「要展开」时拦截，收起始终放行，避免异常态下左栏关不掉。
+    toggleLeft() {
+      if (this.welcomeOn && !this.leftOpen) {
+        this.toast = t('请先打开工程：在内容区新建或打开场景')
+        return
+      }
+      this.leftOpen = !this.leftOpen
+    },
     toggleRight() { this.rightOpen = !this.rightOpen },
     toggleBottom() { this.bottomOpen = !this.bottomOpen },
     // 「本析智擎」：顶栏按钮切换右侧检视器 ↔ 智能体对话界面（AgentChatView）
@@ -1718,6 +1735,8 @@ export const useSimStore = defineStore('sim', {
     // 打开视图：未打开则追加到 tab 列表并激活；已打开则仅激活（不重复开 tab）
     openView(id) {
       if (!VIEW_IDS.includes(id)) return
+      // 欢迎页（未打开工程）：功能视图都依赖当前工程，先引导打开工程
+      if (this.welcomeOn) { this.toast = t('请先打开工程：在内容区新建或打开场景'); return }
       if (!this.openViews.includes(id)) this.openViews.push(id)
       this._activateView(id)
     },
@@ -1789,6 +1808,7 @@ export const useSimStore = defineStore('sim', {
     // HMI人机交互屏：与 3D 数字孪生对等的主视图形态（不进 tab 列表），
     // 开启时回到主视图槽位（功能视图窗口保持打开，点其标签可再切回）
     toggleOverview() {
+      if (this.welcomeOn) { this.toast = t('请先打开工程：在内容区新建或打开场景'); return }
       this.overviewOn = !this.overviewOn
       if (this.overviewOn) {
         if (this.grpRightBackup == null) this.grpRightBackup = this.rightOpen
@@ -2167,6 +2187,9 @@ export const useSimStore = defineStore('sim', {
         // sceneVersion：左右面板（资源树 / 检视器）以它为 :key 重建，清空本地折叠态/档位等残留
         this.sceneVersion++
         try { localStorage.setItem('sim.sceneId', sceneId) } catch (e) { /* localStorage 不可用时忽略 */ }
+        // 打开工程即进入工作区：欢迎页收起、本次会话内刷新不再回欢迎页；并记入「最近」
+        this._noteRecentScene(sceneId, meta)
+        this._markEntered()
         // 手动切换场景：整页重新加载 —— 后续的 sceneVersion++ / nextTick / 3D 重建都不必再做，
         // 重载后由 init 的 _bootSceneId 直接装载新场景，一次到位（见 _reloadWorkspace）。
         if (wantReload) { this._reloadWorkspace(); return true }
@@ -2199,6 +2222,63 @@ export const useSimStore = defineStore('sim', {
       } catch (e) { /* localStorage 不可用时忽略 */ }
       try { window.location.reload() } catch (e) { /* 非浏览器环境忽略 */ }
     },
+    // ===== 工程选择（欢迎页）=====
+    // 启动判定：新会话（新标签页 / 重开浏览器）一律先停在「工程选择」欢迎页，由用户显式打开工程；
+    // 已进入过工作区后本次会话内刷新（F5）不再回欢迎页（sessionStorage，关闭标签即失效）。
+    _loadWelcomeState() {
+      let entered = false
+      try { entered = sessionStorage.getItem('sim.entered') === '1' } catch (e) { /* 隐私模式下忽略 */ }
+      this.welcomeOn = !entered
+      this.entered = entered
+      try {
+        const raw = localStorage.getItem('sim.recentScenes')
+        const arr = raw ? JSON.parse(raw) : []
+        if (Array.isArray(arr)) this.recentScenes = arr.filter((x) => x && x.id).slice(0, 12)
+      } catch (e) { /* 存档损坏：按空列表处理 */ }
+    },
+    // 进入工作区：欢迎页 → 主界面（打开 / 新建工程后调用）
+    _markEntered() {
+      this.welcomeOn = false
+      this.entered = true
+      try { sessionStorage.setItem('sim.entered', '1') } catch (e) { /* 忽略 */ }
+    },
+    // 记入「最近打开的工程」（最新在前，去重，最多 12 条）
+    _noteRecentScene(sceneId, meta) {
+      if (!sceneId) return
+      const m = meta || this.sceneIndex.find((x) => x.id === sceneId) || null
+      const pm = this.scenePack && this.scenePack.meta ? this.scenePack.meta : null
+      const label = (m && (m.label || m.name || m.industry)) || (pm && (pm.label || pm.name)) || sceneId
+      const industry = (m && (m.industryGroup || m.industry)) || (pm && pm.industry) || ''
+      const list = this.recentScenes.filter((x) => x.id !== sceneId)
+      list.unshift({ id: sceneId, label, industry, ts: Date.now() })
+      this.recentScenes = list.slice(0, 12)
+      try { localStorage.setItem('sim.recentScenes', JSON.stringify(this.recentScenes)) } catch (e) { /* 忽略 */ }
+    },
+    // 从「最近」列表移除一项（欢迎页行尾 ✕；只影响记录，不删资源包）
+    removeRecentScene(id) {
+      if (!id) return
+      this.recentScenes = this.recentScenes.filter((x) => x.id !== id)
+      try { localStorage.setItem('sim.recentScenes', JSON.stringify(this.recentScenes)) } catch (e) { /* 忽略 */ }
+    },
+    // 欢迎页「打开工程」：目标已是当前场景时无需重新装载（openScene 会早退），直接进工作区。
+    // 返回是否成功；失败（资源包未就绪 / 不存在）保持停留在工程选择页。
+    async openProjectScene(sceneId, opts) {
+      if (!sceneId) return false
+      if (sceneId === this.sceneId) {
+        this._noteRecentScene(sceneId)
+        this._markEntered()
+        return true
+      }
+      return await this.openScene(sceneId, opts)
+    },
+    // 返回「工程选择」欢迎页（当前工程保持装载，再打开即回到原工程）
+    backToWelcome() {
+      if (this.simMode) this.exitSim()
+      if (this.editMode) this.exitEdit()
+      this.welcomeOn = true
+      this.entered = false
+      try { sessionStorage.removeItem('sim.entered') } catch (e) { /* 忽略 */ }
+    },
     // 消费「切场景重载」留下的一次性状态（读完即删；超过 10s 视为过期，不生效）
     _consumeReloadKeep() {
       try {
@@ -2213,6 +2293,8 @@ export const useSimStore = defineStore('sim', {
     // 启动恢复：自动打开上次退出前打开的场景（localStorage sim.sceneId，随 openScene 写入）。
     // 场景已卸载 / 资源包未就绪时保持默认场景并给出提示，不阻断启动流程。
     async restoreLastScene() {
+      // 欢迎页：保留在「工程选择」，不自动恢复上个场景（否则就绕过了欢迎页）
+      if (this.welcomeOn) return false
       // 已在 init 内首屏装载（资源包场景直接开机到位）：不再二次打开，
       // 避免重复刷新与 3D 场景重建（也是「先闪一下钢铁」的另一半开销）。
       if (this.sceneBooted) return true
@@ -2646,6 +2728,8 @@ export const useSimStore = defineStore('sim', {
     },
     // ---- 编辑态：流程编排 ----
     enterEdit() {
+      // 欢迎页（未打开工程）：编排画布属于具体工程，先引导打开工程
+      if (this.welcomeOn) { this.toast = t('请先打开工程：在内容区新建或打开场景'); return }
       this.editMode = true
       // 彻底清空右侧选中（含策略 / AI 模型），避免残留选中项把编排属性顶成策略属性：
       // 面板一律由用户在画布上点击节点（selectFlow）时才弹出，进入编排不自动开任何面板

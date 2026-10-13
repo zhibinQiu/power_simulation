@@ -38,6 +38,11 @@ const buttons = [
 
 // 点击行为（VS Code 风格）：点击当前活动按钮收起侧栏，点击其它按钮切换面板并展开
 function onClick(id) {
+  // 欢迎页（未打开工程）：功能视图 / 编排 / 资源管理器都依赖具体工程，一律拒绝并提示先打开工程
+  if (store.welcomeOn) {
+    store.toast = t('请先打开工程：在内容区新建或打开场景')
+    return
+  }
   // 流程编排：进入 / 回到编排画布；已停在画布时再次点击即「完成编排」（应用方案并退出编辑态）
   if (id === 'flowEdit') {
     if (store.flowEditing) store.exitEdit()

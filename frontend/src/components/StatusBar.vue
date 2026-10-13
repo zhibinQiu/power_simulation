@@ -5,7 +5,8 @@
           :title="t('产品未激活，点击在「关于本平台」中激活')">
       <span class="lic-tri">⚠</span> {{ t('产品未激活') }}
     </span>
-    <span v-if="store.newsTickerOn" class="st spacer news-ticker" :title="t('市场快讯 · 中国煤炭交易网（ctctc.cn）')">
+    <!-- 快讯条：工程选择页（欢迎页）不显示，进入主界面后随开关恢复 -->
+    <span v-if="store.newsTickerOn && !store.welcomeOn" class="st spacer news-ticker" :title="t('市场快讯 · 中国煤炭交易网（ctctc.cn）')">
       <span class="news-scroll" v-if="newsItems.length">
         <span class="news-track" :style="{ '--news-dur': newsDur + 's' }">
           <span class="news-list">
@@ -57,7 +58,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
 import { visiblePoll } from '../utils/poll.js'
@@ -127,13 +128,23 @@ function fmtNotifTime(t) {
     : `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
+// 快讯轮询：欢迎页不显示快讯，也就不再请求（省一次外部抓取 + 5 分钟轮询）
+function newsWanted() { return store.newsTickerOn && !store.welcomeOn }
+function startNews() {
+  if (stopNews || !newsWanted()) return
+  loadNews()
+  stopNews = visiblePoll(loadNews, 5 * 60 * 1000) // 每 5 分钟刷新一次快讯
+}
+function stopNewsPoll() { if (stopNews) { stopNews(); stopNews = null } }
+
 onMounted(() => {
   // 可见性感知：后台标签不跳秒、不拉快讯（切回可见时立即补一轮）
   tickClock(); stopClock = visiblePoll(tickClock, 1000)
-  loadNews(); stopNews = visiblePoll(loadNews, 5 * 60 * 1000) // 每 5 分钟刷新一次快讯
+  startNews()
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', onKey)
 })
+watch(newsWanted, (on) => { on ? startNews() : stopNewsPoll() })
 onBeforeUnmount(() => {
   if (stopClock) { stopClock(); stopClock = null }
   if (stopNews) { stopNews(); stopNews = null }

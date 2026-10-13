@@ -178,7 +178,8 @@ async function onOk() {
   try {
     if (props.mode === 'new') {
       const c = curCat.value
-      const ok = await store.openScene(c.meta.id)
+      // openProjectScene：目标已是当前场景时也能正确「进入工作区」（openScene 会早退不记入最近）
+      const ok = await store.openProjectScene(c.meta.id)
       if (ok) {
         store.enterEdit()
         store.clearScheme()   // 新场景从空白编排开始

@@ -156,8 +156,6 @@
                        :value="spShow(att)" @input="onAttSpInput(att, $event.target.value)" @change="onAttSetpoint(att, $event.target.value)"
                        :title="t('设定值（{label}）：只用于调节运行工况，不参与取数；本工序实际功率请在「传感器」中添加电功率传感器', { label: spOf(att).label })" />
                 <span class="u">{{ spOf(att).unit }}</span>
-                <input class="att-fx" type="number" step="0.01" :value="fxShow(att)" @input="onAttFxInput(att, $event.target.value)" @change="onAttFactor(att, $event.target.value)"
-                       :title="t('换算系数：读数 = 源值 × 系数（系统单位与设备实际度量不一致时换算用，默认 1，最多两位小数）')" />
                 <select class="att-src" :value="writeSrcOf(att)" @change="onAttWriteSrc(att, $event.target.value)"
                         :title="t('绑定数据源设备的可写点位：修改设定值时自动下发写入（仅列出具有可写权限的点位）')">
                   <option value="">{{ t('不绑定写点位') }}</option>
@@ -170,6 +168,8 @@
                     <option :value="boundFallback[att.uid].value">{{ boundFallback[att.uid].label }}</option>
                   </optgroup>
                 </select>
+                <input class="att-fx" type="number" step="0.01" :value="fxShow(att)" @input="onAttFxInput(att, $event.target.value)" @change="onAttFactor(att, $event.target.value)"
+                       :title="t('换算系数：读数 = 源值 × 系数（系统单位与设备实际度量不一致时换算用，默认 1，最多两位小数）')" />
               </template>
               <select v-if="att.kind === 'sensor'" class="att-src" :value="srcOf(att)" @change="onAttSrc(att, $event.target.value)">
                 <option value="fixed">{{ t('固定值') }}</option>
@@ -229,8 +229,6 @@
           <div class="pr-hint">{{ t('能碳口径：附加的「电功率传感器（kW）」读数即折碳功率来源；可变设备设定值只调工况、不参与折碳。') }}</div>
         </div>
       </CollapseSection>
-
-      <button class="del-node" @click="store.removeFlowNode(node.id)">{{ t('删除该工序节点') }}</button>
     </div>
 
     <!-- ===== 设备节点 ===== -->
@@ -251,7 +249,6 @@
           </div>
         </div>
       </CollapseSection>
-      <button class="del-node" @click="store.removeFlowNode(node.id)">{{ t('删除该设备节点') }}</button>
     </div>
 
     <!-- ===== 其它（原料源等，钢铁场景专属概念） ===== -->
@@ -708,6 +705,4 @@ const setpointUnit = computed(() => node.value?.range?.unit || '')
 .att-pick-item + .att-pick-item { border-top: 1px solid var(--line-soft); }
 .att-pick-item:hover { background: rgba(95,130,148,.14); color: var(--accent-d); }
 .att-pick-item .api-u { font-size: 10px; color: var(--muted); }
-.del-node { margin-top: 10px; width: auto; align-self: flex-start; padding: 0 var(--btn-pad-x); min-height: var(--btn-h); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: #c0453c; background: var(--btn-bg); border: 1px solid rgba(192, 69, 60, 0.55); border-radius: 4px; cursor: pointer; }
-.del-node:hover { background: rgba(192, 69, 60, 0.08); }
 </style>
