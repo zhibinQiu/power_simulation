@@ -487,7 +487,7 @@
             <!-- 手动刷新：重新拉取三列数据 + 强制同步拉云端 CRD（用户主动点时才付 5s 超时代价） -->
             <button class="cbx-op cbx-xs" :disabled="resRefreshing" @click="refreshResources()"
                     :title="t('重新拉取盒子 / 模型 / 设备列表，并同步拉取云端最新 CRD 状态')">
-              <span class="cbx-ref-ic" :class="{ spin: resRefreshing }">⟳</span>{{ resRefreshing ? t('刷新中…') : t('刷新') }}
+              {{ resRefreshing ? t('刷新中…') : t('刷新') }}
             </button>
           </div>
           <div v-if="secFold.reslist" class="cbx-reslist">
@@ -4150,10 +4150,6 @@ onUnmounted(stopCmdPoll)
 }
 
 /* ---- 资源列表（拓扑图下方：盒子 / 模型 / 设备三列并排） ---- */
-/* 刷新按钮图标：进行中匀速旋转，给出「正在拉取」的即时反馈 */
-@keyframes cbx-ref-spin { to { transform: rotate(360deg); } }
-.cbx-ref-ic { display: inline-block; line-height: 1; }
-.cbx-ref-ic.spin { animation: cbx-ref-spin .8s linear infinite; }
 .cbx-reslist { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .cbx-rescol { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--panel); }
 /* 列头靠 bar 底色与列表区分，不再叠一条分隔线 */

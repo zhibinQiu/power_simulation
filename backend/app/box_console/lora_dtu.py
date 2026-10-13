@@ -447,20 +447,32 @@ def build_patches(devices: Optional[List[Dict[str, Any]]] = None,
     # 逐站下发、等该站应答再问下一站（半双工 485 本来就一问一答），多条问帧在同
     # 一瞬间挤同一个 DTU 的下行窗口会互相顶掉应答 —— 实测 4 台温度各 5s 独立下发
     # 时抓包 3 次里只有 1 次回数据，四台读数一路老化到几分钟。
-    # 主设备 = 组内第一台启用中的设备，它的 polls 带上整组所有从站，应答按
+    # 主设备 = 组内站号最小的那台，它的 polls 带上整组所有从站，应答按
     # polls[].device 由 mapper 分流上报到各自的平台设备（routed），成员因此停采。
     poll_of: Dict[str, Dict[str, Any]] = {}
     peers_of: Dict[str, List[str]] = {}
     group_polls_of: Dict[str, List[Dict[str, Any]]] = {}
+    primary_of: Dict[str, str] = {}
     for g in pl["groups"]:
         for p in g["polls"]:
             poll_of[str(p.get("device") or "")] = p
         all_polls = sorted(g["polls"], key=lambda x: int(x.get("slave") or 0))
-        for m in g["members"]:
-            peers_of[str(m)] = list(g["members"])
-            group_polls_of[str(m)] = all_polls
-    # 主设备 = 组内第一台设备：采集设备没有「启用/停用」之分，平台上有就采集、
-    # 不想采就在平台上删掉（三端同步），所以选主不看任何 enabled 之类的开关字段。
+        # 主设备必须与「平台设备列表顺序」无关（2026-10-13 事故）：曾按组内第一台
+        # 选取，而开发机与生产实例的设备清单顺序不同（env-temp→shuitong-temp vs
+        # shuitong-temp→env-temp），两个实例各自算出不同的主设备并交替下发，每次
+        # 都把对方的主设备删掉、把自己的加上，盒子因此反复 remove/add 并在每次
+        # config 后重启 mapper，LoRa 读数断断续续、设备频繁离线。改用站号最小的
+        # 那台（确定性，任何实例算出来都一样）。
+        members = [str(m) for m in (g.get("members") or []) if m]
+        primary = str((all_polls[0].get("device") or "").strip()) if all_polls else ""
+        if primary not in members:
+            primary = sorted(members)[0] if members else ""
+        for m in members:
+            peers_of[m] = list(members)
+            group_polls_of[m] = all_polls
+            primary_of[m] = primary
+    # 采集设备没有「启用/停用」之分，平台上有就采集、不想采就在平台上删掉（三端
+    # 同步），所以选主不看任何 enabled 之类的开关字段。
 
     patches: List[Dict[str, Any]] = []
     changes: List[str] = []
@@ -507,7 +519,7 @@ def build_patches(devices: Optional[List[Dict[str, Any]]] = None,
 
         mine = poll_of.get(name)
         members = [n for n in (peers_of.get(name) or []) if n]
-        primary = members[0] if members else name
+        primary = primary_of.get(name) or (members[0] if members else name)
         if not (mine and primary == name):
             # 不生成下发条目：
             #   - 组内成员（由主设备代采）：读数由主设备按 polls[].device 代报，盒子

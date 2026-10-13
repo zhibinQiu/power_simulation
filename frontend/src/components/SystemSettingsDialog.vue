@@ -603,16 +603,18 @@ function resetDefaults() {
 
 <style scoped>
 .ss-mask { position: fixed; inset: 0; background: rgba(20,30,40,.42); display: flex; align-items: center; justify-content: center; z-index: 200; }
-.ss-modal { width: 780px; max-width: 94vw; height: min(600px, 86vh); display: flex; flex-direction: column; background: var(--panel);
-  border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 18px 50px rgba(0,0,0,.28); font-family: var(--ui); color: var(--text); }
-.ss-head { background: var(--head-bg);
+/* 圆角收口：外壳裁掉子元素（头 / 左栏 / 底部操作区）溢出的直角背景，四角才不留直角 */
+.ss-modal { width: 780px; max-width: 94vw; height: min(600px, 86vh); display: flex; flex-direction: column;
+  background: var(--panel); overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: 0 18px 50px rgba(0,0,0,.28); font-family: var(--ui); color: var(--text); }
+.ss-head { background: var(--head-bg); border-radius: var(--r-lg) var(--r-lg) 0 0;
  display: flex; align-items: center; justify-content: space-between; padding: 12px 16px;  }
 .ss-title { font-size: 14px; font-weight: 700; letter-spacing: .5px; }
 
 /* 主体：左侧目录 + 右侧内容（高度由 .ss-modal 固定，切换标签时窗口尺寸不跳动） */
 .ss-body { flex: 1; min-height: 0; display: flex; }
 .ss-nav { width: 168px; flex: none; display: flex; flex-direction: column; gap: 2px; padding: 10px 8px;
-  background: var(--bar); border-right: 1px solid var(--border); overflow: auto; }
+  background: var(--bar); border-right: 1px solid var(--border); border-radius: 0 0 0 var(--r-lg); overflow: auto; }
 .ss-nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: none; border-radius: 6px;
   background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; position: relative; text-align: left; }
 .ss-nav-item:hover { background: var(--panel); color: var(--text); }
@@ -665,7 +667,9 @@ function resetDefaults() {
 .ss-msg-lat { margin-left: auto; font-variant-numeric: tabular-nums; }
 .ss-llm-btns { display: flex; gap: 10px; margin-top: 14px; justify-content: flex-end; }
 .ss-btn:disabled { opacity: .5; cursor: not-allowed; }
-.ss-actions { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--line-soft); }
+/* 底部操作区：与头部同为 --head-bg 铺底（靠色差分层，不画分隔线），并收口下方两角 */
+.ss-actions { display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  background: var(--head-bg); border-radius: 0 0 var(--r-lg) var(--r-lg); }
 .ss-actions .sp { flex: 1; }
 .ss-btn { padding: 0 var(--btn-pad-x-lg); min-height: var(--btn-h-lg); min-width: var(--btn-min-w); display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 6px; background: var(--btn-bg); cursor: pointer; font-size: 12px; color: var(--text); }
 .ss-btn:hover { border-color: var(--accent-d); }

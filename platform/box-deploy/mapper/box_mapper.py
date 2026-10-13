@@ -1135,6 +1135,28 @@ class LoraReader:
         rest = dl.get("rest") or {}
         self.dl_rest_url = str(rest.get("url") or "").strip()    # 如 http://127.0.0.1:8080/api/devices/{devEUI}/queue
         self.dl_rest_token = str(rest.get("token") or "").strip()
+
+        # ---- 下行链路观测与退避（2026-10-13） --------------------------------
+        # ChirpStack 只在「近期收到过该终端上行」时才肯下发下行（rx history 为空时
+        # 直接拒绝：gateway rx history is empty after filtering, no downlink path
+        # available）。而 DR206 这类透传终端不会自发上行，读数全靠下行问帧驱动 ——
+        # 一旦这条链断掉就是死结：下行发不出 → 终端不回 → 永远没有上行 → 永远发不出。
+        # mapper 唯一能自救的是「看得清 + 别添乱」：订阅网关侧下行帧（ChirpStack →
+        # 网关）区分两类故障，并在确认无下行路径时退避轮询周期，不再每拍往队列里
+        # 堆无效问帧（实测 19 分钟堆到 150+ 条，恢复瞬间会一次性倾泻撞车）。
+        self.interval = float(d.get("interval", 30.0) or 30.0)
+        # 网关下行帧主题（ChirpStack → 网关，region/gateway/{id}/command/down）
+        self._gw_topic = str(self.cfg.get("gatewayTopic") or "+/gateway/+/command/down").strip()
+        self._gw_down_ts = 0.0
+        self._gw_down_count = 0
+        self.dev_addr = ""       # 本终端 DevAddr（从上行事件里学，用于归属网关下行帧）
+        self._no_down_streak = 0
+        self._backoff = 0
+        self._no_down_max = max(1, int(self.cfg.get("noDownMax", 2) or 2))
+        try:
+            self._backoff_mults = [max(1.0, float(m)) for m in (self.cfg.get("backoffMults") or [1, 2, 4, 10])]
+        except Exception:
+            self._backoff_mults = [1.0, 2.0, 4.0, 10.0]
         if self.dl_enabled:
             print("[info] lora %s 主动取数已启用: mode=%s fPort=%s timeout=%.1fs 通道=%s" % (
                 self.name, self.dl_mode, self.dl_fport, self.dl_timeout,
@@ -1207,16 +1229,55 @@ class LoraReader:
 
     # -- MQTT ---------------------------------------------------------------
     def _on_message(self, client, userdata, msg):
+        topic = str(getattr(msg, "topic", "") or "")
+        if "/gateway/" in topic and topic.endswith("/command/down"):
+            self._note_gateway_downlink(msg.payload)   # ChirpStack → 网关：真下发
+            return
         try:
             data = json.loads(msg.payload.decode(errors="replace"))
         except Exception:
             return
         if not isinstance(data, dict):
             return
+        self._note_dev_addr(data)
         # 上行只认"本拍问帧的应答"：按站号路由到对应 polls 项缓存，供 _read_polls 取用。
         # 没有 polls 就没有"问"，此时的上行无从归属（读数一律由轮询下发取得），直接忽略。
         if self.polls:
             self._route_uplink(data)
+
+    def _note_dev_addr(self, data):
+        """从上行事件里记住本终端的 DevAddr（用于归属网关下行帧）。"""
+        if self.dev_addr:
+            return
+        addr = data.get("devAddr")
+        if not addr and isinstance(data.get("deviceInfo"), dict):
+            addr = data["deviceInfo"].get("devAddr")
+        if addr:
+            self.dev_addr = str(addr).strip().lower()
+
+    def _note_gateway_downlink(self, payload):
+        """记一帧「ChirpStack → 网关」的下行：证明本拍下行真的发到了网关。
+
+        能解出 DevAddr 就按 DevAddr 归属（同一台盒子多台终端订阅同一网关主题时
+        不会互相误判）；解不出就按"本拍刚问过"兜底计数。
+        """
+        addr = ""
+        try:
+            obj = json.loads(payload.decode(errors="replace"))
+            raw = obj.get("phyPayload") or obj.get("phyPayloadBase64") or ""
+            if raw:
+                head = base64.b64decode(raw)[:4]
+                if len(head) == 4:
+                    addr = head[::-1].hex()   # LoRaWAN 空中帧 DevAddr 是小端
+        except Exception:
+            addr = ""
+        if addr and self.dev_addr and addr.lower() != self.dev_addr.lower():
+            return   # 别的终端的下行帧，与本设备无关
+        self._gw_down_ts = time.time()
+        self._gw_down_count += 1
+        if self._gw_down_count == 1:
+            print("[info] lora %s 已观测到 ChirpStack→网关下行帧（DevAddr=%s）："
+                  "下行链路判据生效，此后「无应答」将按空口/终端侧归因" % (self.name, addr or "-"))
 
     def _route_uplink(self, data):
         """多从站 DTU 上行路由：把一帧应答归到对应的 polls 项。
@@ -1473,26 +1534,35 @@ class LoraReader:
         某台没答不影响其它台；全部无应答才返回空，采集线程会跳过本拍上报。
         """
         routed, got_any = {}, False
+        down_seen = False      # 本拍是否观测到 ChirpStack 真把帧下发到了网关
         for poll in self.polls:
             slave = poll["slave"]
             with self._lock:
                 before = (self._by_slave.get(slave) or {}).get("ts", 0)
             self._pending_slave = slave
+            gw_before = self._gw_down_ts
             if not self.send_downlink(hex_data=poll["hex"], fport=poll["fport"] or None):
                 continue
+            if self._gw_down_ts > gw_before:
+                down_seen = True
             if not self._wait_slave(slave, before):
+                # 已判定"ChirpStack 无下行路径"时不再补发：此时补发只会让它的下行
+                # 队列翻倍堆积（实测 19 分钟堆到 150+ 条），恢复瞬间还会一次性倾泻
+                if self._backoff:
+                    self._no_answer(slave, poll, down_seen)
+                    continue
                 # 同拍补发一次：LoRa 上下行本身丢包率高（现场实测单发命中率常只有
                 # 30%~60%），补发一条成本极低，命中率可从 p 提升到 1-(1-p)^2，
                 # 直接把读数延迟与「设备显示离线」的概率压下去
                 with self._lock:
                     before = (self._by_slave.get(slave) or {}).get("ts", 0)
+                gw_before = self._gw_down_ts
                 if not self.send_downlink(hex_data=poll["hex"], fport=poll["fport"] or None):
                     continue
+                if self._gw_down_ts > gw_before:
+                    down_seen = True
                 if not self._wait_slave(slave, before):
-                    # 把实际下发的问帧打出来：现场对帧时可直接拿它与 NS/串口助手收到的帧比对
-                    # （从站号、寄存器、CRC 任一不符都会「发了但没人答」，只报从站号看不出问题）
-                    print("[warn] lora %s 从站%d 下行 %s 后 %.1fs 内无新应答（已补发一次；终端离线 / 下行未达 / 该从站无设备？）"
-                          % (self.name, slave, poll.get("hex") or "-", self.dl_timeout))
+                    self._no_answer(slave, poll, down_seen)
                     continue
             with self._lock:
                 vals = dict((self._by_slave.get(slave) or {}).get("values") or {})
@@ -1502,10 +1572,58 @@ class LoraReader:
             routed.setdefault(poll["device"] or self.name, {}).update(vals)
         self._pending_slave = None
         self.routed = routed if got_any else {}
+        self._update_backoff(got_any)
         merged = {}
         for sub in self.routed.values():
             merged.update(sub)
         return merged
+
+    def _no_answer(self, slave, poll, down_seen):
+        """一拍问完没拿到应答：分开报「ChirpStack 没下发」与「下发了终端没答」。
+
+        这两类的处置完全不同，混成一句「终端离线」会把排查带偏：
+          * 无网关下行帧 = ChirpStack 侧拒绝下发（终端久未上行 → rx history 空），
+            平台/盒子侧再怎么重试都没用，必须现场让终端上行一次起搏；
+          * 有网关下行帧 = 空口与终端侧问题（射频、485 接线、从站无设备/掉电），
+            重试与补发是有意义的。
+        """
+        hex_data = poll.get("hex") or "-"
+        age = (time.time() - self._gw_down_ts) if self._gw_down_ts else -1
+        age_s = ("%.0fs" % age) if age >= 0 else "从未"
+        if not down_seen:
+            self._no_down_streak += 1
+            print("[warn] lora %s 从站%d 下行 %s 后 %.1fs 内无应答，且 ChirpStack 未向网关下发下行帧"
+                  "（终端久未上行 → 无下行路径，重试无效；连续 %d 拍；上一次观测到网关下行：%s）"
+                  % (self.name, slave, hex_data, self.dl_timeout, self._no_down_streak, age_s))
+        else:
+            print("[warn] lora %s 从站%d 下行 %s 后 %.1fs 内无新应答（已补发一次；网关已收到下行，"
+                  "属空口/终端侧：射频、485 接线或从站无设备？）"
+                  % (self.name, slave, hex_data, self.dl_timeout))
+
+    def _update_backoff(self, got_any):
+        """按下行链路健康度调整轮询周期（断链后止损，恢复后自动收敛）。"""
+        if got_any:
+            if self._backoff or self._no_down_streak:
+                print("[info] lora %s 下行链路恢复，轮询周期回到 %.0fs（连续无下行计数归零）"
+                      % (self.name, self.cycle_interval()))
+            self._backoff = 0
+            self._no_down_streak = 0
+            return
+        if self._no_down_streak < self._no_down_max:
+            return
+        mx = len(self._backoff_mults) - 1
+        if self._backoff < mx:
+            self._backoff += 1
+            print("[warn] lora %s 连续 %d 拍 ChirpStack 无下行路径：终端近期没有上行，"
+                  "ChirpStack 拒绝下发下行（no downlink path available），重试只会让下行队列堆积。"
+                  "轮询周期退避至 %.0fs；需现场让终端上行一次（重启终端 / 检查终端与传感器供电），"
+                  "恢复后自动回到 %.0fs" % (self.name, self._no_down_streak,
+                                       self.cycle_interval(), self.interval))
+
+    def cycle_interval(self, base=None):
+        """本拍之后的休眠周期：下行链路失效时按倍数退避，恢复后回到 base。"""
+        b = float(base or self.interval or 30.0)
+        return max(b * self._backoff_mults[min(self._backoff, len(self._backoff_mults) - 1)], b)
 
     def connect(self):
         self.close()
@@ -1524,6 +1642,21 @@ class LoraReader:
             if rc == 0:
                 self._conn.set()
                 c.subscribe(self._topic)
+                # 网关侧下行帧（ChirpStack → 网关）：用来判断"问帧到底有没有发到网关"
+                if self._gw_topic:
+                    try:
+                        res = c.subscribe(self._gw_topic)
+                        rc = res[0] if isinstance(res, (tuple, list)) else 0
+                        if rc in (0, None):
+                            print("[info] lora %s 订阅网关下行帧 %s（判据：ChirpStack 是否真下发）"
+                                  % (self.name, self._gw_topic))
+                        else:
+                            # 订阅失败时"没看到网关下行帧"会被误判成 ChirpStack 无下行路径，
+                            # 必须把失败本身暴露出来，否则又是查不出的静默失败
+                            print("[warn] lora %s 订阅网关下行帧失败 rc=%s: %s"
+                                  % (self.name, rc, self._gw_topic))
+                    except Exception as e:
+                        print("[warn] lora %s 订阅网关下行帧异常 %s: %s" % (self.name, self._gw_topic, e))
             else:
                 print("[warn] lora %s 连接 broker %s:%s 失败 rc=%s" % (self.name, self.broker, self.port, rc))
 
@@ -3371,6 +3504,13 @@ def _apply_config_cmd(payload):
                         gone.append(n)
     cfg["devices"] = merged
 
+    # 写盘前的原文：用于判断本次下发是否真的改了配置（见下方"按需重启"）
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as _f:
+            _old_text = _f.read()
+    except Exception:
+        _old_text = ""
+
     backup = ""
     try:
         if os.path.exists(CONFIG_PATH):
@@ -3399,7 +3539,24 @@ def _apply_config_cmd(payload):
         except Exception as e:  # noqa: BLE001
             print("[warn] 重启 box-mapper 未触发（配置已在运行期生效）: %s" % e)
 
-    threading.Thread(target=_restart, daemon=True).start()
+    # 但配置没有实质变化时不要重启（2026-10-13）：每次下发都重启会清空 LoRa 的
+    # 从站应答缓存并重建采集线程，读数随之中断一拍，平台上就表现为 LoRa 设备
+    # 反复离线；而两个平台实例交替下发时重启更是每十几秒一次。需要强制重启时
+    # 在 payload 里带 "restart": true。
+    def _unchanged():
+        try:
+            old = json.loads(_old_text) if _old_text else None
+        except Exception:
+            return False
+        if not isinstance(old, dict):
+            return False
+        return (json.dumps(old, sort_keys=True, ensure_ascii=False, default=str)
+                == json.dumps(cfg, sort_keys=True, ensure_ascii=False, default=str))
+
+    if _unchanged() and not payload.get("restart"):
+        print("[info] 配置无实质变化，跳过兜底重启（避免打断 LoRa 采集）")
+    else:
+        threading.Thread(target=_restart, daemon=True).start()
     st = config_state()
     # 立即回报一次生效配置摘要（不等周期上报），平台据此判定「已下发 = 已生效」
     _publish_config_state()
@@ -3606,6 +3763,17 @@ def get_stub():
         return _stub_global
 
 
+def _cycle_interval(reader, interval):
+    """本拍后的休眠周期：支持 reader 自行退避（目前只有 LoRa 下行链路失效时用）。"""
+    fn = getattr(reader, "cycle_interval", None)
+    if callable(fn):
+        try:
+            return float(fn(interval))
+        except Exception:
+            return float(interval)
+    return float(interval)
+
+
 def collector(device, stop_event):
     """每设备独立线程：协议采集 -> 上报 -> 断连缓存/补传。"""
     name = device.get("name", "?")
@@ -3648,7 +3816,9 @@ def collector(device, stop_event):
                         # 既不重复上报旧值，也不写缓存，下一拍重新下发再试
                         # 按「补齐周期」休眠：周期严格等于 interval，拍用时长也不会把
                         # 周期越拖越长（对 LoRa 这类一拍要数秒的协议尤其重要）
-                        time.sleep(max(0.1, interval - (time.time() - t0)))
+                        # LoRa 下行链路失效时周期由 reader 退避放大（避免持续往
+                        # ChirpStack 下行队列堆无效问帧），恢复后自动回到 interval
+                        time.sleep(max(0.1, _cycle_interval(reader, interval) - (time.time() - t0)))
                         continue
                     if watcher.enabled:
                         for prop, on in watcher.update(values):
@@ -3675,7 +3845,7 @@ def collector(device, stop_event):
                 except Exception as e:
                     raise  # 采集层异常 -> 断开重连
                 # 补齐周期：周期 = interval，拍用时计入其中
-                time.sleep(max(0.1, interval - (time.time() - t0)))
+                time.sleep(max(0.1, _cycle_interval(reader, interval) - (time.time() - t0)))
         except Exception as e:
             wait = backoff_steps[min(fail_streak, len(backoff_steps) - 1)]
             fail_streak += 1
