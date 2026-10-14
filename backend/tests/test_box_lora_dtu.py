@@ -159,6 +159,43 @@ def test_patches_keep_box_snapshot_custom_fields():
     assert built["snapshot"] is True
 
 
+def test_patches_interval_follows_platform_collect_cycle():
+    """采集周期必须由平台下发覆盖盒子旧值（2026-10-14）。
+
+    下发条目以盒子现配置为底稿（保住现场定制），但 interval 曾漏了覆盖：底稿里带的
+    是盒子正在跑的旧周期，于是「平台上把 10s 改成 15s」下发后条目里仍是 10s，盒子
+    照旧按老周期采集 —— 用户在界面上改了周期、上报间隔却小于新值，且无任何报错。
+    Modbus 直连分支一直有覆盖，只有 LoRa 漏了。
+    """
+    devs = [dict(_dev("env-temp", "0120560100000264", 1), collectCycle=15000),
+            dict(_dev("shuitong-temp", "0120560100000264", 8), collectCycle=15000)]
+    snap = [{"name": "env-temp", "protocol": "lora", "interval": 5.0,
+             "lora": {"devEUI": "0120560100000264", "slaveId": 1, "maxAge": 30},
+             "points": [{"property": "temperature"}]}]
+    built = lora_dtu.build_patches(devs, snap)
+    entry = [p for p in built["patches"] if p["name"] == "env-temp"][0]
+    assert entry["interval"] == 15.0            # 平台 15000ms -> 盒子 15s，不是底稿的 5.0
+    assert entry["lora"]["maxAge"] == 30        # 同时仍保住现场定制字段
+    assert entry["points"][0]["property"] == "temperature"
+    # 主设备回执里带上周期，便于核对下发是否真的带了新值
+    assert "周期15s" in " ".join(built["changes"])
+
+
+def test_member_change_note_tells_real_cycle_is_primarys():
+    """代采成员改周期不会生效：整组只有一个采集线程，周期由主设备决定。
+
+    用户把成员（shuitong-temp）从 10s 改成 15s、上报间隔却仍是主设备（env-temp）的
+    5s —— 必须在回执里把「实际周期随主设备 Ns，本机周期设置不生效」说出来，否则
+    这种改动表现为静默无效。
+    """
+    devs = [dict(_dev("env-temp", "0120560100000264", 1), collectCycle=5000),
+            dict(_dev("shuitong-temp", "0120560100000264", 8), collectCycle=15000)]
+    built = lora_dtu.build_patches(devs, None)
+    assert "shuitong-temp" in built["remove"]        # 成员不生成下发条目
+    note = [c for c in built["changes"] if c.startswith("shuitong-temp")][0]
+    assert "env-temp" in note and "5s" in note and "不生效" in note
+
+
 def test_patches_empty_for_unsupported_protocol():
     """LoRa 与 Modbus 之外的协议（opcua/蓝牙等）盒子侧为现场定制，平台不下发。
 

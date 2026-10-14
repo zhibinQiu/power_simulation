@@ -227,21 +227,23 @@ def _device_points(dev: Dict[str, Any]) -> List[Dict[str, Any]]:
 def _base_entry(dev: Dict[str, Any], snap: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """下发条目的底稿：优先用盒子上正在跑的那份（避免覆盖现场定制），否则按平台定义生成。"""
     if snap:
-        return json.loads(json.dumps(snap))  # 深拷贝，避免改到缓存里的对象
-    lora = dict(dev.get("lora") or {})
-    try:
-        interval = float(int(dev.get("collectCycle") or 5000) / 1000.0)
-    except (TypeError, ValueError):
-        interval = 5.0
-    return {
-        "name": str(dev.get("name") or "").strip(),
-        "namespace": str(dev.get("namespace") or "default"),
-        "protocol": "lora",
-        "interval": interval,
-        "lora": lora,
-        "points": _device_points(dev),
-        "enabled": True,
-    }
+        entry = json.loads(json.dumps(snap))  # 深拷贝，避免改到缓存里的对象
+    else:
+        lora = dict(dev.get("lora") or {})
+        entry = {
+            "name": str(dev.get("name") or "").strip(),
+            "namespace": str(dev.get("namespace") or "default"),
+            "protocol": "lora",
+            "lora": lora,
+            "points": _device_points(dev),
+            "enabled": True,
+        }
+    # 采集周期必须无条件覆盖（2026-10-14）：底稿里带的是盒子现跑的旧周期，
+    # 不覆盖就成了「平台上改了周期、下发条目里还是旧值」，盒子照旧按老周期采 ——
+    # 用户改 10s→15s 后上报间隔仍是旧值，且无任何报错（Modbus 分支一直有覆盖，
+    # 只有 LoRa 漏了）。平台是采集周期的配置源，与从站号/串口同口径。
+    entry["interval"] = _interval_of(dev)
+    return entry
 
 
 # ---------------------------------------------------------------------------
@@ -453,6 +455,8 @@ def build_patches(devices: Optional[List[Dict[str, Any]]] = None,
     peers_of: Dict[str, List[str]] = {}
     group_polls_of: Dict[str, List[Dict[str, Any]]] = {}
     primary_of: Dict[str, str] = {}
+    dev_by_name = {str(d.get("name") or "").strip(): d for d in (devices or [])
+                   if isinstance(d, dict)}
     for g in pl["groups"]:
         for p in g["polls"]:
             poll_of[str(p.get("device") or "")] = p
@@ -528,8 +532,15 @@ def build_patches(devices: Optional[List[Dict[str, Any]]] = None,
             # 两种情况若盒子配置里还留着旧条目，都随本次下发一并删除（remove）。
             if mine:
                 remove.append(name)
-                changes.append("%s: 由主设备 %s 代采（终端…%s 站%d），盒子不保留该条目" % (
-                    name, primary, str(lora.get("devEUI") or "")[-4:], int(mine["slave"])))
+                # 整组只有一个采集线程、一个周期（主设备一拍串行问完所有从站），所以
+                # 成员设备自己的「采集周期」不生效。必须写进回执，否则用户在成员上改
+                # 周期会发现「改了没反应」（2026-10-14：shuitong-temp 10s→15s 无效果，
+                # 真实周期是主设备 env-temp 的 5s）。
+                p_int = _interval_of(dev_by_name.get(primary) or {})
+                changes.append("%s: 由主设备 %s 代采（终端…%s 站%d，实际周期随主设备 %gs，"
+                               "本机周期设置不生效），盒子不保留该条目" % (
+                                   name, primary, str(lora.get("devEUI") or "")[-4:],
+                                   int(mine["slave"]), p_int))
             else:
                 changes.append("%s: 未配 devEUI 或从站号，拼不出下发指令" % name)
             continue
@@ -553,7 +564,8 @@ def build_patches(devices: Optional[List[Dict[str, Any]]] = None,
         entry["points"] = entry.get("points") or _device_points(d) or []
 
         others = [n for n in members if n != name]
-        what = "主设备轮询站%s" % "、".join(str(int(p["slave"])) for p in polls)
+        what = "主设备轮询站%s，周期%gs" % (
+            "、".join(str(int(p["slave"])) for p in polls), entry["interval"])
         if others:
             what += "（终端…%s，代采：%s）" % (
                 str(lora.get("devEUI") or "")[-4:], "、".join(others))
