@@ -5,7 +5,8 @@
                    强化学习 · 粒子群仍按可调 / 传感设备勾选配对回路），
                    右栏为该算法自己的编排体，右上角「运行」即按编排的算法执行。
      运行时不做整页的实时观测图表，改为点击左侧 / 画布 / 编排条上的任意模块查看它的实时值。
-     规则：可调（橙）· 传感（青）· 条件（紫）· 逻辑门 AND/OR（紫青）· 循环（黄），只有可调模块可以设定数值。 -->
+     规则：可调（橙）· 传感（青）· 条件（紫，分支内可用「并且 / 或者」写多条比较）· 循环（黄），
+     只有可调模块可以设定数值。 -->
 <template>
   <div class="agc">
     <!-- ══════════ ① 模型库 ══════════ -->
@@ -186,7 +187,7 @@
           <section v-if="isRule" class="card rg">
             <div class="card-hd">
               <span class="ct">{{ t('规则编排') }}</span>
-              <span class="cs">{{ t('开始 → 可调 / 传感 → if / AND / OR → 下游模块 → 结束') }}</span>
+              <span class="cs">{{ t('开始 → 可调 / 传感 → 条件判断（可含「并且 / 或者」多条件）→ 下游模块 → 结束') }}</span>
             </div>
             <RuleFlowEditor ref="rfRef" :key="cur.id" class="rf-fill" :graph="cur.graph" :running="running" :period="cur.period" :model-id="cur.id" />
           </section>
@@ -380,7 +381,13 @@ import RuleFlowEditor from './RuleFlowEditor.vue'
 import PsoTuner from './PsoTuner.vue'
 import { t } from '../i18n'
 // 规则编排的「开始 / 结束」端点与通路判定：能否运行取决于是否形成「开始 → 结束」通路
-import { hasFlowPath, ensureFlowEnds } from '../utils/ruleFlow'
+import { hasFlowPath, ensureFlowEnds, upgradeBranches } from '../utils/ruleFlow'
+
+/** 载入模型时把旧版编排升级到当前形态（AND / OR 收进条件内部），幂等 */
+function upgradeGraph(g) {
+  upgradeBranches(g)
+  return g
+}
 
 const store = useSimStore()
 
@@ -499,9 +506,8 @@ const modGroups = computed(() => [
     key: 'logic',
     title: t('逻辑'),
     items: [
-      { key: 'lg-if', k: 'if', ico: '⑃', name: t('条件判断'), desc: 'if / elif / else' },
-      { key: 'lg-and', k: 'gate', op: 'and', ico: '∧', name: 'AND', desc: t('全部条件满足') },
-      { key: 'lg-or', k: 'gate', op: 'or', ico: '∨', name: 'OR', desc: t('任一条件满足') },
+      // AND / OR 不再是独立模块：它们是「条件判断」内部多行条件之间的连接词
+      { key: 'lg-if', k: 'if', ico: '⑃', name: t('条件判断'), desc: 'if / elif / else（多条件用并且 / 或者）' },
       { key: 'lg-loop', k: 'loop', ico: '↻', name: t('循环'), desc: t('重复执行下游') },
     ],
   },
@@ -1318,10 +1324,10 @@ function normalizeModel(m) {
     alg: ALG_TYPES.some((a) => a.id === mm.alg) ? mm.alg : 'rule',
     ts: Number(mm.ts) || Date.now(),
     period: Number(mm.period) || 2,
-    graph: {
+    graph: upgradeGraph({
       nodes: Array.isArray(mm.graph && mm.graph.nodes) ? mm.graph.nodes : [],
       edges: Array.isArray(mm.graph && mm.graph.edges) ? mm.graph.edges : [],
-    },
+    }),
     pso: { ...blankPso(), ...(mm.pso || {}) },
     selAdj: Array.isArray(mm.selAdj) ? mm.selAdj : [],
     selSen: Array.isArray(mm.selSen) ? mm.selSen : [],

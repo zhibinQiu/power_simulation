@@ -2,8 +2,10 @@
      与「流程编排 FlowEditor」完全不同的语义：
        流程编排 = 物料流 / 工艺拓扑（节点=工艺·物料·设备，连线=物流）
        规则编排 = 控制逻辑（节点=可调/传感/IF/循环，连线=执行顺序）
-     五类模块用五种颜色区分：可调（可设定数值）· 传感（只读观测）· IF 条件（if/elif/else 分支）·
-     AND / OR 逻辑门（把若干条判定归约成一个真 / 假出口）· 循环（重复跑下游）。
+     四类模块用四种颜色区分：可调（可设定数值）· 传感（只读观测）· IF 条件（if/elif/else 分支）·
+     循环（重复跑下游）。
+     AND / OR 不是模块：它们是「IF 分支」内部多行条件之间的连接词 —— 一条分支可以写多条比较
+     （如「机柜温度 ≥ 25 并且 < 50」），行首下拉切「并且 / 或者」，AND 优先于 OR 归约。
      左侧模块列表拖入画布即建节点（也可点工具条按钮）；IF 模块默认 if-else，可手动添加 elif，
      每条分支也可单条删除（至少保留一条）。
      每个条件分支的输出端口可继续往下连接可调或传感节点并进行设置（只有可调可设定数值）；
@@ -24,7 +26,6 @@
       <span class="rf-lg"><i class="lg-d adj"></i>{{ t('可调') }}</span>
       <span class="rf-lg"><i class="lg-d sen"></i>{{ t('传感') }}</span>
       <span class="rf-lg"><i class="lg-d ifn"></i>{{ t('条件') }}</span>
-      <span class="rf-lg"><i class="lg-d gat"></i>{{ t('逻辑') }}</span>
       <span class="rf-lg"><i class="lg-d lop"></i>{{ t('循环') }}</span>
       <span class="rf-sp"></span>
       <span class="rf-cnt mono">{{ nodes.length }} {{ t('模块') }} · {{ edges.length }} {{ t('连线') }}</span>
@@ -115,78 +116,51 @@
             <button class="rf-x" :title="t('删除模块')" @mousedown.stop @click.stop="delNode(n)">✕</button>
           </div>
 
-          <div v-for="b in n.branches" :key="b.id" class="rf-br"
+          <div v-for="b in n.branches" :key="b.id" class="rf-br" :style="{ height: branchH(b) + 'px' }"
                :class="[b.type, { act: activeBranch === n.id + ':' + b.id }]">
             <div class="rf-br1">
               <span class="rf-bt">{{ b.type === 'if' ? t('如果') : b.type === 'elif' ? t('否则如果') : t('否则') }}</span>
               <template v-if="b.type !== 'else'">
-                <select class="rf-sel src" v-model="b.src" @mousedown.stop @focus="histBegin" @change="histCommit">
+                <select class="rf-sel src" v-model="condsOf(b)[0].src" @mousedown.stop @focus="histBegin" @change="histCommit">
                   <option value="">{{ t('跟随输入') }}</option>
                   <option v-for="d in devNodes" :key="d.id" :value="d.id">{{ d.label }}</option>
                 </select>
-                <select class="rf-sel op" v-model="b.op" @mousedown.stop @focus="histBegin" @change="histCommit">
+                <select class="rf-sel op" v-model="condsOf(b)[0].op" @mousedown.stop @focus="histBegin" @change="histCommit">
                   <option v-for="o in OPS" :key="o.v" :value="o.v">{{ o.l }}</option>
                 </select>
-                <input class="rf-num sm" type="number" v-model.number="b.val" @mousedown.stop @focus="histBegin" @change="histCommit" />
+                <input class="rf-num sm" type="number" v-model.number="condsOf(b)[0].val" @mousedown.stop @focus="histBegin" @change="histCommit" />
               </template>
               <span v-else class="rf-el">{{ t('以上都不满足') }}</span>
               <button class="rf-bx" :disabled="b.type === 'else'" @mousedown.stop @click.stop="delBranch(n, b)"
                       :title="b.type === 'else' ? t('else 分支不可删除') : t('删除该分支')">✕</button>
             </div>
+            <!-- 同分支内的追加条件：行间的下拉决定它与上一条是「并且」还是「或者」 -->
+            <div v-for="c in condsOf(b).slice(1)" :key="c.id" class="rf-gc">
+              <select class="rf-jn" v-model="c.join" :title="t('与上一条条件的连接方式')" @mousedown.stop @focus="histBegin" @change="histCommit">
+                <option value="and">{{ t('并且') }}</option>
+                <option value="or">{{ t('或者') }}</option>
+              </select>
+              <select class="rf-sel src" v-model="c.src" @mousedown.stop @focus="histBegin" @change="histCommit">
+                <option value="">{{ t('跟随输入') }}</option>
+                <option v-for="d in devNodes" :key="d.id" :value="d.id">{{ d.label }}</option>
+              </select>
+              <select class="rf-sel op" v-model="c.op" @mousedown.stop @focus="histBegin" @change="histCommit">
+                <option v-for="o in OPS" :key="o.v" :value="o.v">{{ o.l }}</option>
+              </select>
+              <input class="rf-num sm" type="number" v-model.number="c.val" @mousedown.stop @focus="histBegin" @change="histCommit" />
+              <button class="rf-bx" @mousedown.stop @click.stop="delCond(b, c)" :title="t('删除该条件')">✕</button>
+            </div>
             <div class="rf-br2">
               <span class="rf-tg" :class="{ none: !branchTargets(n, b).length }">{{ branchTgTxt(n, b) }}</span>
               <span class="rf-sv mono" v-if="b.type !== 'else'">{{ branchSrcTxt(n, b) }}</span>
+              <button v-if="b.type !== 'else'" class="rf-add rf-addc" :title="t('追加一条「并且 / 或者」条件')"
+                      @mousedown.stop @click.stop="addCond(b)">+ {{ t('条件') }}</button>
             </div>
             <span class="rf-pt out" :title="t('输出端口可连接多个下游')" @mousedown.stop="startLink(n, b.id)"></span>
           </div>
 
           <div class="rf-nft">
             <button class="rf-add" @mousedown.stop @click.stop="addBranch(n)">+ {{ t('elif') }}</button>
-          </div>
-        </div>
-
-        <!-- ─────── AND / OR 逻辑门：若干条判定归约成一个「满足 / 不满足」出口 ─────── -->
-        <div v-for="n in gateNodes" :key="n.id" class="rf-node gate" :data-nid="n.id"
-             :class="{ sel: n.id === selNode, act: activeNode.has(n.id) }" :style="nodeStyle(n)" @mousedown.stop="selNode = n.id">
-          <span class="rf-pt in"></span>
-
-          <div class="rf-hd" @mousedown.stop="startMove(n, $event)">
-            <i class="rf-ic">{{ n.op === 'or' ? '∨' : '∧' }}</i>
-            <span class="rf-nm">{{ n.op === 'or' ? 'OR' : 'AND' }} · {{ t('逻辑') }}</span>
-            <select class="rf-gop" v-model="n.op" @mousedown.stop @focus="histBegin" @change="histCommit">
-              <option value="and">AND</option>
-              <option value="or">OR</option>
-            </select>
-            <button class="rf-x" :title="t('删除模块')" @mousedown.stop @click.stop="delNode(n)">✕</button>
-          </div>
-
-          <div v-for="(c, i) in n.conds" :key="c.id" class="rf-gc">
-            <span class="rf-gt">{{ i === 0 ? (n.op === 'or' ? t('任一') : t('全部')) : (n.op === 'or' ? t('或者') : t('并且')) }}</span>
-            <select class="rf-sel src" v-model="c.src" @mousedown.stop @focus="histBegin" @change="histCommit">
-              <option value="">{{ t('跟随输入') }}</option>
-              <option v-for="d in devNodes" :key="d.id" :value="d.id">{{ d.label }}</option>
-            </select>
-            <select class="rf-sel op" v-model="c.op" @mousedown.stop @focus="histBegin" @change="histCommit">
-              <option v-for="o in OPS" :key="o.v" :value="o.v">{{ o.l }}</option>
-            </select>
-            <input class="rf-num sm" type="number" v-model.number="c.val" @mousedown.stop @focus="histBegin" @change="histCommit" />
-            <button class="rf-bx" :disabled="n.conds.length <= 1" @mousedown.stop @click.stop="delCond(n, c)"
-                    :title="n.conds.length <= 1 ? t('至少保留一条条件') : t('删除该条件')">✕</button>
-          </div>
-
-          <div class="rf-nft">
-            <button class="rf-add" @mousedown.stop @click.stop="addCond(n)">+ {{ t('条件') }}</button>
-          </div>
-
-          <div v-for="g in GATE_OUTS" :key="g.id" class="rf-br" :class="{ act: activeBranch === n.id + ':' + g.id }">
-            <div class="rf-br1">
-              <span class="rf-bt" :class="g.p">{{ g.name }}</span>
-              <span class="rf-el">{{ gateTxt(n) }}</span>
-            </div>
-            <div class="rf-br2">
-              <span class="rf-tg" :class="{ none: !branchTargets(n, g).length }">{{ branchTgTxt(n, g) }}</span>
-            </div>
-            <span class="rf-pt out" :title="t('输出端口可连接多个下游')" @mousedown.stop="startLink(n, g.id)"></span>
           </div>
         </div>
 
@@ -244,7 +218,7 @@
 
       <div v-if="!nodes.length" class="rf-empty">
         <p class="t1">{{ t('从左侧「模块」列表拖入画布，或点击工具条按钮开始编排') }}</p>
-        <p class="t2">{{ t('规则逻辑：开始 → 传感/可调 → IF/AND/OR → 出口 → 下游可调（写设定值）或传感（观测）→ 结束；需形成「开始 → 结束」通路才会执行') }}</p>
+        <p class="t2">{{ t('规则逻辑：开始 → 传感/可调 → 条件判断（一条分支可写多条比较，行间用「并且 / 或者」连接）→ 出口 → 下游可调（写设定值）或传感（观测）→ 结束；需形成「开始 → 结束」通路才会执行') }}</p>
       </div>
     </div>
 
@@ -271,7 +245,7 @@ import { useSimStore } from '../stores/sim'
 import { DEVICE_MAP } from '../data/flowLibrary'
 import { ADJUSTABLE_MAP } from '../data/attachLibrary'
 import { t } from '../i18n'
-import { flowPath, evalFlowGraph, isDevKind, isFlowKind, isGateKind, KIND_START, KIND_END } from '../utils/ruleFlow'
+import { flowPath, evalFlowGraph, isDevKind, isFlowKind, branchConds, branchH, upgradeBranches, KIND_START, KIND_END } from '../utils/ruleFlow'
 
 const props = defineProps({
   // { nodes: [], edges: [] } —— 由父组件（模型）持有的响应式对象，本组件就地读写，持久化由父组件负责
@@ -305,19 +279,9 @@ const ST_W = 132
 const ST_H = 40
 const IF_W = 300
 const IF_HD = 30       // 头部
-const IF_BR = 46       // 每条分支（两行：条件 + 下游提示）
-const IF_FT = 28       // 底部 +elif
-// AND / OR 逻辑门：头部 + 若干条条件行 + 「满足 / 不满足」两条出口 + 底部 +条件
-const GATE_W = 300
-const GATE_HD = 30
-const GATE_ROW = 30    // 每条条件行（与 .rf-gc 同高）
-const GATE_BR = 46     // 每个出口行（复用 .rf-br 的高度）
-const GATE_FT = 28     // 底部「+ 条件」（复用 .rf-nft 的高度）
-/** 逻辑门的两个出口：id 即端口 id（写进连线的 port 字段），t = 满足、f = 不满足 */
-const GATE_OUTS = [
-  { id: 't', name: 'TRUE' },
-  { id: 'f', name: 'FALSE' },
-]
+const IF_FT = 28       // 底部「+ elif」
+// 分支高度统一由 utils/ruleFlow 的 branchH 给出（首行 46 + 每追加一条条件 30），
+// 编辑器与自动布局共用同一份口径，避免「端口位置与卡片实际高度」再次漂移。
 const OPS = [
   { v: '>', l: '>' }, { v: '>=', l: '≥' }, { v: '<', l: '<' },
   { v: '<=', l: '≤' }, { v: '==', l: '=' }, { v: '!=', l: '≠' },
@@ -326,7 +290,12 @@ const OPS = [
 const nodes = computed(() => (props.graph && props.graph.nodes) || [])
 const edges = computed(() => (props.graph && props.graph.edges) || [])
 const ifNodes = computed(() => nodes.value.filter((n) => n.kind === 'if'))
-const gateNodes = computed(() => nodes.value.filter((n) => isGateKind(n.kind)))
+/** 分支内的条件组：一组条件之间由 join（并且 / 或者）连接，AND / OR 是条件的内部组件而不再是独立模块 */
+function condsOf(b) { return branchConds(b) }
+// 存量升级（幂等）：旧版把 AND / OR 做成独立逻辑门模块，这里把它们收进条件内部 ——
+// gate 节点转成「条件判断」节点（TRUE / FALSE 两出口 → if / else 两分支），旧式单比较分支转成 conds 数组。
+// 必须早于首次渲染，否则模板取 condsOf(b)[0] 会拿到 undefined。
+upgradeBranches(props.graph)
 // 设备模块只含可调 / 传感；开始 / 结束是流程端点，不对应任何设备
 const devNodes = computed(() => nodes.value.filter((n) => isDevKind(n.kind)))
 const flowNodes = computed(() => nodes.value.filter((n) => isFlowKind(n.kind)))
@@ -565,6 +534,8 @@ function dropPoint(at, w, h) {
   if (clash) { x = clampX(x + 24, w); y = clampY(y + 20, h) }
   return { x, y }
 }
+/** 条件 id（分支内多条条件各有自己的 id，供 v-for 的 key 与增删定位） */
+function cid() { return 'c' + Date.now().toString(36) + (seq++) }
 function addIf(at) {
   histBegin()
   const n = {
@@ -573,8 +544,8 @@ function addIf(at) {
     x: 0,
     y: 0,
     branches: [
-      { id: 'b1', type: 'if', src: '', op: '>', val: 0 },
-      { id: 'b2', type: 'else', src: '', op: '>', val: 0 },
+      { id: 'b1', type: 'if', conds: [{ id: cid(), src: '', op: '>', val: 0, join: 'and' }] },
+      { id: 'b2', type: 'else' },
     ],
   }
   const p = dropPoint(at, IF_W, nodeH(n))
@@ -584,62 +555,23 @@ function addIf(at) {
   histCommit()
 }
 /**
- * AND / OR 逻辑门：把若干条「传感读数 vs 阈值」的判定归约成一个出口。
- * 条件全部成立（AND）或任一成立（OR）→ 走 TRUE 出口；否则走 FALSE 出口。
+ * 给分支追加一条条件：AND / OR 是条件的内部组件（行间的连接词），不再是独立模块。
+ * 新条件的判定来源默认沿用首条（最常见的写法就是同一读数落在某个区间：x ≥ 25 并且 x < 50），
+ * 追加后再把行首下拉切成「或者」即可表达「任一成立」。
  */
-function addGate(op, at) {
+function addCond(b) {
+  if (!b || !Array.isArray(b.conds)) return
   histBegin()
-  const n = {
-    id: nid('gate'),
-    kind: 'gate',
-    op: op === 'or' ? 'or' : 'and',
-    conds: [{ id: 'c' + Date.now().toString(36) + (seq++), src: '', op: '>', val: 0 }],
-    x: 0,
-    y: 0,
-  }
-  const p = dropPoint(at, GATE_W, nodeH(n))
-  n.x = p.x
-  n.y = p.y
-  nodes.value.push(n)
+  b.conds.push({ id: cid(), src: b.conds[0] ? b.conds[0].src : '', op: '>', val: 0, join: 'and' })
   histCommit()
 }
-/** 给逻辑门追加一条条件（AND = 并且，OR = 或者） */
-function addCond(n) {
-  if (!n || !Array.isArray(n.conds)) return
+/** 删除分支里的一条条件：至少保留一条 */
+function delCond(b, c) {
+  if (!b || !Array.isArray(b.conds) || b.conds.length <= 1) return
   histBegin()
-  n.conds.push({ id: 'c' + Date.now().toString(36) + (seq++), src: '', op: '>', val: 0 })
+  const i = b.conds.indexOf(c)
+  if (i >= 0) b.conds.splice(i, 1)
   histCommit()
-}
-/** 删除逻辑门的一条条件：至少保留一条 */
-function delCond(n, c) {
-  if (!n || !Array.isArray(n.conds) || n.conds.length <= 1) return
-  histBegin()
-  const i = n.conds.indexOf(c)
-  if (i >= 0) n.conds.splice(i, 1)
-  histCommit()
-}
-/** 条件行的判定来源：显式指定 > 逻辑门的上游连线 > 无（与 IF 分支同一口径） */
-function condSrc(n, c) {
-  if (c && c.src) {
-    const x = nodes.value.find((k) => k.id === c.src)
-    if (x && !isGateKind(x.kind) && x.kind !== 'if') return x
-  }
-  const e = edges.value.find((x) => x.to === n.id)
-  if (!e) return null
-  const s = nodes.value.find((x) => x.id === e.from)
-  return s && !isGateKind(s.kind) && s.kind !== 'if' ? s : null
-}
-/** 逻辑门出口上的即时摘要：各条件的「来源 = 读数」 */
-function gateTxt(n) {
-  const out = []
-  for (const c of n.conds || []) {
-    const s = condSrc(n, c)
-    if (!s) continue
-    const v = liveOf(s.devId)
-    out.push(`${s.label} ${c.op} ${fmt(c.val)} → ${v == null ? '—' : fmt(v)}`)
-    if (out.length >= 2) break
-  }
-  return out.length ? out.join('；') : t('无判定来源')
 }
 /** 循环模块：走到它时把下游链路重复执行 N 轮（每轮之间可设间隔秒数） */
 function addLoop(at) {
@@ -706,7 +638,7 @@ function addBranch(n) {
   histBegin()
   // elif 插在 else 之前
   const ei = n.branches.findIndex((b) => b.type === 'else')
-  const item = { id: 'b' + Date.now().toString(36) + (seq++), type: 'elif', src: '', op: '>', val: 0 }
+  const item = { id: 'b' + Date.now().toString(36) + (seq++), type: 'elif', conds: [{ id: cid(), src: '', op: '>', val: 0, join: 'and' }] }
   if (ei >= 0) n.branches.splice(ei, 0, item)
   else n.branches.push(item)
   histCommit()
@@ -733,7 +665,7 @@ function normBranches(n) {
   const head = bs.filter((x) => x && x.type !== 'else')
   head.forEach((x, i) => { x.type = i === 0 ? 'if' : 'elif' })
   let tail = bs.filter((x) => x && x.type === 'else').slice(0, 1)
-  if (!tail.length) tail = [{ id: 'b' + Date.now().toString(36) + (seq++), type: 'else', src: '', op: '>', val: 0 }]
+  if (!tail.length) tail = [{ id: 'b' + Date.now().toString(36) + (seq++), type: 'else' }]
   n.branches = head.concat(tail)
   const ids = {}
   for (const x of n.branches) ids[x.id] = 1
@@ -751,10 +683,10 @@ function delNode(n) {
     const e = edges.value[k]
     if (e.from === n.id || e.to === n.id) edges.value.splice(k, 1)
   }
-  // 清掉其它模块里指向它的判定来源（IF 分支 / 逻辑门条件）
+  // 清掉其它模块里指向它的判定来源（IF 各分支的每条条件）
   for (const m of nodes.value) {
-    if (m.kind === 'if') for (const b of m.branches || []) if (b.src === n.id) b.src = ''
-    else if (isGateKind(m.kind)) for (const c of m.conds || []) if (c.src === n.id) c.src = ''
+    if (m.kind !== 'if') continue
+    for (const b of m.branches || []) for (const c of condsOf(b)) if (c.src === n.id) c.src = ''
   }
   if (selNode.value === n.id) selNode.value = ''
   histCommit()
@@ -851,13 +783,10 @@ function paste() {
   if (c.kind === 'if' && Array.isArray(c.branches)) {
     for (const b of c.branches) {
       b.id = 'b' + Date.now().toString(36) + '_' + (seq++)
-      if (b.src) b.src = ''   // 分支判定来源指向旧节点，粘贴后需重新指定
-    }
-  }
-  if (isGateKind(c.kind) && Array.isArray(c.conds)) {
-    for (const q of c.conds) {
-      q.id = 'c' + Date.now().toString(36) + '_' + (seq++)
-      if (q.src) q.src = ''   // 同上：条件来源指向旧节点
+      for (const q of condsOf(b)) {
+        q.id = 'c' + Date.now().toString(36) + '_' + (seq++)
+        q.src = ''   // 判定来源指向旧节点，粘贴后需重新指定
+      }
     }
   }
   nodes.value.push(c)
@@ -867,7 +796,7 @@ function paste() {
 }
 
 // ─────────── 拖放（左侧模块列表 → 画布） ───────────
-// 左栏把模块（开始 / 结束 / IF / AND / OR / 循环 / 可调 / 传感）以 JSON 写进 dataTransfer，
+// 左栏把模块（开始 / 结束 / IF / 循环 / 可调 / 传感）以 JSON 写进 dataTransfer，
 // 落到画布时按落点世界坐标建模块；点击左栏项时由父组件调 addModule 加到视图中心。
 const dragOver = ref(false)
 function onDrop(e) {
@@ -884,7 +813,6 @@ function addModule(p, at) {
   if (!p || !p.k) return
   if (p.k === KIND_START || p.k === KIND_END) { addFlow(p.k, at); return }
   if (p.k === 'if') { addIf(at); return }
-  if (p.k === 'gate') { addGate(p.op, at); return }
   if (p.k === 'loop') { addLoop(at); return }
   if (p.k === 'adj' || p.k === 'sen') {
     const list = p.k === 'adj' ? adjList.value : senList.value
@@ -896,14 +824,12 @@ function addModule(p, at) {
 // ─────────── 几何：端口与连线 ───────────
 function nodeW(n) {
   if (n.kind === 'if') return IF_W
-  if (isGateKind(n.kind)) return GATE_W
   if (n.kind === 'loop') return LOOP_W
   return isFlowKind(n.kind) ? ST_W : DEV_W
 }
 function nodeH(n) {
-  if (n.kind === 'if') return IF_HD + n.branches.length * IF_BR + IF_FT
-  // 头部 + 条件行 + 底部「+ 条件」+ 真 / 假 两条出口
-  if (isGateKind(n.kind)) return GATE_HD + (n.conds || []).length * GATE_ROW + GATE_FT + 2 * GATE_BR
+  // 每条分支的高度随它的条件条数变化（首行 + 追加条件行）
+  if (n.kind === 'if') return IF_HD + (n.branches || []).reduce((s, b) => s + branchH(b), 0) + IF_FT
   if (n.kind === 'loop') return LOOP_H
   return isFlowKind(n.kind) ? ST_H : DEV_H
 }
@@ -917,15 +843,13 @@ function nodeStyle(n) {
 function inPort(n) { return { x: n.x, y: n.y + nodeH(n) / 2 } }
 function outPort(n, port) {
   if (n.kind === 'if') {
-    let i = n.branches.findIndex((b) => b.id === port)
+    // 分支按其在节点内的实际高度依次排下来（每条分支可能含多行条件）
+    let y = n.y + IF_HD
+    const bs = n.branches || []
+    let i = bs.findIndex((b) => b.id === port)
     if (i < 0) i = 0
-    return { x: n.x + IF_W, y: n.y + IF_HD + i * IF_BR + IF_BR / 2 }
-  }
-  if (isGateKind(n.kind)) {
-    // 出口排在条件行与底部「+ 条件」之后：0 = 满足（TRUE）、1 = 不满足（FALSE）
-    const i = port === 'f' ? 1 : 0
-    const top = n.y + GATE_HD + (n.conds || []).length * GATE_ROW + GATE_FT
-    return { x: n.x + GATE_W, y: top + i * GATE_BR + GATE_BR / 2 }
+    for (let k = 0; k < i; k++) y += branchH(bs[k])
+    return { x: n.x + IF_W, y: y + branchH(bs[i] || {}) / 2 }
   }
   if (n.kind === KIND_START) return { x: n.x + ST_W, y: n.y + ST_H / 2 }
   if (n.kind === 'loop') return { x: n.x + LOOP_W, y: n.y + LOOP_H / 2 }
@@ -956,14 +880,13 @@ function nodeName(n) {
   if (!n) return t('模块')
   if (n.label) return n.label
   if (n.kind === 'if') return t('条件判断')
-  if (isGateKind(n.kind)) return `${n.op === 'or' ? 'OR' : 'AND'} · ${t('逻辑')}`
   if (n.kind === 'loop') return t('循环模块')
   if (n.kind === KIND_START) return t('开始')
   if (n.kind === KIND_END) return t('结束')
   return t('模块')
 }
 function isLinked(n) {
-  if (n.kind === 'if' || isGateKind(n.kind)) return true
+  if (n.kind === 'if') return true
   if (n.kind === KIND_START) return edges.value.some((e) => e.from === n.id)
   if (n.kind === KIND_END) return edges.value.some((e) => e.to === n.id)
   return edges.value.some((e) => e.to === n.id || e.from === n.id)
@@ -992,10 +915,22 @@ function branchSrcTxt(n, b) {
   const v = liveOf(s.devId)
   return `${s.label} = ${v == null ? '—' : fmt(v)}`
 }
-/** 判定来源：分支显式指定 > IF 模块输入连线 > 无 */
+/** 判定来源：条件显式指定 > IF 模块输入连线 > 无（取分支首条条件的来源作代表） */
 function srcNodeOf(n, b) {
-  if (b.src) {
-    const x = nodes.value.find((k) => k.id === b.src)
+  const c = condsOf(b)[0]
+  if (c && c.src) {
+    const x = nodes.value.find((k) => k.id === c.src)
+    if (x && x.kind !== 'if') return x
+  }
+  const e = edges.value.find((x) => x.to === n.id)
+  if (!e) return null
+  const s = nodes.value.find((x) => x.id === e.from)
+  return s && s.kind !== 'if' ? s : null
+}
+/** 某条条件自己的判定来源：显式指定 > IF 模块输入连线 > 无 */
+function condSrcNode(n, c) {
+  if (c && c.src) {
+    const x = nodes.value.find((k) => k.id === c.src)
     if (x && x.kind !== 'if') return x
   }
   const e = edges.value.find((x) => x.to === n.id)
@@ -1030,19 +965,15 @@ const issues = computed(() => {
       for (const b of n.branches) {
         const bn = b.type === 'if' ? t('如果') : b.type === 'elif' ? t('否则如果') : t('否则')
         if (b.type !== 'else') {
-          if (!srcNodeOf(n, b)) out.push(t('IF 模块「{name}」分支未接入判定来源', { name: bn }))
-          if (!Number.isFinite(Number(b.val))) out.push(t('IF 模块「{name}」分支阈值未填写', { name: bn }))
+          const cs = condsOf(b)
+          cs.forEach((c, i) => {
+            const cn = cs.length > 1 ? `${bn}·${t('条件')}${i + 1}` : bn
+            if (!condSrcNode(n, c)) out.push(t('IF 模块「{name}」分支未接入判定来源', { name: cn }))
+            if (!Number.isFinite(Number(c.val))) out.push(t('IF 模块「{name}」分支阈值未填写', { name: cn }))
+          })
         }
         if (!branchTargets(n, b).length) out.push(t('IF 模块「{name}」分支未连接下游模块', { name: bn }))
       }
-    } else if (isGateKind(n.kind)) {
-      const nm = nodeName(n)
-      for (const c of n.conds || []) {
-        if (!condSrc(n, c)) out.push(t('逻辑模块「{name}」条件未接入判定来源', { name: nm }))
-        if (!Number.isFinite(Number(c.val))) out.push(t('逻辑模块「{name}」条件阈值未填写', { name: nm }))
-      }
-      if (!branchTargets(n, GATE_OUTS[0]).length) out.push(t('逻辑模块「{name}」「满足」出口未连接下游模块', { name: nm }))
-      if (!branchTargets(n, GATE_OUTS[1]).length) out.push(t('逻辑模块「{name}」「不满足」出口未连接下游模块', { name: nm }))
     } else if (isDevKind(n.kind)) {
       if (isMissing(n)) out.push(t('模块「{name}」对应的设备已不存在', { name: n.label }))
       if (n.kind === 'adj' && !Number.isFinite(Number(n.value))) out.push(t('可调模块「{name}」未设定数值', { name: n.label }))
@@ -1103,7 +1034,6 @@ function decorateActs(acts) {
       return { ...a, txt: `${nodeName(n)} ← ${t('写入')} ${fmt(a.value)}${(n && n.unit) || ''}${tail}` }
     }
     if (a.kind === 'sen') return { ...a, txt: `${nodeName(n)}（${t('仅观测，不写入')}）` }
-    if (a.kind === 'gate') return { ...a, txt: `${nodeName(n)} → ${a.hit === 't' ? t('满足') : t('不满足')}` }
     if (a.kind === 'loop') return { ...a, txt: `${nodeName(n)} · ${t('第 {i}/{n} 轮', { i: a.round, n: a.total })}` }
     return { ...a, txt: '' }
   })
@@ -1250,8 +1180,6 @@ defineExpose({ runOnce, fitView, addModule })
 
 .rfe {
   display: flex; flex-direction: column; min-height: 0;
-  /* 逻辑门种类色：由条件紫与传感青调和而来，不额外引入主题变量 */
-  --k-gate: color-mix(in srgb, var(--k-if) 52%, var(--k-sen));
 }
 .rfe em, .rfe i { font-style: normal; }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
@@ -1279,7 +1207,6 @@ defineExpose({ runOnce, fitView, addModule })
 .lg-d.adj { background: var(--k-adj); }
 .lg-d.sen { background: var(--k-sen); }
 .lg-d.ifn { background: var(--k-if); }
-.lg-d.gat { background: var(--k-gate); }
 .lg-d.lop { background: var(--k-loop); }
 .lg-d.st { background: var(--green); }
 .lg-d.en { background: var(--red); }
@@ -1352,7 +1279,6 @@ defineExpose({ runOnce, fitView, addModule })
   background: var(--panel); border: 1px solid var(--border);
   box-shadow: 0 1px 3px rgba(0, 0, 0, .10); font-size: var(--fs-b); color: var(--text); user-select: none;
 }
-.rf-node::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: var(--radius) 0 0 var(--radius); }
 .rf-node.sel { border-color: var(--accent-d); box-shadow: 0 0 0 2px var(--accent-l); }
 /* 兜底：卡片里的控件一律允许收缩到 0，避免全局 select/input { width: 100% } 撑破卡片 */
 .rf-node select, .rf-node input { min-width: 0; }
@@ -1369,24 +1295,16 @@ defineExpose({ runOnce, fitView, addModule })
 .rf-x { flex: 0 0 auto; width: 14px; height: 14px; line-height: 12px; padding: 0; font-size: var(--fs-s); color: var(--faint); background: none; border: 0; cursor: pointer; font-family: inherit; }
 .rf-x:hover { color: var(--red); }
 
-/* 种类色只用在三处：左侧识别条 · 头部淡底 · 种类图标 */
-.rf-node.adj::before { background: var(--k-adj); }
+/* 种类色只用在两处：头部淡底 · 种类图标（卡片左侧不再有竖条） */
 .rf-node.adj .rf-hd { background: color-mix(in srgb, var(--k-adj) 12%, transparent); }
 .rf-node.adj .rf-ic { color: var(--k-adj); }
 .rf-node.adj .rf-pt { border-color: var(--k-adj); }
-.rf-node.sen::before { background: var(--k-sen); }
 .rf-node.sen .rf-hd { background: color-mix(in srgb, var(--k-sen) 12%, transparent); }
 .rf-node.sen .rf-ic { color: var(--k-sen); }
 .rf-node.sen .rf-pt { border-color: var(--k-sen); }
-.rf-node.ifn::before { background: var(--k-if); }
 .rf-node.ifn .rf-hd { background: color-mix(in srgb, var(--k-if) 12%, transparent); }
 .rf-node.ifn .rf-ic { color: var(--k-if); }
 .rf-node.ifn .rf-pt { border-color: var(--k-if); }
-.rf-node.gate::before { background: var(--k-gate); }
-.rf-node.gate .rf-hd { background: color-mix(in srgb, var(--k-gate) 12%, transparent); }
-.rf-node.gate .rf-ic { color: var(--k-gate); font-weight: var(--fw-t); }
-.rf-node.gate .rf-pt { border-color: var(--k-gate); }
-.rf-node.loop::before { background: var(--k-loop); }
 .rf-node.loop .rf-hd { background: color-mix(in srgb, var(--k-loop) 12%, transparent); }
 .rf-node.loop .rf-ic { color: var(--k-loop); }
 .rf-node.loop .rf-pt { border-color: var(--k-loop); }
@@ -1410,9 +1328,8 @@ defineExpose({ runOnce, fitView, addModule })
 .rf-bind { margin-left: auto; font-size: var(--fs-s); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rf-bind.on { color: var(--green); }
 
-/* 开始 / 结束：胶囊形端点（不显示种类色条） */
+/* 开始 / 结束：胶囊形端点 */
 .rf-node.flow { display: flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 20px; }
-.rf-node.flow::before { display: none; }
 .rf-fic { flex: 0 0 auto; font-size: var(--fs-s); }
 .rf-fnm { flex: 1 1 auto; min-width: 0; font-size: var(--fs-b); font-weight: var(--fw-t); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rf-node.start { border-color: color-mix(in srgb, var(--green) 50%, transparent); background: color-mix(in srgb, var(--green) 10%, transparent); }
@@ -1455,28 +1372,20 @@ defineExpose({ runOnce, fitView, addModule })
 .rf-add { padding: 0; font-size: var(--fs-s); color: var(--k-if); background: none; border: 0; cursor: pointer; font-family: inherit; }
 .rf-add:hover { text-decoration: underline; }
 
-/* AND / OR 逻辑门：条件行（高度 = GATE_ROW）与出口标签 */
+/* 条件分支内的追加条件行：行首下拉决定它与上一条之间是「并且」还是「或者」 */
 .rf-gc {
   box-sizing: border-box; height: 30px; display: flex; align-items: center; gap: 4px;
   padding: 0 8px 0 10px; border-top: 1px dashed var(--border);
 }
-.rf-gt {
-  flex: 0 0 auto; padding: 0 5px; border-radius: 8px; font-size: var(--fs-s); line-height: 15px;
-  color: var(--k-gate); border: 1px solid color-mix(in srgb, var(--k-gate) 34%, transparent);
-  background: color-mix(in srgb, var(--k-gate) 12%, transparent);
-}
 /* width / min-width 必须显式写：main.css 里有全局 select { width: 100% }，
-   不覆盖的话这个下拉会按容器满宽撑开且 flex-shrink:0 不收缩，把标题挤没、卡片整体溢出。 */
-.rf-gop {
-  flex: 0 0 auto; width: 50px; min-width: 0; padding: 0 2px; font-size: var(--fs-s); font-family: var(--mono); font-weight: var(--fw-t);
-  color: var(--k-gate); background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); outline: none;
+   不覆盖的话这个下拉会按容器满宽撑开且 flex-shrink:0 不收缩，把条件行挤乱。 */
+.rf-jn {
+  flex: 0 0 auto; width: 46px; min-width: 0; padding: 0 2px; font-size: var(--fs-s); font-family: inherit; font-weight: var(--fw-t);
+  color: var(--k-if); background: var(--panel); border: 1px solid color-mix(in srgb, var(--k-if) 34%, transparent);
+  border-radius: var(--radius); outline: none;
 }
-.rf-gop:focus { border-color: var(--accent-d); }
-.rf-bt.t {
-  color: var(--green); border-color: color-mix(in srgb, var(--green) 34%, transparent);
-  background: color-mix(in srgb, var(--green) 12%, transparent);
-}
-.rf-bt.f { color: var(--muted); background: var(--bar); border-color: var(--border); }
+.rf-jn:focus { border-color: var(--accent-d); }
+.rf-addc { margin-left: auto; flex: 0 0 auto; }
 
 /* 循环参数行 */
 .rf-lpr { display: flex; align-items: center; gap: 5px; padding: 5px 8px 0; }

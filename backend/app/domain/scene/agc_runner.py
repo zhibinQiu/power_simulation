@@ -194,6 +194,41 @@ def _eval_graph(graph, live_of, state) -> Dict[str, Any]:
         for nx in [x for x in edges if x.get("from") == tid]:
             advance(nx, depth + 1, visited)
 
+    def _branch_conds(b: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """分支内的条件组。
+
+        AND / OR 是条件的内部组件：一条分支可以写多条比较（conds），相邻两条之间由 join 连接
+        （join='or' → 或者，其余 → 并且）。旧编排只有单一比较（src / op / val 直接写在分支上），
+        这里把它兜底成「一条条件」，与前端 branchConds 同口径。
+        """
+        cs = [c for c in ((b or {}).get("conds") or []) if isinstance(c, dict)]
+        return cs or [b or {}]
+
+    def _branch_hit(n, b) -> bool:
+        """分支是否成立：AND 优先于 OR 归约，例如「x<20 或 x≥25 且 x<50」= x<20 OR (x≥25 AND x<50)。
+        任一条件取不到有效读数 / 阈值不合法 → 整条分支不命中（与单条件时代的口径一致）。
+        """
+        hit_or = False
+        grp = True
+        started = False
+        for i, c in enumerate(_branch_conds(b)):
+            s = src_of(n, c)
+            v = live_of(s.get("devId")) if s else None
+            if v is None:
+                return False
+            try:
+                float(c.get("val"))
+            except (TypeError, ValueError):
+                return False
+            r = _cmp(v, c.get("op"), c.get("val"))
+            if i > 0 and str(c.get("join")) == "or":
+                hit_or = hit_or or grp
+                grp = r
+            else:
+                grp = grp and r
+            started = True
+        return (hit_or or grp) if started else False
+
     def eval_if(n, depth, visited):
         if depth > 8 or n.get("id") in visited:
             return
@@ -202,9 +237,7 @@ def _eval_graph(graph, live_of, state) -> Dict[str, Any]:
         for b in n.get("branches") or []:
             if not isinstance(b, dict) or b.get("type") == "else":
                 continue
-            s = src_of(n, b)
-            v = live_of(s.get("devId")) if s else None
-            if v is not None and _cmp(v, b.get("op"), b.get("val")):
+            if _branch_hit(n, b):
                 hit = b
                 break
         if hit is None:
