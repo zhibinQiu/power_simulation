@@ -489,6 +489,11 @@
                     :title="t('重新拉取盒子 / 模型 / 设备列表，并同步拉取云端最新 CRD 状态')">
               {{ resRefreshing ? t('刷新中…') : t('刷新') }}
             </button>
+            <!-- 数据采集：对当前在线设备逐条记录读数，导出 Excel（每台在线设备一张子表） -->
+            <button class="cbx-op cbx-xs cbx-res-op" :class="{ primary: collectRunning }" @click="openCollect()"
+                    :title="t('对当前在线设备发起一次数据采集：把每台设备的读数按真实返回时刻逐条记录，采完导出 Excel（每台在线设备一张子表）')">
+              <span class="cbx-ref-ic" :class="{ rec: collectRunning }">◉</span>{{ collectRunning ? t('采集中 {time}', { time: collectElapsedText }) : t('数据采集') }}
+            </button>
           </div>
           <div v-if="secFold.reslist" class="cbx-reslist">
             <!-- 盒子列表 -->
@@ -1477,6 +1482,11 @@
 
   <!-- 云端时序历史查询（TDengine） -->
   <CloudHistoryDialog v-if="cloudHistoryDev" :device="cloudHistoryDev" @close="cloudHistoryDev = null" />
+
+  <!-- 数据采集（资源列表 › 数据采集）：进度弹窗。采集器持有在组件上，关掉本窗口不中断采集 -->
+  <DataCollectDialog v-if="collectOpen" :vm="collectVM" :preview="collectPreview"
+                     @start="startCollect" @stop="stopCollect" @restart="startCollect"
+                     @download="downloadCollect" @close="collectOpen = false" />
 </template>
 
 <script setup>
@@ -1485,8 +1495,15 @@ import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
 import { t } from '../i18n'
 import { visiblePoll } from '../utils/poll'
+// 数据采集内核（资源列表 ›「数据采集」按钮 / 进度弹窗共用）：
+// createCollector = 按设备真实数据返回驱动记步的采集器；buildCollectSheets = 明细 → 分设备工作表；
+// collectFileName / fmtDuration / deviceStats / COLLECT_DURATION_MS = 文件名、时长格式化、分设备统计、默认时长
+import { createCollector, buildCollectSheets, collectFileName, deviceStats, fmtDuration,
+  COLLECT_DURATION_MS } from '../utils/dataCollect'
 // 云端时序历史查询弹窗（TDengine）：异步分包，点开才加载
 const CloudHistoryDialog = defineAsyncComponent(() => import('./CloudHistoryDialog.vue'))
+// 数据采集进度弹窗：同样异步分包（采集是低频动作，不必进首屏主包）
+const DataCollectDialog = defineAsyncComponent(() => import('./DataCollectDialog.vue'))
 
 const store = useSimStore()
 
@@ -2489,6 +2506,135 @@ async function refreshResources() {
     resRefreshing.value = false
   }
 }
+
+// ---- ② 资源列表 › 数据采集：对在线设备逐条记录读数，导出 Excel（每台在线设备一张子表）----
+// 采集内核 utils/dataCollect（edge-triggered：设备数据源时间戳推进才记一步，不按设定周期补点），
+// Excel 写出 utils/xlsx（零依赖，点导出时才异步加载）。采集器挂在本组件而非弹窗内：
+// 关掉弹窗不影响采集，标题栏按钮持续显示进度，采完（或被停止）立即落盘并弹提示。
+const collectOpen = ref(false)
+const collectVM = ref(null)          // 采集进度视图模型（弹窗只读渲染）
+const lastFile = ref(null)           // 最近一次导出的产物信息（文件名/大小/表数）
+let collector = null
+let lastBlob = null
+const collectRunning = computed(() => !!(collectVM.value && collectVM.value.phase === 'running'))
+const collectElapsedText = computed(() => fmtDuration(collectVM.value ? collectVM.value.elapsed : 0))
+
+/** 采集目标：实时通道里 state=reporting 的设备（与资源列表「在线」圆点同口径） */
+function onlineTargets(snap) {
+  const cyc = new Map((devices.value.devices || []).map((d) => [d.name, d.collectCycle]))
+  return ((snap && snap.devices) || [])
+    .filter((r) => r.state === 'reporting')
+    .map((r) => ({
+      name: r.name,
+      model: r.model || '',
+      node: r.node || '',
+      cycleMs: cyc.get(r.name),   // 设定周期：导出表里仅作对照列，不参与计步
+    }))
+}
+/** 弹窗「开始」前的在线设备预览：直接用 3s 快轮询的实时数据，不额外打请求 */
+const collectPreview = computed(() => (rtDevices.value || [])
+  .filter((r) => r.state === 'reporting')
+  .map((r) => ({
+    name: r.name,
+    model: r.model || '',
+    node: r.node || '',
+    props: (r.twins || []).filter((x) => x.reported != null && !x.invalid).length,
+  })))
+
+/** 采集器状态 → 视图模型（每拍重建，保证弹窗/按钮响应式刷新） */
+function setCollectVM(s) {
+  collectVM.value = {
+    phase: s.running ? 'running' : (s.finished ? 'done' : 'stopped'),
+    startedAt: s.startedAt,
+    endedAt: s.endedAt,
+    elapsed: s.elapsed,
+    durationMs: s.durationMs,
+    records: s.records.length,
+    error: s.error,
+    file: lastFile.value,
+    devices: s.devices.map((d) => {
+      const st = deviceStats(d)
+      return {
+        name: d.name, model: d.model, node: d.node, online: d.online,
+        steps: st.steps, avgGap: st.avgGap, hz: st.hz, dup: st.dup,
+      }
+    }),
+  }
+}
+
+/** Blob → 浏览器下载 */
+function saveBlob(blob, name) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 5000)
+}
+
+/** 采集结束（到时自动 / 手动停止 / 页面切走）：导出 xlsx 并落盘 */
+async function exportCollect(s) {
+  const records = s.records || []
+  lastFile.value = null
+  lastBlob = null
+  setCollectVM(s)
+  if (!records.length) {
+    store.showToast(t('本次采集未收到任何数据：设备在本窗口内没有新的数据返回'), 'warn')
+    return
+  }
+  try {
+    const { buildXlsx } = await import('../utils/xlsx')   // 零依赖 xlsx 写出器，用时才加载
+    const name = collectFileName(s.startedAt)
+    const sheets = buildCollectSheets(records, {
+      startedAt: s.startedAt,
+      endedAt: s.endedAt,
+      durationMs: s.elapsed,
+      deviceCount: s.devices.length,
+      devices: s.devices,
+    })
+    const blob = await buildXlsx(sheets)
+    lastBlob = blob
+    lastFile.value = { name, size: blob.size, sheets: sheets.length, devices: s.devices.length }
+    saveBlob(blob, name)
+    setCollectVM(s)
+    store.showToast(`${t('数据采集完成')}：${t('{n} 台设备', { n: s.devices.length })} · `
+      + `${t('{n} 条记录', { n: records.length })} · ${t('已导出')} ${name}`, 'success')
+  } catch (e) {
+    store.showToast(t('导出失败') + '：' + (e.message || e), 'error')
+  }
+}
+
+function openCollect() { collectOpen.value = true }
+
+/** 开始采集：先把「此刻在线且有读数」的设备定下来，再交给采集内核按返回节奏记录 */
+async function startCollect(durationMs) {
+  if (collectRunning.value) return
+  try {
+    const list = onlineTargets(await api.boxDevicesRealtime())
+    if (!list.length) {
+      store.showToast(t('当前没有在线设备（无实时数据推送），无法采集'), 'warn')
+      return
+    }
+    lastFile.value = null
+    lastBlob = null
+    collectVM.value = null
+    collector = createCollector({
+      fetchSnapshot: () => api.boxDevicesRealtime(),
+      devices: list,
+      durationMs: Number(durationMs) > 0 ? Number(durationMs) : COLLECT_DURATION_MS,
+      onUpdate: setCollectVM,
+      onFinish: exportCollect,
+    })
+    collector.start()
+  } catch (e) {
+    store.showToast(t('采集启动失败') + '：' + (e.message || e), 'error')
+  }
+}
+function stopCollect() { if (collector) collector.stop() }
+function downloadCollect() { if (lastBlob && lastFile.value) saveBlob(lastBlob, lastFile.value.name) }
+// 切走视图（组件卸载）时给采集收尾：内核 stop 会走到 onFinish → 导出落盘，已采到的数据不丢
+onUnmounted(() => { if (collector && collector.state.running) collector.stop() })
+
 // ---- 配置变更实时同步（服务端单一配置 → 多客户端一致显示）----
 // 采集设备配置只存服务端 backend/config/box_devices.json 一份，客户端不做本地副本。
 // 任一客户端改动（新建/修改设备、更新模型、下发）后后端写盘并广播 config 事件，
@@ -4150,6 +4296,15 @@ onUnmounted(stopCmdPoll)
 }
 
 /* ---- 资源列表（拓扑图下方：盒子 / 模型 / 设备三列并排） ---- */
+/* 计数提示紧跟区块标题（默认 .cbx-sec-hint 的 margin-left:auto 会把它推到最右），右侧留给刷新按钮 */
+.cbx-sec-hint.res-hint { margin-left: 6px; }
+/* 刷新按钮图标：进行中匀速旋转，给出「正在拉取」的即时反馈 */
+@keyframes cbx-ref-spin { to { transform: rotate(360deg); } }
+.cbx-ref-ic { display: inline-block; line-height: 1; }
+.cbx-ref-ic.spin { animation: cbx-ref-spin .8s linear infinite; }
+/* 采集按钮图标：采集中呼吸闪烁，与按钮上的「采集中 mm:ss」文案呼应（不再是一动不动的 ◉） */
+@keyframes cbx-rec-blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+.cbx-ref-ic.rec { animation: cbx-rec-blink 1s ease-in-out infinite; }
 .cbx-reslist { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .cbx-rescol { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--panel); }
 /* 列头靠 bar 底色与列表区分，不再叠一条分隔线 */

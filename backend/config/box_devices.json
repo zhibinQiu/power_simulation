@@ -816,7 +816,7 @@
       "model": "lora-temp-model",
       "node": "nt001",
       "protocol": "lora",
-      "collectCycle": 5000,
+      "collectCycle": 30000,
       "cloudDevice": "",
       "comm": {
         "commType": "serial",
@@ -1017,8 +1017,8 @@
           "desc": "LoRaWAN DR206 透传 DTU 温度：值=寄存器×0.1；数据源=LoRa 网管 ChirpStack(nt001 一体机内), mapper 上行解码实时上报"
         }
       ],
-      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"env-temp\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\n    nengtan.io/hwid: \"lora-0120560100000264-s1\"\nspec:\n  deviceModelRef:\n    name: \"lora-temp-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"temperature\"\n    collectCycle: 15000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        broker: \"127.0.0.1:41884\"\n        applicationID: \"0ce81243-64fb-455c-a484-9b26acb42f65\"\n        devEUI: \"0120560100000264\"\n        slaveId: 1\n        appKey: \"\"\n        region: \"CN470\"\n        dataRate: \"SF7BW125\"\n        visitors:\n        - propertyName: \"temperature\"\n",
-      "created_at": 1791946131,
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"zhileng-temp\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\n    nengtan.io/hwid: \"lora-0120560100000245-s7\"\nspec:\n  deviceModelRef:\n    name: \"lora-temp-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"temperature\"\n    collectCycle: 5000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        broker: \"127.0.0.1:41884\"\n        applicationID: \"0ce81243-64fb-455c-a484-9b26acb42f65\"\n        devEUI: \"0120560100000245\"\n        slaveId: 7\n        appKey: \"\"\n        region: \"CN470\"\n        dataRate: \"SF7BW125\"\n        visitors:\n        - propertyName: \"temperature\"\n",
+      "created_at": 1791622208,
       "status": "reporting"
     },
     {
@@ -1028,7 +1028,7 @@
       "model": "lora-temp-model",
       "node": "nt001",
       "protocol": "lora",
-      "collectCycle": 15000,
+      "collectCycle": 10000,
       "cloudDevice": "",
       "comm": {
         "commType": "serial",
