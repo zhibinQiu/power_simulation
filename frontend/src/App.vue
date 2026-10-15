@@ -248,6 +248,8 @@ function onAutoLayout() { store.autoLayout(); store.refresh(); store.sceneRev++ 
 function onToggleEdit() { if (store.editMode) store.exitEdit(); else store.enterEdit() }
 // 编排动作（载入模板 / 清空画布 / 自动布局…）前置：未进入编排则进入；已在编排但当前在其它 tab 则切回编排标签
 function ensureEdit() { if (!store.editMode) store.enterEdit(); else store.activateView('flowEdit') }
+// 当前场景是否提供该模板 id（编排菜单据此决定模板项显隐）
+function hasTemplate(id) { return (store.sceneTemplates || []).some((t) => t.id === id || t.route === id) }
 function loadExample(route) { ensureEdit(); store.loadTemplate(route) }
 function clearScheme() { ensureEdit(); store.clearScheme() }
 // 编排手动保存：改动只反映在编排画布（草稿），点「保存」才写入本地存档 + 服务端 designs/flow，
@@ -404,8 +406,10 @@ const menus = computed(() => [
     { label: t('复制小组'), hide: () => !store.editMode, disabled: () => !store.selectedGroupId, act: () => duplicateGroupBtn() },
     { label: t('删除小组'), hide: () => !store.editMode, disabled: () => !store.selectedGroupId, act: () => store.removeFlowGroup(store.selectedGroupId) },
     { sep: true, hide: () => !store.editMode },
-    { label: t('长流程模板'), hide: () => !store.editMode, act: () => loadExample('long') },
-    { label: t('短流程模板'), hide: () => !store.editMode, act: () => loadExample('short') },
+    // 模板项按「当前场景实际有哪些模板」显隐：非钢场景（如机房温控）没有长/短流程，
+    // 此前写死显示，点了会静默载入本场景第一个模板并弹出「已载入长流程炼钢模板」的误导提示
+    { label: t('长流程模板'), hide: () => !store.editMode || !hasTemplate('long'), act: () => loadExample('long') },
+    { label: t('短流程模板'), hide: () => !store.editMode || !hasTemplate('short'), act: () => loadExample('short') },
     { label: t('清空画布'), hide: () => !store.editMode, act: () => clearScheme() },
   ] },
   { id: 'tools', label: t('工具'), items: [

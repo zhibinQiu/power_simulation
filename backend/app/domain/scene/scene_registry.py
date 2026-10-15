@@ -39,6 +39,7 @@ import zipfile
 from typing import Any, Dict, List, Optional
 
 from ...core.config import DATA_DIR
+from ...core.storage import read_json_file, write_json_atomic
 
 # backend/data/scenes（统一走配置中心 core.config.DATA_DIR，与模块位置/CWD 无关）
 # 注意：本模块曾在 2026-09-21 的 app 顶层模块下沉中从 backend/app/ 搬到这里，
@@ -76,11 +77,7 @@ def scene_dir(scene_id: str) -> str:
 
 def _read_meta(scene_id: str) -> Optional[Dict[str, Any]]:
     path = os.path.join(_SCENES_DIR, scene_id, "meta.json")
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            meta = json.load(f)
-    except (OSError, ValueError):
-        return None
+    meta = read_json_file(path, None)
     if not isinstance(meta, dict) or not meta.get("id"):
         return None
     return meta
@@ -232,8 +229,7 @@ def install_resource_package(data: bytes) -> Dict[str, Any]:
         pkg_meta["package"]["installedAt"] = ts
     pkg_meta["ready"] = bool(pkg_meta.get("ready"))
     try:
-        with open(os.path.join(dest, "meta.json"), "w", encoding="utf-8") as f:
-            json.dump(pkg_meta, f, ensure_ascii=False, indent=2)
+        write_json_atomic(os.path.join(dest, "meta.json"), pkg_meta)
     except OSError as e:
         return {"ok": False, "error": f"资源包注册信息写入失败：{e}"}
 

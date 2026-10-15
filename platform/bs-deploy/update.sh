@@ -5,12 +5,9 @@
 # 用途（开发机执行，日常更新唯一通道）：
 #   本地构建前端/文档站产物 → rsync 源码到服务器 → 容器按需重建/热生效 → 健康检查
 #
-# 用法：bash platform/bs-deploy/update.sh [--server root@<主机>] [--skip-build] [--skip-config] [--no-designs]
+# 用法：bash platform/bs-deploy/update.sh [--server root@<主机>] [--skip-build] [--skip-config]
 #       （或统一入口：./update.sh bs，二者等价）
 #       --skip-config：本次**不**用本地 backend/config 覆盖服务器（默认每次都覆盖，见 [2/3]）
-#       --no-designs：本次**不**同步编排存档（默认每次都同步，见 [2/3]）
-#         编排存档（flow/agc）**以服务器为准**：先把服务器上的编排合回本地，
-#         再由本次 rsync 把合并结果推回服务器 → 两端收敛一致。
 #   默认目标：71（root@36.151.146.71:/root/qzb/jianpai，Docker 源码卷挂载 + uvicorn --reload）
 #   说明：同步本地工作区（含未提交改动），改完即可上线；代码入库推送统一走仓库根入口
 #         ./update.sh github "提交信息" [--tag v1.0.0]（./update.sh all github ... = 全量同步 + 推送）。
@@ -40,14 +37,11 @@ IMAGE_NAME="ghcr.io/zhibinqiu/power_simulation:latest"
 # ---- 解析参数 ----
 RUN_BUILD=1
 SYNC_CONFIG=1
-SYNC_DESIGNS=1          # 编排存档默认每次推送都同步（用户口径：编排要和服务器一致，且以服务器为准）
 while [ $# -gt 0 ]; do
   case "$1" in
     # 每个分支都必须 shift：漏掉会让 $# 不变 → while 死循环（进程 100% CPU 空转）
     --skip-build) RUN_BUILD=0; shift ;;
     --skip-config|--no-config) SYNC_CONFIG=0; shift ;;
-    --designs|--with-designs) SYNC_DESIGNS=1; shift ;;
-    --no-designs|--skip-designs) SYNC_DESIGNS=0; shift ;;
     --server|--target) SERVER="${2:-$CLOUD_MAIN}"; shift 2 ;;
     *) echo "[error] 未知参数：${1}（-h 查看头部注释）" >&2; exit 1 ;;
   esac
@@ -79,9 +73,10 @@ fi
 #   ③ *.bak.* 备份件不同步（本地/服务器的历史备份不上传，避免目录堆积）；
 #   ④ 配置确有变更时重启后端容器使其生效（uvicorn --reload 只监听 .py，不监听配置文件）。
 # 数据/内容口径（用户要求：**项目相关的本地文件一律同步**，本地为唯一真源）：
-#   backend/data 下的项目资产同步——scenes（场景/编排模板快照）、designs（编排方案服务端存档
-#   flow/agc，原只存在浏览器 localStorage）、ontology / agents / skills 等平台资产；
-#   backend/knowledge 知识库文档同样同步。
+#   backend/data 下的项目资产同步——scenes（场景/编排模板快照）、ontology / agents / skills 等平台资产；
+#   backend/knowledge 知识库文档同样同步；
+#   **例外**：backend/data/designs（编排方案 / AI 群控策略 / 最后打开的工程）是官网用户的运行期
+#   数据，永不同步见 DESIGN_RULES —— 官网为唯一真源，本地副本不得回填。
 #   运行产出（服务器自有的业务数据）**不同步**，避免把生产数据抹成开发机状态：
 #   reports（报告及其索引）/ sessions.json（聊天会话）/ carbon_compliance.json（企业碳合规台账）/
 #   market_snapshot.json（行情缓存）。
@@ -115,22 +110,13 @@ else
   echo "    · 本次跳过配置/数据同步（--skip-config），服务器 backend/config|data|knowledge 保持原样"
 fi
 
-# 编排存档（backend/data/designs/{flow,agc}.json）**以服务器为准**，默认每次推送都同步：
-# 它是用户在平台上编辑出来的运行期内容，本地 8010 与服务器 40014 各写各的一份；
-# 服务器实例（40014）是权威侧，所以先把服务器那一份合回本地（服务器有的场景无条件覆盖本地），
-# 再由本次 rsync 把合并结果推回服务器 → 两端收敛一致。本地独有的场景保留并一并推上去。
-#   单独同步（不构建、不动代码）：./update.sh designs
-#   本次推送不同步：bash platform/bs-deploy/update.sh --no-designs
-if [ "$SYNC_DESIGNS" = "1" ] && [ "$SYNC_CONFIG" = "1" ]; then
-  # 先排备份件、再 include（rsync「先匹配者生效」，顺序不可颠倒）
-  DESIGN_RULES="--exclude=backend/data/designs/*.bak.* --include=backend/data/designs/***"
-  bash "$SELF_DIR/sync_designs.sh" --server "$SERVER" --dir "$SERVER_DIR" --no-push \
-    || echo "    ⚠ 编排存档同步失败（不阻断推送，服务器存档保持原样）"
-else
-  # 放在既有 include 之后即可（本轮已无 designs 的 include，不会与之冲突）
-  DESIGN_RULES="--exclude=backend/data/designs/***"
-  echo "    · 本次不同步编排存档（流程编排 / AI 群控），两端各自保留；需同步请执行：./update.sh designs"
-fi
+# 编排存档（backend/data/designs/{flow,agc}.json + workspace.json）**永远不同步**：
+# 它是用户在官网平台上编辑出来的运行期内容（流程编排 / AI 群控策略 / 最后打开的工程），
+# **官网实例就是唯一真源** —— 开发机既不接受服务器回传、也不用本地副本覆盖服务器，
+# 否则一次代码推送就会把所有人在官网上建的策略抹掉（历史事故，2026-10-14）。
+# 放在既有 include 之后即可（本轮无任何 designs 的 include，不会与之冲突）。
+DESIGN_RULES="--exclude=backend/data/designs/***"
+echo "    · 编排存档不随本次推送同步（官网为准，服务器各自保有）"
 
 echo "==> [2/3] rsync 源码 + 配置/数据 + 前端产物到服务器..."
 RSYNC_LOG="${TMPDIR:-/tmp}/nengtan-rsync-${BK_TS}.log"

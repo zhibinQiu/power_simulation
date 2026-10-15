@@ -18,14 +18,6 @@ from .rest import json_api
 router = APIRouter(prefix="/api/middleware", tags=["数据中间件服务"])
 
 
-@router.get("/status")
-def middleware_status():
-    """中间件服务状态：在线与否、输出桥（云端 Broker 连接）、已注册数据源数。"""
-    st = middleware_client.status(force=True)
-    return {"ok": True, "middleware": st,
-            "config": middleware_client.public_config()}
-
-
 @router.post("/config")
 @json_api("保存中间件配置失败")
 def middleware_save_config(payload: Dict[str, Any]):

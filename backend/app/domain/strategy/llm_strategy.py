@@ -17,10 +17,10 @@ import json
 import logging
 import os
 import urllib.error
-import urllib.request
 from typing import List, Optional
 
 from app.core.config import APP_DIR, CONFIG_DIR
+from app.core.http import http_error_body, open_stream, post_json
 from app.models import ParseResult, ParsedOp
 from app.domain.sim.param_schema import PARAM_SCHEMA, TECHS_INFO, UNIT_TYPES_INFO
 
@@ -157,17 +157,8 @@ def _call_llm(messages: List[dict], timeout: float = 25.0, response_format=None,
     }
     if is_json:
         payload["response_format"] = response_format
-    payload = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=payload, method="POST", headers={
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
-    })
-    # 绕过本机 HTTPS_PROXY（如 127.0.0.1:53483），直达 api.deepseek.com，
-    # 否则 urllib 会把外部请求交给本地代理而失败。
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
-        with opener.open(req, timeout=timeout) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        data = post_json(url, payload, headers={"Authorization": f"Bearer {api_key}"}, timeout=timeout)
         msg = data["choices"][0]["message"]
         content = (msg.get("content") or "").strip()
         # 只返回正式回复 content；reasoning_content（思考过程）可能重述系统提示词，
@@ -204,15 +195,8 @@ def chat_completion_tools(messages: List[dict], tools: List[dict],
         "tools": tools,
         "tool_choice": "auto",
     }
-    body = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=body, method="POST", headers={
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
-    })
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
-        with opener.open(req, timeout=timeout) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        data = post_json(url, payload, headers={"Authorization": f"Bearer {api_key}"}, timeout=timeout)
         msg = data["choices"][0]["message"]
         calls = []
         for c in (msg.get("tool_calls") or []):
@@ -226,9 +210,9 @@ def chat_completion_tools(messages: List[dict], tools: List[dict],
     except (urllib.error.URLError, urllib.error.HTTPError, KeyError, IndexError,
             ValueError, TimeoutError, OSError) as exc:
         logger.warning("chat_completion_tools failed: %s %s", type(exc).__name__, exc)
-        if isinstance(exc, urllib.error.HTTPError):
-            logger.warning("  http body: %s",
-                           exc.read().decode("utf-8", "ignore")[:400])
+        body = http_error_body(exc)
+        if body:
+            logger.warning("  http body: %s", body)
         return None
 
 
@@ -250,16 +234,11 @@ def chat_completion_stream(messages: List[dict], timeout: float = 300.0,
         "max_tokens": max_tokens,
         "stream": True,
     }
-    body = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=body, method="POST", headers={
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
-        "Accept": "text/event-stream",
-    })
-    # 绕过本机 HTTPS_PROXY（与 _call_llm 一致），直达远端兼容接口
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
-        resp = opener.open(req, timeout=timeout)
+        resp = open_stream(url, payload, headers={
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "text/event-stream",
+        }, timeout=timeout)
         for raw in resp:  # urllib 响应按行迭代
             line = raw.decode("utf-8", "ignore").strip()
             if not line.startswith("data:"):

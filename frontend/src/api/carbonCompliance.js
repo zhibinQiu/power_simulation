@@ -1,20 +1,10 @@
 // 碳合规（企业履约台账 / 策略 / 预警 / 行情库表）API
 // 对应后端 /api/carbon-assistant 下 carbon_compliance router
 import { t } from '../i18n'
+import { request as jfetch } from './client'
 const base = '/api/carbon-assistant'
 
-async function jfetch(url, opts = {}) {
-  const res = await fetch(url, opts)
-  if (!res.ok) {
-    let msg = `${res.status} ${res.statusText}`
-    try {
-      const data = await res.json()
-      msg = data.detail || data.message || msg
-    } catch (_) {}
-    throw new Error(msg)
-  }
-  return res.json()
-}
+
 
 async function jblob(url) {
   const res = await fetch(url)

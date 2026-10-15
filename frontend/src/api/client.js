@@ -1,30 +1,58 @@
 // 后端 API 客户端（原生 fetch 封装，零额外依赖）
+//
+// 全平台**唯一**的 HTTP 出口：其它 api/*.js 一律复用这里导出的 `request`，
+// 不再各写一份 fetch + 错误解析（此前 carbonAssistant.js / carbonCompliance.js
+// 各有一份逐字相同的 jfetch，错误文案口径也不一致）。
 const BASE = '/api'
 
-async function jpost(path, body) {
-  const r = await fetch(BASE + path, {
+/**
+ * 发起 JSON 请求并解析响应。
+ *
+ * 失败时优先抛服务端返回的 detail/message（比纯状态码可读得多：
+ * 后端校验类错误都带中文原因），拿不到才回退到状态码。
+ *
+ * @param {string} url 完整 URL（可以是 BASE 相对路径之外的地址，如 /api/carbon-assistant/...）
+ * @param {RequestInit} opts
+ * @returns {Promise<any>} 解析后的 JSON
+ */
+export async function request(url, opts = {}) {
+  const r = await fetch(url, opts)
+  if (!r.ok) {
+    let msg = `API ${url} -> ${r.status}`
+    try {
+      const data = await r.json()
+      msg = data.detail || data.message || msg
+    } catch {
+      /* 非 JSON 错误体：保留状态码文案 */
+    }
+    throw new Error(msg)
+  }
+  return r.json()
+}
+
+function jpost(path, body) {
+  return request(BASE + path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  if (!r.ok) throw new Error(`API ${path} -> ${r.status}`)
-  return r.json()
 }
 
-async function jget(path) {
-  const r = await fetch(BASE + path)
-  if (!r.ok) throw new Error(`API ${path} -> ${r.status}`)
-  return r.json()
+function jget(path) {
+  return request(BASE + path)
 }
 
-async function jput(path, body) {
-  const r = await fetch(BASE + path, {
+function jput(path, body) {
+  return request(BASE + path, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  if (!r.ok) throw new Error(`API ${path} -> ${r.status}`)
-  return r.json()
+}
+
+/** DELETE（返回 JSON；与 jpost/jget 同口径，失败抛服务端原因） */
+export function jdel(path) {
+  return request(BASE + path, { method: 'DELETE' })
 }
 
 export const api = {
@@ -39,7 +67,7 @@ export const api = {
   listStrategies: () => jget('/strategies'),
   createStrategy: (name, description, raw_text, ops) =>
     jpost('/strategies', { name, description, raw_text, ops }),
-  deleteStrategy: (sid) => fetch(BASE + '/strategies/' + sid, { method: 'DELETE' }).then(r => r.json()),
+  deleteStrategy: (sid) => jdel('/strategies/' + sid),
   applyStrategy: (sid, model, factors = null) => jpost('/strategies/' + sid + '/apply', { model, factors }),
   updateStrategy: (sid, patch) => {
     const qs = new URLSearchParams()
@@ -55,7 +83,7 @@ export const api = {
   getReportTask: (taskId) => jget('/report/task/' + taskId),
   listReports: () => jget('/reports'),
   getReport: (id) => jget('/report/' + id),
-  deleteReport: (id) => fetch(BASE + '/reports/' + id, { method: 'DELETE' }).then(r => r.json()),
+  deleteReport: (id) => jdel('/reports/' + id),
   // AI 优化模型（GA / PSO / RL 在线训练）
   optimizerContext: (model, factors = null) => jpost('/optimizers/context', { model, factors }),
   listOptimizers: () => jget('/optimizers'),
@@ -78,7 +106,7 @@ export const api = {
     return fetch(BASE + '/scene/package', { method: 'POST', body: fd }).then((r) => r.json())
   },
   uninstallScenePackage: (id) =>
-    fetch(BASE + '/scene/package/' + encodeURIComponent(id), { method: 'DELETE' }).then((r) => r.json()),
+    jdel('/scene/package/' + encodeURIComponent(id)),
   exportScenePackage: (payload) => jpost('/scene/export', payload),
   // 导出场景包（二进制 .ec）：后端返回 application/zip（jpost 会按 JSON 解析失败），
   // 故单独以 blob 拉取，并从 Content-Disposition 取回文件名，供「文件 → 另存为场景…」下载。
@@ -99,9 +127,16 @@ export const api = {
   },
   // ---- 编排方案服务端存档（流程编排 flow / AI 群控编排 agc）----
   // 此前编排只存浏览器 localStorage，换实例即丢失；现落到后端 backend/data/designs/，
-  // 随 platform/bs-deploy/update.sh 同步到服务器（本地为真源）。localStorage 仅作离线兜底。
+  // **官网实例即唯一真源**：存运行期数据，不随代码推送同步，开发机永不覆盖线上；
+  // 写入走条目级合并（多人共用一份存档，各自的新增都留得下）。localStorage 仅作离线兜底。
+  // 全局「最后打开的工程」（无用户体系，所有人共用一份）：换浏览器也落到同一个工程，
+  // 否则「在这个工程建的策略，换个浏览器因为在默认工程里而看不到」。
+  workspaceLastScene: () => jget('/workspace/last-scene'),
+  workspaceSetLastScene: (scene, label = '') => jput('/workspace/last-scene', { scene, label }),
   // AI 群控服务端运行器状态：哪些策略在运行、各策略最近一轮执行结果（执行在服务端，关掉浏览器也照跑）
   agcRuntime: () => jget('/agc/runtime'),
+  // 整桶读取：返回 { ok, bucket, data: { <sceneId>: payload } }，调用方按 sceneId 取自己那一档
+  designBucket: (bucket) => jget('/designs/' + encodeURIComponent(bucket)),
   designSave: (bucket, scene, data) => jput('/designs/' + encodeURIComponent(bucket), { scene, data }),
   // 页面关闭 / 切到后台时立刻落库：普通 fetch 在卸载阶段会被浏览器直接取消，
   // keepalive 让请求在页面销毁后仍由浏览器代为发出 —— 否则「配完附加传感就关页面」时
@@ -136,7 +171,7 @@ export const api = {
   boxLinks: () => jget('/realtime/link'),
   linkMqttDevice: (cloudId, localId, factor = 1) => jput('/realtime/link', { cloud_id: cloudId, local_id: localId, factor }),
   unlinkMqttDevice: (cloudId) =>
-    fetch(BASE + '/realtime/link/' + encodeURIComponent(cloudId), { method: 'DELETE' }).then(r => r.json()),
+    jdel('/realtime/link/' + encodeURIComponent(cloudId)),
   // 能碳一体机管理台（云端 K3s/KubeEdge 管理、设备 CRUD、盒子接入）
   boxOverview: () => jget('/box/overview'),
   boxDevices: () => jget('/box/devices'),
@@ -188,7 +223,7 @@ export const api = {
   boxCameraImageUrl: (deviceId, imageId) =>
     BASE + '/box/camera/' + encodeURIComponent(deviceId) + '/images/' + encodeURIComponent(imageId),
   boxCameraDeleteImage: (deviceId, imageId) =>
-    fetch(BASE + '/box/camera/' + encodeURIComponent(deviceId) + '/images/' + encodeURIComponent(imageId), { method: 'DELETE' }).then(r => r.json()),
+    jdel('/box/camera/' + encodeURIComponent(deviceId) + '/images/' + encodeURIComponent(imageId)),
   // 云端 Broker 配置（前端配置化：能碳一体机管理 -> 总览 -> 云端数据链路「配置」，免手工编辑 mqtt.yaml）
   boxConfig: () => jget('/box/config'),
   boxConfigSave: (payload) => jpost('/box/config', payload),
@@ -218,7 +253,7 @@ export const api = {
   kbCreateFolder: (name, parent = '') => jpost('/knowledge/folder', { name, parent }),
   kbRenameFolder: (path, name) => jput('/knowledge/folder', { path, name }),
   kbDeleteFolder: (path) =>
-    fetch(BASE + '/knowledge/folder?path=' + encodeURIComponent(path), { method: 'DELETE' }).then(r => r.json()),
+    jdel('/knowledge/folder?path=' + encodeURIComponent(path)),
   kbUpload: (file, folder = '') => {
     const fd = new FormData()
     fd.append('file', file)
@@ -226,7 +261,7 @@ export const api = {
     return fetch(BASE + '/knowledge/upload', { method: 'POST', body: fd }).then(r => r.json())
   },
   kbRenameDoc: (id, name) => jput('/knowledge/doc/' + id, { name }),
-  kbDeleteDoc: (id) => fetch(BASE + '/knowledge/doc/' + id, { method: 'DELETE' }).then(r => r.json()),
+  kbDeleteDoc: (id) => jdel('/knowledge/doc/' + id),
   kbDocContent: (id) => jget('/knowledge/doc/' + id + '/content'),
   kbRawUrl: (id) => BASE + '/knowledge/doc/' + id + '/raw',
   kbSearch: (q) => jget('/knowledge/search?q=' + encodeURIComponent(q)),
@@ -234,7 +269,7 @@ export const api = {
   get: jget,
   post: jpost,
   put: jput,
-  del: (path) => fetch(BASE + path, { method: 'DELETE' }).then(r => r.json()),
+  del: (path) => jdel(path),
   upload: (path, formData) =>
     fetch(BASE + path, { method: 'POST', body: formData }).then(r => r.json()),
 }

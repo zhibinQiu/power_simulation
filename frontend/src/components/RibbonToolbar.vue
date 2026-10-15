@@ -65,10 +65,10 @@
           </div>
           <span class="rdiv"></span>
           <div class="rbtns">
-            <button class="rbtn" @click="actions.loadExample('long')" :title="t('载入长流程炼钢模板')">
+            <button v-if="hasTemplate('long')" class="rbtn" @click="actions.loadExample('long')" :title="t('载入长流程炼钢模板')">
               <Icon name="flow"/><span>{{ t('长流程模板') }}</span>
             </button>
-            <button class="rbtn" @click="actions.loadExample('short')" :title="t('载入短流程炼钢模板')">
+            <button v-if="hasTemplate('short')" class="rbtn" @click="actions.loadExample('short')" :title="t('载入短流程炼钢模板')">
               <Icon name="process"/><span>{{ t('短流程模板') }}</span>
             </button>
             <button class="rbtn" @click="actions.clearScheme()" :title="t('清空编排画布')">
@@ -144,6 +144,12 @@ const props = defineProps({
 })
 
 const store = useSimStore()
+
+// 当前场景是否提供该模板 id：编排工具条的模板按钮据此显隐
+// （非钢场景没有长/短流程，写死显示会出现「点了没反应」的按钮）
+function hasTemplate(id) {
+  return (store.sceneTemplates || []).some((t) => t.id === id || t.route === id)
+}
 
 // 当前工具栏所属视图：流程编排 / 工况数据分析 / 碳资产管理 / 碳排核算 / 能流分析 / 能碳一体机 / 数字孪生
 // 流程编排：仅当编排画布标签在前台（flowEditing）时渲染编排工具条；

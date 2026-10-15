@@ -6,15 +6,21 @@
 
 本模块把这两类编排落到服务端文件 ``backend/data/designs/<bucket>.json``：
 - 前端编辑时写入服务端（localStorage 仅作离线兜底）；
-- 打开平台时优先取服务端版本，跨端一致；
-- 该文件随 ``platform/bs-deploy/update.sh`` 同步到服务器（本地为唯一真源）。
+- 打开平台时以服务端版本为准，跨端一致；
+- **该文件是运行期数据，绝不随代码推送同步**（platform/bs-deploy/update.sh 已永久排除
+  backend/data/designs/***）：官网实例上的档案就是唯一真源，开发机不得覆盖。
+
+写入采用**整档覆盖**：提交什么就存什么，删除即「不提交该项」，不做条目级合并、
+不留删除墓碑（此前那套 removed / deleted / hidden 墓碑已移除）。
 
 存储形态：``{ "<sceneId>": <payload> }``（按场景分档，切场景不串档）。
+同目录 ``workspace.json`` 记录全局「最后打开的工程」（见 read/write_last_scene）。
 """
 from __future__ import annotations
 
 import os
 import re
+import time
 from typing import Any, Dict
 
 from ...core.config import DATA_DIR
@@ -68,7 +74,11 @@ def read_scene(bucket: str, scene: str) -> Any:
 
 
 def write_scene(bucket: str, scene: str, payload: Any) -> Dict[str, Any]:
-    """写入某场景的编排数据，返回写入后的整桶内容。"""
+    """写入某场景的编排数据，返回写入后的整桶内容。
+
+    整档覆盖（last-writer-wins）：提交什么就存什么，不合并、不留删除墓碑。
+    agc / flow 桶唯一的写入方是前端（后台运行器只读），故无需服务端做多端合并。
+    """
     if bucket not in BUCKETS:
         raise ValueError(f"未知的编排桶：{bucket}（可选：{', '.join(BUCKETS)}）")
     scene = _norm_scene(scene)
@@ -91,3 +101,35 @@ def delete_scene(bucket: str, scene: str) -> Dict[str, Any]:
         return data
 
     return _repo(bucket).mutate(_fn)
+
+
+# ---------------------------------------------------------------- 最后打开的工程
+# 平台没有用户体系：所有人在官网共用同一份工作区。此前「当前打开哪个工程」纯靠浏览器
+# localStorage，换浏览器就落到默认钢包，于是「在机房温控建的策略，换个浏览器就看不到」。
+_WORKSPACE_KEY = "__workspace__"
+
+
+def _workspace_repo() -> JsonRepository:
+    repo = _repos.get(_WORKSPACE_KEY)
+    if repo is None:
+        repo = JsonRepository(os.path.join(DESIGN_DIR, "workspace.json"), default={})
+        _repos[_WORKSPACE_KEY] = repo
+    return repo
+
+
+def read_last_scene() -> Dict[str, Any]:
+    """读取全局「最后打开的工程」{ scene, ts, label }；无记录返回 {}。"""
+    data = _workspace_repo().read()
+    return data if isinstance(data, dict) else {}
+
+
+def write_last_scene(scene: str, label: str = "") -> Dict[str, Any]:
+    """记下最后打开的工程（任何人在官网切换工程都会更新，所有人下一次进来都落到这里）。"""
+    scene = _norm_scene(scene)
+
+    def _fn(cur: Any) -> Dict[str, Any]:
+        data = dict(cur) if isinstance(cur, dict) else {}
+        data.update({"scene": scene, "label": label or scene, "ts": int(time.time() * 1000)})
+        return data
+
+    return _workspace_repo().mutate(_fn)

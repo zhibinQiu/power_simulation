@@ -15,10 +15,11 @@ from typing import Dict, Optional
 from .base import SkillRegistry
 from .builtin import register_builtin_skills
 from .methodology import register_methodology_skills
+from app.core.config import data_path
 
 logger = logging.getLogger(__name__)
 
-DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+DATA_DIR = Path(data_path())
 SKILLS_STATE_FILE = DATA_DIR / "skills.json"
 _state_lock = threading.Lock()
 

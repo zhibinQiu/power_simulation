@@ -16,10 +16,12 @@ import os
 import time
 
 from fastapi import APIRouter
+from ..core.config import CONFIG_DIR
+from ..core.storage import read_json_file
 
 router = APIRouter()
 
-_CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "config")
+_CONFIG_DIR = CONFIG_DIR
 _DEVICES_PATH = os.path.join(_CONFIG_DIR, "box_devices.json")
 _BROKER_CFG_PATH = os.path.join(_CONFIG_DIR, "box_config.json")
 _DEFAULT_CLOUD_HOST = "36.151.146.71"
@@ -58,8 +60,7 @@ def _resolve_cloud_host() -> str:
         (_BROKER_CFG_PATH, ("broker", "host")),
     ):
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                c = json.load(f) or {}
+            c = read_json_file(path, {}) or {}
             for k in keys:
                 c = c.get(k) or {}
             h = str(c).strip()

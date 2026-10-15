@@ -16,6 +16,8 @@ import { SENSOR_MAP, ADJUSTABLE_MAP, ATTACH_MAP, attachUnit, attachDef, attachMe
 // （业务数据与代码逻辑分离），本 store 只负责仿真状态与交互逻辑；
 // 下方 re-export 保持既有组件 `import { ... } from '../stores/sim'` 兼容。
 import { OP_PARAM_KEYS, DIRECT_PARAM_KEYS, EDITABLE_PARAMS, UNIT_TYPES, CATEGORY_ORDER, TECHS } from '../data/processMeta'
+import { uid } from '../utils/id'
+import { fmtNum } from '../utils/format'
 export { OP_PARAM_KEYS, DIRECT_PARAM_KEYS, EDITABLE_PARAMS, UNIT_TYPES, CATEGORY_ORDER, TECHS }
 
 // AI 优化模型：左侧「策略 → AI优化模型」目录（序列预测 / 强化学习 / 遗传算法 / 粒子群）。
@@ -49,8 +51,6 @@ export const VIEW_DEFS = [
 export const VIEW_IDS = VIEW_DEFS.map((v) => v.id)
 export const VIEW_TITLE = Object.fromEntries(VIEW_DEFS.map((v) => [v.id, v.title]))
 
-let _idc = 0
-const uid = (p) => `${p}_${Date.now().toString(36)}${(_idc++).toString(36)}`
 // 数据源管理设备列表轮询：_boxSrcBusy 防并发重入，_boxSrcTimer 常驻定时器
 let _boxSrcBusy = false
 let _boxSrcTimer = null
@@ -68,8 +68,6 @@ const _extWriteErrAt = {}
 let _agcTimer = null
 let _agcModel = null      // 运行中的模型（持引用：编排改动即时生效）
 let _agcState = null      // 跨轮次状态（循环模块的挂起轮次）
-// 数值展示：保留 2 位小数并去掉末尾多余的 0
-const fmtNum = (v) => (v == null || isNaN(v) ? '—' : Number(v).toFixed(2).replace(/\.?0+$/, ''))
 
 // ===== 附加设备（传感器 / 可变设备）合成工具 =====
 // 附加设备挂在具体工艺节点 node.attached[] 上，id 均为 ext::节点id::attUid；
@@ -447,6 +445,10 @@ let _refreshTimer = null   // 刷新防抖定时器（模块级，避免进入�
 let _refreshSeq = 0       // 刷新序号：丢弃过期响应，避免旧请求覆盖新状态
 let _simSnapshot = null   // 仿真模式进入时的全量快照（模块级，避免进入响应式 state）
 let _schemeDirtyBound = false // 编排「改动检测」监听只绑一次（手动保存模式：只标脏，不落盘）
+let _rtSyncTimer = null      // 编辑→服务端自动同步的防抖定时器（见 stores 的 _scheduleRuntimeSync）
+let _autoSetpointGuard = 0   // 「群控自动写设定值」抑制计数（>0 表示刚发生机器写入，不推服务端，详见 _bindSchemeDirty）
+let _serverSyncTimer = null  // 服务端→本端 回拉定时器（见 _startServerSync）
+let _serverSyncBusy = false  // 回拉进行中标志：避免 5s 轮询叠加成并发风暴
 let _simPrevDirty = false     // 进入仿真前的未保存标记：仿真态编辑不落盘，退出后应回到该状态
 let _simParamSnapshot = null  // 仿真进入时的参数快照（「仿真前 → 当前」变化展示用，模块级）
 const _snapParams = (model) => {  // 提取各工序参数：{ unitId: { key: val } }
@@ -1033,7 +1035,9 @@ export const useSimStore = defineStore('sim', {
         await this._runRefresh()  // 首屏立即重算（不走防抖），保证 KPI 就绪；非钢场景走本地静态核算
         if (!booted) await this.loadStrategies()
         this.ready = true
-        this._bindSchemeDirty() // 编排改动检测（手动保存模式：只置「未保存」标记，不自动落盘）
+        this._bindSchemeDirty() // 编排改动检测（只置「未保存」标记；编辑内容本身防抖推服务端）
+        this._purgeLocalDesignCache() // 清理历史遗留的编排 / 群控本地副本（会以本地旧档盖住服务端真源）
+        this._startServerSync() // 跨端同步：其它端的编排 / 属性改动自动拉回并重绘
         // 停在欢迎页时不必播报「系统就绪」：工程尚未打开，等用户选完工程进入主界面再提示
         if (!this.welcomeOn) this.notify('success', t('系统就绪'), t('数字孪生已载入 {units} 个工序、{flows} 条物流，实时链路与优化模型已就绪。', { units: this.model.units.length, flows: this.model.flows.length }))
         this._startFeed()
@@ -1045,25 +1049,53 @@ export const useSimStore = defineStore('sim', {
         this.notify('error', t('初始化失败'), e.message)
       }
     },
-    // 启动首屏场景：上次退出前打开的场景（localStorage sim.sceneId，随 openScene 写入）。
+    // 当前工程由三者决定，优先级：URL ?scene= > 服务端全局「最后打开的工程」 > 本机 localStorage。
+    // 之所以把服务端那份提到本机之前：平台没有用户体系，官网就是所有人共用的一个工作区 ——
+    // 只看 localStorage 会让「别人 / 别的浏览器在机房温控下建的策略，换台电脑就看不到」。
+    _urlScene() {
+      try {
+        const q = new URLSearchParams(window.location.search).get('scene')
+        return (q || '').trim() || ''
+      } catch (e) { return '' }
+    },
+    _sceneReady(id) {
+      if (!id) return false
+      const meta = this.sceneIndex.find((x) => x.id === id)
+      return !!(meta && meta.ready)
+    },
+    // 启动首屏场景：优先 URL / 服务端记录的工程；都没有再看本机 localStorage。
     // 仅当它是**非钢资源包且已就绪**时返回其 id；钢包 / 未安装 / 不可用时返回 null（走原钢铁默认启动）。
     // 目的：让资源包场景（机房温控等）在初始化阶段一次装载到位，避免先按钢铁初始化再切换。
     async _bootSceneId() {
-      // 欢迎页（未打开工程）：不自动装载上次场景，等用户在工程选择里显式打开
-      if (this.welcomeOn) return null
+      if (!this.sceneIndex.length) await this.refreshSceneIndex()
+      // ① URL 指定（https://.../sim/?scene=dc-thermal）：分享 / 收藏链接直达同一个工程
+      const fromUrl = this._urlScene()
+      if (fromUrl) {
+        if (!this._sceneReady(fromUrl)) {
+          this.pushCmd(t('链接指定的场景「{id}」未就绪或不存在，已按默认场景启动。', { id: fromUrl }), 'sys')
+          return null
+        }
+        return fromUrl
+      }
+      // ② 服务端全局记录：任何人最后一次打开的工程（官网为真源，所有人共用）
+      try {
+        const r = await api.workspaceLastScene()
+        const s = (r && r.data && r.data.scene) || ''
+        if (s && s !== 'steel' && s !== this.sceneId && this._sceneReady(s)) return s
+      } catch (e) { /* 服务端不可用时退回本机记录 */ }
+      // ③ 本机兜底
+      if (this.welcomeOn) return null   // 欢迎页：等用户在工程选择里显式打开
       let last = null
       try { last = localStorage.getItem('sim.sceneId') } catch (e) { return null }
       if (!last || last === 'steel' || last === this.sceneId) return null
-      if (!this.sceneIndex.length) await this.refreshSceneIndex()
       const meta = this.sceneIndex.find((x) => x.id === last)
       if (!meta || !meta.ready) return null
       return last
     },
     // 恢复上次保存的编排方案（钢铁默认启动路径）：
-    // 服务端存档优先（跨端真源，随代码同步），本地 localStorage 作为离线兜底 / 较新者胜出；
-    // 均无存档时按上次流程路线构建默认方案，避免刷新后回退。
+    // 编排单一真源：只认服务端存档（本地不留存任何副本）；无存档时按默认路线构建，避免刷新后回退。
     async _restoreSchemeSession() {
-      const saved = (await this._pullScheme(this.sceneId || 'steel')) || this._loadScheme()
+      const saved = await this._pullScheme(this.sceneId || 'steel')
       if (saved) {
         this.scheme = this._adoptScheme(saved.scheme, saved.sceneId || this.sceneId)
         migrateLegacyDevices(this.scheme)   // 存量方案：旧可调设备 -> 独立工辅节点 + 驱动连线
@@ -1115,8 +1147,7 @@ export const useSimStore = defineStore('sim', {
         this.compileSchemeToModel()
         this.autoLayout()
       } else {
-        const savedRoute = (() => { try { return localStorage.getItem('sim.processRoute') } catch (e) { return null } })()
-        this._setDefaultRoute(savedRoute || 'long')
+        this._setDefaultRoute('long')
       }
     },
     // ---------- 平台激活 ----------
@@ -2128,8 +2159,8 @@ export const useSimStore = defineStore('sim', {
         if (res.devices) this.deviceLibrary = res.devices
         const routes = Array.isArray(pkg.meta.routes) && pkg.meta.routes.length ? pkg.meta.routes : null
         const defaultRoute = pkg.meta.defaultRoute || (routes && routes[0]) || null
-        // 编排方案：优先恢复本场景存档（服务端跨端真源 → 本地 localStorage 兜底），否则按包模板构建
-        const saved = (await this._pullScheme(sceneId)) || this._loadScheme()
+        // 编排方案：只认服务端存档（跨端唯一真源），无存档则按包模板构建
+        const saved = await this._pullScheme(sceneId)
         this.processRoute = isSteel ? ((saved && saved.route) || 'short') : (defaultRoute || 'cool')
         // 恢复的存档先补齐容器字段并按场景做口径迁移（旧口径存档升级而非整档丢弃，见 _adoptScheme）
         this.scheme = this._adoptScheme((saved && saved.scheme) ? saved.scheme : this._buildSceneScheme(this.processRoute), sceneId)
@@ -2187,6 +2218,9 @@ export const useSimStore = defineStore('sim', {
         // sceneVersion：左右面板（资源树 / 检视器）以它为 :key 重建，清空本地折叠态/档位等残留
         this.sceneVersion++
         try { localStorage.setItem('sim.sceneId', sceneId) } catch (e) { /* localStorage 不可用时忽略 */ }
+        // 记到服务端「最后打开的工程」：官网没有用户体系，这份记录所有人共用 ——
+        // 换浏览器 / 换电脑进来都会落到同一个工程，不会退回默认钢包而看不到这边的策略。
+        api.workspaceSetLastScene(sceneId, (meta && (meta.label || meta.name)) || '').catch(() => { /* 服务端不可用时本机兜底仍在 */ })
         // 打开工程即进入工作区：欢迎页收起、本次会话内刷新不再回欢迎页；并记入「最近」
         this._noteRecentScene(sceneId, meta)
         this._markEntered()
@@ -2788,6 +2822,14 @@ export const useSimStore = defineStore('sim', {
     },
 
     loadTemplate(route) {
+      // 先确认当前场景确有该模板：此前找不到会静默 fallback 到本场景第一个模板，
+      // 还把 processRoute 改成该场景并不存在的 id（如机房温控下载入 'long'），
+      // toast 却仍报「已载入长流程炼钢模板」——表现为「点了模板没变化」。
+      const tpl = (this.sceneTemplates || []).find((x) => x.id === route || x.route === route)
+      if (!tpl) {
+        this.showToast(t('当前场景没有该模板'), 'warn')
+        return false
+      }
       this._histCapture('tmpl_' + uid('h'))
       this.processRoute = route
       this.scheme = this._buildSceneScheme(route)
@@ -2796,13 +2838,15 @@ export const useSimStore = defineStore('sim', {
       if (this.scheme.activeGroupId == null) this.scheme.activeGroupId = null
       this.selectedFlowId = null
       this.selectedGroupId = null
-      try { localStorage.setItem('sim.processRoute', route) } catch (e) {}
       this._markDirty()      // 载入模板属于编辑：只置未保存标记，由「保存」按钮落盘
+      // 路线不再写 localStorage：流程路线与编排同属一份服务端存档，本地不留副本（单一真源）
       // 载入模板是编辑动作：不重编译 model，孪生 / 设备树 / KPI 仍显示旧模板，
       // 点「保存」后由 _applyScheme() 统一重编译（否则未保存的换模板会直接改掉孪生）。
       // 编排模式下载入模板后自动适配视图：新方案分行排布，让画布尽量占满屏幕
       if (this.editMode) this.flowZoomFit()
-      this.toast = route === 'short' ? t('已载入短流程炼钢模板') : t('已载入长流程炼钢模板')
+      // 用实际命中的模板名，不再按 route 猜（非钢场景也有自己的模板名）
+      this.toast = t('已载入模板「{name}」', { name: tpl.label || tpl.id || route })
+      return true
     },
     // 手动保存：编排唯一落盘入口（工具条「保存」按钮 / Ctrl+S）。
     // 本地存档 + 服务端 designs/flow 一次写入；未保存前刷新页面，改动按设计丢弃。
@@ -2823,7 +2867,17 @@ export const useSimStore = defineStore('sim', {
       _schemeDirtyBound = true
       watch(
         () => [this.scheme, this.processRoute, this.materialOverrides, this.deviceSetpoints, this.deviceExtraSetpoints],
-        () => { this.schemeDirty = true },
+        () => {
+          // 群控策略每轮自动写设定值也会进这里（deviceSetpoints 变更）—— **必须跳过**：
+          // 那会把本端手里这份 scheme 每 800ms 整档 PUT 上去，而 flow 桶是整档覆盖写，
+          // 于是任何一个持有旧 scheme 的客户端（另一个浏览器 / 标签页）就能把别人刚加的
+          // 附加传感设备整片抹掉 —— 表现为「一运行 AI 群控，编排就被还原」。
+          if (_autoSetpointGuard > 0) return
+          this.schemeDirty = true
+          // 同时把改动推到服务端：官网才是一份数据，别的浏览器要能看到这里的每一次调整
+          // （「保存」按钮依旧只负责让编排草稿在孪生上生效，不影响这一条链路）
+          this._scheduleRuntimeSync()
+        },
         { deep: true },
       )
       // 手动保存的配套保护：有未保存改动时关闭 / 刷新页面给浏览器原生二次确认（仿真态编辑本就不落盘，不提示）
@@ -2832,9 +2886,57 @@ export const useSimStore = defineStore('sim', {
         e.preventDefault()
         e.returnValue = ''
       })
+      // 卸载 / 切后台：把防抖里还没发出去的编排改动立刻补发（keepalive），不留半截存档
+      window.addEventListener('pagehide', () => this._flushRuntimeSync())
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') this._flushRuntimeSync()
+      })
     },
     // 标记「有未保存改动」：编辑类操作显式调用，避免只靠 watch 时的时序歧义
     _markDirty() { this.schemeDirty = true },
+
+    // ── 跨端同步（服务端 → 本端）───────────────────────────────────────────────
+    // 官网就是一个共享的工作区：甲在浏览器 A 改了编排 / 属性，浏览器 B 必须自动看到，
+    // 不需要 B 手动刷新。定期拉回服务端那份（真源），比本地新就采用并重绘。
+    // 本端「手上拿着未落定的改动」时一律不拉（dirty / 编辑态 / 仿真态），避免把用户正在改的东西冲掉。
+    _startServerSync() {
+      if (_serverSyncTimer) return
+      _serverSyncTimer = setInterval(() => { this._syncFromServer() }, 5000)
+    },
+    _stopServerSync() {
+      if (_serverSyncTimer) { clearInterval(_serverSyncTimer); _serverSyncTimer = null }
+    },
+    async _syncFromServer() {
+      if (_serverSyncBusy) return
+      if (this.simMode || this.editMode || this.schemeDirty) return
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      const sid = this.sceneId || 'steel'
+      _serverSyncBusy = true
+      try {
+        let remote = null
+        try {
+          const r = await api.designBucket('flow')
+          remote = (r && r.data) ? r.data[sid] : null
+        } catch (e) { return }
+        if (!remote || !this._schemeAccepted(remote, sid)) return
+        const ts = Number(remote.updatedAt) || 0
+        // 只认「别人写的更新」：本端刚推上去的版本（_lastSyncedAt）不再拉回，避免自抖动
+        if (!ts || ts <= Number(this._lastSyncedAt || 0)) return
+        // 采用服务端那一版：编排 + 路由 + 物料覆盖 + 设备设定值一并回来（这些都是同一份档案）
+        if (remote.route) this.processRoute = remote.route
+        if (remote.scheme) this.scheme = this._adoptScheme(remote.scheme, sid)
+        if (remote.materialOverrides) this.materialOverrides = remote.materialOverrides
+        this._restoreSetpoints(remote)
+        this._lastSyncedAt = ts
+        // 已是最新版本：直接重编译并重绘（等价于点了一次「保存」的效果，但不影响自身编辑意图）
+        this._applyScheme()
+        this.schemeDirty = false
+        nextTick(() => { this.schemeDirty = false })
+        this.showToast(t('已同步其它端的编排改动'), 'info')
+      } finally {
+        _serverSyncBusy = false
+      }
+    },
     // 「文件 → 另存为场景…」：把当前场景（默认含当前编排方案快照）打包为可分发的 .ec 资源包下载。
     // 导出包为非内置分发包，重新导入后即回到当前编排态。
     async exportSceneAsPackage({ label, industry, version, vendor, product, withScheme = true } = {}) {
@@ -2872,12 +2974,10 @@ export const useSimStore = defineStore('sim', {
       this.deviceSetpoints = { ...sps, ...s2 }
       this.deviceExtraSetpoints = { ...esps, ...e2 }
     },
-    // 落盘当前编排方案（手动保存 / 场景切换 / 旧档迁移时调用）：
-    // 本地 localStorage + 服务端 designs/flow，使刷新后保持最后一次保存的编排结果。
-    // 编辑类操作一律不调用它 —— 编排改为手动保存后，只有点「保存」才落盘。
-    _saveScheme() {
-      if (this.simMode) return   // 仿真模式：一切编辑不持久化
-      const payload = {
+    // 落盘当前编排方案「载荷」：编排 + 路由 + 物料覆盖 + 设备设定值是一份整体档案，
+    // 任何一侧单独写都会把另一侧的字段抹成空（flow 桶按场景整档存），故统一由这里产出。
+    _schemePayload() {
+      return {
         sceneId: this.sceneId || 'steel',   // 编排方案所属场景包：切场景不串档
         route: this.processRoute,
         scheme: this.scheme,
@@ -2888,17 +2988,44 @@ export const useSimStore = defineStore('sim', {
         _ovUnitV: 1,   // 价格口径标记：v1 起 price/salePrice 统一为「万元/单位」（旧版存的是元/单位）
         updatedAt: Date.now(),   // 存档时间戳：服务端/本地两份冲突时取较新的一份
       }
-      try { localStorage.setItem(this._schemeKey(payload.sceneId), JSON.stringify(payload)) } catch (e) { /* localStorage 不可用时静默忽略 */ }
-      // 旧版是「所有场景共用一个 sim.scheme 键」：本场景专属键已写好，旧键若不是本场景内容就清掉，
-      // 避免 _loadScheme 回落时把别场景的旧档当成当前场景的兜底（串档的老入口）。
-      try {
-        const oldRaw = localStorage.getItem('sim.scheme')
-        const old = oldRaw ? JSON.parse(oldRaw) : null
-        if (old && old.sceneId && old.sceneId !== payload.sceneId) localStorage.removeItem('sim.scheme')
-      } catch (e) { /* 忽略 */ }
+    },
+    // 编辑即同步（不等「保存」）：用户改了属性 / 设备设定值 / 物料覆盖 / 编排结构后，防抖推到服务端，
+    // 让其它浏览器不必等这边点「保存」也能拿到最新值（用户口径：**前端所有操作后端都要同步**）。
+    // 只写服务端与 localStorage —— **不动 appliedScheme、不重编译 model**，否则每微调一次都重建 3D 孪生。
+    // 编排草稿「生效」仍由「保存」按钮控制（saveScheme），两侧分工不变。
+    _scheduleRuntimeSync() {
+      if (this.simMode) return        // 仿真模式：一切编辑不持久化
+      this._rtSyncNeeded = true
+      if (_rtSyncTimer) clearTimeout(_rtSyncTimer)
+      _rtSyncTimer = setTimeout(() => {
+        _rtSyncTimer = null
+        const p = this._schemePayload()
+        try { api.designSave('flow', p.sceneId, p).catch(() => {}) } catch (e) { /* 忽略 */ }
+        this._lastSyncedAt = p.updatedAt
+        this._rtSyncNeeded = false
+      }, 800)
+    },
+    // 关页面 / 切后台时立刻补发防抖里那次 PUT：普通 fetch 在卸载阶段会被浏览器取消
+    // （keepalive 才能送达），否则「刚加完附加传感就关页面」时服务端停在旧档，
+    // 下次打开看起来就像编排被还原了。
+    _flushRuntimeSync() {
+      if (this.simMode || !this._rtSyncNeeded) return
+      if (_rtSyncTimer) { clearTimeout(_rtSyncTimer); _rtSyncTimer = null }
+      const p = this._schemePayload()
+      this._rtSyncNeeded = false
+      try { api.designSaveNow('flow', p.sceneId, p).catch(() => {}) } catch (e) { /* 忽略 */ }
+      this._lastSyncedAt = p.updatedAt
+    },
+    // 落盘当前编排方案（手动保存 / 场景切换 / 旧档迁移时调用）：
+    // 本地 localStorage + 服务端 designs/flow，使刷新后保持最后一次保存的编排结果。
+    _saveScheme() {
+      if (this.simMode) return   // 仿真模式：一切编辑不持久化
+      const payload = this._schemePayload()
+      if (_rtSyncTimer) { clearTimeout(_rtSyncTimer); _rtSyncTimer = null }
       // 服务端存档 backend/data/designs/flow.json 是跨端真源，随 platform/bs-deploy/update.sh 同步；
       // 手动保存为显式动作，这里直接 PUT（不再防抖），接口不可用时静默降级为「仅本地存档」。
       try { api.designSave('flow', payload.sceneId, payload).catch(() => {}) } catch (e) { /* 忽略 */ }
+      this._lastSyncedAt = payload.updatedAt   // 刚写上去的版本不必再由回拉同步拉回来
       this.schemeDirty = false
       this.schemeSavedAt = Date.now()
       // 兜底：保存前若刚改过 scheme，深度 watch 的回调会在其后触发并重标脏 —— 这里再清一次
@@ -2913,26 +3040,27 @@ export const useSimStore = defineStore('sim', {
         const r = await api.designBucket('flow')
         const remote = (r && r.data) ? r.data[sid] : null
         if (!remote || !this._schemeAccepted(remote, sid)) return null
+        // 记下这批服务端版本：回拉同步据此判断「是不是别人后来写的新版本」
+        this._lastSyncedAt = Number(remote.updatedAt) || this._lastSyncedAt || 0
         return remote
       } catch (e) { return null }
     },
-    // 本地兜底存档也按场景分键（'sim.scheme::<sceneId>'）：共用一个键时，在 A 场景编辑、
-    // 切到 B 场景会把 A 的兜底冲掉，B 又读不到自己的存档。旧版单键仍作一次性回落读取，
-    // 但内容必须过 _schemeAccepted 的场景归属校验（旧档带 sceneId 才认）。
-    _schemeKey(sid) { return 'sim.scheme::' + (sid || this.sceneId || 'steel') },
-    _loadScheme() {
-      let d = null
+    // 本地兜底存档已废止（2026-10-14）：编排的唯一真源是服务端 designs/flow，**浏览器不再留存任何
+    // 编排副本**（历史遗留的 'sim.scheme' / 'sim.scheme::<scene>' 键由 _purgeLocalDesignCache 清理）。
+    // 服务端拉不到就是没有存档，按包模板重新构建 —— 避免本地旧档盖住服务端的新版本造成两端不一致。
+    _loadScheme() { return null },
+    // 一次性清理：历史上留在浏览器的编排 / 群控副本（它们会盖住服务端真源，是两端不一致的元凶）
+    _purgeLocalDesignCache() {
       try {
-        const raw = localStorage.getItem(this._schemeKey())
-        d = raw ? JSON.parse(raw) : null
-      } catch (e) { d = null }
-      if (!d) {
-        try {
-          const raw = localStorage.getItem('sim.scheme')
-          d = raw ? JSON.parse(raw) : null
-        } catch (e) { d = null }
-      }
-      return this._schemeAccepted(d, this.sceneId || 'steel') ? d : null
+        const drop = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i)
+          if (!k) continue
+          if (k === 'sim.scheme' || k.startsWith('sim.scheme::') || k === 'sim.processRoute'
+            || k.startsWith('nengtan.agc')) drop.push(k)
+        }
+        for (const k of drop) localStorage.removeItem(k)
+      } catch (e) { /* localStorage 不可用时忽略 */ }
     },
     // 编排存档可用性校验：结构完整性 + 场景隔离。
     // 说明：此处**只做能否恢复的结构判定**，不做业务口径判定 —— 机房温控曾经在这里按
@@ -3391,7 +3519,7 @@ export const useSimStore = defineStore('sim', {
     // opts.force  —— 跳过去重强制下发（手动点击时用）。
     // opts.localOnly —— 只改平台内设定值、不下发到现场设备（编排编辑态：改完要等点「运行」才生效）。
     setExtSetpoint(extId, value, opts) {
-      this.setDeviceSetpoint(extId, value)
+      this.setDeviceSetpoint(extId, value, opts)
       if (opts && opts.localOnly) return
       const bound = this.boundWriteOf(extId)
       if (!bound) return
@@ -3989,7 +4117,20 @@ export const useSimStore = defineStore('sim', {
       d.boundTo = pid || null
       if (p && !p.deviceBindings.includes(deviceId)) p.deviceBindings.push(deviceId)
     },
-    setDeviceSetpoint(deviceId, val) {
+    // opts.silent —— AI 群控规则每一轮的自动写（非用户操作）：只改本端运行值，
+    //   **既不置脏、也不推服务端**（由 _bindSchemeDirty 的 _autoSetpointGuard 兜住）。
+    //   否则每轮都整档覆盖 flow，会把别人刚加的附加传感 / 编排改动抹掉。
+    setDeviceSetpoint(deviceId, val, opts) {
+      const _auto = !!(opts && opts.silent)
+      if (_auto) _autoSetpointGuard++
+      try {
+        this._setDeviceSetpointInner(deviceId, val)
+      } finally {
+        // 计数在宏任务里回滚：Vue 的 watch（pre flush）是微任务，一定先于此处执行
+        if (_auto) setTimeout(() => { _autoSetpointGuard = Math.max(0, _autoSetpointGuard - 1) }, 0)
+      }
+    },
+    _setDeviceSetpointInner(deviceId, val) {
       this._histCapture('ds_' + deviceId)   // 同设备设定滑动在合并窗口内合成一步
       const v = Number(val)
       // 仿真模式：记录本次设备设定变更（供右上角对比窗口左侧展示）。

@@ -22,7 +22,9 @@ from ..domain.scene.design_store import (
     BUCKETS,
     delete_scene,
     read_bucket,
+    read_last_scene,
     read_scene,
+    write_last_scene,
     write_scene,
 )
 
@@ -32,6 +34,11 @@ router = APIRouter()
 class DesignPayload(BaseModel):
     scene: str = Field(default="steel", description="场景 id（与 /api/scenes 的 id 一致）")
     data: Any = None
+
+
+class LastScenePayload(BaseModel):
+    scene: str = Field(..., description="场景 id")
+    label: str = Field(default="", description="工程显示名（仅用于提示）")
 
 
 @router.get("/api/designs/{bucket}")
@@ -72,6 +79,26 @@ def get_agc_runtime() -> Dict[str, Any]:
     """
     from ..domain.scene import agc_runner
     return agc_runner.runtime()
+
+
+@router.get("/api/workspace/last-scene")
+def get_last_scene() -> Dict[str, Any]:
+    """全局「最后打开的工程」（{ scene, label, ts }；无记录返回 {}）。
+
+    平台没有用户体系，所有人共用官网这一份记录：换浏览器 / 换电脑打开时自动落到
+    同一个工程，避免「在机房温控建的策略，换个浏览器因为在默认钢包里而看不到」。
+    """
+    return {"ok": True, "data": read_last_scene()}
+
+
+@router.put("/api/workspace/last-scene")
+def put_last_scene(payload: LastScenePayload) -> Dict[str, Any]:
+    """记下最后打开的工程（任何人切换工程都更新这一份全局记录）。"""
+    try:
+        data = write_last_scene(payload.scene, payload.label)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "data": data}
 
 
 @router.delete("/api/designs/{bucket}/{scene}")

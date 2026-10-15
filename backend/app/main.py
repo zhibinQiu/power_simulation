@@ -16,6 +16,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import sys
 
@@ -55,6 +56,8 @@ async def _lifespan(app):
     from .skills.registry import init_registry
 
     init_registry()
+    # 绑定主事件循环：mqtt_source 等后台线程经 manager.notify 推送事件到前端弹窗
+    realtime.manager.bind_loop(asyncio.get_running_loop())
     # 启动实时数据源（MQTT 订阅，参照参考项目 yunduan1 数据链路）：
     # 后台线程连接云端 MQTT Broker 订阅主题（Broker 配置前端化：能碳一体机管理 -> 总览 -> 配置 Broker，
     # 保存后热更新重连并持久化到 box_config.json），设备读数一律来自该真实数据源。

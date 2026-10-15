@@ -41,6 +41,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <style scoped>
+/* 遮罩层：本组件 teleport 到 body，因此**必须**自己铺满视口并居中 ——
+   少了这段，.cd-mask 会以 position:static 排在 body 内容流末尾（视口之外），
+   用户点「删除」后弹窗就在屏幕下方看不见，表现为「点了没反应」。 */
+.cd-mask { position: fixed; inset: 0; z-index: 300; display: flex; align-items: center;
+  justify-content: center; padding: var(--sp-4); background: rgba(0, 0, 0, .42);
+  animation: cd-mask-in var(--dur) var(--ease); }
+@keyframes cd-mask-in { from { opacity: 0 } to { opacity: 1 } }
+
 /* 确认对话框 = 全平台「确认 / 取消」形态样板：
    弹窗 --r-lg 圆角 + 玻璃阴影；标题 L1(--fs-dialog)/600；正文 L4(--fs-body)/1.7/次要色；
    底部按钮「取消（次级）在左 → 确认（主色）或删除（危险）在最右」，弹窗档 28px 等宽。 */

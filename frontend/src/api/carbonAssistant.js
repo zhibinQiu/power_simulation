@@ -1,18 +1,8 @@
 // 碳资产助手 API：报告生成 / 任务管理 / 列表 / 详情 / 下载 / HTML 查看
+import { request as jfetch } from './client'
 const base = '/api/carbon-assistant'
 
-async function jfetch(url, opts = {}) {
-  const res = await fetch(url, opts)
-  if (!res.ok) {
-    let msg = `${res.status} ${res.statusText}`
-    try {
-      const data = await res.json()
-      msg = data.detail || data.message || msg
-    } catch (_) {}
-    throw new Error(msg)
-  }
-  return res.json()
-}
+
 
 export const carbonAssistantApi = {
   // 提交碳资产报告生成任务（report_type: market_brief/policy_digest/compliance_analysis）

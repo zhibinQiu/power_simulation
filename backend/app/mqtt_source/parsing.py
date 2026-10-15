@@ -96,21 +96,12 @@ def _primary_value(fields: Dict[str, float]) -> Optional[float]:
 
 
 def _box_device_name_of_cloud_id(cloud_id: str) -> Optional[str]:
-    """反查盒子设备配置：哪个设备的 cloudDevice/name 等于 cloud_id（用于 CRD twins 匹配）。"""
-    cid = str(cloud_id or "").strip()
-    if not cid:
-        return None
-    try:
-        with open(BOX_DEVICES_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception:
-        return None
-    for d in (data.get("devices") or []):
-        if str(d.get("cloudDevice") or "").strip() == cid:
-            return str(d.get("name") or "").strip() or None
-        if str(d.get("name") or "").strip() == cid:
-            return cid
-    return None
+    """反查盒子设备配置：哪个设备的 cloudDevice/name 等于 cloud_id（用于 CRD twins 匹配）。
+
+    实现在 _shared.device_name_of_cloud_id（带索引缓存）：本函数是每条 MQTT 消息的
+    热路径，不能每次都 open + 解析 46KB 的 box_devices.json。
+    """
+    return _shared.device_name_of_cloud_id(cloud_id)
 
 
 def _crd_twin_reading(cloud_id: str) -> Optional[float]:

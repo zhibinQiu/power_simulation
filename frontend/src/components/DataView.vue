@@ -245,6 +245,7 @@ import { t } from '../i18n'
 import TrendChart from './TrendChart.vue'
 import PidControlView from './PidControlView.vue'
 import MultiTrendChart from './MultiTrendChart.vue'
+import { fmtNum } from '../utils/format'
 const store = useSimStore()
 
 // 形态：'analysis' 数据分析（AI → 数据分析：tabs = 原始数据/时序预测/聚类分析）；
@@ -795,7 +796,7 @@ const liveOf = (d) => {
   return store.deviceLiveOf(d.id) != null ? store.deviceLiveOf(d.id) : d.reading
 }
 
-const fmt = (v) => (v == null || isNaN(v) ? '—' : Number(v).toFixed(2).replace(/\.?0+$/, ''))
+const fmt = (v) => fmtNum(v)
 
 const avg = computed(() => {
   const a = rows.value.filter((r) => r.v != null)

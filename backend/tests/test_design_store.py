@@ -106,3 +106,35 @@ def test_api_roundtrip(client):
 def test_api_rejects_bad_input(client):
     assert client.get("/api/designs/etc%2Fpasswd").status_code == 400
     assert client.put("/api/designs/flow", json={"scene": "../x", "data": {}}).status_code == 400
+
+
+# ---------------- 删除墓碑（条目级合并下的删除必须持久） ----------------
+
+def test_removed_item_stays_deleted(store):
+    """删除声明必须被服务端记住：另一端带着旧档保存时不得把已删条目写回。
+
+    背景：条目级合并「缺项不隐含删除」解决了多人互抹，但带来新坑 —— A 删掉 m1 后，
+    B（拉到的旧档里还有 m1）任何一次保存都会把 m1 原样写回，前端 8s 轮询拉回时
+    卡片复活，表现为「点删除没反应」。
+    """
+    store.write_scene("agc", "dc-thermal", {"designs": [{"id": "m1"}, {"id": "m2"}]})
+    # A 端删除 m1
+    store.write_scene("agc", "dc-thermal", {"designs": [{"id": "m2"}], "removed": ["m1"]})
+    assert [i["id"] for i in store.read_scene("agc", "dc-thermal")["designs"]] == ["m2"]
+    # B 端（旧档含 m1）随后保存：m1 不得复活
+    store.write_scene("agc", "dc-thermal", {"designs": [{"id": "m1"}, {"id": "m2"}, {"id": "m3"}]})
+    assert [i["id"] for i in store.read_scene("agc", "dc-thermal")["designs"]] == ["m2", "m3"]
+    # 其它场景不受影响（墓碑按场景分档）
+    store.write_scene("agc", "steel", {"designs": [{"id": "m1"}]})
+    assert [i["id"] for i in store.read_scene("agc", "steel")["designs"]] == ["m1"]
+
+
+def test_hidden_builtin_tombstone_is_union(store):
+    """内置示例墓碑取并集：任一端的保存（不带该字段）不得抹掉另一端的「已删除」。 """
+    store.write_scene("agc", "dc-thermal",
+                      {"designs": [], "hidden": ["dc_cool_rule_50c"]})
+    store.write_scene("agc", "dc-thermal", {"designs": [], "hidden": []})
+    assert store.read_scene("agc", "dc-thermal")["hidden"] == ["dc_cool_rule_50c"]
+    # 另一端新删的示例并入
+    store.write_scene("agc", "dc-thermal", {"designs": [], "hidden": ["other_example"]})
+    assert sorted(store.read_scene("agc", "dc-thermal")["hidden"]) == ["dc_cool_rule_50c", "other_example"]

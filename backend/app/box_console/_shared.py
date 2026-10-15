@@ -13,18 +13,18 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..core import config_events
+from ..core.config import APP_DIR as _APP_DIR, CONFIG_DIR as _CONFIG_DIR, PROJECT_DIR as _PROJECT_DIR
 from ..core.storage import JsonRepository
 
-# __file__ = backend/app/box_console/_shared.py
-# parents[0]=app/box_console  parents[1]=app  parents[2]=backend  parents[3]=project root
-CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
+# 路径一律由 core.config 派生（历史下沉漂移过，勿再按 __file__ 层级拼）
+CONFIG_DIR = Path(_CONFIG_DIR)
 DEVICES_FILE = CONFIG_DIR / "box_devices.json"
 EDGECORE_TEMPLATE = CONFIG_DIR / "edgecore.template.yaml"
 # 一键接入包输出目录与文件（平台侧生成，供下载 / 远程推送）
-GENERATED_DIR = Path(__file__).resolve().parents[2] / "generated"
+GENERATED_DIR = Path(_APP_DIR) / "generated"
 ONBOARD_SCRIPT_PATH = GENERATED_DIR / "onboard_box.sh"
 # box-deploy 采集部署包（打包内嵌进一键接入脚本，免除现场手工上传）
-BOX_DEPLOY_DIR = Path(__file__).resolve().parents[3] / "platform" / "box-deploy"
+BOX_DEPLOY_DIR = Path(_PROJECT_DIR) / "platform" / "box-deploy"
 
 _LOCK = threading.Lock()
 # 设备 twins 趋势历史：dev_id -> [(epoch, value)]

@@ -14,6 +14,7 @@ from typing import Dict, Optional
 
 from app.core.config import config_path
 from app.core.json_cfg import JsonCfgStore
+from ..core.storage import read_json_file
 
 CONFIG_PATH = config_path("llm_cfg.json")
 
@@ -33,10 +34,8 @@ def _default_llm_cfg() -> Dict[str, str]:
     }
     try:
         p = config_path("llm.json")
-        if os.path.isfile(p):
-            with open(p, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if isinstance(data, dict):
+        data = read_json_file(p, {})
+        if isinstance(data, dict):
                 for k in ("base_url", "api_key", "model"):
                     v = data.get(k)
                     if v and str(v).strip():

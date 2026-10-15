@@ -510,7 +510,6 @@ function fmtNum(n) { return Number(n).toLocaleString('zh-CN', { maximumFractionD
 
 <style scoped>
 /* 模块内部说明：不单独成模块，直接写在对应模块内容区顶部 */
-.sec-desc { font-size: 11px; line-height: 1.5; color: var(--muted); margin: 0 0 8px 0; padding: 0; }
 /* .chips 已统一定义于全局 main.css */
 /* TFT 卡片：与实时监测其它指标同一 chip2 形式，右侧附加状态徽章 */
 .chip2.tft em { font-style: normal; font-size: 10px; line-height: 15px; color: #fff; border-radius: 8px; padding: 0 6px; margin-left: auto; flex: 0 0 auto; }

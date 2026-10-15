@@ -21,6 +21,7 @@ import threading
 
 from ..core.config import config_path
 from ..core.netinfo import gateway_host
+from ..core.storage import read_json_file
 import time
 import urllib.parse
 import urllib.request
@@ -93,8 +94,7 @@ def _load_agent_cfg() -> Dict[str, Any]:
     """读盘解析 agent 连接配置（仅由 agent_cfg 在缓存过期时调用）。"""
     host, port, token, namespace = "", _DEFAULT_PORT, "", "default"
     try:
-        with open(_DEVICES_PATH, "r", encoding="utf-8") as f:
-            c = (json.load(f) or {}).get("cloud") or {}
+        c = (read_json_file(_DEVICES_PATH, {}) or {}).get("cloud") or {}
         host = str(c.get("host") or "").strip()
         if c.get("agent_port"):
             port = int(c["agent_port"])
@@ -104,8 +104,7 @@ def _load_agent_cfg() -> Dict[str, Any]:
         pass
     if not host:
         try:
-            with open(_BROKER_CFG_PATH, "r", encoding="utf-8") as f:
-                bcfg = json.load(f) or {}
+            bcfg = read_json_file(_BROKER_CFG_PATH, {}) or {}
             host = str((bcfg.get("broker") or {}).get("host") or "").strip()
         except Exception:  # noqa: BLE001
             pass
@@ -130,8 +129,7 @@ _fail_until: Dict[str, float] = {}
 def _broker_host() -> str:
     """云端 Broker 地址（box_config.json broker.host）：与 agent 同机，可作回退候选。"""
     try:
-        with open(_BROKER_CFG_PATH, "r", encoding="utf-8") as f:
-            bcfg = json.load(f) or {}
+        bcfg = read_json_file(_BROKER_CFG_PATH, {}) or {}
         return str((bcfg.get("broker") or {}).get("host") or "").strip()
     except Exception:  # noqa: BLE001
         return ""

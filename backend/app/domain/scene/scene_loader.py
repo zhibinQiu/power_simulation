@@ -27,6 +27,7 @@ import zipfile
 from typing import Any, Dict, List, Optional
 
 from . import scene_registry
+from ...core.storage import read_json_file
 from app.application.simulation_service import simulation_service
 
 # 包文件形态：资源 key -> 目录内文件名
@@ -69,11 +70,7 @@ _STEEL_METHODS = [
 
 def _read_package_json(path: str) -> Optional[Any]:
     """读包文件 JSON：model/param-schema/factors 为对象，strategies/methods 为数组。"""
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return None
+    return read_json_file(path, None)
 
 
 def _package_dir_resources(scene_id: str) -> Optional[Dict[str, Any]]:

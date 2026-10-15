@@ -298,7 +298,6 @@ function shortTs(ts) {
 
 .pso { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
 .pso em, .pso i { font-style: normal; }
-.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .dim { color: var(--faint); }
 
 .pso-cfg { flex: 1 1 460px; min-width: 320px; display: flex; flex-direction: column; gap: 10px; }

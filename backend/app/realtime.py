@@ -212,12 +212,11 @@ def _safe_json(raw: str) -> Dict[str, Any]:
 
 
 def register_realtime(app) -> None:
-    """把实时遥测相关路由挂载到 FastAPI 应用（在 main.py 中调用一次）。"""
-    @app.on_event("startup")
-    async def _bind_loop() -> None:
-        # 绑定主事件循环：mqtt_source 等后台线程经 manager.notify 推送事件到前端弹窗
-        manager.bind_loop(asyncio.get_running_loop())
+    """把实时遥测相关路由挂载到 FastAPI 应用（在 main.py 中调用一次）。
 
+    注：事件循环绑定由 main.py 的 lifespan 统一完成（on_event("startup") 已废弃，
+    且与 lifespan 双轨会让「启动副作用」散在两个地方）。
+    """
     @app.websocket("/api/ws/feed")
     async def _ws_feed(ws: WebSocket):
         manager.bind_loop(asyncio.get_running_loop())   # 兜底：连接建立时确保 loop 已绑定

@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
-from app.domain.sim.carbon_engine import cached_simulate, conservation_audit, sim_cache_stats
+from app.domain.sim.carbon_engine import cached_simulate, conservation_audit
 from app.domain.sim.device_readings import library_payload
 from app.domain.sim.factors import default_factors
 from app.domain.strategy.llm_strategy import chat_completion, chat_completion_stream, llm_parse
@@ -64,10 +64,6 @@ class SimulationService:
     def get_devices(self) -> Dict[str, Any]:
         """内置监测设备库：设备类型 + 工序设备规格 + 档位库。"""
         return library_payload()
-
-    def cache_stats(self) -> Dict[str, Any]:
-        """仿真缓存命中率（诊断用）。"""
-        return sim_cache_stats()
 
     # ------------------------- 解析 / 仿真 -------------------------
 

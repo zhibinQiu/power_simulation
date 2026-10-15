@@ -1500,6 +1500,7 @@ import { visiblePoll } from '../utils/poll'
 // collectFileName / fmtDuration / deviceStats / COLLECT_DURATION_MS = 文件名、时长格式化、分设备统计、默认时长
 import { createCollector, buildCollectSheets, collectFileName, deviceStats, fmtDuration,
   COLLECT_DURATION_MS } from '../utils/dataCollect'
+import { inflight } from '../utils/inflight'
 // 云端时序历史查询弹窗（TDengine）：异步分包，点开才加载
 const CloudHistoryDialog = defineAsyncComponent(() => import('./CloudHistoryDialog.vue'))
 // 数据采集进度弹窗：同样异步分包（采集是低频动作，不必进首屏主包）
@@ -1809,13 +1810,15 @@ onUnmounted(() => {
 
 // ---- Tab1 数据概览 ----
 const overview = ref({})
-async function loadOverview() {
+// 在途合并：本函数是 3s 快轮询 / 30s 慢轮询 / 配置变更事件 / 手动刷新的共同入口，
+// 快轮询与慢轮询在 30s 边界必然落在同一 tick，合并后每 tick 只发一次请求。
+const loadOverview = inflight(async function _loadOverview() {
   try {
     overview.value = await api.boxOverview()
     // 把云端状态同步到全局 store，供 App.vue 顶部 view-banner 实时显示
     store.boxCloudSource = overview.value.cloud_source || 'unknown'
   } catch (e) {}
-}
+})
 const stats = computed(() => (overview.value.broker && overview.value.broker.stats) || {})
 
 // ---- Tab2 设备管理 ----
@@ -1853,7 +1856,10 @@ function openCreate() {
   if (ready) form.nodeName = ready.name
   createOpen.value = true
 }
-async function loadDevices() { try { devices.value = await api.boxDevices() } catch (e) {} }
+// 设备定义响应较大，且同样被慢轮询 / 配置变更事件 / 手动刷新多路触发 → 在途合并
+const loadDevices = inflight(async function _loadDevices() {
+  try { devices.value = await api.boxDevices() } catch (e) {}
+})
 
 // ---- 点位归属：设备绑定模型后，属性点位由模型承载（新建/配置弹窗只做只读展示）----
 function modelByName(name) {

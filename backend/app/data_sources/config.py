@@ -28,8 +28,9 @@ import uuid
 from typing import Any, Dict, List
 
 from ..core.storage import read_json_file, write_json_atomic
+from ..core.config import CONFIG_DIR as _CONFIG_DIR
 
-CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "config")
+CONFIG_DIR = _CONFIG_DIR
 CONFIG_PATH = os.path.join(CONFIG_DIR, "data_sources.json")
 
 TYPE_LABELS = {

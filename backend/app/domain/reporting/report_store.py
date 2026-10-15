@@ -13,9 +13,13 @@ import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
+from app.core.config import data_path
 from app.core.storage import JsonRepository, copy_file_to_trash
 
-_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "reports")
+# 注意：历史上这里用 dirname(dirname(__file__)) 拼接，模块从 app/ 下沉到 app/domain/reporting/
+# 后基准变了，实际落到 backend/app/domain/data/reports（与 docstring 声明的 backend/data/reports
+# 不符），而 JsonRepository 写盘失败是静默的 —— 报告"生成成功"却查不到。统一走 core.config。
+_DIR = data_path("reports")
 _INDEX = os.path.join(_DIR, "index.json")
 _LOCK = threading.Lock()
 

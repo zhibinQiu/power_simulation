@@ -22,13 +22,14 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
+from ..core.config import data_path
+from ..core.storage import read_json_file, write_json_atomic
 from .publish import publish
 
 JPEG_SOI = b"\xff\xd8"
 JPEG_EOI = b"\xff\xd9"
 
-DATA_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                         "..", "..", "data", "camera"))
+DATA_ROOT = data_path("camera")
 INDEX_NAME = "index.json"
 ASSEMBLE_TTL = 180.0          # 重组超时（秒）：超时缺片先补发，再判废
 RESEND_MAX_ROUNDS = 2         # 缺片补发轮数上限（免重拍，依赖摄像头内部缓存）
@@ -222,28 +223,24 @@ class _Assembler:
         return os.path.join(self._device_dir(device), INDEX_NAME)
 
     def _index_read_locked(self, device: str) -> List[Dict[str, Any]]:
+        items = read_json_file(self._index_path(device), [])
+        return items if isinstance(items, list) else []
+
+    def _index_write_locked(self, device: str, items: List[Dict[str, Any]]) -> None:
+        """索引落盘（原子写）。写失败只告警，不阻断图片重组主流程。"""
         try:
-            with open(self._index_path(device), "r", encoding="utf-8") as fp:
-                items = json.load(fp)
-            return items if isinstance(items, list) else []
-        except Exception:
-            return []
+            write_json_atomic(self._index_path(device), items)
+        except Exception as e:  # noqa: BLE001
+            print("[camera] 索引写入失败 %s: %s" % (device, e))
 
     def _index_append_locked(self, device: str, entry: Dict[str, Any]) -> None:
-        fdir = self._device_dir(device)
-        os.makedirs(fdir, exist_ok=True)
+        os.makedirs(self._device_dir(device), exist_ok=True)
         items = self._index_read_locked(device)
         # 同一 imageId 只保留最新一条（failed 后重拍同 id 不堆积）
         items = [x for x in items if x.get("imageId") != entry.get("imageId")]
         items.append(entry)
         items = items[-RETAIN_MAX_IMAGES:]
-        try:
-            tmp = self._index_path(device) + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as fp:
-                json.dump(items, fp, ensure_ascii=False, indent=1)
-            os.replace(tmp, self._index_path(device))
-        except Exception as e:  # noqa: BLE001
-            print("[camera] 索引写入失败 %s: %s" % (device, e))
+        self._index_write_locked(device, items)
 
     def _retention_locked(self, device: str) -> None:
         """保留策略：每设备最多 RETAIN_MAX_IMAGES 张、最长 RETAIN_MAX_AGE 秒。"""
@@ -271,13 +268,7 @@ class _Assembler:
                 pass
             keep.remove(x)
         if changed:
-            try:
-                tmp = self._index_path(device) + ".tmp"
-                with open(tmp, "w", encoding="utf-8") as fp:
-                    json.dump(keep, fp, ensure_ascii=False, indent=1)
-                os.replace(tmp, self._index_path(device))
-            except Exception:  # noqa: BLE001
-                pass
+            self._index_write_locked(device, keep)
 
     # ---------------- 查询接口（REST 路由用） ----------------
     def list_images(self, device: str) -> List[Dict[str, Any]]:
@@ -308,13 +299,7 @@ class _Assembler:
                 except OSError:
                     pass
             items = [x for x in items if x.get("imageId") != image_id]
-            try:
-                tmp = self._index_path(device) + ".tmp"
-                with open(tmp, "w", encoding="utf-8") as fp:
-                    json.dump(items, fp, ensure_ascii=False, indent=1)
-                os.replace(tmp, self._index_path(device))
-            except Exception:  # noqa: BLE001
-                pass
+            self._index_write_locked(device, items)
             self._bufs.pop(self._key(device, image_id), None)
         return True
 

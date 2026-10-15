@@ -351,7 +351,6 @@ function onNote(val) { store.setMaterialAttr(mat.value.id, 'note', val) }
 
 <style scoped>
 /* 模块内部说明：不单独成模块，直接写在对应模块内容区顶部 */
-.sec-desc { font-size: 11px; line-height: 1.5; color: var(--muted); margin: 0 0 8px 0; padding: 0; }
 .mat-insp { display: flex; flex-direction: column; }
 .ash-sub-t { font-size: 11px; font-weight: 500; color: var(--green, #4f9d6b); margin: 10px 0 2px; padding-top: 8px; border-top: 1px dashed var(--line); }
 .ash-sub { padding: 4px 0 0 10px; }

@@ -10,7 +10,6 @@
 #   ./update.sh all github "feat: xxx"               同步到所有位置 + 推送 GitHub
 #   ./update.sh all github "feat: xxx" --tag v1.2.3  同步 + 推送 + 打 tag（触发打包发布）
 #   ./update.sh github "feat: xxx" [--tag v1.2.3]    仅推送 GitHub（可单独用）
-#   ./update.sh all --designs                        全量同步 + 顺带双向同步编排存档
 #   ./update.sh bs                                   仅平台服务器（代码 + 前端产物 + 配置）
 #   ./update.sh cloud                                仅云端（cloud-agent + 数据面 broker/collector/dashboard）
 #   ./update.sh middleware                           仅数据中间件（/opt/nengtan-middleware）
@@ -18,7 +17,6 @@
 #   ./update.sh portal                               仅官网门户静态内容
 #   ./update.sh nginx                                仅官网 nginx 反代网关
 #   ./update.sh simsource start|status|stop|...      独立模拟数据源服务（非平台代码）
-#   ./update.sh designs                              仅双向同步编排存档（流程编排 / AI 群控）
 #   ./update.sh list                                 查看全部目标
 #
 # all 覆盖六个位置（按顺序，单步失败不中断，末尾汇总）：
@@ -32,12 +30,9 @@
 # 目标地址集中配置在 platform/servers.conf（可用环境变量覆盖，见该文件）。
 # 单目标的附加参数直接透传，例：./update.sh bs --skip-build / --skip-config
 #
-# 编排存档（backend/data/designs/{flow,agc}.json）**默认每次推送都同步，且以服务器为准**：
-#   它是用户在平台上编辑出来的运行期内容，本地 8010 与服务器 40014 各写各的一份；
-#   服务器实例是权威侧 —— 先把服务器那一份合回本地（服务器有的场景覆盖本地），
-#   再随本次推送把合并结果推回服务器 → 两端收敛一致（本地独有的场景一并上到服务器）。
-#   单独同步（不构建、不动代码）：./update.sh designs
-#   本次推送不同步：./update.sh bs --no-designs
+# 编排存档（backend/data/designs/{flow,agc}.json + workspace.json）**永不随推送同步**：
+#   它是用户在官网平台上编辑出来的运行期内容（流程编排 / AI 群控策略 / 最后打开的工程），
+#   官网实例即为唯一真源 —— 开发机不回填、不覆盖，否则一次代码推送就会抹掉线上数据。
 #
 # 全新部署（第一次装机）走 ./deploy.sh，不在本脚本范围内。
 # ============================================================================
@@ -59,13 +54,11 @@ shift
 # ---- 参数解析：github 关键字与 --tag 归 GitHub 步骤，其余透传给具体目标 ----
 PASS_ARGS=()
 DO_GH=0
-DO_DESIGNS=0
 GH_MSG=""
 GH_TAG=""
 while [ $# -gt 0 ]; do
   case "$1" in
     github|gh)  DO_GH=1; shift ;;
-    --designs|--with-designs) DO_DESIGNS=1; shift ;;
     --tag)      GH_TAG="${2:-}"; shift 2 ;;
     -h|--help)  usage ;;
     *)          PASS_ARGS+=("$1"); shift ;;
@@ -97,16 +90,10 @@ run_step() {       # run_step <显示名> <函数>
 
 # ---------------------------------------------------------------- ① 平台服务器
 step_bs() {
-  # --designs 由本脚本统一解析后下传（不下传的话会落进 PASS_ARGS 被当成提交信息/未知参数）
   # 注意：macOS bash 3.2 + set -u 下展开**空数组**（echo "${a[@]}"）会报
   # "a[@]: unbound variable"，所以每个分支都必须先判 ${#...[@]} 再展开，不能图省事统一展开。
   # 同理 lib.sh 的 LIB_EXCLUDE_STATE 保留了 *.swp 占位项而不是留空。
-  local args=()
-  [ "$DO_DESIGNS" = "1" ] && args+=("--designs")
-  if [ ${#args[@]} -gt 0 ]; then
-    if [ ${#PASS_ARGS[@]} -gt 0 ]; then args+=("${PASS_ARGS[@]}"); fi
-    bash "$ROOT/platform/bs-deploy/update.sh" "${args[@]}"
-  elif [ ${#PASS_ARGS[@]} -gt 0 ]; then
+  if [ ${#PASS_ARGS[@]} -gt 0 ]; then
     bash "$ROOT/platform/bs-deploy/update.sh" "${PASS_ARGS[@]}"
   else
     bash "$ROOT/platform/bs-deploy/update.sh"
@@ -155,9 +142,6 @@ step_cloud() {
 step_middleware() {
   bash "$ROOT/platform/cloud-deploy/middleware/deploy_middleware.sh" sync --server "${PLATFORM_SSH:-root@36.151.146.71}"
 }
-# 编排存档同步：以服务器为准，把服务器上的编排合回本地再推回服务器（两端收敛）。
-# 独立成一个目标，便于只同步编排（不跑构建 / 不动代码）时单独执行。
-step_designs() { bash "$ROOT/platform/bs-deploy/sync_designs.sh"; }
 step_docs()    { bash "$ROOT/platform/doc-deploy/update.sh"; }
 step_portal()  { bash "$ROOT/platform/portal-deploy/update.sh"; }
 step_nginx()   { bash "$ROOT/platform/nginx-deploy/deploy.sh"; }
@@ -225,11 +209,6 @@ case "$TARGET" in
     if [ "$DO_GH" = "1" ]; then run_step "⑦ GitHub" step_github "$GH_MSG" "$GH_TAG"; fi
     echo ""
     echo "────────────────────────────────────────────"
-    if [ "$DO_DESIGNS" != "1" ]; then
-      echo "ℹ️ 编排存档（流程编排 / AI 群控）本次未同步，两端各自保留；需同步请执行：./update.sh designs"
-    else
-      echo "ℹ️ 编排存档已随本次推送双向合并（两端收敛）"
-    fi
     if [ ${#FAILED[@]} -gt 0 ]; then
       echo "⚠ 完成，但有步骤失败：${FAILED[*]}"
       exit 1
@@ -237,7 +216,6 @@ case "$TARGET" in
     echo "✅ 全部位置已更新（GitHub：$([ "$DO_GH" = "1" ] && echo 已推送 || echo 未推送)）"
     ;;
   bs|platform)  step_bs ;;
-  designs|design) step_designs ;;
   cloud)        step_cloud ;;
   middleware|mw) step_middleware ;;
   docs)         step_docs ;;

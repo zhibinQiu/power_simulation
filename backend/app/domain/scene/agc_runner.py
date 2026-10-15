@@ -29,6 +29,7 @@ from ...mqtt_source import publish
 from ...mqtt_source import _LOCK as _MQTT_LOCK
 from ...mqtt_source import CLOUD_DEVICES
 from ...mqtt_source import BOX_DEVICES_FILE
+from ...mqtt_source import _shared
 
 _TICK = 1.0            # 调度粒度：每秒检查一次「哪个模型到执行周期了」
 _WRITE_KEEP = 30.0     # 下发成功后：同值 30s 内不重复下发
@@ -374,18 +375,8 @@ def _field_of(dev: str, prop: str):
 
 def _box_of_device(dev: str) -> str:
     """设备所属盒子（盒子配置文件兜底，带 mtime 缓存）。"""
-    global _DEV_NODE
     try:
-        mt = os.path.getmtime(BOX_DEVICES_FILE)
-        if mt != _DEV_NODE["mtime"]:
-            with open(BOX_DEVICES_FILE, "r", encoding="utf-8") as f:
-                cfg = json.load(f) or {}
-            mp = {}
-            for d in cfg.get("devices") or []:
-                if isinstance(d, dict) and d.get("name"):
-                    mp[d["name"]] = d.get("node") or ""
-            _DEV_NODE = {"mtime": mt, "map": mp}
-        return _DEV_NODE["map"].get(dev) or ""
+        return _shared.device_node_of(dev)
     except Exception:
         return ""
 

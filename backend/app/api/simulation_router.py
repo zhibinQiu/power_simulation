@@ -31,12 +31,6 @@ def health():
     return {"status": "ok", "service": "steel-carbon-twin"}
 
 
-@router.get("/api/cache/stats")
-def cache_stats():
-    """仿真缓存命中率（诊断用）：连续重复仿真（前端轮询/防抖后请求）应命中缓存。"""
-    return simulation_service.cache_stats()
-
-
 # ------------------------- 预置模型 / 元数据 -------------------------
 
 @router.get("/api/model/preset", response_model=ProcessModel)

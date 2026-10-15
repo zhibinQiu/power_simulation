@@ -40,7 +40,9 @@ import { useSimStore } from '../stores/sim'
 import { PROCESS_MAP } from '../data/flowLibrary'
 import CollapseSection from './CollapseSection.vue'
 import { t } from '../i18n'
+import { fmtLocale } from '../utils/format'
 
+const fmt = (n) => fmtLocale(n, 1)
 const store = useSimStore()
 
 const group = computed(() => store.selectedGroup)
@@ -88,7 +90,6 @@ function nodeSub(n) {
   if (n.kind === 'device') return n.metering ? t('计量·只读') : t('可调·设定')
   return (PROCESS_MAP[n.type] && PROCESS_MAP[n.type].label) || n.type
 }
-function fmt(n) { return (n == null ? '—' : Number(n).toLocaleString('zh-CN', { maximumFractionDigits: 1 })) }
 </script>
 
 <style scoped>

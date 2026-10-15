@@ -175,8 +175,6 @@ def _apply_techs(unit, res: Dict) -> Dict:
 # 不存在被外部改写的风险，故缓存同一对象引用而非深拷贝，开销最低。
 _SIM_CACHE: "OrderedDict[str, SimResult]" = OrderedDict()
 _SIM_CACHE_MAX = 64                          # 缓存容量，超出淘汰最久未用
-_SIM_CACHE_HITS = 0
-_SIM_CACHE_MISSES = 0
 
 
 def _sim_cache_key(model: ProcessModel, factors) -> str:
@@ -191,23 +189,16 @@ def _sim_cache_key(model: ProcessModel, factors) -> str:
 
 
 def cached_simulate(model: ProcessModel, factors: Dict = None) -> SimResult:
-    global _SIM_CACHE_HITS, _SIM_CACHE_MISSES
     key = _sim_cache_key(model, factors)
     hit = _SIM_CACHE.get(key)
     if hit is not None:
         _SIM_CACHE.move_to_end(key)
-        _SIM_CACHE_HITS += 1
         return hit
-    _SIM_CACHE_MISSES += 1
     res = simulate(model, factors)
     _SIM_CACHE[key] = res
     if len(_SIM_CACHE) > _SIM_CACHE_MAX:
         _SIM_CACHE.popitem(last=False)
     return res
-
-
-def sim_cache_stats() -> Dict[str, int]:
-    return {"size": len(_SIM_CACHE), "hits": _SIM_CACHE_HITS, "misses": _SIM_CACHE_MISSES}
 
 
 def _raw_units(model: ProcessModel, cfg: Dict) -> List[tuple]:

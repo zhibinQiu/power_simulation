@@ -26,6 +26,7 @@ import sys
 import uuid
 
 from app.core.config import DATA_DIR
+from ..core.storage import read_json_file, write_json_atomic
 
 # 厂商签名密钥（模拟：正式产品应置于安全配置，不在代码库明文分发）
 _SECRET = b"nengtan-carbon-platform-2026#X7kQ"
@@ -113,17 +114,11 @@ def verify(code: str, machine: str | None = None) -> bool:
 # ------------------------- 激活状态持久化 -------------------------
 
 def _load() -> dict:
-    try:
-        with open(_LICENSE_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
+    return read_json_file(_LICENSE_PATH, {})
 
 
 def _save(state: dict) -> None:
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(_LICENSE_PATH, "w", encoding="utf-8") as f:
-        json.dump(state, f, ensure_ascii=False, indent=2)
+    write_json_atomic(_LICENSE_PATH, state)
 
 
 def get_status() -> dict:

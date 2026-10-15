@@ -10,6 +10,7 @@ from ._shared import (CLOUD_DEVICES, READINGS, RUNTIME_CONFIG_PATH, _LOCK,
                       _STATE)
 from .client import _restart_subscriber
 from .links import _load_links
+from ..core.storage import write_json_atomic
 
 
 def get_config() -> Dict[str, Any]:
@@ -35,8 +36,7 @@ def _save_runtime_config() -> None:
         cfg = {"broker": dict(_shared._BROKER), "topics": list(_shared._TOPICS),
                "mapping": dict(_shared._MAPPING),
                "ignored_devices": sorted(_shared._IGNORED_DEVICES)}
-        with open(RUNTIME_CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, ensure_ascii=False, indent=2)
+        write_json_atomic(RUNTIME_CONFIG_PATH, cfg)
     except Exception:
         pass
 

@@ -359,7 +359,6 @@ function f(n) { return n == null ? '—' : Number(n).toLocaleString('zh-CN', { m
 
 <style scoped>
 /* 模块内部说明：不单独成模块，直接写在对应模块内容区顶部 */
-.sec-desc { font-size: 11px; line-height: 1.5; color: var(--muted); margin: 0 0 8px 0; padding: 0; }
 .dh-row { display: flex; align-items: center; gap: 10px; }
 .dh-icon { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 3px; background: var(--panel-3); }
 .insp-head { margin-bottom: 4px; }

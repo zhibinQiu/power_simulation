@@ -19,6 +19,7 @@ from typing import Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from ..core.http import post_json
 from ..settings import kb_settings, llm_settings
 
 router = APIRouter()
@@ -63,7 +64,6 @@ def test_llm_config(req: Optional[LlmConfigRequest] = None):
     """测试 LLM 连通性：传入字段可临时覆盖当前配置进行验证（不影响已保存配置）。"""
     import json
     import urllib.error
-    import urllib.request
 
     cfg = llm_settings.get_llm_cfg()
     if req is not None:
@@ -86,17 +86,9 @@ def test_llm_config(req: Optional[LlmConfigRequest] = None):
         "temperature": 0.0,
         "max_tokens": 8,
     }
-    body = json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(url, data=body, method="POST", headers={
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {cfg['api_key']}",
-    })
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-
     started = time.time()
     try:
-        with opener.open(request, timeout=15.0) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        data = post_json(url, payload, headers={"Authorization": f"Bearer {cfg['api_key']}"}, timeout=15.0)
     except urllib.error.HTTPError as e:
         latency_ms = int((time.time() - started) * 1000)
         reason = (e.read().decode("utf-8", "ignore") or e.reason or "")[:120]

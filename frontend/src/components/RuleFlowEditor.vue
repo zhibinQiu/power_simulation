@@ -1182,7 +1182,6 @@ defineExpose({ runOnce, fitView, addModule })
   display: flex; flex-direction: column; min-height: 0;
 }
 .rfe em, .rfe i { font-style: normal; }
-.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
 /* ══════════ 工具条 ══════════ */
 .rfe-bar {

@@ -10,8 +10,10 @@ import threading
 import time
 import uuid
 from typing import Any, Dict, List, Optional
+from ..core.config import DATA_DIR
+from ..core.storage import read_json_file, write_json_atomic
 
-_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data")
+_DATA_DIR = DATA_DIR
 
 
 class ChatStore:
@@ -25,22 +27,12 @@ class ChatStore:
 
     # ------------------------- 内部 -------------------------
     def _load(self) -> None:
-        try:
-            if os.path.isfile(self._path):
-                with open(self._path, "r", encoding="utf-8") as f:
-                    loaded = json.load(f)
-                if isinstance(loaded, dict):
-                    self._data = loaded
-        except Exception:  # pragma: no cover - 文件损坏时降级为空
-            self._data = {"sessions": []}
+        loaded = read_json_file(self._path, {})
+        self._data = loaded if isinstance(loaded, dict) else {"sessions": []}
         self._data.setdefault("sessions", [])
 
     def _save(self) -> None:
-        os.makedirs(os.path.dirname(self._path), exist_ok=True)
-        tmp = self._path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(self._data, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, self._path)
+        write_json_atomic(self._path, self._data)
 
     @staticmethod
     def _now() -> str:

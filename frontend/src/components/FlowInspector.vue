@@ -415,6 +415,7 @@ import CollapseSection from './CollapseSection.vue'
 import OtherFlowPanel from './OtherFlowPanel.vue'
 import { calcSlagBasicity } from '../utils/slagBasicity'
 import { t } from '../i18n'
+import { fmtLocale } from '../utils/format'
 
 const store = useSimStore()
 
@@ -821,7 +822,7 @@ function switchInstance(dir) {
 
 
 function estOf(id) { return store.schemeResult.nodes[id] }
-function fmt(n) { return (n == null ? '—' : Number(n).toLocaleString('zh-CN', { maximumFractionDigits: 1 })) }
+const fmt = (n) => fmtLocale(n, 1)
 function nodeSub(n) {
   if (n.kind === 'material') return t('原料/产物源')
   if (n.kind === 'device') return n.metering ? t('计量·只读') : t('可调·设定')

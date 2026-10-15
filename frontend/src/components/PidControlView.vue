@@ -1,8 +1,8 @@
 <!-- ============ AI 群控（AGC）============
      两级结构：
-       ① 模型库 —— 以卡片形式列出所有已设计的算法模型，支持新建（规则 / 强化学习 / 粒子群）
+       ① 模型库 —— 以卡片形式列出所有已设计的算法模型，支持新建（规则 / 强化学习 / 粒子群 / MPC）
        ② 编排   —— 进入某个模型后：左栏为「模块列表」（规则模型：拖入 / 点击即建模块；
-                   强化学习 · 粒子群仍按可调 / 传感设备勾选配对回路），
+                   强化学习 · 粒子群 · MPC 仍按可调 / 传感设备勾选配对回路），
                    右栏为该算法自己的编排体，右上角「运行」即按编排的算法执行。
      运行时不做整页的实时观测图表，改为点击左侧 / 画布 / 编排条上的任意模块查看它的实时值。
      规则：可调（橙）· 传感（青）· 条件（紫，分支内可用「并且 / 或者」写多条比较）· 循环（黄），
@@ -16,6 +16,10 @@
         <span class="cnt">{{ designs.length }}</span>
         <!-- 群控策略属于具体的场景资源包：明确标出当前场景，避免把别场景的策略当成自己的 -->
         <span class="lib-scene">{{ t('场景') }} · {{ sceneLabel }}</span>
+        <!-- 手动从服务端拉一次清单：群控编排单一真源在服务端，任何一端新建的策略都在这里同步过来 -->
+        <button class="lib-refresh" :disabled="refreshing" :title="t('从服务端重新拉取本场景的模型库')" @click="refreshDesigns">
+          <span class="rf-ic" :class="{ spin: refreshing }">⟳</span><span class="rf-tx">{{ refreshing ? t('刷新中…') : t('刷新') }}</span>
+        </button>
       </div>
       <p class="lib-tip">{{ t('每个模型是一套群控算法：编排完成后点右上角「运行」；运行中点击模块可看实时值。') }}</p>
 
@@ -44,13 +48,15 @@
         <button class="mcard new" @click="openNew">
           <span class="plus">+</span>
           <span class="nt">{{ t('新建模型') }}</span>
-          <span class="nd">{{ t('规则 / 强化学习 / 粒子群') }}</span>
+          <span class="nd">{{ t('规则 / 强化学习 / 粒子群 / MPC') }}</span>
         </button>
       </div>
 
       <div v-if="!designs.length" class="lib-empty">
-        <p class="t1">{{ t('还没有算法模型') }}</p>
-        <p class="t2">{{ t('点击「+ 新建模型」，选择规则 / 强化学习 / 粒子群，即可进入编排。') }}</p>
+        <p class="t1">{{ t('「{scene}」下还没有算法模型', { scene: sceneLabel }) }}</p>
+        <p class="t2">{{ t('点击「+ 新建模型」，选择规则 / 强化学习 / 粒子群 / MPC，即可进入编排。') }}</p>
+        <!-- 群控策略按工程（场景）分档保存在官网：换浏览器看不到时，多半是打开了别的工程 -->
+        <p class="t3">{{ t('新建的策略保存在官网当前工程下，所有人可见；若在别的浏览器看不到，请确认打开的是同一个工程。') }}</p>
       </div>
     </section>
 
@@ -149,6 +155,7 @@
             </div>
             <div v-show="!fold.sen" class="pnl-bd">
               <p v-if="cur && cur.alg === 'rl'" class="emp drag-tip">{{ t('强化学习：按勾选顺序与「① 可调设备」一一配对形成控制回路（第 1 台传感配第 1 台可调）。') }}</p>
+              <p v-if="cur && cur.alg === 'mpc'" class="emp drag-tip">{{ t('MPC：按勾选顺序与「① 可调设备」一一配对形成控制回路（第 1 台传感配第 1 台可调），每拍按模型预测滚动求解最优调节量。') }}</p>
               <p v-if="!senList.length" class="emp">{{ t('当前场景没有传感设备。') }}</p>
               <div v-for="s in senList" :key="s.id" class="dev" :class="{ on: has(selSen, s.id) }">
                 <div class="dev-hd" @click="toggle(selSen, s.id)">
@@ -323,6 +330,17 @@
             </section>
           </template>
 
+          <!-- MPC：模型预测控制（按过程模型滚动求解最优调节量） -->
+          <template v-else-if="cur.alg === 'mpc'">
+            <section class="card">
+              <div class="card-hd">
+                <span class="ct">{{ t('MPC 编排') }}</span>
+                <span class="cs">{{ t('可调设备 → 过程模型 → 预测时域内滚动求解最优调节量') }}</span>
+              </div>
+              <MpcTuner :cfg="cur.mpc" :loops="loops" :targets="spOf" :running="running" @update:running="onMpcRun" />
+            </section>
+          </template>
+
           <!-- 粒子群：在线寻优 -->
           <template v-else>
             <section class="card">
@@ -350,14 +368,13 @@
             <em>{{ t('模型名称') }}</em>
             <input class="mk-in" v-model.trim="newName" :placeholder="t('例如：冷却水分段调控')" @keyup.enter="createModel" />
           </label>
-          <div class="mk-t">{{ t('算法类型') }}</div>
-          <div class="mk-types">
-            <button v-for="a in ALG_TYPES" :key="a.id" class="mk-tp" :class="[a.id, { on: newAlg === a.id }]" @click="newAlg = a.id">
-              <i class="tp-ic">{{ a.ico }}</i>
-              <b>{{ a.label }}</b>
-              <span>{{ a.desc }}</span>
-            </button>
-          </div>
+          <label class="mk-f">
+            <em>{{ t('算法类型') }}</em>
+            <select class="sel grow" v-model="newAlg">
+              <option v-for="a in ALG_TYPES" :key="a.id" :value="a.id">{{ a.ico }} {{ a.label }}</option>
+            </select>
+          </label>
+          <p class="mk-tip">{{ algDesc(newAlg) }}</p>
         </div>
         <div class="mk-ft">
           <button class="btn ghost" @click="newOpen = false">{{ t('取消') }}</button>
@@ -379,6 +396,7 @@ import { api } from '../api/client'
 import { ADJUSTABLE_MAP } from '../data/attachLibrary'
 import RuleFlowEditor from './RuleFlowEditor.vue'
 import PsoTuner from './PsoTuner.vue'
+import MpcTuner from './MpcTuner.vue'
 import { t } from '../i18n'
 // 规则编排的「开始 / 结束」端点与通路判定：能否运行取决于是否形成「开始 → 结束」通路
 import { hasFlowPath, ensureFlowEnds, upgradeBranches } from '../utils/ruleFlow'
@@ -1224,14 +1242,7 @@ watch([() => adjList.value.length, () => senList.value.length], () => {
 onMounted(() => {
   loadVers()
   loadDesigns()
-  pullDesigns().then(() => {
-    // 服务端不可用时的离线兜底：只认本场景本地记的运行态（服务端拉到时以服务端为准）
-    if (runId.value) return
-    try {
-      const lr = localStorage.getItem(runKey(designScene())) || ''
-      if (lr && designs.value.some((m) => m.id === lr)) resumeRun(lr)
-    } catch (e) { /* 忽略 */ }
-  })   // 服务端群控编排存档优先（本地为离线兜底）
+  pullDesigns()   // 群控编排唯一真源：服务端 designs/agc（本地不留任何副本）
   if (versions.value.length) activeVer.value = versions.value[0].id
   scheduleNext()
   autoTimer = setInterval(checkAuto, 15000)
@@ -1240,11 +1251,23 @@ onMounted(() => {
   pollRuntime()
   window.addEventListener('pagehide', flushDesigns)
   document.addEventListener('visibilitychange', onVisHide)
+  syncTimer = setInterval(syncPeers, 8000)
 })
+// 多人在同一个官网实例上协作：定期把服务端（真源）的清单拉回来，
+// 别人在这期间新建的策略就能直接出现在模型库里（不必重开浏览器）。
+// 只在**模型库页**做（此时手上没有正在编辑的编排体），且有本地改动待推时跳过，避免覆盖自己。
+let syncTimer = null
+function syncPeers() {
+  if (page.value !== 'lib' || cur.value) return
+  if (pushPending || saveTimer) return
+  if (document.visibilityState === 'hidden') return
+  pullDesigns()
+}
 onBeforeUnmount(() => {
   trainStop.value = true
   // 不清 runId：运行态是全局的，关掉本视图服务端仍在跑，下次进来仍应显示「运行中」
   stopSample()
+  if (syncTimer) { clearInterval(syncTimer); syncTimer = null }
   if (rtTimer) { clearInterval(rtTimer); rtTimer = null }
   flushDesigns()   // 切走视图也补发一次，避免防抖里的群控编排改动丢失
   window.removeEventListener('pagehide', flushDesigns)
@@ -1281,20 +1304,19 @@ function fullTs(ts) {
 
 // ==================== ① 模型库（算法模型清单） ====================
 // 一个模型 = 一套独立的群控算法（规则 / 强化学习 / 粒子群），各自保存自己的编排与设备选择。
-// **群控编排绑定到场景资源包**：服务端 designs/agc.json 以 sceneId 分档，本地兜底也必须带
-// 场景后缀（DESIGNS_KEY + '::<scene>'）。历史上这里只用了一个全局键，于是「上一场景留在本地
-// 暂存里的模型」会出现在下一个场景（该场景服务端暂无存档 / 拉档失败时兜底接管），用户一编辑
-// 就被存成新场景的策略 —— 钢铁、火电场景里冒出「机房温控」群控策略就是这么串过来的。
-const DESIGNS_KEY = 'nengtan.agc.designs.v1'
-function designsKey(scene) { return DESIGNS_KEY + '::' + (scene || 'steel') }
+// **群控编排绑定到场景资源包**：服务端 designs/agc.json 以 sceneId 分档存取。
+// 历史上这里还按场景存一份 localStorage 兜底（DESIGNS_KEY + '::<scene>'），那份副本会让本显示的
+// 是本机旧清单而不是服务端的同一份 —— 现已全部移除，浏览器不再留存任何群控存档（单一真源）。
 const ALG_TYPES = [
   { id: 'rule', ico: '⌥', label: t('规则'), desc: t('if-elif-else 阈值编排，直观可控') },
   { id: 'rl', ico: '◈', label: t('强化学习'), desc: t('PPO 在线辨识 + 策略寻优') },
   { id: 'pso', ico: '⁂', label: t('粒子群'), desc: t('在线寻优，让观测值逼近目标') },
+  { id: 'mpc', ico: '⧗', label: 'MPC', desc: t('模型预测控制：按过程模型滚动求解最优调节量') },
 ]
 function algMeta(id) { return ALG_TYPES.find((a) => a.id === id) || ALG_TYPES[0] }
 function algIco(id) { return algMeta(id).ico }
 function algLabel(id) { return algMeta(id).label }
+function algDesc(id) { return algMeta(id).desc }
 
 const page = ref('lib')            // lib = 模型库；edit = 编排
 const designs = ref([])
@@ -1304,9 +1326,7 @@ const newAlg = ref('rule')
 // 正在运行的模型 id。运行态是全局状态：写进服务端群控存档（agc 桶的 running 字段），
 // 换电脑 / 重开浏览器打开仍是运行态，并由 sim store 的后台运行器继续按周期执行下发。
 const runId = ref('')
-// 同样按场景分键：运行态归场景所有，切场景时旧场景的策略必须停下来
-const AGC_RUN_KEY = 'nengtan.agc.running.v1'
-function runKey(scene) { return AGC_RUN_KEY + '::' + (scene || 'steel') }
+// 运行态同样只认服务端（agcRuntime / 存档的 running 字段）：本地不再留存任何运行态副本
 
 const isRule = computed(() => !!cur.value && cur.value.alg === 'rule')
 /** 运行状态由父级（编排页右上角「运行」/ 模型库卡片「启动」）统一下发，编排体自身不再各带开关 */
@@ -1315,6 +1335,10 @@ function isRunning(id) { return !!id && runId.value === id }
 
 function blankPso() {
   return { vars: [], senId: '', target: 0, pNum: 12, iters: 20, w: 0.7, c1: 1.5, c2: 1.5, waitMs: 3000 }
+}
+/** MPC 默认参数：预测时域 10 步、控制周期 5s、增量权重 λ、单步限幅 0（不限）、在线辨识开 */
+function blankMpc() {
+  return { np: 10, ts: 5, lam: 0.02, duMax: 0, ident: true, md: {} }
 }
 function normalizeModel(m) {
   const mm = m || {}
@@ -1329,6 +1353,7 @@ function normalizeModel(m) {
       edges: Array.isArray(mm.graph && mm.graph.edges) ? mm.graph.edges : [],
     }),
     pso: { ...blankPso(), ...(mm.pso || {}) },
+    mpc: { ...blankMpc(), ...(mm.mpc || {}) },
     selAdj: Array.isArray(mm.selAdj) ? mm.selAdj : [],
     selSen: Array.isArray(mm.selSen) ? mm.selSen : [],
     spOf: mm.spOf && typeof mm.spOf === 'object' ? { ...mm.spOf } : {},
@@ -1349,13 +1374,22 @@ const sceneLabel = computed(() => {
 })
 let pushTimer = null
 let pushPending = null   // 待推送的群控存档：防抖窗口内关页面时靠它补发（keepalive）
+// 在途删除：删除请求发出到服务端确认之间，8s 轮询可能拉回「还没删掉」的旧档，
+// 若不过滤，刚删掉的卡片会立刻复活（表现为「点删除没反应」）。服务端确认后清除。
+const pendingRemoved = new Set()
+function dropDesigns(id) {
+  designs.value = designs.value.filter((x) => x.id !== id)
+  if (!id) return
+  pendingRemoved.add(id)
+}
 function persist() {
   const scene = designScene()
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
-    try { localStorage.setItem(designsKey(scene), JSON.stringify(designs.value.slice(0, 50))) } catch (e) { /* 忽略 */ }
+    saveTimer = null   // 置空：syncPeers 据此判断「本地是否还有待写的改动」
   }, 200)
-  // 同步到服务端（backend/data/designs/agc.json）：服务端存档是跨端真源，随代码同步到服务器实例。
+  // 单一真源：清单只写服务端 designs/agc（本地不留副本）。
+  // 服务端整档覆盖 —— 提交的清单里没有的条目即为已删除，不需要额外声明。
   // running 每次都取当前值（而非快照）—— 否则一次编辑保存会把刚切换的运行态覆盖回旧值。
   try {
     pushPending = { scene, data: { scene, designs: designs.value.slice(0, 50), updatedAt: Date.now(), running: runId.value ? [runId.value] : [] } }
@@ -1364,7 +1398,9 @@ function persist() {
       const p = pushPending
       pushPending = null
       if (!p) return
-      api.designSave('agc', p.scene, p.data).catch(() => { /* 服务端不可用时保留 localStorage 兜底 */ })
+      api.designSave('agc', p.scene, p.data).then(() => {
+        pendingRemoved.clear()   // 整档已被服务端接受：在途删除随之生效
+      }).catch(() => { /* 服务端不可用时保持在途过滤，下次重试 */ })
     }, 600)
   } catch (e) { /* 忽略 */ }
 }
@@ -1375,39 +1411,42 @@ function flushDesigns() {
   if (!p) return
   pushPending = null
   clearTimeout(pushTimer)
-  try { localStorage.setItem(designsKey(p.scene), JSON.stringify((p.data && p.data.designs) || [])) } catch (e) { /* 忽略 */ }
-  api.designSaveNow('agc', p.scene, p.data).catch(() => { /* 卸载阶段失败：localStorage 兜底仍在 */ })
+  api.designSaveNow('agc', p.scene, p.data).catch(() => { /* 卸载阶段失败：下次编辑仍会带上 */ })
 }
 function onVisHide() { if (document.visibilityState === 'hidden') flushDesigns() }
 function loadDesigns() {
-  // 本地兜底只读**本场景**那一档
-  try {
-    const raw = localStorage.getItem(designsKey(designScene()))
-    const arr = raw ? JSON.parse(raw) : []
-    designs.value = Array.isArray(arr) ? arr.filter((m) => m && m.id).map(normalizeModel) : []
-  } catch (e) { designs.value = [] }
-  seedDcExample()
+  // 单一真源：本地不再读取任何群控存档 —— 清单由 pullDesigns() 从服务端 designs/agc 取回。
+  // 挂载瞬间先用空清单渲染，服务端返回后立即替换（本地旧档不再有「抢先显示」的机会）。
+  designs.value = []
 }
 // 服务端为准：服务器实例是群控编排的权威侧，服务端有存档就无条件采用，
 // 本地 localStorage 只作离线兜底（不再按 ts 比对，否则两端永远不同步）
 async function pullDesigns() {
   const scene = designScene()
+  // 拉取前的本端清单：可能含有「本端刚建、还没来得及推送」的策略
+  const before = designs.value.slice()
   try {
     const r = await api.designBucket('agc')
     // 只取本场景那一档：服务端按 sceneId 分档，别的场景的策略与本场景无关
     const remote = (r && r.data) ? r.data[scene] : null
-    const arr = remote && Array.isArray(remote.designs) ? remote.designs.filter((m) => m && m.id) : null
+    const arr = remote && Array.isArray(remote.designs)
+      ? remote.designs.filter((m) => m && m.id && !pendingRemoved.has(m.id))
+      : null
     if (!arr) {
-      // 服务端本场景无存档：以本场景的本地兜底为准（designs 已是 loadDesigns 读到的本场景内容），
-      // 绝不沿用其它场景留在本机的旧档
+      // 服务端本场景暂无存档：清单保持现状（本端刚建的模型会经 persist 写上去成为首档）
+      seedDcExample()
       return
     }
     designs.value = arr.map(normalizeModel)
-    try {
-      localStorage.setItem(designsKey(scene), JSON.stringify(designs.value.slice(0, 50)))
-      // 迁移收尾：旧版全局键已不再使用且内容是「最后编辑过的那个场景」的，清掉避免日后误读
-      localStorage.removeItem(DESIGNS_KEY)
-    } catch (e) { /* 忽略 */ }
+    // 并集保护：本端有、服务端没有的条目必然是「本端刚建还没推送」，
+    // 先并入清单再回推一次服务端，避免刚建的策略被拉回的版本盖掉。
+    // 在途删除的条目不参与并集 —— 否则刚删掉的模型会被自己重新并回来。
+    const seen = new Set(designs.value.map((m) => m.id))
+    const extra = before.filter((m) => m && m.id && !seen.has(m.id) && !pendingRemoved.has(m.id))
+    if (extra.length) {
+      designs.value = [...designs.value, ...extra.map((m) => normalizeModel(m))]
+      persist()
+    }
     // 运行态同样以服务端为准：换电脑 / 重开浏览器打开，运行中的策略在这里接着跑
     const run = remote && (Array.isArray(remote.running)
       ? remote.running
@@ -1418,8 +1457,25 @@ async function pullDesigns() {
       if (runId.value) stopModel(runId.value, true)
       if (rid) resumeRun(rid)
     }
-    try { localStorage.setItem(runKey(scene), runId.value || '') } catch (e) { /* 忽略 */ }
-  } catch (e) { /* 服务端不可用时沿用本场景 localStorage 兜底 */ }
+  } catch (e) { /* 服务端不可用时保持当前清单，下次轮询再拉 */ }
+  // 注意：内置示例只在「服务端本场景还没有存档」时补种（见上方 arr 为空分支）。
+  // 服务端已有存档时一律以服务端清单为准 —— 用户删掉的策略不会在刷新后被补回来。
+}
+
+// 手动刷新：先把本端待发的改动补推上去，再从服务端整份拉回（跨端新建/删除立即对齐）
+const refreshing = ref(false)
+async function refreshDesigns() {
+  if (refreshing.value) return
+  refreshing.value = true
+  try {
+    flushDesigns()                 // 本端还有没发出去的编辑：先落服务端，避免被拉回的版本盖掉
+    await pullDesigns()
+    store.showToast(t('已刷新模型库'), 'success')
+  } catch (e) {
+    store.showToast(t('刷新失败，稍后重试'), 'warn')
+  } finally {
+    refreshing.value = false
+  }
 }
 
 // ── 切场景：群控编排是场景资源包的一部分，必须整档换掉 ──
@@ -1439,21 +1495,22 @@ watch(() => store.sceneId, async (nid, oid) => {
 })
 
 // ==================== 内置示例：机房温控「机柜超温 → 降泵压」 ====================
-// 首次在机房热控场景打开本视图时自动给出一个可直接运行的示例编排（只种一次，
-// 用户删除后不再出现；场景未装载完成时跳过，下次打开视图再试）。
-const DC_EXAMPLE_FLAG = 'nengtan.agc.seed.dc'
+// 首次在机房热控场景打开本视图时自动给出一个可直接运行的示例编排。
+// 判据只有一条：**服务端清单里有没有这一条**（本地不再记 flag）—— 用户删掉后它就随服务端存档消失，
+// 换任何浏览器都不会因为各自 flag 不同而重复种回去。
+// 内置示例的 id：只在服务端本场景「还没有存档」时补种一次（见 pullDesigns），
+// 用户删掉后服务端清单里就没有它了，刷新不会被重新种回去。
+const EXAMPLE_ID = 'dc_cool_rule_50c'
 function seedDcExample() {
   if ((store.sceneId || '') !== 'dc-thermal') return
-  try { if (localStorage.getItem(DC_EXAMPLE_FLAG) === '1') return } catch (e) { /* 忽略 */ }
+  // 在途删除：刚点删除、服务端还没确认，别把它补回来
+  if (pendingRemoved.has(EXAMPLE_ID)) return
   const senId = 'ext::n_dc_it::att_dc_it_temp'      // 机柜温度传感器
   const adjId = 'ext::n_dc_cw::att_dc_cw_pump'      // 循环水泵变压器
   if (!findDev(senId) || !findDev(adjId)) return
-  if (designs.value.some((m) => m.id === 'dc_cool_rule_50c')) {
-    try { localStorage.setItem(DC_EXAMPLE_FLAG, '1') } catch (e) { /* 忽略 */ }
-    return
-  }
+  if (designs.value.some((m) => m.id === EXAMPLE_ID)) return
   const m = normalizeModel({
-    id: 'dc_cool_rule_50c',
+    id: EXAMPLE_ID,
     name: '示例 · 机柜超 50℃ → 循环水泵变压器 24V',
     alg: 'rule',
     ts: Date.now(),
@@ -1480,8 +1537,7 @@ function seedDcExample() {
     selSen: [senId],
   })
   designs.value = [m, ...designs.value]
-  try { localStorage.setItem(DC_EXAMPLE_FLAG, '1') } catch (e) { /* 忽略 */ }
-  persist()
+  persist()   // 示例也要写进服务端存档：它是所有客户端共用的同一份清单
 }
 
 // —— 进入 / 退出编排：设备选择与目标值随模型存取 ——
@@ -1570,7 +1626,7 @@ async function delModel(m) {
   const ok = await store.confirm({ title: t('删除模型'), message: t('删除后该模型的编排配置不可恢复，确认删除？'), danger: true })
   if (!ok) return
   if (runId.value === m.id) stopModel(m.id, true)
-  designs.value = designs.value.filter((x) => x.id !== m.id)
+  dropDesigns(m.id)
   persist()
 }
 
@@ -1590,6 +1646,13 @@ function statOf(m) {
       { k: t('优化变量'), v: (m.pso.vars || []).length },
       { k: t('目标值'), v: fmt(m.pso.target) },
       { k: t('粒子数'), v: m.pso.pNum },
+    ]
+  }
+  if (m.alg === 'mpc') {
+    return [
+      { k: t('回路'), v: Math.min((m.selAdj || []).length, (m.selSen || []).length) },
+      { k: t('预测时域'), v: `${(m.mpc && m.mpc.np) || 10}` },
+      { k: t('周期'), v: `${(m.mpc && m.mpc.ts) || 5}s` },
     ]
   }
   return [
@@ -1624,6 +1687,7 @@ const runStateTxt = computed(() => {
     return canRun.value ? t('就绪') : t('未连通')
   }
   if (m.alg === 'pso') return running.value ? t('寻优中') : t('待运行')
+  if (m.alg === 'mpc') return running.value ? t('MPC 运行中') : t('待运行')
   if (trainBusy.value) return `${t('训练中')} ${iterN.value}/${maxIter.value}`
   if (sampling.value) return t('采集中')
   if (curve.value.length) return `${t('已完成')} ${iterN.value} ${t('轮')}`
@@ -1647,7 +1711,6 @@ function syncRunFromServer(ids) {
   if (id && !designs.value.some((m) => m.id === id)) return   // 属于其它场景的模型，不管
   if (runId.value) store.stopAgcRule(runId.value)             // 本地兜底执行器让位给服务端
   runId.value = id
-  try { localStorage.setItem(runKey(designScene()), id) } catch (e) { /* 忽略 */ }
 }
 const zeroSeen = {}   // modelId -> 已处理过的归零时间戳（避免重复处理同一条）
 async function pollRuntime() {
@@ -1690,7 +1753,6 @@ function runTipOf(m) {
 function persistRunning() {
   markRunLocal()   // 本端刚改过：先以本端为准，别被尚未追上的服务端旧存档弹回去
   const scene = designScene()
-  try { localStorage.setItem(runKey(scene), runId.value || '') } catch (e) { /* 忽略 */ }
   try {
     const data = { scene, designs: designs.value.slice(0, 50), updatedAt: Date.now(), running: runId.value ? [runId.value] : [] }
     // 已立即推送：清掉待发的防抖载荷，否则页面关闭时会再补发一份不带最新运行态的旧数据
@@ -1740,7 +1802,10 @@ function resumeRun(id) {
   const m = designs.value.find((x) => x.id === id)
   if (!m) return
   runId.value = id
-  if (m.alg === 'rule') store.startAgcRule(m)
+  // 服务端运行器在线时不在这里再起一份本地执行器：它由服务端统一执行（关页面也照跑），
+  // 若每个客户端都本地跑一轮，就会周期写本端的设备设定值 → 连带整档覆盖 flow 编排，
+  // 把别人刚加的附加传感设备抹掉（表现为「一运行群控，编排附件就被还原」）。
+  if (m.alg === 'rule' && !backendRunner.value) store.startAgcRule(m)
   // 强化学习 / 粒子群的采样与训练定时器只在编排页存活：进页时补，见 enter()
   else if (page.value === 'edit' && cur.value && cur.value.id === id && m.alg === 'rl') {
     syncRuns()
@@ -1763,6 +1828,8 @@ function toggleRun() {
 function stopRun() { stopModel(runId.value) }
 /** 粒子群寻优结束（或被中断）由子面板回报 */
 function onPsoRun(v) { if (!v) stopModel(cur.value && cur.value.id) }
+/** MPC 面板自报停止（例如配置不完整无法启动） */
+function onMpcRun(v) { if (!v) stopModel(cur.value && cur.value.id) }
 
 defineExpose({ startSample, stopSample, enter, back })
 </script>
@@ -1781,7 +1848,6 @@ defineExpose({ startSample, stopSample, enter, back })
 .agc b, .agc strong { font-weight: var(--fw-m); }
 .agc em, .agc i { font-style: normal; }
 .hd-sp { flex: 1 1 auto; }
-.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .grow { flex: 1 1 auto; }
 
 /* ══════════ 通用控件（对齐全局按钮 / 表单规范，本页不另立一套） ══════════ */
@@ -1840,6 +1906,10 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
   color: var(--k-sen); border-color: color-mix(in srgb, var(--k-sen) 34%, transparent);
   background: color-mix(in srgb, var(--k-sen) 10%, transparent);
 }
+.mc-tg.mpc {
+  color: var(--k-loop); border-color: color-mix(in srgb, var(--k-loop) 34%, transparent);
+  background: color-mix(in srgb, var(--k-loop) 10%, transparent);
+}
 .tag.on, .badge.ok {
   color: var(--green); border-color: color-mix(in srgb, var(--green) 34%, transparent);
   background: color-mix(in srgb, var(--green) 10%, transparent);
@@ -1855,7 +1925,23 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
 .lib-bar { display: flex; align-items: baseline; gap: 8px; }
 .lib-ttl { font-size: var(--fs-t); font-weight: var(--fw-t); color: var(--text); }
 /* 场景归属标记：群控策略随场景资源包走，明确写在这里避免跨场景误用 */
-.lib-scene { margin-left: auto; font-size: var(--fs-s); color: var(--faint); white-space: nowrap; }
+.lib-scene { font-size: var(--fs-s); color: var(--faint); white-space: nowrap; }
+/* 刷新：群控清单单一真源在服务端，手动拉一次让本端与其它端对齐 */
+.lib-refresh {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 9px; font-size: var(--fs-s); font-family: inherit; cursor: pointer;
+  color: var(--faint); background: transparent;
+  border: 1px solid var(--line, rgba(127, 127, 127, .35)); border-radius: 999px;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.lib-refresh:hover:not(:disabled) {
+  color: var(--blue, #0860a8); border-color: color-mix(in srgb, var(--blue, #0860a8) 45%, transparent);
+  background: color-mix(in srgb, var(--blue, #0860a8) 8%, transparent);
+}
+.lib-refresh:disabled { opacity: .55; cursor: default; }
+.rf-ic { display: inline-block; line-height: 1; font-size: 1.05em; }
+.rf-ic.spin { animation: rf-spin .8s linear infinite; }
+@keyframes rf-spin { to { transform: rotate(360deg); } }
 .lib-tip { margin: 0; max-width: 780px; font-size: var(--fs-s); line-height: 1.6; color: var(--faint); }
 .lib-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
@@ -1907,6 +1993,7 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
 .mcard.alg-rule .mc-ic { color: var(--k-adj); }
 .mcard.alg-rl .mc-ic { color: var(--k-if); }
 .mcard.alg-pso .mc-ic { color: var(--k-sen); }
+.mcard.alg-mpc .mc-ic { color: var(--k-loop); }
 .mc-nm {
   flex: 1 1 auto; min-width: 0; font-size: var(--fs-t); font-weight: var(--fw-t); color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1945,6 +2032,7 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
 .lib-empty { padding: 26px 0; text-align: center; }
 .lib-empty .t1 { margin: 0 0 4px; font-size: var(--fs-t); color: var(--muted); }
 .lib-empty .t2 { margin: 0; font-size: var(--fs-s); color: var(--faint); }
+.lib-empty .t3 { margin: 6px 0 0; font-size: var(--fs-s); color: var(--faint); line-height: 1.6; }
 
 /* ══════════ ② 编排 · 头部 ══════════ */
 .agc-edit { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -2108,21 +2196,9 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
 .mk-bd { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .mk-f { display: flex; align-items: center; gap: 8px; }
 .mk-f em { flex: 0 0 auto; font-size: var(--fs-b); color: var(--muted); }
-.mk-t { font-size: var(--fs-s); color: var(--muted); }
-.mk-types { display: flex; flex-direction: column; gap: 6px; }
-.mk-tp {
-  display: grid; grid-template-columns: 26px 1fr; grid-template-rows: auto auto; gap: 0 10px;
-  padding: 8px 10px; text-align: left; cursor: pointer; font-family: inherit;
-  border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel);
-}
-.mk-tp:hover { background: var(--panel-2); }
-.mk-tp.on { border-color: var(--accent-d); background: var(--accent-l); }
-.mk-tp .tp-ic { grid-row: 1 / 3; align-self: center; font-size: 16px; text-align: center; color: var(--muted); }
-.mk-tp b { font-size: var(--fs-t); font-weight: var(--fw-t); color: var(--text); }
-.mk-tp span { font-size: var(--fs-s); color: var(--faint); }
-.mk-tp.rule .tp-ic { color: var(--k-adj); }
-.mk-tp.rl .tp-ic { color: var(--k-if); }
-.mk-tp.pso .tp-ic { color: var(--k-sen); }
+/* 算法类型：下拉选择（种类增多后不再用平铺卡片，避免弹窗过高） */
+.sel.grow { flex: 1 1 auto; min-width: 0; }
+.mk-tip { margin: 0; padding: 6px 8px; font-size: var(--fs-s); line-height: 1.6; color: var(--faint); background: var(--panel-2); border-radius: var(--radius); }
 .mk-ft { background: var(--head-bg);
  display: flex; justify-content: flex-end; gap: 8px; padding: 10px 12px;  }
 </style>

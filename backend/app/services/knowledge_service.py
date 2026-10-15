@@ -23,6 +23,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
 from ..settings import kb_settings
+from ..core.storage import read_json_file, write_json_atomic
 
 # 非法文件名字符（跨平台：Windows 保留字符 + 控制字符）
 _INVALID = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
@@ -47,18 +48,11 @@ def _meta_path() -> str:
 
 
 def _load_meta() -> Dict[str, Any]:
-    try:
-        with open(_meta_path(), 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {'docs': {}}
+    return read_json_file(_meta_path(), {'docs': {}})
 
 
 def _save_meta(meta: Dict[str, Any]) -> None:
-    tmp = _meta_path() + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as f:
-        json.dump(meta, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, _meta_path())
+    write_json_atomic(_meta_path(), meta)
 
 
 def _now() -> str:

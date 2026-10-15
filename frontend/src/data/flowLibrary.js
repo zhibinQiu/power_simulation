@@ -943,8 +943,12 @@ export const PROCESS_ADJUSTABLE = (() => {
   return Object.freeze(m)
 })()
 
-let _idc = 0
-export function uid(p) { return `${p}_${Date.now().toString(36)}${(_idc++).toString(36)}` }
+// id 生成统一到 utils/id.js（此前 sim.js 与此处各有一份逐字相同的实现）。
+// 注意：必须写成 import + 再导出，不能写 `export { uid } from ...` ——
+// 后者只是转发绑定，不会在本模块作用域创建 uid，本文件内 20+ 处 uid(...) 调用会
+// 全部抛 ReferenceError（编排载入模板时表现为「点了没反应」）。
+import { uid } from '../utils/id'
+export { uid }
 
 // 由模板生成工艺节点（含默认端口与配比）。
 // spec 为可选设备规格对象（{key, defaults, ranges, ...}，来自后端规格库）；

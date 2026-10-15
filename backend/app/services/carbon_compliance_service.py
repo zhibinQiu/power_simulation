@@ -28,6 +28,8 @@ from app.services.carbon_compliance.defaults import (
 from app.services.carbon_compliance.market_cycle import judge_market_cycle
 from app.services.carbon_compliance.report_export import strategy_run_to_markdown
 from app.services.carbon_compliance.strategy_engine import build_strategy_payload
+from ..core.config import DATA_DIR
+from ..core.storage import read_json_file, write_json_atomic
 
 try:
     from openpyxl import Workbook, load_workbook
@@ -35,7 +37,7 @@ except ImportError:  # pragma: no cover
     Workbook = None  # type: ignore
     load_workbook = None  # type: ignore
 
-_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "data")
+_DATA_DIR = DATA_DIR
 _DATA_PATH = os.path.join(_DATA_DIR, "carbon_compliance.json")
 
 # 平台无用户系统，固定默认用户
@@ -61,11 +63,7 @@ def _load_store() -> dict:
         store = _empty_store()
         _save_store(store)
         return store
-    try:
-        with open(_DATA_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception:
-        data = _empty_store()
+    data = read_json_file(_DATA_PATH, None) or _empty_store()
     return {
         "settings": data.get("settings") or {},
         "enterprises": data.get("enterprises") or [],
@@ -76,11 +74,7 @@ def _load_store() -> dict:
 
 
 def _save_store(store: dict) -> None:
-    os.makedirs(_DATA_DIR, exist_ok=True)
-    tmp = _DATA_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(store, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, _DATA_PATH)
+    write_json_atomic(_DATA_PATH, store)
 
 
 class _Row(dict):

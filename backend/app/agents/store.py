@@ -15,10 +15,11 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from app.core.config import data_path
 
 logger = logging.getLogger(__name__)
 
-DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+DATA_DIR = Path(data_path())
 AGENTS_FILE = DATA_DIR / "agents.json"
 
 _APP_CONTEXT = (

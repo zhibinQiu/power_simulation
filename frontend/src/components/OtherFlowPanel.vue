@@ -269,6 +269,7 @@ import { useSimStore } from '../stores/sim'
 import { t } from '../i18n'
 import CollapseSection from './CollapseSection.vue'
 import { ATTACH_GROUPS, ATTACH_MAP, attachUnit, attachPowerSensor } from '../data/attachLibrary'
+import { fmtDigits } from '../utils/format'
 
 const store = useSimStore()
 
@@ -276,7 +277,7 @@ const node = computed(() => store.selectedFlowNode)
 const group = computed(() => store.selectedGroup)
 const dict = computed(() => store.sceneCtx || null)
 
-const fmt = (v, d = 1) => (v == null || !isFinite(v) ? '—' : Number(v).toFixed(d))
+const fmt = (v, d = 1) => fmtDigits(v, d)
 const groupMembers = computed(() => {
   if (!group.value) return []
   const ids = new Set(group.value.members || [])
@@ -654,7 +655,6 @@ const setpointUnit = computed(() => node.value?.range?.unit || '')
 .l-trail { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .u { font-size: 10px; color: var(--muted); font-style: normal; }
 .empty { font-size: 11px; color: var(--muted); padding: 8px 0; }
-.card { }
 .ports-col { display: block; width: 100%; }
 .ports-col + .ports-col { margin-top: 10px; }
 .pc-t { font-size: 10px; color: var(--accent2); font-weight: 400; display: block; margin-bottom: 4px; }

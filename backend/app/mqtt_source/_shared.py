@@ -17,7 +17,10 @@ from __future__ import annotations
 import json
 import os
 import threading
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+from ..core.config import CONFIG_DIR as _CONFIG_DIR
+from ..core.storage import JsonRepository, read_json_file, write_json_atomic
 
 # paho-mqtt 为可选依赖（pip install paho-mqtt）；未安装时降级为空实现，不影响平台启动
 try:
@@ -27,12 +30,70 @@ except Exception:  # pragma: no cover
     mqtt = None  # type: ignore[assignment]
     _PAHO_OK = False
 
-CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "config")
+CONFIG_DIR = _CONFIG_DIR
 RUNTIME_CONFIG_PATH = os.path.join(CONFIG_DIR, "box_config.json")  # 前端配置持久化（运行时产物，无需手工编辑）
 LINKS_FILE = os.path.join(CONFIG_DIR, "links.json")   # 云端设备 <-> 仿真设备实例关联持久化
 BOX_DEVICES_FILE = os.path.join(CONFIG_DIR, "box_devices.json")  # 盒子设备配置（cloudDevice/name 反查用）
 
-from ..integrations import cloud_agent  # noqa: F401 —— re-export：子模块经 _shared.cloud_agent 访问  # noqa: E402 云端 agent 推送（cloud/# 主题）解析，替代 SSH 数据通道
+# 盒子设备清单仓储：box_devices.json 有 46KB，而解析入口在每条 MQTT 消息的热路径上
+# （见 device_name_of_cloud_id）。JsonRepository 以文件指纹做缓存，
+# 命中时只做一次 os.stat，避免每帧重新解析整份配置。
+_devices_repo = JsonRepository(BOX_DEVICES_FILE, default={"models": [], "devices": []})
+
+# 设备清单索引缓存：{索引名: {"fp": 文件指纹, "map": {...}}}。
+# box_devices.json 的读取分散在多个模块（parsing 的 cloudDevice 反查、agc_runner 的
+# 设备→盒子归属），原先各自 open + json.load + 线性遍历。统一在这里按文件指纹建索引，
+# 命中时 O(1) 且不重新解析整份配置。
+_DEV_INDEX: Dict[str, Dict[str, Any]] = {}
+_DEV_INDEX_LOCK = threading.Lock()
+
+
+def _device_index(name: str, build) -> Dict[str, str]:
+    """按文件指纹缓存的设备索引（线程安全）。build(devices) -> dict。"""
+    with _DEV_INDEX_LOCK:
+        fp = _devices_repo.fingerprint()
+        slot = _DEV_INDEX.get(name)
+        if slot is None or slot.get("fp") != fp:
+            devices = (_devices_repo.read() or {}).get("devices") or []
+            slot = {"fp": fp, "map": build(devices)}
+            _DEV_INDEX[name] = slot
+        return slot["map"]
+
+
+def _build_cloud_id_map(devices: List[Dict[str, Any]]) -> Dict[str, str]:
+    m: Dict[str, str] = {}
+    for d in devices:
+        name = str(d.get("name") or "").strip()
+        if not name:
+            continue
+        m[name] = name
+        cloud_dev = str(d.get("cloudDevice") or "").strip()
+        if cloud_dev:
+            m[cloud_dev] = name
+    return m
+
+
+def _build_node_map(devices: List[Dict[str, Any]]) -> Dict[str, str]:
+    return {str(d.get("name") or "").strip(): str(d.get("node") or "").strip()
+            for d in devices if d.get("name")}
+
+
+def device_name_of_cloud_id(cloud_id: str) -> Optional[str]:
+    """cloudDevice 标识 / 设备名 → 设备名（CRD twins 匹配用）。未命中返回 None。"""
+    cid = str(cloud_id or "").strip()
+    if not cid:
+        return None
+    return _device_index("cloud_id", _build_cloud_id_map).get(cid)
+
+
+def device_node_of(device: str) -> str:
+    """设备名 → 所属盒子节点名（K8s node）。未命中返回空串。"""
+    name = str(device or "").strip()
+    if not name:
+        return ""
+    return _device_index("node", _build_node_map).get(name, "")
+
+from ..integrations import cloud_agent  # noqa: F401,E402 —— re-export：子模块经 _shared.cloud_agent 访问云端 agent 推送（cloud/# 主题）解析，替代 SSH 数据通道
 
 # ------------------------- 配置加载（环境变量 > box_config.json > 默认值） -------------------------
 DEFAULT_CFG: Dict[str, Any] = {
@@ -62,8 +123,7 @@ def _load_config() -> Dict[str, Any]:
     """
     cfg = json.loads(json.dumps(DEFAULT_CFG))  # 深拷贝默认值
     try:
-        with open(RUNTIME_CONFIG_PATH, "r", encoding="utf-8") as f:
-            saved = json.load(f) or {}
+        saved = read_json_file(RUNTIME_CONFIG_PATH, {}) or {}
         for key in ("broker", "topics", "mapping", "ignored_devices"):
             if key in saved:
                 cfg[key] = saved[key]

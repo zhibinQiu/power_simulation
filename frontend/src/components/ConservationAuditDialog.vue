@@ -60,6 +60,7 @@ import { api } from '../api/client'
 import Icon from './Icon.vue'
 import CarbonSankey from './CarbonSankey.vue'
 import { t } from '../i18n'
+import { fmtLocale } from '../utils/format'
 
 const store = useSimStore()
 const state = auditState
@@ -70,7 +71,7 @@ const loadingA = ref(false)
 
 const hasSankey = computed(() => !!(store.resultForView && store.resultForView.sankey && store.resultForView.sankey.nodes && store.resultForView.sankey.nodes.length))
 
-function fmt(n) { return Number(n || 0).toLocaleString('zh-CN', { maximumFractionDigits: 1 }) }
+const fmt = (n) => fmtLocale(n || 0, 1)
 
 async function runAudit() {
   loadingA.value = true

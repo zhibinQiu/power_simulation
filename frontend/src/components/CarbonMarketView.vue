@@ -4,6 +4,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { api } from '../api/client.js'
 import { visiblePoll } from '../utils/poll.js'
 import { useSimStore } from '../stores/sim'
+import { fmtDigits } from '../utils/format'
 
 const store = useSimStore()
 const quotes = ref(null)
@@ -19,7 +20,7 @@ let stopPoll = null    // visiblePoll 返回的停止函数
 const POLL_MS = 15000
 const FORECAST_DAYS = 10
 
-const fmt = (v, digits = 2) => (v == null || Number.isNaN(+v) ? '--' : (+v).toFixed(digits))
+const fmt = (v, digits = 2) => fmtDigits(v, digits, '--')
 
 // 关闭视图（与 DataView 一致：返回数字孪生场景）
 const close = () => store.toggleCarbonMarket()

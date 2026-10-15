@@ -9,6 +9,7 @@ from typing import Any, Dict
 
 from . import _shared
 from ._shared import CLOUD_DEVICES, LINKS_FILE, _LOCK
+from ..core.storage import read_json_file, write_json_atomic
 
 
 def _rebuild_rev() -> None:
@@ -24,8 +25,7 @@ def _load_links() -> None:
         if field and dev:
             links[field] = dev
     try:
-        with open(LINKS_FILE, "r", encoding="utf-8") as f:
-            saved = json.load(f) or {}
+        saved = read_json_file(LINKS_FILE, {}) or {}
         for c, l in (saved.get("links") or {}).items():   # 运行时关联覆盖/补充
             if c and l:
                 links[c] = l
@@ -48,9 +48,7 @@ def _load_links() -> None:
 
 def _save_links() -> None:
     try:
-        with open(LINKS_FILE, "w", encoding="utf-8") as f:
-            json.dump({"links": _shared._LINKS, "factors": _shared._LINKS_FACTOR},
-                      f, ensure_ascii=False, indent=2)
+        write_json_atomic(LINKS_FILE, {"links": _shared._LINKS, "factors": _shared._LINKS_FACTOR})
     except Exception:
         pass
 

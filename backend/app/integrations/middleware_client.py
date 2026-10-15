@@ -168,13 +168,9 @@ _fail_until: Dict[str, float] = {}
 
 def _broker_base() -> str:
     """同机 Broker 主机上的中间件候选（中间件与 Broker 同机部署，端口固定 42084）。"""
-    try:
-        with open(_BROKER_CFG_PATH, "r", encoding="utf-8") as f:
-            bcfg = json.load(f) or {}
-        host = str((bcfg.get("broker") or {}).get("host") or "").strip()
-        return f"http://{host}:{_MW_PORT}" if host else ""
-    except Exception:  # noqa: BLE001
-        return ""
+    bcfg = read_json_file(_BROKER_CFG_PATH, {}) or {}
+    host = str((bcfg.get("broker") or {}).get("host") or "").strip()
+    return f"http://{host}:{_MW_PORT}" if host else ""
 
 
 def _gateway_base() -> str:
