@@ -1,12 +1,12 @@
 <template>
   <div class="sf-mask" @click.self="$emit('close')">
-    <div class="sf-modal">
+    <div class="sf-modal" :class="{ open: mode === 'open' }">
       <div class="sf-head">
         <span class="sf-title">{{ title }}</span>
         <button class="sf-x" :title="t('关闭')" @click="$emit('close')">×</button>
       </div>
 
-      <div class="sf-body">
+      <div class="sf-body" :class="{ flush: mode === 'open' }">
         <!-- ===== 新建场景：先选场景类别（四大控排 / 其它），按组分区 —— 类别卡片两列等宽，
                「其它」单独成组并独占一行，避免出现半格孤卡导致排版参差 ===== -->
         <template v-if="mode === 'new'">
@@ -31,24 +31,33 @@
           </div>
         </template>
 
-        <!-- ===== 打开场景：按行业分组列出场景注册表 ===== -->
+        <!-- ===== 打开场景：「示例 / 我的」两栏 —— 扁平列表 + 行内状态，去掉行业分组与冗余说明 ===== -->
         <template v-else-if="mode === 'open'">
-          <div class="sf-desc">{{ t('选择要打开的场景：切换场景会重建编排方案与数字孪生（各场景的编排方案独立保存）。') }}</div>
-          <div v-for="g in sceneGroups" :key="g.name" class="sf-group">
-            <div class="sf-gname">{{ g.name }}</div>
-            <div v-for="m in g.items" :key="m.id" class="sf-row"
-                 :class="{ on: pickedScene === m.id, cur: m.id === store.sceneId }"
+          <div class="sf-tabs">
+            <button v-for="tb in openTabs" :key="tb.key" class="sf-tab" :class="{ on: openTab === tb.key }"
+                    @click="switchTab(tb.key)">
+              {{ t(tb.label) }}<i class="sf-n">{{ tb.n }}</i>
+            </button>
+            <span class="sf-hint">{{ t('切换场景会重建编排方案与数字孪生') }}</span>
+          </div>
+          <div class="sf-list">
+            <div v-for="m in shownScenes" :key="m.id" class="sf-row"
+                 :class="{ on: pickedScene === m.id, cur: m.id === store.sceneId, off: !m.ready }"
+                 :title="m.ready ? sceneLabel(m) : t('「{label}」资源包尚未就绪', { label: sceneLabel(m) })"
                  @click="onPickScene(m)" @dblclick="onOk">
-              <span class="sf-dot" :class="{ on: !!m.ready }"></span>
               <div class="sf-main">
                 <div class="sf-name">{{ sceneLabel(m) }}<em v-if="m.enterprise" class="sf-ent">·{{ m.enterprise }}</em></div>
                 <div class="sf-sub">{{ m.desc || m.industry || m.id }}<span v-if="pkgVersion(m)"> · {{ pkgVersion(m) }}</span></div>
               </div>
               <span v-if="m.id === store.sceneId" class="sf-tag cur">{{ t('当前') }}</span>
-              <span v-else-if="!m.ready" class="sf-tag">{{ t('未安装 .ec') }}</span>
+              <span v-else-if="!m.ready" class="sf-tag">{{ t('未安装') }}</span>
             </div>
+            <div v-if="!shownScenes.length" class="sf-blank"><p>{{ blankTip }}</p></div>
+            <!-- 「我的」栏：就地导入 .ec 工程包（与欢迎页「打开文件夹…」同一安装链路） -->
+            <button v-if="openTab === 'mine'" class="sf-import" :disabled="busy" @click="pickPackage">
+              {{ busy ? t('导入中…') : t('＋ 导入工程包 (.ec)') }}
+            </button>
           </div>
-          <div v-if="!store.sceneIndex.length" class="sf-note">{{ t('场景注册表为空：请确认后端可用，或导入 .ec 资源包。') }}</div>
         </template>
 
         <!-- ===== 另存为场景：把当前场景（含编排快照）打包为 .ec 下载 ===== -->
@@ -76,6 +85,9 @@
         </template>
       </div>
 
+      <!-- 隐藏的原生文件输入：由「导入工程包」按钮触发，选完即安装 -->
+      <input ref="fileRef" class="sf-file" type="file" accept=".ec,.zip" @change="onPickPackage" />
+
       <div class="sf-foot">
         <span class="sf-busy">{{ busy ? t('处理中…') : '' }}</span>
         <button class="sf-btn" @click="$emit('close')">{{ t('取消') }}</button>
@@ -89,6 +101,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { t } from '../i18n'
+import { api } from '../api/client'
 
 const props = defineProps({
   mode: { type: String, default: 'open' },   // new | open | saveAs
@@ -111,6 +124,7 @@ const INDUSTRIES = ['钢铁', '水泥', '化工', '有色', '其它']
 const busy = ref(false)
 const pickedCat = ref('steel')
 const pickedScene = ref('')
+const openTab = ref('sample')   // sample = 平台内置示例 | mine = 用户导入的 .ec 工程
 
 const title = computed(() => ({ new: t('新建场景'), open: t('打开场景'), saveAs: t('另存为场景') }[props.mode] || t('场景')))
 const okText = computed(() => ({ new: t('新建'), open: t('打开'), saveAs: t('另存为 .ec') }[props.mode] || t('确定')))
@@ -129,26 +143,53 @@ const catSections = computed(() => [
   { key: 'other', name: '其它行业', items: catGroups.value.filter((c) => c.key === 'other') },
 ].filter((g) => g.items.length))
 
-// 打开场景：按行业分组（与「设置 → 场景」同序）
-const sceneGroups = computed(() => {
-  const map = new Map()
-  for (const m of store.sceneIndex) {
-    const g = m.industryGroup || '其它'
-    if (!map.has(g)) map.set(g, [])
-    map.get(g).push(m)
-  }
-  return [...map.entries()].map(([name, items]) => ({
-    name,
-    items: items.slice().sort((a, b) => (a.order == null ? 99 : a.order) - (b.order == null ? 99 : b.order)),
-  })).sort((a, b) => {
-    const oa = a.items[0] && a.items[0].order != null ? a.items[0].order : 99
-    const ob = b.items[0] && b.items[0].order != null ? b.items[0].order : 99
-    return oa - ob
-  })
-})
+// 打开场景：平台内置包（package.builtin）归「示例」，用户导入的 .ec 归「我的」
+const byOrder = (a, b) => (a.order == null ? 99 : a.order) - (b.order == null ? 99 : b.order)
+const isMine = (m) => !((m && m.package) || {}).builtin
+const sampleScenes = computed(() => store.sceneIndex.filter((m) => !isMine(m)).slice().sort(byOrder))
+const myScenes = computed(() => store.sceneIndex.filter(isMine).slice().sort(byOrder))
+const openTabs = computed(() => [
+  { key: 'sample', label: '示例', n: sampleScenes.value.length },
+  { key: 'mine', label: '我的', n: myScenes.value.length },
+])
+const shownScenes = computed(() => (openTab.value === 'mine' ? myScenes.value : sampleScenes.value))
+const blankTip = computed(() =>
+  openTab.value === 'mine'
+    ? t('「我的」还没有工程：导入 .ec 工程资源包后会显示在这里。')
+    : t('场景注册表为空：请确认后端可用，或导入 .ec 资源包。'))
+function switchTab(k) {
+  if (openTab.value === k) return
+  openTab.value = k
+  pickedScene.value = ''   // 换栏即清空选中，避免跨栏残留一个看不见的选中项
+}
 function onPickScene(m) {
   if (!m || !m.ready || m.id === store.sceneId) return
   pickedScene.value = m.id
+}
+
+// 「我的」栏就地导入 .ec：安装 → 刷新注册表 → 自动选中新工程（不直接切换，留给「打开」按钮）
+const fileRef = ref(null)
+function pickPackage() { fileRef.value && fileRef.value.click() }
+async function onPickPackage(e) {
+  const f = e.target && e.target.files && e.target.files[0]
+  if (e.target) e.target.value = ''   // 允许再次选择同一个文件
+  if (!f) return
+  busy.value = true
+  try {
+    const res = await api.installScenePackage(f)
+    if (!res || !res.ok) {
+      store.toast = t('导入工程包失败：') + ((res && res.error) || t('未知错误'))
+      return
+    }
+    await store.refreshSceneIndex()
+    const sc = res.scene || {}
+    if (sc.id) pickedScene.value = sc.id
+    else store.toast = t('工程包已导入：请在列表中选择该工程')
+  } catch (err) {
+    store.toast = t('导入工程包失败：') + (err && err.message ? err.message : '')
+  } finally {
+    busy.value = false
+  }
 }
 
 // 另存为场景表单
@@ -172,6 +213,8 @@ const canOk = computed(() => {
 onMounted(async () => {
   if (!store.sceneIndex.length) await store.refreshSceneIndex()
   const cur = store.sceneIndex.find((x) => x.id === store.sceneId)
+  // 当前工程是「我的」时直接停在该栏，少一次手动切换
+  if (cur && isMine(cur)) openTab.value = 'mine'
   const ind = (cur && (cur.industryGroup || cur.industry)) || '钢铁'
   form.value = {
     label: sceneLabel(cur) || '',
@@ -204,10 +247,13 @@ async function onOk() {
         store.toast = t('已新建场景「{label}」', { label: sceneLabel(c.meta) })
       }
     } else if (props.mode === 'open') {
-      // 打开场景 = 切换工作区：整页重新加载（所有页面按新场景重建），不自动打开任何功能视图标签
       const id = pickedScene.value
-      const ok = await store.openScene(id, { reload: true })
-      if (!ok) return
+      if (!id) return
+      // 立即关弹窗，不阻塞界面：openScene 拉资源包/编译较慢（1~2s），
+      // 失败/成功提示都在 store 内部用 toast 输出，无需停留在弹窗上等待
+      emit('close')
+      store.openScene(id).catch(() => { /* 失败已 toast */ })
+      return
     } else {
       const f = form.value
       const file = await store.exportSceneAsPackage({
@@ -233,12 +279,16 @@ async function onOk() {
 .sf-mask { position: fixed; inset: 0; z-index: 4000; background: rgba(12, 16, 20, 0.45); display: flex; align-items: center; justify-content: center; }
 /* overflow:hidden —— 头/底用底色铺底，需靠容器圆角裁掉直角 */
 .sf-modal { width: 600px; max-width: calc(100vw - 40px); max-height: calc(100vh - 80px); display: flex; flex-direction: column; overflow: hidden; background: var(--panel, #1b2028); border: 1px solid var(--stroke, var(--line, #2c333d)); border-radius: var(--r-lg, 10px); box-shadow: var(--glass-shadow-lg, 0 18px 48px rgba(0, 0, 0, 0.45)); }
+/* 打开场景模式：固定弹窗总高，body 内部滚动；切 tab 时容器高度不变（内容滚动不撑高） */
+.sf-modal.open { height: min(460px, calc(100vh - 80px)); }
 /* 头 / 底：铺 --head-bg 与内容区形成色差，不再用灰分隔线 */
 .sf-head { display: flex; align-items: center; justify-content: space-between; min-height: var(--head-h, 28px); padding: 8px 8px 8px 14px; background: var(--head-bg, var(--panel-2)); }
 .sf-title { font-size: var(--fs-head, 14px); font-weight: 600; color: var(--text, #e6ebf2); }
 .sf-x { flex: 0 0 auto; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: var(--r-sm, 4px); background: transparent; color: var(--muted, #8b95a3); font-size: 16px; line-height: 1; cursor: pointer; transition: background var(--dur-fast, .12s) var(--ease), color var(--dur-fast, .12s) var(--ease); }
 .sf-x:hover { color: var(--text, #e6ebf2); background: var(--hover); }
-.sf-body { padding: 14px; overflow: auto; }
+.sf-body { padding: 14px; overflow: auto; flex: 1 1 auto; min-height: 0; }
+/* 打开场景：页签条 + 列表自带内边距，容器不再重复加 padding */
+.sf-body.flush { padding: 0; }
 .sf-desc { font-size: var(--fs-body2, 11px); color: var(--muted, #8b95a3); line-height: 1.7; margin: 0 0 12px; }
 /* 分组：标题 12px/600 + 主题色竖线（与右侧属性面板同一契约） */
 .sf-sec + .sf-sec { margin-top: 14px; }
@@ -269,20 +319,45 @@ async function onOk() {
 /* 提示条：弱底 + 警告色竖线，与分组标题同构 */
 .sf-note { margin-top: 12px; padding: 8px 10px; border-left: 2px solid var(--yellow); border-radius: var(--r-sm, 4px); background: var(--fill-1, rgba(0,0,0,.045)); font-size: var(--fs-body2, 11px); color: var(--muted, #8b95a3); line-height: 1.7; }
 .sf-link { border: 0; background: transparent; color: var(--accent-d, #d8b45c); font-size: var(--fs-body2, 11px); cursor: pointer; padding: 0 2px; text-decoration: underline; }
-.sf-group + .sf-group { margin-top: 10px; }
-.sf-gname { padding-left: 8px; margin-bottom: 6px; font-size: var(--fs-body, 12px); font-weight: 600; color: var(--text, #e6ebf2); border-left: 2px solid var(--accent, #c9a33e); line-height: 1.3; }
+/* 「示例 / 我的」页签条 —— 与平台 .tab / .vw-tab 同款：高 28、字号 12、左右内边距 12；
+   激活态用底色 --panel 浮起（与标签条底 --head-bg 形成明暗层次），不加主题色底线（与 .vw-tab.on 一致） */
+.sf-tabs { display: flex; align-items: stretch; height: var(--head-h, 28px); background: var(--head-bg, var(--panel-2)); }
+.sf-tab {
+  display: inline-flex; align-items: center; gap: 6px; height: 100%;
+  padding: 0 var(--sp-4, 12px); border: 0; background: transparent;
+  color: var(--muted, #8b95a3); font-size: var(--fs-t, 12px); font-weight: 400; cursor: pointer;
+  transition: color var(--dur-fast, .12s) var(--ease), background var(--dur-fast, .12s) var(--ease);
+}
+.sf-tab:hover { color: var(--text, #e6ebf2); background: var(--hover); }
+.sf-tab.on { color: var(--text, #e6ebf2); background: var(--panel, #1b2028); font-weight: 500; }
+.sf-tab.on:hover { background: var(--panel, #1b2028); }
+.sf-n { font-style: normal; font-size: var(--fs-caption, 10px); color: var(--faint, #9a9da3); font-variant-numeric: tabular-nums; }
+.sf-tab.on .sf-n { color: var(--muted, #8b95a3); }
+.sf-hint { margin-left: auto; align-self: center; padding-right: 12px; font-size: var(--fs-caption, 10px); color: var(--faint, #9a9da3); }
+.sf-list { padding: 8px 10px 12px; }
+.sf-blank { padding: 16px 12px; }
+.sf-blank p { margin: 0 0 8px; font-size: var(--fs-body2, 11px); color: var(--muted, #8b95a3); line-height: 1.7; }
+/* 导入：文字链形态（无底无框，hover 才出主题色），与列表行左对齐 */
+.sf-import {
+  margin: 4px 8px 0; padding: 0; border: 0; background: transparent;
+  color: var(--muted, #8b95a3); font-size: var(--fs-body2, 11px); cursor: pointer;
+  transition: color var(--dur-fast, .12s) var(--ease);
+}
+.sf-import:hover:not(:disabled) { color: var(--accent-d, #d8b45c); }
+.sf-import:disabled { opacity: .5; cursor: not-allowed; }
+.sf-file { display: none; }
 .sf-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; }
 .sf-row:hover { background: var(--hover); }
 .sf-row.on { border-color: var(--accent, #c9a33e); background: var(--sel, rgba(0,0,0,.085)); }
-.sf-row.cur { cursor: default; opacity: 0.75; }
-.sf-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; }
-.sf-dot.on { background: var(--accent2, #4f9d6b); }
+.sf-row.cur { cursor: default; opacity: 0.72; }
+.sf-row.off { cursor: not-allowed; opacity: 0.5; }
 .sf-main { flex: 1; min-width: 0; }
 .sf-name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sf-ent { font-size: 10px; color: var(--muted, #8b95a3); font-style: normal; }
 .sf-sub { font-size: 11px; color: var(--muted, #8b95a3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sf-tag { font-size: 10px; color: var(--muted, #8b95a3); border: 1px solid var(--line, #2c333d); border-radius: 8px; padding: 1px 6px; }
-.sf-tag.cur { color: var(--accent, #c9a33e); border-color: rgba(201, 163, 62, 0.5); }
+/* 「当前」徽标：不要边框，只用主题色字 + 极小内边，与普通「未安装」灰底徽标形成对比即可 */
+.sf-tag.cur { color: var(--accent, #c9a33e); border-color: transparent; background: transparent; padding: 1px 2px; }
 .sf-field { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: var(--fs-body, 12px); }
 .sf-field > span { width: 72px; flex: 0 0 auto; color: var(--muted, #8b95a3); }
 .sf-input { flex: 1; min-width: 0; font-size: var(--fs-body, 12px); padding: 4px 8px; border: 1px solid var(--stroke-soft, var(--line, #2c333d)); border-radius: var(--r-sm, 4px); background: var(--bg, #14181e); color: var(--text, #e6ebf2); }

@@ -38,6 +38,9 @@ const buttons = [
 
 // 点击行为（VS Code 风格）：点击当前活动按钮收起侧栏，点击其它按钮切换面板并展开
 function onClick(id) {
+  // 数据源管理：能碳一体机 + 外部数据源的统一接入管理，属于全局配置入口，不依赖具体工程
+  // 因此在欢迎页也允许直接打开；其余功能视图 / 编排 / 资源管理器仍依赖具体工程。
+  if (id === 'boxManage') { store.toggleView(id); return }
   // 欢迎页（未打开工程）：功能视图 / 编排 / 资源管理器都依赖具体工程，一律拒绝并提示先打开工程
   if (store.welcomeOn) {
     store.toast = t('请先打开工程：在内容区新建或打开场景')
@@ -50,8 +53,6 @@ function onClick(id) {
     else store.enterEdit()
     return
   }
-  // 数据源管理：能碳一体机 + 外部数据源的统一接入管理（中间内容区独立视图，再点一次关闭）
-  if (id === 'boxManage') { store.toggleView(id); return }
   // AI 群控：打开独立群控视图（自动展开左侧「资源管理器」树供拖入受控设备）；已打开时再次点击关闭返回孪生
   if (id === 'aiGroup') {
     if (store.aiGroupOn) { store.toggleAiGroup(); return }

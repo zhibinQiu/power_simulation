@@ -5,16 +5,16 @@
 
     <!-- 底部中央工具组（图标按钮横排）：2D/3D 切换 / 亮度 / 刷新视角 / 自动环视 -->
     <div v-if="!store.flowEditing" class="twin-left-tools">
-      <button type="button" class="twin-tool-btn" :class="{ on: view2D }" @click="toggleView2D()" :title="view2D ? t('切换到 3D 数字孪生视图') : t('切换到 2D 工艺流程图（ISA-101 人机界面）')">
+      <button type="button" class="twin-tool-btn" :class="{ on: view2D }" @click="toggleView2D()">
         <Icon :name="view2D ? 'scene3d' : 'front'"/>
       </button>
-      <button type="button" class="twin-tool-btn" :class="{ on: showBrightness }" @click.stop="showBrightness = !showBrightness" :title="t('画面亮度（点击展开滑条）')">
+      <button type="button" class="twin-tool-btn" :class="{ on: showBrightness }" @click.stop="showBrightness = !showBrightness">
         <Icon name="brightness"/>
       </button>
-      <button type="button" class="twin-tool-btn" @click="store.resetView()" :title="t('刷新视角：重置为园区俯瞰')">
+      <button type="button" class="twin-tool-btn" @click="store.resetView()">
         <Icon name="target"/>
       </button>
-      <button type="button" class="twin-tool-btn" :class="{ on: store.autoRotate }" @click="store.setAutoRotate(!store.autoRotate)" :title="t('相机自动环绕旋转')">
+      <button type="button" class="twin-tool-btn" :class="{ on: store.autoRotate }" @click="store.setAutoRotate(!store.autoRotate)">
         <Icon name="rotate"/>
       </button>
       <div v-if="showBrightness" class="twin-bright-pop" @click.stop>
@@ -37,7 +37,7 @@
 
     <!-- 全屏模式浮动工具（右上角）：全屏时顶栏/工具栏已隐藏，「HMI人机交互屏」切换与「退出全屏」入口移至内容区 -->
     <div v-if="store.fullscreenOn" class="twin-fs-tools">
-      <button type="button" class="fs-tool-btn" :title="t('切换到 HMI人机交互屏')" @click="store.toggleOverview()">
+      <button type="button" class="fs-tool-btn" @click="store.toggleOverview()">
         <Icon name="eye" :size="16" :stroke="1.6"/>
       </button>
       <button type="button" class="fs-tool-btn" :title="t('退出全屏')" @click="store.toggleFullscreen()">
@@ -95,16 +95,27 @@ function toggleView2D() {
 }
 
 function rebuildScene() {
-  if (!scene || !store.ready || !store.model || !store.model.units || !store.model.units.length) return
+  if (!scene) return   // 引擎未就绪（initScene 失败）：已在它自己的 catch 里收尾
+  if (!store.ready || !store.model || !store.model.units) return   // 数据未到：继续等
+  // 场景确实没有工序可渲染（异常资源包）：这里不 return 就会一直不收尾，
+  // 底栏进度条永远停在「正在加载三维引擎…」，故按失败收尾让它停下来。
+  if (!store.model.units.length) {
+    if (store.sceneLoad && store.sceneLoad.phase === 'code') store.failSceneLoad(t('场景内没有可渲染的工序'))
+    return
+  }
   try {
     // 非编辑态下若处于某小组子场景（activeGroupId），3D 场景以该小组子场景模式重建
     const gid = (!store.flowEditing && appliedActiveGroupId.value) ? appliedActiveGroupId.value : null
     scene.buildModel(store.model, store.resultForView, gid ? { groupScene: gid } : undefined)
     scene.setAutoRotate(store.autoRotate)
+    // 三维首帧已建成：收尾底栏的「正在加载三维引擎…」进度指示。
+    // 只认 code 阶段——其它阶段（data/design/calculate）由各自流程收尾，避免互相抢着结束。
+    if (store.sceneLoad && store.sceneLoad.active && store.sceneLoad.phase === 'code') store.finishSceneLoad()
   } catch (e) {
     console.error('buildModel failed:', e)
     ok.value = false
     lastErr.value = (e && e.message) ? e.message : String(e)
+    if (store.sceneLoad && store.sceneLoad.phase === 'code') store.failSceneLoad(lastErr.value)
   }
 }
 
@@ -143,6 +154,9 @@ function initScene() {
     console.error('3D init failed:', e)
     ok.value = false
     lastErr.value = (e && e.message) ? e.message : String(e)
+    // 引擎起不来（WebGL 不可用 / 显卡驱动异常）时也必须收尾，否则底栏会永远卡在
+    // 「正在加载三维引擎…」——页面其实已经降级显示兜底提示了。
+    if (store.sceneLoad && store.sceneLoad.phase === 'code') store.failSceneLoad(lastErr.value)
   }
 }
 

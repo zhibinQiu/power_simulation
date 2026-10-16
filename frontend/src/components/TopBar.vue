@@ -58,13 +58,15 @@
       <button class="tbtn" @click="$emit('export')" :title="t('导出分析报告')"><Icon name="export"/><span>{{ t('导出') }}</span></button>
       <!-- 本析智擎：右侧属性弹窗 ↔ 智能体对话界面（中间 3D 场景保持） -->
       <button class="tbtn" :class="{ on: store.agentOn }" @click="$emit('toggle-agent')"
-              :title="t('本析智擎：切换右侧属性面板为智能体对话界面')"><Icon name="robot"/><span>{{ t('本析智擎') }}</span></button>
-      <button class="tbtn" @click="$emit('help')" :title="t('宣传手册 (F1)')"><Icon name="help"/></button>
+             ><Icon name="robot"/><span>{{ t('本析智擎') }}</span></button>
+      <!-- 系统时钟：原底栏右侧，已迁到顶栏（本析智擎之后、问号之前），保持 mono 字形便于快速扫读 -->
+      <span class="tbtn tb-clock" :title="t('系统时间')">{{ clock }}</span>
+      <button class="tbtn" @click="$emit('help')"><Icon name="help"/></button>
       <span class="tdiv"></span>
-      <button class="tbtn" :class="{ on: store.leftOpen }" :title="store.leftOpen ? t('收起左侧栏') : t('展开左侧栏')" @click="store.toggleLeft()"><Icon name="panelLeft"/></button>
-      <button class="tbtn" :class="{ on: store.rightOpen }" :title="store.rightOpen ? t('收起右侧栏') : t('展开右侧栏')" @click="store.toggleRight()"><Icon name="panelRight"/></button>
+      <button class="tbtn" :class="{ on: store.leftOpen }" @click="store.toggleLeft()"><Icon name="panelLeft"/></button>
+      <button class="tbtn" :class="{ on: store.rightOpen }" @click="store.toggleRight()"><Icon name="panelRight"/></button>
       <span class="tdiv"></span>
-      <button class="tbtn" :class="{ on: store.bottomOpen }" :title="store.bottomOpen ? t('收起命令行窗口') : t('展开命令行窗口')" @click="store.toggleBottom()"><Icon name="panelBottom"/></button>
+      <button class="tbtn" :class="{ on: store.bottomOpen }" @click="store.toggleBottom()"><Icon name="panelBottom"/></button>
     </div>
   </header>
 </template>
@@ -74,11 +76,13 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useSimStore } from '../stores/sim'
 import Icon from './Icon.vue'
 import { t } from '../i18n'
+import { useClock } from '../utils/clock.js'
 
 defineProps({ menus: { type: Array, required: true } })
 defineEmits(['export', 'help', 'toggle-agent'])
 
 const store = useSimStore()
+const clock = useClock()
 const openMenu = ref(null)
 const openSub = ref(null)
 const openSub2 = ref(null)

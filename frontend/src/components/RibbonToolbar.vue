@@ -7,12 +7,12 @@
         <template v-if="view === 'twin'">
           <div class="rbtns">
             <button class="rbtn sim-btn" :class="{ on: store.simMode }" @click="actions.onSimToggle()"
-                    :title="store.simMode ? t('退出仿真') : t('运行仿真')">
+                   >
               <Icon :name="store.simMode ? 'stop' : 'run'" size="14"/>
             </button>
             <!-- 视图切换：三维仿真 / HMI人机交互屏（企业实时运行大屏） -->
             <button class="rbtn view-switch" :class="{ on: store.overviewOn }" @click="actions.toggleOverview()"
-                    :title="store.overviewOn ? t('切换到三维仿真场景') : t('切换到HMI人机交互屏（企业实时运行情况）')">
+                   >
               <Icon :name="store.overviewOn ? 'cube' : 'eye'"/><span>{{ store.overviewOn ? t('三维仿真') : t('HMI人机交互屏') }}</span>
             </button>
           </div>
@@ -41,16 +41,16 @@
           </div>
           <span class="rdiv"></span>
           <div class="rbtns">
-            <button class="rbtn" :disabled="!store.canUndo" @click="store.undo()" :title="t('撤销（Ctrl+Z）')">
+            <button class="rbtn" :disabled="!store.canUndo" @click="store.undo()">
               <Icon name="undo"/><span>{{ t('撤销') }}</span>
             </button>
-            <button class="rbtn" :disabled="!store.canRedo" @click="store.redo()" :title="t('重做（Ctrl+Y）')">
+            <button class="rbtn" :disabled="!store.canRedo" @click="store.redo()">
               <Icon name="redo"/><span>{{ t('重做') }}</span>
             </button>
           </div>
           <span class="rdiv"></span>
           <div class="rbtns">
-            <button class="rbtn" @click="actions.autoLayoutScheme()" :title="t('自动排列画布节点')">
+            <button class="rbtn" @click="actions.autoLayoutScheme()">
               <Icon name="grid"/><span>{{ t('自动布局') }}</span>
             </button>
             <button class="rbtn" @click="actions.flowZoomBtn(1.1)" :title="t('放大画布')">
@@ -65,10 +65,10 @@
           </div>
           <span class="rdiv"></span>
           <div class="rbtns">
-            <button v-if="hasTemplate('long')" class="rbtn" @click="actions.loadExample('long')" :title="t('载入长流程炼钢模板')">
+            <button v-if="hasTemplate('long')" class="rbtn" @click="actions.loadExample('long')">
               <Icon name="flow"/><span>{{ t('长流程模板') }}</span>
             </button>
-            <button v-if="hasTemplate('short')" class="rbtn" @click="actions.loadExample('short')" :title="t('载入短流程炼钢模板')">
+            <button v-if="hasTemplate('short')" class="rbtn" @click="actions.loadExample('short')">
               <Icon name="process"/><span>{{ t('短流程模板') }}</span>
             </button>
             <button class="rbtn" @click="actions.clearScheme()" :title="t('清空编排画布')">
@@ -81,7 +81,7 @@
           <span class="ribbon-title">{{ t('数据分析') }}</span>
           <span class="rdiv"></span>
           <div class="rbtns">
-            <button class="rbtn" @click="actions.dataRefresh()" :title="t('重新拉取工况数据')">
+            <button class="rbtn" @click="actions.dataRefresh()">
               <Icon name="refresh"/><span>{{ t('刷新数据') }}</span>
             </button>
           </div>
@@ -99,23 +99,23 @@
               <button class="rbtn" @click="actions.marketRefresh()" :title="t('刷新行情数据')">
                 <Icon name="refresh"/><span>{{ t('刷新行情') }}</span>
               </button>
-              <button class="rbtn" :class="{ on: actions.marketInstrument() === 'cea' }" @click="actions.marketSwitch('cea')" :title="t('切换为 CEA 日 K 行情')">
+              <button class="rbtn" :class="{ on: actions.marketInstrument() === 'cea' }" @click="actions.marketSwitch('cea')">
                 <Icon name="compare"/><span>{{ t('CEA 日K') }}</span>
               </button>
-              <button class="rbtn" :class="{ on: actions.marketInstrument() === 'ccer' }" @click="actions.marketSwitch('ccer')" :title="t('切换为 CCER 均价行情')">
+              <button class="rbtn" :class="{ on: actions.marketInstrument() === 'ccer' }" @click="actions.marketSwitch('ccer')">
                 <Icon name="compare"/><span>{{ t('CCER 均价') }}</span>
               </button>
-              <button class="rbtn" :class="{ on: actions.marketForecastOn() }" @click="actions.marketForecast()" :title="t('叠加未来走势预测曲线')">
+              <button class="rbtn" :class="{ on: actions.marketForecastOn() }" @click="actions.marketForecast()">
                 <Icon name="eye"/><span>{{ t('预测叠加') }}</span>
               </button>
             </template>
             <!-- 台账页签功能 -->
             <template v-else>
-              <button class="rbtn" @click="actions.marketLedgerRefresh()" :title="t('刷新企业台账与策略数据')">
+              <button class="rbtn" @click="actions.marketLedgerRefresh()">
                 <Icon name="refresh"/><span>{{ t('刷新台账') }}</span>
               </button>
             </template>
-            <button class="rbtn" @click="actions.carbonReport()" :title="t('生成碳资产分析报告（Markdown）')">
+            <button class="rbtn" @click="actions.carbonReport()">
               <Icon name="report"/><span>{{ t('生成碳资产报告') }}</span>
             </button>
           </div>
@@ -148,7 +148,11 @@ const store = useSimStore()
 // 当前场景是否提供该模板 id：编排工具条的模板按钮据此显隐
 // （非钢场景没有长/短流程，写死显示会出现「点了没反应」的按钮）
 function hasTemplate(id) {
-  return (store.sceneTemplates || []).some((t) => t.id === id || t.route === id)
+  // 优先使用已加载的包内模板；若尚未加载（异步空窗期），回退到场景元信息的 routes/defaultRoute
+  const fromTemplates = (store.sceneTemplates || []).some((t) => t.id === id || t.route === id)
+  if (fromTemplates) return true
+  const routes = store.scenePack?.meta?.routes || store.sceneIndex?.find((s) => s.id === store.sceneId)?.routes
+  return (routes || []).includes(id)
 }
 
 // 当前工具栏所属视图：流程编排 / 工况数据分析 / 碳资产管理 / 碳排核算 / 能流分析 / 能碳一体机 / 数字孪生

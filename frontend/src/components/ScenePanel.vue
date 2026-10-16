@@ -12,7 +12,7 @@
           <span class="twisty" :class="{ open: open[u.id] === true }" @click.stop="toggle(u.id)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </span>
-          <span class="tch-dot" :title="t('已部署至场景')"></span>
+          <span class="tch-dot"></span>
           <span class="tch-tt">{{ u.name || (PROCESS_MAP[u.type] || {}).label || u.type }}</span>
         </div>
         <div class="tchildren" v-show="open[u.id] === true">
@@ -25,7 +25,7 @@
                @dragstart="onDevDrag($event, d)"
                @dragend="onDevDragEnd">
             <span class="tc-tt">{{ d.label }}</span>
-            <span v-if="d.adjustable" class="adj-badge" :title="t('可调设备：设定值可调节')">{{ t('可调') }}</span>
+            <span v-if="d.adjustable" class="adj-badge">{{ t('可调') }}</span>
             <span class="dev-live">{{ fmt(d.live) }}<span v-if="d.unit" class="dev-unit">{{ d.unit }}</span></span>
           </div>
         </div>

@@ -169,7 +169,8 @@
   --btn-pad-x-lg: 12px; /* 按钮左右内边距 · 弹窗档 */
   --btn-min-w: 76px;    /* 弹窗档按钮最小宽度（同组按钮等宽） */
   --row-h: 26px;    /* 树行 / 列表行 */
-  --head-h: 28px;   /* 面板头 / 工具条 / 标签条 */
+  --head-h: 28px;   /* 面板头 / 标签条 / 面板内部分区头 */
+  --bar-h: 32px;    /* 行高：工具条行 / 视图标签条 / 左右边栏头（与内部控件高度解耦，只放行高） */
   --pad-x: 12px;    /* 面板内容左右边距 */
   /* 种类色：一律中性灰阶（靠明度深浅区分层级，不再引入橙/青/紫/蓝等额外色相）。
      类型区分由「文字标签 + 图标」承担，强调/选中才用主题色。 */
@@ -181,8 +182,10 @@
 
 /* ===== 仿真模式 · 夜间主题（VSCode + 工业金属：中性石墨灰 + 发丝线 + 单一主题色） =====
    面板用无蓝偏色的中性金属灰分层（VSCode #1e1e1e/#252526/#2d2d30 系），
-   主题色只做主行动/选中，状态色仅做语义；底栏继承 :root 的彩色状态栏变量不再覆盖 */
-.app.sim-dark {
+   主题色只做主行动/选中，状态色仅做语义；底栏继承 :root 的彩色状态栏变量不再覆盖
+   说明：这里不带 .app 前缀，是因为 Teleport 到 body 的弹窗（高炉数值仿真、确认框等）
+   同样要拿到这套深色变量，否则深色界面里会弹出白色弹窗（body 由 App.vue 同步 sim-dark 类）。 */
+.sim-dark {
   --bg: #1B1C1E;            /* 应用背景：VSCode 编辑器底（中性金属灰） */
   --panel: #242528;         /* 面板（VSCode 侧栏灰） */
   --panel-2: #2A2B2E;       /* 二级面板底 */
@@ -286,7 +289,7 @@
 .app.sim-dark .cmd-log .ln, .app.sim-dark .cmd-log .ln.cmd, .app.sim-dark .cmd-log .ln.guide,
 .app.sim-dark .cmd-log .ln.err, .app.sim-dark .cmd-log .ln.bot { color: #fff; }
 .app.sim-dark .cmd-log .ln.cmd::before, .app.sim-dark .cmd-log .ln.bot::before { color: #fff; }
-.app.sim-dark input[type="range"] { accent-color: var(--accent-d); }
+.sim-dark input[type="range"] { accent-color: var(--accent-d); }
 /* 输入框：金属凹槽感（比面板更深） */
 .app.sim-dark .num, .app.sim-dark .num-input {
   background: var(--input);
@@ -337,7 +340,7 @@ button b, button strong,
 .app {
   display: grid;
   grid-template-columns: 48px var(--lw, 286px) minmax(0, 1fr) var(--rw, 372px);
-  grid-template-rows: 30px 28px minmax(0, 1fr) var(--cmd-h, 132px) 22px;
+  grid-template-rows: 30px var(--bar-h) minmax(0, 1fr) var(--cmd-h, 132px) 22px;
   /* 命令行窗口（cmd）与中间数字孪生（stage）同列同宽；工具栏宽度与数字孪生一致（仅占中间列），左右侧栏/活动栏顶到顶部（延伸至工具栏行），VSCode 面板式布局 */
   grid-template-areas:
     "topbar topbar topbar topbar"
@@ -361,7 +364,7 @@ body.panel-dragging .app { transition: none; }
 .app.left-collapsed .sidebar { visibility: hidden; pointer-events: none; }
 .app.right-collapsed .inspector { visibility: hidden; pointer-events: none; }
 /* 底栏（命令行窗口 + 状态条）收起：仅隐藏命令行窗口，蓝色系统状态条保留；行高 0 + 内容裁剪实现平滑收起 */
-.app.bottom-collapsed { grid-template-rows: 30px 28px 1fr 0 22px; }
+.app.bottom-collapsed { grid-template-rows: 30px var(--bar-h) 1fr 0 22px; }
 .app.bottom-collapsed .cmdwin { visibility: hidden; pointer-events: none; transition: visibility .22s; }
 /* 工程选择（欢迎页）：未打开工程时中间内容区整块给欢迎页，
    工具条行 / 右侧检视器 / 底部命令行都不占位（右栏与命令行由 App 直接不渲染，这里只收列宽行高） */
@@ -494,9 +497,17 @@ body.panel-dragging .app { transition: none; }
 .tbtn:disabled:hover, .tbtn.disabled:hover { background: transparent; color: var(--faint); }
 .tbtn .ui-icon { width: 15px; height: 15px; }
 .topbar .tbtn .ui-icon { width: 13px; height: 13px; }
+/* 顶栏系统时钟（原底栏时钟迁来）：与快捷按钮同高同字号，等宽字形便于跳秒时不产生宽度抖动 */
+.topbar .tb-clock {
+  font-family: var(--mono); font-size: var(--fs-b); color: var(--topbar-fg-mute);
+  letter-spacing: .2px; cursor: default; padding: 0 var(--sp-2);
+  font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1;
+}
+.topbar .tb-clock:hover { background: none; color: var(--topbar-fg-mute); }
+.topbar .tb-clock:active { background: none; transform: none; }
 
 /* ============ 工具条（独立行：顶部菜单条下方、3D 视图/编排画布上方，横贯全宽，顶边与左右侧栏对齐） ============ */
-.ribbon { grid-area: toolbar; height: var(--head-h);
+.ribbon { grid-area: toolbar; height: var(--bar-h);
   display: flex; flex-direction: row; align-items: center; overflow: visible;
   background: var(--panel);  padding: 0 var(--sp-3);
   border-bottom: 1px solid var(--hairline);
@@ -601,12 +612,12 @@ body.panel-dragging .app { transition: none; }
    固定模式的本析智擎（agent-view z-index:8）铺满面板，手柄需置于其上保持可拖拽 */
 .inspector-rsz { position: absolute; top: 0; left: 0; width: 6px; height: 100%; cursor: ew-resize; z-index: 60; }
 .inspector-rsz.dragging { background: rgba(20, 110, 180, .25); }
-/* 面板头：左右栏共用同一套度量（高度 28 · 左右内边距 12 · 字号 11 · 600 字重），
-   与工具条 / 标签条同高，保证横向切齐 */
+/* 面板头：左右栏共用同一套度量（行高 --bar-h · 左右内边距 12 · 600 字重），
+   与工具条 / 视图标签条同高，保证横向切齐；行高由 --bar-h 单独控制，内部图标·按钮高度不变 */
 .sidebar-head, .inspector-head {
   display: flex; align-items: center; gap: var(--sp-3); padding: 0 var(--pad-x);
   font-size: var(--fs-b); color: var(--text); background: var(--head-bg); flex: 0 0 auto;
-  height: var(--head-h); font-weight: 600; letter-spacing: .4px;
+  height: var(--bar-h); font-weight: 600; letter-spacing: .4px;
   font-family: var(--head);
 }
 .sidebar-head .ttl, .inspector-head .ttl { font-size: var(--fs-b); color: var(--text); letter-spacing: .4px; font-family: var(--head); }
@@ -748,6 +759,11 @@ body.panel-dragging .app { transition: none; }
 .cmd-log .ln.warn, .cmd-log .ln.err { color: var(--red); }
 .cmd-log .ln.sim { color: var(--green); }
 .cmd-log .ln.sim::before { content: "［仿真］"; color: var(--green); font-weight: 600; margin-right: 4px; }
+/* 「输出」页签中的实时消息流（MQTT，由「数据源管理」采集）：时间 + 主题 + 载荷 */
+.cmd-log .ln.msg { display: flex; align-items: baseline; gap: 8px; color: var(--text); }
+.cmd-log .ln.msg .ln-ts { flex: none; color: var(--faint); font-variant-numeric: tabular-nums; }
+.cmd-log .ln.msg .ln-topic { flex: none; color: var(--accent-d); }
+.cmd-log .ln.msg .ln-payload { min-width: 0; color: var(--muted); }
 /* 「仿真对比」页签：变更记录（与右上角对比面板同源） */
 .cmd-log .sim-compare-empty { padding: 14px 16px; color: var(--faint); font-size: 12px; line-height: 1.8; }
 /* 调整前后碳排放/能源量化对比（左右两栏：碳排放 | 能耗） */
@@ -792,16 +808,43 @@ body.panel-dragging .app { transition: none; }
 .app.sim-dark .cmd-log .sim-cmp-delta.good { color: #43c07a; background: rgba(67, 192, 122, .12); }
 .app.sim-dark .cmd-log .sim-cmp-delta.bad { color: #e06b62; background: rgba(224, 107, 98, .12); }
 
+/* 功能视图异步分片：首次打开时立即给出反馈，避免内容区空白像“没点上”。 */
+.lazy-view-fallback { width: 100%; height: 100%; min-height: 120px; display: flex; align-items: center; justify-content: center;
+  gap: var(--sp-3); color: var(--muted); background: var(--panel); font-size: var(--fs-body); font-family: var(--ui); }
+.lazy-view-fallback.error { flex-direction: column; color: var(--red); }
+.lazy-view-fallback.error span { max-width: 70%; color: var(--muted); font-size: var(--fs-caption); word-break: break-word; }
+.scene-load-spinner { display: inline-block; flex: none; width: 10px; height: 10px; border: 1.5px solid currentColor; border-right-color: transparent;
+  border-radius: 50%; animation: scene-load-spin .72s linear infinite; }
+@keyframes scene-load-spin { to { transform: rotate(360deg); } }
+
 /* ============ 底栏状态条（ISA-101 高绩效 HMI：白天亮色 / 夜间深色，不喧宾夺主） ============ */
 .statusbar { grid-area: status; display: flex; align-items: stretch; height: 22px; overflow: hidden;
   background: var(--sb-bg); border-top: 1px solid var(--sb-line); font-size: var(--fs-b); color: var(--sb-fg); font-family: var(--mono); letter-spacing: .1px; }
 .statusbar .st { display: flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-3); border-right: 1px solid var(--sb-line); white-space: nowrap; cursor: default; }
 .statusbar .st:hover { background: var(--sb-hover-bg); }
 .statusbar .st .v { color: var(--sb-fg-strong); }
+/* 场景加载进度（底栏最左侧）。busy=转圈+进度条，done=绿√（短暂），fail=红✕ */
+.statusbar .scene-loading { color: var(--sb-fg-strong); font-family: var(--ui); gap: var(--sp-2); padding-right: var(--sp-3); }
+.statusbar .scene-loading .scene-load-spinner { width: 9px; height: 9px; }
+/* ISA-101：正常态安静（用常规前景色，转圈本身就够显眼），只有异常（fail）才上高亮色 */
+.statusbar .scene-loading.done { color: var(--sb-ok); }
+.statusbar .scene-loading.fail { color: var(--sb-err); }
+.statusbar .scene-load-ic { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 11px; height: 11px; }
+.statusbar .scene-load-ic svg { display: block; }
+.statusbar .scene-load-label { white-space: nowrap; }
+/* 进度条：底栏行高只有 22px，用 2px 细条表示当前处在哪一阶段（阶段内无细粒度进度） */
+.statusbar .scene-load-track { flex: none; width: 36px; height: 2px; border-radius: 1px; overflow: hidden;
+  background: var(--sb-line); }
+.statusbar .scene-load-fill { display: block; height: 100%; width: 0; background: currentColor;
+  transition: width var(--dur-slow, .26s) var(--ease-out, ease-out); }
+@media (prefers-reduced-motion: reduce) {
+  .statusbar .scene-load-fill { transition: none; }
+}
 .statusbar .st.spacer { flex: 1; border-right: none; }
 .statusbar .st.spacer:hover { background: none; }
-/* 时钟 + 通知常驻最右：快讯条关闭（spacer 缺失）时由 auto 外边距把尾部组推到右端 */
-.statusbar .st.mono { margin-left: auto; }
+/* 通知常驻最右：快讯条关闭（spacer 缺失）时由 auto 外边距把铃铛推到右端
+   （系统时钟已迁至顶栏，原 .st.mono 的 auto 外边距改挂这里） */
+.statusbar .st-notif { margin-left: auto; }
 /* 市场快讯滚动条 */
 .statusbar .news-ticker { min-width: 0; overflow: hidden; gap: 0; }
 .statusbar .nt-label { display: inline-flex; align-items: center; gap: var(--sp-1); flex: none; padding-right: var(--sp-3); white-space: nowrap; font-family: var(--ui); }
@@ -812,14 +855,11 @@ body.panel-dragging .app { transition: none; }
 .statusbar .news-track:hover { animation-play-state: paused; }
 .statusbar .news-list { display: inline-flex; align-items: center; }
 .statusbar .news-item { padding-right: var(--sp-5); font-size: var(--fs-b); font-family: var(--ui); -webkit-font-smoothing: antialiased; }
-.statusbar .news-item .news-time { color: var(--sb-fg-strong); margin-right: var(--sp-2); font-family: var(--mono); }
+.statusbar .news-item .news-time { color: var(--sb-fg-strong); margin-right: var(--sp-2); }
 .statusbar .nt-empty { color: var(--sb-fg-faint); padding-left: 4px; font-family: var(--ui); }
 @keyframes news-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 /* 语义状态色（ISA-101：白天用深色可读版，夜间用柔和高亮，避免高饱和闪烁） */
 .statusbar .ok { color: var(--sb-ok); } .statusbar .err { color: var(--sb-err); } .statusbar .warnc { color: var(--sb-warn); }
-/* 平台激活状态提示：未激活时显示在实时链路左侧，黄色警示、可点击进入激活弹窗 */
-.statusbar .lic-warn { color: var(--sb-warn); cursor: pointer; }
-.statusbar .lic-warn .lic-tri { font-size: 10px; line-height: 1; }
 .statusbar .mono { font-family: var(--mono); }
 .feed-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--feed-init); transition: background .15s; }
 .feed-open { background: var(--feed-open); } .feed-closed { background: var(--feed-closed); }
@@ -1048,12 +1088,12 @@ select, input, textarea { background: var(--panel); color: var(--text); border: 
 input[type='checkbox'], input[type='radio'] { width: auto; padding: 0; border: none; }
 select:focus, input:focus, textarea:focus { outline: none; border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent-l); }
 textarea { resize: vertical; font-family: inherit; min-height: 56px; }
-.app.sim-dark select, .app.sim-dark input, .app.sim-dark textarea {
+.sim-dark select, .sim-dark input, .sim-dark textarea {
   background: var(--input, #1A1B1D);
   border-color: #44464B;
   color: var(--text);
 }
-.app.sim-dark select:focus, .app.sim-dark input:focus, .app.sim-dark textarea:focus {
+.sim-dark select:focus, .sim-dark input:focus, .sim-dark textarea:focus {
   border-color: var(--accent-d);
   box-shadow: 0 0 0 1px var(--accent-l);
 }
@@ -1577,6 +1617,7 @@ input[type=range]::-moz-range-thumb { width: 11px; height: 11px; background: var
   .pop-enter-from .modal, .pop-leave-to .modal { transform: none; }
   .slide-enter-from, .slide-leave-to { transform: none; }
   .rise-enter-from { transform: none; }
+  .scene-load-spinner { animation: none; border-right-color: currentColor; opacity: .7; }
 }
 
 /* =========================================================
@@ -1594,8 +1635,8 @@ input:not([type]):focus, textarea:focus { border-color: var(--accent-d); box-sha
 *::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb { background: rgba(120,130,140,.35); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
 *::-webkit-scrollbar-thumb:hover { background: rgba(120,130,140,.55); border: 2px solid transparent; background-clip: content-box; }
-.app.sim-dark *::-webkit-scrollbar-thumb { background: rgba(140,155,170,.3); border: 2px solid transparent; background-clip: content-box; }
-.app.sim-dark *::-webkit-scrollbar-thumb:hover { background: rgba(140,155,170,.5); border: 2px solid transparent; background-clip: content-box; }
+.sim-dark *::-webkit-scrollbar-thumb { background: rgba(140,155,170,.3); border: 2px solid transparent; background-clip: content-box; }
+.sim-dark *::-webkit-scrollbar-thumb:hover { background: rgba(140,155,170,.5); border: 2px solid transparent; background-clip: content-box; }
 
 /* 数值输入与文本输入统一为紧凑工业表单（高 22px、圆角 4px、tabular 数字） */
 input[type="text"], input[type="number"], input[type="password"], input:not([type]), textarea {
@@ -1782,7 +1823,7 @@ button, input, select, textarea,
 
 /* —— 6.5 弹窗外壳统一契约（14 个对话框共用）：同一圆角 / 同一阴影 / 同一进场动画 —— */
 .ab-modal, .am-modal, .cbx-dialog, .chd-panel, .cd-modal, .audit-modal,
-.kb-modal, .om-modal, .sf-modal, .sm-modal, .cw-card, .mk-modal, .ss-modal, .tad-modal {
+.kb-modal, .om-modal, .sf-modal, .sm-modal, .cw-card, .mk-dlg, .ss-modal, .tad-modal {
   background: var(--panel) !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--r-lg) !important;
@@ -1802,10 +1843,12 @@ button, input, select, textarea,
       同一等级 = 同一字号 + 同一字重 + 同一间距；跨面板视觉完全对齐 —— */
 .inspector-head, .insp-head, .pnl-head, .flow-insp .fi-head, .mat-insp .mi-head {
   display: flex; align-items: center; gap: var(--sp-2);
-  height: var(--head-h); padding: 0 var(--pad-x);
+  padding: 0 var(--pad-x);
   font-size: var(--fs-head) !important; font-weight: var(--fw-t) !important;
   color: var(--text); background: var(--head-bg); flex: 0 0 auto;
 }
+/* 行高分级：左右边栏头跟工具条行走（--bar-h，横向切齐），面板内部分区头维持 --head-h */
+.insp-head, .pnl-head, .flow-insp .fi-head, .mat-insp .mi-head { height: var(--head-h); }
 /* L4 分组标题（唯一规格）：12px / 600 / 主文字色 / 主题色竖线 / 上下间距固定 */
 .sec, .pnl-sec, .grp-title, .att-sec {
   display: flex; align-items: center; gap: var(--sp-2);

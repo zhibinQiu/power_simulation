@@ -17,7 +17,7 @@
           <input v-else class="gname-in" :value="g.name" @click.stop @mousedown.stop
                  @input="g.name = $event.target.value" @keydown.enter.prevent="endGroupRename"
                  @keydown.esc.prevent="endGroupRename" @blur="endGroupRename" />
-          <span v-if="g.members && g.members.length" class="ncount" :title="t('小组内设备台数')">×{{ g.members.length }}</span>
+          <span v-if="g.members && g.members.length" class="ncount">×{{ g.members.length }}</span>
           <button class="x-btn danger" @mousedown.stop @click.stop="store.removeFlowGroup(g.id)" :title="t('删除小组')">✕</button>
         </div>
         <div class="nbody">
@@ -69,7 +69,7 @@
           <input v-else class="nname-in" :value="n.name" @click.stop @mousedown.stop
                  @input="n.name = $event.target.value" @keydown.enter.prevent="endRename"
                  @keydown.esc.prevent="endRename" @blur="endRename" />
-          <span v-if="(n.count || 1) > 1" class="ncount" :title="t('台数')">×{{ n.count }}</span>
+          <span v-if="(n.count || 1) > 1" class="ncount">×{{ n.count }}</span>
           <button class="x-btn danger" @mousedown.stop @click.stop="store.removeFlowNode(n.id)" :title="t('删除节点')">✕</button>
         </div>
         <div class="nbody">
@@ -88,7 +88,7 @@
             <span class="plbl">{{ matName(p.material) }}</span><span class="pdot"></span>
           </div>
           <!-- 添加入口：工辅等无输入端口（或需更多端口）时，点此弹出浮层自由添加输入/输出端口 -->
-          <span v-if="n.kind === 'process'" class="addport" :title="t('添加输入/输出端口')"
+          <span v-if="n.kind === 'process'" class="addport"
                 @mousedown.stop @click.stop="onAddPort(n, $event)">＋</span>
           <div v-if="n.kind === 'material'" :class="phClass(n, 'out', n.ports.out[0].id)" :style="portStyle(n, 'out', 0)"
                @mousedown.stop="onPortDown(n, 'out', n.ports.out[0].id, $event)"

@@ -51,6 +51,8 @@ export const VIEW_DEFS = [
 export const VIEW_IDS = VIEW_DEFS.map((v) => v.id)
 export const VIEW_TITLE = Object.fromEntries(VIEW_DEFS.map((v) => [v.id, v.title]))
 
+// 实时消息流（并入底栏「输出」）保留条数上限：现场设备每秒都有上报，超出即丢弃最旧的
+const MQTT_LOG_CAP = 300
 // 数据源管理设备列表轮询：_boxSrcBusy 防并发重入，_boxSrcTimer 常驻定时器
 let _boxSrcBusy = false
 let _boxSrcTimer = null
@@ -445,10 +447,16 @@ let _refreshTimer = null   // 刷新防抖定时器（模块级，避免进入�
 let _refreshSeq = 0       // 刷新序号：丢弃过期响应，避免旧请求覆盖新状态
 let _simSnapshot = null   // 仿真模式进入时的全量快照（模块级，避免进入响应式 state）
 let _schemeDirtyBound = false // 编排「改动检测」监听只绑一次（手动保存模式：只标脏，不落盘）
-let _rtSyncTimer = null      // 编辑→服务端自动同步的防抖定时器（见 stores 的 _scheduleRuntimeSync）
-let _autoSetpointGuard = 0   // 「群控自动写设定值」抑制计数（>0 表示刚发生机器写入，不推服务端，详见 _bindSchemeDirty）
-let _serverSyncTimer = null  // 服务端→本端 回拉定时器（见 _startServerSync）
-let _serverSyncBusy = false  // 回拉进行中标志：避免 5s 轮询叠加成并发风暴
+let _autoSetpointGuard = 0   // 「群控自动写设定值」抑制计数（>0 表示刚发生机器写入，不标脏也不写服务端，详见 _bindSchemeDirty）
+// 服务端编排存档（designs/flow）的读取结果，决定「是否允许写回服务端」：
+//   'ok'    —— 成功读到本场景存档（可写回）
+//   'empty' —— 服务端确认本场景尚无存档（可写回：即首次初始化存档）
+//   'error' —— 读取失败（接口异常 / 网络中断）或存档不可用被拒收（**禁止写回**）
+// 分这三态是因为：读取失败时前端手里只有「按模板重建的默认方案」，一旦照旧落盘
+// 就会把默认模板写成服务端真档，用户保存过的编排被永久抹掉 ——
+// 表现为「编排莫名其妙回到默认」（历史顽疾，见 _pullScheme / openScene）。
+let _designPullState = 'ok'
+let _schemeAdoptChanged = false  // _adoptScheme 是否真的改过方案内容（决定是否回写服务端）
 let _simPrevDirty = false     // 进入仿真前的未保存标记：仿真态编辑不落盘，退出后应回到该状态
 let _simParamSnapshot = null  // 仿真进入时的参数快照（「仿真前 → 当前」变化展示用，模块级）
 const _snapParams = (model) => {  // 提取各工序参数：{ unitId: { key: val } }
@@ -477,9 +485,7 @@ export const useSimStore = defineStore('sim', {
     entered: false,      // 欢迎页是否已进入（打开项目后置 true，进入主界面）
     busy: false,
     feedStatus: 'init',
-    // 平台激活状态（后端 /api/license/*）：未激活时状态栏提示「产品未激活」
-    license: { activated: false, machineId: '', boundMachine: '', activatedAt: '', checked: false },
-    aboutDialog: false,   // 关于本平台弹窗开关（内嵌平台激活；StatusBar / 帮助菜单 / App 共用）
+    aboutDialog: false,   // 关于本平台弹窗开关（StatusBar / 帮助菜单 / App 共用）
     toast: '',
     toastType: 'info',    // 类型化 Toast：success / info / warn / error（ToastLayer 渲染）
     confirmDialog: { open: false, title: '', message: '', okText: '', cancelText: '', danger: false }, // 确认弹窗（ConfirmDialog 渲染）
@@ -502,6 +508,7 @@ export const useSimStore = defineStore('sim', {
     sceneCtx: null,              // 包内通用字典上下文（dictionary/factors/paramSchema…），供非钢场景资源树/属性渲染
     sceneVersion: 0,             // 场景包装载代数：切换场景后自增，触发组件按新场景重建
     sceneBusy: false,            // 场景资源包装载/切换中
+    sceneLoad: { active: false, phase: 'idle', error: '', seq: 0, startedAt: 0 }, // 3D 场景从数据到首帧的加载阶段
     scenarios: [
       { id: 'steel', label: t('钢铁') },
       { id: 'cement', label: t('水泥') },
@@ -607,6 +614,10 @@ export const useSimStore = defineStore('sim', {
     // 由工具条「保存」按钮 / Ctrl+S 触发 saveScheme() 才写入本地存档 + 服务端 designs/flow。
     schemeDirty: false,
     schemeSavedAt: 0,       // 最近一次手动保存时间戳（ms）
+    // AI 群控编排同样为手动保存（与流程编排同一口径）：Ctrl+S 由 App.vue 统一接，
+    // 这里只是个自增的「保存请求」信号 —— AI 群控视图 watch 到变化即执行自己的落库，
+    // 避免 App.vue 直接持有群控组件实例（视图是懒加载的，拿不到 ref）。
+    agcSaveSeq: 0,
 
     // ---- 编排画布视图变换（缩放/平移）：提升为单一真源，供顶栏「编排」工具条驱动 ----
     flowTf: { scale: 1, tx: 40, ty: 30 },
@@ -645,7 +656,9 @@ export const useSimStore = defineStore('sim', {
     historyPast: [],        // 历史快照（每次编辑前压入上一状态）
     historyFuture: [],      // 重做快照
     // 命令行窗口日志（全局共享：App 顶栏/按钮、ReportPanel 报告进度等均可推送）
-    cmdLog: [],             // [{ t, k }] k: cmd|out|sys|guide|tip|warn|err|bot|sim
+    cmdLog: [],             // [{ t, k, ts }] k: cmd|out|sys|guide|tip|warn|err|bot|sim
+    // 实时消息流（MQTT：云端 Broker → 平台），由「数据源管理」采集后并入底栏「输出」页签显示
+    mqttLog: [],            // [{ ts, topic, payload }]，最多 MQTT_LOG_CAP 条
     // 系统通知中心（底栏铃铛）：{ id, level: 'info'|'success'|'warn'|'error', title, body, time, read }
     notifications: [],
   }),
@@ -953,8 +966,28 @@ export const useSimStore = defineStore('sim', {
   },
   actions: {
     // 命令行窗口：追加一条日志（k：cmd 命令回显 / out·sys 一般信息 / guide 引导输入 / tip 提醒 / warn·err 警告报错 / bot 聊天 / sim 仿真记录）
-    pushCmd(msg, k = 'out') { this.cmdLog.push({ t: msg, k }) },
-    clearCmdLog() { this.cmdLog = [] },
+    pushCmd(msg, k = 'out') { this.cmdLog.push({ t: msg, k, ts: Date.now() }) },
+    clearCmdLog() { this.cmdLog = []; this.mqttLog = [] },
+    // 实时消息流：增量并入底栏「输出」。入参为后端返回的最近消息（按时间升序），
+    // 按 ts+topic+payload 去重（轮询每 3s 一次，同一条消息会被重复拉到），避免刷屏重复行
+    syncMqttLog(list) {
+      if (!Array.isArray(list) || !list.length) return 0
+      const seen = new Set(this.mqttLog.map((m) => `${m.ts}|${m.topic}|${m.payload}`))
+      let added = 0
+      for (const m of list) {
+        if (!m) continue
+        const ts = Number(m.t || m.ts || 0)
+        const topic = String(m.topic || '')
+        const payload = String(m.payload == null ? '' : m.payload)
+        const key = `${ts}|${topic}|${payload}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        this.mqttLog.push({ ts, topic, payload })
+        added++
+      }
+      if (this.mqttLog.length > MQTT_LOG_CAP) this.mqttLog.splice(0, this.mqttLog.length - MQTT_LOG_CAP)
+      return added
+    },
     // —— 系统通知中心（底栏铃铛）——
     // 新增一条系统通知，自动附带 toast 提示；列表最多保留 50 条
     notify(level = 'info', title = '', body = '') {
@@ -968,6 +1001,30 @@ export const useSimStore = defineStore('sim', {
       this.toast = msg
       this.toastType = type
     },
+    beginSceneLoad(phase = 'data') {
+      const seq = Number(this.sceneLoad && this.sceneLoad.seq || 0) + 1
+      this.sceneLoad = { active: true, phase, error: '', seq, startedAt: Date.now() }
+      return seq
+    },
+    setSceneLoadPhase(phase, seq = null) {
+      if (seq != null && seq !== this.sceneLoad.seq) return false
+      if (!this.sceneLoad.active) return this.beginSceneLoad(phase)
+      this.sceneLoad = { ...this.sceneLoad, active: true, phase, error: '' }
+      return this.sceneLoad.seq
+    },
+    finishSceneLoad(seq = null) {
+      if (seq != null && seq !== this.sceneLoad.seq) return false
+      this.sceneLoad = { ...this.sceneLoad, active: false, phase: 'ready', error: '' }
+      return true
+    },
+    failSceneLoad(error, seq = null) {
+      if (seq != null && seq !== this.sceneLoad.seq) return false
+      this.sceneLoad = { ...this.sceneLoad, active: false, phase: 'error', error: String(error || '') }
+      return true
+    },
+    // 「保存 AI 群控编排」请求信号（Ctrl+S / 菜单）：自增即触发，由 PidControlView 监听执行。
+    // 用信号而非直接调用，是因为 AI 群控视图是懒加载的，App.vue 拿不到它的实例。
+    requestAgcSave() { this.agcSaveSeq++ },
     // 确认弹窗（ConfirmDialog 渲染）：返回 Promise<boolean>
     confirm({ title, message, okText = t('确定'), cancelText = t('取消'), danger = false } = {}) {
       this.confirmDialog = { open: true, title, message, okText, cancelText, danger }
@@ -992,9 +1049,9 @@ export const useSimStore = defineStore('sim', {
     async init() {
       try {
         this._loadWelcomeState()   // 是否停在「工程选择」欢迎页 + 最近工程列表（同步，先于任何场景装载）
+        if (!this.welcomeOn) this.beginSceneLoad('data')
         loadCalibrations()   // 启动即恢复本厂标定耦合（localStorage），否则用默认机理/经验系数
         this._loadDataSource() // 恢复上次设置的实时数据源（平台 MQTT 实时 / 自定义 WS / HTTP）
-        this._consumeReloadKeep()   // 切场景重载：把左栏开合状态带过这一次重载（仅一次性）
         this._startMqttPolling() // 定时拉取 MQTT 数据源状态（连接状态/订阅主题/最近消息）
         // 场景注册表（/api/scenes）：首屏即拉取 —— 左栏第一个模块标题、AI 群控的场景标记
         // 都要用场景**显示名**；此前只由「设置 → 场景」/「打开场景」弹窗拉取，首屏会退化成场景 id
@@ -1002,10 +1059,9 @@ export const useSimStore = defineStore('sim', {
         // 「数据源管理」中的传感器设备：附加设备绑定真实读数的数据源候选（首次加载 + 常驻轮询）
         this.loadBoxSourceDevices()
         this._startBoxSourcePolling()
-        this.fetchLicense() // 查询平台激活状态（后台加载，不阻塞主流程）
-        const [m, presets, factors, schema, devs, hist] = await Promise.all([
+        const [m, presets, factors, schema, devs] = await Promise.all([
           api.presetModel(), api.presetStrategies(), api.getFactors(), api.getParamSchema(),
-          api.getDevices(), api.getDeviceHistory(),
+          api.getDevices(),
         ])
         this.model = m
         // 首屏场景：上次打开的是资源包场景（如机房温控）时，在初始化阶段**直接装载该场景**，
@@ -1014,7 +1070,12 @@ export const useSimStore = defineStore('sim', {
         const bootId = await this._bootSceneId()
         const booted = bootId ? await this.openScene(bootId) : false
         this.sceneBooted = booted
-        if (!booted) await this._restoreSchemeSession()
+        if (!booted) {
+          // 默认钢铁启动路径：_bootSceneId() 对 steel 返回 null，openScene 从未调用，
+          // 资源包未装载 → 补装载包元数据（长/短流程模板等），否则编排工具条模板按钮不显示
+          await this._loadScenePackMeta(this.sceneId || 'steel')
+          await this._restoreSchemeSession()
+        }
         if (booted) {
           // 场景包自带的排放因子 / 参数元数据 / 设备库已由 openScene 装载，缺失时才回落到平台默认
           if (this.factors == null) this.factors = factors
@@ -1026,27 +1087,40 @@ export const useSimStore = defineStore('sim', {
           this.factorsDefault = factors   // 快照默认基线，供编辑态估算偏移归零
           this.paramSchema = schema   // 工序参数分级元数据，供流程编排编辑器分组与参考范围展示
           this.deviceLibrary = devs   // 内置监测设备库，供 3D 设备标记、设备详情面板与规格档位联动
-          // 设备历史时序（首屏即带趋势）
-          if (hist && hist.history) this.deviceHistory = hist.history
-          if (hist && hist.meta) this.deviceMeta = hist.meta
+          // 设备历史只供趋势面板使用，不阻塞模型、核算和 3D 首帧。
+          const historySceneId = this.sceneId
+          api.getDeviceHistory().then((hist) => {
+            if (this.sceneId !== historySceneId) return
+            if (hist && hist.history) this.deviceHistory = hist.history
+            if (hist && hist.meta) this.deviceMeta = hist.meta
+          }).catch(() => {})
           this.autoLayout()        // 初次加载先按序等距自动布局，避免工艺图标重叠
         }
         this.presets = booted ? this.presets : presets   // 资源包场景无策略库（openScene 已清空）
-        await this._runRefresh()  // 首屏立即重算（不走防抖），保证 KPI 就绪；非钢场景走本地静态核算
-        if (!booted) await this.loadStrategies()
+        if (!booted) {
+          this.setSceneLoadPhase('calculate')
+          await this._runRefresh()
+        }  // openScene 已完成资源包场景核算，避免启动时重复编译/请求
+        if (!booted) this.loadStrategies().catch(() => {})
         this.ready = true
-        this._bindSchemeDirty() // 编排改动检测（只置「未保存」标记；编辑内容本身防抖推服务端）
+        this._bindSchemeDirty() // 编排改动检测：只置「未保存」标记，编辑内容一律不写服务端
         this._purgeLocalDesignCache() // 清理历史遗留的编排 / 群控本地副本（会以本地旧档盖住服务端真源）
-        this._startServerSync() // 跨端同步：其它端的编排 / 属性改动自动拉回并重绘
+        // 不做跨端自动同步：谁保存谁写入服务端，另一端刷新（打开工程 / 切场景）时才取最新，
+        // 两端同时编辑同一份编排时「最后保存的覆盖之前的」（last-writer-wins）。
         // 停在欢迎页时不必播报「系统就绪」：工程尚未打开，等用户选完工程进入主界面再提示
         if (!this.welcomeOn) this.notify('success', t('系统就绪'), t('数字孪生已载入 {units} 个工序、{flows} 条物流，实时链路与优化模型已就绪。', { units: this.model.units.length, flows: this.model.flows.length }))
         this._startFeed()
         // AI 优化模型：同步训练上下文并轮询状态（后台定时训练由后端调度，前端展示「逐渐变优」）
         this.syncOptimizerContext().then(() => this.refreshOptimizers())
         this.startOptimizerPolling()
+        // 收尾：非资源包场景这条路径（booted=false）此前只推进到 calculate 阶段就再没人收尾，
+        // 底栏加载指示会一直停在「正在计算场景数据…」。资源包路径 openScene 已自行收尾，此处幂等。
+        this.finishSceneLoad()
+        return true
       } catch (e) {
         this.toast = t('初始化失败：') + e.message
         this.notify('error', t('初始化失败'), e.message)
+        return false
       }
     },
     // 当前工程由三者决定，优先级：URL ?scene= > 服务端全局「最后打开的工程」 > 本机 localStorage。
@@ -1091,6 +1165,22 @@ export const useSimStore = defineStore('sim', {
       const meta = this.sceneIndex.find((x) => x.id === last)
       if (!meta || !meta.ready) return null
       return last
+    },
+    // 补装载当前场景资源包的「展示用元数据」：scenePack / sceneTemplates / sceneCtx。
+    // 默认钢铁启动路径下 _bootSceneId() 返回 null（steel 不触发 openScene），资源包从未装载，
+    // sceneTemplates 恒为空 → 编排工具条的长/短流程模板按钮不显示（hasTemplate 判定失败）。
+    // 这里只填元数据，不重置任何会话状态（区别于 openScene 的整场景切换）。
+    async _loadScenePackMeta(sceneId) {
+      try {
+        const pkg = await api.getSceneResource(sceneId || this.sceneId || 'steel')
+        if (!pkg || !pkg.meta) return false
+        this.scenePack = pkg
+        const res = pkg.resources || {}
+        this.sceneTemplates = Array.isArray(res.templates) ? res.templates : []
+        if (!this.sceneCtx) this.sceneCtx = res.dictionary || res.config || null
+        registerSceneMaterials(this.sceneCtx)
+        return true
+      } catch (e) { /* 后端不可用时静默：模板按钮按 routes 兜底 */ return false }
     },
     // 恢复上次保存的编排方案（钢铁默认启动路径）：
     // 编排单一真源：只认服务端存档（本地不留存任何副本）；无存档时按默认路线构建，避免刷新后回退。
@@ -1147,23 +1237,13 @@ export const useSimStore = defineStore('sim', {
         this.compileSchemeToModel()
         this.autoLayout()
       } else {
+        // 无存档（empty）按默认长流程构建属正常；读取失败（error）必须让用户知道：
+        // 否则画面看着就是「编排被重置成默认」，而线上存档其实还在。
+        if (_designPullState === 'error') {
+          this.pushCmd(t('服务端编排存档读取失败：当前按默认长流程显示，且不会写入服务端（线上存档未被覆盖），请刷新页面重试。'), 'sys')
+        }
         this._setDefaultRoute('long')
       }
-    },
-    // ---------- 平台激活 ----------
-    async fetchLicense() {
-      try {
-        const st = await api.licenseStatus()
-        this.license = { ...st, checked: true }
-      } catch (e) {
-        this.license = { activated: false, machineId: '', boundMachine: '', activatedAt: '', checked: true }
-      }
-    },
-    // 提交激活码；返回 { ok, activated, message }，失败时 message 可直接展示
-    async activatePlatform(code) {
-      const r = await api.licenseActivate(code)
-      if (r && r.ok && r.status) this.license = { ...r.status, activated: true, checked: true }
-      return r
     },
     openAbout() { this.aboutDialog = true },
     closeAbout() { this.aboutDialog = false },
@@ -1767,7 +1847,8 @@ export const useSimStore = defineStore('sim', {
     openView(id) {
       if (!VIEW_IDS.includes(id)) return
       // 欢迎页（未打开工程）：功能视图都依赖当前工程，先引导打开工程
-      if (this.welcomeOn) { this.toast = t('请先打开工程：在内容区新建或打开场景'); return }
+      // 例外：数据源管理（boxManage）是全局配置入口，不依赖具体工程，欢迎页可直接打开
+      if (this.welcomeOn && id !== 'boxManage') { this.toast = t('请先打开工程：在内容区新建或打开场景'); return }
       if (!this.openViews.includes(id)) this.openViews.push(id)
       this._activateView(id)
     },
@@ -2086,17 +2167,17 @@ export const useSimStore = defineStore('sim', {
     //  - 水泥/化工/有色 → 未安装引导（对应行业 .ec 资源包安装后可在此打开）
     async setScenario(id) {
       if (id === this.scenario && id === 'steel' && this.sceneId === 'steel') return
-      if (id === 'steel') { await this.openScene('steel', { reload: true }); return }
+      if (id === 'steel') { await this.openScene('steel'); return }
       if (id === 'other') {
         const meta = this._readySceneOfGroup('其它')
-        if (meta) await this.openScene(meta.id, { reload: true })
-        else this.toast = t('「其它」分组暂无已安装的资源包：请先在场景设置中「导入资源包」安装 .ec 文件（系统内置示例：机房热控）')
+        if (meta) await this.openScene(meta.id)
+        else this.toast = t('「其它」分组暂无已安装的资源包：请先在场景设置中「导入资源包」安装 .ec 文件（系统内置示例：算力中心热控）')
         return
       }
       const meta = this.sceneIndex.find((x) => x.id === id)
-      if (meta && meta.ready) { await this.openScene(meta.id, { reload: true }); return }
+      if (meta && meta.ready) { await this.openScene(meta.id); return }
       const label = (meta && meta.label) || (this.scenarios.find((s) => s.id === id) || {}).label || id
-      this.toast = t('「{label}」行业资源包尚未安装：可通过「导入资源包」安装对应 .ec 定制包后打开（当前内置：钢铁、机房热控示例）', { label })
+      this.toast = t('「{label}」行业资源包尚未安装：可通过「导入资源包」安装对应 .ec 定制包后打开（当前内置：钢铁企业示例、算力中心热控示例）', { label })
     },
     // 「其它」分组下第一个就绪场景（按注册表 order 升序）
     _readySceneOfGroup(group) {
@@ -2117,13 +2198,15 @@ export const useSimStore = defineStore('sim', {
     },
     // 打开场景资源包：卸载当前流程状态 → 装载包数据 → 重建编排方案/模型/资源视图。
     // 返回是否成功；失败不改变当前场景。
-    // opts.reload = true：切换场景后整页重新加载（用户手动切换场景的口径，见 _reloadWorkspace）。
-    // 启动装载（init / restoreLastScene）不传，避免开机就多刷一次页面。
-    async openScene(sceneId, opts) {
+    // 一律「就地切换」，不整页刷新（此前切场景会 window.location.reload()，表现为打开场景就闪一下重刷）：
+    // 资源树 / 检视器按 sceneVersion 重建、3D 按 sceneRev 重建、核算结果等会话态在下面逐项归零，
+    // 功能视图 tab 与数据分析数据源（绑定的是上一场景的设备 id）在切换前清空 —— 与重载后的状态等价。
+    async openScene(sceneId) {
       if (!sceneId) return false
-      const wantReload = !!(opts && opts.reload)
       const sameMode = this.sceneMode === (sceneId === 'steel' ? 'steel' : 'other')
-      if (sceneId === this.sceneId && sameMode) return true
+      // 仅在资源已加载时才跳过：初始 sceneId='steel'/sceneMode='steel' 时 scenePack 仍为 null，
+      // 否则长/短流程模板等资源不会被填充（编排工具条模板按钮不显示）
+      if (sceneId === this.sceneId && sameMode && this.scenePack && this.scenePack.meta?.id === sceneId) return true
       let meta = this.sceneIndex.find((x) => x.id === sceneId)
       if (!meta) await this.refreshSceneIndex()
       meta = this.sceneIndex.find((x) => x.id === sceneId) || meta
@@ -2136,10 +2219,23 @@ export const useSimStore = defineStore('sim', {
       // 先退出仿真/编排，避免在切换过程中触发旧场景的后端刷新
       if (this.simMode) this.exitSim()
       if (this.editMode) this.exitEdit()
+      // 功能视图 tab（数据分析 / AI 群控 / 能碳一体机…）与数据分析数据源都绑着上一场景的设备 id，
+      // 切场景前一并清空，避免新场景里还挂着旧设备卡片（重载后这些本来就是空的）。
+      this.closeAllViews()
+      this.clearDvSources()
+      // HMI 大屏展示的也是上一场景的 KPI/报警：切场景回到三维孪生主视图
+      this.overviewOn = false
       // 切换场景 = 换了一个页面：收起右侧属性面板并丢弃恢复备份，避免旧场景的选中态残留
       this.rightOpen = false
       this.grpRightBackup = null
+      // 地址栏带上当前工程：刷新 / 分享链接都能直达这个场景（不触发导航，只改地址）
+      try {
+        const url = new URL(window.location.href)
+        url.searchParams.set('scene', sceneId)
+        window.history.replaceState(window.history.state, '', url)
+      } catch (e) { /* 非浏览器环境忽略 */ }
       this.sceneBusy = true
+      const loadSeq = this.beginSceneLoad('data')
       try {
         const pkg = await api.getSceneResource(sceneId)
         if (!pkg || !pkg.meta) throw new Error(t('资源包数据异常'))
@@ -2160,7 +2256,9 @@ export const useSimStore = defineStore('sim', {
         const routes = Array.isArray(pkg.meta.routes) && pkg.meta.routes.length ? pkg.meta.routes : null
         const defaultRoute = pkg.meta.defaultRoute || (routes && routes[0]) || null
         // 编排方案：只认服务端存档（跨端唯一真源），无存档则按包模板构建
+        this.setSceneLoadPhase('design', loadSeq)
         const saved = await this._pullScheme(sceneId)
+        const pullState = _designPullState   // 'ok' 读到存档 / 'empty' 确认无存档 / 'error' 读取失败
         this.processRoute = isSteel ? ((saved && saved.route) || 'short') : (defaultRoute || 'cool')
         // 恢复的存档先补齐容器字段并按场景做口径迁移（旧口径存档升级而非整档丢弃，见 _adoptScheme）
         this.scheme = this._adoptScheme((saved && saved.scheme) ? saved.scheme : this._buildSceneScheme(this.processRoute), sceneId)
@@ -2205,16 +2303,26 @@ export const useSimStore = defineStore('sim', {
         this.inspectorView = 'auto'
         // 切场景是显式载入：方案即最终态，同步为已应用方案后再编译
         this._syncAppliedScheme()
-        // 编译模型并按场景模式刷新（其它场景走本地静态核算，不请求钢铁碳引擎）
-        this.compileSchemeToModel()
+        this.setSceneLoadPhase('calculate', loadSeq)
+        // 非钢场景由 _otherSceneRefresh 内部编译一次；钢铁场景编译后走后端碳引擎。
         if (!isSteel) {
           this._otherSceneRefresh()
           this._pushModelToFeed()   // 新场景模型同步给实时数据源，避免继续按旧 model 下发遥测
         } else {
+          this.compileSchemeToModel()
           await this._loadSteelSession()
         }
-        // 切场景按模板整体重建了方案：直接固化落盘（非编排编辑动作，避免跨场景存档错乱）
-        this._saveScheme()
+        // 落盘与否取决于服务端存档的读取结果（_designPullState）：
+        //   empty —— 服务端确认本场景尚无存档：本次按模板构建的方案即初始存档，固化落盘；
+        //   ok    —— 仅在采纳过程真修改了内容（旧档迁移 / 资源包结构升级）时才回写，
+        //            内容没变就不写：打开场景是只读动作，不该产生会覆盖别的端存档的写；
+        //   error —— **绝不落盘**：此刻手里是按模板重建的默认方案，写回去就会把用户
+        //            保存过的编排永久抹掉（「编排莫名其妙回到默认」的顽疾根因）。
+        if (pullState === 'error') {
+          this.pushCmd(t('服务端编排存档读取失败：本场景暂按默认模板显示，且未写入服务端（线上存档未被覆盖），请刷新页面重试。'), 'sys')
+        } else if (pullState === 'empty' || _schemeAdoptChanged) {
+          this._saveScheme()
+        }
         // sceneVersion：左右面板（资源树 / 检视器）以它为 :key 重建，清空本地折叠态/档位等残留
         this.sceneVersion++
         try { localStorage.setItem('sim.sceneId', sceneId) } catch (e) { /* localStorage 不可用时忽略 */ }
@@ -2224,9 +2332,6 @@ export const useSimStore = defineStore('sim', {
         // 打开工程即进入工作区：欢迎页收起、本次会话内刷新不再回欢迎页；并记入「最近」
         this._noteRecentScene(sceneId, meta)
         this._markEntered()
-        // 手动切换场景：整页重新加载 —— 后续的 sceneVersion++ / nextTick / 3D 重建都不必再做，
-        // 重载后由 init 的 _bootSceneId 直接装载新场景，一次到位（见 _reloadWorkspace）。
-        if (wantReload) { this._reloadWorkspace(); return true }
         // 3D 重建延后一帧：等面板按新 key 挂载、容器尺寸稳定后再 buildModel，
         // 避免 canvas 0x0 导致相机投影矩阵 NaN（与 exitEdit 的处理口径一致）
         await nextTick()
@@ -2234,27 +2339,17 @@ export const useSimStore = defineStore('sim', {
         const label = meta.label || pkg.meta.label || sceneId
         this.toast = t('已打开场景「{label}」', { label })
         this.pushCmd(t('已打开场景「{label}」：资源列表、编排方案与孪生模型已切换。', { label }), 'cmd')
+        // 收尾：此前 openScene 从未置过 active=false，底栏加载指示会一直转圈不消失
+        this.finishSceneLoad(loadSeq)
         return true
       } catch (e) {
+        this.failSceneLoad(e && e.message ? e.message : String(e), loadSeq)
         this.toast = t('打开场景失败：') + e.message
         this.notify('error', t('打开场景失败'), e.message)
         return false
       } finally {
         this.sceneBusy = false
       }
-    },
-    // 切换场景后整页重新加载：**所有页面**都按新场景重建（左侧资源树 / 右侧检视器 /
-    // 功能视图窗口 / 3D 数字孪生），不留任何上一场景的界面状态。
-    // 重载后 openViews 为空 —— 不会自动打开任何功能视图标签，停在三维孪生主视图。
-    // 场景 id 已写入 localStorage sim.sceneId，重载后由 init 的 _bootSceneId 直接装载该场景，
-    // 不会二次切换、也不会先闪一下默认场景。
-    _reloadWorkspace() {
-      try {
-        // 只带过「这一次」重载：左栏默认折叠，切场景重载不该把用户已展开的左栏折回去。
-        // 普通刷新（F5）不写这个键，仍保持「每次启动左栏折叠」的默认口径。
-        localStorage.setItem('sim.reloadKeep', JSON.stringify({ leftOpen: !!this.leftOpen, ts: Date.now() }))
-      } catch (e) { /* localStorage 不可用时忽略 */ }
-      try { window.location.reload() } catch (e) { /* 非浏览器环境忽略 */ }
     },
     // ===== 工程选择（欢迎页）=====
     // 启动判定：新会话（新标签页 / 重开浏览器）一律先停在「工程选择」欢迎页，由用户显式打开工程；
@@ -2296,14 +2391,14 @@ export const useSimStore = defineStore('sim', {
     },
     // 欢迎页「打开工程」：目标已是当前场景时无需重新装载（openScene 会早退），直接进工作区。
     // 返回是否成功；失败（资源包未就绪 / 不存在）保持停留在工程选择页。
-    async openProjectScene(sceneId, opts) {
+    async openProjectScene(sceneId) {
       if (!sceneId) return false
       if (sceneId === this.sceneId) {
         this._noteRecentScene(sceneId)
         this._markEntered()
         return true
       }
-      return await this.openScene(sceneId, opts)
+      return await this.openScene(sceneId)
     },
     // 返回「工程选择」欢迎页（当前工程保持装载，再打开即回到原工程）
     backToWelcome() {
@@ -2312,17 +2407,6 @@ export const useSimStore = defineStore('sim', {
       this.welcomeOn = true
       this.entered = false
       try { sessionStorage.removeItem('sim.entered') } catch (e) { /* 忽略 */ }
-    },
-    // 消费「切场景重载」留下的一次性状态（读完即删；超过 10s 视为过期，不生效）
-    _consumeReloadKeep() {
-      try {
-        const raw = localStorage.getItem('sim.reloadKeep')
-        if (!raw) return
-        localStorage.removeItem('sim.reloadKeep')
-        const s = JSON.parse(raw) || {}
-        if (Date.now() - (s.ts || 0) > 10000) return
-        if (s.leftOpen) this.leftOpen = true
-      } catch (e) { /* 忽略 */ }
     },
     // 启动恢复：自动打开上次退出前打开的场景（localStorage sim.sceneId，随 openScene 写入）。
     // 场景已卸载 / 资源包未就绪时保持默认场景并给出提示，不阻断启动流程。
@@ -2776,6 +2860,10 @@ export const useSimStore = defineStore('sim', {
         this.scheme = this._buildSceneScheme(route)
         // 首次进入编排、方案为空时以默认方案兜底：这属于「显式载入」而非编辑，同步为已应用方案
         this._syncAppliedScheme()
+        // 重建 scheme 会触发 _bindSchemeDirty 的 deep watch 把 schemeDirty 置 true，
+        // 但用户此时并未做任何编辑，应显式恢复为未保存状态 false
+        this.schemeDirty = false
+        nextTick(() => { this.schemeDirty = false })
       }
       if (!this.appliedScheme) this._syncAppliedScheme()   // 兜底：已应用快照缺失时以当前方案为基准
       // 保证小组容器字段存在（存量方案/旧 localStorage 可能缺失）
@@ -2852,9 +2940,18 @@ export const useSimStore = defineStore('sim', {
     // 本地存档 + 服务端 designs/flow 一次写入；未保存前刷新页面，改动按设计丢弃。
     // 保存同时是「编排生效」的时刻：把当前方案固化为已应用方案并重编译 model，
     // 3D 数字孪生 / 2D 工艺图 / KPI / 设备树自此才切换到新编排（未保存前一律保持旧方案）。
-    saveScheme() {
+    async saveScheme() {
       if (this.simMode) { this.showToast(t('仿真模式下的改动不会保存，退出仿真后自动恢复'), 'warn'); return false }
-      this._saveScheme()
+      // 上次读取服务端存档失败时，保存前先重拉一次：服务端其实有档而本端画面是默认模板的话，
+      // 这一保存就会把线上真档盖成默认 —— 直接拦下并让用户刷新载入真档再改。
+      if (_designPullState === 'error') {
+        const remote = await this._pullScheme(this.sceneId || 'steel')
+        if (remote) {
+          this.showToast(t('服务端存在该场景的编排存档：请刷新页面载入后再编辑，避免覆盖线上方案'), 'error')
+          return false
+        }
+      }
+      if (!this._saveScheme()) return false   // 服务端存档不可写（读取失败）：已提示原因，不谎报「已保存」
       this._applyScheme()
       this.showToast(t('编排已保存'), 'success')
       return true
@@ -2874,9 +2971,6 @@ export const useSimStore = defineStore('sim', {
           // 附加传感设备整片抹掉 —— 表现为「一运行 AI 群控，编排就被还原」。
           if (_autoSetpointGuard > 0) return
           this.schemeDirty = true
-          // 同时把改动推到服务端：官网才是一份数据，别的浏览器要能看到这里的每一次调整
-          // （「保存」按钮依旧只负责让编排草稿在孪生上生效，不影响这一条链路）
-          this._scheduleRuntimeSync()
         },
         { deep: true },
       )
@@ -2886,57 +2980,16 @@ export const useSimStore = defineStore('sim', {
         e.preventDefault()
         e.returnValue = ''
       })
-      // 卸载 / 切后台：把防抖里还没发出去的编排改动立刻补发（keepalive），不留半截存档
-      window.addEventListener('pagehide', () => this._flushRuntimeSync())
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') this._flushRuntimeSync()
-      })
     },
     // 标记「有未保存改动」：编辑类操作显式调用，避免只靠 watch 时的时序歧义
     _markDirty() { this.schemeDirty = true },
 
-    // ── 跨端同步（服务端 → 本端）───────────────────────────────────────────────
-    // 官网就是一个共享的工作区：甲在浏览器 A 改了编排 / 属性，浏览器 B 必须自动看到，
-    // 不需要 B 手动刷新。定期拉回服务端那份（真源），比本地新就采用并重绘。
-    // 本端「手上拿着未落定的改动」时一律不拉（dirty / 编辑态 / 仿真态），避免把用户正在改的东西冲掉。
-    _startServerSync() {
-      if (_serverSyncTimer) return
-      _serverSyncTimer = setInterval(() => { this._syncFromServer() }, 5000)
-    },
-    _stopServerSync() {
-      if (_serverSyncTimer) { clearInterval(_serverSyncTimer); _serverSyncTimer = null }
-    },
-    async _syncFromServer() {
-      if (_serverSyncBusy) return
-      if (this.simMode || this.editMode || this.schemeDirty) return
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
-      const sid = this.sceneId || 'steel'
-      _serverSyncBusy = true
-      try {
-        let remote = null
-        try {
-          const r = await api.designBucket('flow')
-          remote = (r && r.data) ? r.data[sid] : null
-        } catch (e) { return }
-        if (!remote || !this._schemeAccepted(remote, sid)) return
-        const ts = Number(remote.updatedAt) || 0
-        // 只认「别人写的更新」：本端刚推上去的版本（_lastSyncedAt）不再拉回，避免自抖动
-        if (!ts || ts <= Number(this._lastSyncedAt || 0)) return
-        // 采用服务端那一版：编排 + 路由 + 物料覆盖 + 设备设定值一并回来（这些都是同一份档案）
-        if (remote.route) this.processRoute = remote.route
-        if (remote.scheme) this.scheme = this._adoptScheme(remote.scheme, sid)
-        if (remote.materialOverrides) this.materialOverrides = remote.materialOverrides
-        this._restoreSetpoints(remote)
-        this._lastSyncedAt = ts
-        // 已是最新版本：直接重编译并重绘（等价于点了一次「保存」的效果，但不影响自身编辑意图）
-        this._applyScheme()
-        this.schemeDirty = false
-        nextTick(() => { this.schemeDirty = false })
-        this.showToast(t('已同步其它端的编排改动'), 'info')
-      } finally {
-        _serverSyncBusy = false
-      }
-    },
+    // ── 跨端同步：一律不做 ────────────────────────────────────────────────────
+    // 编排的唯一真源仍是服务端 designs/flow，但**不再有任何定时推 / 拉**：
+    //   · 编辑不写服务端（只置 schemeDirty，等用户点「保存」）；
+    //   · 也不轮询拉其它端的改动（否则本端画面会被另一端悄悄改写）；
+    // 谁保存谁写入服务端，另一端刷新页面 / 打开工程 / 切场景（_pullScheme）时才取到最新。
+    // 两端同时编辑同一份编排 → 最后保存的那一版覆盖之前的（last-writer-wins），不做合并。
     // 「文件 → 另存为场景…」：把当前场景（默认含当前编排方案快照）打包为可分发的 .ec 资源包下载。
     // 导出包为非内置分发包，重新导入后即回到当前编排态。
     async exportSceneAsPackage({ label, industry, version, vendor, product, withScheme = true } = {}) {
@@ -2989,61 +3042,61 @@ export const useSimStore = defineStore('sim', {
         updatedAt: Date.now(),   // 存档时间戳：服务端/本地两份冲突时取较新的一份
       }
     },
-    // 编辑即同步（不等「保存」）：用户改了属性 / 设备设定值 / 物料覆盖 / 编排结构后，防抖推到服务端，
-    // 让其它浏览器不必等这边点「保存」也能拿到最新值（用户口径：**前端所有操作后端都要同步**）。
-    // 只写服务端与 localStorage —— **不动 appliedScheme、不重编译 model**，否则每微调一次都重建 3D 孪生。
-    // 编排草稿「生效」仍由「保存」按钮控制（saveScheme），两侧分工不变。
-    _scheduleRuntimeSync() {
-      if (this.simMode) return        // 仿真模式：一切编辑不持久化
-      this._rtSyncNeeded = true
-      if (_rtSyncTimer) clearTimeout(_rtSyncTimer)
-      _rtSyncTimer = setTimeout(() => {
-        _rtSyncTimer = null
-        const p = this._schemePayload()
-        try { api.designSave('flow', p.sceneId, p).catch(() => {}) } catch (e) { /* 忽略 */ }
-        this._lastSyncedAt = p.updatedAt
-        this._rtSyncNeeded = false
-      }, 800)
-    },
-    // 关页面 / 切后台时立刻补发防抖里那次 PUT：普通 fetch 在卸载阶段会被浏览器取消
-    // （keepalive 才能送达），否则「刚加完附加传感就关页面」时服务端停在旧档，
-    // 下次打开看起来就像编排被还原了。
-    _flushRuntimeSync() {
-      if (this.simMode || !this._rtSyncNeeded) return
-      if (_rtSyncTimer) { clearTimeout(_rtSyncTimer); _rtSyncTimer = null }
-      const p = this._schemePayload()
-      this._rtSyncNeeded = false
-      try { api.designSaveNow('flow', p.sceneId, p).catch(() => {}) } catch (e) { /* 忽略 */ }
-      this._lastSyncedAt = p.updatedAt
-    },
     // 落盘当前编排方案（手动保存 / 场景切换 / 旧档迁移时调用）：
     // 本地 localStorage + 服务端 designs/flow，使刷新后保持最后一次保存的编排结果。
     _saveScheme() {
       if (this.simMode) return   // 仿真模式：一切编辑不持久化
+      // 服务端存档没读成功（接口异常 / 存档被拒收）时**绝不落盘**：
+      // 此刻内存里的方案是按包模板重建的默认编排，写回去就把用户保存过的编排永久抹掉了。
+      if (_designPullState === 'error') {
+        this.showToast(t('服务端编排未能读取，已阻止写入以免覆盖线上存档：请刷新页面重试'), 'error')
+        return false
+      }
       const payload = this._schemePayload()
-      if (_rtSyncTimer) { clearTimeout(_rtSyncTimer); _rtSyncTimer = null }
-      // 服务端存档 backend/data/designs/flow.json 是跨端真源，随 platform/bs-deploy/update.sh 同步；
-      // 手动保存为显式动作，这里直接 PUT（不再防抖），接口不可用时静默降级为「仅本地存档」。
-      try { api.designSave('flow', payload.sceneId, payload).catch(() => {}) } catch (e) { /* 忽略 */ }
-      this._lastSyncedAt = payload.updatedAt   // 刚写上去的版本不必再由回拉同步拉回来
+      // 服务端存档 backend/data/designs/flow.json 是跨端真源（不随代码推送同步）。
+      // 手动保存为显式动作，这里直接 PUT（不再防抖）。整档覆盖写：这一版即成为服务端最新，
+      // 后保存的端覆盖先保存的端（last-writer-wins）。
+      // 失败必须让用户看见：此前 catch 静默，用户以为「已保存」，刷新后回到默认编排。
+      try {
+        const send = () => api.designSave('flow', payload.sceneId, payload)
+        send().catch(() => {
+          // 一次重试：偶发网络抖动不至于丢掉用户这次保存
+          send().catch(() => {
+            this.schemeSavedAt = 0
+            this.showToast(t('编排保存失败：服务端未写入，请检查网络后重试'), 'error')
+          })
+        })
+      } catch (e) {
+        this.schemeSavedAt = 0
+        this.showToast(t('编排保存失败：服务端未写入，请检查网络后重试'), 'error')
+        return false
+      }
       this.schemeDirty = false
       this.schemeSavedAt = Date.now()
       // 兜底：保存前若刚改过 scheme，深度 watch 的回调会在其后触发并重标脏 —— 这里再清一次
       nextTick(() => { this.schemeDirty = false })
+      return true
     },
     // 从服务端取回本场景的编排存档：**服务端为准**（服务器实例是编排的权威侧）。
     // 只要服务端有该场景的存档就无条件采用 —— 本地 localStorage 仅作离线兜底，
     // 不再按 updatedAt 比对（否则本地那份较新的旧档会盖住服务器上的编排，两端永远不同步）。
+    // 返回值与「读取结果」分开：结果写进模块级 _designPullState（ok / empty / error），
+    // 调用方据此决定能否落盘（详见 _saveScheme 与 openScene 的守卫）。
     async _pullScheme(sceneId) {
+      const sid = sceneId || this.sceneId || 'steel'
+      let r = null
       try {
-        const sid = sceneId || this.sceneId || 'steel'
-        const r = await api.designBucket('flow')
-        const remote = (r && r.data) ? r.data[sid] : null
-        if (!remote || !this._schemeAccepted(remote, sid)) return null
-        // 记下这批服务端版本：回拉同步据此判断「是不是别人后来写的新版本」
-        this._lastSyncedAt = Number(remote.updatedAt) || this._lastSyncedAt || 0
-        return remote
-      } catch (e) { return null }
+        r = await api.designBucket('flow')
+      } catch (e) {
+        // 一次重试：编排存档读取失败代价极大（会用默认模板重建并可能覆盖真档）
+        try { r = await api.designBucket('flow') } catch (e2) { _designPullState = 'error'; return null }
+      }
+      const remote = (r && r.data) ? r.data[sid] : null
+      if (!remote) { _designPullState = 'empty'; return null }
+      // 存档存在但被判为不可用（结构损坏 / 场景不匹配）：同样按「不确定」处理，禁止回写
+      if (!this._schemeAccepted(remote, sid)) { _designPullState = 'error'; return null }
+      _designPullState = 'ok'
+      return remote
     },
     // 本地兜底存档已废止（2026-10-14）：编排的唯一真源是服务端 designs/flow，**浏览器不再留存任何
     // 编排副本**（历史遗留的 'sim.scheme' / 'sim.scheme::<scene>' 键由 _purgeLocalDesignCache 清理）。
@@ -3102,6 +3155,10 @@ export const useSimStore = defineStore('sim', {
     // 保证两条路径的兜底与迁移口径一致。
     _adoptScheme(scheme, sceneId) {
       const s = scheme || { nodes: [], connections: [], devices: [], groups: [], activeGroupId: null }
+      // 记录「采纳过程是否真的改动过内容」：openScene 依此决定要不要回写服务端 ——
+      // 内容没变就不写（打开场景是只读动作，不该产生会覆盖别的端存档的写）。
+      _schemeAdoptChanged = false
+      const _before = JSON.stringify(s)
       if (!s.groups) s.groups = []
       if (s.activeGroupId == null) s.activeGroupId = null
       // 非钢场景模板方案没有 devices 字段，补齐为数组——否则 setDeviceSetpoint 等
@@ -3109,6 +3166,7 @@ export const useSimStore = defineStore('sim', {
       if (!s.devices) s.devices = []
       if ((sceneId || this.sceneId) === 'dc-thermal') this._migrateDcScheme(s)
       this._mergeTemplateStructure(s, sceneId)
+      _schemeAdoptChanged = _before !== JSON.stringify(s)
       return s
     },
     // 资源包模板结构升级：**增量补齐**模板新增的节点 / 小组 / 连线到已有存档。

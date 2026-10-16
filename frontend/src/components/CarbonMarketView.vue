@@ -369,7 +369,7 @@ defineExpose({ loadAll, switchInstrument, toggleForecast, instrument, forecastOn
             <button :class="{ on: instrument === 'cea' }" @click="switchInstrument('cea')" title="切换 CEA 走势">CEA</button>
             <button :class="{ on: instrument === 'ccer' }" @click="switchInstrument('ccer')" title="切换 CCER 走势">CCER</button>
           </span>
-          <button class="cm-fc-btn" :class="{ on: forecastOn }" @click="toggleForecast" :title="forecastOn ? '关闭预测叠加' : '开启预测叠加'">预测叠加</button>
+          <button class="cm-fc-btn" :class="{ on: forecastOn }" @click="toggleForecast">预测叠加</button>
         </div>
       </div>
 

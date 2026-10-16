@@ -29,8 +29,8 @@
       <div class="ai-titlebtns">
         <button class="at-btn" :title="t('查看历史对话')" @click="openHistory">{{ t('历史对话') }}</button>
         <button class="at-btn" :title="t('清空当前对话，开始新对话')" @click="newChat"><Icon name="trash" /> {{ t('新对话') }}</button>
-        <button v-if="!floatMode" class="at-btn at-float" :title="t('以弹窗形式展示对话界面')" @click="toggleFloat">⧉ {{ t('浮动') }}</button>
-        <button v-else class="at-btn at-float" :title="t('固定回右侧属性面板')" @click="toggleFloat">📌 {{ t('固定') }}</button>
+        <button v-if="!floatMode" class="at-btn at-float" @click="toggleFloat">⧉ {{ t('浮动') }}</button>
+        <button v-else class="at-btn at-float" @click="toggleFloat">📌 {{ t('固定') }}</button>
       </div>
     </div>
 
@@ -44,7 +44,7 @@
         </div>
         <div class="agent-inputbox">
           <div class="ai-inputrow">
-            <button class="ai-plus" :class="{ on: pickOpen }" :title="t('添加智能体 / 技能')" @click="togglePick($event)"></button>
+            <button class="ai-plus" :class="{ on: pickOpen }" @click="togglePick($event)"></button>
             <textarea
               ref="idleInput"
               v-model="input"
@@ -76,7 +76,7 @@
           <div class="msg-wrap">
             <!-- 思考过程折叠面板：完成后默认收起，点击展开 -->
             <div v-if="m.role === 'assistant' && m.thoughts && m.thoughts.length" class="msg-thoughts">
-              <button class="mt-toggle" :title="t('展开/收起思考过程')" @click="m.thoughtsOpen = !m.thoughtsOpen">
+              <button class="mt-toggle" @click="m.thoughtsOpen = !m.thoughtsOpen">
                 <span class="mt-ic">🧠</span>
                 <span>{{ t('思考过程') }}</span>
                 <span class="mt-count">{{ m.thoughts.length }}</span>
@@ -106,7 +106,7 @@
       <div class="ac-inputbar">
         <div class="agent-inputbox">
           <div class="ai-inputrow">
-            <button class="ai-plus" :class="{ on: pickOpen }" :title="t('添加智能体 / 技能')" @click="togglePick($event)"></button>
+            <button class="ai-plus" :class="{ on: pickOpen }" @click="togglePick($event)"></button>
             <textarea
               ref="chatInput"
               v-model="input"
@@ -163,7 +163,7 @@
     </div>
 
     <!-- 右下角拖拽手柄：仅浮动窗口可调整大小 -->
-    <div v-if="floatMode" class="ai-resize-handle" :title="t('拖动调整浮动窗口大小')" @mousedown.prevent="onFloatResizeStart"></div>
+    <div v-if="floatMode" class="ai-resize-handle" @mousedown.prevent="onFloatResizeStart"></div>
   </div>
 </template>
 

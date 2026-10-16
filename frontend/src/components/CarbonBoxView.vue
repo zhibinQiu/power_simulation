@@ -12,7 +12,7 @@
         <!-- 0 运行状态总览：面向非技术人员的“一眼式”健康摘要；下方所有专业区块功能均保留 -->
         <section class="cbx-hero">
           <div class="cbx-sec-head">
-            <button class="cbx-caret" @click="toggleSec('overview')" :title="secFold.overview ? t('收起') : t('展开')">{{ secFold.overview ? '▾' : '▸' }}</button>
+            <button class="cbx-caret" @click="toggleSec('overview')">{{ secFold.overview ? '▾' : '▸' }}</button>
             <b class="cbx-sec-toggle" @click="toggleSec('overview')">{{ t('运行状态总览') }}</b>
           </div>
           <div v-if="secFold.overview" class="cbx-hero-main">
@@ -26,16 +26,16 @@
             <button class="cbx-op cbx-xs cbx-guide-btn" @click="toggleGuide"
                     >{{ guideOpen ? t('收起指引') : t('使用指引') }}</button>
             <div class="cbx-hero-stats">
-              <div class="cbx-hero-stat" :class="'tone-' + heroCloud.cls" :title="t('云端服务器连接与数据推送状态')">
+              <div class="cbx-hero-stat" :class="'tone-' + heroCloud.cls">
                 <b>{{ heroCloud.txt }}</b><span>{{ t('云端服务') }}</span>
               </div>
-              <div class="cbx-hero-stat click" :class="'tone-' + heroBox.cls" @click="scrollToSec('box')" :title="t('在线盒子数 / 总数（点击查看盒子列表）')">
+              <div class="cbx-hero-stat click" :class="'tone-' + heroBox.cls" @click="scrollToSec('box')">
                 <b>{{ heroBox.txt }}</b><span>{{ t('盒子在线') }}</span>
               </div>
-              <div class="cbx-hero-stat click" :class="'tone-' + heroDev.cls" @click="scrollToSec('dev')" :title="t('正在上报数据的设备 / 全部设备（点击查看设备列表）')">
+              <div class="cbx-hero-stat click" :class="'tone-' + heroDev.cls" @click="scrollToSec('dev')">
                 <b>{{ heroDev.txt }}</b><span>{{ t('设备上传中') }}</span>
               </div>
-              <div class="cbx-hero-stat" :class="'tone-' + heroMsg.cls" :title="t('近 3 秒收到的设备消息条数')">
+              <div class="cbx-hero-stat" :class="'tone-' + heroMsg.cls">
                 <b>{{ heroMsg.n }}</b><span>{{ t('实时消息') }}</span>
               </div>
             </div>
@@ -70,7 +70,7 @@
              前缀区分，共用同一条摄取管道（平台与中间件自身都不产生模拟数据） -->
         <section id="cbx-sec-sources" class="cbx-sec cbx-sec-sources">
           <div class="cbx-sec-head">
-            <button class="cbx-caret" @click="toggleSec('sources')" :title="secFold.sources ? t('收起') : t('展开')">{{ secFold.sources ? '▾' : '▸' }}</button>
+            <button class="cbx-caret" @click="toggleSec('sources')">{{ secFold.sources ? '▾' : '▸' }}</button>
             <b class="cbx-sec-toggle" @click="toggleSec('sources')">{{ t('数据源接入') }}</b>
             <span class="cbx-sec-spacer"></span>
             <button class="cbx-op primary cbx-xs" @click="openAddForm()">＋ {{ t('注册外部数据源') }}</button>
@@ -168,7 +168,7 @@
 
             <!-- 空态：无外部数据源时给出引导（含模拟数据注册入口） -->
             <div v-if="!extSources.length" class="ds-card ds-empty" @click="openAddForm('mqtt')"
-                 :title="t('外部 MQTT / 数据中台先接入一体机，上行 ext/# 后由中间件转为 data/ext-*。点击此处注册第一条。')">
+                >
               <div class="ds-empty-ic">⇄</div>
               <b>{{ t('尚无外部数据源') }}</b>
               <button class="cbx-op cbx-xs">＋ {{ t('注册外部数据源') }}</button>
@@ -236,7 +236,7 @@
              服务运行在设备内部，连线只表示设备之间的通道 -->
         <section class="cbx-sec">
           <div class="cbx-sec-head">
-            <button class="cbx-caret" @click="toggleSec('topo')" :title="secFold.topo ? t('收起') : t('展开')">{{ secFold.topo ? '▾' : '▸' }}</button>
+            <button class="cbx-caret" @click="toggleSec('topo')">{{ secFold.topo ? '▾' : '▸' }}</button>
             <b class="cbx-sec-toggle" @click="toggleSec('topo')">{{ t('系统连接图') }}</b>
             <span class="cbx-sec-spacer"></span>
             <button class="cbx-op cbx-xs" @click="autoLayoutTopo()" :title="t('恢复自动布局，清除所有模块的手动拖拽位置')">{{ t('自动布局') }}</button>
@@ -244,9 +244,9 @@
           <div v-if="secFold.topo">
           <!-- 链路说明：完整路径见各条 title（悬浮查看），图上只保留方向 -->
           <div class="cbx-topo-legend">
-            <span class="leg" :title="t('传感器链路：现场设备 —RS485/Modbus→ 一体机 —MQTT data/#→ 云端 → 平台')"><i class="lg g"></i>{{ t('传感器 → 一体机 → 云端 → 平台') }}</span>
-            <span class="leg" :title="t('外部数据链路：外部系统 —以太网/OPC→ 一体机 —MQTT ext/#→ 云端 → 平台；CloudHub :10002 双向管理')"><i class="lg b"></i>{{ t('外部数据 → 一体机 → 云端 → 平台') }}</span>
-            <span class="leg" :title="t('平台下行：平台 → 云端（cloud-agent HTTP :42083 写操作）')"><i class="lg r"></i>{{ t('平台 → 云端（下发指令）') }}</span>
+            <span class="leg"><i class="lg g"></i>{{ t('传感器 → 一体机 → 云端 → 平台') }}</span>
+            <span class="leg"><i class="lg b"></i>{{ t('外部数据 → 一体机 → 云端 → 平台') }}</span>
+            <span class="leg"><i class="lg r"></i>{{ t('平台 → 云端（下发指令）') }}</span>
           </div>
           <div ref="topoCanvasRef" class="cbx-topo cbx-topo-canvas">
             <div class="cbx-topo-lanes">
@@ -267,18 +267,18 @@
                       <span class="cbx-topo-svc-dot on"></span>
                       <span class="cbx-topo-svc-name">{{ t('Web 前端') }}</span>
                       <a class="cbx-topo-svc-addr mono" :href="httpOpenUrl(platformHost, '/')" target="_blank" rel="noopener"
-                         :title="t('点击在新标签页打开') + ' ' + platformHost" @click.stop>{{ platformHost }}</a>
+                         @click.stop>{{ platformHost }}</a>
                     </div>
                     <div class="cbx-topo-svc" :title="t('平台后端服务：设备/盒子管理、数据接入与对外 API') + '\n' + platformHost + '/api\n' + t('点击在新标签页打开')">
                       <span class="cbx-topo-svc-dot on"></span>
                       <span class="cbx-topo-svc-name">{{ t('平台后端') }}</span>
                       <a class="cbx-topo-svc-addr mono" :href="httpOpenUrl(platformHost, '/docs')" target="_blank" rel="noopener"
-                         :title="t('点击在新标签页打开') + ' ' + platformHost + '/docs'" @click.stop>{{ platformHost }}</a>
+                         @click.stop>{{ platformHost }}</a>
                     </div>
                     <div class="cbx-topo-svc" :title="t('数据接入：订阅云端 Broker data/#（一体机上报 + 中间件转换）') + '\n' + (brokerAddr || '—') + '\n' + t('MQTT 地址无法在浏览器直接打开')">
                       <span class="cbx-topo-svc-dot on"></span>
                       <span class="cbx-topo-svc-name">{{ t('数据接入') }}</span>
-                      <span class="cbx-topo-svc-addr mono" :title="t('订阅') + ' ' + (brokerAddr || '—')">{{ brokerAddr || '—' }}</span>
+                      <span class="cbx-topo-svc-addr mono">{{ brokerAddr || '—' }}</span>
                     </div>
                   </div>
                   <div class="cbx-topo-mod-ops">
@@ -294,7 +294,7 @@
                   <div class="cbx-topo-dev-hd">
                     <span class="cbx-topo-dev-ic">☁</span>
                     <div class="cbx-topo-dev-meta">
-                      <b class="cbx-topo-dev-title" :title="t('CloudCore / cloud-agent / MQTT Broker / 中间件均运行在本机')">{{ t('云端服务器') }}</b>
+                      <b class="cbx-topo-dev-title">{{ t('云端服务器') }}</b>
                       <span class="cbx-topo-dev-addr mono">{{ cloudCfg.host || '—' }}</span>
                     </div>
                     <span class="cbx-topo-mod-badge" :class="{ ok: agentStatusOk }">{{ agentStatusOk ? t('在线') : t('离线') }}</span>
@@ -313,7 +313,7 @@
                          :title="'CloudCore · CloudHub :10002 · KubeEdge CRD' + '\n' + (cloudHubAddr || '—')">
                       <span class="cbx-topo-svc-dot" :class="{ on: overview.cloudcore && overview.cloudcore.phase === 'Running' }"></span>
                       <span class="cbx-topo-svc-name">{{ t('云边连接服务') }}</span>
-                      <span class="cbx-topo-svc-addr mono" :title="'CloudHub ' + (cloudHubAddr || '—')">{{ cloudHubAddr || '—' }}</span>
+                      <span class="cbx-topo-svc-addr mono">{{ cloudHubAddr || '—' }}</span>
                       <span class="cbx-topo-svc-ops">
                         <button class="cbx-op cbx-tiny" :disabled="!!restartingKey" @click="restartCloudcore()" :title="t('重启云端 kubeedge 命名空间下的 cloudcore 工作负载')">{{ restartingKey === 'deployment:cloudcore' ? '…' : '↻' }}</button>
                       </span>
@@ -322,7 +322,7 @@
                       <span class="cbx-topo-svc-dot" :class="{ on: agentStatusOk }"></span>
                       <span class="cbx-topo-svc-name">{{ t('云端数据服务') }}</span>
                       <a class="cbx-topo-svc-addr mono" :href="httpOpenUrl(agentAddr, '/api/health')" target="_blank" rel="noopener"
-                         :title="t('点击在新标签页打开') + ' ' + (agentAddr || '') + '/api/health'" @click.stop>{{ agentAddr || '—' }}</a>
+                         @click.stop>{{ agentAddr || '—' }}</a>
                       <span class="cbx-topo-svc-ops">
                         <button class="cbx-op cbx-tiny" :disabled="!!restartingKey" @click="restartAgent()" :title="t('重启云端 cloud-agent systemd 服务（2 秒后自动拉起）')">{{ restartingKey === 'systemd:cloud-agent' ? '…' : '↻' }}</button>
                       </span>
@@ -332,7 +332,7 @@
                       <span class="cbx-topo-svc-dot" :class="{ on: mwOnline }"></span>
                       <span class="cbx-topo-svc-name">{{ t('数据中间件') }}</span>
                       <a class="cbx-topo-svc-addr mono" :href="httpOpenUrl(mwAddr, '/api/health')" target="_blank" rel="noopener"
-                         :title="t('点击在新标签页打开') + ' ' + (mwAddr || '') + '/api/health'" @click.stop>{{ mwAddr || '—' }}</a>
+                         @click.stop>{{ mwAddr || '—' }}</a>
                       <span class="cbx-topo-svc-type">{{ mwOnline ? t('在线') : (mwChecked ? t('离线') : '—') }}</span>
                     </div>
                   </div>
@@ -345,7 +345,7 @@
               </div>
               <!-- 设备③：能碳一体机（每台一台设备，卡内为边缘运行时/采集服务/云端部署应用） -->
               <div class="cbx-topo-lane box-lane">
-                <div class="cbx-topo-lane-title">{{ t('能碳一体机') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openOnboard" :title="t('新盒子接入：生成 edgecore.yaml。一体机下接传感器/仪表、后接外部数据系统')">{{ t('盒子接入') }}</button></div>
+                <div class="cbx-topo-lane-title">{{ t('能碳一体机') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openOnboard">{{ t('盒子接入') }}</button></div>
                 <div v-for="b in topoBoxes" :key="b.name" :ref="setBoxNodeRef(b.name)" class="cbx-topo-mod device box" :class="{ down: b.ready === false }">
                   <div class="cbx-topo-dev-hd">
                     <span class="cbx-topo-dev-ic">⬢</span>
@@ -361,14 +361,14 @@
                          :title="t('KubeEdge 边缘运行时：与云端 CloudHub 建立长连接，接收设备/应用下发并上报状态') + '\n→ ' + (cloudHubAddr || '—')">
                       <span class="cbx-topo-svc-dot" :class="{ on: b.ready !== false }"></span>
                       <span class="cbx-topo-svc-name">EdgeCore</span>
-                      <span class="cbx-topo-svc-addr mono" :title="'CloudHub ' + (cloudHubAddr || '—')">→ {{ cloudHubAddr || '—' }}</span>
+                      <span class="cbx-topo-svc-addr mono">→ {{ cloudHubAddr || '—' }}</span>
                       <span class="cbx-topo-svc-type">{{ t('边缘运行时') }}</span>
                     </div>
                     <div class="cbx-topo-svc" :class="{ off: b.ready === false }"
                          :title="t('采集服务：按协议采集读数，经 DMI 与 MQTT 上报（data/# · ext/#）') + '\n→ ' + (brokerAddr || '—')">
                       <span class="cbx-topo-svc-dot" :class="{ on: b.ready !== false }"></span>
                       <span class="cbx-topo-svc-name">box-mapper</span>
-                      <span class="cbx-topo-svc-addr mono" :title="t('上报') + ' ' + (brokerAddr || '—')">→ {{ brokerAddr || '—' }}</span>
+                      <span class="cbx-topo-svc-addr mono">→ {{ brokerAddr || '—' }}</span>
                       <span class="cbx-topo-svc-type">{{ t('采集') }}</span>
                       <span class="cbx-topo-svc-ops">
                         <button class="cbx-op cbx-tiny" :disabled="!!restartingKey || !edgeIpOk(b)" @click="restartMapper(b)" :title="edgeIpOk(b) ? t('重启该盒子的 box-mapper 服务（云端 agent 经 SSH 执行）') : t('未配置盒子 IP 或探测不通，无法重启 Mapper（先点「配置」填写现场可达地址）')">{{ restartingKey === 'edge:box-mapper' ? '…' : '↻' }}</button>
@@ -380,7 +380,7 @@
                         <span class="cbx-topo-svc-dot" :class="{ on: s.running || s.status === 'running' }"></span>
                         <span class="cbx-topo-svc-name">{{ s.name }}</span>
                         <a v-if="s.url" class="cbx-topo-svc-addr mono" :href="s.url" target="_blank" rel="noopener"
-                           :title="t('点击在新标签页打开') + ' ' + s.url" @click.stop>{{ urlHostPort(s.url) }}</a>
+                           @click.stop>{{ urlHostPort(s.url) }}</a>
                         <span class="cbx-topo-svc-type">{{ s.type || '' }}{{ s.running === false || s.status === 'stopped' ? ' · ' + t('已停止') : '' }}</span>
                       </div>
                     </template>
@@ -391,14 +391,14 @@
                   <div class="cbx-topo-inner">{{ devCountOf(b.name) }} {{ t('台待下发') }} · {{ b.source === 'mqtt' ? t('MQTT 识别') : 'K8s Agent' }}<template v-if="b.roles && b.roles !== '—'"> · {{ roleZh(b.roles) }}</template></div>
                   <div class="cbx-topo-mod-ops">
                     <button class="cbx-op cbx-xs" @click="openBoxEdgeCfg(b)" :title="t('配置盒子显示名称 / 现场可达 IP / SSH 凭据（重启 Mapper 前必须配置且探测可达）')">{{ t('配置') }}</button>
-                    <button class="cbx-op cbx-xs" @click="openAppDeploy(b)" :title="t('云端部署模型/服务到盒子（经云端 Broker 命令主题下发，盒子订阅执行）')">⬇ {{ t('部署') }}</button>
+                    <button class="cbx-op cbx-xs" @click="openAppDeploy(b)">⬇ {{ t('部署') }}</button>
                   </div>
                 </div>
                 <div v-if="!topoBoxes.length" class="cbx-topo-empty">{{ t('未识别到盒子节点（云端未连接）。') }}</div>
               </div>
               <!-- 设备④：现场设备（传感器/仪表，一体机下接，卡内为各台采集设备） -->
               <div class="cbx-topo-lane dev">
-                <div class="cbx-topo-lane-title">{{ t('现场设备（传感器/仪表）') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openModelCreate">＋ {{ t('模型') }}</button><button class="cbx-op cbx-xs" @click="openCreate()" :title="t('设备接入：新建采集设备并默认关联到盒子')">＋ {{ t('设备') }}</button></div>
+                <div class="cbx-topo-lane-title">{{ t('现场设备（传感器/仪表）') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openModelCreate">＋ {{ t('模型') }}</button><button class="cbx-op cbx-xs" @click="openCreate()">＋ {{ t('设备') }}</button></div>
                 <div :ref="setNodeRef('d_devs')" class="cbx-topo-mod device devgroup">
                   <div class="cbx-topo-dev-hd">
                     <span class="cbx-topo-dev-ic">🛠</span>
@@ -438,12 +438,12 @@
               </div>
               <!-- 设备⑤：外部数据系统（一体机后面一级：第三方系统 / 数据中台 / 模拟源，经网线接入一体机） -->
               <div class="cbx-topo-lane extsrc-lane">
-                <div class="cbx-topo-lane-title">{{ t('外部数据系统') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openAddForm('mqtt')" :title="t('注册外部数据源：第三方系统/数据中台经网线接入能碳一体机，由一体机上行到云端')">＋ {{ t('外部源') }}</button></div>
+                <div class="cbx-topo-lane-title">{{ t('外部数据系统') }}<span class="cbx-sec-spacer"></span><button class="cbx-op cbx-xs" @click="openAddForm('mqtt')">＋ {{ t('外部源') }}</button></div>
                 <div :ref="setNodeRef('d_ext')" class="cbx-topo-mod device extsrc">
                   <div class="cbx-topo-dev-hd">
                     <span class="cbx-topo-dev-ic">🏭</span>
                     <div class="cbx-topo-dev-meta">
-                      <b class="cbx-topo-dev-title" :title="t('外部数据系统：PLC / 仪表 / 数据中台经网线或工业总线接入一体机；演示环境由 sim-source 模拟')">{{ t('外部数据系统') }}</b>
+                      <b class="cbx-topo-dev-title">{{ t('外部数据系统') }}</b>
                       <span class="cbx-topo-dev-addr">{{ t('以太网 / 串口 / OPC') }} → {{ t('一体机') }} → ext/&lt;源&gt;/#</span>
                     </div>
                     <span class="cbx-topo-mod-badge" :class="{ ok: extSources.some(s => s.enabled && s.status && s.status.active) }">{{ extSources.some(s => s.enabled && s.status && s.status.active) ? t('采集中') : t('未采集') }}</span>
@@ -480,18 +480,18 @@
         <!-- ② 资源列表：盒子 / 模型 / 设备（三列并排总览，点击行可快速跳转编辑/实时） -->
         <section class="cbx-sec">
           <div class="cbx-sec-head">
-            <button class="cbx-caret" @click="toggleSec('reslist')" :title="secFold.reslist ? t('收起') : t('展开')">{{ secFold.reslist ? '▾' : '▸' }}</button>
+            <button class="cbx-caret" @click="toggleSec('reslist')">{{ secFold.reslist ? '▾' : '▸' }}</button>
             <b class="cbx-sec-toggle" @click="toggleSec('reslist')">{{ t('资源列表') }}</b>
             <!-- 数据统计统一在「运行状态总览」展示一次，此处不再重复计数 -->
             <span class="cbx-sec-spacer"></span>
             <!-- 手动刷新：重新拉取三列数据 + 强制同步拉云端 CRD（用户主动点时才付 5s 超时代价） -->
             <button class="cbx-op cbx-xs" :disabled="resRefreshing" @click="refreshResources()"
-                    :title="t('重新拉取盒子 / 模型 / 设备列表，并同步拉取云端最新 CRD 状态')">
+                   >
               {{ resRefreshing ? t('刷新中…') : t('刷新') }}
             </button>
             <!-- 数据采集：对当前在线设备逐条记录读数，导出 Excel（每台在线设备一张子表） -->
             <button class="cbx-op cbx-xs cbx-res-op" :class="{ primary: collectRunning }" @click="openCollect()"
-                    :title="t('对当前在线设备发起一次数据采集：把每台设备的读数按真实返回时刻逐条记录，采完导出 Excel（每台在线设备一张子表）')">
+                   >
               <span class="cbx-ref-ic" :class="{ rec: collectRunning }">◉</span>{{ collectRunning ? t('采集中 {time}', { time: collectElapsedText }) : t('数据采集') }}
             </button>
           </div>
@@ -533,7 +533,7 @@
                   <span class="cbx-res-sub">{{ modelOf(d) || '—' }}<template v-if="d.node"> · {{ d.node }}</template><template v-else-if="d.protocol"> · {{ d.protocol }}</template><template v-if="slaveLabelOf(d)"> · {{ t('站') }}{{ slaveLabelOf(d) }}</template></span>
                   <span class="cbx-res-ops">
                     <button class="cbx-op cbx-tiny" @click.stop="openEditDev(d)">{{ t('配置') }}</button>
-                    <button v-if="d._cloud" class="cbx-op cbx-tiny" @click.stop="openCloudHistory(d)" :title="t('云端时序库（TDengine）历史读数曲线')">{{ t('历史') }}</button>
+                    <button v-if="d._cloud" class="cbx-op cbx-tiny" @click.stop="openCloudHistory(d)">{{ t('历史') }}</button>
                     <!-- 采集设备没有「禁用」这一档：不想采集就删除，三端配置同步清除 -->
                     <button class="cbx-op cbx-tiny danger" @click.stop="delDevice(d)" :title="t('删除该设备：平台本地配置 / 云端 CRD / 盒子取数配置三端同步清除')">{{ t('删除') }}</button>
                   </span>
@@ -543,26 +543,10 @@
             </div>
           </div>
         </section>
-        <!-- ④-2 实时消息流（云端 Broker → 本平台；默认折叠，排查链路时再展开） -->
-        <section class="cbx-sec">
-          <div class="cbx-sec-head">
-            <button class="cbx-caret" @click="toggleSec('msglog')" :title="secFold.msglog ? t('收起') : t('展开')">{{ secFold.msglog ? '▾' : '▸' }}</button>
-            <b class="cbx-sec-toggle" @click="toggleSec('msglog')">{{ t('实时消息流') }}</b>
-          </div>
-          <div v-if="secFold.msglog" ref="msgLogRef" class="cbx-msglog">
-            <div v-for="(m, i) in messages" :key="i" class="cbx-msgrow">
-              <span class="cbx-msgtime">{{ fmtTime(m.t) }}</span>
-              <code class="cbx-msg-topic">{{ m.topic }}</code>
-              <span class="cbx-msg-payload">{{ m.payload }}</span>
-            </div>
-            <div v-if="!messages.length" class="cbx-empty">{{ t('暂无消息。') }}</div>
-          </div>
-        </section>
-
         <!-- ④ 命令执行：向一体机下发设备读/写/LoRaWAN 下行；原「发送指令」保留为「原始消息」子模式 -->
         <section id="cbx-sec-cmd" class="cbx-sec">
           <div class="cbx-sec-head">
-            <button class="cbx-caret" @click="toggleSec('cmd')" :title="secFold.cmd ? t('收起') : t('展开')">{{ secFold.cmd ? '▾' : '▸' }}</button>
+            <button class="cbx-caret" @click="toggleSec('cmd')">{{ secFold.cmd ? '▾' : '▸' }}</button>
             <b class="cbx-sec-toggle" @click="toggleSec('cmd')"
                :title="t('仅供专业维护：下发读/写寄存器或 LoRaWAN 下行，结果等盒子回报')">{{ t('命令执行') }}</b>
             <span class="cbx-sec-spacer"></span>
@@ -680,7 +664,7 @@
 
             <div class="cbx-form-row" v-if="cmdDevMeta">
               <label>{{ t('将发送') }}</label>
-              <pre class="cbx-cmd-json" :title="t('自动生成载荷，可直接复制到「原始消息」手动微调')">{{ cmdPayloadText }}</pre>
+              <pre class="cbx-cmd-json">{{ cmdPayloadText }}</pre>
               <button class="cbx-op primary" :disabled="cmdSending" @click="execCmd">{{ cmdSending ? t('发送中…') : (cmdPending ? t('等待回报…') : t('执行')) }}</button>
             </div>
 
@@ -697,7 +681,7 @@
               <label>{{ t('主题') }}</label><input v-model="pubForm.topic" class="cbx-input cbx-md" placeholder="data/box-001/device-1"/>
               <label>{{ t('载荷') }}</label><input v-model="pubForm.payload" class="cbx-input cbx-grow" placeholder='{"device":"device-1","value":88.8}'/>
               <button class="cbx-op primary" @click="doPublish"
-                      :title="t('data/# 发布可自检上报链路；cmd/{box}/# 为盒子命令主题（mapper 需支持）')">{{ t('发布') }}</button>
+                     >{{ t('发布') }}</button>
             </div>
           </div>
 
@@ -745,7 +729,7 @@
                 <label>{{ t('命名空间') }}</label><input v-model="editForm.namespace" class="cbx-input" style="width:110px"/>
                 <template v-if="editTarget !== 'model'">
                   <label>{{ t('调度节点（盒子）') }}</label>
-                  <select v-model="editForm.nodeName" class="cbx-input" style="width:170px" :title="t('从识别到的盒子中选择，或保留原值')">
+                  <select v-model="editForm.nodeName" class="cbx-input" style="width:170px">
                     <option v-for="n in overview.nodes || []" :key="n.name" :value="n.name">{{ n.name }}（{{ readyZh(n.ready) }}）</option>
                     <option v-if="!(overview.nodes || []).some((n) => n.name === editForm.nodeName)" :value="editForm.nodeName">{{ editForm.nodeName }}（{{ t('未识别') }}）</option>
                   </select>
@@ -922,7 +906,7 @@
             <div v-if="devRtIsCamera" class="cbx-cam">
               <div class="cbx-cam-head">
                 <b>{{ t('摄像头图片') }}</b>
-                <select v-model="camSize" class="cbx-input cbx-sm" :title="t('尺寸档（仅支持小图，大图分片量大已禁用）')">
+                <select v-model="camSize" class="cbx-input cbx-sm">
                   <option value="1">1 · 160x120（{{ t('默认，最稳') }}）</option>
                   <!-- 80x60（size=0）档已移除：SVL130w A 版协议尺寸码从 1 起步（1=160x120 为最小档），
                        平台曾自定义的 0 档真机固件不认识，下发会被摄像头错误应答拒绝（2026-10-12 实测） -->
@@ -1013,7 +997,7 @@
               <!-- 读数口径说明：默认只显示一个小问号，点击才展开注释，避免长文案常驻占版面 -->
               <div class="cbx-rt-help">
                 <button class="cbx-help" :class="{ on: rtHelpOpen }" :aria-label="t('读数说明')"
-                        :title="t('点击查看读数说明')" @click="rtHelpOpen = !rtHelpOpen">?</button>
+                        @click="rtHelpOpen = !rtHelpOpen">?</button>
                 <div v-if="rtHelpOpen" class="cbx-help-pop">
                   {{ t('读数双源融合：云端 twins + 盒子 MQTT data/#（时间戳新者优先）；均无数据多为传感器无信号或未标定。') }}
                 </div>
@@ -1140,7 +1124,7 @@
               <div class="cbx-form-row">
                 <label>{{ t('命名空间') }}</label><input v-model="form.namespace" class="cbx-input" style="width:90px" placeholder="default"/>
                 <label>{{ t('调度节点') }}</label>
-                <select v-model="form.nodeName" class="cbx-input" :title="t('从识别到的盒子中选择')">
+                <select v-model="form.nodeName" class="cbx-input">
                   <option v-for="n in overview.nodes || []" :key="n.name" :value="n.name">{{ n.name }}（{{ readyZh(n.ready) }}）</option>
                 </select>
                 <label>{{ t('采集周期(ms)') }}</label><input v-model.number="form.collectCycle" type="number" class="cbx-input" style="width:100px"/>
@@ -1520,8 +1504,7 @@ const sourcesResp = reactive({ sources: [], middleware: {} })
 const sourcesLoading = ref(false)
 const mwChecked = ref(false)          // 是否已探测过中间件（得到过确定结果）
 // 各区块折叠态（true=展开）：默认只展开常用区块，折叠区块不渲染 DOM（首屏更快）
-const secFold = ref({ overview: true, sources: false, topo: false, reslist: true,
-  msglog: false, cmd: true })
+const secFold = ref({ overview: true, sources: false, topo: false, reslist: true, cmd: true })
 function toggleSec(k) {
   secFold.value = { ...secFold.value, [k]: !secFold.value[k] }
 }
@@ -1779,7 +1762,6 @@ const startPolling = () => {
 // 展开区块时立刻补拉其数据，避免「展开后要等下一个轮询周期才有内容」
 watch(() => ({ ...secFold.value }), (now, prev) => {
   if (now.sources && !prev.sources) loadSources()
-  if (now.msglog && !prev.msglog) loadMessages()
 })
 const stopPolling = () => {
   if (stopFastPoll) { stopFastPoll(); stopFastPoll = null }
@@ -2459,8 +2441,6 @@ function rtTsOf(d) {
   for (const t of r.twins || []) if ((t.timestamp || 0) > max) max = t.timestamp
   return max
 }
-const messages = ref([])
-const msgLogRef = ref(null)
 const pubForm = reactive({ topic: '', payload: '' })
 async function loadRealtime() {
   try {
@@ -2468,10 +2448,11 @@ async function loadRealtime() {
     rtDevices.value = r.devices || []
   } catch (e) {}
 }
+// 消息流不再单独成块：拉到后增量并入 store.mqttLog，由底栏「输出」页签统一显示
 async function loadMessages() {
   try {
     const r = await api.boxStats()
-    messages.value = r.messages || []
+    store.syncMqttLog(r.messages || [])
   } catch (e) {}
 }
 async function doPublish() {
@@ -2480,11 +2461,10 @@ async function doPublish() {
     const r = await api.boxPublish(pubForm.topic, pubForm.payload)
     store.showToast(r.ok
       ? (pubForm.topic.trim().startsWith('data/')
-          ? t('已发布到 {topic} → 见「实时消息流」，实时数据已刷新', { topic: r.topic })
-          : t('已发布到 {topic} → 见「实时消息流」', { topic: r.topic }))
+          ? t('已发布到 {topic} → 见底栏「输出」，实时数据已刷新', { topic: r.topic })
+          : t('已发布到 {topic} → 见底栏「输出」', { topic: r.topic }))
       : t('发布失败') + '：' + (r.error || ''), r.ok ? 'success' : 'error')
-    await loadMessages()
-    nextTick(scrollMsgLog)
+  await loadMessages()
   } catch (e) { store.showToast(t('发布失败') + '：' + (e.message || e), 'error') }
 }
 
@@ -2673,11 +2653,9 @@ function onConfigMsg(msg) {
 
 // 快速轮询（3s）：合并界面无页签切换，统一拉轻量数据；云端 CRD 由 30s 慢轮询承担
 // 快轮询只带「实时读数 + 链路状态」；设备定义列表（loadDevices，响应较大）移入慢轮询，
-// 折叠中的区块（消息流 / 云端日志）不再轮询其数据，展开时立即补拉一次
+// 消息流已并入底栏「输出」，不受区块折叠影响，随快轮询增量同步
 async function refreshFast() {
-  const jobs = [loadOverview(), loadRealtime()]
-  if (secFold.value.msglog) jobs.push(loadMessages())
-  await Promise.allSettled(jobs)
+  await Promise.allSettled([loadOverview(), loadRealtime(), loadMessages()])
 }
 // 慢轮询（30s，与后端 CRD 缓存对齐）：云端 CRD + 拓扑盒子状态 + Agent 状态 + 设备定义列表
 async function refreshSlow() {
@@ -3720,10 +3698,6 @@ function closeGuide() {
   try { localStorage.setItem('cbx-guide-seen', '1') } catch (e) {}
 }
 // 指标卡点击 → 平滑滚动到对应列表（sources=数据源接入区块，box/dev=资源列表）
-function scrollMsgLog() {
-  const el = msgLogRef.value
-  if (el) el.scrollTop = el.scrollHeight
-}
 function scrollToSec(which) {
   // 目标区块若处于折叠态先展开，否则滚过去只看到标题
   const foldKey = which === 'sources' ? 'sources' : 'reslist'
@@ -3758,8 +3732,11 @@ const heroDev = computed(() => {
   const off = list.filter((d) => d.state === 'offline').length
   return { n: list.length, on, off, txt: list.length ? on + ' / ' + list.length : '—', cls: !list.length ? 'mute' : (on ? 'ok' : (off ? 'warn' : 'mute')) }
 })
-// 实时消息（近端缓存条数）
-const heroMsg = computed(() => ({ n: messages.value.length, cls: messages.value.length ? 'ok' : 'mute' }))
+// 实时消息（近端缓存条数）：消息流已并入 store.mqttLog，由底栏「输出」页签统一显示
+const heroMsg = computed(() => {
+  const n = (store.mqttLog || []).length
+  return { n, cls: n ? 'ok' : 'mute' }
+})
 // 总体结论（优先级：云中断 > 云端降级/过期 > 盒子未就绪 > 设备离线 > 空系统 > 正常）
 const hero = computed(() => {
   const cs = overview.value.cloud_source
@@ -4642,22 +4619,6 @@ onUnmounted(stopCmdPoll)
 .cbx-spark { width: 100px; height: 24px; }
 .cbx-spark-cell { width: 110px; }
 .cbx-faint { color: var(--faint); }
-/* ---- 消息流 ---- */
-/* 日志区固定白色背景（终端风格深色底已按需求移除），文字统一用深色系保证可读 */
-.cbx-msglog {
-  display: flex; flex-direction: column; gap: 2px;
-  max-height: 220px; overflow: auto; background: var(--panel);
-  border: 1px solid var(--border); border-radius: 3px; padding: 6px 8px;
-  color: #23303d;
-}
-.cbx-msgrow { display: flex; align-items: center; gap: 8px; font-size: 10px; padding: 1px 4px; border-radius: 2px; color: var(--text); }
-.cbx-msgrow:hover { background: rgba(0,0,0,.05); }
-.cbx-msgtime { color: var(--faint); flex: none; font-variant-numeric: tabular-nums; }
-.cbx-msg-topic {
-  flex: none; color: var(--accent-d); background: var(--accent-l);
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent); border-radius: 3px; padding: 0 5px;
-}
-.cbx-msg-payload { color: var(--text); opacity: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* ---- 接入指引 ---- */
 .cbx-guide-flow { display: flex; align-items: stretch; gap: 10px; margin: 8px 0; flex-wrap: wrap; }
 .cbx-flow-node {
@@ -4889,20 +4850,20 @@ a.cbx-topo-svc-addr:hover { text-decoration: underline; opacity: 1; }
 .cbx-rt-unit { color: var(--muted); }
 .cbx-rt-upd { color: var(--faint); font-size: 10px; margin-left: auto; }
 /* ---- VSCode 风格细滚动条（覆盖全部可滚动容器） ---- */
-.cbx-body::-webkit-scrollbar, .cbx-msglog::-webkit-scrollbar, .cbx-yaml::-webkit-scrollbar,
+.cbx-body::-webkit-scrollbar, .cbx-yaml::-webkit-scrollbar,
 .cbx-code::-webkit-scrollbar, .cbx-onboard::-webkit-scrollbar, .cbx-rt::-webkit-scrollbar,
 .cbx-topo::-webkit-scrollbar, .cbx-dialog::-webkit-scrollbar { width: 8px; height: 8px; }
-.cbx-body::-webkit-scrollbar-thumb, .cbx-msglog::-webkit-scrollbar-thumb, .cbx-yaml::-webkit-scrollbar-thumb,
+.cbx-body::-webkit-scrollbar-thumb, .cbx-yaml::-webkit-scrollbar-thumb,
 .cbx-code::-webkit-scrollbar-thumb, .cbx-onboard::-webkit-scrollbar-thumb, .cbx-rt::-webkit-scrollbar-thumb,
 .cbx-topo::-webkit-scrollbar-thumb, .cbx-dialog::-webkit-scrollbar-thumb {
   background: var(--border); border-radius: 4px; border: 2px solid transparent; background-clip: content-box;
 }
-.cbx-body::-webkit-scrollbar-thumb:hover, .cbx-msglog::-webkit-scrollbar-thumb:hover, .cbx-yaml::-webkit-scrollbar-thumb:hover,
+.cbx-body::-webkit-scrollbar-thumb:hover, .cbx-yaml::-webkit-scrollbar-thumb:hover,
 .cbx-code::-webkit-scrollbar-thumb:hover, .cbx-onboard::-webkit-scrollbar-thumb:hover, .cbx-rt::-webkit-scrollbar-thumb:hover,
 .cbx-topo::-webkit-scrollbar-thumb:hover, .cbx-dialog::-webkit-scrollbar-thumb:hover {
   background: var(--muted); border: 2px solid transparent; background-clip: content-box;
 }
-.cbx-body::-webkit-scrollbar-track, .cbx-msglog::-webkit-scrollbar-track, .cbx-yaml::-webkit-scrollbar-track,
+.cbx-body::-webkit-scrollbar-track, .cbx-yaml::-webkit-scrollbar-track,
 .cbx-code::-webkit-scrollbar-track, .cbx-onboard::-webkit-scrollbar-track, .cbx-rt::-webkit-scrollbar-track,
 .cbx-topo::-webkit-scrollbar-track, .cbx-dialog::-webkit-scrollbar-track { background: transparent; }
 

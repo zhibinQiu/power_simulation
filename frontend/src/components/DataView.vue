@@ -54,7 +54,7 @@
       <!-- 表格上方统计行：设备名、属性选择已移至左侧面板，这里仅保留时间段选择（AI 群控固定参数优化，不消费时间段，隐藏） -->
       <div class="dv-stats" v-if="!isGroup">
         <!-- 时间段选择（快捷范围 + 自定义起止） -->
-        <div class="dv-time" :title="t('选择时间段')">
+        <div class="dv-time">
           <button v-for="r in timeQuick" :key="r.v" class="dv-tq"
                   :class="{ on: !customMode && rangeQuick === r.v }" @click="setRange(r.v)">{{ t(r.label) }}</button>
           <button class="dv-tq" :class="{ on: customMode }" @click="customMode = !customMode">{{ t('自定义') }}</button>

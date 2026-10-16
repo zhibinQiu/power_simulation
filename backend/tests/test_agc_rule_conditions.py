@@ -4,7 +4,8 @@
   · 一条 IF 分支 = 一组比较（b.conds），相邻两条之间由 join 连接（join='or' → 或者，其余 → 并且）；
   · AND 优先于 OR 归约：「x<20 或 x≥25 且 x<50」= x<20 OR (x≥25 AND x<50)；
   · 任一条件取不到有效读数 / 阈值不合法 → 整条分支不命中；
-  · 旧编排的 AND / OR 逻辑门（kind='gate'）在服务端仍可执行（前端载入时会升级，服务端兼容未升级的存档）。
+  · 旧编排的 AND / OR 逻辑门（kind='gate'）在服务端仍可执行（前端载入时会升级，服务端兼容未升级的存档）；
+  · 「结束」端点已取消：卡片不要求接下游，能否运行只看它是否与「开始」连通。
 """
 import pytest
 
@@ -19,13 +20,11 @@ def _graph(branch):
             {"id": "if1", "kind": "if", "x": 400, "y": 0,
              "branches": [branch, {"id": "b2", "type": "else"}]},
             {"id": "ad1", "kind": "adj", "devId": "A1", "label": "pump", "value": 24, "x": 700, "y": 0},
-            {"id": "en", "kind": "end", "x": 900, "y": 0},
         ],
         "edges": [
             {"id": "e1", "from": "st", "port": "out", "to": "sen"},
             {"id": "e2", "from": "sen", "port": "out", "to": "if1"},
             {"id": "e3", "from": "if1", "port": "b1", "to": "ad1"},
-            {"id": "e4", "from": "ad1", "port": "out", "to": "en"},
         ],
     }
 
@@ -80,11 +79,9 @@ def test_unusable_condition_falls_to_else():
              "branches": [{"id": "b1", "type": "if",
                            "conds": [{"id": "c1", "src": "ghost", "op": ">=", "val": 0}]},
                           {"id": "b2", "type": "else"}]},
-            {"id": "en", "kind": "end", "x": 900, "y": 0},
         ],
         "edges": [
             {"id": "e1", "from": "st", "port": "out", "to": "if1"},
-            {"id": "e2", "from": "if1", "port": "b1", "to": "en"},
         ],
     }
     r = agc_runner._eval_graph(g, lambda dev: None, {})
@@ -106,3 +103,39 @@ def test_legacy_gate_still_evaluated():
     g["edges"][2] = {"id": "e3", "from": "g1", "port": "t", "to": "ad1"}
     assert _hit(g, 30) is True
     assert _hit(g, 60) is False
+
+
+def test_tail_card_without_downstream_still_runs():
+    """「结束」取消后，末端卡片没有下游也要照常写入。"""
+    r = agc_runner._eval_graph(_graph(BAND), lambda dev: 30 if dev == "S1" else None, {})
+    assert r["ok"] is True
+    assert any(a.get("write") for a in r["acts"])
+
+
+def test_legacy_end_node_is_ignored():
+    """旧存档里残留的「结束」端点：既不算孤立卡片，也不阻断执行。"""
+    g = _graph(BAND)
+    g["nodes"].append({"id": "en", "kind": "end", "x": 900, "y": 0})
+    g["edges"].append({"id": "e4", "from": "ad1", "port": "out", "to": "en"})
+    r = agc_runner._eval_graph(g, lambda dev: 30 if dev == "S1" else None, {})
+    assert r["ok"] is True
+    assert any(a.get("write") for a in r["acts"])
+
+
+def test_isolated_card_never_writes():
+    """与「开始」不连通的卡片不产生任何写入，且通路判定不通过（连通的部分照常执行）。"""
+    g = _graph(BAND)
+    g["nodes"].append({"id": "ad2", "kind": "adj", "devId": "A2", "label": "orphan",
+                       "value": 99, "x": 700, "y": 300})
+    r = agc_runner._eval_graph(g, lambda dev: 30 if dev == "S1" else None, {})
+    assert r["ok"] is False
+    assert [a.get("devId") for a in r["acts"] if a.get("write")] == ["A1"]
+
+
+def test_without_start_nothing_runs():
+    g = _graph(BAND)
+    g["nodes"] = [n for n in g["nodes"] if n["id"] != "st"]
+    g["edges"] = [e for e in g["edges"] if e["from"] != "st"]
+    r = agc_runner._eval_graph(g, lambda dev: 30 if dev == "S1" else None, {})
+    assert r["ok"] is False
+    assert not any(a.get("write") for a in r["acts"])

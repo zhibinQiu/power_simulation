@@ -1,0 +1,44 @@
+# ChirpStack v4 主配置（能碳平台版）
+#   * 容器间用 compose 服务名互访（postgres / redis / mosquitto-lora）
+#   * MQTT_BROKER_HOST 环境变量供 ChirpStack 内置 gateway backend 默认模板替换
+#   * region 由 deploy_chirpstack.sh --region 渲染（默认 cn470_0）
+#   * region_*.toml 频段文件随本包提供（官方镜像不带）
+
+[logging]
+  level="info"
+
+[postgresql]
+  dsn="postgres://chirpstack:chirpstack@postgres:5432/chirpstack?sslmode=disable"
+  max_open_connections=10
+  min_idle_connections=0
+
+[redis]
+  servers=[
+    "redis://redis/",
+  ]
+  tls_enabled=false
+  cluster=false
+
+[network]
+  net_id="000000"
+  # 必须与网关桥的 MQTT 主题前缀一致，否则收不到网关上行
+  enabled_regions=[
+    "cn470_0",
+  ]
+
+[api]
+  bind="0.0.0.0:8080"
+  # 部署脚本首次安装时用 openssl rand -base64 32 自动替换
+  secret="__CHIRPSTACK_SECRET__"
+
+[integration]
+  enabled=["mqtt"]
+
+[integration.mqtt]
+  server="tcp://mosquitto-lora:1883/"
+  json=true
+
+[chirpstack.gateway.backend.mqtt]
+  server="tcp://mosquitto-lora:1883/"
+  username=""
+  password=""

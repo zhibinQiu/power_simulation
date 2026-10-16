@@ -12,7 +12,7 @@
       </div>
     </div>
     <!-- ===== 1. 实测值 / 设定值 ===== -->
-    <CollapseSection :title="t('实测值 / 设定值')" tone="blue" :show-more="false">
+    <CollapseSection tone="blue" :show-more="false">
     <p class="sec-desc" v-if="metaDesc !== '—'">{{ metaDesc }}</p>
     <div class="kv2"><span>{{ t('所属工序') }}</span><b>{{ info.unitName }}（{{ unitTypeLabel }}）</b></div>
     <!-- 计量项：仅计量设备展示 -->
@@ -31,7 +31,7 @@
         <div class="pr-top"><span>{{ spLabel }}</span><b>{{ f(setpointVal) }} <span class="u">{{ sp.unit || '' }}</span></b></div>
         <input type="number" :min="sp.min" :max="sp.max" :step="sp.step || 1"
                :value="setpointVal" @input="onSetpoint" class="num"
-               :title="t('当前 {val} {unit}', { val: f(setpointVal), unit: sp.unit || '' })" />
+               />
         <div class="pr-hint">{{ t('参考范围') }} {{ f(sp.min) }} – {{ f(sp.max) }} {{ sp.unit || '' }}</div>
       </div>
       <!-- 附加可调项（如鼓风机鼓风湿度） -->
@@ -39,7 +39,7 @@
         <div class="pr-top"><span>{{ es.label }}</span><b>{{ f(extraVal(es.key)) }} <span class="u">{{ es.unit }}</span></b></div>
         <input type="number" :min="es.min" :max="es.max" :step="es.step || 1"
                :value="extraVal(es.key)" @input="onExtraSetpoint(es.key, $event.target.value)"
-               class="num" :title="t('当前 {val} {unit}', { val: f(extraVal(es.key)), unit: es.unit })" />
+               class="num" />
         <div class="pr-hint">{{ t('参考范围') }} {{ f(es.min) }} – {{ f(es.max) }} {{ es.unit }}</div>
       </div>
       <!-- 附加的可变设备：设定值只调工况、不参与取数；原话术（设定值直接折算电耗）仅适用于流程内可调设备 -->
@@ -65,7 +65,7 @@
     </CollapseSection>
 
     <!-- ===== 3. 实时监控 ===== -->
-    <CollapseSection :title="t('实时监控')" tone="teal" :show-more="false">
+    <CollapseSection tone="teal" :show-more="false">
     <div class="trend-head">
       <span class="live-dot"></span> {{ dev.adjustable ? t('设定值轨迹 · 1 Hz') : t('实时采样 · 1 Hz') }}
       <span class="sp"></span>
@@ -95,7 +95,7 @@
     <!-- ===== 4. 其他内容 ===== -->
     <!-- 附加可调项联动指标（如高炉鼓风含湿）：展示推导公式，透明可审计 -->
     <template v-if="multiIndicators.length">
-      <CollapseSection :title="t('衍生指标 · ') + (multiIndicators[0] ? multiIndicators[0].label : '')" tone="amber" :show-more="false">
+      <CollapseSection tone="amber" :show-more="false">
       <div class="couple-box">
         <div v-for="ind in multiIndicators" :key="ind.key" class="multi-ind">
           <div class="couple-top">
@@ -112,7 +112,7 @@
     </template>
 
     <!-- 减碳影响依据（耦合透明度）：让"为什么调整设备会影响碳排"对用户可见、可审计 -->
-    <CollapseSection v-if="coupling" :title="t('减碳影响依据 · 耦合透明度')" tone="green" :show-more="false">
+    <CollapseSection v-if="coupling" tone="green" :show-more="false">
     <div class="couple-box">
       <div class="couple-top">
         <span class="cb-badge" :class="sourceClass">{{ sourceLabel }}</span>
@@ -132,7 +132,7 @@
     </div>
     </CollapseSection>
 
-    <CollapseSection :title="t('活动数据 → 碳引擎')" tone="teal" :show-more="false">
+    <CollapseSection tone="teal" :show-more="false">
     <div class="feeds">{{ feedsText }}</div>
     <div class="note">{{ t('碳排放 = 活动数据 × 排放因子；接入 SCADA / EMS 后显示实测值。') }}</div>
     </CollapseSection>

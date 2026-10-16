@@ -9,7 +9,7 @@
       </div>
       </CollapseSection>
 
-      <CollapseSection v-if="purchasable" :title="t('外购单价（全厂成本核算）')" tone="amber" :show-more="false">
+      <CollapseSection v-if="purchasable" tone="amber" :show-more="false">
       <div class="card">
         <div class="kv2">
           <span>{{ t('外购单价') }}</span>
@@ -23,7 +23,7 @@
       </div>
       </CollapseSection>
 
-      <CollapseSection v-if="saleable" :title="t('销售单价（产品收益核算）')" tone="amber" :show-more="false">
+      <CollapseSection v-if="saleable" tone="amber" :show-more="false">
       <div class="card">
         <div class="kv2">
           <span>{{ t('销售单价') }}</span>
@@ -37,7 +37,7 @@
       </div>
       </CollapseSection>
 
-      <CollapseSection :title="t('隐含碳因子')" tone="amber" :show-more="false">
+      <CollapseSection tone="amber" :show-more="false">
       <div class="card">
         <div class="param-row">
           <div class="pr-top"><span>{{ t('当前值') }}</span><b>{{ fmt(carbon) }} <span class="u">tCO₂/{{ mat.unit }}</span></b></div>
@@ -73,7 +73,7 @@
       </div>
       </CollapseSection>
 
-      <CollapseSection :title="t('物理与物流参数')" tone="teal" :show-more="false">
+      <CollapseSection tone="teal" :show-more="false">
       <div class="card">
         <div class="kv2" v-for="a in attributeDefs" :key="a.key">
           <span>{{ a.label }}</span>
@@ -90,7 +90,7 @@
       </div>
       </CollapseSection>
 
-      <CollapseSection v-if="compFields && mat.id !== 'pulverized_coal'" :title="t('详细化学成分')" tone="green" :show-more="false">
+      <CollapseSection v-if="compFields && mat.id !== 'pulverized_coal'" tone="green" :show-more="false">
       <div class="card">
         <div class="kv2" v-for="f in mainCompFields" :key="f.key">
           <span>{{ t(f.label) }}</span>
@@ -118,7 +118,7 @@
       </div>
       </CollapseSection>
 
-      <CollapseSection v-if="mat.id === 'pulverized_coal'" :title="t('喷吹煤粉 · 配煤混合（N 种煤）')" tone="green" :show-more="false">
+      <CollapseSection v-if="mat.id === 'pulverized_coal'" tone="green" :show-more="false">
       <div class="card">
         <div class="pr-hint">{{ t('喷吹煤粉按设定比例混合磨制；系统按质量分数加权折算有效成分，联动 TFT / RR / CO₂ / 碱度。默认混合为数值中性。') }}</div>
 
@@ -165,7 +165,7 @@
       </div>
       </CollapseSection>
 
-      <CollapseSection :title="t('相关工艺 · 输入 / 输出')" tone="green" :show-more="false">
+      <CollapseSection tone="green" :show-more="false">
       <div class="card" v-if="usedIn.length">
         <div v-for="u in usedIn" :key="u.type" class="used-row">
           <span class="ur-name">{{ u.label }}</span>

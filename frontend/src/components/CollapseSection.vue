@@ -15,7 +15,6 @@
         draggable="true"
         @dragstart.stop="onGripStart"
         @dragend.stop="onGripEnd"
-        :title="t('拖动调整模块顺序')"
       >⠿</span>
       <span v-if="$slots.actions" class="chead-actions" @click.stop>
         <slot name="actions" />

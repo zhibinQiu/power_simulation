@@ -1364,7 +1364,7 @@ curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<branch>/platform/bs
 | SearchPanel | 全局搜索：按名称模糊匹配工序 / 物料 / 策略 / 设备，点击结果联动检视器、资源管理器与 3D 聚焦 |
 | ScenePanel | 场景控制：环境主题切换、显示图层开关（网格/轴向/标签/连线/热力图）、视角工具 |
 | ConnectionsPanel | 连接面板：三种数据源（模拟/WebSocket/HTTP）运行状态展示与在线启停，入口直达数据源配置 |
-| CarbonBoxView | 能碳一体机管理（视图 → 能碳一体机管理）：原「数据概览」+「设备管理」合并为单界面——工具栏（盒子接入/新建设备/刷新）、云端数据链路（Broker $SYS 统计 + CloudCore 状态 + 证书与 Token，由云端 cloud-agent 经 MQTT 长连接推送，非 SSH；云端状态四态：云端实时/数据过期/部分异常/不可达）、实时消息流与发测试消息、设备管理（DeviceModel/Device 五协议 CRUD + v1beta1 YAML 生成，config/box_devices.json + 一键下发云端 K3s）、拓扑图 + 云端 CRD 生效态；盒子接入（edgecore.yaml 模板渲染 + 云端 CA 重签 1 年 token/caHash + 完整部署命令：① keadm join → ② 配置下发 → ③ 云建设备 → ④ box-deploy 采集包 → ⑤ 路由验证）；云端设备关联 / 边缘节点 / twins 实时值 / CloudHub 端口显示已移除；总体架构：云端 K3s + CloudCore 控制平面，盒子边缘仅装 EdgeCore（无本地控制平面，运行 Pod / mosquitto / mapper，DMI 采集 + 云边协同断点续传） |
+| CarbonBoxView | 能碳一体机管理（视图 → 能碳一体机管理）：原「数据概览」+「设备管理」合并为单界面——工具栏（盒子接入/新建设备/刷新）、云端数据链路（Broker $SYS 统计 + CloudCore 状态 + 证书与 Token，由云端 cloud-agent 经 MQTT 长连接推送，非 SSH；云端状态四态：云端实时/数据过期/部分异常/不可达）、发测试消息（实时消息流并入底部命令行「输出」页签）、设备管理（DeviceModel/Device 五协议 CRUD + v1beta1 YAML 生成，config/box_devices.json + 一键下发云端 K3s）、拓扑图 + 云端 CRD 生效态；盒子接入（edgecore.yaml 模板渲染 + 云端 CA 重签 1 年 token/caHash + 完整部署命令：① keadm join → ② 配置下发 → ③ 云建设备 → ④ box-deploy 采集包 → ⑤ 路由验证）；云端设备关联 / 边缘节点 / twins 实时值 / CloudHub 端口显示已移除；总体架构：云端 K3s + CloudCore 控制平面，盒子边缘仅装 EdgeCore（无本地控制平面，运行 Pod / mosquitto / mapper，DMI 采集 + 云边协同断点续传） |
 
 ## 七、数据源管理与系统设置
 

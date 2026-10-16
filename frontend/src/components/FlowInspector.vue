@@ -2,14 +2,14 @@
   <div class="flow-insp">
     <!-- 工艺设备小组属性（优先于节点/总览；钢铁场景专属逻辑） -->
     <template v-if="group && !store.customSceneOn">
-      <CollapseSection :title="t('工艺设备小组')" tone="blue">
+      <CollapseSection tone="blue" :default-open="true">
         <div class="card">
           <div class="kv2"><span>{{ t('名称') }}</span><input class="gname-in" :value="group.name" @input="store.renameFlowGroup(group.id, $event.target.value)" /></div>
           <div class="kv2"><span>{{ t('成员设备') }}</span><b>{{ group.members.length }} {{ t('台') }}</b></div>
         </div>
       </CollapseSection>
 
-      <CollapseSection :title="t('成员设备（点击查看/编辑）')" tone="teal" :show-more="false">
+      <CollapseSection tone="teal" :show-more="false">
         <div v-for="m in groupMembers" :key="m.id" class="lrow click" :class="{active: m.id===store.selectedFlowId}" @click="store.selectFlow(m.id)">
           <div class="l-stack">
             <span class="l-tt">{{ m.name }}</span>
@@ -21,7 +21,7 @@
         <div v-if="!groupMembers.length" class="empty">{{ t('该小组暂无成员。双击小组卡片进入子编排，从左侧拖入设备即可归入本组。') }}</div>
       </CollapseSection>
 
-      <CollapseSection :title="t('对外输入 / 输出设定')" tone="green" :show-more="false">
+      <CollapseSection tone="green" :show-more="false">
       <div class="card">
         <div class="ports-col">
           <span class="pc-t">{{ t('输入（来自上游）') }}</span>
@@ -55,7 +55,7 @@
 
     <!-- 未选中：方案总览（钢铁） -->
     <template v-else-if="!node">
-      <CollapseSection :title="t('编排方案总览')" tone="blue" :show-more="false">
+      <CollapseSection tone="blue" :show-more="false">
       <div class="chips">
         <div class="chip2"><span>{{ t('总排放') }}</span><b>{{ fmt(totals.co2_total) }}</b><i>tCO₂/h</i></div>
         <div class="chip2"><span>{{ powerScene ? t('度电碳排') : t('吨钢强度') }}</span><b>{{ fmt(totals.intensity) }}</b><i>{{ powerScene ? 'g/kWh' : 'kg/t' }}</i></div>
@@ -66,7 +66,7 @@
       </div>
       </CollapseSection>
 
-      <CollapseSection :title="t('工艺设备小组（双击进入子编排）')" tone="teal" :show-more="false">
+      <CollapseSection tone="teal" :show-more="false">
       <div v-for="g in store.scheme.groups" :key="g.id" class="lrow click" :class="{active: g.id===store.selectedGroupId}" @click="store.selectFlowGroup(g.id)" @dblclick="store.enterGroup(g.id)">
         <div class="l-stack">
           <span class="l-tt">▦ {{ g.name }}</span>
@@ -77,7 +77,7 @@
       <div v-if="!store.scheme.groups.length" class="muted-note">{{ t('尚未创建小组。点击工具条「编排 → 新建小组」，或将设备组合（如鼓风机 + 热风炉）成组。') }}</div>
       </CollapseSection>
 
-      <CollapseSection :title="t('节点清单（点击查看/编辑）')" tone="amber" :show-more="false">
+      <CollapseSection tone="amber" :show-more="false">
       <div v-for="n in store.scheme.nodes" :key="n.id" class="lrow click" :class="{active: n.id===store.selectedFlowId}" @click="store.selectFlow(n.id)">
         <div class="l-stack">
           <span class="l-tt">{{ n.name }}</span>
@@ -92,12 +92,12 @@
     <!-- 工艺节点 -->
     <template v-else-if="node.kind === 'process'">
       <!-- 从主工艺跳转而来：面板左上角返回按钮，回到来源工艺（不改变 3D 聚焦） -->
-      <div v-if="store.flowBackId" class="flow-back-bar" @click="store.backFlow()" :title="t('返回跳转前的主工艺面板')">
+      <div v-if="store.flowBackId" class="flow-back-bar" @click="store.backFlow()">
         <span class="fb-arrow">←</span>
         <span class="fb-txt">{{ t('返回') }} {{ backFlowName }}</span>
       </div>
       <!-- ===== 1. 介绍 ===== -->
-      <CollapseSection :title="t('工序 · ') + (tpl ? tpl.label : '')" tone="blue">
+      <CollapseSection :title="t('工序 · ') + (tpl ? tpl.label : '')" tone="blue" :default-open="true">
         <template #actions>
           <span v-if="sameTypeNodes.length > 1" class="inst-switch">
             <button class="inst-btn" :title="t('上一实例')" @click="switchInstance(-1)">‹</button>
@@ -127,7 +127,7 @@
       </CollapseSection>
 
       <!-- ===== 2. 输入 / 输出设定（输入位置直接设置配比） ===== -->
-      <CollapseSection :title="t('输入 / 输出设定')" tone="green" :show-more="false">
+      <CollapseSection tone="green" :show-more="false">
       <div class="card">
         <div class="ports-col">
           <span class="pc-t">{{ t('输入（来自上游 · 配比）') }}</span>
@@ -157,7 +157,7 @@
       </div>
       </CollapseSection>
 
-      <CollapseSection :title="t('工艺参数设定')" tone="amber" :show-more="false">
+      <CollapseSection tone="amber" :show-more="false">
       <div class="card">
         <!-- 该工艺本身的固定参数设定：面板直接录值（非监测值、非运行可调项、非自动计算指标） -->
         <div v-for="p in directParams" :key="p.key" class="param-row">
@@ -169,13 +169,13 @@
                  @input="store.setFlowParam(node.id, p.key, $event.target.value)" />
           <div class="pr-hint pr-range-row">
             <span>{{ t('范围') }}</span>
-            <input type="number" class="rg-in" :value="p.min" :title="t('下限')"
+            <input type="number" class="rg-in" :value="p.min"
                    @input="store.setFlowParamRange(node.id, p.key, { min: $event.target.value })" />
             <span class="rg-dash">–</span>
-            <input type="number" class="rg-in" :value="p.max" :title="t('上限')"
+            <input type="number" class="rg-in" :value="p.max"
                    @input="store.setFlowParamRange(node.id, p.key, { max: $event.target.value })" />
             <span class="rg-unit">{{ p.unit }}</span>
-            <input type="number" class="rg-in rg-step" :value="p.step" :title="t('步长')"
+            <input type="number" class="rg-in rg-step" :value="p.step"
                    @input="store.setFlowParamRange(node.id, p.key, { step: $event.target.value })" />
             <button v-if="hasNodeRange(p.key)" class="rg-reset" :title="t('恢复默认范围')" @click="store.resetFlowParamRange(node.id, p.key)">↺</button>
           </div>
@@ -185,7 +185,7 @@
       </CollapseSection>
 
       <!-- ===== 炉渣二元碱度 R₂（仅高炉节点）：CaO/SiO₂ 全来源平衡 ===== -->
-      <CollapseSection v-if="node.type === 'blast_furnace' && slagInfo" :title="t('炉渣碱度（CaO/SiO₂/MgO/Al₂O₃）')" tone="green" :show-more="false">
+      <CollapseSection v-if="node.type === 'blast_furnace' && slagInfo" tone="green" :show-more="false">
       <div class="card">
       <div class="kv2 slag-r2-row">
         <span>{{ t('二元碱度 R₂（CaO/SiO₂）') }}</span>
@@ -232,7 +232,7 @@
       </CollapseSection>
 
       <!-- ===== 附加传感 / 可变设备：传感器负责取数，可变设备只做设定 ===== -->
-      <CollapseSection :title="t('附加传感 / 可变设备')" tone="blue" :show-more="false">
+      <CollapseSection tone="blue" :show-more="false">
       <div class="card">
         <div class="pr-hint">{{ t('绑定方向：工序 ← 传感。数据源可选固定值 / 随机模拟 / 已接入传感器点位 / 随可变设备联动；电功率传感器（kW）即本工序核算的功率来源，可变设备设定值只调工况。') }}</div>
         <div v-for="ag in attachGroups" :key="ag.kind" class="ports-col">
@@ -327,7 +327,7 @@
             <input :ref="setNewNameEl" class="att-nm-in" v-model="addDraft.name" :placeholder="t('为该设备命名（留空用类型名）')"
                    @keyup.enter="confirmAddAttach()" @keyup.esc="addDraft.kind = ''" />
             <button class="att-nm-btn ok" :title="t('确定添加')" @click="confirmAddAttach()">{{ t('确定') }}</button>
-            <button class="att-nm-btn" :title="t('取消')" @click="addDraft.kind = ''">{{ t('取消') }}</button>
+            <button class="att-nm-btn" @click="addDraft.kind = ''">{{ t('取消') }}</button>
           </div>
         </div>
       </div>
@@ -336,7 +336,7 @@
 
     <!-- 设备节点 -->
     <template v-else-if="node.kind === 'device'">
-      <CollapseSection :title="node.metering ? t('计量设备（只读）') : t('可调设备（可设定）')" tone="blue" :show-more="false">
+      <CollapseSection tone="blue" :show-more="false">
       <div class="card">
         <div class="kv2"><span>{{ t('名称') }}</span><b>{{ node.name }}</b></div>
         <div class="kv2"><span>{{ t('类别') }}</span><b>{{ node.metering ? t('计量·监测') : t('可调·控制') }}</b></div>
@@ -349,7 +349,7 @@
       </div>
       </CollapseSection>
       <template v-if="!node.metering">
-        <CollapseSection :title="t('设定值')" tone="amber" :show-more="false">
+        <CollapseSection tone="amber" :show-more="false">
         <div class="card">
           <div class="param-row">
             <div class="pr-top"><span>{{ t('设定') }}</span><b>{{ node.setpoint }} <span class="u">{{ dSp(node).unit }}</span></b></div>
@@ -357,13 +357,13 @@
                    :value="node.setpoint" @input="store.setDeviceSetpoint(node.id, $event.target.value)" />
             <div class="pr-hint pr-range-row">
               <span>{{ t('量程') }}</span>
-              <input type="number" class="rg-in" :value="dSp(node).min" :title="t('下限')"
+              <input type="number" class="rg-in" :value="dSp(node).min"
                      @input="store.setFlowDeviceRange(node.id, { min: $event.target.value })" />
               <span class="rg-dash">–</span>
-              <input type="number" class="rg-in" :value="dSp(node).max" :title="t('上限')"
+              <input type="number" class="rg-in" :value="dSp(node).max"
                      @input="store.setFlowDeviceRange(node.id, { max: $event.target.value })" />
               <span class="rg-unit">{{ dSp(node).unit }}</span>
-              <input type="number" class="rg-in rg-step" :value="dSp(node).step||1" :title="t('步长')"
+              <input type="number" class="rg-in rg-step" :value="dSp(node).step||1"
                      @input="store.setFlowDeviceRange(node.id, { step: $event.target.value })" />
               <button v-if="node.range" class="rg-reset" :title="t('恢复默认量程')" @click="store.resetFlowDeviceRange(node.id)">↺</button>
             </div>
@@ -378,7 +378,7 @@
         </div>
         </CollapseSection>
       </template>
-      <CollapseSection :title="t('绑定到工序')" tone="green" :show-more="false">
+      <CollapseSection tone="green" :show-more="false">
       <div class="card">
         <select :value="node.boundTo || ''" @change="bindToProcess($event.target.value)">
           <option value="">{{ t('未绑定') }}</option>
@@ -391,7 +391,7 @@
 
     <!-- 原料源节点 -->
     <template v-else>
-      <CollapseSection :title="t('原料 / 产物源')" tone="blue" :show-more="false">
+      <CollapseSection tone="blue" :show-more="false">
       <div class="card">
         <div class="kv2"><span>{{ t('名称') }}</span><b>{{ matName(node.type) }}</b></div>
         <div class="kv2"><span>{{ t('类别') }}</span><b>{{ matCat }}</b></div>

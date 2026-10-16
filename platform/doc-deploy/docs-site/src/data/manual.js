@@ -195,7 +195,7 @@ export const sections = [
 
 1. **工具栏**：盒子接入 / 新建设备 / 刷新；状态行显示本地设备数与云端 CRD 生效数；
 2. **云端数据链路**：MQTT Broker 实时统计（在线客户端 / 累计收发 / 订阅数 / 版本 / 运行时长）、CloudCore 状态、证书与 Token 有效期（均由云端 cloud-agent 采集并经 MQTT 推送，非 SSH；云端不可达时明确报错，不伪造数据）；
-3. **实时消息流与发测试消息**：展示云端 Broker → 本平台的消息活动，可向云端 Broker 发布测试消息调试；
+3. **发测试消息**：向云端 Broker 发布测试消息调试；云端 Broker → 本平台的实时消息流统一并入底部命令行窗口「输出」页签显示；
 4. **设备管理**：DeviceModel / Device（KubeEdge 设备模型与实例）CRUD——五协议（Modbus / OPC-UA / Bluetooth / LoRaWAN / Cellular）创建表单、YAML 预览（dryRun）、保存本地配置 / 一键下发云端 K3s（apply）、删除；拓扑图展示云端 → 盒子 → 设备结构，点击设备可查看 DMI 实时读数；
 5. **盒子接入**：输入盒子主机名 / 云端 CloudCore IP / 盒子 IP，生成 edgecore.yaml（模板渲染）+ 共享 Token + CA 指纹 + 完整部署命令（① keadm join → ② 配置下发 → ③ 云端创建设备 → ④ box-deploy 采集包部署 → ⑤ 触发路由验证）。
 

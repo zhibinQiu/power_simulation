@@ -49,12 +49,11 @@ _DEV_NODE = {"mtime": 0, "map": {}}
 # ══════════════ 规则图求值（与前端 utils/ruleFlow.js 同源） ══════════════
 
 def _flow_path(graph: Dict[str, Any]) -> Dict[str, Any]:
-    """通路分析：只有「开始 → … → 结束」通路上的模块才会被执行。"""
+    """通路分析：只有与「开始」连通的模块才会被执行（「结束」端点已取消）。"""
     nodes = [n for n in ((graph or {}).get("nodes") or []) if isinstance(n, dict) and n.get("id")]
     edges = [e for e in ((graph or {}).get("edges") or []) if isinstance(e, dict)]
     by_id = {n["id"] for n in nodes}
     out: Dict[str, List[str]] = {}
-    inn: Dict[str, List[str]] = {}
     for e in edges:
         f, t = e.get("from"), e.get("to")
         if f not in by_id or t not in by_id:
@@ -62,9 +61,6 @@ def _flow_path(graph: Dict[str, Any]) -> Dict[str, Any]:
         out.setdefault(f, [])
         if t not in out[f]:
             out[f].append(t)
-        inn.setdefault(t, [])
-        if f not in inn[t]:
-            inn[t].append(f)
 
     def walk(seeds, nxt):
         seen = set()
@@ -80,11 +76,11 @@ def _flow_path(graph: Dict[str, Any]) -> Dict[str, Any]:
         return seen
 
     starts = [n["id"] for n in nodes if n.get("kind") == "start"]
-    ends = [n["id"] for n in nodes if n.get("kind") == "end"]
     fwd = walk(starts, out)
-    rev = walk(ends, inn)
-    live = {i for i in fwd if i in rev}
-    return {"starts": starts, "ends": ends, "live": live, "ok": any(e in fwd for e in ends)}
+    # 「卡片」= 除流程端点（开始）以外的模块；遗留的「结束」节点不计入孤立判定（由前端迁移清理）
+    cards = [n["id"] for n in nodes if n.get("kind") not in ("start", "end")]
+    lost = [i for i in cards if i not in fwd]
+    return {"starts": starts, "live": fwd, "lost": lost, "ok": bool(starts) and bool(cards) and not lost}
 
 
 def _cmp(a, op, b) -> bool:
@@ -137,10 +133,7 @@ def _eval_graph(graph, live_of, state) -> Dict[str, Any]:
     an = set()
     ae = set()
     branch = ""
-    pend = state.setdefault("pend", [])
-    if not fp["ok"]:
-        state["pend"] = []
-        return {"ok": False, "acts": [], "nodes": [], "edges": [], "branch": ""}
+    state.setdefault("pend", [])
     nmap = {n["id"]: n for n in nodes}
 
     def on_branch(v):
@@ -170,8 +163,6 @@ def _eval_graph(graph, live_of, state) -> Dict[str, Any]:
         ae.add(e.get("id"))
         an.add(tid)
         kind = tgt.get("kind")
-        if kind == "end":
-            return
         if kind == "if":
             eval_if(tgt, depth, visited)
             return
@@ -322,7 +313,7 @@ def _eval_graph(graph, live_of, state) -> Dict[str, Any]:
         for e in [x for x in edges if x.get("from") == sid]:
             advance(e, 0, visited)
 
-    return {"ok": True, "acts": acts, "nodes": sorted(an), "edges": sorted(x for x in ae if x), "branch": branch}
+    return {"ok": fp["ok"], "acts": acts, "nodes": sorted(an), "edges": sorted(x for x in ae if x), "branch": branch}
 
 
 # ══════════════ 读数 / 绑定 / 下发 ══════════════

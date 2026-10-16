@@ -403,8 +403,8 @@ onBeforeUnmount(clearPoll)
                 <div class="meta">{{ r.created_at }} · {{ r.length }} {{ t('字') }}</div>
               </div>
               <div class="actions">
-                <button @click="viewHtml(r.id)" :title="t('HTML 阅读页查看')">📖</button>
-                <button @click="downloadReport(r.id, r.title)" :title="t('下载 Markdown')">⬇</button>
+                <button @click="viewHtml(r.id)">📖</button>
+                <button @click="downloadReport(r.id, r.title)">⬇</button>
                 <button @click="removeReport(r.id)" :title="t('删除')">🗑</button>
               </div>
             </li>

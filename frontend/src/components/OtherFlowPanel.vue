@@ -2,13 +2,13 @@
   <div class="ofp">
     <!-- ===== 小组（双击进入子编排前的一层，点击成员可选中） ===== -->
     <div v-if="group">
-      <CollapseSection :title="t('工艺设备小组')" tone="blue">
+      <CollapseSection tone="blue" :default-open="true">
         <div class="card">
           <div class="kv2"><span>{{ t('名称') }}</span><b>{{ group.name }}</b></div>
           <div class="kv2"><span>{{ t('成员设备') }}</span><b>{{ group.members.length }} {{ t('台') }}</b></div>
         </div>
       </CollapseSection>
-      <CollapseSection :title="t('成员设备（点击查看/编辑）')" tone="teal" :show-more="false">
+      <CollapseSection tone="teal" :show-more="false">
         <div v-for="m in groupMembers" :key="m.id" class="lrow click" :class="{ active: m.id === store.selectedFlowId }" @click="store.selectFlow(m.id)">
           <div class="l-stack">
             <span class="l-tt">{{ m.name }}</span>
@@ -22,7 +22,7 @@
 
     <!-- ===== 未选中：编排方案总览 ===== -->
     <div v-else-if="!node">
-      <CollapseSection :title="t('编排方案总览')" tone="blue" :show-more="false">
+      <CollapseSection tone="blue" :show-more="false">
         <div class="chips">
           <div class="chip2"><span>{{ t('总功耗') }}</span><b>{{ fmt(totals.energy / 1000, 3) }}</b><i>MW</i></div>
           <div class="chip2"><span>{{ t('总碳排') }}</span><b>{{ fmt(totals.carbon) }}</b><i>kgCO₂/h</i></div>
@@ -33,7 +33,7 @@
         <div class="pr-hint">{{ methodHint }}</div>
       </CollapseSection>
 
-      <CollapseSection v-if="store.scheme.groups.length" :title="t('工艺设备小组（点击查看成员）')" tone="teal" :show-more="false">
+      <CollapseSection v-if="store.scheme.groups.length" tone="teal" :show-more="false">
         <div v-for="g in store.scheme.groups" :key="g.id" class="lrow click" :class="{ active: g.id === store.selectedGroupId }" @click="store.selectFlowGroup(g.id)">
           <div class="l-stack">
             <span class="l-tt">▦ {{ g.name }}</span>
@@ -42,7 +42,7 @@
         </div>
       </CollapseSection>
 
-      <CollapseSection :title="t('节点清单（点击查看/编辑）')" tone="amber" :show-more="false">
+      <CollapseSection tone="amber" :show-more="false">
         <div v-for="n in store.scheme.nodes" :key="n.id" class="lrow click" :class="{ active: n.id === store.selectedFlowId }" @click="store.selectFlow(n.id)">
           <div class="l-stack">
             <span class="l-tt">{{ n.name }}</span>
@@ -56,7 +56,7 @@
 
     <!-- ===== 工艺节点：属性 + 参数设定（资源包字典渲染，编辑即生效） ===== -->
     <div v-else-if="node.kind === 'process'">
-      <CollapseSection :title="t('工序 · ') + (procDef ? procDef.name : typeNameOf(node.type))" tone="blue">
+      <CollapseSection :title="t('工序 · ') + (procDef ? procDef.name : typeNameOf(node.type))" tone="blue" :default-open="true">
         <div class="card">
           <div class="kv2"><span>{{ t('名称') }}</span><b>{{ node.name }}</b></div>
           <div class="kv2"><span>{{ t('类型') }}</span><b>{{ procDef ? procDef.name : node.type }}</b></div>
@@ -69,7 +69,7 @@
       </CollapseSection>
 
       <!-- 运行指标：随参数编辑即时联动（功率 × 电网因子）；功率口径与实时折碳一致（实测功率优先） -->
-      <CollapseSection :title="t('运行指标 · 折碳核算')" tone="blue" :open="true">
+      <CollapseSection tone="blue" :open="true">
         <div class="chips">
           <div class="chip2"><span>{{ t('设定功率') }}</span><b>{{ fmt(packKwNow / 1000, 3) }}</b><i>MW</i></div>
           <div class="chip2"><span>{{ t('实时功耗') }}</span><b>{{ fmt(powerKwNow) }}</b><i>kW</i></div>
@@ -94,7 +94,7 @@
       </CollapseSection>
 
       <!-- 工艺参数设定（可编辑：功率等参数改动立即反映到上方折碳） -->
-      <CollapseSection :title="t('工艺参数设定')" tone="amber" :show-more="false">
+      <CollapseSection tone="amber" :show-more="false">
         <div class="card">
           <div v-for="p in paramDefs" :key="p.key" class="param-row">
             <div class="pr-top">
@@ -111,7 +111,7 @@
       </CollapseSection>
 
       <!-- 输入 / 输出物料（资源包模板固定，端口中文名） -->
-      <CollapseSection v-if="ioRows.length" :title="t('输入 / 输出')" tone="green" :show-more="false">
+      <CollapseSection v-if="ioRows.length" tone="green" :show-more="false">
         <div class="card">
           <div class="ports-col">
             <span class="pc-t">{{ t('输入') }}</span>
@@ -132,7 +132,7 @@
       </CollapseSection>
 
       <!-- 附加传感 / 可变设备 -->
-      <CollapseSection :title="t('附加传感 / 可变设备')" tone="blue" :show-more="false">
+      <CollapseSection tone="blue" :show-more="false">
         <div class="card">
           <div v-for="ag in attachGroups" :key="ag.kind" class="ports-col">
             <span class="pc-t">{{ ag.label }}（{{ t('已绑') }} {{ attachedOf(ag.kind).length }}）</span>
@@ -223,7 +223,7 @@
               <input :ref="setNewNameEl" class="att-nm-in" v-model="addDraft.name" :placeholder="t('为该设备命名（留空用类型名）')"
                      @keyup.enter="confirmAddAttach()" @keyup.esc="addDraft.kind = ''" />
               <button class="att-nm-btn ok" :title="t('确定添加')" @click="confirmAddAttach()">{{ t('确定') }}</button>
-              <button class="att-nm-btn" :title="t('取消')" @click="addDraft.kind = ''">{{ t('取消') }}</button>
+              <button class="att-nm-btn" @click="addDraft.kind = ''">{{ t('取消') }}</button>
             </div>
           </div>
           <div class="pr-hint">{{ t('能碳口径：附加的「电功率传感器（kW）」读数即折碳功率来源；可变设备设定值只调工况、不参与折碳。') }}</div>
@@ -233,7 +233,7 @@
 
     <!-- ===== 设备节点 ===== -->
     <div v-else-if="node.kind === 'device'">
-      <CollapseSection :title="node.metering ? t('计量设备（只读）') : t('可调设备')" tone="blue" :show-more="false">
+      <CollapseSection tone="blue" :show-more="false">
         <div class="card">
           <div class="kv2"><span>{{ t('名称') }}</span><b>{{ node.name }}</b></div>
           <div class="kv2"><span>{{ t('类别') }}</span><b>{{ node.metering ? t('计量·监测') : t('可调·控制') }}</b></div>
@@ -253,7 +253,7 @@
 
     <!-- ===== 其它（原料源等，钢铁场景专属概念） ===== -->
     <div v-else>
-      <CollapseSection :title="t('节点属性')" tone="blue" :show-more="false">
+      <CollapseSection tone="blue" :show-more="false">
         <div class="card">
           <div class="kv2"><span>{{ t('名称') }}</span><b>{{ node.name || node.type }}</b></div>
         </div>

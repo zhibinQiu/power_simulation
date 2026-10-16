@@ -7,7 +7,7 @@
             <Icon name="bolt" :size="15" />
             <span>{{ t('碳素流守恒审计') }}</span>
           </div>
-          <button class="x-btn lg" @click="close" :title="t('关闭 (Esc)')">✕</button>
+          <button class="x-btn lg" @click="close">✕</button>
         </div>
         <div class="am-body">
           <div class="am-row">

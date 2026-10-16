@@ -9,7 +9,7 @@
         <input v-model="kw" type="text" class="sp-input" :placeholder="t('搜索工艺、设备、物料、策略…')" />
         <button v-if="kw" class="x-btn sm" :title="t('清除搜索')" @click="kw = ''">✕</button>
       </div>
-      <label class="sp-scene" :class="{ on: onlyScene }" :title="t('仅显示已部署到场景中的资源')">
+      <label class="sp-scene" :class="{ on: onlyScene }">
         <input type="checkbox" v-model="onlyScene" />
         <span>{{ t('仅场景') }}</span>
       </label>

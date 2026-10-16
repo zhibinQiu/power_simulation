@@ -1,7 +1,7 @@
 <template>
   <aside class="inspector">
     <!-- 宽度拖拽手柄（左侧边缘） -->
-    <div class="inspector-rsz" :class="{ dragging: rszDragging }" @mousedown.prevent="onRszStart" :title="t('拖拽调整宽度')"></div>
+    <div class="inspector-rsz" :class="{ dragging: rszDragging }" @mousedown.prevent="onRszStart"></div>
     <!-- 本析智擎模式：按需隐藏顶部标题栏与关闭按钮（窗口内自含工具条） -->
     <div v-if="mode !== 'agent'" class="sidebar-head">
       <span class="ttl">{{ headTitle }}</span>
@@ -103,7 +103,7 @@
                 <div class="cd-row">
                   <span class="cd-name" style="background:var(--green)">{{ t('主产品') }}</span>
                   <span class="cd-qty">
-                    <select class="q-in rev-sel" v-model="revMainId" :title="t('自动匹配产线终端产品，或手动指定')">
+                    <select class="q-in rev-sel" v-model="revMainId">
                       <option value="auto">{{ t('自动匹配（按产线终端工序）') }}</option>
                       <option v-for="p in PRODUCTS" :key="p.id" :value="p.id">{{ p.name }} · {{ fmt(revPriceOf(p.id)) }} 万元/{{ p.unit }}</option>
                     </select>
@@ -168,8 +168,8 @@
               <div v-if="carbOpen" class="cost-detail carb-detail">
                 <div class="cd-head">{{ t('预估碳成本 = (年配额 n − 到年底排放 m) × 实时碳价 p（均为范围一）') }}</div>
                 <div class="carb-edit">
-                  <label>{{ t('企业年配额 n') }}<input class="q-in" v-model="quotaDraft" type="number" min="0" step="100000" :title="t('单位：tCO₂/年')" @change="onQuotaEdit" /></label>
-                  <label>{{ t('实时碳价 p') }}<input class="q-in" v-model="priceDraft" type="number" min="0" step="0.0001" :title="t('单位：万元/tCO₂')" @change="onPriceEdit" /></label>
+                  <label>{{ t('企业年配额 n') }}<input class="q-in" v-model="quotaDraft" type="number" min="0" step="100000" @change="onQuotaEdit" /></label>
+                  <label>{{ t('实时碳价 p') }}<input class="q-in" v-model="priceDraft" type="number" min="0" step="0.0001" @change="onPriceEdit" /></label>
                 </div>
                 <div v-for="row in carbDetail" :key="row.k" class="cd-row">
                   <span class="cd-name" :style="{ background: row.color || 'var(--panel-3)' }">{{ row.k }}</span>

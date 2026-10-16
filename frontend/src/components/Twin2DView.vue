@@ -182,7 +182,7 @@
         </g>
       </svg>
       <!-- 适配画布：原顶部 KPI 条已移除，按钮改为画布右下角悬浮（双击画布同效） -->
-      <button type="button" class="t2d-fit" @click.stop="fitAll()" :title="t('适配画布（双击也可）')">{{ t('适配') }}</button>
+      <button type="button" class="t2d-fit" @click.stop="fitAll()">{{ t('适配') }}</button>
     </div>
 
     <!-- 空方案提示 -->

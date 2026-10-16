@@ -88,8 +88,8 @@
           <a class="rp-link" :href="report.url" target="_blank" rel="noopener">
             {{ t('新页面查看 ↗') }}
           </a>
-          <button class="rp-btn" :title="t('下载 Markdown 文件')" @click="download">{{ t('下载') }}</button>
-          <button class="rp-btn" :title="t('复制 Markdown 全文')" @click="copy">{{ t('复制') }}</button>
+          <button class="rp-btn" @click="download">{{ t('下载') }}</button>
+          <button class="rp-btn" @click="copy">{{ t('复制') }}</button>
         </div>
         <div class="rp-meta-line">
           <span>{{ report.title }}</span>

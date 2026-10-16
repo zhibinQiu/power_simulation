@@ -5,7 +5,7 @@
   <div class="vw-tabs">
     <!-- 首项固定标签 = 主视图槽位：3D 数字孪生 ⇄ HMI人机交互屏（二者对等，切换不新增 tab） -->
     <button class="vw-tab vw-scene" :class="{ on: !store.activeViewId }" @click="store.activateView(null)"
-            :title="mainTitle">
+           >
       <span class="vw-t">{{ mainTitle }}</span>
     </button>
     <button v-for="id in store.openViews" :key="id" class="vw-tab" :class="{ on: store.activeViewId === id }"
@@ -13,7 +13,7 @@
       <span class="vw-t">{{ t(VIEW_TITLE[id] || id) }}</span>
       <!-- 未保存改动标记（VS Code 风格）：标题右侧一个 *，点击标签即可切回去在工具条保存 / Ctrl+S -->
       <i v-if="isDirty(id)" class="vw-star">*</i>
-      <span class="vw-x" :title="id === 'flowEdit' ? t('完成编排并关闭') : t('关闭该窗口')" @click.stop="close(id)">✕</span>
+      <span class="vw-x" @click.stop="close(id)">✕</span>
     </button>
   </div>
 </template>
@@ -40,12 +40,12 @@ function tabTip(id) {
 </script>
 
 <style scoped>
-/* 标签条：占用工具栏行（grid-area: toolbar），与 Ribbon 同高（--head-h 28px）；
+/* 标签条：占用工具栏行（grid-area: toolbar），与 Ribbon 同高（--bar-h，行高令牌）；
    度量/字号与左栏分类 tab、底部面板页签一致，但激活态不同 —— 本条与下方工具条同底融为一体，
    不加主题色指示线（见 .vw-tab.on 与 main.css 页签激活指示的例外说明） */
 .vw-tabs {
   grid-area: toolbar;
-  display: flex; align-items: stretch; height: var(--head-h);
+  display: flex; align-items: stretch; height: var(--bar-h);
   background: var(--panel-2); 
   border-left: 1px solid var(--border); border-right: 1px solid var(--border);
   overflow-x: auto; overflow-y: hidden; user-select: none;

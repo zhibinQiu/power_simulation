@@ -80,6 +80,26 @@ def test_external_file_change_is_picked_up(store, tmp_path):
     assert store.read_scene("flow", "steel") == {"v": 99}
 
 
+def test_prev_snapshot_keeps_last_version(store, tmp_path):
+    """整档覆盖写前必须留一版 .prev：某端把默认模板提交上来时可直接回滚。
+
+    背景（编排「莫名其妙回到默认」顽疾）：前端在服务端存档读取失败时会按模板重建
+    默认方案，此前照旧落盘就把真档抹掉了。留 .prev 让运维能 cp 回来。
+    """
+    store.write_scene("flow", "steel", {"nodes": [{"id": "bf"}]})
+    prev = os.path.join(str(tmp_path), "flow.json.prev")
+    assert not os.path.exists(prev)   # 首次写入（无旧文件）不留
+    store.write_scene("flow", "steel", {"nodes": []})   # 模拟被默认/空方案覆盖
+    assert os.path.exists(prev)
+    import json
+    with open(prev, "r", encoding="utf-8") as f:
+        assert json.load(f)["steel"]["nodes"] == [{"id": "bf"}]
+    # 再写一次：.prev 只保留最近一版（不累积文件）
+    store.write_scene("flow", "steel", {"nodes": [{"id": "ea"}]})
+    with open(prev, "r", encoding="utf-8") as f:
+        assert json.load(f)["steel"]["nodes"] == []
+
+
 # ---------------- HTTP 接口 ----------------
 
 @pytest.fixture()
@@ -108,33 +128,23 @@ def test_api_rejects_bad_input(client):
     assert client.put("/api/designs/flow", json={"scene": "../x", "data": {}}).status_code == 400
 
 
-# ---------------- 删除墓碑（条目级合并下的删除必须持久） ----------------
+# ---------------- 整档覆盖（last-writer-wins）：提交什么存什么，不提交即删除 ----------------
 
-def test_removed_item_stays_deleted(store):
-    """删除声明必须被服务端记住：另一端带着旧档保存时不得把已删条目写回。
+def test_write_is_whole_scene_overwrite(store):
+    """存档语义为整档覆盖：本次没提交的条目即视为删除，另一端带旧档保存会原样覆盖。
 
-    背景：条目级合并「缺项不隐含删除」解决了多人互抹，但带来新坑 —— A 删掉 m1 后，
-    B（拉到的旧档里还有 m1）任何一次保存都会把 m1 原样写回，前端 8s 轮询拉回时
-    卡片复活，表现为「点删除没反应」。
+    背景：此前用 removed / hidden 墓碑防止「删了又被写回」，用户明确否决该机制
+    （复杂且会让真正的删除难以推理）。现在的口径是单一真源 + 整档覆盖，
+    代价是多端同时编辑时后写者胜，由使用者避免并发编辑来规避。
     """
     store.write_scene("agc", "dc-thermal", {"designs": [{"id": "m1"}, {"id": "m2"}]})
-    # A 端删除 m1
-    store.write_scene("agc", "dc-thermal", {"designs": [{"id": "m2"}], "removed": ["m1"]})
+    assert [i["id"] for i in store.read_scene("agc", "dc-thermal")["designs"]] == ["m1", "m2"]
+    # 删除 m1：不提交即为删除，无需任何墓碑声明
+    store.write_scene("agc", "dc-thermal", {"designs": [{"id": "m2"}]})
     assert [i["id"] for i in store.read_scene("agc", "dc-thermal")["designs"]] == ["m2"]
-    # B 端（旧档含 m1）随后保存：m1 不得复活
+    # 另一端拿着旧档保存：后写者胜（不再有墓碑把 m1 拦掉）
     store.write_scene("agc", "dc-thermal", {"designs": [{"id": "m1"}, {"id": "m2"}, {"id": "m3"}]})
-    assert [i["id"] for i in store.read_scene("agc", "dc-thermal")["designs"]] == ["m2", "m3"]
-    # 其它场景不受影响（墓碑按场景分档）
-    store.write_scene("agc", "steel", {"designs": [{"id": "m1"}]})
-    assert [i["id"] for i in store.read_scene("agc", "steel")["designs"]] == ["m1"]
-
-
-def test_hidden_builtin_tombstone_is_union(store):
-    """内置示例墓碑取并集：任一端的保存（不带该字段）不得抹掉另一端的「已删除」。 """
-    store.write_scene("agc", "dc-thermal",
-                      {"designs": [], "hidden": ["dc_cool_rule_50c"]})
-    store.write_scene("agc", "dc-thermal", {"designs": [], "hidden": []})
-    assert store.read_scene("agc", "dc-thermal")["hidden"] == ["dc_cool_rule_50c"]
-    # 另一端新删的示例并入
-    store.write_scene("agc", "dc-thermal", {"designs": [], "hidden": ["other_example"]})
-    assert sorted(store.read_scene("agc", "dc-thermal")["hidden"]) == ["dc_cool_rule_50c", "other_example"]
+    assert [i["id"] for i in store.read_scene("agc", "dc-thermal")["designs"]] == ["m1", "m2", "m3"]
+    # 按场景分档，互不影响
+    store.write_scene("agc", "steel", {"designs": [{"id": "s1"}]})
+    assert [i["id"] for i in store.read_scene("agc", "steel")["designs"]] == ["s1"]

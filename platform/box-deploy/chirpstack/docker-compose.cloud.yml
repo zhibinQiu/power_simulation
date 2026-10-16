@@ -1,0 +1,70 @@
+# ============================================================================
+# 云端版 ChirpStack v4（部署在平台服务器，如 36.151.146.71）
+#
+# 与盒子本地版（docker-compose.yml，host 网络）的区别：
+#   * 云端 docker 的 iptables 正常，用默认 bridge 网络 + 端口映射
+#   * 端口遵循 >40000 规范：UI 8080 → 41080；LoRa MQTT 1883 → 41884（仅回环）
+#   * UDP 1700 是网关固件固定端口，无法改，需在云厂商安全组放行（建议仅放行网关 IP）
+#   * 云端有网，镜像可直接 docker pull（deploy_chirpstack.sh install --cloud --online）
+#
+# 适用：联调/测试、ABP 节点纯上行场景；生产主链路（OTAA 入网、下行控制）
+#       建议仍用盒子本地版 docker-compose.yml，原因见 README「LNS 放在哪」。
+# ============================================================================
+services:
+  chirpstack:
+    image: chirpstack/chirpstack:4.19.1
+    command: -c /etc/chirpstack
+    restart: unless-stopped
+    volumes:
+      - ./configuration/chirpstack:/etc/chirpstack
+    environment:
+      - MQTT_BROKER_HOST=mosquitto-lora
+      - POSTGRESQL_HOST=postgres
+      - REDIS_HOST=redis
+    ports:
+      - "41080:8080"
+    depends_on:
+      - postgres
+      - redis
+      - mosquitto-lora
+
+  chirpstack-gateway-bridge:
+    image: chirpstack/chirpstack-gateway-bridge:4.1.2
+    restart: unless-stopped
+    volumes:
+      - ./configuration/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge
+    ports:
+      - "1700:1700/udp"
+    depends_on:
+      - mosquitto-lora
+
+  postgres:
+    image: postgres:14-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=chirpstack
+      - POSTGRES_PASSWORD=chirpstack
+      - POSTGRES_DB=chirpstack
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - ./configuration/postgresql/initdb:/docker-entrypoint-initdb.d
+      - postgresqldata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    command: redis-server --save 300 1 --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru
+
+  mosquitto-lora:
+    image: eclipse-mosquitto:2.0.22
+    restart: unless-stopped
+    volumes:
+      - ./configuration/mosquitto-lora/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    ports:
+      - "127.0.0.1:41884:1883"
+
+volumes:
+  postgresqldata:
+  redisdata:

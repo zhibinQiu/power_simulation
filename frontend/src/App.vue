@@ -5,7 +5,7 @@
     <TopBar :menus="menus" ref="topBarRef" @export="onExport" @help="openDocsSite('promo')" @toggle-agent="toggleAgent" />
 
     <!-- 最左侧活动栏（VS Code 式）：资源管理器（左栏入口） / 资源管理 / 搜索 / 连接 -->
-    <ActivityBar />
+    <ActivityBar @preload-view="preloadView" />
     <!-- 左侧栏：园区资产（工艺 / 设备 / 原料 / 策略）；收起时由 .left-collapsed 置列宽 0 + 裁切，实现平滑滑出。
          key 绑定「场景 id + 场景版本」：切换场景时强制重建，清空树折叠态 / 当前 tab 等本地状态，避免残留旧场景目录 -->
     <LeftSidebar :key="'ls:' + store.sceneId + ':' + store.sceneVersion" :dragging="lResizing" @rsz="startLeftResize" />
@@ -17,14 +17,17 @@
     <main class="stage">
       <!-- 工程选择（欢迎页）：启动后先停在这里，左栏保留，内容区做工程选择；
            打开 / 新建工程后由 store.welcomeOn = false 进入主界面。 -->
-      <WelcomeView v-if="store.welcomeOn" @new-scene="sceneFileMode = 'new'" @open-scene="sceneFileMode = 'open'" />
-      <template v-else>
+      <WelcomeView v-if="store.welcomeOn && store.activeViewId !== 'boxManage'" @new-scene="sceneFileMode = 'new'" @open-scene="sceneFileMode = 'open'" />
+      <template v-else-if="!store.welcomeOn">
       <!-- 主视图槽位：HMI人机交互屏与 3D 数字孪生对等，二者互斥切换且都不产生 tab -->
       <SceneViewer v-if="sceneMounted" v-show="!store.activeViewId && !store.overviewOn" />
       <DataOverview v-if="store.overviewOn" v-show="!store.activeViewId" />
+      </template>
       <!-- 功能视图窗口（tab 模式）：窗口内顶部为当前视图的工具栏，下方为视图内容。
            流程编排同样以窗口 + tab 形式打开（标签「流程编排」），与三维仿真 / 其它视图自由切换；
-           编排草稿随编辑态保留，关闭该标签即完成编排并应用方案。 -->
+           编排草稿随编辑态保留，关闭该标签即完成编排并应用方案。
+           数据源管理属全局配置入口，在欢迎页也可直接打开，故视图窗口与欢迎页解耦，
+           在非欢迎页场景（有 tab 时）保持铺满中间内容区原有布局。 -->
       <section v-if="store.openViews.length || store.editMode" class="view-window" :class="{ 'on-scene': !store.activeViewId }">
         <!-- AI 群控（PID·EKF 控制台）顶部工具栏已移除：控制台自身含标题与操作，无需 35px 工具行 -->
         <RibbonToolbar v-if="!store.aiGroupOn" :actions="ribbonActions" />
@@ -47,17 +50,18 @@
           <div v-if="viewOpened('energyFlow')" v-show="store.activeViewId === 'energyFlow'" class="vw-pane">
             <EnergyFlowView />
           </div>
-          <div v-if="viewOpened('boxManage')" v-show="store.activeViewId === 'boxManage'" class="vw-pane flush-pane">
+          <!-- 数据源管理：打开过即常驻挂载（v-show 隐藏），关闭 tab 不销毁，避免每次进入都重新拉一遍数据 -->
+          <div v-if="boxMounted" v-show="store.activeViewId === 'boxManage'" class="vw-pane flush-pane">
             <CarbonBoxView ref="boxViewRef" />
           </div>
         </div>
       </section>
-      </template>
     </main>
 
     <!-- 顶栏下方一行：tab 模式（有功能视图窗口，含流程编排）显示视图标签条，工具栏已移入对应 tab 内部；
-         非 tab 模式（纯三维仿真，无打开窗口）显示原工具条。欢迎页（未打开工程）无工具条。 -->
-    <template v-if="!store.welcomeOn">
+         非 tab 模式（纯三维仿真，无打开窗口）显示原工具条。欢迎页（未打开工程）无工具条，
+         但数据源管理可在欢迎页直接打开，此时仍需标签条（否则无法退出该视图）。 -->
+    <template v-if="!store.welcomeOn || store.activeViewId === 'boxManage'">
       <ViewTabBar v-if="tabMode" />
       <RibbonToolbar v-else :actions="ribbonActions" />
     </template>
@@ -91,11 +95,11 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, watchEffect, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useSimStore } from './stores/sim'
 import { t } from './i18n'
 import { accent, themeMode } from './theme'
-import { lazyDialog } from './utils/asyncComp'
+import { lazyDialog, lazyView } from './utils/asyncComp'
 import ToastLayer from './components/ToastLayer.vue'
 import TaskProgress from './components/TaskProgress.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
@@ -132,14 +136,31 @@ const SceneFileDialog = defineAsyncComponent(() => import('./components/SceneFil
 // 3D 数字孪生场景：three.js（~500KB）+ 场景构建代码体积巨大，改为异步加载。
 // 首次进入数字孪生视图（默认即此视图）时才开始加载，加载后保持挂载，
 // 不销毁 WebGL 上下文（切换视图速度与原先一致）；首屏只渲染 UI 框架，不阻塞。
-const SceneViewer = defineAsyncComponent(() => import('./components/SceneViewer.vue'))
-const DataView = defineAsyncComponent(() => import('./components/DataView.vue'))
-const CarbonAssistantView = defineAsyncComponent(() => import('./views/CarbonAssistantView.vue'))
-const CarbonCalcView = defineAsyncComponent(() => import('./components/CarbonCalcView.vue'))
-const EnergyFlowView = defineAsyncComponent(() => import('./components/EnergyFlowView.vue'))
-const CarbonBoxView = defineAsyncComponent(() => import('./components/CarbonBoxView.vue'))
-const DataOverview = defineAsyncComponent(() => import('./components/DataOverview.vue'))
-const FlowEditor = defineAsyncComponent(() => import('./components/FlowEditor.vue'))
+function cachedLoader(factory) {
+  let pending = null
+  return () => {
+    if (!pending) pending = factory().catch((error) => { pending = null; throw error })
+    return pending
+  }
+}
+
+const loadSceneViewer = cachedLoader(() => import('./components/SceneViewer.vue'))
+const loadDataView = cachedLoader(() => import('./components/DataView.vue'))
+const loadCarbonAssistant = cachedLoader(() => import('./views/CarbonAssistantView.vue'))
+const loadCarbonCalc = cachedLoader(() => import('./components/CarbonCalcView.vue'))
+const loadEnergyFlow = cachedLoader(() => import('./components/EnergyFlowView.vue'))
+const loadCarbonBox = cachedLoader(() => import('./components/CarbonBoxView.vue'))
+const loadDataOverview = cachedLoader(() => import('./components/DataOverview.vue'))
+const loadFlowEditor = cachedLoader(() => import('./components/FlowEditor.vue'))
+
+const SceneViewer = lazyView(loadSceneViewer, { label: t('三维仿真'), delay: 0 })
+const DataView = lazyView(loadDataView, { label: t('数据分析') })
+const CarbonAssistantView = lazyView(loadCarbonAssistant, { label: t('碳资产管理') })
+const CarbonCalcView = lazyView(loadCarbonCalc, { label: t('全景碳核查') })
+const EnergyFlowView = lazyView(loadEnergyFlow, { label: t('能流分析') })
+const CarbonBoxView = lazyView(loadCarbonBox, { label: t('数据源管理') })
+const DataOverview = lazyView(loadDataOverview, { label: t('HMI人机交互屏') })
+const FlowEditor = lazyView(loadFlowEditor, { label: t('流程编排'), delay: 0 })
 
 // 等待视图组件挂载完成：懒加载组件首次打开需异步加载代码，ref 可能延迟可用。
 // 用 watch 等 ref 由 null 变为组件实例，而不是 setInterval 每 80ms 轮询一次
@@ -189,17 +210,64 @@ function markPanelAnim() {
 }
 watch(() => [store.leftOpen, store.rightOpen, store.bottomOpen], () => markPanelAnim())
 
-// 3D 场景挂载标记：首次加载后保持 true，避免卸载 WebGL 上下文（切换视图速度不受影响）
+// 深色模式同步到 body：高炉数值仿真弹窗等对话框用 <Teleport to="body"> 渲染，
+// 不在 .app 作用域内，拿不到 .app.sim-dark 上那套深色变量（只会继承 :root 的浅色），
+// 表现为「深色界面里弹出白色弹窗」。把同一状态挂到 body，让弹窗与主界面同主题。
+watchEffect(() => {
+  if (typeof document === 'undefined') return
+  document.body.classList.toggle('sim-dark', !!store.simMode || themeMode.value === 'dark')
+})
+
+// 3D 场景首次加载后保持挂载，避免切视图时反复销毁 WebGL 上下文。
 const sceneMounted = ref(false)
-// 空闲时挂载 3D 场景 chunk：欢迎页（未打开工程）阶段不加载 three.js，首屏只渲染 UI 框架
-const mountSceneIdle = () => {
-  if (sceneMounted.value) return
-  const mountScene = () => { sceneMounted.value = true }
-  if (window.requestIdleCallback) window.requestIdleCallback(mountScene, { timeout: 1500 })
-  else setTimeout(mountScene, 300)
+function preloadSceneViewer() {
+  if (!store.sceneLoad.active) store.beginSceneLoad('code')
+  return loadSceneViewer().catch((error) => {
+    store.failSceneLoad(error && error.message ? error.message : String(error))
+    throw error
+  })
 }
-// 欢迎页 → 主界面时再挂载 3D（欢迎页阶段不加载）；在 onMounted 内注册，卸载时注销
+const viewLoaders = {
+  flowEdit: loadFlowEditor,
+  dataView: loadDataView,
+  aiGroup: loadDataView,
+  carbonMarket: loadCarbonAssistant,
+  carbonCalc: loadCarbonCalc,
+  energyFlow: loadEnergyFlow,
+  boxManage: loadCarbonBox,
+  overview: loadDataOverview,
+}
+function preloadView(id) {
+  const loader = viewLoaders[id]
+  if (loader) loader().catch(() => {})
+}
+function preloadWorkspaceCore() {
+  preloadSceneViewer().catch(() => {})
+  loadFlowEditor().catch(() => {})
+}
+function mountSceneNow() {
+  if (sceneMounted.value) return
+  preloadSceneViewer().catch(() => {})
+  sceneMounted.value = true
+}
+function scheduleCommonViewPreload() {
+  const run = () => {
+    loadDataView().catch(() => {})
+    loadCarbonAssistant().catch(() => {})
+    loadCarbonCalc().catch(() => {})
+    loadEnergyFlow().catch(() => {})
+    loadCarbonBox().catch(() => {})
+    loadDataOverview().catch(() => {})
+    import('./views/AgentChatView.vue').catch(() => {})
+    import('./components/UnitCarbonDetail.vue').catch(() => {})
+    import('./components/FlowInspector.vue').catch(() => {})
+  }
+  if (window.requestIdleCallback) window.requestIdleCallback(run, { timeout: 2000 })
+  else setTimeout(run, 600)
+}
+// 欢迎页 → 主界面时挂载 3D；场景装载一开始即预取代码，与资源请求并行。
 let stopWelcomeWatch = null
+let stopSceneBusyWatch = null
 const topBarRef = ref(null)
 const consoleRef = ref(null)
 // 视图组件引用：供各视图工具栏（RibbonToolbar）调用其内部动作（刷新行情 / 刷新数据等）
@@ -245,16 +313,23 @@ function focusSel(mode) {
 }
 function onOverview() { store.viewUnit('__overview__', 'overview') }
 function onAutoLayout() { store.autoLayout(); store.refresh(); store.sceneRev++ }
-function onToggleEdit() { if (store.editMode) store.exitEdit(); else store.enterEdit() }
+function onToggleEdit() { preloadView('flowEdit'); if (store.editMode) store.exitEdit(); else store.enterEdit() }
 // 编排动作（载入模板 / 清空画布 / 自动布局…）前置：未进入编排则进入；已在编排但当前在其它 tab 则切回编排标签
-function ensureEdit() { if (!store.editMode) store.enterEdit(); else store.activateView('flowEdit') }
+function ensureEdit() { preloadView('flowEdit'); if (!store.editMode) store.enterEdit(); else store.activateView('flowEdit') }
 // 当前场景是否提供该模板 id（编排菜单据此决定模板项显隐）
-function hasTemplate(id) { return (store.sceneTemplates || []).some((t) => t.id === id || t.route === id) }
+function hasTemplate(id) {
+  const fromTemplates = (store.sceneTemplates || []).some((t) => t.id === id || t.route === id)
+  if (fromTemplates) return true
+  const routes = store.scenePack?.meta?.routes || store.sceneIndex?.find((s) => s.id === store.sceneId)?.routes
+  return (routes || []).includes(id)
+}
 function loadExample(route) { ensureEdit(); store.loadTemplate(route) }
 function clearScheme() { ensureEdit(); store.clearScheme() }
 // 编排手动保存：改动只反映在编排画布（草稿），点「保存」才写入本地存档 + 服务端 designs/flow，
 // 并同步为已应用方案 —— 3D 数字孪生 / 2D 工艺图 / KPI 自此才切换到新的编排内容
 function saveScheme() {
+  // AI 群控编排同样是手动保存：Ctrl+S 落在群控视图上时转发给它（由其自行落库 agc 桶）
+  if (store.activeViewId === 'aiGroup') { store.requestAgcSave(); return }
   if (!store.editMode) { store.showToast(t('编排保存仅在流程编排模式下可用'), 'info'); return }
   store.saveScheme()
 }
@@ -293,6 +368,11 @@ function onAbout() { store.openAbout() }
 
 // 功能视图是否已打开（窗口已挂载）：用于决定视图组件是否创建（关闭的窗口才销毁组件）
 const viewOpened = (id) => store.openViews.includes(id)
+// 「数据源管理」：一旦打开过就保持挂载，关闭 tab 只隐藏不销毁。
+// 该视图首屏要拉设备清单 / 云端 CRD / agent 状态 / 数据源目录等多路数据（云端不可达时还要等满超时），
+// 销毁重建会让每次进入都重新加载一遍；组件内部在未激活时会停掉轮询与观察器，隐藏期间零请求。
+const boxMounted = ref(false)
+watch(() => store.openViews.includes('boxManage'), (on) => { if (on) boxMounted.value = true }, { immediate: true })
 // tab 模式：已打开任何视图窗口（功能视图 / 流程编排）—— 顶栏下方让位给视图标签条，
 // 各视图工具栏移入窗口内部（tab 下方），随 tab 切换一起变化
 const tabMode = computed(() => store.openViews.length > 0)
@@ -323,7 +403,7 @@ function openAiModel(id) {
 }
 // AI 群控视图（AI → AI群控 / 活动栏按钮共用）：与数据分析同布局、无 tab，
 // 内容区左右两栏：左「训练前测试」（滤波 → 稳态闭环控制实验）｜右「训练相关设定」（低能耗稳态寻优训练，GA/PSO/RL）
-function openAiGroup() { store.openAiGroup() }
+function openAiGroup() { preloadView('aiGroup'); store.openAiGroup() }
 // 碳资产管理视图：刷新行情（CarbonAssistantView 暴露的 loadAll）
 async function marketRefresh() { await waitViewRef(marketViewRef); if (marketViewRef.value?.loadAll) marketViewRef.value.loadAll() }
 // 碳资产管理视图：切换品种（CEA / CCER）与预测叠加开关（CarbonAssistantView 暴露）
@@ -338,17 +418,18 @@ const marketForecastOn = () => !!(marketViewRef.value?.forecastOn)
 const marketTabOn = () => marketViewRef.value?.tab || 'market'
 // 顶栏菜单：打开碳资产管理窗口并切换到指定页签（market 行情 / ledger 台账）
 const marketSubNav = async (id) => {
+  preloadView('carbonMarket')
   store.openView('carbonMarket')
   await waitViewRef(marketViewRef)
   if (marketViewRef.value) marketViewRef.value.switchTab(id)
 }
 // 顶栏「视图」菜单：打开数据源管理（能碳一体机 + 外部数据源统一接入；
 // 原「数据概览 / 设备管理」两页签已合并为同一界面，对外名称为「数据源管理」）
-const boxSubNav = () => { store.openView('boxManage') }
+const boxSubNav = () => { preloadView('boxManage'); store.openView('boxManage') }
 // 碳资产管理视图：刷新企业台账（CarbonAssistantView 暴露的 refreshLedger，转发到台账面板 loadAll）
 const marketLedgerRefresh = async () => { await waitViewRef(marketViewRef); if (marketViewRef.value?.refreshLedger) marketViewRef.value.refreshLedger() }
 // 工具栏「三维仿真/HMI人机交互屏」切换：中间 3D 场景 ↔ 企业实时运行 HMI 大屏
-function toggleOverview() { store.toggleOverview() }
+function toggleOverview() { preloadView('overview'); store.toggleOverview() }
 // 工具栏「本析智擎」切换：右侧属性弹窗 ↔ 智能体对话界面（中间 3D 场景保持）
 function toggleAgent() { store.toggleAgent() }
 
@@ -415,7 +496,7 @@ const menus = computed(() => [
   { id: 'tools', label: t('工具'), items: [
     // AI（原顶层「AI」菜单整体下沉到工具菜单）：数据分析 / 群控 + 知识库 / 智能体 / 技能 / 本体
     { sub: true, label: t('AI'), items: () => [
-      { label: t('数据分析'), toggle: () => store.dataViewOn, act: () => store.toggleDataView() },
+      { label: t('数据分析'), toggle: () => store.dataViewOn, act: () => { preloadView('dataView'); store.toggleDataView() } },
       { label: t('AI群控'), toggle: () => store.aiGroupOn, act: () => openAiGroup() },
       { sep: true },
       { label: t('行业知识库'), act: () => { showKnowledgeManage.value = true } },
@@ -427,7 +508,7 @@ const menus = computed(() => [
     // 双碳：碳素流审计 / 全景碳核查 / 碳资产管理
     { sub: true, label: t('双碳'), items: () => [
       { label: t('碳素流守恒审计'), run: () => openAuditDialog() },
-      { label: t('全景碳核查'), toggle: () => store.carbonCalcOn, run: () => store.toggleCarbonCalc() },
+      { label: t('全景碳核查'), toggle: () => store.carbonCalcOn, run: () => { preloadView('carbonCalc'); store.toggleCarbonCalc() } },
       { sep: true },
       { sub: true, label: t('碳资产管理'), items: () => [
         { label: t('CEA / CCER 行情'), checked: store.carbonMarketOn && marketTabOn() === 'market', run: () => marketSubNav('market') },
@@ -436,7 +517,7 @@ const menus = computed(() => [
     ] },
     // 能源：能流分析
     { sub: true, label: t('能源'), items: () => [
-      { label: t('能流分析'), run: () => store.toggleEnergyFlow() },
+      { label: t('能流分析'), run: () => { preloadView('energyFlow'); store.toggleEnergyFlow() } },
     ] },
   ] },
   { id: 'help', label: t('帮助'), items: [
@@ -461,44 +542,39 @@ useGlobalShortcuts({
 })
 
 onMounted(async () => {
-  // 3D 场景懒加载：挂载时机刻意放在**首屏数据就绪之后**（见 mountSceneIdle）——
-  // 此前在 onMounted 开头就挂载，TwinScene 的构造（渲染器/环境/地表）与 store.init、waitReady、
-  // 首屏 Vue 渲染抢同一条主线程，模型刚建好又要跟着 ready/sceneRev/场景恢复连做 2~3 次全量重建，
-  // 首页加载那几秒正是掉帧最明显的时候。延后挂载后场景一次成型，重建次数也降到最少。
-  store.init()   // 内部首件事即判定是否停在「工程选择」欢迎页（_loadWelcomeState）
-  // 启动提示不再推入命令行（底部命令只保留用户输入交互与直接反馈，少即是多）
-  await store.waitReady()
-  // 停在欢迎页：不做场景恢复 / 不加载 3D（工程尚未选定），由 WelcomeView 接管内容区
+  const initPromise = store.init()
+  // _loadWelcomeState 在 init 的第一个 await 前同步完成：已进入工作区时立即并行下载 3D 与编排分片。
+  if (!store.welcomeOn) preloadWorkspaceCore()
+  stopSceneBusyWatch = watch(() => store.sceneBusy, (busy) => {
+    if (busy) preloadWorkspaceCore()
+  }, { flush: 'sync' })
+
+  const initialized = await initPromise
+  if (!initialized || !store.ready) {
+    store.failSceneLoad(store.toast || t('初始化失败'))
+    return
+  }
   if (!store.welcomeOn) {
-    // 自动恢复上次退出前打开的场景（随 openScene 持久化到 localStorage）；
-    // 未恢复（首次启动 / 场景已卸载 / 资源包未就绪）时按默认场景走原启动流程
     const restored = await store.restoreLastScene()
     store.entered = true
     if (!restored) {
       store.refresh()
       store.sceneRev++
     }
-    mountSceneIdle()
+    mountSceneNow()
+    scheduleCommonViewPreload()
   }
-  // 欢迎页 → 主界面：此刻才加载 3D 场景 chunk（欢迎页阶段不加载 three.js，首屏更轻）
-  stopWelcomeWatch = watch(() => store.welcomeOn, (on) => { if (!on) mountSceneIdle() })
-  // 首屏渲染完成且浏览器空闲后，预取常用视图 chunk：兼顾首屏轻量与后续视图切换的响应速度
-  // （defineAsyncComponent 的 loader 拉取模块后即被缓存，再次打开无需重新请求）
-  const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 4000))
-  idle(() => {
-    import('./components/CarbonBoxView.vue')
-    import('./views/CarbonAssistantView.vue')
-    import('./components/DataView.vue')
-    import('./views/AgentChatView.vue')
-    // 右侧高频面板（选中工序的详情 / 编排属性）：已从首屏主包异步拆出，这里补一次空闲预取，
-    // 保证点开时不出现等待
-    import('./components/UnitCarbonDetail.vue')
-    import('./components/FlowInspector.vue')
-  }, { timeout: 8000 })
+  stopWelcomeWatch = watch(() => store.welcomeOn, (on) => {
+    if (on) return
+    preloadWorkspaceCore()
+    mountSceneNow()
+    scheduleCommonViewPreload()
+  })
 })
 onBeforeUnmount(() => {
   if (panelAnimTimer) { clearTimeout(panelAnimTimer); panelAnimTimer = null }
   if (stopWelcomeWatch) { stopWelcomeWatch(); stopWelcomeWatch = null }
-  document.body.classList.remove('panel-animating')
+  if (stopSceneBusyWatch) { stopSceneBusyWatch(); stopSceneBusyWatch = null }
+  document.body.classList.remove('panel-animating', 'sim-dark')
 })
 </script>

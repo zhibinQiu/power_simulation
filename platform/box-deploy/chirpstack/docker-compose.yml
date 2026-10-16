@@ -1,0 +1,71 @@
+# ============================================================================
+# 能碳一体机 · LoRaWAN 网络服务器（ChirpStack v4）容器栈
+#
+# 链路：LoRa 传感器 --LoRaWAN 射频--> 外置网关 --UDP 1700(Semtech Packet Forwarder)-->
+#       网关桥(1700/udp, host 网络) --MQTT--> mosquitto-lora --MQTT--> ChirpStack
+#       --> box_mapper LoraReader 订阅 application/{appID}/device/{devEUI}/event/up
+#       --> DMI twins --> 云端
+#
+# 网络设计（盒子 docker 的 iptables=false，尽量少依赖端口映射）：
+#   * 网关桥用 host 网络：UDP 1700 入站最稳；它通过宿主 127.0.0.1:41884 连 mosquitto-lora
+#   * 其余服务用默认 bridge 网络，容器间用服务名互访（compose DNS）
+#   * mosquitto-lora 容器内监听 1883（ChirpStack 官方默认模板端口），映射到宿主 127.0.0.1:41884
+#   * MQTT_BROKER_HOST=mosquitto-lora 供 ChirpStack 内置的 gateway backend 默认模板替换
+# ============================================================================
+services:
+  chirpstack:
+    image: chirpstack/chirpstack:4.19.1
+    command: -c /etc/chirpstack
+    restart: unless-stopped
+    volumes:
+      - ./configuration/chirpstack:/etc/chirpstack
+    environment:
+      - MQTT_BROKER_HOST=mosquitto-lora
+      - POSTGRESQL_HOST=postgres
+      - REDIS_HOST=redis
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+      - mosquitto-lora
+
+  chirpstack-gateway-bridge:
+    image: chirpstack/chirpstack-gateway-bridge:4.1.2
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./configuration/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge
+
+  postgres:
+    image: postgres:14-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=chirpstack
+      - POSTGRES_PASSWORD=chirpstack
+      - POSTGRES_DB=chirpstack
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - ./configuration/postgresql/initdb:/docker-entrypoint-initdb.d
+      - postgresqldata:/var/lib/postgresql/data
+    command: postgres -c max_connections=50 -c shared_buffers=64MB -c work_mem=4MB
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    command: redis-server --save 300 1 --appendonly no --maxmemory 64mb --maxmemory-policy allkeys-lru
+
+  # LoRa 专用 broker：容器内 1883，宿主仅 127.0.0.1:41884 可达（与 KubeEdge 的 1883 隔离）
+  mosquitto-lora:
+    image: eclipse-mosquitto:2.0.22
+    restart: unless-stopped
+    volumes:
+      - ./configuration/mosquitto-lora/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    ports:
+      - "127.0.0.1:41884:1883"
+
+volumes:
+  postgresqldata:
+  redisdata:

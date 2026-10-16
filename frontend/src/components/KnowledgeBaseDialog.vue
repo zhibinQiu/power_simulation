@@ -22,7 +22,7 @@
         <aside class="kb-side">
           <div class="kb-side-head">
             <span>{{ t('目录') }}</span>
-            <button class="kb-mini" @click="onNewFolder('/')" :title="t('在根目录新建文件夹')">＋</button>
+            <button class="kb-mini" @click="onNewFolder('/')">＋</button>
           </div>
           <div class="kb-tree">
             <div class="kb-node" :class="{ active: current === '/' }" @click="selectFolder('/')">

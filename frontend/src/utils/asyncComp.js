@@ -1,6 +1,54 @@
 import { defineAsyncComponent, h } from 'vue'
 import { t } from '../i18n'
 
+function retryingAsync(loader, {
+  retries = 3,
+  delay = 120,
+  retryDelay = 250,
+  loadingComponent,
+  errorComponent,
+} = {}) {
+  return defineAsyncComponent({
+    loader,
+    delay,
+    loadingComponent,
+    errorComponent,
+    onError(error, retry, fail, attempts) {
+      if (attempts <= retries) setTimeout(retry, retryDelay)
+      else fail(error)
+    },
+  })
+}
+
+export function lazyView(loader, { label = '', retries = 2, delay = 80, retryDelay = 250 } = {}) {
+  const loadingComponent = {
+    name: 'LazyViewLoading',
+    render() {
+      return h('div', {
+        class: 'lazy-view-fallback',
+        role: 'status',
+        'aria-live': 'polite',
+      }, [
+        h('span', { class: 'scene-load-spinner', 'aria-hidden': 'true' }),
+        h('span', label ? t('正在加载「{name}」…', { name: label }) : t('正在加载视图…')),
+      ])
+    },
+  }
+
+  const errorComponent = {
+    name: 'LazyViewError',
+    props: { error: Object },
+    setup(props) {
+      return () => h('div', { class: 'lazy-view-fallback error', role: 'alert' }, [
+        h('strong', t('视图加载失败，请重试')),
+        h('span', (props.error && props.error.message) || String(props.error || '')),
+      ])
+    },
+  }
+
+  return retryingAsync(loader, { retries, delay, retryDelay, loadingComponent, errorComponent })
+}
+
 // 对话框类异步组件统一封装：
 // 解决「偶尔打不开」——裸 defineAsyncComponent 在动态 import 偶发失败（网络抖动、
 // dev 热更新 chunk 失效、构建缓存不一致）时静默空白，无加载态、无重试、无任何提示。

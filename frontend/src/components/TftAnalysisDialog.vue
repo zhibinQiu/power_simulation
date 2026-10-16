@@ -9,7 +9,7 @@
           <span class="tad-subtitle">blast_furnace · {{ t('TFT 热风温度仿真') }}</span>
           <span class="tad-spacer"></span>
           <button class="tad-restore" :disabled="!restoreDirty" :title="t('恢复打开弹窗时的高炉参数')" @click.stop="onRestore">{{ t('恢复仿真前') }}</button>
-          <button class="tad-close" :title="t('关闭 (Esc)')" @click="onClose">
+          <button class="tad-close" @click="onClose">
             <svg width="14" height="14" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>
           </button>
         </div>

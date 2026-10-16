@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import time
 from typing import Any, Dict
 
@@ -73,6 +74,20 @@ def read_scene(bucket: str, scene: str) -> Any:
     return read_bucket(bucket).get(_norm_scene(scene))
 
 
+def _snapshot_prev(path: str) -> None:
+    """写盘前把当前文件复制一份到 ``<path>.prev``（只留最近一版，不累积）。
+
+    编排是整档覆盖写：一旦某端把「按模板重建的默认方案」提交上来，真实编排就被抹掉。
+    留一份上一版可在事故后直接回滚（cp flow.json.prev flow.json 即可），
+    比翻 designs_sync 的按次备份更快也更贴近「被覆盖前那一刻」。
+    """
+    try:
+        if os.path.exists(path):
+            shutil.copyfile(path, path + ".prev")
+    except Exception:  # noqa: BLE001 —— 备份失败绝不阻断写入
+        pass
+
+
 def write_scene(bucket: str, scene: str, payload: Any) -> Dict[str, Any]:
     """写入某场景的编排数据，返回写入后的整桶内容。
 
@@ -82,6 +97,7 @@ def write_scene(bucket: str, scene: str, payload: Any) -> Dict[str, Any]:
     if bucket not in BUCKETS:
         raise ValueError(f"未知的编排桶：{bucket}（可选：{', '.join(BUCKETS)}）")
     scene = _norm_scene(scene)
+    _snapshot_prev(design_path(bucket))
 
     def _fn(cur: Any) -> Dict[str, Any]:
         data = dict(cur) if isinstance(cur, dict) else {}

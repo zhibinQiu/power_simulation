@@ -3,11 +3,11 @@
     <template v-if="strategy">
       <!-- 内置预置策略：只读展示 -->
       <template v-if="strategy.source === 'preset'">
-        <CollapseSection :title="t('策略名称')" tone="blue" :show-more="false">
+        <CollapseSection tone="blue" :show-more="false">
         <div class="card"><div class="kv2"><span>{{ t('名称') }}</span><b>{{ strategy.name }} <span class="tag">{{ t('内置') }}</span></b></div></div>
         <div class="note-box" v-if="strategy.description">{{ strategy.description }}</div>
         </CollapseSection>
-        <CollapseSection :title="t('数值调整')" tone="amber" :show-more="false">
+        <CollapseSection tone="amber" :show-more="false">
         <div class="note">{{ t('该策略为系统内置，点击「策略仿真」进入仿真模式解析测试。') }}</div>
         <div class="actions">
           <button class="x" :disabled="store.busy" @click="runSim">{{ t('策略仿真') }}</button>
@@ -17,7 +17,7 @@
 
       <!-- AI 优化模型（序列预测 / 强化学习 / 遗传算法 / 粒子群 / 聚类工况识别）：随实时传感器数据采集，后台定时训练、模型逐渐变优 -->
       <template v-else-if="strategy.source === 'ai'">
-        <CollapseSection :title="t('模型名称')" tone="blue" :show-more="false">
+        <CollapseSection tone="blue" :show-more="false">
           <div class="card">
             <div class="kv2"><span>{{ t('名称') }}</span><b>{{ strategy.name }} <span class="tag">{{ modelTag }}</span></b></div>
             <div class="kv2"><span>{{ t('状态') }}</span><b><span class="badge" :class="badgeCls">{{ badgeTxt }}</span></b></div>
@@ -30,7 +30,7 @@
           <div class="note" v-if="st.ready && !st.iteration">{{ isClu ? t('模型已就绪：可「开始自动训练」或「训练一轮」启动工况聚类识别。') : t('模型已就绪：可「开始自动训练」或「训练一轮」启动迭代优化。') }}</div>
         </CollapseSection>
 
-        <CollapseSection :title="t('训练概览')" tone="green" :show-more="false">
+        <CollapseSection tone="green" :show-more="false">
           <div v-if="st.ready" class="stat-row">
             <div class="stat"><b>{{ st.iteration || 0 }}</b><span>{{ t('迭代轮数') }}</span></div>
             <div class="stat"><b>{{ fmtSamples }}</b><span>{{ t('传感器样本') }}</span></div>
@@ -61,7 +61,7 @@
           </div>
         </div>
 
-        <CollapseSection :title="t('控制与训练设置')" tone="amber" :show-more="false">
+        <CollapseSection tone="amber" :show-more="false">
           <div class="set-block">
             <div class="set-row">
               <span class="set-label">{{ t('自动化控制') }}</span>
@@ -98,7 +98,7 @@
         </CollapseSection>
 
         <!-- 聚类工况识别：工况簇分布（替代适应度曲线） -->
-        <CollapseSection v-if="isClu" :title="t('工况簇分布')" tone="amber" :show-more="false">
+        <CollapseSection v-if="isClu" tone="amber" :show-more="false">
           <div v-if="clusters.length" class="clu-list">
             <div v-for="c in clusters" :key="c.id" class="clu-row">
               <div class="clu-head">
@@ -115,7 +115,7 @@
           </div>
         </CollapseSection>
 
-        <CollapseSection v-else :title="t('适应度曲线')" tone="amber" :show-more="false">
+        <CollapseSection v-else tone="amber" :show-more="false">
           <div v-if="curve.length > 1" class="chart">
             <svg :viewBox="`0 0 ${CW} ${CH}`" preserveAspectRatio="none" class="chart-svg">
               <line v-for="g in gridY" :key="'g' + g" :x1="0" :x2="CW" :y1="g" :y2="g" class="grid" />
@@ -132,7 +132,7 @@
         </CollapseSection>
 
         <!-- 决策变量：策略模型（强化学习 / 遗传算法 / 粒子群）——参与寻优的工艺参数 -->
-        <CollapseSection :title="t('决策变量')" v-if="strategy.id !== 'ai::seq' && !isClu" tone="teal" :show-more="false">
+        <CollapseSection v-if="strategy.id !== 'ai::seq' && !isClu" tone="teal" :show-more="false">
           <div class="note">{{ t('参与寻优的工艺参数（可手动增删；未选择的参数保持当前设定值）。') }}</div>
           <div v-if="decisionList.length" class="dv-list">
             <div v-for="row in decisionList" :key="row.dkey" class="dv-tag">
@@ -140,7 +140,7 @@
                 <b>{{ row.label }}</b>
                 <span class="muted">{{ row.unit_name }} · {{ t('当前') }} {{ row.value }}{{ row.unit }}</span>
               </span>
-              <button class="dv-del" :disabled="store.busy" :title="t('移除此参数（不参与寻优）')" @click="removeDecision(row.dkey)">×</button>
+              <button class="dv-del" :disabled="store.busy" @click="removeDecision(row.dkey)">×</button>
             </div>
           </div>
           <div v-else class="note">{{ decisionRows.length ? t('未选择任何参数参与优化（全部参数保持当前设定值）') : t('当前流程暂无可优化参数（kind=optim）：请先在「流程编排」中为工序添加可调参数。') }}</div>
@@ -153,7 +153,7 @@
         </CollapseSection>
 
         <!-- 优化目标：策略模型——选择优化的最小化指标 -->
-        <CollapseSection :title="t('优化目标')" v-if="strategy.id !== 'ai::seq' && !isClu" tone="green" :show-more="false">
+        <CollapseSection v-if="strategy.id !== 'ai::seq' && !isClu" tone="green" :show-more="false">
           <div class="set-block">
             <div class="set-row">
               <span class="set-label">{{ t('目标方向') }}</span>
@@ -175,7 +175,7 @@
         </CollapseSection>
 
         <!-- 聚类工况识别：聚类算法选择 -->
-        <CollapseSection :title="t('聚类算法')" v-if="isClu" tone="teal" :show-more="false">
+        <CollapseSection v-if="isClu" tone="teal" :show-more="false">
           <div class="set-block">
             <div class="set-row">
               <span class="set-label">{{ t('聚类方法') }}</span>
@@ -195,7 +195,7 @@
           </div>
         </CollapseSection>
 
-        <CollapseSection :title="t('预测模型')" v-if="strategy.id === 'ai::seq'" tone="teal" :show-more="false">
+        <CollapseSection v-if="strategy.id === 'ai::seq'" tone="teal" :show-more="false">
           <div class="set-block">
             <div class="set-row">
               <span class="set-label">{{ t('时间序列模型') }}</span>
@@ -209,7 +209,7 @@
         </CollapseSection>
 
         <!-- 预测目标 / 影响变量：序列预测算法 -->
-        <CollapseSection :title="t('预测目标')" v-if="strategy.id === 'ai::seq'" tone="teal" :show-more="false">
+        <CollapseSection v-if="strategy.id === 'ai::seq'" tone="teal" :show-more="false">
           <div class="set-block">
             <div class="set-row">
               <span class="set-label">{{ t('预测对象') }}</span>
@@ -221,7 +221,7 @@
           </div>
         </CollapseSection>
 
-        <CollapseSection :title="t('影响变量')" v-if="strategy.id === 'ai::seq'" tone="teal" :show-more="false">
+        <CollapseSection v-if="strategy.id === 'ai::seq'" tone="teal" :show-more="false">
           <div class="note">{{ t('参与预测的设备指标（可手动增删；不勾选 = 全部参与；预测对象自动剔除）。') }}</div>
           <div v-if="impactRows.length" class="dv-list">
             <label v-for="row in impactRows" :key="row.id" class="dv-row chk">
@@ -236,7 +236,7 @@
         </CollapseSection>
 
         <!-- 聚类工况识别：聚类特征变量 -->
-        <CollapseSection :title="t('聚类特征')" v-if="isClu" tone="teal" :show-more="false">
+        <CollapseSection v-if="isClu" tone="teal" :show-more="false">
           <div class="note">{{ t('参与聚类的设备指标（可手动增删；不勾选 = 全部参与）。') }}</div>
           <div v-if="featureRows.length" class="dv-list">
             <label v-for="row in featureRows" :key="row.id" class="dv-row chk">
@@ -250,7 +250,7 @@
           <div v-else class="note">{{ t('暂无实时设备数据（MQTT 未上报）：聚类将回退为基于全部可用指标。') }}</div>
         </CollapseSection>
 
-        <CollapseSection :title="t('算法超参数')" tone="teal" :show-more="false">
+        <CollapseSection tone="teal" :show-more="false">
           <div v-for="(hp, key) in hpSchema" :key="key" class="hp-row">
             <span class="hp-label">{{ t(hp.label) }}</span>
             <input class="hp-slider" type="range" :min="hp.min" :max="hp.max" :step="hp.step" v-model.number="hpDraft[key]" />
@@ -259,7 +259,7 @@
           <div class="actions"><button class="x" :disabled="store.busy || !st.ready" @click="saveHyper">{{ t('保存超参数') }}</button></div>
         </CollapseSection>
 
-        <CollapseSection :title="t('最优参数建议')" v-if="!isClu" tone="blue" :show-more="false">
+        <CollapseSection v-if="!isClu" tone="blue" :show-more="false">
           <div class="note" v-if="recommended">{{ t('以下参数来自当前生效版本') }} <b>{{ recommended.version_id }}</b>（{{ t('迭代') }} {{ recommended.iteration }} {{ t('轮') }} · {{ t('最优') }} {{ recommended.best_fitness }} {{ objUnit }}）。</div>
           <div v-if="bestParams.length" class="bp-list">
             <div v-for="bp in bestParams" :key="bp.unit_id + ':' + bp.key" class="bp-row">
@@ -278,7 +278,7 @@
           <div class="note" v-if="st.archived && st.archived.best_fitness != null">{{ t('上一轮模型：迭代') }} {{ st.archived.iteration }} {{ t('轮') }} · {{ t('最优') }} {{ fmtFitness(st.archived.best_fitness) }} {{ objUnit }}</div>
         </CollapseSection>
 
-        <CollapseSection :title="t('模型版本')" v-if="!isClu" tone="green" :show-more="false">
+        <CollapseSection v-if="!isClu" tone="green" :show-more="false">
           <div class="note">{{ t('仅当新模型的评估指标（吨钢碳强度）优于当前版本时才自动替换为新版本；历史版本全部保留，可随时切换。') }}</div>
           <div v-if="versions.length" class="ver-list">
             <div v-for="v in versions" :key="v.id" class="ver-row" :class="{ active: v.active }">
@@ -303,14 +303,14 @@
           </div>
         </CollapseSection>
 
-        <CollapseSection :title="t('训练日志')" tone="purple" :show-more="false">
+        <CollapseSection tone="purple" :show-more="false">
           <div v-if="st.logs && st.logs.length" class="logs">
             <div v-for="(lg, i) in st.logs" :key="i" class="lg-line">{{ lg }}</div>
           </div>
           <div v-else class="note">{{ t('暂无日志。') }}</div>
         </CollapseSection>
 
-        <CollapseSection :title="t('工作机制')" tone="gray" :show-more="false">
+        <CollapseSection tone="gray" :show-more="false">
           <div class="note" v-if="isClu">
             {{ t('实时采集 → 构造最近 10 分钟工况快照（特征读数 + 全厂负荷因子）→') }}
             {{ t('按所选算法（K-Means / DBSCAN / 层次）划分工况簇 → 输出占比与代表负荷。') }}
@@ -326,7 +326,7 @@
 
       <!-- 数据拟合（多项式 / 指数 / 对数 / 幂函数）：对历史工况序列做曲线拟合建模，输出方程与 R²，不下发参数 -->
       <template v-else-if="strategy.source === 'ai-fit'">
-        <CollapseSection :title="t('模型名称')" tone="blue" :show-more="false">
+        <CollapseSection tone="blue" :show-more="false">
           <div class="card">
             <div class="kv2"><span>{{ t('名称') }}</span><b>{{ strategy.name }} <span class="tag">{{ modelTag }}</span></b></div>
             <div class="kv2"><span>{{ t('状态') }}</span><b><span class="badge" :class="badgeCls">{{ badgeTxt }}</span></b></div>
@@ -335,7 +335,7 @@
           <div class="note" v-if="st.ready && !st.iteration">{{ t('模型已就绪：可「开始自动训练」或「训练一轮」启动曲线拟合。') }}</div>
         </CollapseSection>
 
-        <CollapseSection :title="t('训练概览')" tone="green" :show-more="false">
+        <CollapseSection tone="green" :show-more="false">
           <div v-if="st.ready" class="stat-row">
             <div class="stat"><b>{{ st.iteration || 0 }}</b><span>{{ t('迭代轮数') }}</span></div>
             <div class="stat"><b>{{ fmtSamples }}</b><span>{{ t('传感器样本') }}</span></div>
@@ -358,7 +358,7 @@
         </CollapseSection>
 
         <!-- 拟合设置：拟合对象 / 拟合方法（拟合对象与拟合变量互斥） -->
-        <CollapseSection :title="t('拟合设置')" tone="teal" :show-more="false">
+        <CollapseSection tone="teal" :show-more="false">
           <div class="set-block">
             <div class="set-row">
               <span class="set-label">{{ t('拟合对象') }}</span>
@@ -378,7 +378,7 @@
         </CollapseSection>
 
         <!-- 拟合变量：参与拟合的设备序列（默认中间视图勾选，可手动增删；空 = 全部设备） -->
-        <CollapseSection :title="t('拟合变量')" tone="teal" :show-more="false">
+        <CollapseSection tone="teal" :show-more="false">
           <div class="note">{{ t('参与拟合的设备序列（可手动增删；未指定 = 全部参与；拟合对象自动剔除）。') }}</div>
           <div v-if="fitVarList.length" class="dv-list">
             <div v-for="row in fitVarList" :key="row.id" class="dv-tag">
@@ -386,7 +386,7 @@
                 <b>{{ row.label }}</b>
                 <span class="muted">{{ row.unit_name }} · {{ row.unit || '—' }}</span>
               </span>
-              <button class="dv-del" :disabled="store.busy" :title="t('移除此变量（不参与拟合）')" @click="removeFitVar(row.id)">×</button>
+              <button class="dv-del" :disabled="store.busy" @click="removeFitVar(row.id)">×</button>
             </div>
           </div>
           <div v-else class="note">{{ t('未指定任何设备：全部设备参与拟合。') }}</div>
@@ -399,7 +399,7 @@
         </CollapseSection>
 
         <!-- 拟合结果：方程 + R² + 拟合曲线（实际值散点 + 拟合线，含外推） -->
-        <CollapseSection :title="t('拟合结果')" tone="blue" :show-more="false">
+        <CollapseSection tone="blue" :show-more="false">
           <div v-if="fitResult && fitResult.equation" class="fit-eq">
             <div class="fit-eq-main">{{ fitResult.equation }}</div>
             <div class="muted">{{ t('拟合方法') }} {{ fitResult.method_label || '—' }} · {{ t('样本') }} {{ fitResult.n || 0 }} {{ t('个') }} · R² = {{ fitResult.r2 != null ? fitResult.r2.toFixed(4) : '—' }}</div>
@@ -419,7 +419,7 @@
           </div>
         </CollapseSection>
 
-        <CollapseSection :title="t('算法超参数')" tone="teal" :show-more="false">
+        <CollapseSection tone="teal" :show-more="false">
           <div v-for="(hp, key) in hpSchema" :key="key" class="hp-row">
             <span class="hp-label">{{ t(hp.label) }}</span>
             <input class="hp-slider" type="range" :min="hp.min" :max="hp.max" :step="hp.step" v-model.number="hpDraft[key]" />
@@ -428,14 +428,14 @@
           <div class="actions"><button class="x" :disabled="store.busy || !st.ready" @click="saveHyper">{{ t('保存超参数') }}</button></div>
         </CollapseSection>
 
-        <CollapseSection :title="t('训练日志')" tone="purple" :show-more="false">
+        <CollapseSection tone="purple" :show-more="false">
           <div v-if="st.logs && st.logs.length" class="logs">
             <div v-for="(lg, i) in st.logs" :key="i" class="lg-line">{{ lg }}</div>
           </div>
           <div v-else class="note">{{ t('暂无日志。') }}</div>
         </CollapseSection>
 
-        <CollapseSection :title="t('工作机制')" tone="gray" :show-more="false">
+        <CollapseSection tone="gray" :show-more="false">
           <div class="note">
             {{ t('实时传感器数据持续采集 → 取最近样本窗口的目标序列（全厂工况负荷或指定设备指标）→') }}
             {{ t('按所选方法（多项式 / 指数 / 对数 / 幂函数）最小二乘拟合 → 输出方程与 R²，') }}
@@ -446,7 +446,7 @@
 
       <!-- 工艺策略（某工艺对应的绿色策略）：只读展示 + 启用/停用 + 查看工艺 -->
       <template v-else-if="strategy.source === 'green'">
-        <CollapseSection :title="t('策略名称')" tone="blue" :show-more="false">
+        <CollapseSection tone="blue" :show-more="false">
         <div class="card"><div class="kv2"><span>{{ t('名称') }}</span><b>{{ strategy.name }} <span class="tag">{{ t('工艺策略') }}</span></b></div></div>
         <div class="card">
           <div class="kv2"><span>{{ t('所属工艺') }}</span><b>{{ strategy.processLabel }}</b></div>
@@ -462,7 +462,7 @@
           </div>
         </div>
         </CollapseSection>
-        <CollapseSection :title="t('启用状态')" tone="green" :show-more="false">
+        <CollapseSection tone="green" :show-more="false">
         <div class="card toggle-card">
           <span class="muted">{{ strategy.enabled ? t('该策略已在对应工艺中启用') : t('该策略未启用') }}</span>
           <button class="x" :class="{ on: strategy.enabled }" @click="toggleGreen">
@@ -475,23 +475,23 @@
 
       <!-- 自定义策略：可编辑 -->
       <template v-else>
-        <CollapseSection :title="t('策略名称')" tone="blue" :show-more="false">
+        <CollapseSection tone="blue" :show-more="false">
         <div class="card"><input v-model="nameDraft" class="inp" @change="markDirty" /></div>
         </CollapseSection>
-        <CollapseSection :title="t('来源')" tone="teal" :show-more="false">
+        <CollapseSection tone="teal" :show-more="false">
         <div class="card">
           <span class="tag">{{ strategy.applied ? t('已应用') : t('自定义') }}</span>
           <span class="muted src-tip">{{ t('仿真模式下保存') }}</span>
         </div>
         </CollapseSection>
-        <CollapseSection v-if="strategy.description" :title="t('描述')" tone="teal" :show-more="false">
+        <CollapseSection v-if="strategy.description" tone="teal" :show-more="false">
         <div class="card">
           <textarea v-model="descDraft" class="inp" rows="2" @change="markDirty"></textarea>
         </div>
         </CollapseSection>
 
         <!-- 数值调整（可编辑） -->
-        <CollapseSection :title="t('数值调整')" tone="amber" :show-more="false">
+        <CollapseSection tone="amber" :show-more="false">
         <div v-if="opsDraft.length" class="ops">
           <div v-for="(op, i) in opsDraft" :key="i" class="op-row">
             <div class="op-head">

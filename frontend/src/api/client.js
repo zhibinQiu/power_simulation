@@ -5,6 +5,17 @@
 // 各有一份逐字相同的 jfetch，错误文案口径也不一致）。
 const BASE = '/api'
 
+// 请求超时信号（编排存档这类「读不到就会用默认模板重建」的接口必须设上限，
+// 否则一次挂起就会让页面一直停在等待里，或在超时后误判成「没有存档」）。
+function timeoutSignal(ms) {
+  try {
+    if (typeof AbortSignal === 'function' && typeof AbortSignal.timeout === 'function') {
+      return AbortSignal.timeout(ms)
+    }
+  } catch (e) { /* 老浏览器不支持：退化为不设超时 */ }
+  return undefined
+}
+
 /**
  * 发起 JSON 请求并解析响应。
  *
@@ -42,11 +53,12 @@ function jget(path) {
   return request(BASE + path)
 }
 
-function jput(path, body) {
+function jput(path, body, opts = {}) {
   return request(BASE + path, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    ...opts,
   })
 }
 
@@ -136,8 +148,8 @@ export const api = {
   // AI 群控服务端运行器状态：哪些策略在运行、各策略最近一轮执行结果（执行在服务端，关掉浏览器也照跑）
   agcRuntime: () => jget('/agc/runtime'),
   // 整桶读取：返回 { ok, bucket, data: { <sceneId>: payload } }，调用方按 sceneId 取自己那一档
-  designBucket: (bucket) => jget('/designs/' + encodeURIComponent(bucket)),
-  designSave: (bucket, scene, data) => jput('/designs/' + encodeURIComponent(bucket), { scene, data }),
+  designBucket: (bucket) => request(BASE + '/designs/' + encodeURIComponent(bucket), { signal: timeoutSignal(10000) }),
+  designSave: (bucket, scene, data) => jput('/designs/' + encodeURIComponent(bucket), { scene, data }, { signal: timeoutSignal(15000) }),
   // 页面关闭 / 切到后台时立刻落库：普通 fetch 在卸载阶段会被浏览器直接取消，
   // keepalive 让请求在页面销毁后仍由浏览器代为发出 —— 否则「配完附加传感就关页面」时
   // 防抖（800ms）里的那次 PUT 会丢，服务端存档停在旧版本，下次打开又回到旧编排。
@@ -161,9 +173,6 @@ export const api = {
   marketNews: (page = 1) => jget('/market-news?page=' + page),
   // 实时数据源状态（MQTT 连接状态 / 订阅主题 / 最近消息）
   realtimeSource: () => jget('/realtime/source'),
-  // 平台激活：查询激活状态 / 提交激活码激活
-  licenseStatus: () => jget('/license/status'),
-  licenseActivate: (code) => jpost('/license/activate', { code }),
   // 工况数据分析：多设备时间序列聚类（devices: [{id, label?, unit?, series:[{t,v}]}], k?）
   clusterDevices: (devices, k = null) =>
     jpost('/cluster', k ? { devices, k } : { devices }),

@@ -7,7 +7,7 @@
       </div>
     </div>
 
-    <CollapseSection :title="t('小组概览')" tone="blue" :default-open="true">
+    <CollapseSection tone="blue" :default-open="true">
       <div class="chips">
         <div class="chip2"><span>{{ t('成员设备') }}</span><b>{{ group.members.length }}</b><i>{{ t('台') }}</i></div>
         <div class="chip2"><span>{{ t('碳排放') }}</span><b>{{ fmt(totals.co2) }}</b><i>tCO₂/h</i></div>
@@ -20,7 +20,7 @@
       </div>
     </CollapseSection>
 
-    <CollapseSection :title="t('成员工艺 / 设备（实测值）')" tone="teal" :default-open="true">
+    <CollapseSection tone="teal" :default-open="true">
       <div v-for="m in members" :key="m.id" class="lrow click" :class="{ active: activeMember === m.id }" @click="onMemberClick(m)">
         <div class="l-stack">
           <span class="l-tt">{{ m.name }}</span>

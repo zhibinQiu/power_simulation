@@ -9,7 +9,15 @@
     <div ref="logEl" class="cmd-log">
       <!-- 输出 / 命令：日志流（按页签过滤） -->
       <template v-if="activeTab !== 'compare'">
-        <div v-for="(l, i) in shownLog" :key="i" class="ln" :class="l.k">{{ l.t }}</div>
+        <!-- 实时消息流（MQTT，来自「数据源管理」）：时间 + 主题 + 载荷，与系统输出按时间混排 -->
+        <div v-for="l in shownLog" :key="l.id" class="ln" :class="l.k">
+          <template v-if="l.k === 'msg'">
+            <span class="ln-ts">{{ fmtClock(l.ts) }}</span>
+            <code class="ln-topic">{{ l.topic }}</code>
+            <span class="ln-payload">{{ l.payload }}</span>
+          </template>
+          <template v-else>{{ l.text }}</template>
+        </div>
       </template>
       <!-- 仿真对比：调整前后碳排放 / 能源量化对比（before=仿真前基线 after=当前实时结果） -->
       <template v-else>
@@ -70,7 +78,20 @@ const activeTab = ref('output')
 const tabs = computed(() => (store.simMode
   ? [{ id: 'output', label: t('输出') }, { id: 'interact', label: t('命令') }, { id: 'compare', label: t('仿真对比') }]
   : [{ id: 'output', label: t('输出') }, { id: 'interact', label: t('命令') }]))
-const shownLog = computed(() => (activeTab.value === 'output' ? outputLog.value : interactLog.value))
+// 「输出」= 系统自动输出 + 实时消息流（MQTT），按时间升序混排；消息流由「数据源管理」采集后写入 store.mqttLog
+const outputRows = computed(() => [
+  ...outputLog.value.map((l, i) => ({ id: `c${i}`, ts: l.ts || 0, k: l.k, text: l.t })),
+  ...store.mqttLog.map((m, i) => ({ id: `m${i}`, ts: m.ts || 0, k: 'msg', topic: m.topic, payload: m.payload })),
+].sort((a, b) => a.ts - b.ts))
+const interactRows = computed(() => interactLog.value.map((l, i) => ({ id: `i${i}`, ts: l.ts || 0, k: l.k, text: l.t })))
+const shownLog = computed(() => (activeTab.value === 'output' ? outputRows.value : interactRows.value))
+// 消息流时间戳（后端为秒级）→ HH:MM:SS
+function fmtClock(ts) {
+  if (!ts) return '--:--:--'
+  const d = new Date(ts * 1000)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
 
 // ---- 「仿真对比」页签：调整前后碳排放/能源量化对比（before=simBaseline.totals after=simCurrent.totals） ----
 // 兼容字段取值：前端估算结果用 energy，后端完整结果用 energy_total

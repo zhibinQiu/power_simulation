@@ -17,7 +17,7 @@
         <!-- 群控策略属于具体的场景资源包：明确标出当前场景，避免把别场景的策略当成自己的 -->
         <span class="lib-scene">{{ t('场景') }} · {{ sceneLabel }}</span>
         <!-- 手动从服务端拉一次清单：群控编排单一真源在服务端，任何一端新建的策略都在这里同步过来 -->
-        <button class="lib-refresh" :disabled="refreshing" :title="t('从服务端重新拉取本场景的模型库')" @click="refreshDesigns">
+        <button class="lib-refresh" :disabled="refreshing" @click="refreshDesigns">
           <span class="rf-ic" :class="{ spin: refreshing }">⟳</span><span class="rf-tx">{{ refreshing ? t('刷新中…') : t('刷新') }}</span>
         </button>
       </div>
@@ -87,7 +87,7 @@
               <div v-show="!modFold[g.key]" class="pnl-bd">
                 <p v-if="!g.items.length" class="emp">{{ t('当前场景没有可用设备') }}</p>
                 <div v-for="it in g.items" :key="it.key" class="mi" :class="'k-' + it.k"
-                     draggable="true" :title="t('拖入画布，或点击直接添加到画布')"
+                     draggable="true"
                      @dragstart="onModDrag($event, it)" @click="addModFromLib(it)">
                   <i class="mi-ic">{{ it.ico }}</i>
                   <span class="mi-nm">{{ it.name }}<em>{{ it.desc }}</em></span>
@@ -194,7 +194,7 @@
           <section v-if="isRule" class="card rg">
             <div class="card-hd">
               <span class="ct">{{ t('规则编排') }}</span>
-              <span class="cs">{{ t('开始 → 可调 / 传感 → 条件判断（可含「并且 / 或者」多条件）→ 下游模块 → 结束') }}</span>
+              <span class="cs">{{ t('开始 → 可调 / 传感 → 条件判断（可含「并且 / 或者」多条件）→ 下游模块；卡片需与「开始」连通才会执行') }}</span>
             </div>
             <RuleFlowEditor ref="rfRef" :key="cur.id" class="rf-fill" :graph="cur.graph" :running="running" :period="cur.period" :model-id="cur.id" />
           </section>
@@ -398,8 +398,8 @@ import RuleFlowEditor from './RuleFlowEditor.vue'
 import PsoTuner from './PsoTuner.vue'
 import MpcTuner from './MpcTuner.vue'
 import { t } from '../i18n'
-// 规则编排的「开始 / 结束」端点与通路判定：能否运行取决于是否形成「开始 → 结束」通路
-import { hasFlowPath, ensureFlowEnds, upgradeBranches } from '../utils/ruleFlow'
+// 规则编排的「开始」端点与通路判定：能否运行取决于每张卡片是否与「开始」连通
+import { hasFlowPath, ensureFlowStart, upgradeBranches } from '../utils/ruleFlow'
 
 /** 载入模型时把旧版编排升级到当前形态（AND / OR 收进条件内部），幂等 */
 function upgradeGraph(g) {
@@ -516,8 +516,8 @@ const modGroups = computed(() => [
     key: 'flow',
     title: t('流程'),
     items: [
+      // 「结束」端点已取消：卡片与「开始」连通即会执行，不再要求接出口
       { key: 'flow-start', k: 'start', ico: '▶', name: t('开始'), desc: t('流程入口') },
-      { key: 'flow-end', k: 'end', ico: '■', name: t('结束'), desc: t('流程出口') },
     ],
   },
   {
@@ -1524,13 +1524,11 @@ function seedDcExample() {
           { id: 'b2', type: 'else', src: '', op: '>', val: 0 },
         ] },
         { id: 'adj_pump', kind: 'adj', devId: adjId, label: '循环水泵变压器', unit: 'V', unitName: '冷却水', value: 24, x: 800, y: 60 },
-        { id: 'nd_end', kind: 'end', x: 980, y: 150 },
       ],
       edges: [
         { id: 'e_st', from: 'nd_start', port: 'out', to: 'sen_rack' },
         { id: 'e_s2if', from: 'sen_rack', port: 'out', to: 'if_temp' },
         { id: 'e_if2adj', from: 'if_temp', port: 'b1', to: 'adj_pump' },
-        { id: 'e_en', from: 'adj_pump', port: 'out', to: 'nd_end' },
       ],
     },
     selAdj: [adjId],
@@ -1549,8 +1547,8 @@ function loadSel(m) {
   Object.assign(spOf, m.spOf || {})
   // 规则模型的模块由画布自己维护（左栏模块列表拖入），不参与设备勾选
   if (m.alg !== 'rule' && !kept) autoPick(true)
-  // 存量编排可能没有「开始 / 结束」端点：进入编排时补齐，并把断开的两端自动接上
-  if (m.alg === 'rule') ensureFlowEnds(m.graph)
+  // 存量编排可能没有「开始」端点：进入编排时补齐，并把断开的两端自动接上
+  if (m.alg === 'rule') ensureFlowStart(m.graph)
   syncRuns()
 }
 watch([selAdj, selSen, spOf], () => {
@@ -1666,7 +1664,7 @@ function statOf(m) {
 const canRun = computed(() => {
   const m = cur.value
   if (!m) return false
-  // 规则：必须形成「开始 → … → 结束」通路才允许执行
+  // 规则：每张卡片都必须与「开始」连通才允许执行
   if (m.alg === 'rule') return hasFlowPath(m.graph)
   if (m.alg === 'pso') return (m.pso.vars || []).length > 0 && !!m.pso.senId
   return loops.value.length > 0
@@ -1675,7 +1673,7 @@ const runTip = computed(() => {
   const m = cur.value
   if (!m) return ''
   if (canRun.value) return t('按当前编排运行；再点一次停止')
-  if (m.alg === 'rule') return t('请先用「开始 / 结束」模块把流程连通：开始 → 条件判断 / 可调设备 → 结束')
+  if (m.alg === 'rule') return t('请把卡片都接到「开始」上：开始 → 条件判断 / 可调设备，孤立卡片不会执行')
   if (m.alg === 'pso') return t('请先选择优化变量（可调设备）与优化目标（传感设备）')
   return t('请先在左栏勾选可调设备与传感设备（按勾选顺序一一配对形成控制回路）')
 })
@@ -1745,7 +1743,7 @@ function canRunModel(m) {
 }
 function runTipOf(m) {
   if (!m) return ''
-  if (m.alg === 'rule') return t('请先用「开始 / 结束」模块把流程连通：开始 → 条件判断 / 可调设备 → 结束')
+  if (m.alg === 'rule') return t('请把卡片都接到「开始」上：开始 → 条件判断 / 可调设备，孤立卡片不会执行')
   if (m.alg === 'pso') return t('请先选择优化变量（可调设备）与优化目标（传感设备）')
   return t('请先在左栏勾选可调设备与传感设备（按勾选顺序一一配对形成控制回路）')
 }

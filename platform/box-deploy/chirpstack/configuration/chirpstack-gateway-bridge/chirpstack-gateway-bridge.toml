@@ -1,0 +1,16 @@
+# ChirpStack 网关桥（Semtech UDP Packet Forwarder 后端）
+# 网关侧配置 "server address = 盒子IP, port up/down = 1700"
+
+[backend.semtech_udp]
+  udp_bind="0.0.0.0:1700"
+
+[integration.mqtt]
+  # 主题前缀必须与 chirpstack.toml 的 enabled_regions 一致（cn470_0）
+  event_topic_template="cn470_0/gateway/{{ .GatewayID }}/event/{{ .EventType }}"
+  state_topic_template="cn470_0/gateway/{{ .GatewayID }}/state/{{ .StateType }}"
+  command_topic_template="cn470_0/gateway/{{ .GatewayID }}/command/#"
+
+[integration.mqtt.auth.generic]
+  servers=["tcp://127.0.0.1:41884"]
+  username=""
+  password=""

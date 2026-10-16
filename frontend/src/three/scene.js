@@ -208,13 +208,22 @@ function boxMesh(w, h, d, material) {
 }
 
 // ---------------- 工序竖式铭牌（窄高名片，模型旁显示名称 + 实时能耗/碳排） ----------------
-// 画布按「逻辑尺寸 × LABEL_SS」超采样绘制，再由 sRGB 纹理下采样呈现，保证文字锐利。
+// 画布按「逻辑尺寸 × 超采样倍率」绘制，再由 sRGB 纹理采样呈现；倍率随屏幕像素动态选档。
 const LABEL_W = 88              // 逻辑宽（绘制坐标系）——窄竖卡：横向瘦、纵向紧凑排 3 行；同时是自适应卡宽的下限
 const LABEL_W_MAX = 220         // 自适应卡宽上限：名称更长时先加宽到此限，仍放不下才降字号/截断
 const LABEL_H = 52              // 连接/管道标签逻辑高（两行：物料名 + 速度）
 const UNIT_LABEL_H = 86         // 工艺/工辅标签逻辑高（三行：名称 + 能耗 + 碳排）
 const GROUP_LABEL_H = 92        // 小组聚合标签逻辑高（四行：名称 + ×N 徽章 + 能耗 + 碳排）
-const LABEL_SS = 4              // 超采样倍率（清晰度关键：4x 保证远处放大 5.2x 后文字仍锐利）
+// 超采样倍率（canvas 像素 / 逻辑单位）：不再固定常数，改为按标签「当前实际屏幕像素」动态
+// 选档（见 _pickLabelSS / _flushLabelRes）。固定 4× 的问题是：远景下整张卡在屏幕上只有几十
+// 个设备像素，纹理被缩小 4~5 倍，双线性降采样把中文笔画糊成一团灰（标签「发虚」的主因），
+// 而近景又常常不够用。改为贴近「屏幕像素 1:1」后，字形始终按真实显示尺寸光栅化。
+// 注意：这只改变纹理清晰度，不改变标签在世界/屏幕上的大小。
+const LABEL_SS_INIT = 3         // 创建时的初始档，下一帧即按实际屏幕像素校正
+const LABEL_SS_MIN = 1.5        // 下限：卡片描边/圆角仍需足够采样精度，不能无限贴近 1:1
+const LABEL_SS_MAX = 6          // 上限：限制近景极端放大时的纹理内存
+const LABEL_SS_GAIN = 1.25      // 相对屏幕像素的余量：留一点点超采样吸收透视形变，但不至于被过度缩小
+const LABEL_SS_AREA_MAX = 1200 * 520  // 单张标签纹理的像素上限（长名字 × 高倍率的显存兜底）
 const LABEL_PARENT_REF = 4.6    // 工艺标签世界尺寸基准：工艺模型父级缩放代表值，所有标签以此为统一大小
 const LABEL_AUX_GAIN = 0.72     // 工辅/小组标签相对工艺标签的小一号系数（0.85→0.72 再小一号）
 const LABEL_SCALE = 2.2         // 世界坐标下的铭牌宽度：工序标签与管道/轨道连接标签统一尺寸（紧凑铭牌：整体收敛避免过高遮挡）
@@ -1090,6 +1099,7 @@ export class TwinScene {
     this._frame = 0
     this._warmupFrames = 90   // 首屏预热期：模型刚建好、纹理与 shader 首次上传，先用 1× 像素比
     this._warmupDone = false
+    this._ssQueue = []        // 待重建纹理分辨率的标签队列（见 _queueLabelRes / _flushLabelRes）
     this._init()
   }
 
@@ -1256,6 +1266,10 @@ export class TwinScene {
       this.scene.add(l)
       this._neon.push(l)
     }
+  }
+
+  afterNextRender(callback) {
+    this._afterNextRender = typeof callback === 'function' ? callback : null
   }
 
   setPaused(v) {
@@ -3055,18 +3069,21 @@ export class TwinScene {
     // 组名同样按长度自适应卡宽（组名含「×N」徽章与「点击 ▸」，副行最小正文宽取大一些）
     const w = this._fitLabelW(this._measureText(name, NAME_FONT), 84)
     const canvas = document.createElement('canvas')
-    canvas.width = w * LABEL_SS
-    canvas.height = GROUP_LABEL_H * LABEL_SS
+    canvas.width = w * LABEL_SS_INIT
+    canvas.height = GROUP_LABEL_H * LABEL_SS_INIT
     const ctx = canvas.getContext('2d')
+    ctx.setTransform(LABEL_SS_INIT, 0, 0, LABEL_SS_INIT, 0, 0)
     const tex = new THREE.CanvasTexture(canvas)
     tex.colorSpace = THREE.SRGBColorSpace
     tex.minFilter = THREE.LinearFilter
     tex.magFilter = THREE.LinearFilter
     tex.generateMipmaps = false
-    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }))
+    // toneMapped=false：标签是 UI 性质的贴图，不应被渲染器的 ACES 色调映射压暗/降对比，
+    // 否则白字与新玻璃卡片会被统一压到中灰，观感发灰发虚（文字锐度的直接杀手）。
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false }))
     spr.scale.set(LABEL_SCALE * (w / LABEL_W), LABEL_SCALE * (GROUP_LABEL_H / LABEL_W), 1)
     spr.renderOrder = 11
-    const obj = { canvas, ctx, tex, sprite: spr, w, name, count, co2, energy, isGroup: true, _key: null }
+    const obj = { canvas, ctx, tex, sprite: spr, w, name, count, co2, energy, isGroup: true, cardH: GROUP_LABEL_H, ss: LABEL_SS_INIT, _key: null }
     spr.userData.labelObj = obj
     this._drawGroupLabel(obj, co2, energy)
     return spr
@@ -3083,7 +3100,7 @@ export class TwinScene {
     obj.co2 = co2; obj.energy = energy
     const W = obj.w || LABEL_W
     const BODY_W = this._labelBodyW(W)
-    ctx.setTransform(LABEL_SS, 0, 0, LABEL_SS, 0, 0)
+    ctx.setTransform(obj.ss || LABEL_SS_INIT, 0, 0, obj.ss || LABEL_SS_INIT, 0, 0)
     ctx.clearRect(0, 0, W, GROUP_LABEL_H)
 
     const light = this.envMode === 'industrial'
@@ -3155,21 +3172,23 @@ export class TwinScene {
     // 卡片宽度按工序名自适应（如「循环冷却水系统」比「锅炉系统」宽），名称完整显示
     const w = this._fitLabelW(this._measureText(name, NAME_FONT))
     const canvas = document.createElement('canvas')
-    canvas.width = w * LABEL_SS
-    canvas.height = UNIT_LABEL_H * LABEL_SS
+    canvas.width = w * LABEL_SS_INIT
+    canvas.height = UNIT_LABEL_H * LABEL_SS_INIT
     const ctx = canvas.getContext('2d')
-    ctx.setTransform(LABEL_SS, 0, 0, LABEL_SS, 0, 0)   // 之后统一按逻辑坐标绘制
+    ctx.setTransform(LABEL_SS_INIT, 0, 0, LABEL_SS_INIT, 0, 0)   // 之后统一按逻辑坐标绘制
     const tex = new THREE.CanvasTexture(canvas)
     tex.colorSpace = THREE.SRGBColorSpace   // 与渲染器输出一致，避免文字发灰、色块偏暗
-    tex.anisotropy = this._maxAniso()
     tex.minFilter = THREE.LinearFilter      // 关闭 mipmap 链，远处文字不被过度模糊
     tex.magFilter = THREE.LinearFilter
     tex.generateMipmaps = false
-    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }))
+    // toneMapped=false：标签是 UI 贴图，不能再被渲染器的 ACES 色调映射压暗降对比（否则白字
+    // 变灰、卡片围边变弱，远距离时直接糊成一片）。注意此时 anisotropy 无意义——各向异性只在
+    // minFilter 走 mipmap 链时生效，而这里刻意关掉了 mipmap。
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false }))
     // 世界宽度按卡宽同比放大（高度不变），保持字号恒定、只是卡片变宽
     spr.scale.set(LABEL_SCALE * (w / LABEL_W), LABEL_SCALE * (UNIT_LABEL_H / LABEL_W), 1)
     spr.renderOrder = 12
-    const obj = { canvas, ctx, tex, sprite: spr, w, _wFor: name, name, role, co2Css, focused: false }
+    const obj = { canvas, ctx, tex, sprite: spr, w, _wFor: name, name, role, co2Css, focused: false, cardH: UNIT_LABEL_H, ss: LABEL_SS_INIT }
     this._drawLabel(obj, co2, energy, role, co2Css)
     spr.userData.labelObj = obj
     return spr
@@ -3200,7 +3219,7 @@ export class TwinScene {
   // 工艺标签两行布局：第一行工序名 + 角色色点，第二行实时能耗 ⚡ / 碳排 ☁（先能后碳），无需点击即可直接查看。
   _drawLabel(obj, co2, energy, role, co2Css) {
     if (obj && obj.isGroup) { this._drawGroupLabel(obj, energy != null ? energy : obj.energy, co2 != null ? co2 : obj.co2); return }
-    const { ctx, tex } = obj
+    let { ctx, tex } = obj
     if (role !== undefined) obj.role = role
     if (co2Css !== undefined) obj.co2Css = co2Css
     if (co2 !== undefined) obj.co2 = co2
@@ -3208,12 +3227,13 @@ export class TwinScene {
     const c = obj.co2
     const e = obj.energy
     const focused = !!obj.focused
-    // 卡宽随名称自适应：改名后重新测量宽度并重排画布（resize 会清空画布，故强制重绘）
+    // 卡宽随名称自适应：改名后重新测量宽度并重排画布（换新画布会清空内容，故强制重绘）
     if (obj._wFor !== obj.name) {
       obj.w = this._fitLabelW(this._measureText(obj.name, NAME_FONT))
       obj._wFor = obj.name
-      obj.canvas.width = obj.w * LABEL_SS
-      obj.ctx.setTransform(LABEL_SS, 0, 0, LABEL_SS, 0, 0)
+      const ss0 = obj.ss || LABEL_SS_INIT
+      this._replaceLabelCanvas(obj, Math.max(1, Math.round(obj.w * ss0)), Math.max(1, Math.round(UNIT_LABEL_H * ss0)))
+      ;({ ctx, tex } = obj)
       obj._key = null
     }
     const W = obj.w || LABEL_W
@@ -3225,6 +3245,8 @@ export class TwinScene {
     // 白底浅灰卡片、无角色圆点/彩色侧条，左侧深色工序名，下方数据行
     const light = this.envMode === 'industrial'
 
+    const ssNow = obj.ss || LABEL_SS_INIT
+    ctx.setTransform(ssNow, 0, 0, ssNow, 0, 0)
     ctx.clearRect(0, 0, W, UNIT_LABEL_H)
 
     if (light) {
@@ -3430,20 +3452,22 @@ export class TwinScene {
     // 物料名同样自适应卡宽（副行为「x.x m/s」，最小正文宽 62）
     const w = this._fitLabelW(this._measureText(name, NAME_FONT))
     const canvas = document.createElement('canvas')
-    canvas.width = w * LABEL_SS
-    canvas.height = LABEL_H * LABEL_SS
+    canvas.width = w * LABEL_SS_INIT
+    canvas.height = LABEL_H * LABEL_SS_INIT
     const ctx = canvas.getContext('2d')
-    ctx.setTransform(LABEL_SS, 0, 0, LABEL_SS, 0, 0)
+    ctx.setTransform(LABEL_SS_INIT, 0, 0, LABEL_SS_INIT, 0, 0)
     const tex = new THREE.CanvasTexture(canvas)
     tex.colorSpace = THREE.SRGBColorSpace
-    tex.anisotropy = this._maxAniso()
     tex.minFilter = THREE.LinearFilter
     tex.magFilter = THREE.LinearFilter
     tex.generateMipmaps = false
-    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }))
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false }))
     spr.scale.set(LABEL_SCALE * (w / LABEL_W), LABEL_SCALE * LABEL_ASPECT, 1)   // 与工序标签统一尺寸
     spr.renderOrder = 12
-    spr.userData = { w }   // 自适应卡宽，供 _updateLabelScales 按宽高比缩放
+    // obj 形态与工序标签对齐：分辨率随屏幕像素自适应（见 _pickLabelSS / _flushLabelRes）
+    const obj = { canvas, ctx, tex, sprite: spr, w, cardH: LABEL_H, ss: LABEL_SS_INIT,
+      flow: { name, color: hexColor, rate, carbon, speed } }
+    spr.userData = { w, kind: 'flow', labelObj: obj }   // w 供 _updateLabelScales 按宽高比缩放
     this._drawFlowLabel(ctx, tex, name, hexColor, rate, carbon, speed, w)
     return spr
   }
@@ -4840,6 +4864,11 @@ export class TwinScene {
     // 阴影贴图低频刷新：静态光源 + 静态厂区，阴影几乎不变，没必要每帧重绘整张深度图
     if (this._shadowEvery > 0 && this._frame % this._shadowEvery === 0) this.renderer.shadowMap.needsUpdate = true
     this.renderer.render(this.scene, this.camera)
+    if (this._afterNextRender) {
+      const callback = this._afterNextRender
+      this._afterNextRender = null
+      try { callback() } catch (e) { /* 状态回调失败不影响渲染循环 */ }
+    }
   }
 
   // 静止时的目标帧间隔（ms）：满档 30fps；省电档再降一档，优先保证不掉帧
@@ -4917,6 +4946,11 @@ export class TwinScene {
     const amp = this._labelAmp || (this._labelAmp = new THREE.Vector3())
     const REF = 35          // 距摄像机此距离内使用基准尺寸
     const MAX_FACTOR = 5.2  // 最大放大倍数：汇报视角仍要清晰识别主工艺名称
+    // 屏幕换算：垂直 FOV 决定该距离上的可见世界高度，由此把「世界单位」换算成 CSS 像素，
+    // 仅用于纹理分辨率自适应选档（不改变标签在屏幕上的大小）。
+    const viewH = this._ch || this.container.clientHeight || 1
+    const tanHalfV = Math.tan((this.camera.fov * Math.PI / 180) / 2)
+    const pr = this._pr || window.devicePixelRatio || 1
     // 工序标签：与管道/轨道连接标签完全一致的展示形式——恒定显示、无悬浮动画、同尺寸同缩放
     const parentScale = this._labelParentScale || (this._labelParentScale = new THREE.Vector3())
     this.unitGroups.forEach((g) => {
@@ -4926,6 +4960,8 @@ export class TwinScene {
       const dist = Math.max(1, amp.distanceTo(camPos))
       const factor = Math.min(dist / REF, MAX_FACTOR)
       lo.sprite.material.opacity = 1
+      const visWorldH = 2 * dist * tanHalfV
+      const pxPerWorld = viewH / visWorldH         // 每世界单位对应的 CSS 像素（仅供纹理分辨率选档）
       const sf = LABEL_SCALE * factor * (lo.focused ? LABEL_FOCUS_GAIN : 1)
       // 世界尺寸基准：工艺标签 = sf × LABEL_PARENT_REF；工辅/小组标签在此基础上小一号（× LABEL_AUX_GAIN）。
       // 再除以各自父级世界缩放换算为局部 scale（工艺模型父级 4~5、工辅 3.5~3.8、小组外层 1），
@@ -4938,6 +4974,9 @@ export class TwinScene {
       const lh = (lo.isGroup ? GROUP_LABEL_H : UNIT_LABEL_H) / LABEL_W
       const ly = (base * lh) / ps.y
       lo.sprite.scale.set((base * (lw / LABEL_W)) / ps.x, ly, 1)
+      // 纹理分辨率随屏幕像素自适应（详见 _pickLabelSS）：画布尺寸与实际显示像素接近 1:1
+      // 时文字最锐利，远景不再出现「54px 字形被压到 10px」的糊字。
+      this._queueLabelRes(lo, ly * ps.y * pxPerWorld * pr)
       // 纵向摆位：卡底缘 = 模型最高点 + 悬停间隙（父级局部单位，每帧重算）。
       // 卡片为保持屏幕尺寸会随视距放大（factor 最大 5.2×），若只在创建时按基准半高摆一次，
       // 远视距下膨胀的卡片会把间隙吃回去、卡底缘沉到模型顶以下 —— 矮小装置（机房温控的冷却水 /
@@ -4956,14 +4995,109 @@ export class TwinScene {
         if (!spr.isSprite || !spr.userData || spr.userData.kind !== 'flow') return
         spr.getWorldPosition(amp)
         const dist = Math.max(1, amp.distanceTo(camPos))
+        const visWorldH = 2 * dist * tanHalfV
+        const pxPerWorld = viewH / visWorldH
         const factor = Math.min(dist / REF, MAX_FACTOR)
         const focused = this.focusedFlowId && spr.userData.flowId === this.focusedFlowId
         const gain = focused ? LABEL_FOCUS_GAIN : 1
         const sf = LABEL_SCALE * factor * gain
         const fw = (spr.userData && spr.userData.w) || LABEL_W
         spr.scale.set(sf * (fw / LABEL_W), sf * LABEL_ASPECT, 1)
+        const lo = spr.userData.labelObj
+        if (lo) this._queueLabelRes(lo, sf * LABEL_ASPECT * pxPerWorld * pr)
       })
     }
+    this._flushLabelRes()
+  }
+
+  // ---------------- 标签清晰度：画布分辨率跟随屏幕像素 ----------------
+  // 标签画布与实际显示像素接近 1:1（再留 LABEL_SS_GAIN 余量）时字形最锐利。原先固定 4× 超
+  // 采样：远景下卡片只占几十个设备像素，纹理被缩小 4~5 倍，双线性降采样把中文笔画糊成一团
+  // 灰；近景又反过来不够用。改为按「当前屏幕像素 ÷ 逻辑卡高」动态选档后两种场景都清晰。
+  _pickLabelSS(screenPx, cardH, cardW) {
+    if (!(screenPx > 0) || !(cardH > 0)) return LABEL_SS_INIT
+    const w = cardW || LABEL_W
+    const need = Math.min(LABEL_SS_MAX, Math.max(LABEL_SS_MIN, (screenPx / cardH) * LABEL_SS_GAIN))
+    let ss = Math.round(need * 2) / 2            // 0.5 步进，避免微小变化就重建纹理
+    if (w * cardH * ss * ss > LABEL_SS_AREA_MAX) {   // 长名字 × 高倍率的显存兜底
+      ss = Math.max(LABEL_SS_MIN, Math.sqrt(LABEL_SS_AREA_MAX / (w * cardH)))
+    }
+    return Math.round(ss * 2) / 2
+  }
+
+  // 仅当目标档位变化幅度 >18% 时才入队，防止相机微抖动造成每帧重建
+  _queueLabelRes(lo, screenPx) {
+    if (!lo || !lo.canvas || !lo.sprite) return
+    const q = this._ssQueue || (this._ssQueue = [])
+    const cardH = lo.cardH || (lo.isGroup ? GROUP_LABEL_H : UNIT_LABEL_H)
+    const want = this._pickLabelSS(screenPx, cardH, lo.w)
+    lo._ssWant = want
+    if (want === lo.ss || Math.abs(want / (lo.ss || 1) - 1) <= 0.18) return
+    if (lo._ssQueued) return
+    lo._ssQueued = true
+    q.push(lo)
+  }
+
+  // 每帧最多重建 3 张：缩放时所有标签会同时判变，整批复建会造成明显卡顿
+  _flushLabelRes() {
+    const q = this._ssQueue
+    if (!q || !q.length) return
+    let budget = 3
+    while (q.length > 0 && budget-- > 0) {
+      const lo = q.shift()
+      lo._ssQueued = false
+      const want = lo._ssWant
+      if (!want || !lo.canvas || lo.ss === want) continue
+      lo.ss = want
+      this._relayoutLabel(lo)
+    }
+  }
+
+  // 重建画布并整体重绘（改 canvas.width/height 会清空内容并复位 ctx 状态）
+  _relayoutLabel(lo) {
+    const cardH = lo.cardH || (lo.isGroup ? GROUP_LABEL_H : UNIT_LABEL_H)
+    const w = lo.w || LABEL_W
+    const cw = Math.max(1, Math.round(w * lo.ss))
+    const ch = Math.max(1, Math.round(cardH * lo.ss))
+    if (lo.canvas.width !== cw || lo.canvas.height !== ch) this._replaceLabelCanvas(lo, cw, ch)
+    lo._key = null
+    this._redrawLabelObj(lo)
+  }
+
+  // 整体替换标签画布与纹理（不得就地改 canvas.width/height！）
+  // Chrome 对 GPU 加速的 2D canvas 用 glCopySubTextureCHROMIUM 上传 WebGL 纹理，
+  // 对「同一 canvas 反复变尺寸」的上传会报 Offset overflows texture dimensions，
+  // 纹理中新旧两份内容叠加 → 标签出现重影/重复（视距越远档位变化越频繁，重影越多）。
+  // 换档时新建画布 + 新建 CanvasTexture 替换（旧纹理 dispose），保证上传的纹理与画布尺寸严格一致。
+  _replaceLabelCanvas(lo, cw, ch) {
+    const canvas = document.createElement('canvas')
+    canvas.width = cw
+    canvas.height = ch
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.colorSpace = THREE.SRGBColorSpace
+    tex.minFilter = THREE.LinearFilter
+    tex.magFilter = THREE.LinearFilter
+    tex.generateMipmaps = false
+    const old = lo.tex
+    lo.canvas = canvas
+    lo.ctx = canvas.getContext('2d')
+    lo.tex = tex
+    if (lo.sprite && lo.sprite.material) {
+      lo.sprite.material.map = tex
+      lo.sprite.material.needsUpdate = true
+    }
+    if (old) old.dispose()
+  }
+
+  _redrawLabelObj(lo) {
+    if (!lo || !lo.canvas) return
+    if (lo.isGroup) this._drawGroupLabel(lo, lo.co2, lo.energy)
+    else if (lo.flow) {
+      const f = lo.flow
+      const ss = lo.ss || LABEL_SS_INIT
+      lo.ctx.setTransform(ss, 0, 0, ss, 0, 0)
+      this._drawFlowLabel(lo.ctx, lo.tex, f.name, f.color, f.rate, f.carbon, f.speed, lo.w)
+    } else this._drawLabel(lo)
   }
 
   _stepParticles(pts, dt, speed, isSmoke) {
@@ -5053,6 +5187,8 @@ export class TwinScene {
     this.unitGroups.clear()
     this.groupModels.clear()
     this.deviceMap.clear()
+    // 标签对象随模型一起销毁，待重建队列必须清空，否则会持有已释放的 canvas/tex
+    if (this._ssQueue) this._ssQueue.length = 0
     this.flows = []
     this.focusedId = null
     this.focusedFlowId = null
@@ -5064,6 +5200,7 @@ export class TwinScene {
   }
 
   dispose() {
+    this._afterNextRender = null
     cancelAnimationFrame(this._raf)
     this._raf = null
     if (this._resizeRaf) { cancelAnimationFrame(this._resizeRaf); this._resizeRaf = null }

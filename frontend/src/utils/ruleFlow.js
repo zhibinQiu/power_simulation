@@ -1,18 +1,20 @@
-// ============ 规则编排 · 开始 / 结束模块与「通路」判定 ============
+// ============ 规则编排 · 开始模块与「通路」判定 ============
 import { t } from '../i18n'
-// 执行语义（用户约定）：只有「开始 → … → 结束」形成通路的流程才可以执行；
+// 执行语义（用户约定）：只有与「开始」连通的模块才会被执行；
 // 画布上没接进这条通路的模块只作展示，运行时不产生任何写入动作。
+// 「结束」模块已取消：卡片不再要求接下游（条件卡片除外，它的每条分支仍要有走向）。
 //
 // 校验（能不能跑）与执行（实际跑哪些）共用同一套图算法，
 // 避免出现「校验说可以跑、实际分支没走到」的不一致。
 
 export const KIND_START = 'start'
+/** 已取消的「结束」端点：只用于识别并清理存量编排，新编排不再产生 */
 export const KIND_END = 'end'
 
 /** 设备模块（可调 / 传感）—— 对应一台真实设备 */
 export function isDevKind(k) { return k === 'adj' || k === 'sen' }
-/** 流程端点模块（开始 / 结束）—— 不对应任何设备 */
-export function isFlowKind(k) { return k === KIND_START || k === KIND_END }
+/** 流程端点模块（开始）—— 不对应任何设备 */
+export function isFlowKind(k) { return k === KIND_START }
 
 // 自动布局用的尺寸估算（与 RuleFlowEditor 的渲染常量一致，仅供排版参考）
 const W_IF = 300
@@ -25,13 +27,13 @@ const H_LOOP = 104
 function estW(n) {
   if (n.kind === 'if') return W_IF
   if (n.kind === 'loop') return W_LOOP
-  return isFlowKind(n.kind) ? W_FLOW : W_DEV
+  return n.kind === KIND_START || n.kind === KIND_END ? W_FLOW : W_DEV
 }
 function estH(n) {
   // 头部 30 + 每条分支（首行 46 + 追加条件行每行 30）+ 底部「+ elif」28
   if (n.kind === 'if') return 30 + ((n.branches || []).reduce((s, b) => s + branchH(b), 0)) + 28
   if (n.kind === 'loop') return H_LOOP
-  return isFlowKind(n.kind) ? H_FLOW : H_DEV
+  return n.kind === KIND_START || n.kind === KIND_END ? H_FLOW : H_DEV
 }
 
 function listOf(g, key) { return Array.isArray(g && g[key]) ? g[key] : [] }
@@ -82,28 +84,26 @@ function walk(seeds, next) {
 }
 
 /**
- * 通路分析：
- *   starts / ends —— 端点模块 id
- *   fwd  —— 从任一「开始」可达的节点
- *   rev  —— 能走到任一「结束」的节点
- *   live —— 既从开始可达、又能走到结束的节点（= 真正会执行的那部分流程）
- *   ok   —— 是否存在「开始 → … → 结束」通路（决定能否运行）
+ * 通路分析（结束模块已取消，通路口径 = 与「开始」连通）：
+ *   starts —— 「开始」模块 id
+ *   fwd    —— 从任一「开始」可达的节点（含开始自身）
+ *   live   —— 同 fwd：与「开始」连通的那部分，才是运行时会走到的
+ *   lost   —— 与「开始」之间没有通路的模块 id（孤立卡片，运行时不执行）
+ *   ok     —— 有「开始」、有卡片、且没有孤立卡片（决定能否运行）
  */
 export function flowPath(g) {
   const nodes = listOf(g, 'nodes')
   const out = outMap(g)
-  const inn = inMap(g)
   const starts = nodes.filter((n) => n && n.kind === KIND_START).map((n) => n.id)
-  const ends = nodes.filter((n) => n && n.kind === KIND_END).map((n) => n.id)
   const fwd = walk(starts, (id) => out.get(id))
-  const rev = walk(ends, (id) => inn.get(id))
-  const live = new Set()
-  for (const id of fwd) if (rev.has(id)) live.add(id)
-  const ok = ends.some((id) => fwd.has(id))
-  return { starts, ends, fwd, rev, live, ok }
+  // 「卡片」= 除流程端点（开始）以外的模块；遗留的「结束」节点不计入孤立判定（由迁移清理）
+  const cards = nodes.filter((n) => n && n.id && n.kind !== KIND_START && n.kind !== KIND_END)
+  const lost = cards.filter((n) => !fwd.has(n.id)).map((n) => n.id)
+  const ok = starts.length > 0 && cards.length > 0 && lost.length === 0
+  return { starts, fwd, live: fwd, lost, ok }
 }
 
-/** 是否存在「开始 → … → 结束」通路（规则模型能否运行的判据） */
+/** 每张卡片都与「开始」连通（规则模型能否运行的判据） */
 export function hasFlowPath(g) { return flowPath(g).ok }
 
 // ============ 规则执行器（纯函数） ============
@@ -191,7 +191,6 @@ function nodeTitle(n) {
   if (n.kind === 'if') return t('条件判断')
   if (n.kind === 'loop') return t('循环模块')
   if (n.kind === KIND_START) return t('开始')
-  if (n.kind === KIND_END) return t('结束')
   return t('模块')
 }
 
@@ -220,19 +219,12 @@ export function evalFlowGraph(graph, ctx) {
   let branch = ''
   const onBranch = (v) => { if (!branch) branch = v }
 
-  // 没有「开始 → … → 结束」通路：整条流程不执行（也就不产生任何写入）
-  if (!fp.ok) {
-    state.pendLoops = []
-    return { ok: false, acts, activeNodes, activeEdges, branch: '' }
-  }
-
   function advance(e, depth, visited) {
     if (depth > 24) return
     const tgt = nodes.find((x) => x.id === e.to)
     if (!tgt || !fp.live.has(tgt.id)) return
     activeEdges.add(e.id)
     activeNodes.add(tgt.id)
-    if (tgt.kind === KIND_END) return
     if (tgt.kind === 'if') { evalIf(tgt, depth, visited); return }
     if (tgt.kind === 'loop') { evalLoop(tgt, depth, visited); return }
     if (!isDevKind(tgt.kind)) return
@@ -312,61 +304,71 @@ export function evalFlowGraph(graph, ctx) {
     activeNodes.add(id)
     for (const e of edges.filter((x) => x.from === id)) advance(e, 0, visited)
   }
-  return { ok: true, acts, activeNodes, activeEdges, branch }
+  return { ok: fp.ok, acts, activeNodes, activeEdges, branch }
+}
+
+/** 清理已取消的「结束」端点及其连线（就地删，兼容响应式数组） */
+function stripEnds(g) {
+  const ends = new Set()
+  for (const n of listOf(g, 'nodes')) if (n && n.kind === KIND_END && n.id) ends.add(n.id)
+  if (!ends.size) return false
+  for (let i = g.nodes.length - 1; i >= 0; i--) {
+    const n = g.nodes[i]
+    if (n && n.kind === KIND_END) g.nodes.splice(i, 1)
+  }
+  for (let i = g.edges.length - 1; i >= 0; i--) {
+    const e = g.edges[i]
+    if (e && (ends.has(e.from) || ends.has(e.to))) g.edges.splice(i, 1)
+  }
+  return true
 }
 
 /**
- * 给存量编排补齐「开始 / 结束」端点，并把断开的两端自动接上：
- *   无上游的模块 ← 开始（开始只有一个出口，接第一个即可）
- *   无下游的模块 → 结束（结束可汇聚多条）
+ * 存量迁移 + 端点补齐（幂等）：
+ *   ① 删除已取消的「结束」端点及其连线（老编排里它只是个标记，去掉后链路照旧）；
+ *   ② 没有「开始」时补一个（落在内容左侧）；
+ *   ③ 把没有上游的卡片接到「开始」—— 出口可连多个下游，散落的卡片一律并列挂在开始之后。
+ * 新口径下「卡片必须与开始连通」，这样迁移完的旧编排立刻就是可运行状态。
  * 返回 true 表示图被改动过（调用方据此落盘）。
  */
-export function ensureFlowEnds(g) {
+export function ensureFlowStart(g) {
   if (!g) return false
   if (!Array.isArray(g.nodes)) g.nodes = []
   if (!Array.isArray(g.edges)) g.edges = []
-  let changed = false
+  const n0 = g.nodes.length + g.edges.length
+  stripEnds(g)
 
-  const body = g.nodes.filter((n) => n && !isFlowKind(n.kind))
-  let x0 = 40, x1 = 760, yMid = 200
+  const body = g.nodes.filter((n) => n && n.kind !== KIND_START)
+  let x0 = 40, yMid = 200
   if (body.length) {
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    let minX = Infinity, minY = Infinity, maxY = -Infinity
     for (const n of body) {
       const nx = Number(n.x) || 0
       const ny = Number(n.y) || 0
-      minX = Math.min(minX, nx); maxX = Math.max(maxX, nx + estW(n))
+      minX = Math.min(minX, nx)
       minY = Math.min(minY, ny); maxY = Math.max(maxY, ny + estH(n))
     }
     // 不夹到 12：画布支持负坐标（往左 / 上自由布局），内容整体在负区间时「开始」应落在它的左侧
     x0 = minX - 180
-    x1 = maxX + 180
     yMid = Math.round((minY + maxY) / 2 - H_FLOW / 2)
   }
+  let added = false
   if (!g.nodes.some((n) => n && n.kind === KIND_START)) {
     g.nodes.push({ id: newId(KIND_START), kind: KIND_START, x: Math.round(x0), y: yMid })
-    changed = true
+    added = true
   }
-  if (!g.nodes.some((n) => n && n.kind === KIND_END)) {
-    g.nodes.push({ id: newId(KIND_END), kind: KIND_END, x: Math.round(x1), y: yMid })
-    changed = true
-  }
-  // 只在本次「补齐端点」时接一次线，已有端点的编排不动，避免反复改用户的连法
-  if (!changed) return false
-
-  const start = g.nodes.find((n) => n && n.kind === KIND_START)
-  const end = g.nodes.find((n) => n && n.kind === KIND_END)
-  const inn = inMap(g)
-  const out = outMap(g)
-  if (start) {
-    const root = body.find((n) => (inn.get(n.id) || []).length === 0)
-    if (root) g.edges.push(newEdge(start.id, 'out', root.id))
-  }
-  if (end) {
-    for (const n of body) {
-      if ((out.get(n.id) || []).length === 0) g.edges.push(newEdge(n.id, 'out', end.id))
+  // 只在这次「补齐端点」时接一次线：已有「开始」的编排一律不动，
+  // 否则用户刻意留出的未连通卡片会被悄悄接上，校验就永远提示不出来了。
+  if (added) {
+    const start = g.nodes.find((n) => n && n.kind === KIND_START)
+    const inn = inMap(g)
+    if (start) {
+      for (const n of body) {
+        if (!(inn.get(n.id) || []).length) g.edges.push(newEdge(start.id, 'out', n.id))
+      }
     }
   }
-  return true
+  return g.nodes.length + g.edges.length !== n0
 }
 
 // ============ 存量升级 ============

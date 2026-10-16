@@ -1,13 +1,13 @@
 <template>
   <aside class="sidebar">
     <!-- 宽度拖拽手柄（右侧边缘，隐形热区） -->
-    <div class="sidebar-rsz" :class="{ dragging }" @mousedown.prevent="emit('rsz', $event)" :title="t('拖拽调整宽度')"></div>
+    <div class="sidebar-rsz" :class="{ dragging }" @mousedown.prevent="emit('rsz', $event)"></div>
     <div class="sidebar-head">
       <Icon :name="headIcon" :size="15" class="head-ic" />
       <span class="ttl">{{ headTitle }}</span>
       <span class="sb-spacer"></span>
       <!-- 面板显隐：勾选的面板自左栏顶部依次向下显示（资源管理器 → 资源 → 搜索） -->
-      <button class="sb-more" :title="t('选择要显示的面板')" @click.stop="onPanelMenu">
+      <button class="sb-more" @click.stop="onPanelMenu">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/>
         </svg>
@@ -65,7 +65,7 @@
                 <span v-if="devSubItems(nd).length" class="twisty" :class="{ open: isOpen('dev_' + nd.type) }" @click.stop="toggleDev('dev_' + nd.type)">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </span>
-                <span class="tch-dot" v-if="inScene('process', nd.type)" :title="t('已部署至场景')"></span>
+                <span class="tch-dot" v-if="inScene('process', nd.type)"></span>
                 <span class="tc-tt">{{ nd.label }}</span>
               </div>
               <div class="tchildren" v-if="devSubItems(nd).length"
@@ -141,7 +141,7 @@
             <div class="tchildren" v-show="expanded.g_strat_ai">
               <div v-for="m in AI_MODELS" :key="m.id" class="tchild leaf flat click"
                    :class="{ active: store.selectedStrategyId === m.id }"
-                   :title="t('点击查看 AI 优化模型「{name}」训练面板', { name: m.name })"
+                  
                    @click="onAiClick(m)">
                 <span class="tc-tt">{{ m.name }}</span>
               </div>
@@ -160,10 +160,10 @@
             <div class="tchildren" v-show="expanded.g_strat_custom">
               <div v-for="s in customStrategies" :key="s._key" class="tchild leaf flat click"
                    :class="{ active: store.selectedStrategyId === s.id }"
-                   :title="t('点击查看策略属性（名称/数值调整可编辑，底部可「策略仿真」）')"
+                  
                    @click="onCustomClick(s)"
                    @contextmenu.prevent="onStratContext($event, s)">
-                <span class="tch-dot" v-if="s.applied" :title="t('已应用')"></span>
+                <span class="tch-dot" v-if="s.applied"></span>
                 <span class="tc-tt">{{ s.name || t('未命名策略') }}</span>
                 <span class="tc-tag saved">{{ t('自定义') }}</span>
                 <button class="x-btn danger" :title="t('删除策略')" @click.stop="doRemoveStrategy(s)">✕</button>
@@ -192,17 +192,17 @@
                   <span class="twisty" :class="{ open: stratGroupOpen(g.type) }">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                   </span>
-                  <span class="tch-dot" v-if="inScene('process', g.type)" :title="t('该工艺已部署至场景')"></span>
+                  <span class="tch-dot" v-if="inScene('process', g.type)"></span>
                   <span class="tch-tt">{{ g.label }}</span>
                   <span class="tch-count">{{ g.items.length }}</span>
                 </div>
                 <div class="tchildren" v-show="stratGroupOpen(g.type)">
                   <div v-for="gs in g.items" :key="gs.id" class="tchild leaf flat click"
                        :class="{ active: gs.preset ? store.selectedStrategyId === gs.id : isGreenSelected(g, gs) }"
-                       :title="gs.preset ? t('点击查看策略属性（底部「策略仿真」进入仿真模式测试）') : t('点击查看策略属性，可在右侧启用/停用')"
+                      
                        @click="gs.preset ? onPresetClick(gs) : onGreenClick(g, gs)">
                     <span class="tch-dot" v-if="gs.preset ? gs.applied : isGreenActive(g.type, gs.id)"
-                          :title="gs.preset ? t('已应用') : t('已启用')"></span>
+                         ></span>
                     <span class="tc-tt">{{ gs.name }}</span>
                     <span class="tc-tag pre" v-if="!gs.preset && isGreenActive(g.type, gs.id)">{{ t('已启用') }}</span>
                   </div>

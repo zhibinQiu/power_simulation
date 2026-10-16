@@ -267,7 +267,7 @@ const gapClass = computed(() => {
               </div>
             </div>
             <div class="detail-actions">
-              <select v-model="runYear" class="year-select" :title="t('选择策略运行年度')">
+              <select v-model="runYear" class="year-select">
                 <option v-for="y in [2024, 2025, 2026, 2027]" :key="y" :value="y">{{ y }} {{ t('年度') }}</option>
               </select>
               <button class="btn primary" :disabled="running || !selectedId" @click="runStrategy">

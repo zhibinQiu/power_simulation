@@ -22,7 +22,6 @@
       <button class="rf-b" title="Ctrl+V" :disabled="!clipboard" @click="paste">{{ t('粘贴') }}</button>
       <span class="rf-sp"></span>
       <span class="rf-lg"><i class="lg-d st"></i>{{ t('开始') }}</span>
-      <span class="rf-lg"><i class="lg-d en"></i>{{ t('结束') }}</span>
       <span class="rf-lg"><i class="lg-d adj"></i>{{ t('可调') }}</span>
       <span class="rf-lg"><i class="lg-d sen"></i>{{ t('传感') }}</span>
       <span class="rf-lg"><i class="lg-d ifn"></i>{{ t('条件') }}</span>
@@ -90,18 +89,17 @@
             <span v-if="!isLinked(n)" class="rf-warn">{{ t('未接入条件分支') }}</span>
           </div>
 
-          <span class="rf-pt out" :title="t('输出端口可连接多个下游')" @mousedown.stop="startLink(n, 'out')"></span>
+          <span class="rf-pt out" @mousedown.stop="startLink(n, 'out')"></span>
         </div>
 
-        <!-- ─────── 开始 / 结束 节点（流程端点：只有连通二者的那条路会执行） ─────── -->
+        <!-- ─────── 开始节点（流程入口：只有与它连通的卡片才会执行；「结束」端点已取消） ─────── -->
         <div v-for="n in flowNodes" :key="n.id" class="rf-node flow" :data-nid="n.id"
              :class="[n.kind, { sel: n.id === selNode, act: activeNode.has(n.id) }]"
              :style="nodeStyle(n)" @mousedown.stop="startMove(n, $event)">
-          <span v-if="n.kind === 'end'" class="rf-pt in"></span>
-          <i class="rf-fic">{{ n.kind === 'start' ? '▶' : '■' }}</i>
-          <span class="rf-fnm">{{ n.kind === 'start' ? t('开始') : t('结束') }}</span>
+          <i class="rf-fic">▶</i>
+          <span class="rf-fnm">{{ t('开始') }}</span>
           <button class="rf-x" :title="t('删除模块')" @mousedown.stop @click.stop="delNode(n)">✕</button>
-          <span v-if="n.kind === 'start'" class="rf-pt out" :title="t('输出端口可连接多个下游')" @mousedown.stop="startLink(n, 'out')"></span>
+          <span class="rf-pt out" @mousedown.stop="startLink(n, 'out')"></span>
         </div>
 
         <!-- ─────── IF 条件节点 ─────── -->
@@ -136,7 +134,7 @@
             </div>
             <!-- 同分支内的追加条件：行间的下拉决定它与上一条是「并且」还是「或者」 -->
             <div v-for="c in condsOf(b).slice(1)" :key="c.id" class="rf-gc">
-              <select class="rf-jn" v-model="c.join" :title="t('与上一条条件的连接方式')" @mousedown.stop @focus="histBegin" @change="histCommit">
+              <select class="rf-jn" v-model="c.join" @mousedown.stop @focus="histBegin" @change="histCommit">
                 <option value="and">{{ t('并且') }}</option>
                 <option value="or">{{ t('或者') }}</option>
               </select>
@@ -153,10 +151,10 @@
             <div class="rf-br2">
               <span class="rf-tg" :class="{ none: !branchTargets(n, b).length }">{{ branchTgTxt(n, b) }}</span>
               <span class="rf-sv mono" v-if="b.type !== 'else'">{{ branchSrcTxt(n, b) }}</span>
-              <button v-if="b.type !== 'else'" class="rf-add rf-addc" :title="t('追加一条「并且 / 或者」条件')"
+              <button v-if="b.type !== 'else'" class="rf-add rf-addc"
                       @mousedown.stop @click.stop="addCond(b)">+ {{ t('条件') }}</button>
             </div>
-            <span class="rf-pt out" :title="t('输出端口可连接多个下游')" @mousedown.stop="startLink(n, b.id)"></span>
+            <span class="rf-pt out" @mousedown.stop="startLink(n, b.id)"></span>
           </div>
 
           <div class="rf-nft">
@@ -194,7 +192,7 @@
             <span v-if="!isLinked(n)" class="rf-warn">{{ t('未接入流程') }}</span>
           </div>
 
-          <span class="rf-pt out" :title="t('输出端口可连接多个下游')" @mousedown.stop="startLink(n, 'out')"></span>
+          <span class="rf-pt out" @mousedown.stop="startLink(n, 'out')"></span>
         </div>
 
         <!-- ─────── 模块实时值：点选卡片后直接显示在其下方 ─────── -->
@@ -218,7 +216,7 @@
 
       <div v-if="!nodes.length" class="rf-empty">
         <p class="t1">{{ t('从左侧「模块」列表拖入画布，或点击工具条按钮开始编排') }}</p>
-        <p class="t2">{{ t('规则逻辑：开始 → 传感/可调 → 条件判断（一条分支可写多条比较，行间用「并且 / 或者」连接）→ 出口 → 下游可调（写设定值）或传感（观测）→ 结束；需形成「开始 → 结束」通路才会执行') }}</p>
+        <p class="t2">{{ t('规则逻辑：开始 → 传感/可调 → 条件判断（一条分支可写多条比较，行间用「并且 / 或者」连接）→ 出口 → 下游可调（写设定值）或传感（观测）；卡片需与「开始」连通才会执行') }}</p>
       </div>
     </div>
 
@@ -943,20 +941,19 @@ function condSrcNode(n, c) {
 const issues = computed(() => {
   const out = []
   const fp = flow.value
-  // ① 流程端点：没有「开始 → … → 结束」通路，整条流程一次都不会执行
-  if (!fp.starts.length) out.push(t('缺少「开始」模块：点击工具条「+ 开始」添加流程入口'))
-  if (!fp.ends.length) out.push(t('缺少「结束」模块：点击工具条「+ 结束」添加流程出口'))
-  if (fp.starts.length && fp.ends.length && !fp.ok) {
-    out.push(t('「开始」与「结束」之间没有形成通路，流程不会执行'))
-  }
+  // ① 流程入口：没有「开始」模块，整条流程一次都不会执行（「结束」端点已取消，卡片不必再接出口）
+  if (!fp.starts.length) out.push(t('缺少「开始」模块：从左侧「流程」拖入流程入口'))
   for (const id of fp.starts) {
     if (!edges.value.some((e) => e.from === id)) out.push(t('「开始」模块未连接下游模块'))
   }
-  for (const id of fp.ends) {
-    if (!edges.value.some((e) => e.to === id)) out.push(t('「结束」模块未接入上游模块'))
+  // 孤立卡片：与「开始」之间没有通路，运行时不执行（已有「开始」时才逐个点名，否则上面一条提示即可）
+  if (fp.starts.length) {
+    for (const id of fp.lost) {
+      const n = nodes.value.find((x) => x.id === id)
+      if (n) out.push(t('模块「{name}」未与「开始」连通，不会被执行', { name: nodeName(n) }))
+    }
   }
-  // ② 模块自身（通路已通时才逐个点名「落在通路外的模块」，否则整条流程一条提示即可）
-  const linked = fp.ok
+  // ② 模块自身
   for (const n of nodes.value) {
     if (n.kind === 'if') {
       if (!n.branches.some((b) => b.type === 'else')) {
@@ -983,10 +980,7 @@ const issues = computed(() => {
       if (!edges.value.some((e) => e.to === n.id)) out.push(t('循环模块「{name}」未接入上游模块', { name: nm }))
       if (!edges.value.some((e) => e.from === n.id)) out.push(t('循环模块「{name}」未连接下游模块', { name: nm }))
     }
-    // 接了线但没落在「开始 → 结束」通路上：同样不会被执行
-    if (linked && n.kind !== KIND_START && n.kind !== KIND_END && !fp.live.has(n.id)) {
-      out.push(t('模块「{name}」不在「开始 → 结束」通路上，不会被执行', { name: nodeName(n) }))
-    }
+    // 接了线但没落在「开始」通路上：已在上面按孤立卡片统一点名，避免重复提示
   }
   return out
 })
@@ -1016,7 +1010,7 @@ function applyResult(r, withLog) {
   activeBranch.value = (r && r.branch) || ''
   if (!withLog) return
   if (!acts.length) {
-    pushLog(r && r.ok === false ? t('未形成「开始 → 结束」通路，本轮不执行') : t('本轮无命中（检查判定来源与阈值）'))
+    pushLog(r && r.ok === false ? t('没有与「开始」连通的卡片，本轮不执行') : t('本轮无命中（检查判定来源与阈值）'))
     return
   }
   for (const a of acts) pushLog(a.txt)
