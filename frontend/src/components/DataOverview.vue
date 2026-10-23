@@ -312,10 +312,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { api } from '../api/client'
 import { t } from '../i18n'
+import { themeMode } from '../theme'
 import { visiblePoll } from '../utils/poll'
 import { buildHmiAdvice } from '../data/hmiAdvice'
 import Icon from './Icon.vue'
@@ -344,12 +345,20 @@ let stopAdvicePoll = null
 const boxOverview = ref(null)
 const boxDevicesData = ref([])
 
-// ---------- 明暗主题（localStorage 记忆，默认跟随全局仿真模式） ----------
+// ---------- 明暗主题（跟随全局深色态；localStorage 只记「上次主题」，不做锁定） ----------
+// 全局深色态 = 仿真模式（store.simMode）或全局夜间主题（themeMode==='dark'），
+// 与 App.vue 里 .app.sim-dark 的绑定条件保持一致（不查 DOM class，避免挂载时序问题）。
 const theme = ref('dark')
 function toggleTheme() {
   theme.value = theme.value === 'dark' ? 'light' : 'dark'
   try { localStorage.setItem('data-overview-theme', theme.value) } catch (e) { /* 忽略 */ }
 }
+// 运行/停止仿真（或切换全局明暗）时 HMI 主题同步切换 —— 用户中途手动切换仍即时生效，
+// 但下一次全局深色态变化会重新覆盖（方案 A：跟随总是生效，手动选择不做跨状态锁定）。
+watch(() => (store.simMode || themeMode.value === 'dark'), (simDark) => {
+  theme.value = simDark ? 'dark' : 'light'
+  try { localStorage.setItem('data-overview-theme', theme.value) } catch (e) { /* 忽略 */ }
+})
 
 // ---------- 页面路由：home 一级总览 / 二级明细 ----------
 const page = ref('home')
@@ -606,11 +615,13 @@ async function loadBox() {
   } catch (e) { /* 忽略，保持上次数据 */ }
 }
 onMounted(() => {
-  // 主题：优先用户记忆，否则跟随全局仿真模式（.app.sim-dark）
+  // 主题初始值：优先「上次主题」（localStorage），否则跟随当前全局深色态（仿真模式/全局夜间主题）。
+  // 后续变化由上面的 watch 接管 —— 这里是唯一的初始读取点，watch 不开 immediate，
+  // 否则会把用户上次的手动选择在挂载瞬间无条件冲掉。
   let saved = null
   try { saved = localStorage.getItem('data-overview-theme') } catch (e) { /* 忽略 */ }
   if (saved === 'light' || saved === 'dark') theme.value = saved
-  else theme.value = document.querySelector('.app')?.classList.contains('sim-dark') ? 'dark' : 'light'
+  else theme.value = (store.simMode || themeMode.value === 'dark') ? 'dark' : 'light'
   loadBox()
   sampleAdvice(true)   // 首屏立即给出建议，不等第一次采样周期
   stopClockPoll = visiblePoll(() => { now.value = Date.now() }, 1000)
