@@ -117,7 +117,11 @@
         <button :class="{ on: editingPort.dir === 'out' }" @click="setEditDir('out')">{{ t('输出') }}</button>
       </div>
       <select v-model="editingPort.material" @change="applyPortMaterial">
-        <option v-for="m in MATERIALS" :key="m.id" :value="m.id">{{ m.name }}（{{ m.cat }}）</option>
+        <option v-for="m in portMaterials" :key="m.id" :value="m.id">{{ m.name }}（{{ m.cat }}）</option>
+        <!-- 历史存档 / 切场景残留：当前端口的物料若不在本场景物料表内，仍要显示出来（否则下拉框空白、看不出这端口是什么） -->
+        <option v-if="editingPort.material && !portMaterialIds.has(editingPort.material)" :value="editingPort.material">
+          {{ matName(editingPort.material) }}（{{ t('非本场景物料') }}）
+        </option>
       </select>
       <div class="pp-btns">
         <button @click="addPortHere">＋ {{ t('添加') }}{{ editingPort.dir === 'in' ? t('输入') : t('输出') }}{{ t('端口') }}</button>
@@ -151,7 +155,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useSimStore } from '../stores/sim'
-import { MATERIALS, MATERIAL_MAP, PROCESS_MAP, DEVICE_MAP, materialFamily, nodeHeight,
+import { MATERIALS, MATERIAL_MAP, PROCESS_MAP, DEVICE_MAP, materialFamily, nodeHeight, sceneMaterialList,
   NODE_NW as NW, NODE_HEADER as HEADER, NODE_PORT_Y0 as PORT_Y0, NODE_GAP as GAP } from '../data/flowLibrary'
 import DeviceGlyph from './DeviceGlyph.vue'
 import { openContextMenu } from '../composables/contextMenu'
@@ -184,6 +188,22 @@ const activeGroupName = computed(() => {
 
 function matName(id) { return (MATERIAL_MAP[id] && MATERIAL_MAP[id].name) || id }
 function matUnit(id) { return (MATERIAL_MAP[id] && MATERIAL_MAP[id].unit) || '' }
+// 端口编辑下拉的物料候选：只列**当前场景**那一份（钢场景 = 内置钢铁表，资源包场景 = 包内 dictionary.materials）。
+// 全局 MATERIALS 是「钢铁表 + 包内物料」的并集，直接遍历会把铁矿石/钢水等钢铁物料带进机房温控场景。
+const portMaterials = computed(() => sceneMaterialList(store.sceneCtx, store.customSceneOn))
+const portMaterialIds = computed(() => new Set(portMaterials.value.map((m) => m.id)))
+// 当前场景的工序字典：资源包场景只认包内 dictionary.processes（type → 定义），不回落到钢表
+// —— 否则将来某个包复用钢铁工艺类型名（如 boiler）时，会按钢表写进外场景的物料 id。
+const sceneProcDefs = computed(() => {
+  const list = store.sceneCtx && Array.isArray(store.sceneCtx.processes) ? store.sceneCtx.processes : []
+  const m = {}
+  for (const p of list) if (p && p.type) m[p.type] = p
+  return m
+})
+function procDef(type) {
+  if (store.customSceneOn) return sceneProcDefs.value[type] || null
+  return PROCESS_MAP[type] || null
+}
 const GAS_UNITS = new Set(['Nm³', 'GJ'])
 const GAS_IDS = new Set(['oxygen', 'ngas', 'ldg', 'cog', 'bfg', 'steam', 'waste_heat', 'co2', 'air'])
 function isGasMaterial(id) { return GAS_IDS.has(id) || GAS_UNITS.has(matUnit(id)) }
@@ -390,9 +410,22 @@ function setEditDir(dir) {
   if (editingPort.value) editingPort.value.dir = dir
 }
 function defaultPortMaterial(n, dir) {
-  const t = PROCESS_MAP[n.type]
-  if (dir === 'out' && t && t.mainOut) return t.mainOut
-  if (dir === 'in' && t && t.mainIn) return t.mainIn
+  // ① 工序字典优先：钢包用 PROCESS_MAP 的 mainIn/mainOut；资源包用包内 processes[] 的 mainOut
+  // （包内字典没有 mainIn 字段，输入侧退到该工序的 inputs 清单首项，如 boiler → pulverized_coal）
+  const p = procDef(n.type)
+  if (p) {
+    if (dir === 'out' && p.mainOut) return p.mainOut
+    if (dir === 'in' && p.mainIn) return p.mainIn
+    if (store.customSceneOn) {
+      const arr = dir === 'out' ? p.outputs : p.inputs
+      if (Array.isArray(arr) && arr.length) return arr[0]
+    }
+  }
+  // ② 兜底取当前场景物料表第一条：资源包场景不能默认塞 'electricity' / 'hot_metal' 这类钢铁物料
+  if (store.customSceneOn) {
+    const list = portMaterials.value
+    return list.length ? list[0].id : ''
+  }
   if (dir === 'in') return 'electricity'   // 工辅/驱动类常见输入介质
   return MATERIALS.length ? MATERIALS[0].id : 'hot_metal'
 }
@@ -408,7 +441,10 @@ function applyPortMaterial() {
 }
 function addPortHere() {
   if (!editingPort.value) return
-  store.addPort(editingPort.value.nodeId, editingPort.value.dir, editingPort.value.material || 'hot_metal')
+  const mat = editingPort.value.material || (portMaterials.value[0] && portMaterials.value[0].id) || ''
+  // 资源包未提供物料字典时不再兜底塞钢铁物料：宁可不加，也不能往存档里写外场景的物料 id
+  if (!mat) { store.toast = t('当前场景未提供物料字典，无法添加端口'); return }
+  store.addPort(editingPort.value.nodeId, editingPort.value.dir, mat)
 }
 function removePortHere() {
   if (!editingPort.value || !editingPort.value.portId) return

@@ -94,6 +94,15 @@ export function registerSceneMaterials(dict) {
     _sceneMatIds.push(m.id)
   })
 }
+// 当前场景「可选物料」：钢场景 = 内置钢铁表；通用资源包场景 = 包内 dictionary.materials（上面并入的那批）。
+// 全局 MATERIALS 是两者的并集（2D/3D 管线着色、标签、单位换算都要按 id 反查，必须都查得到），
+// 但让用户**挑**物料时只能给当前场景这一份 —— 否则机房温控的端口编辑会列出铁矿石 / 钢水。
+// dict 由调用方传入 store.sceneCtx：它在 openScene / _loadScenePackMeta 里更新，保证切场景后自动刷新。
+export function sceneMaterialList(dict, customScene = false) {
+  if (!customScene) return MATERIALS
+  const list = dict && Array.isArray(dict.materials) ? dict.materials : []
+  return list.map((m) => (m && m.id ? MATERIAL_MAP[m.id] : null)).filter(Boolean)
+}
 // 驱动介质族：把成对的"工辅输出口"与"被服务工艺输入口"归并到同一族，
 // 保证连线时可匹配（输出 draft → 输入 draft 同 id 自然匹配；此处补充跨写法别名）。
 export const MATERIAL_FAMILY = {

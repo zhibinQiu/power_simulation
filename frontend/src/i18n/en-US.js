@@ -1195,6 +1195,8 @@ export default {
   '可调·': 'Adjustable ·',
   '端口编辑（': 'Port edit (',
   '删当前': 'Remove This',
+  '非本场景物料': 'not in this scene',
+  '当前场景未提供物料字典，无法添加端口': 'This scene provides no material dictionary — cannot add a port',
   '返回全部流程': 'Back to Full Flow',
   '小组：': 'Group:',
   '双击成员卡片可编辑 · 拖入新设备自动归入本组': 'Double-click a member card to edit · new devices dragged in auto-join this group',
