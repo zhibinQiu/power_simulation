@@ -60,6 +60,12 @@ const kw = ref('')
 const onlyScene = ref(false)
 // 物料候选与左栏「物料」页签同源：钢场景 = 内置钢铁表，资源包场景 = 包内 dictionary.materials
 const sceneMaterials = computed(() => sceneMaterialList(store.sceneCtx, store.customSceneOn))
+// 工艺候选同源：钢场景 = 钢铁路线分组（ROUTE_GROUPS）；资源包场景 = 包内工序字典
+// （store.sceneProcessDict 从包模板提取；PROCESS_MAP/ROUTE_GROUPS 只有钢铁工艺，
+//  直接遍历会让资源包场景的搜索结果只剩钢工艺、搜不到 dc_* / tp_*）。
+const sceneProcList = computed(() => (store.customSceneOn
+  ? Object.values(store.sceneProcessDict || {})
+  : Object.values(ROUTE_GROUPS).flat()))
 const filtering = computed(() => kw.value.trim() !== '' || onlyScene.value)
 const open = reactive({})
 function toggle(key) { open[key] = open[key] === false ? true : false }
@@ -99,19 +105,17 @@ const results = computed(() => {
 
   // ---- 工艺 ----
   const procs = []
-  for (const group of Object.values(ROUTE_GROUPS)) {
-    for (const t of group) {
-      if (onlyScene.value && !procInScene(t.type)) continue
-      if (q && !t.label.toLowerCase().includes(q)) continue
-      procs.push({
-        id: 'proc:' + t.type,
-        label: t.label,
-        icon: 'process',
-        active: store.selectedAssetType === t.type,
-        title: '点击查看工艺属性' + (store.editMode ? '（可拖入编排画布）' : ''),
-        action: () => openProcess(t.type),
-      })
-    }
+  for (const t of sceneProcList.value) {
+    if (onlyScene.value && !procInScene(t.type)) continue
+    if (q && !String(t.label || t.type).toLowerCase().includes(q)) continue
+    procs.push({
+      id: 'proc:' + t.type,
+      label: t.label || t.type,
+      icon: 'process',
+      active: store.selectedAssetType === t.type,
+      title: '点击查看工艺属性' + (store.editMode ? '（可拖入编排画布）' : ''),
+      action: () => openProcess(t.type),
+    })
   }
   if (procs.length) out.push({ key: 'process', label: '工艺', items: procs })
 
