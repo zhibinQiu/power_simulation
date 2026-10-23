@@ -498,6 +498,7 @@ const menus = computed(() => [
     // AI（原顶层「AI」菜单整体下沉到工具菜单）：数据分析 / 群控 + 知识库 / 智能体 / 技能 / 本体
     { sub: true, label: t('AI'), items: () => [
       { label: t('数据分析'), toggle: () => store.dataViewOn, act: () => { preloadView('dataView'); store.toggleDataView() } },
+      // MPC 控温优化已集成进 AI 群控的模型库（内置求解型模型），不再单列菜单项
       { label: t('AI群控'), toggle: () => store.aiGroupOn, act: () => openAiGroup() },
       { sep: true },
       { label: t('行业知识库'), act: () => { showKnowledgeManage.value = true } },

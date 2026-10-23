@@ -128,6 +128,46 @@ def test_api_rejects_bad_input(client):
     assert client.put("/api/designs/flow", json={"scene": "../x", "data": {}}).status_code == 400
 
 
+# ---------------- 运行态单独写（手动提交模式下启停不得带上未提交的清单） ----------------
+
+def test_update_scene_fields_only_touches_given_keys(store):
+    """启停只改 running：designs / updatedAt 必须原样保留。"""
+    payload = {"scene": "dc-thermal", "designs": [{"id": "m1"}], "updatedAt": 111, "running": []}
+    store.write_scene("agc", "dc-thermal", payload)
+    assert store.update_scene_fields("agc", "dc-thermal", {"running": ["m1"]}) is True
+    got = store.read_scene("agc", "dc-thermal")
+    assert got["running"] == ["m1"]
+    assert got["designs"] == [{"id": "m1"}]   # 清单没被动过
+    assert got["updatedAt"] == 111            # 提交时间不被启停刷新
+    # 停止：running 清空，清单仍在
+    store.update_scene_fields("agc", "dc-thermal", {"running": []})
+    assert store.read_scene("agc", "dc-thermal")["designs"] == [{"id": "m1"}]
+    # 其它场景不受影响
+    store.write_scene("agc", "steel", {"designs": [{"id": "s1"}]})
+    store.update_scene_fields("agc", "dc-thermal", {"running": ["m1"]})
+    assert store.read_scene("agc", "steel") == {"designs": [{"id": "s1"}]}
+
+
+def test_update_scene_fields_reports_missing_scene(store):
+    """服务端还没这个场景的存档：返回 False，且不要凭空造出一个空档。"""
+    assert store.update_scene_fields("agc", "dc-thermal", {"running": ["m1"]}) is False
+    assert store.read_bucket("agc") == {}
+    with pytest.raises(ValueError):
+        store.update_scene_fields("../../etc", "dc-thermal", {"running": []})
+
+
+def test_api_agc_running(client):
+    """PUT /api/designs/agc/running：只改运行态；无存档时 found=False。"""
+    assert client.put("/api/designs/agc/running", json={"scene": "dc-thermal", "running": ["m1"]}).json()["found"] is False
+    client.put("/api/designs/agc", json={"scene": "dc-thermal", "data": {"designs": [{"id": "m1"}], "running": []}})
+    r = client.put("/api/designs/agc/running", json={"scene": "dc-thermal", "running": ["m1"]}).json()
+    assert r["found"] is True and r["ok"] is True
+    data = client.get("/api/designs/agc/dc-thermal").json()["data"]
+    assert data["running"] == ["m1"] and data["designs"] == [{"id": "m1"}]
+    # 场景 id 非法 -> 400
+    assert client.put("/api/designs/agc/running", json={"scene": "../x", "running": []}).status_code == 400
+
+
 # ---------------- 整档覆盖（last-writer-wins）：提交什么存什么，不提交即删除 ----------------
 
 def test_write_is_whole_scene_overwrite(store):

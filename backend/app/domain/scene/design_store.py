@@ -107,6 +107,36 @@ def write_scene(bucket: str, scene: str, payload: Any) -> Dict[str, Any]:
     return _repo(bucket).mutate(_fn)
 
 
+def update_scene_fields(bucket: str, scene: str, fields: Dict[str, Any]) -> bool:
+    """只改某场景存档里的指定字段（目前只用于 ``running``），**不动 designs**。
+
+    手动提交模式下的分工：
+    - ``designs`` 只在用户点「提交」时整档覆盖（write_scene）；
+    - 启停策略只改运行态，属于操作而非编辑 —— 若沿用整档 PUT，
+      会把本端内存里「尚未提交的清单」一起推上去覆盖别人。
+
+    返回 False 表示该场景在服务端还没有存档（运行态无处可写，前端提示「先提交」）。
+    """
+    if bucket not in BUCKETS:
+        raise ValueError(f"未知的编排桶：{bucket}（可选：{', '.join(BUCKETS)}）")
+    scene = _norm_scene(scene)
+    hit = {"ok": False}
+
+    def _fn(cur: Any) -> Dict[str, Any]:
+        data = dict(cur) if isinstance(cur, dict) else {}
+        old = data.get(scene)
+        if not isinstance(old, dict):
+            return data
+        merged = dict(old)
+        merged.update(fields)
+        data[scene] = merged
+        hit["ok"] = True
+        return data
+
+    _repo(bucket).mutate(_fn)
+    return hit["ok"]
+
+
 def delete_scene(bucket: str, scene: str) -> Dict[str, Any]:
     """删除某场景的编排数据，返回删除后的整桶内容。"""
     scene = _norm_scene(scene)

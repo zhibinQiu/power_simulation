@@ -128,26 +128,30 @@
 
       <!-- 策略：直接展示 AI优化模型（系统缺省）/ 自定义（仿真模式下保存的策略）/ 工艺流程优化（各工艺策略 + 系统预置） -->
       <div v-else>
-        <template v-if="!store.customSceneOn">
-          <!-- AI优化模型：系统缺省（默认）AI 优化模型 -->
-          <div class="tnode">
-            <div class="tch sub hdr" @click="toggle('g_strat_ai')">
-              <span class="twisty" :class="{ open: expanded.g_strat_ai }">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-              </span>
-              <span class="tch-tt">{{ t('AI优化模型') }}</span>
-              <span class="tch-count">{{ AI_MODELS.length }}</span>
-            </div>
-            <div class="tchildren" v-show="expanded.g_strat_ai">
-              <div v-for="m in AI_MODELS" :key="m.id" class="tchild leaf flat click"
-                   :class="{ active: store.selectedStrategyId === m.id }"
-                  
-                   @click="onAiClick(m)">
-                <span class="tc-tt">{{ m.name }}</span>
-              </div>
+        <!-- AI优化模型：系统缺省（默认）AI 优化模型。
+             与场景类型无关，始终展示 —— MPC 控温模型是独立视图页面（不依赖场景策略库），
+             通用资源包场景（火电/水泥…）里也必须能从这里进入。 -->
+        <div class="tnode">
+          <div class="tch sub hdr" @click="toggle('g_strat_ai')">
+            <span class="twisty" :class="{ open: expanded.g_strat_ai }">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </span>
+            <span class="tch-tt">{{ t('AI优化模型') }}</span>
+            <span class="tch-count">{{ AI_MODELS.length }}</span>
+          </div>
+          <div class="tchildren" v-show="expanded.g_strat_ai">
+            <div v-for="m in AI_MODELS" :key="m.id" class="tchild leaf flat click"
+                 :class="{ active: aiModelActive(m) }"
+                 :title="m.agc ? t('点击进入「AI群控 → 模型库 → {name}」（可用性自检 / 目标温度与时限求解）', { name: m.name }) : t('点击查看 AI 优化模型「{name}」训练面板', { name: m.name })"
+                 @click="onAiClick(m)">
+              <span class="tc-tt">{{ m.name }}</span>
+              <!-- MPC 条目带一个「内置」标记：它不在右侧训练面板里，而是 AI 群控模型库中的内置求解型模型 -->
+              <span v-if="m.agc" class="tc-tag mpc">{{ t('AI群控') }}</span>
             </div>
           </div>
+        </div>
 
+        <template v-if="!store.customSceneOn">
           <!-- 自定义：仿真模式下保存的策略 -->
           <div class="tnode">
             <div class="tch sub hdr" @click="toggle('g_strat_custom')">
@@ -213,7 +217,7 @@
             </div>
           </div>
         </template>
-        <div v-else class="empty-hint">{{ t('通用资源包场景暂无策略库：参数调整在编排属性面板，折碳展示见主场景') }}</div>
+        <div v-else class="empty-hint">{{ t('通用资源包场景暂无策略库：参数调整在编排属性面板，折碳展示见主场景（上方的 AI 优化模型可独立使用）') }}</div>
       </div>
     </div>
     </template>
@@ -506,7 +510,7 @@ watch(() => store.deviceDetailId, async (id) => {
 const expanded = reactive({
   process: false, g_steel: true, g_aux: true,
   aux: false, material: false, g_mat_raw: false, g_mat_mid: false, g_mat_prod: false,
-  strategy: false, g_strat_builtin: false, g_strat_ai: false, g_strat_custom: false,
+  strategy: false, g_strat_builtin: false, g_strat_ai: true, g_strat_custom: false,
 })
 // 工艺/策略目录不再有右侧专属属性面板（工序顺序已下线），切换时右侧显示总览
 const viewMap = { process: 'overview', aux: 'park', material: 'materials', strategy: 'overview' }
@@ -528,10 +532,21 @@ function onPresetClick(s) {
   store.toast = t('已打开策略「{name}」', { name: s.name || t('未命名') })
 }
 // 点击 AI 优化模型：打开右侧「策略属性」训练面板（随实时数据后台定时训练、模型逐渐变优）
+// 例外：带 agc 字段的模型（MPC 控温模型）不是「训练型」而是「求解型」，它集成在 AI 群控的
+// 模型库里 —— 点击后打开群控窗口并直接落到该内置模型页，不走右侧训练面板。
 function onAiClick(m) {
   if (store.busy) return
+  if (m.agc) {
+    if (store.openAgcMpc()) store.toast = t('已进入「AI群控 → 模型库 → {name}」：先看模型可用性，再输入目标温度与时限', { name: m.name })
+    return
+  }
   store.selectStrategy(m.id)
   store.toast = t('已打开 AI 优化模型「{name}」', { name: m.name })
+}
+// AI 模型条目的选中态：内置群控模型（MPC）跟着群控窗口 + 群控内部页走，其余按右侧策略面板走
+function aiModelActive(m) {
+  if (m.agc) return store.activeViewId === 'aiGroup' && store.agcPage === 'mpc'
+  return m.view ? store.activeViewId === m.view : store.selectedStrategyId === m.id
 }
 // 点击工艺策略（某工艺对应的绿色策略）：打开右侧「策略属性」面板（只读 + 启用/停用开关 + 查看工艺）
 function onGreenClick(g, gs) {
@@ -652,6 +667,8 @@ function onStratContext(e, s) {
 .tc-tag { font-size: 10px; color: #fff; padding: 1px 5px; border-radius: 4px; white-space: nowrap; flex: 0 0 auto; }
 .tc-tag.pre { background: var(--accent); }
 .tc-tag.saved { background: var(--green); }
+/* MPC：带「页面」语义的模型条目（打开独立视图，而非右侧训练面板） */
+.tc-tag.mpc { background: var(--accent-d); }
 
 /* 自定义策略条目：hover / 选中时显示删除按钮（VS Code 行内操作按钮） */
 .tchild .x-btn.danger { display: none; flex: 0 0 auto; }

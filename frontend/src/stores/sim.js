@@ -31,6 +31,12 @@ export const AI_MODELS = [
   { id: 'ai::pso', category: 'opt', categoryName: '参数优化', name: '粒子群优化策略', tag: 'PSO', desc: '适用于连续参数空间下最优解的探索：粒子在连续参数空间协同飞行，快速逼近最优运行点，适合实时在线寻优。' },
   { id: 'ai::clu', category: 'cluster', categoryName: '聚类分析', name: '聚类工况识别', tag: 'CLU', desc: '适用于历史工况的自动聚类与模式划分：内置 K-Means、DBSCAN 与层次聚类，自动识别典型运行工况（低/中/高负荷）及其占比，辅助制定分工况调节策略。' },
   { id: 'ai::fit', category: 'fit', categoryName: '数据拟合', name: '数据拟合分析', tag: 'FIT', desc: '对历史工况数据做曲线拟合建模：内置多项式 / 指数 / 对数 / 幂函数拟合，输出拟合方程与 R² 拟合优度，辅助洞察负荷趋势与关联规律。' },
+  // MPC 控温优化模型：与上面几个「训练型」模型不同，它是一套**求解型**控制器
+  // （灰箱一阶 RC 前向模型 + 离散档位动态规划），点击进入独立页面：
+  // 先看可用性自检（能否启用），再输入「目标温度 + 到达时限」求解能耗最小档位。
+  // view 字段表示点击后打开的中间区视图 id（见 VIEW_DEFS）；agc 字段表示进入该视图后落在哪个内置子页。
+  // MPC 控温优化不是独立视图，而是 AI 群控模型库里的内置求解型模型（见 PidControlView 的 alg-mpc 卡片）。
+  { id: 'ai::mpc', category: 'mpc', categoryName: 'MPC控制', name: 'MPC控温模型', tag: 'MPC', view: 'aiGroup', agc: 'mpc', desc: '面向控温设备的求解型控制器：前向模型用灰箱一阶 RC（时间常数、风扇/制冷片增益），决策用离散档位动态规划，在给定时限内求能耗最小的风扇电压与制冷片电流组合。集成在「AI群控 → 模型库」，与规则 / 强化学习 / 粒子群并列；「>45℃ 满功率、以下智能调控」的双模式也在该页。' },
 ]
 export const AI_MODEL_MAP = Object.fromEntries(AI_MODELS.map((m) => [m.id, m]))
 
@@ -558,6 +564,13 @@ export const useSimStore = defineStore('sim', {
     // AI 群控进入前右侧系统栏的开合备份：群控内容区自含左右两栏（训练前测试 | 训练相关设定），
     // 进入时收起外部右栏腾宽度，离开群控（切视图/返回孪生/关 tab）时由 App watch activeViewId 恢复
     grpRightBackup: null,
+    // AI 群控内部页：'lib' 模型库 / 'mpc' MPC 控温优化（内置求解型） / 'edit' 编排。
+    // 放在 store 里是为了让左侧「MPC控温模型」条目能高亮、也能从外部直接跳到 MPC 页；
+    // 真正的页面状态仍由 PidControlView 持有，这里只是镜像。
+    agcPage: 'lib',
+    // MPC 页跳转令牌：外部入口把 token 加一，PidControlView 收到变化（或挂载时看到非 0）就切到 mpc 页。
+    // openAiGroup() 会把它清零，保证「工具 → AI → AI群控」正常进入时落在模型库。
+    agcMpcToken: 0,
     boxCloudSource: 'unknown',// 能碳一体机管理：云端连接状态（live / degraded / unknown），由 CarbonBoxView 轮询后写回
     inspectorView: 'auto',    // 右侧检视器显式视图：'auto'（按选中推导）| 'park' 园区构成 | 'materials' 原料库 | 'strategy' 减排策略 | 'report' 报告面板 | 'agent' 本析智擎对话
     reportPayload: null,      // 「导出报告」请求载荷（baseline/strategy/ops/...），供右侧报告面板消费
@@ -1917,6 +1930,15 @@ export const useSimStore = defineStore('sim', {
     toggleCarbonCalc() { this.toggleView('carbonCalc') },
     toggleEnergyFlow() { this.toggleView('energyFlow') },
     toggleBoxManage() { this.toggleView('boxManage') },
+    // MPC 控温优化已集成进「AI 群控」的模型库（内置求解型模型），不再是独立视图：
+    // 这里只负责打开 AI 群控 + 把跳转令牌加一，由 PidControlView 切到 mpc 页。
+    openAgcMpc() {
+      if (this.welcomeOn) { this.toast = t('请先打开工程：在内容区新建或打开场景'); return false }
+      this.activateView('aiGroup')
+      this.agcMpcToken += 1
+      this.rightOpen = false
+      return true
+    },
     // HMI人机交互屏：与 3D 数字孪生对等的主视图形态（不进 tab 列表），
     // 开启时回到主视图槽位（功能视图窗口保持打开，点其标签可再切回）
     toggleOverview() {
@@ -1937,6 +1959,9 @@ export const useSimStore = defineStore('sim', {
     openAiGroup() {
       this.toggleAiGroup()
       if (!this.aiGroupOn) return
+      // 正常从菜单进入群控：清掉 MPC 跳转令牌，落在模型库（而不是上次看的 MPC 页）
+      this.agcMpcToken = 0
+      this.agcPage = 'lib'
       const cur = this.selectedStrategyId
       const curOpt = /^ai::(ga|pso|rl)$/.test(String(cur || ''))
       this.selectStrategy(curOpt ? cur : 'ai::ga')

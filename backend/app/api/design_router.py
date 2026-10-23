@@ -7,13 +7,14 @@
   GET    /api/designs/{bucket}             -> 整桶数据 { sceneId: payload }
   GET    /api/designs/{bucket}/{scene}     -> 单场景编排数据（不存在返回 null）
   PUT    /api/designs/{bucket}             -> 写入某场景 { scene, data }
+  PUT    /api/designs/agc/running          -> 只写 AI 群控运行态 { scene, running }（不动 designs）
   DELETE /api/designs/{bucket}/{scene}     -> 删除某场景编排数据
 
 bucket 白名单：flow（流程编排）/ agc（AI 群控编排）。
 """
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -24,6 +25,7 @@ from ..domain.scene.design_store import (
     read_bucket,
     read_last_scene,
     read_scene,
+    update_scene_fields,
     write_last_scene,
     write_scene,
 )
@@ -39,6 +41,11 @@ class DesignPayload(BaseModel):
 class LastScenePayload(BaseModel):
     scene: str = Field(..., description="场景 id")
     label: str = Field(default="", description="工程显示名（仅用于提示）")
+
+
+class RunningPayload(BaseModel):
+    scene: str = Field(default="steel", description="场景 id（与 /api/scenes 的 id 一致）")
+    running: List[str] = Field(default_factory=list, description="正在运行的模型 id（同时只允许一个）")
 
 
 @router.get("/api/designs/{bucket}")
@@ -69,6 +76,22 @@ def put_scene_design(bucket: str, payload: DesignPayload) -> Dict[str, Any]:
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"ok": True, "bucket": bucket, "scene": payload.scene, "data": data}
+
+
+@router.put("/api/designs/agc/running")
+def put_agc_running(payload: RunningPayload) -> Dict[str, Any]:
+    """**只写 AI 群控的运行态**（启停），不动 designs。
+
+    编排改动改为手动提交后，启停若仍走整档 PUT ``/api/designs/agc``，
+    就会把本端内存里尚未提交的清单一起推上去，覆盖掉别人已提交的版本。
+    这里只合并 ``running`` 字段；``found=False`` 表示服务端还没有该场景存档
+    （前端应提示「先提交再启动」）。
+    """
+    try:
+        found = update_scene_fields("agc", payload.scene, {"running": list(payload.running or [])})
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "scene": payload.scene, "found": found}
 
 
 @router.get("/api/agc/runtime")

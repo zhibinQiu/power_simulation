@@ -39,6 +39,7 @@ from .api.chat_session_router import router as chat_session_router
 from .api.data_sources_router import router as data_sources_router
 from .api.design_router import router as design_router
 from .api.middleware_router import router as middleware_router
+from .api.mpc_router import router as mpc_router
 from .api.help_router import router as help_router
 from .api.knowledge_router import router as knowledge_router
 from .api.simulation_router import router as simulation_router
@@ -64,6 +65,18 @@ async def _lifespan(app):
     #   cloud：云端 Broker（41883），能碳一体机盒子/云端 agent 推送；中间件把外部数据
     #          转换后也直发本 Broker（ext/# 上行空间 → data/ext-*），按前缀区分。
     mqtt_source.start()
+    # MPC 闭环兜底：上次进程退出前闭环没正常收尾（崩溃 / 重启 / 热重载）时，
+    # 设备会继续按最后一次设定输出，而页面显示「未启动」。启动时主动归零一次。
+    try:
+        from .domain.mpc import loop as mpc_loop
+        _rec = mpc_loop.recover_on_boot()
+        if _rec:
+            realtime.manager.notify(
+                "warn", "MPC 闭环已归零",
+                "服务重启前存在未正常收尾的 MPC 闭环，已把风扇 / 制冷片两路输出归零。"
+                + ("" if _rec.get("ok") else "（归零命令发布失败，请到「设备命令」页核对）"))
+    except Exception as _e:  # pragma: no cover
+        realtime.manager.notify("warn", "MPC 闭环兜底未执行", f"重启归零检查失败：{_e}")
     # AI 群控：服务端常驻运行器 —— 策略点「运行」后只要没人手动停止就一直执行下发，
     # 不依赖浏览器是否打开 / 是否停在编排页（运行态存在 designs/agc.json 的 running 字段）。
     try:
@@ -115,6 +128,7 @@ app.include_router(chat_session_router)        # 聊天会话（历史对话/继
 app.include_router(box_router)                 # 能碳一体机管理
 app.include_router(carbon_assets_router)       # 碳资产管理（含 /api/carbon-assistant/*）
 app.include_router(data_sources_router)       # 统一数据源接入（一体机 + 经中间件接入的外部数据/模拟数据）
+app.include_router(mpc_router)                # MPC 控温优化模型（可用性自检 / 目标温度+时限 -> 能耗最优动作）
 app.include_router(middleware_router)         # 数据中间件服务（连接配置/状态/对账/接入类型）
 app.include_router(help_router)                # 帮助中心（独立文档网站地址）
 app.include_router(knowledge_router)           # 知识库（LLM-WIKI 式多级文件夹 + 文档解析，无需权限）
@@ -190,12 +204,33 @@ class CacheAwareStaticFiles(StaticFiles):
     def file_response(self, *args, **kwargs):
         resp = super().file_response(*args, **kwargs)
         full_path = str(args[0]) if args else str(kwargs.get("full_path", ""))
+        # 按扩展名硬修正 MIME：Windows 的 mimetypes 会读注册表，`.js` 常被第三方软件
+        # 登记成 text/plain，浏览器随即拒绝加载 type="module" 的脚本（整页白屏，
+        # 控制台只报 "MIME type of text/plain"）。这里不依赖注册表。
+        fixed = _MIME_FIX.get(os.path.splitext(full_path)[1].lower())
+        if fixed:
+            resp.headers["content-type"] = fixed
         try:
             rel = os.path.relpath(full_path, self.directory).replace(os.sep, "/")
         except Exception:  # pragma: no cover - 路径异常时不阻断响应
             rel = ""
         resp.headers["Cache-Control"] = _cache_control_for_static(rel)
         return resp
+
+
+# 浏览器严格校验的几类资源（type=module 的脚本要求 JavaScript MIME）
+_MIME_FIX = {
+    ".js": "text/javascript; charset=utf-8",
+    ".mjs": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".json": "application/json",
+    ".map": "application/json",
+    ".svg": "image/svg+xml",
+    ".wasm": "application/wasm",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+    ".ttf": "font/ttf",
+}
 
 
 def _cache_control_for_static(rel: str) -> str:

@@ -147,19 +147,16 @@ export const api = {
   workspaceSetLastScene: (scene, label = '') => jput('/workspace/last-scene', { scene, label }),
   // AI 群控服务端运行器状态：哪些策略在运行、各策略最近一轮执行结果（执行在服务端，关掉浏览器也照跑）
   agcRuntime: () => jget('/agc/runtime'),
-  // 整桶读取：返回 { ok, bucket, data: { <sceneId>: payload } }，调用方按 sceneId 取自己那一档
-  designBucket: (bucket) => request(BASE + '/designs/' + encodeURIComponent(bucket), { signal: timeoutSignal(10000) }),
+  // 读取整桶编排存档（返回 { ok, bucket, data: { sceneId: payload } }）。
+  // 群控 / 流程编排启动时都以它为准来恢复「服务端那份」。
+  designBucket: (bucket) => jget('/designs/' + encodeURIComponent(bucket)),
+  // 只读单个场景那一档（需要时可以少传数据量）
+  designScene: (bucket, scene) =>
+    jget('/designs/' + encodeURIComponent(bucket) + '/' + encodeURIComponent(scene)),
   designSave: (bucket, scene, data) => jput('/designs/' + encodeURIComponent(bucket), { scene, data }, { signal: timeoutSignal(15000) }),
-  // 页面关闭 / 切到后台时立刻落库：普通 fetch 在卸载阶段会被浏览器直接取消，
-  // keepalive 让请求在页面销毁后仍由浏览器代为发出 —— 否则「配完附加传感就关页面」时
-  // 防抖（800ms）里的那次 PUT 会丢，服务端存档停在旧版本，下次打开又回到旧编排。
-  designSaveNow: (bucket, scene, data) =>
-    fetch(BASE + '/designs/' + encodeURIComponent(bucket), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scene, data }),
-      keepalive: true,
-    }).then((r) => r.json()),
+  // 只写 AI 群控运行态（启停）：手动提交模式下，启停属于操作而非编辑 ——
+  // 若走整档 PUT，就会把本端「尚未提交的清单」一起推上去覆盖别人。
+  designSaveRunning: (scene, running) => jput('/designs/agc/running', { scene, running }, { signal: timeoutSignal(10000) }),
   designDelete: (bucket, scene) =>
     fetch(BASE + '/designs/' + encodeURIComponent(bucket) + '/' + encodeURIComponent(scene),
       { method: 'DELETE' }).then((r) => r.json()),
@@ -274,6 +271,23 @@ export const api = {
   kbDocContent: (id) => jget('/knowledge/doc/' + id + '/content'),
   kbRawUrl: (id) => BASE + '/knowledge/doc/' + id + '/raw',
   kbSearch: (q) => jget('/knowledge/search?q=' + encodeURIComponent(q)),
+  // ---- MPC 控温优化模型（可用性自检 / 启用开关 / 目标温度+时限 -> 能耗最优动作）----
+  mpcStatus: () => jget('/mpc/status'),
+  mpcEnable: (enabled) => jpost('/mpc/enable', { enabled }),
+  mpcPlan: (payload) => jpost('/mpc/plan', payload),
+  // 决策日志：每次求解一条（收到反馈温度 → 判定 → 下发档位 → 预计结果），落盘在 backend/logs/mpc.log
+  mpcLogs: (limit = 100) => jget('/mpc/logs?limit=' + encodeURIComponent(limit)),
+  mpcLogClear: () => jdel('/mpc/logs'),
+  // 实时反馈点位：当前温度 zhileng-temp / 室温 env-temp / 水桶温度 shuitong-temp（MQTT 真实上报）
+  mpcFeedback: () => jget('/mpc/feedback'),
+  // 下发：v_fan -> fengshan-power.voltage_set（恒压），i_tec -> zhileng-power.current_set（恒流）
+  mpcApply: (payload) => jpost('/mpc/apply', payload),
+  mpcStop: (reason, dryRun) => jpost('/mpc/stop', { reason: reason || '手动停止', dry_run: !!dryRun }),
+  mpcMapping: () => jget('/mpc/mapping'),
+  // 闭环：下发当前段 + 之后「三台反馈设备各上报一次就重解并下发」
+  mpcLoop: () => jget('/mpc/loop'),
+  mpcLoopStart: (payload) => jpost('/mpc/loop/start', payload),
+  mpcLoopStop: (reason) => jpost('/mpc/loop/stop', { reason: reason || '手动停止' }),
   // ---- 通用方法（管理界面用） ----
   get: jget,
   post: jpost,

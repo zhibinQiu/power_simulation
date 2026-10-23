@@ -16,14 +16,36 @@
         <span class="cnt">{{ designs.length }}</span>
         <!-- 群控策略属于具体的场景资源包：明确标出当前场景，避免把别场景的策略当成自己的 -->
         <span class="lib-scene">{{ t('场景') }} · {{ sceneLabel }}</span>
-        <!-- 手动从服务端拉一次清单：群控编排单一真源在服务端，任何一端新建的策略都在这里同步过来 -->
+        <!-- 手动从服务端拉一次清单：群控编排单一真源在服务端，任何一端提交的策略都在这里同步过来 -->
         <button class="lib-refresh" :disabled="refreshing" @click="refreshDesigns">
           <span class="rf-ic" :class="{ spin: refreshing }">⟳</span><span class="rf-tx">{{ refreshing ? t('刷新中…') : t('刷新') }}</span>
         </button>
+        <span v-if="dirty" class="lib-dirty">{{ t('有未提交的改动') }}</span>
+        <!-- 唯一的上传入口：编辑只改内存，点这里二次确认后才整档覆盖服务端 -->
+        <button class="lib-refresh lib-submit" :disabled="saving || !dirty" :title="submitTitle" @click="submitDesigns">
+          <span class="rf-ic">{{ saving ? '…' : '⤴' }}</span><span class="rf-tx">{{ saving ? t('提交中…') : t('提交') }}</span>
+        </button>
       </div>
-      <p class="lib-tip">{{ t('每个模型是一套群控算法：编排完成后点右上角「运行」；运行中点击模块可看实时值。') }}</p>
+      <p class="lib-tip">{{ t('每个模型是一套群控算法：编排完成后点「提交」存到服务器，再点「运行」；运行中点击模块可看实时值。') }}</p>
 
       <div class="lib-grid">
+        <!-- 内置求解型模型：MPC 控温优化。它不参与编排（没有「规则/强化学习/粒子群」那样的模块图），
+             点开就是「目标温度 + 时限 → 能耗最小档位」的求解页，因此固定排在最前、不可重命名/删除 -->
+        <article class="mcard alg-mpc" @click="openMpc">
+          <div class="mc-top">
+            <span class="mc-ic">Σ</span>
+            <span class="mc-nm">{{ t('MPC 控温优化') }}</span>
+            <span class="mc-tg mpc">{{ t('内置') }}</span>
+          </div>
+          <div class="mc-bd">
+            <span class="mc-st"><em>{{ t('前向') }}</em><b class="mono">RC τ=1720s</b></span>
+            <span class="mc-st"><em>{{ t('决策') }}</em><b class="mono">{{ t('档位 DP') }}</b></span>
+          </div>
+          <div class="mc-ft">
+            <span class="mc-ts">{{ t('目标温度 + 时限 → 能耗最小档位') }}</span>
+            <span class="mc-ops"><button class="lk run" @click.stop="openMpc">{{ t('进入') }}</button></span>
+          </div>
+        </article>
         <article v-for="m in designs" :key="m.id" class="mcard" :class="['alg-' + m.alg, { live: isRunning(m.id) }]" @click="enter(m)">
           <div class="mc-top">
             <span class="mc-ic">{{ algIco(m.alg) }}</span>
@@ -53,14 +75,28 @@
       </div>
 
       <div v-if="!designs.length" class="lib-empty">
-        <p class="t1">{{ t('「{scene}」下还没有算法模型', { scene: sceneLabel }) }}</p>
-        <p class="t2">{{ t('点击「+ 新建模型」，选择规则 / 强化学习 / 粒子群 / MPC，即可进入编排。') }}</p>
+        <p class="t1">{{ t('本场景「{scene}」下还没有自建算法模型', { scene: sceneLabel }) }}</p>
+        <p class="t2">{{ t('内置的「MPC 控温优化」可直接点开使用；要自建策略请点「+ 新建模型」（规则 / 强化学习 / 粒子群 / MPC）。') }}</p>
         <!-- 群控策略按工程（场景）分档保存在官网：换浏览器看不到时，多半是打开了别的工程 -->
-        <p class="t3">{{ t('新建的策略保存在官网当前工程下，所有人可见；若在别的浏览器看不到，请确认打开的是同一个工程。') }}</p>
+        <p class="t3">{{ t('新建的策略点「提交」后保存在官网当前工程下，所有人可见；若在别的浏览器看不到，请确认打开的是同一个工程。') }}</p>
       </div>
     </section>
 
-    <!-- ══════════ ② 编排 ══════════ -->
+    <!-- ══════════ ② MPC 控温优化（内置求解型模型：无编排，整页为 MPC 面板） ══════════ -->
+    <div v-else-if="page === 'mpc'" class="agc-mpc">
+      <div class="ed-top">
+        <button class="btn ghost" @click="page = 'lib'">{{ '← ' + t('模型库') }}</button>
+        <b class="ed-nm">{{ t('MPC 控温优化') }}</b>
+        <span class="mc-tg mpc">MPC</span>
+        <span class="hd-sp"></span>
+        <span class="ed-st on"><i class="dot"></i>{{ t('求解型控制器：目标温度 + 时限 → 能耗最小档位') }}</span>
+      </div>
+      <div class="agc-mpc-bd">
+        <MpcControlView embedded />
+      </div>
+    </div>
+
+    <!-- ══════════ ③ 编排 ══════════ -->
     <div v-else-if="cur" class="agc-edit">
       <div class="ed-top">
         <button class="btn ghost" @click="back">{{ '← ' + t('模型库') }}</button>
@@ -68,6 +104,10 @@
         <span class="mc-tg" :class="cur.alg">{{ algLabel(cur.alg) }}</span>
         <span class="hd-sp"></span>
         <span class="ed-st" :class="{ on: running }"><i class="dot"></i>{{ runStateTxt }}</span>
+        <span v-if="dirty" class="ed-dirty">{{ t('未提交') }}</span>
+        <button class="btn" :disabled="!dirty || saving" :title="submitTitle" @click="submitDesigns">
+          {{ saving ? t('提交中…') : t('提交') }}
+        </button>
         <button class="btn" :class="running ? 'danger' : 'primary'" :disabled="!canRun" :title="runTip" @click="toggleRun">
           {{ running ? t('停止') : t('运行') }}
         </button>
@@ -396,6 +436,8 @@ import { api } from '../api/client'
 import { ADJUSTABLE_MAP } from '../data/attachLibrary'
 import RuleFlowEditor from './RuleFlowEditor.vue'
 import PsoTuner from './PsoTuner.vue'
+// MPC：整页内置模型（page === 'mpc' 时渲染 MpcControlView），以及旧版编排页里的调参面板
+import MpcControlView from './MpcControlView.vue'
 import MpcTuner from './MpcTuner.vue'
 import { t } from '../i18n'
 // 规则编排的「开始」端点与通路判定：能否运行取决于每张卡片是否与「开始」连通
@@ -1240,6 +1282,8 @@ watch([() => adjList.value.length, () => senList.value.length], () => {
 }, { immediate: true })
 
 onMounted(() => {
+  // 由「MPC控温模型」入口进来时（store.agcMpcToken 已置位），群控挂载后直接落到 MPC 页
+  if (store.agcMpcToken) openMpc()
   loadVers()
   loadDesigns()
   pullDesigns()   // 群控编排唯一真源：服务端 designs/agc（本地不留任何副本）
@@ -1249,17 +1293,16 @@ onMounted(() => {
   // 服务端运行器状态轮询：规则执行在服务端（不依赖本页是否打开），本端只同步运行态与画布高亮
   rtTimer = setInterval(pollRuntime, 2000)
   pollRuntime()
-  window.addEventListener('pagehide', flushDesigns)
-  document.addEventListener('visibilitychange', onVisHide)
+  window.addEventListener('beforeunload', onBeforeUnload)
   syncTimer = setInterval(syncPeers, 8000)
 })
 // 多人在同一个官网实例上协作：定期把服务端（真源）的清单拉回来，
 // 别人在这期间新建的策略就能直接出现在模型库里（不必重开浏览器）。
-// 只在**模型库页**做（此时手上没有正在编辑的编排体），且有本地改动待推时跳过，避免覆盖自己。
+// 只在**模型库页**做（此时手上没有正在编辑的编排体），且本端有未提交改动时跳过，避免覆盖自己。
 let syncTimer = null
 function syncPeers() {
   if (page.value !== 'lib' || cur.value) return
-  if (pushPending || saveTimer) return
+  if (dirty.value || saving.value || refreshing.value) return
   if (document.visibilityState === 'hidden') return
   pullDesigns()
 }
@@ -1269,11 +1312,9 @@ onBeforeUnmount(() => {
   stopSample()
   if (syncTimer) { clearInterval(syncTimer); syncTimer = null }
   if (rtTimer) { clearInterval(rtTimer); rtTimer = null }
-  flushDesigns()   // 切走视图也补发一次，避免防抖里的群控编排改动丢失
-  window.removeEventListener('pagehide', flushDesigns)
-  document.removeEventListener('visibilitychange', onVisHide)
+  // 手动提交：切走视图不再补发任何请求（未提交的改动由 beforeunload 提前警告过）
+  window.removeEventListener('beforeunload', onBeforeUnload)
   if (autoTimer) clearInterval(autoTimer)
-  if (saveTimer) clearTimeout(saveTimer)
 })
 
 // ==================== 格式化 ====================
@@ -1304,9 +1345,8 @@ function fullTs(ts) {
 
 // ==================== ① 模型库（算法模型清单） ====================
 // 一个模型 = 一套独立的群控算法（规则 / 强化学习 / 粒子群），各自保存自己的编排与设备选择。
-// **群控编排绑定到场景资源包**：服务端 designs/agc.json 以 sceneId 分档存取。
-// 历史上这里还按场景存一份 localStorage 兜底（DESIGNS_KEY + '::<scene>'），那份副本会让本显示的
-// 是本机旧清单而不是服务端的同一份 —— 现已全部移除，浏览器不再留存任何群控存档（单一真源）。
+// 群控编排绑定到场景资源包：服务端 designs/agc.json 以 sceneId 分档存取。
+// 浏览器不留任何群控存档（单一真源）——服务端有改动就点「提交」才会写上去。
 const ALG_TYPES = [
   { id: 'rule', ico: '⌥', label: t('规则'), desc: t('if-elif-else 阈值编排，直观可控') },
   { id: 'rl', ico: '◈', label: t('强化学习'), desc: t('PPO 在线辨识 + 策略寻优') },
@@ -1318,7 +1358,15 @@ function algIco(id) { return algMeta(id).ico }
 function algLabel(id) { return algMeta(id).label }
 function algDesc(id) { return algMeta(id).desc }
 
-const page = ref('lib')            // lib = 模型库；edit = 编排
+const page = ref('lib')            // lib = 模型库；mpc = MPC 控温优化（内置求解型）；edit = 编排
+
+// MPC 控温优化：AI 群控模型库里的内置模型。
+// 外部入口（左侧「策略 → AI优化模型 → MPC控温模型」/ 顶栏 AI 菜单）只负责把 store 里的
+// agcMpcToken 加一 —— 本组件挂载时或收到 token 变化时切到 mpc 页，避免再造一个独立视图。
+function openMpc() { page.value = 'mpc' }
+watch(() => store.agcMpcToken, (v) => { if (v) openMpc() })
+// 把内部页镜像到 store：左侧「MPC控温模型」条目据此高亮（只有真正停在 MPC 页时才算选中）
+watch(page, (v) => { store.agcPage = v }, { immediate: true })
 const designs = ref([])
 const newOpen = ref(false)
 const newName = ref('')
@@ -1359,7 +1407,6 @@ function normalizeModel(m) {
     spOf: mm.spOf && typeof mm.spOf === 'object' ? { ...mm.spOf } : {},
   }
 }
-let saveTimer = null
 // 编排存档场景键：AI 群控模型按场景分档（与流程编排同一口径，切场景不串档）
 function designScene() { return store.sceneId || 'steel' }
 // 当前场景资源包的显示名：模型库里标出「属于哪个场景」，群控策略与场景一一对应
@@ -1372,81 +1419,100 @@ const sceneLabel = computed(() => {
   const sc = (store.scenarios || []).find((s) => s.id === sid)   // 内置钢包：注册表还没拉到时兜底「钢铁」
   return (sc && sc.label) || sid
 })
-let pushTimer = null
-let pushPending = null   // 待推送的群控存档：防抖窗口内关页面时靠它补发（keepalive）
-// 在途删除：删除请求发出到服务端确认之间，8s 轮询可能拉回「还没删掉」的旧档，
-// 若不过滤，刚删掉的卡片会立刻复活（表现为「点删除没反应」）。服务端确认后清除。
-const pendingRemoved = new Set()
+// ── 手动提交（唯一的上传入口）─────────────────────────────────────────────
+// 以前是「改动即 600ms 防抖 PUT + 关页面 keepalive 补发」：拖一次滑块就会整档覆盖线上存档，
+// 多人共用一个官网实例时互相抹掉。现在改成显式提交：
+//   · 任何编辑只置 dirty，不产生任何网络请求；
+//   · 点「提交」→ 二次确认 → 整档覆盖到服务端 → dirty 清零；
+//   · 关页面 / 切工程时若有未提交改动，明确提示，不再偷偷补发。
+const dirty = ref(false)      // 本端有未提交的编排改动
+const saving = ref(false)     // 提交请求在途
+const savedAt = ref(0)        // 最近一次提交成功的时间（ms）
+function markDirty() { dirty.value = true }
+/** 提交给服务端的整档载荷（running 取当前值，避免一次提交把刚切换的运行态覆盖回旧值） */
+function agcPayload(scene) {
+  return {
+    scene,
+    designs: designs.value.slice(0, 50),
+    updatedAt: Date.now(),
+    running: runId.value ? [runId.value] : [],
+  }
+}
+/** 已有确认弹窗在等用户点（Ctrl+S 连按时不要叠开，否则前一个 Promise 永远悬着） */
+function dialogOpen() { return !!(store.confirmDialog && store.confirmDialog.open) }
+/** 提交：把当前工程下的全部群控模型整档覆盖到服务端（二次确认后执行） */
+async function submitDesigns() {
+  if (saving.value || dialogOpen()) return false
+  if (!dirty.value) {
+    store.showToast(t('没有需要提交的改动'), 'info')
+    return false
+  }
+  const ok = await store.confirm({
+    title: t('提交到服务器'),
+    message: t('将把当前工程「{scene}」下的全部群控模型整档覆盖到服务器，其它人打开会看到这份清单。确认提交？', { scene: sceneLabel.value }),
+    okText: t('确认提交'),
+    cancelText: t('取消'),
+  })
+  if (!ok) return false
+  saving.value = true
+  try {
+    await api.designSave('agc', designScene(), agcPayload(designScene()))
+    dirty.value = false
+    savedAt.value = Date.now()
+    store.showToast(t('已提交到服务器'), 'success')
+    return true
+  } catch (e) {
+    store.showToast(t('提交失败：{msg}', { msg: (e && e.message) || t('服务端不可用') }), 'error')
+    return false
+  } finally {
+    saving.value = false
+  }
+}
+const refreshing = ref(false)
+/** 提交按钮的提示：带上最近一次提交时间，避免「到底存没存过」的疑虑 */
+const submitTitle = computed(() => {
+  const base = t('把当前工程下的全部群控模型提交到服务器（需二次确认）')
+  return savedAt.value ? `${base} · ${t('上次提交')} ${shortTs(savedAt.value)}` : base
+})
+/** 手动刷新：以服务端存档覆盖本端（有未提交改动时先确认，避免白干一场） */
+async function refreshDesigns() {
+  if (refreshing.value || dialogOpen()) return
+  if (dirty.value) {
+    const ok = await store.confirm({
+      title: t('刷新会丢弃未提交的改动'),
+      message: t('本端还有未提交的群控改动，刷新将以服务器存档覆盖它们。确认刷新？'),
+      okText: t('丢弃并刷新'),
+      cancelText: t('取消'),
+      danger: true,
+    })
+    if (!ok) return
+    dirty.value = false
+  }
+  refreshing.value = true
+  try { await pullDesigns() } finally { refreshing.value = false }
+}
 function dropDesigns(id) {
   designs.value = designs.value.filter((x) => x.id !== id)
-  if (!id) return
-  pendingRemoved.add(id)
 }
-function persist() {
-  const scene = designScene()
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => {
-    saveTimer = null   // 置空：syncPeers 据此判断「本地是否还有待写的改动」
-  }, 200)
-  // 单一真源：清单只写服务端 designs/agc（本地不留副本）。
-  // 服务端整档覆盖 —— 提交的清单里没有的条目即为已删除，不需要额外声明。
-  // running 每次都取当前值（而非快照）—— 否则一次编辑保存会把刚切换的运行态覆盖回旧值。
-  try {
-    pushPending = { scene, data: { scene, designs: designs.value.slice(0, 50), updatedAt: Date.now(), running: runId.value ? [runId.value] : [] } }
-    clearTimeout(pushTimer)
-    pushTimer = setTimeout(() => {
-      const p = pushPending
-      pushPending = null
-      if (!p) return
-      api.designSave('agc', p.scene, p.data).then(() => {
-        pendingRemoved.clear()   // 整档已被服务端接受：在途删除随之生效
-      }).catch(() => { /* 服务端不可用时保持在途过滤，下次重试 */ })
-    }, 600)
-  } catch (e) { /* 忽略 */ }
-}
-// 页面关闭 / 切后台时立刻补发：普通 fetch 会在卸载阶段被取消，keepalive 才能送达，
-// 否则「配完群控设备就关页面」时服务端仍是旧档，下次打开另一端实例会被还原。
-function flushDesigns() {
-  const p = pushPending
-  if (!p) return
-  pushPending = null
-  clearTimeout(pushTimer)
-  api.designSaveNow('agc', p.scene, p.data).catch(() => { /* 卸载阶段失败：下次编辑仍会带上 */ })
-}
-function onVisHide() { if (document.visibilityState === 'hidden') flushDesigns() }
 function loadDesigns() {
-  // 单一真源：本地不再读取任何群控存档 —— 清单由 pullDesigns() 从服务端 designs/agc 取回。
-  // 挂载瞬间先用空清单渲染，服务端返回后立即替换（本地旧档不再有「抢先显示」的机会）。
+  // 服务端是唯一真源，本端不留副本：这里只负责「首次进入机房场景补一个示例编排」
   designs.value = []
+  seedDcExample()
 }
-// 服务端为准：服务器实例是群控编排的权威侧，服务端有存档就无条件采用，
-// 本地 localStorage 只作离线兜底（不再按 ts 比对，否则两端永远不同步）
+// 服务端为准：本场景有存档就整体采用（调用方负责先拦下未提交的改动）
 async function pullDesigns() {
   const scene = designScene()
-  // 拉取前的本端清单：可能含有「本端刚建、还没来得及推送」的策略
-  const before = designs.value.slice()
   try {
     const r = await api.designBucket('agc')
     // 只取本场景那一档：服务端按 sceneId 分档，别的场景的策略与本场景无关
     const remote = (r && r.data) ? r.data[scene] : null
-    const arr = remote && Array.isArray(remote.designs)
-      ? remote.designs.filter((m) => m && m.id && !pendingRemoved.has(m.id))
-      : null
+    const arr = remote && Array.isArray(remote.designs) ? remote.designs.filter((m) => m && m.id) : null
     if (!arr) {
-      // 服务端本场景暂无存档：清单保持现状（本端刚建的模型会经 persist 写上去成为首档）
-      seedDcExample()
+      // 服务端本场景还没有存档：保留本端现有清单（首次提交时它成为首档）
       return
     }
     designs.value = arr.map(normalizeModel)
-    // 并集保护：本端有、服务端没有的条目必然是「本端刚建还没推送」，
-    // 先并入清单再回推一次服务端，避免刚建的策略被拉回的版本盖掉。
-    // 在途删除的条目不参与并集 —— 否则刚删掉的模型会被自己重新并回来。
-    const seen = new Set(designs.value.map((m) => m.id))
-    const extra = before.filter((m) => m && m.id && !seen.has(m.id) && !pendingRemoved.has(m.id))
-    if (extra.length) {
-      designs.value = [...designs.value, ...extra.map((m) => normalizeModel(m))]
-      persist()
-    }
+    dirty.value = false   // 已被服务端版本整体替换：本端不再有相对服务端的改动
     // 运行态同样以服务端为准：换电脑 / 重开浏览器打开，运行中的策略在这里接着跑
     const run = remote && (Array.isArray(remote.running)
       ? remote.running
@@ -1457,25 +1523,13 @@ async function pullDesigns() {
       if (runId.value) stopModel(runId.value, true)
       if (rid) resumeRun(rid)
     }
-  } catch (e) { /* 服务端不可用时保持当前清单，下次轮询再拉 */ }
-  // 注意：内置示例只在「服务端本场景还没有存档」时补种（见上方 arr 为空分支）。
-  // 服务端已有存档时一律以服务端清单为准 —— 用户删掉的策略不会在刷新后被补回来。
+  } catch (e) { /* 服务端不可用：保留本端清单，提交时会重试 */ }
 }
-
-// 手动刷新：先把本端待发的改动补推上去，再从服务端整份拉回（跨端新建/删除立即对齐）
-const refreshing = ref(false)
-async function refreshDesigns() {
-  if (refreshing.value) return
-  refreshing.value = true
-  try {
-    flushDesigns()                 // 本端还有没发出去的编辑：先落服务端，避免被拉回的版本盖掉
-    await pullDesigns()
-    store.showToast(t('已刷新模型库'), 'success')
-  } catch (e) {
-    store.showToast(t('刷新失败，稍后重试'), 'warn')
-  } finally {
-    refreshing.value = false
-  }
+// 有未提交改动时关页面给浏览器原生二次确认（不再在卸载阶段偷偷补发）
+function onBeforeUnload(e) {
+  if (!dirty.value) return
+  e.preventDefault()
+  e.returnValue = ''
 }
 
 // ── 切场景：群控编排是场景资源包的一部分，必须整档换掉 ──
@@ -1485,14 +1539,20 @@ let sceneSeq = 0                  // 连续切场景时只认最后一次（避�
 watch(() => store.sceneId, async (nid, oid) => {
   if (!nid || nid === oid) return
   const seq = ++sceneSeq
-  flushDesigns()                  // pending 里带着旧场景 id：先把旧场景的改动按旧场景落库
+  // 手动提交模式：切工程不再自动落库，未提交的改动只能丢弃 —— 明确告知，别默默消失
+  if (dirty.value) {
+    dirty.value = false
+    store.showToast(t('已切换到新工程，未提交的群控改动已丢弃'), 'warn')
+  }
   if (runId.value) { stopModel(runId.value, true); runId.value = '' }
   cur.value = null                // 退出旧场景模型的编排
   page.value = 'lib'
-  loadDesigns()                   // 新场景的本地兜底
+  loadDesigns()                   // 新场景：清空本端清单（服务端是唯一真源）
   await pullDesigns()             // 再以服务端（新场景那一档）覆盖
   if (seq !== sceneSeq) return    // 期间又切了场景：交给那一次的处理收尾
 })
+// Ctrl+S（工具 / 编排菜单的「保存」）落在群控视图时等价于点「提交」——同样走二次确认
+watch(() => store.agcSaveSeq, (v, o) => { if (v !== o) submitDesigns() })
 
 // ==================== 内置示例：机房温控「机柜超温 → 降泵压」 ====================
 // 首次在机房热控场景打开本视图时自动给出一个可直接运行的示例编排。
@@ -1503,8 +1563,6 @@ watch(() => store.sceneId, async (nid, oid) => {
 const EXAMPLE_ID = 'dc_cool_rule_50c'
 function seedDcExample() {
   if ((store.sceneId || '') !== 'dc-thermal') return
-  // 在途删除：刚点删除、服务端还没确认，别把它补回来
-  if (pendingRemoved.has(EXAMPLE_ID)) return
   const senId = 'ext::n_dc_it::att_dc_it_temp'      // 机柜温度传感器
   const adjId = 'ext::n_dc_cw::att_dc_cw_pump'      // 循环水泵变压器
   if (!findDev(senId) || !findDev(adjId)) return
@@ -1535,7 +1593,7 @@ function seedDcExample() {
     selSen: [senId],
   })
   designs.value = [m, ...designs.value]
-  persist()   // 示例也要写进服务端存档：它是所有客户端共用的同一份清单
+  markDirty()   // 示例只生成本端：要变成所有客户端共用的那一份，需用户点「提交」
 }
 
 // —— 进入 / 退出编排：设备选择与目标值随模型存取 ——
@@ -1557,8 +1615,8 @@ watch([selAdj, selSen, spOf], () => {
   cur.value.selSen = selSen.value.slice()
   cur.value.spOf = { ...spOf }
 }, { deep: true })
-// 模型的编排内容（规则图 / 粒子群参数 / 周期 / 名称）变更即落盘
-watch(() => cur.value, (m) => { if (m) persist() }, { deep: true })
+// 模型的编排内容（规则图 / 粒子群参数 / 周期 / 名称）变更只置「未提交」，等用户点「提交」
+watch(() => cur.value, (m) => { if (m) markDirty() }, { deep: true })
 // 运行中改周期：重启后台运行器，让新的执行周期立即生效
 watch(() => (cur.value ? Number(cur.value.period) || 2 : 0), () => {
   const m = cur.value
@@ -1598,7 +1656,7 @@ function createModel() {
   designs.value = [m, ...designs.value]
   newOpen.value = false
   newName.value = ''
-  persist()
+  markDirty()
   enter(m)
 }
 function renameModel(m) {
@@ -1607,7 +1665,7 @@ function renameModel(m) {
   const nm = String(v).trim()
   if (!nm) return
   m.name = nm
-  persist()
+  markDirty()
 }
 function dupModel(m) {
   const i = designs.value.findIndex((x) => x.id === m.id)
@@ -1618,14 +1676,14 @@ function dupModel(m) {
     ts: Date.now(),
   })
   designs.value.splice(i < 0 ? designs.value.length : i + 1, 0, copy)
-  persist()
+  markDirty()
 }
 async function delModel(m) {
   const ok = await store.confirm({ title: t('删除模型'), message: t('删除后该模型的编排配置不可恢复，确认删除？'), danger: true })
   if (!ok) return
   if (runId.value === m.id) stopModel(m.id, true)
   dropDesigns(m.id)
-  persist()
+  markDirty()
 }
 
 /** 模型卡片的摘要指标 */
@@ -1747,17 +1805,23 @@ function runTipOf(m) {
   if (m.alg === 'pso') return t('请先选择优化变量（可调设备）与优化目标（传感设备）')
   return t('请先在左栏勾选可调设备与传感设备（按勾选顺序一一配对形成控制回路）')
 }
-/** 运行态立刻落到服务端：启停是低频动作，不等 600ms 防抖，避免「点了运行但另一端看不到」 */
+/** 运行态立刻同步到服务端：**只写 running**，绝不带上本端（可能未提交的）清单 */
 function persistRunning() {
   markRunLocal()   // 本端刚改过：先以本端为准，别被尚未追上的服务端旧存档弹回去
   const scene = designScene()
-  try {
-    const data = { scene, designs: designs.value.slice(0, 50), updatedAt: Date.now(), running: runId.value ? [runId.value] : [] }
-    // 已立即推送：清掉待发的防抖载荷，否则页面关闭时会再补发一份不带最新运行态的旧数据
-    pushPending = null
-    clearTimeout(pushTimer)
-    api.designSaveNow('agc', scene, data).catch(() => { /* 失败不影响本地运行态，下次编辑仍会带上 */ })
-  } catch (e) { /* 忽略 */ }
+  const running = runId.value ? [runId.value] : []
+  // 服务端运行器执行的是「服务器上已提交的那份编排」：本端还没提交时它跑的是旧版本
+  if (running.length && dirty.value) {
+    const m = designs.value.find((x) => x.id === running[0])
+    if (m && m.alg === 'rule' && backendRunner.value) {
+      store.showToast(t('服务端运行的是已提交的版本：本端改动点「提交」后才生效'), 'warn')
+    }
+  }
+  api.designSaveRunning(scene, running).then((r) => {
+    if (r && r.found === false) {
+      store.showToast(t('运行态未写入服务器：该工程在服务器上还没有存档，请先点「提交」'), 'warn')
+    }
+  }).catch(() => { /* 服务端不可用：只影响服务端运行器，本端执行不受影响 */ })
 }
 /** 启动：规则模型交给 store 的后台运行器（离开本页 / 关掉编排页也继续按周期执行下发） */
 function startModel(m) {
@@ -1904,10 +1968,6 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
   color: var(--k-sen); border-color: color-mix(in srgb, var(--k-sen) 34%, transparent);
   background: color-mix(in srgb, var(--k-sen) 10%, transparent);
 }
-.mc-tg.mpc {
-  color: var(--k-loop); border-color: color-mix(in srgb, var(--k-loop) 34%, transparent);
-  background: color-mix(in srgb, var(--k-loop) 10%, transparent);
-}
 .tag.on, .badge.ok {
   color: var(--green); border-color: color-mix(in srgb, var(--green) 34%, transparent);
   background: color-mix(in srgb, var(--green) 10%, transparent);
@@ -1937,6 +1997,14 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
   background: color-mix(in srgb, var(--blue, #0860a8) 8%, transparent);
 }
 .lib-refresh:disabled { opacity: .55; cursor: default; }
+/* 提交：唯一的上传入口（未提交时可见、可点） */
+.lib-submit {
+  margin-left: 0; color: var(--blue, #0860a8);
+  border-color: color-mix(in srgb, var(--blue, #0860a8) 45%, transparent);
+}
+.lib-submit:disabled { opacity: .45; cursor: default; }
+/* 未提交提示：只在本端有改动时出现 */
+.lib-dirty { font-size: var(--fs-s); color: var(--warn, #b06a00); white-space: nowrap; }
 .rf-ic { display: inline-block; line-height: 1; font-size: 1.05em; }
 .rf-ic.spin { animation: rf-spin .8s linear infinite; }
 @keyframes rf-spin { to { transform: rotate(360deg); } }
@@ -1991,7 +2059,6 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
 .mcard.alg-rule .mc-ic { color: var(--k-adj); }
 .mcard.alg-rl .mc-ic { color: var(--k-if); }
 .mcard.alg-pso .mc-ic { color: var(--k-sen); }
-.mcard.alg-mpc .mc-ic { color: var(--k-loop); }
 .mc-nm {
   flex: 1 1 auto; min-width: 0; font-size: var(--fs-t); font-weight: var(--fw-t); color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -2043,7 +2110,17 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
 .ed-st .dot, .tstate .dot { flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
 .ed-st.on { color: var(--green); }
 .ed-st.on .dot { background: var(--green); animation: agc-pulse 1s infinite; }
+/* 未提交标记：编排页头部提醒「还没提交到服务器」 */
+.ed-dirty { font-size: var(--fs-s); color: var(--warn, #b06a00); white-space: nowrap; }
 .ed-bd { flex: 1 1 auto; min-height: 0; display: flex; gap: 12px; }
+
+/* ══════════ ② MPC 控温优化（内置求解型，无编排） ══════════ */
+.agc-mpc { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+/* 内嵌面板自己负责滚动（.mpc-col 各自 overflow:auto），这里只给足高度 */
+.agc-mpc-bd { flex: 1 1 auto; min-height: 0; display: flex; }
+.agc-mpc-bd > * { flex: 1 1 auto; min-width: 0; }
+/* 内置卡片的说明文字可能较长，单行省略，避免把「进入」按钮挤出去 */
+.mcard.alg-mpc .mc-ts { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ══════════ ② 编排 · 左栏 ══════════ */
 .agc-aside {
