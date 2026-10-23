@@ -81,3 +81,12 @@ backend/config/github_config.json
 *.jpg
 .pytest_cache/
 backend/data/camera/
+
+# ===== 打包产物 / 页面快照临时文件 =====
+# 注意：GitHub 单文件硬限 100MB，打包 zip 误入版本库后即使删除文件，
+# 历史对象仍会随 push 全量上传（曾导致 157MB 推送 broken pipe）。
+*.zip
+*.tar.gz
+*.tgz
+open.yml
+t.yml
