@@ -1078,7 +1078,11 @@ const vFit = {
 .as-item.high b { color: var(--ov-ab); }
 .as-item.mid b { color: var(--ov-text-2); }
 .as-item.low b { color: var(--ov-text-3); }
-.dt-alarms { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 6px; }
+/* 报警列表可纵向滚动（与设备/碳排放明细的 .dt-scroll 同口径）：
+   报警条数不受控（几十条很常见），overflow:hidden 会把超出部分直接裁掉，看不到也滚不到 */
+.dt-alarms { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; }
+.dt-alarms::-webkit-scrollbar { width: 6px; }
+.dt-alarms::-webkit-scrollbar-thumb { background: var(--ov-border); border-radius: 3px; }
 .dt-alarm {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   background: var(--ov-panel-2); border: 1px solid var(--ov-border); border-left-width: 3px; border-radius: var(--r-sm); padding: 9px 11px;
