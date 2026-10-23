@@ -10,7 +10,7 @@
     </div>
 
     <!-- 运行指标 · 静态核算（功率 × 电网因子）：功率口径与实时折碳一致（实测功率优先） -->
-    <CollapseSection tone="blue" :open="true">
+    <CollapseSection :title="t('运行指标 · 折碳核算')" tone="blue" :open="true">
       <div class="chips">
         <div class="chip2"><span>{{ t('实时功耗') }}</span><b>{{ fmt(powerKW) }}</b><i>kW</i></div>
         <div class="chip2"><span>{{ t('实时碳排') }}</span><b>{{ fmt(carbonKgH, 3) }}</b><i>kgCO₂/h</i></div>
@@ -35,7 +35,7 @@
     </CollapseSection>
 
     <!-- 工艺参数（包内出厂设定） -->
-    <CollapseSection v-if="paramRows.length" tone="amber">
+    <CollapseSection v-if="paramRows.length" :title="t('工艺参数（出厂设定）')" tone="amber">
       <div class="kv2c">
         <div v-for="p in paramRows" :key="p.key" class="kv2-row">
           <span class="k">{{ p.label }}</span>
@@ -46,7 +46,7 @@
     </CollapseSection>
 
     <!-- 输入 / 输出物料 -->
-    <CollapseSection v-if="ins.length || outs.length" tone="green">
+    <CollapseSection v-if="ins.length || outs.length" :title="t('输入 / 输出')" tone="green">
       <div class="kv2c">
         <div v-if="ins.length" class="kv2-row"><span class="k">{{ t('输入') }}</span><span class="v"><b>{{ ins.join('、') }}</b></span></div>
         <div v-if="outs.length" class="kv2-row"><span class="k">{{ t('输出') }}</span><span class="v"><b>{{ outs.join('、') }}</b></span></div>
@@ -54,7 +54,7 @@
     </CollapseSection>
 
     <!-- 关联工艺（物料流上下游） -->
-    <CollapseSection v-if="ups.length || downs.length" tone="teal">
+    <CollapseSection v-if="ups.length || downs.length" :title="t('关联工艺')" tone="teal">
       <div class="kv2c">
         <div v-if="ups.length" class="kv2-row"><span class="k">{{ t('上游来料') }}</span><span class="v"><b>{{ ups.join('、') }}</b></span></div>
         <div v-if="downs.length" class="kv2-row"><span class="k">{{ t('下游供出') }}</span><span class="v"><b>{{ downs.join('、') }}</b></span></div>
@@ -62,7 +62,7 @@
     </CollapseSection>
 
     <!-- 工艺说明 -->
-    <CollapseSection v-if="procDesc" tone="gray">
+    <CollapseSection v-if="procDesc" :title="t('工艺说明')" tone="gray">
       <div class="ou-desc">{{ procDesc }}</div>
     </CollapseSection>
   </div>
