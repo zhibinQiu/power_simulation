@@ -107,26 +107,28 @@
           <span class="nest-v"><b class="mono">{{ estOf(n.id) ? fmtCo2(estOf(n.id).co2) : '—' }}</b><i>tCO₂/h</i></span>
         </div>
       </div>
-    </div>
 
-    <!-- 端口编辑浮层：方向可切换（输入/输出），支持自由增删端口 -->
-    <div v-if="editingPort" class="port-pop" :style="popStyle" @mousedown.stop @click.stop>
-      <div class="pp-t">{{ t('端口编辑（') }}{{ editingPort.dir === 'in' ? t('输入') : t('输出') }}{{ t('）') }}</div>
-      <div class="pp-dir">
-        <button :class="{ on: editingPort.dir === 'in' }" @click="setEditDir('in')">{{ t('输入') }}</button>
-        <button :class="{ on: editingPort.dir === 'out' }" @click="setEditDir('out')">{{ t('输出') }}</button>
-      </div>
-      <select v-model="editingPort.material" @change="applyPortMaterial">
-        <option v-for="m in portMaterials" :key="m.id" :value="m.id">{{ m.name }}（{{ m.cat }}）</option>
-        <!-- 历史存档 / 切场景残留：当前端口的物料若不在本场景物料表内，仍要显示出来（否则下拉框空白、看不出这端口是什么） -->
-        <option v-if="editingPort.material && !portMaterialIds.has(editingPort.material)" :value="editingPort.material">
-          {{ matName(editingPort.material) }}（{{ t('非本场景物料') }}）
-        </option>
-      </select>
-      <div class="pp-btns">
-        <button @click="addPortHere">＋ {{ t('添加') }}{{ editingPort.dir === 'in' ? t('输入') : t('输出') }}{{ t('端口') }}</button>
-        <button v-if="editingPort.portId" class="danger" @click="removePortHere">－ {{ t('删当前') }}</button>
-        <button @click="editingPort = null">{{ t('关闭') }}</button>
+      <!-- 端口编辑浮层：方向可切换（输入/输出），支持自由增删端口。
+           放在 .viewport（画布坐标系）内部，与节点卡片同一套几何 —— 因此随画布缩放/平移一起变换；
+           位置 = 所属节点当前坐标 + 打开时的相对偏移（dx/dy），所以拖动节点时浮层跟着走。 -->
+      <div v-if="editingPort" class="port-pop" :style="popStyle" @mousedown.stop @click.stop>
+        <div class="pp-t">{{ t('端口编辑（') }}{{ editingPort.dir === 'in' ? t('输入') : t('输出') }}{{ t('）') }}</div>
+        <div class="pp-dir">
+          <button :class="{ on: editingPort.dir === 'in' }" @click="setEditDir('in')">{{ t('输入') }}</button>
+          <button :class="{ on: editingPort.dir === 'out' }" @click="setEditDir('out')">{{ t('输出') }}</button>
+        </div>
+        <select v-model="editingPort.material" @change="applyPortMaterial">
+          <option v-for="m in portMaterials" :key="m.id" :value="m.id">{{ m.name }}（{{ m.cat }}）</option>
+          <!-- 历史存档 / 切场景残留：当前端口的物料若不在本场景物料表内，仍要显示出来（否则下拉框空白、看不出这端口是什么） -->
+          <option v-if="editingPort.material && !portMaterialIds.has(editingPort.material)" :value="editingPort.material">
+            {{ matName(editingPort.material) }}（{{ t('非本场景物料') }}）
+          </option>
+        </select>
+        <div class="pp-btns">
+          <button @click="addPortHere">＋ {{ t('添加') }}{{ editingPort.dir === 'in' ? t('输入') : t('输出') }}{{ t('端口') }}</button>
+          <button v-if="editingPort.portId" class="danger" @click="removePortHere">－ {{ t('删当前') }}</button>
+          <button @click="editingPort = null">{{ t('关闭') }}</button>
+        </div>
       </div>
     </div>
 
@@ -168,7 +170,7 @@ const W = 4000, H = 3000
 
 const drag = ref(null)          // {type:'node'|'pan'|'connect'|'group', ...}
 const tempConn = ref(null)      // {x,y} 画布坐标
-const editingPort = ref(null)   // {nodeId, dir, portId, material, sx, sy}
+const editingPort = ref(null)   // {nodeId, dir, portDir, portId, material, dx, dy}（dx/dy = 相对节点左上角的画布偏移）
 const dragTarget = ref(null)    // 连线拖拽中悬停的合法/非法目标端口 {nodeId, dir, portId, valid}
 const renaming = ref('')        // 正在内联重命名的节点 id（空表示无）
 const groupRenaming = ref('')   // 正在内联重命名的小组 id（空表示无）
@@ -397,14 +399,16 @@ function onPortDbl(n, dir, portId, e) {
   e.stopPropagation()
   const c = toCanvas(e)
   // portDir 记录端口所在侧（双击的侧），方向切换只影响后续添加的端口，改/删仍作用于当前端口
-  editingPort.value = { nodeId: n.id, dir, portDir: dir, portId, material: portMaterial(n, dir, portId), sx: c.x * store.flowTf.scale + store.flowTf.tx + 12, sy: c.y * store.flowTf.scale + store.flowTf.ty + 12 }
+  // 位置存**相对节点左上角的偏移**（+12 让浮层退开光标一点）：节点被拖动时浮层跟着走，
+  // 缩放/平移则交给 .viewport 的 transform（浮层在画布坐标系内）
+  editingPort.value = { nodeId: n.id, dir, portDir: dir, portId, material: portMaterial(n, dir, portId), dx: c.x + 12 - n.x, dy: c.y + 12 - n.y }
 }
 // 卡片上的「＋」入口：无输入端口时默认添加输入侧，否则默认输出侧；portId 为空表示仅添加模式
 function onAddPort(n, e) {
   e.stopPropagation()
   const c = toCanvas(e)
   const dir = n.ports.in.length === 0 ? 'in' : 'out'
-  editingPort.value = { nodeId: n.id, dir, portDir: null, portId: null, material: defaultPortMaterial(n, dir), sx: c.x * store.flowTf.scale + store.flowTf.tx + 12, sy: c.y * store.flowTf.scale + store.flowTf.ty + 12 }
+  editingPort.value = { nodeId: n.id, dir, portDir: null, portId: null, material: defaultPortMaterial(n, dir), dx: c.x + 12 - n.x, dy: c.y + 12 - n.y }
 }
 function setEditDir(dir) {
   if (editingPort.value) editingPort.value.dir = dir
@@ -451,7 +455,16 @@ function removePortHere() {
   store.removePort(editingPort.value.nodeId, editingPort.value.portDir, editingPort.value.portId)
   editingPort.value = null
 }
-const popStyle = computed(() => editingPort.value ? { left: editingPort.value.sx + 'px', top: editingPort.value.sy + 'px' } : {})
+// 浮层在 .viewport 内部：left/top 用画布坐标（父层 transform 负责缩放/平移）。
+// 坐标 = 节点当前位置 + 打开时的相对偏移，所以拖动该节点、或拖动它所在的小组时，浮层跟着一起走。
+const popStyle = computed(() => {
+  const p = editingPort.value
+  if (!p) return {}
+  const n = store.scheme.nodes.find((x) => x.id === p.nodeId)
+  // 节点已被删除：浮层失去锚点，直接隐藏（否则会停在画布左上角挡住别的东西）
+  if (!n) return { display: 'none' }
+  return { left: (n.x + p.dx) + 'px', top: (n.y + p.dy) + 'px' }
+})
 
 function hitPort(c) {
   for (const n of visibleNodes.value) {
