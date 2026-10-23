@@ -173,20 +173,36 @@ onMounted(() => {
 
 let resizeRaf = null
 let resizeTimer = null
-// 面板开合动画期间（body.panel-animating，见 App.vue）：中间舞台宽度每帧变化，
-// 若每帧都 scene.resize() → renderer.setSize 每帧重建一次 WebGL 绘制缓冲（真实硬件上
-// 一次就是几毫秒 + 驱动同步），开合侧栏必然掉帧。
-// 画面不会错位：three.js 的 setSize 已改为不写内联样式，canvas 由 CSS 100% 拉伸填充
-// （见 main.css 的 .scene-host > canvas），动画期间只是把上一帧画面按新宽度拉伸，
-// 动画结束后补一次精确 resize 即恢复清晰。
-const PANEL_ANIM_MS = 300
+// 面板开合动画期间（body.panel-animating，见 App.vue）：中间舞台宽度每帧变化，分工如下：
+//   · 每帧只同步 camera.aspect（纯 CPU 矩阵运算，零 GL 开销）→ 画面比例全程正确，
+//     不会再出现「先横向拉宽、动画结束后跳回正常比例」的缩放跳变；
+//   · renderer.setSize 要重建 WebGL 绘制缓冲（真实硬件上一次几毫秒 + 驱动同步），
+//     延后到动画标记撤销后再做一次。这段等待里画面只是分辨率略低，几何比例不受影响。
+// 结算时机以 body 上的动画标记为准（而非写死一个大于过渡时长的固定值），
+// 这样 main.css 里 .app 的过渡时长再调整也不必两边同步数值。
+const PANEL_SETTLE_MS = 90
+// 轮询重试上限：正常路径上标记会在 260ms 内撤销、最多等 3 轮；这里给的 10 轮（≈0.9s）只是兜底——
+// 万一将来 App.vue 侧的撤销逻辑被改坏/短路，也不会无限轮询、让画面永久停在低分辨率。
+const PANEL_SETTLE_MAX_TRIES = 10
+function settleResize(tries = 0) {
+  resizeTimer = setTimeout(() => {
+    resizeTimer = null
+    if (!scene) return
+    // 动画标记还没撤（App.vue 在最后一次开合后 260ms 撤）：继续等，别在动画中途重建缓冲
+    if (document.body.classList.contains('panel-animating') && tries < PANEL_SETTLE_MAX_TRIES) {
+      settleResize(tries + 1)
+      return
+    }
+    scene.resize()
+  }, PANEL_SETTLE_MS)
+}
 function onResize() {
   if (document.body.classList.contains('panel-animating')) {
+    // 取消排队中的普通 resize rAF，否则它会在动画中途执行一次 scene.resize()（重建缓冲）
+    if (resizeRaf) { cancelAnimationFrame(resizeRaf); resizeRaf = null }
+    if (scene) scene.syncAspect()
     clearTimeout(resizeTimer)
-    resizeTimer = setTimeout(() => {
-      resizeTimer = null
-      scene && scene.resize()
-    }, PANEL_ANIM_MS)
+    settleResize()
     return
   }
   if (resizeRaf) return
@@ -287,6 +303,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', onBrightDocClick)
   window.removeEventListener('resize', onResize)
   if (rebuildRaf) { cancelAnimationFrame(rebuildRaf); rebuildRaf = null }
+  if (resizeRaf) { cancelAnimationFrame(resizeRaf); resizeRaf = null }
   if (resizeTimer) { clearTimeout(resizeTimer); resizeTimer = null }
   if (ro) { ro.disconnect(); ro = null }
   if (scene) scene.dispose()

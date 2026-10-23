@@ -194,8 +194,9 @@ watch(() => store.activeViewId, (n, o) => {
 // .app 的 grid 列宽过渡（220ms）会让中间舞台宽度**每帧**变化，而数字孪生视图对尺寸变化的
 // 响应极贵：3D 要重建 WebGL 绘制缓冲（renderer.setSize），2D 要重新适配整幅 SVG 视图并持续
 // 重绘流向动画。每帧各来一次 → 开合侧栏时明显掉帧（实测 2D 下 p95 帧间隔 150~880ms）。
-// 这里在动画期间给 body 打标记，两个视图据此把响应**延后到动画结束执行一次**（见
-// SceneViewer.onResize / Twin2DView.onCanvasResize）；过渡时长见 main.css 的 .app 规则。
+// 这里在动画期间给 body 打标记，两个视图据此把昂贵响应**延后到动画结束执行一次**：
+// 3D 每帧只同步投影宽高比、绘制缓冲延后（见 SceneViewer.onResize），2D 冻结图层、
+// 只改 transform（见 Twin2DView.onCanvasResize）；过渡时长见 main.css 的 .app 规则。
 const PANEL_ANIM_MS = 260   // 略大于 CSS 过渡 .22s，确保覆盖最后一帧
 let panelAnimTimer = null
 function markPanelAnim() {

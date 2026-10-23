@@ -1166,10 +1166,11 @@ export class TwinScene {
     this._dpr = window.devicePixelRatio || 1
     this.renderer.setPixelRatio(pr)
     // 画布的**显示尺寸由 CSS 决定**（main.css 里 .scene-host > canvas 用 100% + !important
-    // 覆盖这里写下的内联尺寸）。于是面板开合动画期间可以只让画面按 CSS 拉伸、不重建绘制
-    // 缓冲，动画结束后再补一次精确 setSize（见 SceneViewer.onResize），避免每帧重建导致掉帧。
+    // 覆盖这里写下的内联尺寸）。于是面板开合动画期间不必每帧重建绘制缓冲（那会明显掉帧）：
+    // 每帧只同步投影宽高比（见 syncAspect）保证画面比例正确，尺寸稳定后再补一次精确
+    // setSize 恢复满分辨率（见 SceneViewer.onResize）。
     // 仍保留内联尺寸写入（updateStyle 默认 true）作为兜底：万一 CSS 规则未命中，画布尺寸
-    // 依然正确，只是动画期间不拉伸。
+    // 依然正确。
     this.renderer.setSize(w, h)
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     // 工业摄影风 - 略压高光 + 强对比，使金属/墙面更具写实质感（参考图风格）
@@ -5154,6 +5155,23 @@ export class TwinScene {
         mf.obj.rotateOnAxis(mf.rotAxis, dt * (mf.rotSpeed || 1.5))
       }
     })
+  }
+
+  // 只同步投影宽高比，不动绘制缓冲 —— 面板开合动画期间每帧调用（见 SceneViewer.onResize）。
+  // 原理：投影用的宽高比只要等于画布的**显示**宽高比，旧尺寸的绘制缓冲被 CSS 拉伸到新尺寸后
+  // 画面比例依然正确（NDC → 缓冲像素 → 显示像素两次轴缩放相互抵消，等价于按显示尺寸渲染，
+  // 仅这几帧分辨率略低）。于是开合侧栏时不再出现「先横向拉宽、动画结束后再跳回正常比例」的
+  // 缩放跳变；真正昂贵的 renderer.setSize（重建 WebGL 绘制缓冲）仍延后到尺寸稳定后执行。
+  syncAspect() {
+    if (!this.camera) return
+    const w = this.container.clientWidth
+    const h = this.container.clientHeight
+    // 防御：canvas display:none 时容器尺寸为 0，不可设置投影矩阵（会导致 NaN）
+    if (!(w > 0 && h > 0)) return
+    const aspect = w / h
+    if (Math.abs(aspect - this.camera.aspect) < 1e-4) return
+    this.camera.aspect = aspect
+    this.camera.updateProjectionMatrix()
   }
 
   resize() {

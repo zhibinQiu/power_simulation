@@ -267,7 +267,7 @@
         }
       ],
       "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: DeviceModel\nmetadata:\n  name: \"lora-temp-model\"\n  namespace: \"default\"\nspec:\n  properties:\n  - name: \"temperature\"\n    description: \"LoRaWAN DR206 透传 DTU 温度：值=寄存器×0.1；数据源=LoRa 网管 ChirpStack(nt001 一体机内), mapper 上行解码实时上报\"\n    type: INT\n    accessMode: ReadOnly\n    unit: \"℃\"\n",
-      "created_at": 1791946261
+      "created_at": 1792111377
     },
     {
       "name": "camera-model",
@@ -810,118 +810,6 @@
       "status": "reporting"
     },
     {
-      "name": "servers-temp",
-      "namespace": "default",
-      "hwId": "lora-0120560100000245-s2",
-      "model": "lora-temp-model",
-      "node": "nt001",
-      "protocol": "lora",
-      "collectCycle": 30000,
-      "cloudDevice": "",
-      "comm": {
-        "commType": "serial",
-        "slaveID": 1,
-        "serialPort": "/dev/ttyS0",
-        "baudRate": 9600,
-        "parity": "none",
-        "tcpIP": "192.168.1.10",
-        "tcpPort": 502
-      },
-      "opcua": {
-        "url": "opc.tcp://127.0.0.1:4840",
-        "userName": "",
-        "password": ""
-      },
-      "bluetooth": {
-        "macAddress": "AA:BB:CC:DD:EE:FF"
-      },
-      "lora": {
-        "broker": "127.0.0.1",
-        "port": 41884,
-        "applicationID": "0ce81243-64fb-455c-a484-9b26acb42f65",
-        "devEUI": "0120560100000245",
-        "appKey": "",
-        "region": "CN470",
-        "dataRate": "SF7BW125",
-        "slaveId": 2
-      },
-      "cellular": {
-        "serialPort": "/dev/ttyUSB2",
-        "baudRate": 115200,
-        "apn": "cmnet",
-        "iface": "wwan0"
-      },
-      "properties": [
-        {
-          "name": "temperature",
-          "type": "int",
-          "accessMode": "r",
-          "scale": 0.1,
-          "unit": "℃",
-          "desc": "LoRaWAN DR206 透传 DTU 温度：值=寄存器×0.1；数据源=LoRa 网管 ChirpStack(nt001 一体机内), mapper 上行解码实时上报"
-        }
-      ],
-      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"servers-temp\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\n    nengtan.io/hwid: \"lora-0120560100000245-s2\"\nspec:\n  deviceModelRef:\n    name: \"lora-temp-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"temperature\"\n    collectCycle: 5000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        broker: \"127.0.0.1:41884\"\n        applicationID: \"0ce81243-64fb-455c-a484-9b26acb42f65\"\n        devEUI: \"0120560100000245\"\n        slaveId: 2\n        appKey: \"\"\n        region: \"CN470\"\n        dataRate: \"SF7BW125\"\n        visitors:\n        - propertyName: \"temperature\"\n",
-      "created_at": 1791622193,
-      "status": "reporting"
-    },
-    {
-      "name": "shuitong-temp",
-      "namespace": "default",
-      "hwId": "lora-0120560100000264-s8",
-      "model": "lora-temp-model",
-      "node": "nt001",
-      "protocol": "lora",
-      "collectCycle": 10000,
-      "cloudDevice": "",
-      "comm": {
-        "commType": "serial",
-        "slaveID": 1,
-        "serialPort": "/dev/ttyS0",
-        "baudRate": 9600,
-        "parity": "none",
-        "tcpIP": "192.168.1.10",
-        "tcpPort": 502
-      },
-      "opcua": {
-        "url": "opc.tcp://127.0.0.1:4840",
-        "userName": "",
-        "password": ""
-      },
-      "bluetooth": {
-        "macAddress": "AA:BB:CC:DD:EE:FF"
-      },
-      "lora": {
-        "broker": "127.0.0.1",
-        "port": 41884,
-        "applicationID": "0ce81243-64fb-455c-a484-9b26acb42f65",
-        "devEUI": "0120560100000264",
-        "appKey": "",
-        "region": "CN470",
-        "dataRate": "SF7BW125",
-        "slaveId": 8
-      },
-      "cellular": {
-        "serialPort": "/dev/ttyUSB2",
-        "baudRate": 115200,
-        "apn": "cmnet",
-        "iface": "wwan0"
-      },
-      "properties": [
-        {
-          "name": "temperature",
-          "type": "int",
-          "accessMode": "r",
-          "scale": 0.1,
-          "unit": "℃",
-          "desc": "LoRaWAN DR206 透传 DTU 温度：值=寄存器×0.1；数据源=LoRa 网管 ChirpStack(nt001 一体机内), mapper 上行解码实时上报"
-        }
-      ],
-      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"shuitong-temp\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\n    nengtan.io/hwid: \"lora-0120560100000264-s8\"\nspec:\n  deviceModelRef:\n    name: \"lora-temp-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"temperature\"\n    collectCycle: 10000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        broker: \"127.0.0.1:41884\"\n        applicationID: \"0ce81243-64fb-455c-a484-9b26acb42f65\"\n        devEUI: \"0120560100000264\"\n        slaveId: 8\n        appKey: \"\"\n        region: \"CN470\"\n        dataRate: \"SF7BW125\"\n        visitors:\n        - propertyName: \"temperature\"\n",
-      "created_at": 1791622421,
-      "status": "reporting"
-    },
-    {
       "name": "camera-485-1",
       "namespace": "default",
       "hwId": "cam-ttyrs485-id1",
@@ -967,7 +855,7 @@
       "model": "lora-temp-model",
       "node": "nt001",
       "protocol": "lora",
-      "collectCycle": 15000,
+      "collectCycle": 10000,
       "cloudDevice": "",
       "comm": {
         "commType": "serial",
@@ -1017,8 +905,130 @@
           "desc": "LoRaWAN DR206 透传 DTU 温度：值=寄存器×0.1；数据源=LoRa 网管 ChirpStack(nt001 一体机内), mapper 上行解码实时上报"
         }
       ],
-      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"zhileng-temp\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\n    nengtan.io/hwid: \"lora-0120560100000245-s7\"\nspec:\n  deviceModelRef:\n    name: \"lora-temp-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"temperature\"\n    collectCycle: 5000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        broker: \"127.0.0.1:41884\"\n        applicationID: \"0ce81243-64fb-455c-a484-9b26acb42f65\"\n        devEUI: \"0120560100000245\"\n        slaveId: 7\n        appKey: \"\"\n        region: \"CN470\"\n        dataRate: \"SF7BW125\"\n        visitors:\n        - propertyName: \"temperature\"\n",
-      "created_at": 1791622208,
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"env-temp\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\n    nengtan.io/hwid: \"lora-0120560100000264-s1\"\nspec:\n  deviceModelRef:\n    name: \"lora-temp-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"temperature\"\n    collectCycle: 10000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        broker: \"127.0.0.1:41884\"\n        applicationID: \"0ce81243-64fb-455c-a484-9b26acb42f65\"\n        devEUI: \"0120560100000264\"\n        slaveId: 1\n        appKey: \"\"\n        region: \"CN470\"\n        dataRate: \"SF7BW125\"\n        visitors:\n        - propertyName: \"temperature\"\n",
+      "created_at": 1792111329,
+      "status": "reporting"
+    },
+    {
+      "name": "servers-temp",
+      "namespace": "default",
+      "hwId": "lora-0120560100000245-s2",
+      "model": "lora-temp-model",
+      "node": "nt001",
+      "protocol": "lora",
+      "collectCycle": 10000,
+      "cloudDevice": "",
+      "comm": {
+        "commType": "serial",
+        "slaveID": 1,
+        "serialPort": "/dev/ttyS0",
+        "baudRate": 9600,
+        "parity": "none",
+        "tcpIP": "192.168.1.10",
+        "tcpPort": 502
+      },
+      "opcua": {
+        "url": "opc.tcp://127.0.0.1:4840",
+        "userName": "",
+        "password": ""
+      },
+      "bluetooth": {
+        "macAddress": "AA:BB:CC:DD:EE:FF"
+      },
+      "lora": {
+        "broker": "127.0.0.1",
+        "port": 41884,
+        "applicationID": "0ce81243-64fb-455c-a484-9b26acb42f65",
+        "devEUI": "0120560100000245",
+        "appKey": "",
+        "region": "CN470",
+        "dataRate": "SF7BW125",
+        "slaveId": 2
+      },
+      "cellular": {
+        "serialPort": "/dev/ttyUSB2",
+        "baudRate": 115200,
+        "apn": "cmnet",
+        "iface": "wwan0"
+      },
+      "camera": {
+        "camId": 1,
+        "size": "1",
+        "packet": 512
+      },
+      "properties": [
+        {
+          "name": "temperature",
+          "type": "int",
+          "accessMode": "r",
+          "scale": 0.1,
+          "unit": "℃",
+          "desc": "LoRaWAN DR206 透传 DTU 温度：值=寄存器×0.1；数据源=LoRa 网管 ChirpStack(nt001 一体机内), mapper 上行解码实时上报"
+        }
+      ],
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"servers-temp\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\n    nengtan.io/hwid: \"lora-0120560100000245-s2\"\nspec:\n  deviceModelRef:\n    name: \"lora-temp-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"temperature\"\n    collectCycle: 10000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        broker: \"127.0.0.1:41884\"\n        applicationID: \"0ce81243-64fb-455c-a484-9b26acb42f65\"\n        devEUI: \"0120560100000245\"\n        slaveId: 2\n        appKey: \"\"\n        region: \"CN470\"\n        dataRate: \"SF7BW125\"\n        visitors:\n        - propertyName: \"temperature\"\n",
+      "created_at": 1792111351,
+      "status": "reporting"
+    },
+    {
+      "name": "shuitong-temp",
+      "namespace": "default",
+      "hwId": "lora-0120560100000264-s8",
+      "model": "lora-temp-model",
+      "node": "nt001",
+      "protocol": "lora",
+      "collectCycle": 10000,
+      "cloudDevice": "",
+      "comm": {
+        "commType": "serial",
+        "slaveID": 1,
+        "serialPort": "/dev/ttyS0",
+        "baudRate": 9600,
+        "parity": "none",
+        "tcpIP": "192.168.1.10",
+        "tcpPort": 502
+      },
+      "opcua": {
+        "url": "opc.tcp://127.0.0.1:4840",
+        "userName": "",
+        "password": ""
+      },
+      "bluetooth": {
+        "macAddress": "AA:BB:CC:DD:EE:FF"
+      },
+      "lora": {
+        "broker": "127.0.0.1",
+        "port": 41884,
+        "applicationID": "0ce81243-64fb-455c-a484-9b26acb42f65",
+        "devEUI": "0120560100000264",
+        "appKey": "",
+        "region": "CN470",
+        "dataRate": "SF7BW125",
+        "slaveId": 8
+      },
+      "cellular": {
+        "serialPort": "/dev/ttyUSB2",
+        "baudRate": 115200,
+        "apn": "cmnet",
+        "iface": "wwan0"
+      },
+      "camera": {
+        "camId": 1,
+        "size": "1",
+        "packet": 512
+      },
+      "properties": [
+        {
+          "name": "temperature",
+          "type": "int",
+          "accessMode": "r",
+          "scale": 0.1,
+          "unit": "℃",
+          "desc": "LoRaWAN DR206 透传 DTU 温度：值=寄存器×0.1；数据源=LoRa 网管 ChirpStack(nt001 一体机内), mapper 上行解码实时上报"
+        }
+      ],
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"shuitong-temp\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\n    nengtan.io/hwid: \"lora-0120560100000264-s8\"\nspec:\n  deviceModelRef:\n    name: \"lora-temp-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"temperature\"\n    collectCycle: 10000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        broker: \"127.0.0.1:41884\"\n        applicationID: \"0ce81243-64fb-455c-a484-9b26acb42f65\"\n        devEUI: \"0120560100000264\"\n        slaveId: 8\n        appKey: \"\"\n        region: \"CN470\"\n        dataRate: \"SF7BW125\"\n        visitors:\n        - propertyName: \"temperature\"\n",
+      "created_at": 1792111362,
       "status": "reporting"
     },
     {
@@ -1078,8 +1088,8 @@
           "desc": "LoRaWAN DR206 透传 DTU 温度：值=寄存器×0.1；数据源=LoRa 网管 ChirpStack(nt001 一体机内), mapper 上行解码实时上报"
         }
       ],
-      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"zhileng-temp\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\n    nengtan.io/hwid: \"lora-0120560100000245-s7\"\nspec:\n  deviceModelRef:\n    name: \"lora-temp-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"temperature\"\n    collectCycle: 15000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        broker: \"127.0.0.1:41884\"\n        applicationID: \"0ce81243-64fb-455c-a484-9b26acb42f65\"\n        devEUI: \"0120560100000245\"\n        slaveId: 7\n        appKey: \"\"\n        region: \"CN470\"\n        dataRate: \"SF7BW125\"\n        visitors:\n        - propertyName: \"temperature\"\n",
-      "created_at": 1791946261,
+      "yaml": "apiVersion: devices.kubeedge.io/v1beta1\nkind: Device\nmetadata:\n  name: \"zhileng-temp\"\n  namespace: \"default\"\n  labels:\n    description: \"\"\n    nengtan.io/hwid: \"lora-0120560100000245-s7\"\nspec:\n  deviceModelRef:\n    name: \"lora-temp-model\"\n  nodeName: \"nt001\"\n  properties:\n  - name: \"temperature\"\n    collectCycle: 10000\n  protocol:\n    protocolName: nengtan-iot\n    configData:\n        broker: \"127.0.0.1:41884\"\n        applicationID: \"0ce81243-64fb-455c-a484-9b26acb42f65\"\n        devEUI: \"0120560100000245\"\n        slaveId: 7\n        appKey: \"\"\n        region: \"CN470\"\n        dataRate: \"SF7BW125\"\n        visitors:\n        - propertyName: \"temperature\"\n",
+      "created_at": 1792111377,
       "status": "reporting"
     }
   ]

@@ -90,3 +90,10 @@ backend/data/camera/
 *.tgz
 open.yml
 t.yml
+
+#===== python类型检查 =====
+pyrightconfig.json
+
+#====== RL更改 ========
+model/RL
+model/idc_rl_collect.py
