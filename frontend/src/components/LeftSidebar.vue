@@ -123,6 +123,27 @@
             </div>
           </div>
         </template>
+        <!-- 通用资源包场景：只列本场景包内 dictionary.materials（如机房温控的 冷却水供水 / 冷却水回水 / 机房冷风）。
+             不能复用上面的三棵子树 —— 它遍历的是全局「钢铁表 + 包内物料」并集，会串场景。
+             可点查看属性；不接拖拽：资源包编排由包模板直译，画布上没有 material 节点的渲染与核算路径。 -->
+        <template v-else-if="sceneMaterials.length">
+          <div class="tnode">
+            <div class="tch sub hdr" @click="toggle('g_mat_scene')">
+              <span class="twisty" :class="{ open: expanded.g_mat_scene }">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </span>
+              <span class="tch-tt">{{ t('物料') }}</span>
+              <span class="tch-count">{{ sceneMaterials.length }}</span>
+            </div>
+            <div class="tchildren" v-show="expanded.g_mat_scene">
+              <div v-for="m in sceneMaterials" :key="m.id" class="tchild leaf flat click"
+                   :class="{ active: store.selectedMaterialId === m.id }"
+                   @click="store.selectMaterial(m.id)">
+                <span class="tc-tt">{{ m.name }}</span>
+              </div>
+            </div>
+          </div>
+        </template>
         <div v-else class="empty-hint">{{ t('该资源包未提供物料字典；系统内置「传感器 / 可变设备」见「工艺」目录底部') }}</div>
       </div>
 
@@ -234,7 +255,7 @@
 <script setup>
 import { reactive, ref, computed, watch, nextTick } from 'vue'
 import { useSimStore, AI_MODELS } from '../stores/sim'
-import { MATERIALS, PRODUCTS, ROUTE_GROUPS, PROCESS_TEMPLATES, PROCESS_ADJUSTABLE, DEVICE_MAP, PROCESS_MAP } from '../data/flowLibrary'
+import { MATERIALS, PRODUCTS, ROUTE_GROUPS, PROCESS_TEMPLATES, PROCESS_ADJUSTABLE, DEVICE_MAP, PROCESS_MAP, sceneMaterialList } from '../data/flowLibrary'
 import { SENSOR_TEMPLATES, ADJUSTABLE_TEMPLATES } from '../data/attachLibrary'
 import Icon from './Icon.vue'
 import { openContextMenu, ctxState } from '../composables/contextMenu'
@@ -369,6 +390,9 @@ function isGreenActive(processType, sid) {
 function isGreenSelected(g, gs) {
   return store.selectedStrategyId === `green::${g.type}::${gs.id}`
 }
+// 通用资源包场景的物料：包内 dictionary.materials（已由 registerSceneMaterials 并入 MATERIAL_MAP）。
+// 不能复用下面的 materialTrees —— 那张清单遍历全局 MATERIALS，是「钢铁表 + 包内物料」的并集，会串场景。
+const sceneMaterials = computed(() => sceneMaterialList(store.sceneCtx, store.customSceneOn))
 // 物料按 原料 / 中间产物 / 产品 分三棵子树：能源类投入归入「原料」，副产品归入「中间产物」
 const prodIds = new Set(PRODUCTS.map((p) => p.id))
 const materialTrees = computed(() => {
@@ -510,6 +534,7 @@ watch(() => store.deviceDetailId, async (id) => {
 const expanded = reactive({
   process: false, g_steel: true, g_aux: true,
   aux: false, material: false, g_mat_raw: false, g_mat_mid: false, g_mat_prod: false,
+  g_mat_scene: true,   // 资源包场景的物料只有几条（机房温控 3 条），默认展开直接可见
   strategy: false, g_strat_builtin: false, g_strat_ai: true, g_strat_custom: false,
 })
 // 工艺/策略目录不再有右侧专属属性面板（工序顺序已下线），切换时右侧显示总览

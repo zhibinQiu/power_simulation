@@ -223,7 +223,7 @@
 
       <!-- 物料库（点击左侧「物料」） -->
       <template v-else-if="mode === 'materials'">
-        <div class="park-sum">{{ t('共') }} {{ materialList.length }} {{ t('种物料（原料/中间产物/能源/副产品），点击查看隐含碳因子与配置。') }}</div>
+        <div class="park-sum">{{ t('共') }} {{ materialList.length }} {{ materialSumTip }}</div>
         <div class="lview">
           <div v-for="m in materialList" :key="m.id" class="lrow click" :class="{active: store.selectedMaterialId===m.id}" @click="store.selectMaterial(m.id)">
             <div class="l-stack">
@@ -241,7 +241,7 @@
 import { computed, ref, reactive, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { energyOf } from '../utils/energy'
 import { useSimStore, UNIT_TYPES } from '../stores/sim'
-import { MATERIALS, MATERIAL_MAP, PRODUCTS } from '../data/flowLibrary'
+import { MATERIAL_MAP, PRODUCTS, sceneMaterialList } from '../data/flowLibrary'
 import { t } from '../i18n'
 import { visiblePoll } from '../utils/poll.js'
 const AgentChatView = defineAsyncComponent(() => import('../views/AgentChatView.vue'))
@@ -281,7 +281,13 @@ function onRszStart(e) {
 }
 
 const store = useSimStore()
-const materialList = MATERIALS
+// 物料库与左栏「物料」页签同源：钢场景 = 内置钢铁表，资源包场景 = 包内 dictionary.materials。
+// 直接写 MATERIALS 会把 45 条钢铁物料带进机房温控（左侧 3 条、右侧 48 条，自相矛盾）。
+const materialList = computed(() => sceneMaterialList(store.sceneCtx, store.customSceneOn))
+// 表头口径随场景变化：资源包字典里没有「原料/中间产物/能源/副产品」这套钢铁分类
+const materialSumTip = computed(() => (store.customSceneOn
+  ? t('种物料（本场景资源包字典），点击查看隐含碳因子与配置。')
+  : t('种物料（原料/中间产物/能源/副产品），点击查看隐含碳因子与配置。')))
 
 // 滚动条显隐：滚动时显示，停止滚动 2s 后自动隐藏
 const scrolling = ref(false)

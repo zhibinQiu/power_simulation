@@ -1964,6 +1964,7 @@ export default {
   '排放最高工序': 'Highest-Emission Process',
   '共': 'Total',
   '种物料（原料/中间产物/能源/副产品），点击查看隐含碳因子与配置。': 'materials (raw materials / intermediates / energy / by-products). Click to view embodied carbon factors and config.',
+  '种物料（本场景资源包字典），点击查看隐含碳因子与配置。': 'materials (from this scene package dictionary). Click to view embodied carbon factors and config.',
   '报告面板': 'Report Panel',
   '园区构成': 'Plant Composition',
   '物料库': 'Material Library',

@@ -51,13 +51,15 @@
 <script setup>
 import { reactive, ref, computed } from 'vue'
 import { useSimStore } from '../stores/sim'
-import { MATERIALS, ROUTE_GROUPS, PROCESS_TEMPLATES, PROCESS_MAP } from '../data/flowLibrary'
+import { ROUTE_GROUPS, PROCESS_TEMPLATES, PROCESS_MAP, sceneMaterialList } from '../data/flowLibrary'
 import Icon from './Icon.vue'
 import { t } from '../i18n'
 
 const store = useSimStore()
 const kw = ref('')
 const onlyScene = ref(false)
+// 物料候选与左栏「物料」页签同源：钢场景 = 内置钢铁表，资源包场景 = 包内 dictionary.materials
+const sceneMaterials = computed(() => sceneMaterialList(store.sceneCtx, store.customSceneOn))
 const filtering = computed(() => kw.value.trim() !== '' || onlyScene.value)
 const open = reactive({})
 function toggle(key) { open[key] = open[key] === false ? true : false }
@@ -134,7 +136,7 @@ const results = computed(() => {
 
   // ---- 物料 ----
   const mats = []
-  for (const m of MATERIALS) {
+  for (const m of sceneMaterials.value) {
     if (onlyScene.value && !materialInScene(m.id)) continue
     if (q && !m.name.toLowerCase().includes(q)) continue
     mats.push({
@@ -197,13 +199,22 @@ const results = computed(() => {
   return out
 })
 
+// 场景内工艺定义：钢场景查 PROCESS_MAP；资源包场景查包内 dictionary.processes。
+// PROCESS_MAP 只有钢铁工艺，dc_* / tp_* 一律查不到 —— 直接拿它判断会把「仅本场景」过滤成空结果。
+function processDefOf(type) {
+  if (store.customSceneOn) {
+    const list = store.sceneCtx && Array.isArray(store.sceneCtx.processes) ? store.sceneCtx.processes : []
+    return list.find((p) => p && p.type === type) || null
+  }
+  return PROCESS_MAP[type] || null
+}
 // 物料是否在场景中：被任一已部署工序作为输入/输出使用
 function materialInScene(matId) {
   const units = store.model && store.model.units ? store.model.units : []
   return units.some((u) => {
-    const t = PROCESS_MAP[u.type]
-    if (!t) return false
-    return (t.inputs || []).includes(matId) || (t.outputs || []).includes(matId)
+    const d = processDefOf(u.type)
+    if (!d) return false
+    return (d.inputs || []).includes(matId) || (d.outputs || []).includes(matId)
   })
 }
 </script>
