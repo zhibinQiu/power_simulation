@@ -2231,7 +2231,13 @@ export const useSimStore = defineStore('sim', {
       const sameMode = this.sceneMode === (sceneId === 'steel' ? 'steel' : 'other')
       // 仅在资源已加载时才跳过：初始 sceneId='steel'/sceneMode='steel' 时 scenePack 仍为 null，
       // 否则长/短流程模板等资源不会被填充（编排工具条模板按钮不显示）
-      if (sceneId === this.sceneId && sameMode && this.scenePack && this.scenePack.meta?.id === sceneId) return true
+      if (sceneId === this.sceneId && sameMode && this.scenePack && this.scenePack.meta?.id === sceneId) {
+        // 资源无需重装（早退），但「打开工程」这个动作仍要成立：欢迎页必须进工作区并记入最近，
+        // 否则经其它入口（如 setScenario('steel')）打开默认装载的场景同样毫无反应
+        this._noteRecentScene(sceneId)
+        this._markEntered()
+        return true
+      }
       let meta = this.sceneIndex.find((x) => x.id === sceneId)
       if (!meta) await this.refreshSceneIndex()
       meta = this.sceneIndex.find((x) => x.id === sceneId) || meta

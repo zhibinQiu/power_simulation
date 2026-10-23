@@ -42,14 +42,14 @@
           </div>
           <div class="sf-list">
             <div v-for="m in shownScenes" :key="m.id" class="sf-row"
-                 :class="{ on: pickedScene === m.id, cur: m.id === store.sceneId, off: !m.ready }"
+                 :class="{ on: pickedScene === m.id, cur: m.id === curSceneId, off: !m.ready }"
                  :title="m.ready ? sceneLabel(m) : t('「{label}」资源包尚未就绪', { label: sceneLabel(m) })"
                  @click="onPickScene(m)" @dblclick="onOk">
               <div class="sf-main">
                 <div class="sf-name">{{ sceneLabel(m) }}<em v-if="m.enterprise" class="sf-ent">·{{ m.enterprise }}</em></div>
                 <div class="sf-sub">{{ m.desc || m.industry || m.id }}<span v-if="pkgVersion(m)"> · {{ pkgVersion(m) }}</span></div>
               </div>
-              <span v-if="m.id === store.sceneId" class="sf-tag cur">{{ t('当前') }}</span>
+              <span v-if="m.id === curSceneId" class="sf-tag cur">{{ t('当前') }}</span>
               <span v-else-if="!m.ready" class="sf-tag">{{ t('未安装') }}</span>
             </div>
             <div v-if="!shownScenes.length" class="sf-blank"><p>{{ blankTip }}</p></div>
@@ -125,6 +125,10 @@ const busy = ref(false)
 const pickedCat = ref('steel')
 const pickedScene = ref('')
 const openTab = ref('sample')   // sample = 平台内置示例 | mine = 用户导入的 .ec 工程
+// 「当前工程」只存在于工作区：欢迎页上还没有打开任何工程，此时的 sceneId 只是启动默认装载的钢包
+// （见 store.init 里的 _loadScenePackMeta），不能据此把列表行标成「当前」并锁住 ——
+// 否则「文件 → 打开场景 → 钢铁企业示例」永远选不中、也点不开。
+const curSceneId = computed(() => (store.welcomeOn ? '' : store.sceneId))
 
 const title = computed(() => ({ new: t('新建场景'), open: t('打开场景'), saveAs: t('另存为场景') }[props.mode] || t('场景')))
 const okText = computed(() => ({ new: t('新建'), open: t('打开'), saveAs: t('另存为 .ec') }[props.mode] || t('确定')))
@@ -163,7 +167,7 @@ function switchTab(k) {
   pickedScene.value = ''   // 换栏即清空选中，避免跨栏残留一个看不见的选中项
 }
 function onPickScene(m) {
-  if (!m || !m.ready || m.id === store.sceneId) return
+  if (!m || !m.ready || m.id === curSceneId.value) return
   pickedScene.value = m.id
 }
 
@@ -249,10 +253,12 @@ async function onOk() {
     } else if (props.mode === 'open') {
       const id = pickedScene.value
       if (!id) return
-      // 立即关弹窗，不阻塞界面：openScene 拉资源包/编译较慢（1~2s），
-      // 失败/成功提示都在 store 内部用 toast 输出，无需停留在弹窗上等待
+      // 立即关弹窗，不阻塞界面：完整装载要拉资源包/编译（1~2s），
+      // 失败/成功提示都在 store 内部用 toast 输出，无需停留在弹窗上等待。
+      // 走 openProjectScene 而不是 openScene：目标已是当前场景时（欢迎页打开启动默认装载的钢包）
+      // openScene 会命中同场景早退，表现为「点了打开没反应」；openProjectScene 会直接进工作区并记入最近。
       emit('close')
-      store.openScene(id).catch(() => { /* 失败已 toast */ })
+      store.openProjectScene(id).catch(() => { /* 失败已 toast */ })
       return
     } else {
       const f = form.value
