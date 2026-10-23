@@ -24,20 +24,33 @@ export { OP_PARAM_KEYS, DIRECT_PARAM_KEYS, EDITABLE_PARAMS, UNIT_TYPES, CATEGORY
 // 随实时传感器数据持续采集，后端调度线程定时训练，模型迭代次数与最优强度逐步提升
 // （属性面板轮询后端状态实时展示「逐渐变优」过程，训练结果可一键应用到流程）。
 // 类别：seq = 时序预测（预测未来工况）；opt = 参数优化（决策变量 + 优化目标设定）；cluster = 聚类分析（工况识别）
+//
+// 场景隔离（scenes 字段）：每个模型只在列出的场景（store.sceneId / 场景包 meta.id）里出现，
+// 不同场景的「策略」栏互不串味 ——
+//   steel      = 钢铁企业示例：六个「训练型」模型（序列预测 / 强化学习 / 遗传 / 粒子群 / 聚类 / 拟合）
+//   dc-thermal = 算力中心热控（机房温控）：只有 MPC 控温模型（求解型控制器）
+// scenes 缺省或为空数组 = 所有场景可见（当前没有这种模型，保留语义便于以后加通用模型）。
 export const AI_MODELS = [
-  { id: 'ai::seq', category: 'seq', categoryName: '时序预测', name: '序列预测算法', tag: 'SEQ', desc: '适用于预测未来工况：内置 LSTM、LightGBM、XGBoost 与时间序列大模型（暂不实现），可设定预测目标 / 影响变量，设定最佳策略或调节变量进行仿真分析。' },
-  { id: 'ai::rl', category: 'opt', categoryName: '参数优化', name: '强化学习优化策略', tag: 'RL', desc: '在线策略梯度：随实时传感器数据持续更新参数策略，先探索后利用，越训越优。' },
-  { id: 'ai::ga', category: 'opt', categoryName: '参数优化', name: '遗传算法优化策略', tag: 'GA', desc: '适用于设备启停与连续参数复合的混合场景：对设备启停开关与喷煤比、焦比等连续参数组合做选择/交叉/变异，全局搜索最低碳排配置。' },
-  { id: 'ai::pso', category: 'opt', categoryName: '参数优化', name: '粒子群优化策略', tag: 'PSO', desc: '适用于连续参数空间下最优解的探索：粒子在连续参数空间协同飞行，快速逼近最优运行点，适合实时在线寻优。' },
-  { id: 'ai::clu', category: 'cluster', categoryName: '聚类分析', name: '聚类工况识别', tag: 'CLU', desc: '适用于历史工况的自动聚类与模式划分：内置 K-Means、DBSCAN 与层次聚类，自动识别典型运行工况（低/中/高负荷）及其占比，辅助制定分工况调节策略。' },
-  { id: 'ai::fit', category: 'fit', categoryName: '数据拟合', name: '数据拟合分析', tag: 'FIT', desc: '对历史工况数据做曲线拟合建模：内置多项式 / 指数 / 对数 / 幂函数拟合，输出拟合方程与 R² 拟合优度，辅助洞察负荷趋势与关联规律。' },
+  { id: 'ai::seq', category: 'seq', categoryName: '时序预测', name: '序列预测算法', tag: 'SEQ', scenes: ['steel'], desc: '适用于预测未来工况：内置 LSTM、LightGBM、XGBoost 与时间序列大模型（暂不实现），可设定预测目标 / 影响变量，设定最佳策略或调节变量进行仿真分析。' },
+  { id: 'ai::rl', category: 'opt', categoryName: '参数优化', name: '强化学习优化策略', tag: 'RL', scenes: ['steel'], desc: '在线策略梯度：随实时传感器数据持续更新参数策略，先探索后利用，越训越优。' },
+  { id: 'ai::ga', category: 'opt', categoryName: '参数优化', name: '遗传算法优化策略', tag: 'GA', scenes: ['steel'], desc: '适用于设备启停与连续参数复合的混合场景：对设备启停开关与喷煤比、焦比等连续参数组合做选择/交叉/变异，全局搜索最低碳排配置。' },
+  { id: 'ai::pso', category: 'opt', categoryName: '参数优化', name: '粒子群优化策略', tag: 'PSO', scenes: ['steel'], desc: '适用于连续参数空间下最优解的探索：粒子在连续参数空间协同飞行，快速逼近最优运行点，适合实时在线寻优。' },
+  { id: 'ai::clu', category: 'cluster', categoryName: '聚类分析', name: '聚类工况识别', tag: 'CLU', scenes: ['steel'], desc: '适用于历史工况的自动聚类与模式划分：内置 K-Means、DBSCAN 与层次聚类，自动识别典型运行工况（低/中/高负荷）及其占比，辅助制定分工况调节策略。' },
+  { id: 'ai::fit', category: 'fit', categoryName: '数据拟合', name: '数据拟合分析', tag: 'FIT', scenes: ['steel'], desc: '对历史工况数据做曲线拟合建模：内置多项式 / 指数 / 对数 / 幂函数拟合，输出拟合方程与 R² 拟合优度，辅助洞察负荷趋势与关联规律。' },
   // MPC 控温优化模型：与上面几个「训练型」模型不同，它是一套**求解型**控制器
   // （灰箱一阶 RC 前向模型 + 离散档位动态规划），点击进入独立页面：
   // 先看可用性自检（能否启用），再输入「目标温度 + 到达时限」求解能耗最小档位。
   // view 字段表示点击后打开的中间区视图 id（见 VIEW_DEFS）；agc 字段表示进入该视图后落在哪个内置子页。
   // MPC 控温优化不是独立视图，而是 AI 群控模型库里的内置求解型模型（见 PidControlView 的 alg-mpc 卡片）。
-  { id: 'ai::mpc', category: 'mpc', categoryName: 'MPC控制', name: 'MPC控温模型', tag: 'MPC', view: 'aiGroup', agc: 'mpc', desc: '面向控温设备的求解型控制器：前向模型用灰箱一阶 RC（时间常数、风扇/制冷片增益），决策用离散档位动态规划，在给定时限内求能耗最小的风扇电压与制冷片电流组合。集成在「AI群控 → 模型库」，与规则 / 强化学习 / 粒子群并列；「>45℃ 满功率、以下智能调控」的双模式也在该页。' },
+  // 它只属于控温场景（dc-thermal）：钢铁等工艺场景的对象是设备启停与参数，不涉及控温回路。
+  { id: 'ai::mpc', category: 'mpc', categoryName: 'MPC控制', name: 'MPC控温模型', tag: 'MPC', scenes: ['dc-thermal'], view: 'aiGroup', agc: 'mpc', desc: '面向控温设备的求解型控制器：前向模型用灰箱一阶 RC（时间常数、风扇/制冷片增益），决策用离散档位动态规划，在给定时限内求能耗最小的风扇电压与制冷片电流组合。集成在「AI群控 → 模型库」，与规则 / 强化学习 / 粒子群并列；「>45℃ 满功率、以下智能调控」的双模式也在该页。' },
 ]
+// 按场景取 AI 优化模型：左侧「策略 → AI优化模型」目录用它过滤，实现策略的场景隔离。
+// sceneId 缺省（场景包还没加载完）时按钢铁处理 —— 与 store 初始值 sceneId='steel' 保持一致。
+export function aiModelsForScene(sceneId) {
+  const sid = sceneId || 'steel'
+  return AI_MODELS.filter((m) => !m.scenes || !m.scenes.length || m.scenes.includes(sid))
+}
 export const AI_MODEL_MAP = Object.fromEntries(AI_MODELS.map((m) => [m.id, m]))
 
 // ===== 功能视图（窗口 + tab）注册表 =====

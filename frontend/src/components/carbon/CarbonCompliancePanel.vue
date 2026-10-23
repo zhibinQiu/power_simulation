@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { carbonComplianceApi as api } from '../../api/carbonCompliance.js'
 import { t } from '../../i18n'
 
@@ -96,9 +96,17 @@ async function updateEnterprise(patch) {
 
 // ---------------- 排放台账 ----------------
 const emForm = reactive({ year: new Date().getFullYear(), verified_total: 0, scope1_combustion: 0, scope1_process: 0, scope2_power: 0, purchased_mwh: 0, historical_gap: null, ccer_used: 0 })
+// 录入表单默认收起，点页签行右端「编辑」才展开
+const emFormOpen = ref(false)
+const emYearInput = ref(null)
+function toggleEmForm() {
+  emFormOpen.value = !emFormOpen.value
+  if (emFormOpen.value) nextTick(() => emYearInput.value?.focus())
+}
 async function upsertEmission() {
   try {
     await api.upsertEmission(selectedId.value, { ...emForm })
+    emFormOpen.value = false
     await loadSelected(); flashOk(t('排放台账已保存'))
   } catch (e) { flashErr(e) }
 }
@@ -223,18 +231,39 @@ const gapClass = computed(() => {
         <div v-if="showEntForm" class="ent-form">
           <input v-model="entForm.name" :placeholder="t('企业名称 *')" />
           <input v-model="entForm.uscc" :placeholder="t('统一社会信用代码')" />
-          <select v-model="entForm.industry">
-            <option v-for="i in meta.industries" :key="i.value" :value="i.value">{{ t(i.label) }}</option>
-          </select>
-          <div class="row2">
-            <input v-model.number="entForm.market_start_year" type="number" :placeholder="t('纳入年度')" />
-            <select v-model="entForm.risk_profile">
-              <option v-for="r in meta.risk_profiles" :key="r.value" :value="r.value">{{ t(r.label) }}</option>
+          <label class="fld">
+            <span class="fl">{{ t('行业') }}</span>
+            <select v-model="entForm.industry">
+              <option v-for="i in meta.industries" :key="i.value" :value="i.value">{{ t(i.label) }}</option>
             </select>
+          </label>
+          <div class="row2">
+            <label class="fld">
+              <span class="fl">{{ t('纳入年度') }}</span>
+              <input v-model.number="entForm.market_start_year" type="number" :placeholder="t('纳入年度')" />
+            </label>
+            <label class="fld">
+              <span class="fl">{{ t('风险偏好') }}</span>
+              <select v-model="entForm.risk_profile">
+                <option v-for="r in meta.risk_profiles" :key="r.value" :value="r.value">{{ t(r.label) }}</option>
+              </select>
+            </label>
           </div>
           <div class="row2">
-            <input v-model.number="entForm.annual_budget_cap" type="number" :placeholder="t('年度预算上限(元)')" />
-            <input v-model.number="entForm.single_trade_limit" type="number" :placeholder="t('单笔限额(元)')" />
+            <label class="fld" :title="t('年度预算上限(元)')">
+              <span class="fl">{{ t('年度预算上限') }}</span>
+              <span class="uf">
+                <input v-model.number="entForm.annual_budget_cap" type="number" min="0" :placeholder="t('年度预算上限')" />
+                <i>{{ t('元') }}</i>
+              </span>
+            </label>
+            <label class="fld" :title="t('单笔限额(万吨)')">
+              <span class="fl">{{ t('单笔限额') }}</span>
+              <span class="uf">
+                <input v-model.number="entForm.single_trade_limit" type="number" min="0" :placeholder="t('单笔限额')" />
+                <i>{{ t('万吨') }}</i>
+              </span>
+            </label>
           </div>
           <button class="btn primary block" @click="createEnterprise">{{ t('创建企业') }}</button>
         </div>
@@ -298,12 +327,19 @@ const gapClass = computed(() => {
             <button :class="{ active: tab === 'green' }" @click="tab = 'green'">{{ t('绿电') }}/{{ t('绿证') }}</button>
             <button :class="{ active: tab === 'strategy' }" @click="tab = 'strategy'">{{ t('策略引擎') }}</button>
             <button :class="{ active: tab === 'alerts' }" @click="tab = 'alerts'">{{ t('预警') }}<span v-if="alerts.filter(a => !a.acked).length" class="badge">{{ alerts.filter(a => !a.acked).length }}</span></button>
+            <button
+              v-if="tab === 'emissions'"
+              class="tabs-act"
+              :class="{ on: emFormOpen }"
+              :title="emFormOpen ? t('收起') : t('编辑')"
+              @click="toggleEmForm"
+            >{{ emFormOpen ? t('收起') : t('编辑') }}</button>
           </div>
 
           <!-- 排放台账 -->
           <div v-show="tab === 'emissions'" class="tab-body">
-            <div class="form-grid">
-              <input v-model.number="emForm.year" type="number" :placeholder="t('年份')" />
+            <div v-show="emFormOpen" class="form-grid entry">
+              <input ref="emYearInput" v-model.number="emForm.year" type="number" :placeholder="t('年份')" />
               <input v-model.number="emForm.verified_total" type="number" :placeholder="t('核查排放') + '(' + t('万吨') + ')'" />
               <input v-model.number="emForm.scope1_combustion" type="number" :placeholder="t('范畴1-燃料燃烧')" />
               <input v-model.number="emForm.scope1_process" type="number" :placeholder="t('范畴1-工业过程')" />
@@ -618,7 +654,19 @@ const gapClass = computed(() => {
 .ent-form input:focus, .ent-form select:focus, .form-grid input:focus, .form-grid select:focus {
   border-color: var(--accent-d); box-shadow: 0 0 0 1px var(--accent-l);
 }
+/* 输入框与下拉框统一高度：浏览器默认下 select 比 input 高 ~4px，同一行并排会高低不齐 */
+.ent-form input, .ent-form select { height: 25px; box-sizing: border-box; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+/* 带字段名的表单项：行业 / 纳入年度 / 风险偏好 / 预算 / 单笔限额 都靠这一层显示「这一项是什么」 */
+.fld { display: grid; gap: 3px; min-width: 0; align-content: start; }
+.fl { font-size: 11px; color: var(--muted); line-height: 14px; white-space: nowrap; }
+/* 带单位后缀的输入框：单位常显，避免只靠 placeholder 提示（有默认值 0 时 placeholder 根本不显示） */
+.uf { position: relative; display: block; min-width: 0; }
+.ent-form .uf input { width: 100%; box-sizing: border-box; padding-right: 32px; }
+.uf i {
+  position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+  font-style: normal; font-size: 10px; color: var(--muted); pointer-events: none;
+}
 .block { width: 100%; }
 .ent-list ul { list-style: none; margin: 0; padding: 4px 6px; }
 .ent-list li { position: relative; padding: 8px 10px; border-radius: 4px; cursor: pointer; border: 1px solid transparent; }
@@ -665,6 +713,16 @@ const gapClass = computed(() => {
 }
 .tabs button:hover { color: var(--text); background: var(--panel-2); }
 .tabs button.active { color: var(--accent-d); font-weight: 600; background: var(--panel); }
+/* 页签行右端的「编辑」入口：点击才展开排放录入表单 */
+.tabs .tabs-act {
+  margin-left: auto; align-self: center; margin-bottom: 4px;
+  height: 22px; padding: 0 12px; line-height: 20px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--panel); color: var(--accent-d);
+  font-size: 11.5px; font-weight: 600;
+}
+.tabs .tabs-act:hover { background: var(--accent); border-color: var(--accent-d); color: var(--on-accent); }
+.tabs .tabs-act.on { background: var(--panel-2); border-color: var(--line-soft); color: var(--muted); font-weight: 400; }
 .badge {
   display: inline-block; min-width: 16px; height: 16px; padding: 0 4px; margin-left: 5px;
   background: var(--red); color: #fff; border-radius: 999px; font-size: 10px; line-height: 16px; text-align: center;
@@ -676,6 +734,10 @@ const gapClass = computed(() => {
   gap: 8px; margin-bottom: 14px; align-items: end;
 }
 .form-grid.sub { margin-top: 18px; border-top: 1px dashed var(--border); padding-top: 12px; }
+.form-grid.entry {
+  padding: 8px 8px 0; border: 1px solid var(--line-soft); border-radius: 4px;
+  background: var(--panel-2); margin-bottom: 14px;
+}
 .form-grid .btn { grid-column: span 1; height: 24px; }
 .check {
   display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted);

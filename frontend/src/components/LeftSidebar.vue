@@ -149,19 +149,20 @@
 
       <!-- 策略：直接展示 AI优化模型（系统缺省）/ 自定义（仿真模式下保存的策略）/ 工艺流程优化（各工艺策略 + 系统预置） -->
       <div v-else>
-        <!-- AI优化模型：系统缺省（默认）AI 优化模型。
-             与场景类型无关，始终展示 —— MPC 控温模型是独立视图页面（不依赖场景策略库），
-             通用资源包场景（火电/水泥…）里也必须能从这里进入。 -->
-        <div class="tnode">
+        <!-- AI优化模型：系统缺省（默认）AI 优化模型，**按场景隔离**（见 stores/sim.js 的 AI_MODELS.scenes）：
+                 钢铁场景只列六个训练型模型（序列预测 / 强化学习 / 遗传 / 粒子群 / 聚类 / 拟合），
+                 机房温控（dc-thermal）只列 MPC 控温模型 —— 避免在钢铁场景点到控温求解器、
+                 或在控温场景点到钢铁的工艺模型。当前场景没有可用模型时整棵子树不渲染。 -->
+        <div v-if="sceneAiModels.length" class="tnode">
           <div class="tch sub hdr" @click="toggle('g_strat_ai')">
             <span class="twisty" :class="{ open: expanded.g_strat_ai }">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </span>
             <span class="tch-tt">{{ t('AI优化模型') }}</span>
-            <span class="tch-count">{{ AI_MODELS.length }}</span>
+            <span class="tch-count">{{ sceneAiModels.length }}</span>
           </div>
           <div class="tchildren" v-show="expanded.g_strat_ai">
-            <div v-for="m in AI_MODELS" :key="m.id" class="tchild leaf flat click"
+            <div v-for="m in sceneAiModels" :key="m.id" class="tchild leaf flat click"
                  :class="{ active: aiModelActive(m) }"
                  :title="m.agc ? t('点击进入「AI群控 → 模型库 → {name}」（可用性自检 / 目标温度与时限求解）', { name: m.name }) : t('点击查看 AI 优化模型「{name}」训练面板', { name: m.name })"
                  @click="onAiClick(m)">
@@ -254,7 +255,7 @@
 
 <script setup>
 import { reactive, ref, computed, watch, nextTick } from 'vue'
-import { useSimStore, AI_MODELS } from '../stores/sim'
+import { useSimStore, aiModelsForScene } from '../stores/sim'
 import { MATERIALS, PRODUCTS, ROUTE_GROUPS, PROCESS_TEMPLATES, PROCESS_ADJUSTABLE, DEVICE_MAP, PROCESS_MAP, sceneMaterialList } from '../data/flowLibrary'
 import { SENSOR_TEMPLATES, ADJUSTABLE_TEMPLATES } from '../data/attachLibrary'
 import Icon from './Icon.vue'
@@ -393,6 +394,9 @@ function isGreenSelected(g, gs) {
 // 通用资源包场景的物料：包内 dictionary.materials（已由 registerSceneMaterials 并入 MATERIAL_MAP）。
 // 不能复用下面的 materialTrees —— 那张清单遍历全局 MATERIALS，是「钢铁表 + 包内物料」的并集，会串场景。
 const sceneMaterials = computed(() => sceneMaterialList(store.sceneCtx, store.customSceneOn))
+// 当前场景可见的 AI 优化模型（策略按场景隔离）：钢铁 = 六个训练型模型，机房温控 = MPC 控温模型。
+// 跟随 store.sceneId 变化自动重算，切场景后「策略」栏立即换成该场景自己那套。
+const sceneAiModels = computed(() => aiModelsForScene(store.sceneId))
 // 物料按 原料 / 中间产物 / 产品 分三棵子树：能源类投入归入「原料」，副产品归入「中间产物」
 const prodIds = new Set(PRODUCTS.map((p) => p.id))
 const materialTrees = computed(() => {

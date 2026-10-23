@@ -2143,6 +2143,8 @@ export default {
   '企业名称 *': 'Enterprise Name *',
   '统一社会信用代码': 'Unified Social Credit Code',
   '纳入年度': 'Inclusion Year',
+  '行业': 'Industry',
+  '风险偏好': 'Risk Profile',
   '年度预算上限(元)': 'Annual Budget Cap (CNY)',
   '单笔限额(元)': 'Single-Trade Limit (CNY)',
   '创建企业': 'Create Enterprise',
