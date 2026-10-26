@@ -10,8 +10,9 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 from app.services.carbon_compliance.accounting import AccountingInput, compute_accounting
@@ -46,6 +47,17 @@ DEFAULT_USER_ID = "default"
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+
+
+def _norm_trade_at(v: Any) -> str:
+    """交易登记时间：允许前端补录历史交易（datetime-local 形如 2026-10-26T14:39），
+    缺省取当前时间。补秒是为了让同一字段格式统一 —— 流水列表按字符串倒序排。"""
+    s = str(v or "").strip()
+    if not s:
+        return _now_iso()
+    if len(s) == 16 and "T" in s:
+        s = s + ":00"
+    return s
 
 
 def _empty_store() -> dict:
@@ -302,6 +314,25 @@ def upsert_forecast(
     return _Row(row)
 
 
+def delete_forecast(
+    db: Any = None, user_id: str = DEFAULT_USER_ID, enterprise_id: str = "", forecast_id: str = ""
+) -> None:
+    """按 id 删除排放预测记录。
+
+    用 id 而不是年份：年份虽然在建档时判重，但老数据可能存在年份相同、id 不同的脏记录，
+    按年份删会一次抹掉多行。
+    """
+    if not get_enterprise(db, user_id, enterprise_id):
+        raise LookupError("enterprise not found")
+    store = _load_store()
+    ent = _find_enterprise(store, enterprise_id)
+    before = len(ent.get("forecasts") or [])
+    ent["forecasts"] = [r for r in ent.get("forecasts") or [] if str(r.get("id")) != str(forecast_id)]
+    if len(ent.get("forecasts")) == before:
+        raise LookupError("forecast not found")
+    _save_store(store)
+
+
 def list_forecasts(db: Any = None, enterprise_id: str = "") -> list:
     store = _load_store()
     ent = _find_enterprise(store, enterprise_id)
@@ -331,6 +362,7 @@ def upsert_cea_holding(
         "free_quota",
         "carry_forward_qty",
         "net_sell_qty",
+        "buy_qty",
         "avg_cost",
         "estimated_free_quota",
         "sellable_cap",
@@ -392,6 +424,7 @@ def add_cea_trade(
         raise ValueError("side must be buy or sell")
     store = _load_store()
     ent = _find_enterprise(store, enterprise_id)
+    vy = data.get("vintage_year")
     row = {
         "id": _uuid(),
         "enterprise_id": enterprise_id,
@@ -399,7 +432,9 @@ def add_cea_trade(
         "qty": float(data["qty"]),
         "price": float(data.get("price") or 0),
         "note": str(data.get("note") or ""),
-        "traded_at": _now_iso(),
+        "traded_at": _norm_trade_at(data.get("traded_at")),
+        # 归属配额年度：与交易发生年解耦，用于把买卖量算进对应年度的「净卖出」
+        "vintage_year": int(vy) if vy not in (None, "") else None,
     }
     ent.setdefault("cea_trades", []).append(row)
     _save_store(store)
@@ -413,6 +448,22 @@ def list_cea_trades(db: Any = None, enterprise_id: str = "") -> list:
         return []
     rows = sorted(ent.get("cea_trades") or [], key=lambda r: r.get("traded_at"), reverse=True)
     return [_Row(r) for r in rows]
+
+
+def delete_cea_trade(
+    db: Any = None, user_id: str = DEFAULT_USER_ID, enterprise_id: str = "", trade_id: str = ""
+) -> None:
+    """删除一条 CEA 交易流水。净卖出是从流水派生的，删掉后持仓「净卖出」会自动跟着回退。"""
+    if not get_enterprise(db, user_id, enterprise_id):
+        raise LookupError("enterprise not found")
+    store = _load_store()
+    ent = _find_enterprise(store, enterprise_id)
+    rows = ent.get("cea_trades") or []
+    kept = [r for r in rows if str(r.get("id")) != str(trade_id)]
+    if len(kept) == len(rows):
+        raise LookupError("cea trade not found")
+    ent["cea_trades"] = kept
+    _save_store(store)
 
 
 def cea_net_sell_qty(db: Any = None, enterprise_id: str = "") -> float:
@@ -431,10 +482,23 @@ def cea_net_sell_qty(db: Any = None, enterprise_id: str = "") -> float:
 def resolve_cea_net_sell(
     db: Any = None, enterprise_id: str = "", compliance_year: int = 0
 ) -> float:
-    """结转测算用净卖出：优先取履约年 CEA 台账「当前净卖出」，否则回退交易流水汇总。"""
+    """结转测算用净卖出：优先取履约年 CEA 台账手填的「卖出 − 买入」，否则回退交易流水汇总。
+
+    compliance_year == 0 表示「全年度」：累加所有年份台账的净卖出（无台账时回退全量流水汇总）。
+    """
+    if int(compliance_year) == 0:
+        holdings = list_cea_holdings(db, enterprise_id)
+        if holdings:
+            return sum(
+                float(r.get("net_sell_qty") or 0) - float(r.get("buy_qty") or 0)
+                for r in holdings
+            )
+        return cea_net_sell_qty(db, enterprise_id)
     row = get_cea_holding_for_year(db, enterprise_id, compliance_year)
     if row is not None:
-        return float(row.get("net_sell_qty") or 0)
+        # net_sell_qty 是「卖出量」（沿用历史字段名），买入量在 buy_qty；
+        # 台账回退口径必须与前端「可用 = 配额基准 − 卖出 + 买入」保持一致
+        return float(row.get("net_sell_qty") or 0) - float(row.get("buy_qty") or 0)
     return cea_net_sell_qty(db, enterprise_id)
 
 
@@ -514,6 +578,8 @@ def add_ccer_trade(
         raise ValueError("side must be buy or sell")
     store = _load_store()
     ent = _find_enterprise(store, enterprise_id)
+    traded_at = _norm_trade_at(data.get("traded_at"))
+    project_type = str(data.get("project_type") or "general")
     row = {
         "id": _uuid(),
         "enterprise_id": enterprise_id,
@@ -521,11 +587,42 @@ def add_ccer_trade(
         "qty": float(data["qty"]),
         "price": float(data.get("price") or 0),
         "note": str(data.get("note") or ""),
-        "traded_at": _now_iso(),
+        "traded_at": traded_at,
+        "project_type": project_type,
     }
     ent.setdefault("ccer_trades", []).append(row)
+    # 买入时若该「项目类型」尚无持仓记录，自动补一条空持仓（基准量 0、到期日空），
+    # 让买入量能落到持仓表上可见，而不是变成「悬空流水」。
+    if side == "buy":
+        holdings = ent.setdefault("ccer_holdings", [])
+        exists = any(
+            str(h.get("project_type") or "") == project_type for h in holdings
+        )
+        if not exists:
+            m = re.match(r"(\d{4})", traded_at)
+            issue_year = int(m.group(1)) if m else int(_now_iso()[:4])
+            holdings.append({
+                "id": _uuid(),
+                "enterprise_id": enterprise_id,
+                "project_type": project_type,
+                "issue_year": issue_year,
+                "expire_at": "",
+                "qty": 0.0,
+                "cost": 0.0,
+                "eligible_qty": 0.0,
+                "linked_green_cert": False,
+            })
     _save_store(store)
     return _Row(row)
+
+
+def list_ccer_trades(db: Any = None, enterprise_id: str = "") -> list:
+    store = _load_store()
+    ent = _find_enterprise(store, enterprise_id)
+    if not ent:
+        return []
+    rows = sorted(ent.get("ccer_trades") or [], key=lambda r: r.get("traded_at"), reverse=True)
+    return [_Row(r) for r in rows]
 
 
 def upsert_green_power(
@@ -559,6 +656,21 @@ def list_green_power(db: Any = None, enterprise_id: str = "") -> list:
         return []
     rows = sorted(ent.get("green_power") or [], key=lambda r: r.get("year"), reverse=True)
     return [_Row(r) for r in rows]
+
+
+def delete_green_power(
+    db: Any = None, user_id: str = DEFAULT_USER_ID, enterprise_id: str = "", year: int = 0
+) -> None:
+    """按年份删除绿电记录（绿电建档主键是 year）。"""
+    if not get_enterprise(db, user_id, enterprise_id):
+        raise LookupError("enterprise not found")
+    store = _load_store()
+    ent = _find_enterprise(store, enterprise_id)
+    before = len(ent.get("green_power") or [])
+    ent["green_power"] = [r for r in ent.get("green_power") or [] if int(r.get("year")) != int(year)]
+    if len(ent.get("green_power")) == before:
+        raise LookupError("green power year not found")
+    _save_store(store)
 
 
 def upsert_green_cert(
@@ -595,6 +707,21 @@ def list_green_certs(db: Any = None, enterprise_id: str = "") -> list:
         return []
     rows = sorted(ent.get("green_certs") or [], key=lambda r: r.get("year"), reverse=True)
     return [_Row(r) for r in rows]
+
+
+def delete_green_cert(
+    db: Any = None, user_id: str = DEFAULT_USER_ID, enterprise_id: str = "", cert_id: str = ""
+) -> None:
+    """按 id 删除绿证记录（绿证建档主键是 id，同年份可有多个批次）。"""
+    if not get_enterprise(db, user_id, enterprise_id):
+        raise LookupError("enterprise not found")
+    store = _load_store()
+    ent = _find_enterprise(store, enterprise_id)
+    before = len(ent.get("green_certs") or [])
+    ent["green_certs"] = [r for r in ent.get("green_certs") or [] if str(r.get("id")) != str(cert_id)]
+    if len(ent.get("green_certs")) == before:
+        raise LookupError("green cert not found")
+    _save_store(store)
 
 
 def upsert_market_cea(db: Any = None, data: dict | None = None) -> _Row:
@@ -789,16 +916,42 @@ def run_strategy(
     cost = settings.get("cost") or {}
     compliance_cfg = settings.get("compliance") or {}
 
+    # compliance_year == 0 表示「全年度」：聚合所有年度的排放 / 预测 / CEA 配额。
+    is_all_years = int(compliance_year) == 0
     emission = None
-    for r in list_emission_years(db, enterprise_id):
-        if int(r.get("year")) == int(compliance_year):
-            emission = r
-            break
-    forecast = None
-    for r in list_forecasts(db, enterprise_id):
-        if int(r.get("year")) == int(compliance_year):
-            forecast = r
-            break
+    forecasts = list_forecasts(db, enterprise_id)
+    emissions = list_emission_years(db, enterprise_id)
+    if is_all_years:
+        # 全年度：把各年 scope1/scope2/外购电累加；verified_override 用各年 verified_total 累加
+        scopes = {"scope1_combustion": 0.0, "scope1_process": 0.0, "scope2_power": 0.0, "purchased_mwh": 0.0}
+        verified_sum = None
+        for r in emissions:
+            for k in scopes:
+                scopes[k] += float(r.get(k) or 0.0)
+            if r.get("verified_total") is not None:
+                verified_sum = (verified_sum or 0.0) + float(r.get("verified_total"))
+        forecast_total = None
+        for f in forecasts:
+            if f.get("forecast_total") is not None:
+                forecast_total = (forecast_total or 0.0) + float(f.get("forecast_total"))
+        # 构造一个聚合后的 emission 字典，供后续 scope 取值
+        emission = {**scopes}
+        if verified_sum is not None:
+            emission["verified_total"] = verified_sum
+        # 无排放台账但有预测时，用预测合计兜底
+        if not emissions and forecast_total is not None:
+            emission["verified_total"] = forecast_total
+        forecast = {"forecast_total": forecast_total} if forecast_total is not None else None
+    else:
+        for r in emissions:
+            if int(r.get("year")) == int(compliance_year):
+                emission = r
+                break
+        forecast = None
+        for r in forecasts:
+            if int(r.get("year")) == int(compliance_year):
+                forecast = r
+                break
 
     cea_rows = list_cea_holdings(db, enterprise_id)
     free_cea = 0.0
@@ -807,19 +960,18 @@ def run_strategy(
     carry_in = 0.0
     market_start_year = int(ent.get("market_start_year") or 0)
     for c in cea_rows:
-        if int(c.get("vintage_year") or 0) == int(compliance_year) or int(
-            c.get("vintage_year") or 0
-        ) >= market_start_year:
+        vy = int(c.get("vintage_year") or 0)
+        # 全年度：累加所有年份；单年度：当年或 >= 市场起始年
+        match_year = vy == int(compliance_year)
+        if is_all_years or match_year or vy >= market_start_year:
             allocated = max(0.0, float(c.get("free_quota") or 0))
             carried = max(0.0, float(c.get("carry_forward_qty") or 0))
             usable = allocated + carried
             free_cea += usable
-            if int(c.get("vintage_year") or 0) == int(compliance_year):
+            if is_all_years or match_year:
                 allocated_free += allocated
                 carry_in += carried
-            if c.get("estimated_free_quota") and int(c.get("vintage_year") or 0) == int(
-                compliance_year
-            ):
+            if c.get("estimated_free_quota") and (is_all_years or match_year):
                 free_cea = max(free_cea, float(c.get("estimated_free_quota")) + carried)
             if c.get("sellable_cap") is not None:
                 sellable += float(c.get("sellable_cap"))
@@ -927,7 +1079,7 @@ def run_strategy(
         year_end_holding=year_end_holding,
         net_sell_multiplier=float(compliance_cfg.get("carry_net_sell_multiplier") or 1.5),
         deadline_md=str(compliance_cfg.get("carry_forward_deadline_md") or "06-10"),
-        deadline_year=compliance_year + 1,  # 履约年后的结转日（如 2025 履约 → 2026-06-10）
+        deadline_year=compliance_year + 1 if not is_all_years else None,  # 履约年后的结转日；全年度无单一年度，回退当年
     )
 
     payload = build_strategy_payload(
@@ -961,7 +1113,7 @@ def run_strategy(
     payload["market_tags"] = tags
     report_md = strategy_run_to_markdown(
         enterprise_name=ent.get("name"),
-        compliance_year=compliance_year,
+        compliance_year="全年度" if is_all_years else compliance_year,
         accounting=payload["accounting"],
         market_tags=payload["market_tags"],
         plans=payload["plans"],
@@ -991,7 +1143,7 @@ def run_strategy(
                 break
 
     alert_dicts = build_alerts(
-        compliance_year=compliance_year,
+        compliance_year=compliance_year if not is_all_years else date.today().year,
         clearance_deadline_md=str(industry_params.get("clearance_deadline_md") or "12-31"),
         warn_days=list(compliance_cfg.get("clearance_warn_days") or [90, 30, 15]),
         compliance_gap=acc.compliance_gap,
@@ -1099,11 +1251,12 @@ def build_import_template_bytes() -> bytes:
             "free_quota_万吨",
             "carry_forward_qty_万吨",
             "net_sell_qty_万吨",
+            "buy_qty_万吨",
             "avg_cost",
             "sellable_cap_万吨",
         ]
     )
-    ws2.append([2024, 14, 0, 0, 0, 1])
+    ws2.append([2024, 14, 0, 0, 0, 0, 1])
     ws3 = wb.create_sheet("ccer")
     ws3.append(
         [
@@ -1141,6 +1294,7 @@ def import_enterprise_excel(
             "free_quota",
             "carry_forward_qty",
             "net_sell_qty",
+            "buy_qty",
             "sellable_cap",
             "qty",
             "eligible_qty",

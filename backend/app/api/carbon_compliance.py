@@ -69,7 +69,10 @@ class CeaHoldingIn(BaseModel):
     vintage_year: int
     free_quota: float = 0
     carry_forward_qty: float = 0
+    # net_sell_qty 沿用历史字段名，语义已收窄为「卖出量」；
+    # 买入量另开 buy_qty（两者都在「该配额年度无交易流水」时作为回退值）
     net_sell_qty: float = 0
+    buy_qty: float = 0
     avg_cost: float = 0
     estimated_free_quota: float = 0
     sellable_cap: float | None = None
@@ -80,6 +83,13 @@ class TradeIn(BaseModel):
     qty: float
     price: float = 0
     note: str = ""
+    # 这笔交易归属哪个配额年度（CEA 用）。成交量与交易发生年不是一回事：
+    # 2026 年卖出的可能是 2025 年度配额，所以必须显式带上，缺省时前端按台账年度兜底
+    vintage_year: int | None = None
+    # 登记时间（可补录历史交易）：datetime-local 形式如 2026-10-26T14:39，缺省取服务器当前时间
+    traded_at: str | None = None
+    # 项目类型（CCER 交易登记用）：forest/renewable/methane/general，缺省 general
+    project_type: str = "general"
 
 
 class CcerHoldingIn(BaseModel):
@@ -147,6 +157,21 @@ def _err(exc: Exception) -> HTTPException:
     if isinstance(exc, ValueError):
         return HTTPException(status_code=400, detail=str(exc))
     return HTTPException(status_code=500, detail=str(exc))
+
+
+def _trade_dict(r) -> dict:
+    """交易流水统一输出结构（CEA / CCER 共用）。"""
+    return {
+        "id": str(r.id),
+        "side": r.side,
+        "qty": float(r.qty or 0),
+        "price": float(r.price or 0),
+        "amount": float(r.qty or 0) * float(r.price or 0) * 10000.0,  # 万吨 × 元/吨 → 元
+        "note": r.note or "",
+        "traded_at": str(r.traded_at or ""),
+        "vintage_year": getattr(r, "vintage_year", None),
+        "project_type": getattr(r, "project_type", "") or "general",
+    }
 
 
 # ---------------------------------------------------------------- meta & settings
@@ -281,6 +306,15 @@ def upsert_forecast(enterprise_id: str, body: ForecastIn) -> dict:
     return {"id": str(row.id), "year": row.year}
 
 
+@router.delete("/enterprises/{enterprise_id}/forecasts/{forecast_id}")
+def delete_forecast(enterprise_id: str, forecast_id: str) -> dict:
+    try:
+        ccs.delete_forecast(None, DEFAULT_USER_ID, enterprise_id, forecast_id)
+    except LookupError as exc:
+        raise _err(exc) from exc
+    return {"ok": True, "id": forecast_id}
+
+
 # ---------------------------------------------------------------- CEA
 @router.get("/enterprises/{enterprise_id}/cea")
 def list_cea(enterprise_id: str) -> list:
@@ -294,6 +328,7 @@ def list_cea(enterprise_id: str) -> list:
             "free_quota": r.free_quota,
             "carry_forward_qty": r.carry_forward_qty,
             "net_sell_qty": r.net_sell_qty,
+            "buy_qty": r.buy_qty or 0,
             "avg_cost": r.avg_cost,
             "estimated_free_quota": r.estimated_free_quota,
             "sellable_cap": r.sellable_cap,
@@ -327,6 +362,22 @@ def add_cea_trade(enterprise_id: str, body: TradeIn) -> dict:
     except (LookupError, ValueError) as exc:
         raise _err(exc) from exc
     return {"id": str(row.id)}
+
+
+@router.get("/enterprises/{enterprise_id}/cea/trades")
+def list_cea_trades(enterprise_id: str) -> list:
+    if not ccs.get_enterprise(None, DEFAULT_USER_ID, enterprise_id):
+        raise HTTPException(status_code=404, detail="enterprise not found")
+    return [_trade_dict(r) for r in ccs.list_cea_trades(None, enterprise_id)]
+
+
+@router.delete("/enterprises/{enterprise_id}/cea/trades/{trade_id}")
+def delete_cea_trade(enterprise_id: str, trade_id: str) -> dict:
+    try:
+        ccs.delete_cea_trade(None, DEFAULT_USER_ID, enterprise_id, trade_id)
+    except LookupError as exc:
+        raise _err(exc) from exc
+    return {"ok": True, "id": trade_id}
 
 
 # ---------------------------------------------------------------- CCER
@@ -381,6 +432,13 @@ def add_ccer_trade(enterprise_id: str, body: TradeIn) -> dict:
     return {"id": str(row.id)}
 
 
+@router.get("/enterprises/{enterprise_id}/ccer/trades")
+def list_ccer_trades(enterprise_id: str) -> list:
+    if not ccs.get_enterprise(None, DEFAULT_USER_ID, enterprise_id):
+        raise HTTPException(status_code=404, detail="enterprise not found")
+    return [_trade_dict(r) for r in ccs.list_ccer_trades(None, enterprise_id)]
+
+
 # ---------------------------------------------------------------- green power / certs
 @router.get("/enterprises/{enterprise_id}/green-power")
 def list_green_power(enterprise_id: str) -> list:
@@ -409,6 +467,15 @@ def upsert_green_power(enterprise_id: str, body: GreenPowerIn) -> dict:
     return {"id": str(row.id), "year": row.year}
 
 
+@router.delete("/enterprises/{enterprise_id}/green-power/{year}")
+def delete_green_power(enterprise_id: str, year: int) -> dict:
+    try:
+        ccs.delete_green_power(None, DEFAULT_USER_ID, enterprise_id, year)
+    except LookupError as exc:
+        raise _err(exc) from exc
+    return {"ok": True, "year": year}
+
+
 @router.get("/enterprises/{enterprise_id}/green-certs")
 def list_green_certs(enterprise_id: str) -> list:
     if not ccs.get_enterprise(None, DEFAULT_USER_ID, enterprise_id):
@@ -434,6 +501,15 @@ def upsert_green_cert(enterprise_id: str, body: GreenCertIn) -> dict:
     except LookupError as exc:
         raise _err(exc) from exc
     return {"id": str(row.id)}
+
+
+@router.delete("/enterprises/{enterprise_id}/green-certs/{cert_id}")
+def delete_green_cert(enterprise_id: str, cert_id: str) -> dict:
+    try:
+        ccs.delete_green_cert(None, DEFAULT_USER_ID, enterprise_id, cert_id)
+    except LookupError as exc:
+        raise _err(exc) from exc
+    return {"ok": True, "id": cert_id}
 
 
 # ---------------------------------------------------------------- market

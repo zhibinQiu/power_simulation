@@ -1578,14 +1578,43 @@ function resumeFlow(delay = 260) {
   }, delay)
 }
 
+/** svg 元素自身尺寸 = 内容坐标系尺寸。
+ *  ★ 必须显式设置：CSS 里 `.t2d-canvas svg` 是 width/height 100%（跟随容器），
+ *  而内容全部按 1:1 用户单位绘制（无 viewBox）。方案一旦变宽 —— 例如钢铁长流程
+ *  主设备横排后 bounds.w ≈ 3705，远超容器宽 1428 —— 超出 svg 视口的内容会被
+ *  SVG 根元素自带的 overflow:hidden 直接裁掉，再叠加 fitAll 的 scale，
+ *  表现就是「只加载出左上角一部分，其余被截断」。把元素撑到内容尺寸后，
+ *  裁剪消失；而 screen = pan + world × z 这套 zoom/pan 语义完全不变（svg 原点仍
+ *  对应 world (0,0)）。 */
+function syncCanvasSize() {
+  if (!svg.value) return
+  let w = bounds.value.w, h = bounds.value.h
+  // 实际内容包围盒可能比 bounds 略大（管线回流的底缘车道、贴边标签等），
+  // 以它为下限兜底，否则最后几十像素会被根部 overflow:hidden 切掉。
+  try {
+    const bb = svg.value.getBBox()
+    if (bb && bb.width > 0) w = Math.max(w, bb.x + bb.width)
+    if (bb && bb.height > 0) h = Math.max(h, bb.y + bb.height)
+  } catch (e) { /* 尚未渲染完成，退回 bounds 即可 */ }
+  w = Math.ceil(w); h = Math.ceil(h)
+  if (w > 0 && svg.value.style.width !== w + 'px') svg.value.style.width = w + 'px'
+  if (h > 0 && svg.value.style.height !== h + 'px') svg.value.style.height = h + 'px'
+}
+
 function fitAll() {
   if (!wrap.value || !nodes.value.length) { view = { z: 1, x: 0, y: 0 }; applyView(); return }
+  // 冻结期间（面板开合动画）尺寸由 freezeCanvas 接管，这里不要抢回，
+  // 否则每帧改尺寸会让整幅矢量图反复重栅格，动画直接卡死。
+  if (!frozen) syncCanvasSize()
   const rect = wrap.value.getBoundingClientRect()
-  // 矩形化：zoom 同时受整体 bounds 宽高约束（取 min），让矩形画布完整适配视口；
-  // 兜底下调到 0.28，避免矩形化后宽高变大被人为压缩。
+  // 矩形化：zoom 同时受整体 bounds 宽高约束（取 min），让矩形画布完整适配视口。
+  // 上限 1.1：常规布局不放大太多，避免设备图形糊；
+  // 下限只留一个极小安全值 —— 原来写死 0.28 会把「本身就很大」的图卡住：
+  // 火电竖排长链 bounds 高 4084，按视口算需要 0.229，被抬到 0.28 后高度溢出 112%，
+  // 上下同样被容器裁掉。缩到该缩的尺寸才是正确的「适配」。
   const bw = bounds.value.w, bh = bounds.value.h
   const z = Math.min((rect.width * 0.92) / bw, (rect.height * 0.92) / bh)
-  const nz = Math.max(0.28, Math.min(1.1, z))
+  const nz = Math.min(1.1, Math.max(0.08, z))
   // 让矩形画布在视口居中：屏中心 = pan + 世界中心 × z → pan = 屏中心 - 世界中心 × z
   const centerX = bounds.value.x + bw / 2
   const centerY = bounds.value.y + bh / 2
@@ -1671,15 +1700,15 @@ function freezeCanvas() {
   if (!svg.value || !wrap.value) return
   const t = targetCanvasSize()
   const r = wrap.value.getBoundingClientRect()
-  const w = Math.ceil(Math.max(r.width, t ? t.w : r.width))
-  const h = Math.ceil(Math.max(r.height, t ? t.h : r.height))
+  // 下限必须是内容尺寸：变小会把超出部分裁掉（见 syncCanvasSize 的说明）。
+  const w = Math.ceil(Math.max(r.width, t ? t.w : r.width, bounds.value.w))
+  const h = Math.ceil(Math.max(r.height, t ? t.h : r.height, bounds.value.h))
   svg.value.style.width = w + 'px'
   svg.value.style.height = h + 'px'
 }
 function unfreezeCanvas() {
-  if (!svg.value) return
-  svg.value.style.width = ''
-  svg.value.style.height = ''
+  // 恢复成「内容尺寸」而不是清空回 CSS 的 100%（清空会立刻触发裁剪）。
+  syncCanvasSize()
 }
 
 // 容器尺寸变化：默认立即重新适配视图。

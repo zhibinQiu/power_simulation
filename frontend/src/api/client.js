@@ -38,6 +38,14 @@ export async function request(url, opts = {}) {
     }
     throw new Error(msg)
   }
+  // 200 却不是 JSON：最常见的是后端缺少这个路由，请求被 nginx/前端 fallback 成了
+  // index.html（HTTP 200 + text/html）。如果直接 r.json()，调用方只会拿到
+  // `SyntaxError: Unexpected token '<'` 并被 catch 成空数据，表现成「接口没数据」，
+  // 极难排查 —— 这里显式说清楚。
+  const ctype = String(r.headers.get('content-type') || '').toLowerCase()
+  if (ctype && !ctype.includes('json')) {
+    throw new Error(`后端未就绪：${url} 返回了非 JSON 内容（${ctype.split(';')[0]}），通常是后端缺少该接口或版本过旧`)
+  }
   return r.json()
 }
 

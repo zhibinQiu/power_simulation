@@ -16,13 +16,15 @@ from app.services.carbon_compliance.labels import (
 def strategy_run_to_markdown(
     *,
     enterprise_name: str,
-    compliance_year: int,
+    compliance_year: int | str,
     accounting: dict[str, Any],
     market_tags: dict[str, Any],
     plans: list[dict[str, Any]],
 ) -> str:
+    # 全年度（传入字符串「全年度」）时不带「年」字；具体年度显示「YYYY 年」
+    year_label = compliance_year if str(compliance_year) == "全年度" else f"{compliance_year} 年"
     lines = [
-        f"# {enterprise_name} {compliance_year} 年碳履约策略推荐",
+        f"# {enterprise_name} {year_label}碳履约策略推荐",
         "",
         "## 核算快照",
         "",

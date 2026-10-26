@@ -21,10 +21,6 @@
           <span class="rf-ic" :class="{ spin: refreshing }">⟳</span><span class="rf-tx">{{ refreshing ? t('刷新中…') : t('刷新') }}</span>
         </button>
         <span v-if="dirty" class="lib-dirty">{{ t('有未提交的改动') }}</span>
-        <!-- 唯一的上传入口：编辑只改内存，点这里二次确认后才整档覆盖服务端 -->
-        <button class="lib-refresh lib-submit" :disabled="saving || !dirty" :title="submitTitle" @click="submitDesigns">
-          <span class="rf-ic">{{ saving ? '…' : '⤴' }}</span><span class="rf-tx">{{ saving ? t('提交中…') : t('提交') }}</span>
-        </button>
       </div>
       <p class="lib-tip">{{ t('每个模型是一套群控算法：编排完成后点「提交」存到服务器，再点「运行」；运行中点击模块可看实时值。') }}</p>
 
@@ -106,7 +102,7 @@
         <span class="ed-st" :class="{ on: running }"><i class="dot"></i>{{ runStateTxt }}</span>
         <span v-if="dirty" class="ed-dirty">{{ t('未提交') }}</span>
         <button class="btn" :disabled="!dirty || saving" :title="submitTitle" @click="submitDesigns">
-          {{ saving ? t('提交中…') : t('提交') }}
+          {{ saving ? t('保存中…') : t('保存') }}
         </button>
         <button class="btn" :class="running ? 'danger' : 'primary'" :disabled="!canRun" :title="runTip" @click="toggleRun">
           {{ running ? t('停止') : t('运行') }}
@@ -1997,12 +1993,6 @@ i.u { font-size: var(--fs-s); color: var(--faint); }
   background: color-mix(in srgb, var(--blue, #0860a8) 8%, transparent);
 }
 .lib-refresh:disabled { opacity: .55; cursor: default; }
-/* 提交：唯一的上传入口（未提交时可见、可点） */
-.lib-submit {
-  margin-left: 0; color: var(--blue, #0860a8);
-  border-color: color-mix(in srgb, var(--blue, #0860a8) 45%, transparent);
-}
-.lib-submit:disabled { opacity: .45; cursor: default; }
 /* 未提交提示：只在本端有改动时出现 */
 .lib-dirty { font-size: var(--fs-s); color: var(--warn, #b06a00); white-space: nowrap; }
 .rf-ic { display: inline-block; line-height: 1; font-size: 1.05em; }

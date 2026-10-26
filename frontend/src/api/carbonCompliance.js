@@ -86,6 +86,8 @@ export const carbonComplianceApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }),
+  deleteForecast: (enterpriseId, forecastId) =>
+    jfetch(`${base}/enterprises/${enterpriseId}/forecasts/${forecastId}`, { method: 'DELETE' }),
 
   // CEA
   listCea: (enterpriseId) => jfetch(`${base}/enterprises/${enterpriseId}/cea`),
@@ -103,6 +105,9 @@ export const carbonComplianceApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }),
+  listCeaTrades: (enterpriseId) => jfetch(`${base}/enterprises/${enterpriseId}/cea/trades`),
+  deleteCeaTrade: (enterpriseId, tradeId) =>
+    jfetch(`${base}/enterprises/${enterpriseId}/cea/trades/${tradeId}`, { method: 'DELETE' }),
 
   // CCER
   listCcer: (enterpriseId) => jfetch(`${base}/enterprises/${enterpriseId}/ccer`),
@@ -120,6 +125,7 @@ export const carbonComplianceApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }),
+  listCcerTrades: (enterpriseId) => jfetch(`${base}/enterprises/${enterpriseId}/ccer/trades`),
 
   // green power / certs
   listGreenPower: (enterpriseId) => jfetch(`${base}/enterprises/${enterpriseId}/green-power`),
@@ -129,6 +135,8 @@ export const carbonComplianceApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }),
+  deleteGreenPower: (enterpriseId, year) =>
+    jfetch(`${base}/enterprises/${enterpriseId}/green-power/${year}`, { method: 'DELETE' }),
   listGreenCerts: (enterpriseId) => jfetch(`${base}/enterprises/${enterpriseId}/green-certs`),
   upsertGreenCert: (enterpriseId, body) =>
     jfetch(`${base}/enterprises/${enterpriseId}/green-certs`, {
@@ -136,6 +144,8 @@ export const carbonComplianceApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }),
+  deleteGreenCert: (enterpriseId, certId) =>
+    jfetch(`${base}/enterprises/${enterpriseId}/green-certs/${certId}`, { method: 'DELETE' }),
 
   // market quotes
   listMarketCea: () => jfetch(`${base}/market/cea`),

@@ -40,13 +40,19 @@ const methodOptions = [
 const reportType = ref('compliance_analysis')
 const forecastMethod = ref('linear')
 const title = ref(t('碳资产管理综合分析报告'))
-const period = ref('2026年度')
 const focus = ref(['compliance', 'trading'])
 const extra = ref('')
-// 履约综合分析专属：目标企业 + 履约年份
+// 履约综合分析专属：目标企业 + 履约年度
+// 核算年度只能从该企业「排放台账」已有年份里选，不再允许自由输入 —— 后端按年度精确匹配
+// 台账，选到台账中没有的年度会静默按 0 排放核算，生成「巨额盈余」的错误报告
 const enterprises = ref([])
 const enterpriseId = ref('')
-const complianceYear = ref(2026)
+const complianceYear = ref(null)
+const ledgerYears = ref([])
+const ledgerLoading = ref(false)
+// 后端仍按字符串使用「核算周期」（默认标题 / 无 compliance_year 时兜底解析年份），
+// 这里统一由选中的台账年度派生，保证两个字段始终一致
+const period = computed(() => (complianceYear.value ? `${complianceYear.value}年度` : ''))
 async function loadEnterprises() {
   try {
     enterprises.value = await carbonComplianceApi.listEnterprises()
@@ -57,10 +63,28 @@ async function loadEnterprises() {
     console.warn('企业列表加载失败', e)
   }
 }
-function matchYear() {
-  const m = String(period.value).match(/20\d{2}/)
-  if (m) complianceYear.value = Number(m[0])
+// 按企业拉取排放台账年份（倒序）并默认选中最新的一个；切换企业时自动重载
+async function loadLedgerYears() {
+  const eid = enterpriseId.value
+  ledgerYears.value = []
+  complianceYear.value = null
+  if (!eid) return
+  ledgerLoading.value = true
+  try {
+    const rows = await carbonComplianceApi.listEmissions(eid)
+    if (eid !== enterpriseId.value) return   // 企业已切走，丢弃过期响应
+    const years = (rows || [])
+      .map(r => Number(r.year))
+      .filter(y => Number.isFinite(y) && y > 0)
+    ledgerYears.value = [...new Set(years)].sort((a, b) => b - a)
+    complianceYear.value = ledgerYears.value[0] ?? null
+  } catch (e) {
+    console.warn('排放台账年份加载失败', e)
+  } finally {
+    if (eid === enterpriseId.value) ledgerLoading.value = false
+  }
 }
+watch(enterpriseId, loadLedgerYears)
 
 const focusOptions = [
   { key: 'compliance', label: '履约合规' },
@@ -70,16 +94,16 @@ const focusOptions = [
   { key: 'reduction', label: '减排路径' },
 ]
 
-// 切换报告类型/周期时同步默认标题（仅当用户未自定义标题时）
-let prevDefaultTitle = '2026年度 碳资产管理综合分析'
+// 切换报告类型/核算年度时同步默认标题（仅当用户未自定义标题时）
+let prevDefaultTitle = ''
 function syncDefaultTitle() {
   const prefix = { market_brief: '碳交易市场简报', policy_digest: '双碳政策动态摘要', compliance_analysis: '碳资产管理综合分析' }[reportType.value]
-  const def = `${period.value} ${prefix}`
-  if (!title.value.trim() || title.value === prevDefaultTitle) title.value = def
+  const def = period.value ? `${period.value} ${prefix}` : prefix
+  // prevDefaultTitle 为空 = 尚未同步过初始文案，此时强制跟随；之后仅在用户没改过标题时才跟随
+  if (!prevDefaultTitle || !title.value.trim() || title.value === prevDefaultTitle) title.value = def
   prevDefaultTitle = def
 }
 watch([reportType, period], syncDefaultTitle)
-watch(period, matchYear)
 // 履约综合分析必须选择企业，否则提示
 watch(reportType, (v) => {
   if (v === 'compliance_analysis' && !enterprises.value.length) loadEnterprises()
@@ -98,9 +122,15 @@ let stopPoll = null   // visiblePoll 返回的停止函数
 
 async function startAnalysis() {
   if (submitting.value) return
-  if (reportType.value === 'compliance_analysis' && !enterpriseId.value) {
-    statusMsg.value = t('履约综合分析需要先选择控排企业')
-    return
+  if (reportType.value === 'compliance_analysis') {
+    if (!enterpriseId.value) {
+      statusMsg.value = t('履约综合分析需要先选择控排企业')
+      return
+    }
+    if (!complianceYear.value) {
+      statusMsg.value = t('该企业暂无排放台账，请先在企业台账中录入排放年度')
+      return
+    }
   }
   submitting.value = true
   statusMsg.value = ''
@@ -129,17 +159,19 @@ function pollTask(taskId) {
   // 可见性感知：后台标签不轮询任务状态（切回可见时立即补查一次，任务早已完成即可立刻收尾）
   stopPoll = visiblePoll(async () => {
     try {
-      const t = await carbonAssistantApi.getTask(taskId)
-      trackingTask.value = t
-      if (['completed', 'failed', 'cancelled'].includes(t.status)) {
+      // 变量名不能叫 t：那会遮蔽 i18n 的 t()，任务结束时 t('报告生成完成') 直接抛
+      // "t is not a function"，被下面的 catch 捕获后误报成「任务查询失败」
+      const task = await carbonAssistantApi.getTask(taskId)
+      trackingTask.value = task
+      if (['completed', 'failed', 'cancelled'].includes(task.status)) {
         clearPoll()
         submitting.value = false
-        if (t.status === 'completed' && t.report_id) {
+        if (task.status === 'completed' && task.report_id) {
           statusMsg.value = t('报告生成完成')
           await loadReports()
-          await showReport(t.report_id)
-        } else if (t.status === 'failed') {
-          statusMsg.value = t('生成失败：') + (t.message || t('未知错误'))
+          await showReport(task.report_id)
+        } else if (task.status === 'failed') {
+          statusMsg.value = t('生成失败：') + (task.message || t('未知错误'))
         } else {
           statusMsg.value = t('任务已取消')
         }
@@ -229,9 +261,9 @@ function extractSummary(md) {
   for (const line of lines) {
     const m = line.match(/^#{2,4}\s*(.*)$/)
     if (m) {
-      const t = m[1].replace(/^\d+[\.、]?\s*/, '').trim()
+      const head = m[1].replace(/^\d+[\.、]?\s*/, '').trim()
       if (collecting) break
-      if (heads.some(h => t.includes(h))) { collecting = true; continue }
+      if (heads.some(h => head.includes(h))) { collecting = true; continue }
     }
     if (collecting) {
       const s = line.replace(/^[-*>]\s*/, '').trim()
@@ -315,17 +347,28 @@ onBeforeUnmount(clearPoll)
             <span>{{ t('报告标题') }}</span>
             <input v-model="title" type="text" :placeholder="t('例如：2026年度碳资产管理综合分析报告')" />
           </label>
-          <label class="field">
-            <span>{{ t('核算周期') }}</span>
-            <input v-model="period" type="text" :placeholder="t('例如：2026年度')" />
-          </label>
           <div v-if="reportType === 'compliance_analysis'" class="field">
             <span>{{ t('控排企业') }}（{{ t('履约综合分析必选') }}）</span>
             <select v-model="enterpriseId">
               <option value="" disabled>{{ t('请选择企业') }}</option>
               <option v-for="e in enterprises" :key="e.id" :value="e.id">{{ e.name }}</option>
             </select>
-            <div class="sub-hint">{{ t('履约年份按核算周期中的年份自动识别') }}（{{ complianceYear }} {{ t('年') }}）</div>
+          </div>
+          <div v-if="reportType === 'compliance_analysis'" class="field">
+            <span>{{ t('核算年度') }}</span>
+            <select
+              :value="complianceYear === null ? '' : complianceYear"
+              :disabled="!ledgerYears.length"
+              @change="complianceYear = $event.target.value ? Number($event.target.value) : null"
+            >
+              <option v-if="!ledgerYears.length" value="">
+                {{ ledgerLoading ? t('正在加载台账年份…') : t('该企业暂无排放台账') }}
+              </option>
+              <option v-for="y in ledgerYears" :key="y" :value="y">{{ y }} {{ t('年') }}</option>
+            </select>
+            <div class="sub-hint">
+              {{ t('核算年度取自该企业排放台账') }}<template v-if="ledgerYears.length">（{{ ledgerYears.length }} {{ t('个年度可选') }}）</template>
+            </div>
           </div>
           <div class="field">
             <span>{{ t('分析重点') }}</span>
