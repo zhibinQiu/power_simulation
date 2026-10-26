@@ -71,7 +71,9 @@
       <span class="sp"></span>
       <span class="mono">{{ history.length }} {{ t('点') }}</span>
     </div>
-    <TrendChart :data="history" :color="dev.color" :height="150" :grid="true" :unit="dev.unit" />
+    <!-- axis 必须显式开启：TrendChart 的 axis 默认 false（不画 y 轴刻度与 x 轴时间标签），
+         数据分析页的两处调用都已传 axis:true，此处漏传导致监控图没有纵横坐标 -->
+    <TrendChart :data="history" :color="dev.color" :height="150" :grid="true" :axis="true" :unit="dev.unit" />
     <div class="trend-foot">
       <!-- 可调设备不显示「最新」：输入框中的数字即当前设定值，避免与面板重复 -->
       <span v-if="!dev.adjustable">{{ t('最新') }} <b :style="{color:dev.color}">{{ f(latest) }} {{ dev.unit }}</b></span>
