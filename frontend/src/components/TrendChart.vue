@@ -1,5 +1,5 @@
 <template>
-  <canvas ref="cv" class="trend" :style="height > 0 ? { height: height + 'px' } : { height: '100%' }"></canvas>
+  <canvas ref="cv" class="trend" :class="{ hoverable: hover }" :style="height > 0 ? { height: height + 'px' } : { height: '100%' }"></canvas>
 </template>
 
 <script setup>
@@ -14,10 +14,13 @@ const props = defineProps({
   grid: { type: Boolean, default: false },
   axis: { type: Boolean, default: false },    // 绘制 y 轴刻度 + x 轴时间标签
   unit: { type: String, default: '' },
+  hover: { type: Boolean, default: true },    // 鼠标悬停：十字参考线 + 该点 tooltip（时间 + 数值）
 })
 
 const cv = ref(null)
 let ro = null
+let hoverI = -1        // 当前悬停的数据点下标（-1 = 无）
+let geom = null        // draw 时记录的布局参数，供 mousemove 反推最近点
 
 function draw() {
   const el = cv.value
@@ -33,6 +36,7 @@ function draw() {
 
   const pts = props.data || []
   if (!pts.length) {
+    geom = null
     ctx.fillStyle = '#6B7F92'
     ctx.font = '11px ui-monospace, monospace'
     ctx.fillText(t('暂无数据'), 8, h / 2)
@@ -56,6 +60,7 @@ function draw() {
   const n = pts.length
   const x = (i) => (n === 1 ? w - 2 : padL + 2 + (i / (n - 1)) * (wInner - 4))
   const y = (v) => padT + hInner - ((v - min) / (max - min)) * (hInner - 2)
+  geom = { padL, wInner, n }
 
   // 预测段起点：数据点带 forecast:true 时，其后为外推预测（画虚线）
   let histLen = n
@@ -152,6 +157,55 @@ function draw() {
     ctx.strokeStyle = 'rgba(90,100,115,.25)'
     ctx.beginPath(); ctx.moveTo(padL, h - padB); ctx.lineTo(w - padR, h - padB); ctx.stroke()
   }
+
+  // 悬停：十字参考线 + 该点 tooltip（横坐标 = 时间，纵坐标 = 数值+单位）
+  if (props.hover && hoverI >= 0 && hoverI < n) {
+    const p = pts[hoverI]
+    const hx = x(hoverI), hy = y(p.v)
+    ctx.strokeStyle = 'rgba(90,100,115,.5)'
+    ctx.lineWidth = 1
+    ctx.setLineDash([3, 3])
+    ctx.beginPath(); ctx.moveTo(hx, padT); ctx.lineTo(hx, h - padB); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(padL, hy); ctx.lineTo(hx, hy); ctx.stroke()
+    ctx.setLineDash([])
+    ctx.beginPath(); ctx.arc(hx, hy, 3.4, 0, Math.PI * 2)
+    ctx.fillStyle = props.color; ctx.fill()
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.4; ctx.stroke()
+
+    const timeS = timeFmt(p.t, (pts[n - 1].t - pts[0].t) < 3600)
+    const valS = axisFmt(p.v) + (props.unit ? ' ' + props.unit : '')
+    ctx.font = '10px ui-monospace, monospace'
+    const tw = Math.ceil(Math.max(ctx.measureText(timeS).width, ctx.measureText(valS).width)) + 16
+    const th = 34
+    let bx = hx + 10, by = hy - th - 8
+    if (bx + tw > w - padR) bx = hx - tw - 10   // 右侧放不下则翻到点的左侧
+    if (bx < padL) bx = padL
+    if (by < 2) by = hy + 10                    // 顶部放不下则移到点的下方
+    ctx.fillStyle = 'rgba(22,32,44,.88)'
+    ctx.beginPath()
+    if (ctx.roundRect) ctx.roundRect(bx, by, tw, th, 4); else ctx.rect(bx, by, tw, th)
+    ctx.fill()
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillStyle = '#E8EEF4'
+    ctx.fillText(timeS, bx + 8, by + 14)
+    ctx.fillStyle = '#9FC3E0'
+    ctx.fillText(valS, bx + 8, by + 28)
+  }
+}
+
+// 鼠标位置 → 最近数据点下标（数据点沿 x 均匀分布，直接按公式反推）
+function onMove(e) {
+  if (!props.hover || !geom || !cv.value) return
+  const rect = cv.value.getBoundingClientRect()
+  const mx = e.clientX - rect.left
+  const { padL, wInner, n } = geom
+  const i = n === 1 ? 0 : Math.round((mx - padL - 2) / (wInner - 4) * (n - 1))
+  const clamped = Math.max(0, Math.min(n - 1, i))
+  if (clamped !== hoverI) { hoverI = clamped; draw() }
+}
+function onLeave() {
+  if (hoverI !== -1) { hoverI = -1; draw() }
 }
 
 // y 轴刻度：按量级自适应小数位
@@ -181,12 +235,22 @@ function hexA(hex, a) {
 
 onMounted(() => {
   draw()
+  const el = cv.value
+  el.addEventListener('mousemove', onMove)
+  el.addEventListener('mouseleave', onLeave)
   if (window.ResizeObserver) {
     ro = new ResizeObserver(() => draw())
-    ro.observe(cv.value.parentElement || cv.value)
+    ro.observe(el.parentElement || el)
   }
 })
-onBeforeUnmount(() => { if (ro) ro.disconnect() })
+onBeforeUnmount(() => {
+  if (ro) ro.disconnect()
+  const el = cv.value
+  if (el) {
+    el.removeEventListener('mousemove', onMove)
+    el.removeEventListener('mouseleave', onLeave)
+  }
+})
 watch(() => props.data, () => nextTick(draw), { deep: true })
 watch(() => props.color, () => draw())
 watch(() => props.height, () => draw())
@@ -195,4 +259,5 @@ watch(() => props.axis, () => draw())
 
 <style scoped>
 .trend { display: block; width: 100%; }
+.trend.hoverable { cursor: crosshair; }
 </style>
