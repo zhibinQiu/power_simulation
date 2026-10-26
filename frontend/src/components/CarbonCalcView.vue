@@ -166,22 +166,17 @@ const standards = [
     id: 'market',
     code: '全国碳市场',
     sub: '生态环境部令第19号',
-    title: '全国碳市场 钢铁行业管控口径',
-    desc: '全国碳市场对钢铁行业的管控范围，仅覆盖烧结/球团、焦化、炼铁、炼钢（转炉）等核心工序的直接排放，轧钢等间接排放工序暂不纳入管控。',
+    title: '全国碳市场 钢铁行业核算口径',
+    desc: '全国碳市场钢铁行业核算口径，覆盖烧结/球团、焦化、炼铁、炼钢、轧钢等各工序的直接排放（Scope 1）。',
+    // 不再区分「管控 / 豁免 非管控」：全口径按 Scope 1 工序直接排放汇总
     tags: [
-      { label: 'Scope 1 管控工序直接排放', type: 's1', key: 'controlled' },
-      { label: '豁免 非管控工序', type: 'exempt', key: 'exempt' },
+      { label: 'Scope 1 直接排放', type: 's1', key: 'scope1' },
     ],
     icon: '<path d="M3 3v18h18"/><path d="M7 16l4-6 4 4 5-8"/>',
   },
 ]
 
 const current = computed(() => standards.find(s => s.id === selected.value) || standards[0])
-
-const controlledTypes = new Set([
-  'sinter_plant', 'pelletizing', 'coke_oven', 'blast_furnace',
-  'hydrogen_bf', 'smelting_reduction', 'bof', 'aod'
-])
 
 const processKeywords = ['分解', '电极', '金属料脱碳', '残碳氧化', '脱碳(不锈钢)', '碳酸']
 function isProcessItem(name) {
@@ -210,8 +205,6 @@ function unitRow(unit) {
   const total = direct + indirect
   const intensity = total / steel * 1000
   const gbt = classifyGbt(unit)
-  const controlled = controlledTypes.has(unit.type) ? direct : 0
-  const exempt = controlled ? 0 : direct
 
   return {
     name,
@@ -221,11 +214,8 @@ function unitRow(unit) {
     fuel: gbt.fuel,
     process: gbt.process,
     elec: gbt.elec,
-    controlled,
-    exempt,
     total,
     intensity,
-    control: controlled ? '管控' : '豁免',
   }
 }
 
@@ -237,8 +227,7 @@ const rows = computed(() => {
 const totalRow = computed(() => {
   const init = {
     scope1: 0, scope2: 0, scope3: 0,
-    fuel: 0, process: 0, elec: 0,
-    controlled: 0, exempt: 0, total: 0,
+    fuel: 0, process: 0, elec: 0, total: 0,
   }
   for (const r of rows.value) {
     for (const k of Object.keys(init)) init[k] += r[k] || 0
@@ -266,8 +255,7 @@ const columnSet = {
   ],
   market: [
     { key: 'name', label: '工序设备', align: 'left' },
-    { key: 'controlled', label: '管控工序直接排放', align: 'right' },
-    { key: 'exempt', label: '非管控工序直接排放', align: 'right' },
+    { key: 'scope1', label: 'Scope 1 直接排放', align: 'right' },
     { key: 'total', label: '合计排放', align: 'right' },
     { key: 'intensity', label: '吨钢排放', align: 'right' },
   ],
@@ -279,7 +267,7 @@ const columns = computed(() => {
 
 function cardValue(id) {
   if (!result.value) return 0
-  if (id === 'market') return totalRow.value.controlled
+  if (id === 'market') return totalRow.value.scope1
   return result.value.totals?.co2_total || 0
 }
 
