@@ -14,7 +14,7 @@
                  @keyup.enter="doSearch" @input="onSearchInput" />
           <button v-if="q" class="kb-search-clear" @click="clearSearch" :title="t('清除搜索')">×</button>
         </div>
-        <button class="x-btn lg" @click="close" :aria-label="t('关闭')">×</button>
+        <button class="x-btn lg kb-close" @click="close" :aria-label="t('关闭')">×</button>
       </div>
 
       <div class="kb-body">
@@ -33,7 +33,9 @@
                 <button class="kb-mini" @click.stop="onNewFolder('/')" :title="t('新建文件夹')">＋</button>
               </span>
             </div>
-            <div v-for="ch in rootChildren" :key="ch.path" class="kb-branch">
+            <!-- 根节点的折叠三角（toggle('/')）只改 expanded 状态，子树必须跟着显隐；
+                 用 v-show 而非 v-if：折叠不销毁 FolderNode，展开/选中状态保留 -->
+            <div v-for="ch in rootChildren" :key="ch.path" class="kb-branch" v-show="expanded.has('/')">
               <FolderNode :node="ch" :depth="1" :expanded="expanded" :current="current"
                           @select="selectFolder" @toggle="toggle" @new-folder="onNewFolder"
                           @rename-folder="onRenameFolder" @remove-folder="onRemoveFolder" />
@@ -528,9 +530,12 @@ onMounted(refresh)
 
 <style scoped>
 .kb-mask { position: fixed; inset: 0; background: rgba(16,24,34,.5); display: flex; align-items: center; justify-content: center; z-index: 300; }
-.kb-modal { width: 980px; max-width: 96vw; height: 660px; max-height: 92vh; background: var(--panel);
+.kb-modal { position: relative; width: 980px; max-width: 96vw; height: 660px; max-height: 92vh; background: var(--panel);
   border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 20px 60px rgba(0,0,0,.35);
   display: flex; flex-direction: column; overflow: hidden; color: var(--text); font-family: var(--ui); }
+/* 关闭按钮固定在对话框右上角：head 内容（标题+统计+搜索）远短于 modal 宽度，
+   放在 flex 行尾会停在标题栏中段而不是右上角 */
+.kb-close { position: absolute; top: 8px; right: 10px; z-index: 2; }
 
 /* —— 头部 —— */
 .kb-head { display: flex; align-items: center; gap: 12px; padding: 10px 14px; 
@@ -554,16 +559,20 @@ onMounted(refresh)
  display: flex; align-items: center; justify-content: space-between; padding: 8px 10px;
   font-size: 12px; color: var(--muted);  }
 .kb-tree { flex: 1; overflow-y: auto; padding: 6px 4px; }
-.kb-node { display: flex; align-items: center; gap: 4px; padding: 5px 8px; border-radius: 4px; cursor: pointer;
+/* 树节点内部样式一律 :deep()：FolderNode 由渲染函数 h() 生成，scoped 的 data-v 属性
+   只会落到子组件根节点，不会落到 .kb-node / .kb-node-ops / .kb-mini 这些内部元素上。
+   不加深穿的话，子文件夹行会退回全局 button 尺寸（24px），且 .kb-node-ops 的
+   display:none + hover 显示失效（操作按钮常显）。模板里的根节点/侧栏按钮同样命中，无回归。 */
+:deep(.kb-node) { display: flex; align-items: center; gap: 4px; padding: 5px 8px; border-radius: 4px; cursor: pointer;
   font-size: 13px; color: var(--text); }
-.kb-node:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.kb-node.active { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-d); font-weight: 600; }
-.kb-twist { width: 14px; flex: none; font-size: 11px; color: var(--faint); text-align: center; user-select: none; }
-.kb-folder-ico { flex: none; color: var(--yellow); font-size: 13px; }
-.kb-node-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kb-node-count { flex: none; font-size: 10px; color: var(--faint); font-family: var(--mono); }
-.kb-node-ops { flex: none; display: none; gap: 2px; }
-.kb-node:hover .kb-node-ops { display: flex; }
+:deep(.kb-node:hover) { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+:deep(.kb-node.active) { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-d); font-weight: 600; }
+:deep(.kb-twist) { width: 14px; flex: none; font-size: 11px; color: var(--faint); text-align: center; user-select: none; }
+:deep(.kb-folder-ico) { flex: none; color: var(--yellow); font-size: 13px; }
+:deep(.kb-node-name) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:deep(.kb-node-count) { flex: none; font-size: 10px; color: var(--faint); font-family: var(--mono); }
+:deep(.kb-node-ops) { flex: none; display: none; gap: 2px; }
+:deep(.kb-node:hover .kb-node-ops) { display: flex; }
 .kb-empty-side { padding: 18px 12px; font-size: 12px; color: var(--faint); text-align: center; }
 .kb-side-tip { padding: 8px 10px; border-top: 1px solid var(--line-soft); font-size: 11px; color: var(--faint); line-height: 1.5; }
 .kb-tip-llm { color: var(--accent-d); font-family: var(--mono); font-weight: 600; letter-spacing: .5px; margin-right: 4px; }
@@ -602,11 +611,13 @@ onMounted(refresh)
 .kb-doc-ops { flex: none; display: none; gap: 2px; }
 .kb-doc:hover .kb-doc-ops { display: flex; }
 
-/* 通用小按钮 */
-.kb-mini { width: var(--btn-h-sm); height: var(--btn-h-sm); display: inline-flex; align-items: center; justify-content: center; font-size: 12px;
+/* 通用小按钮（目录树节点的 ＋/✎/✕ 与侧栏头部 ＋）：比全局紧凑档再小一号，
+   与 13px 的树节点文字同量级，避免操作按钮在节点行里喧宾夺主。
+   注意全局 button 有 min-height: var(--btn-h)，必须一并覆盖，否则 height 会被顶回 24px */
+:deep(.kb-mini) { width: 16px; min-width: 16px; height: 16px; min-height: 16px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px;
   color: var(--muted); background: transparent; border: none; border-radius: 3px; cursor: pointer; padding: 0; }
-.kb-mini:hover { color: var(--accent-d); background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.kb-mini.danger:hover { color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
+:deep(.kb-mini:hover) { color: var(--accent-d); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+:deep(.kb-mini.danger:hover) { color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
 .kb-btn { padding: 0 var(--btn-pad-x-lg); min-height: var(--btn-h-lg); min-width: var(--btn-min-w); font-size: 12px; font-family: var(--ui); border-radius: 4px; cursor: pointer;
   color: var(--text); background: var(--btn-bg); border: 1px solid var(--border); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 .kb-btn:hover { border-color: var(--accent); color: var(--accent-d); }
