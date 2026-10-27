@@ -4779,9 +4779,13 @@ export const useSimStore = defineStore('sim', {
       }
     },
     _pushModelToFeed() {
+      // 推送前与 api.simulate 一样先做设备设定值/驱动连线桥接（_applyDeviceOpParams 返回浅拷贝，不污染源 model）。
+      // 否则后端 ws_feed 的实时仿真仍按原始参数（如电耗 28）计算，
+      // 「实时排放」不会随可调设备（变频器等）的设定值更新，与基线「总排放」口径不一致。
+      const model = this._applyDeviceOpParams(this.model)
       for (const c of this._conns || []) {
         if (c.ws && c.ws.readyState === 1) {
-          try { c.ws.send(JSON.stringify({ type: 'model', model: this.model })) } catch (e) {}
+          try { c.ws.send(JSON.stringify({ type: 'model', model })) } catch (e) {}
         }
       }
     },
