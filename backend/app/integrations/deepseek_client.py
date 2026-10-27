@@ -14,8 +14,19 @@ from app.domain.strategy.llm_strategy import chat_completion as _chat_completion
 
 
 def is_configured() -> bool:
-    """是否配置了 LLM API Key（环境变量或 config/.env）。"""
-    return bool(os.getenv("LLM_API_KEY", "").strip())
+    """是否配置了 LLM API Key。
+
+    取值口径必须与 llm_strategy._llm_cfg 一致（动态配置 > 环境变量 > 默认值），
+    否则「config/llm_cfg.json 或设置页里填了 key、但进程环境变量没写」时会被误判为
+    未配置，报告直接落到兜底文本。JsonCfgStore.get() 本身不写回 os.environ，
+    只有 save() 才写，所以这里不能只看环境变量。
+    """
+    try:
+        from app.settings.llm_settings import get_llm_cfg
+
+        return bool(str(get_llm_cfg().get("api_key") or "").strip())
+    except Exception:  # noqa: BLE001 —— 配置读取异常时回退环境变量，不阻断调用
+        return bool(os.getenv("LLM_API_KEY", "").strip())
 
 
 def _choice(message: str) -> Dict[str, Any]:
@@ -73,7 +84,9 @@ async def chat_completion_stream_parts(
         yield {"kind": "error", "text": "语言模型未配置"}
         return
     if unlimited_output:
-        max_tokens = max(max_tokens, 4096)
+        # 长文场景（履约综合分析等八章报告）需要远大于 4K 的输出预算，
+        # deepseek-reasoner 单次输出上限 64K，这里取 16K 兼顾完整性与等待时长。
+        max_tokens = max(max_tokens, 16384)
     text = _chat_completion_sync(messages, timeout=timeout, max_tokens=max_tokens)
     if not text:
         yield {"kind": "error", "text": "语言模型调用失败或无返回"}

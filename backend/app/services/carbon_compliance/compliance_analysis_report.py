@@ -66,6 +66,15 @@ def _plans_md(plans: list[dict[str, Any]]) -> str:
             f"净节约：{_fmt_num(p.get('net_saving'))} 元；"
             f"窗口：{zh(TIME_WINDOW_LABELS, p.get('time_window'))}"
         )
+        # 成本被合规规则清零时必须写清原因，否则"0 元"会被误读成"不花钱"
+        _planned = p.get("planned_cost")
+        _issues = (p.get("compliance") or {}).get("issues") or []
+        if _issues:
+            _msg = "；".join(str(i.get("message") or "") for i in _issues if i.get("message"))
+            lines.append(
+                f"- 合规拦截：该方案有动作未通过合规校验，可执行成本按 {_fmt_num(p.get('total_cost'))} 元计；"
+                f"拦截前计划成本 {_fmt_num(_planned)} 元；原因：{_msg}"
+            )
         actions = p.get("actions") or []
         if actions:
             lines.append("")
@@ -224,6 +233,7 @@ async def build_compliance_factsheet(
             db,
             industry_label=industry_label,
             compliance_year=compliance_year,
+            industry=industry,
             max_items=16,
             read_full=10,
             social_max=8,
@@ -295,15 +305,26 @@ async def build_compliance_factsheet(
         f"CCER 持仓记录：{len(ccer_rows)}\n"
     )
 
+    # 缺口口径：compliance_gap 已是「扣减自有 CCER（≤5% 抵销上限）」后的净缺口，
+    # 报告里同时给出抵扣前缺口与动用/上限，便于逐步核对。
+    acc_gap = float(accounting.get("compliance_gap") or 0)
+    acc_offset = float(accounting.get("own_ccer_usable") or 0)
+    _raw_gap = accounting.get("gap_before_ccer")
+    acc_gap_gross = float(_raw_gap) if _raw_gap is not None else acc_gap + acc_offset
+    acc_ratio = float(accounting.get("ccer_max_ratio") or 0.05)
+
     parts.append("\n## 二、履约核算结果\n")
     parts.append(
         "### 计算过程\n"
-        "- 可用 CEA = 当年分配 + 结转量\n"
-        "- 履约缺口 = 核查排放 − 可用 CEA（负值表示盈余）\n"
+        "- 可用 CEA = 当年分配 + 结转量（已并入买入、卖出流水）\n"
+        "- 抵扣前缺口 = 核查排放 − 可用 CEA（负值表示盈余）\n"
         "- 台账可抵扣 CCER = 未过期且非绿证双计的持仓可抵扣量之和（且不超过持有存量）\n"
-        "- 本履约可动用 CCER = min(台账可抵扣, CCER 上限, max(履约缺口, 0))；"
+        f"- CCER 抵销上限 = 应清缴碳排放配额（核查排放）× {acc_ratio * 100:.0f}% = "
+        f"{_fmt_wan(accounting.get('ccer_cap'))} 万吨"
+        "（政策：重点排放单位每年使用 CCER 抵销的比例不得超过应清缴配额的 5%）\n"
+        "- 本履约可动用 CCER = min(台账可抵扣, CCER 抵销上限, max(抵扣前缺口, 0))；"
         "盈余企业为 0\n"
-        "- 扣自有 CCER 后缺口 = 履约缺口 − 本履约可动用 CCER\n\n"
+        "- 履约缺口 = 抵扣前缺口 − 本履约可动用 CCER（已扣 CCER）\n\n"
     )
     parts.append(
         f"| 指标 | 数值 |\n|---|---:|\n"
@@ -311,11 +332,12 @@ async def build_compliance_factsheet(
         f"| 可用 CEA 合计(万吨) | {_fmt_wan(accounting.get('free_cea_quota'))} |\n"
         f"| 其中当年分配(万吨) | {_fmt_wan(accounting.get('allocated_free_cea'))} |\n"
         f"| 其中结转量(万吨) | {_fmt_wan(accounting.get('carry_forward_qty'))} |\n"
-        f"| 履约缺口(万吨) | {_fmt_wan(accounting.get('compliance_gap'))} |\n"
-        f"| CCER 上限(万吨) | {_fmt_wan(accounting.get('ccer_cap'))} |\n"
+        f"| 抵扣前缺口(万吨) | {_fmt_wan(acc_gap_gross)} |\n"
+        f"| CCER 抵销比例（占应清缴配额） | {acc_ratio * 100:.0f}% |\n"
+        f"| CCER 抵销上限(万吨) | {_fmt_wan(accounting.get('ccer_cap'))} |\n"
         f"| 台账可抵扣 CCER(万吨) | {_fmt_wan(accounting.get('own_ccer_eligible'))} |\n"
         f"| 本履约可动用 CCER(万吨) | {_fmt_wan(accounting.get('own_ccer_usable'))} |\n"
-        f"| 扣自有 CCER 后缺口(万吨) | {_fmt_wan(accounting.get('residual_gap_after_own_ccer'))} |\n"
+        f"| 履约缺口(已扣 CCER, 万吨) | {_fmt_wan(accounting.get('compliance_gap'))} |\n"
     )
 
     if carry_info:
@@ -428,10 +450,11 @@ async def build_compliance_factsheet(
     }
 
 
-def _analysis_system_prompt(*, subject: str, year: int) -> str:
+def _analysis_system_prompt(*, subject: str, year: int, report_type: str = "compliance_analysis") -> str:
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    heading = report_heading_of(report_type)
     return (
-        f"你是全国碳市场控排企业履约顾问，正在为「{subject}」出具 {year} 年履约综合分析报告。\n"
+        f"你是全国碳市场控排企业履约顾问，正在为「{subject}」出具 {year} 年{heading}。\n"
         f"生成时间：{now}\n"
         "硬约束：\n"
         "1. 仅基于用户提供的事实底稿与结构化数字，禁止编造碳价、政策条文、排放量或成本。\n"
@@ -448,7 +471,7 @@ def _analysis_system_prompt(*, subject: str, year: int) -> str:
         "「正文不入报告」「事实底稿附录」等过程性提示。\n"
         "8. 履约缺口、结转上限等须保留简明计算过程（可用编号步骤）。\n"
         "9. 输出纯 Markdown，必须包含以下标题（顺序可微调但不可缺）：\n"
-        f"# 「{subject}」{year} 履约综合分析报告\n\n"
+        f"{_report_header(subject, year, report_type)}\n\n"
         "## 先看结论\n"
         "## 分析所用关键数据\n"
         "## 企业与履约形势研判\n"
@@ -519,6 +542,28 @@ def _is_leak_para(para: str) -> bool:
     return False
 
 
+def _drop_duplicate_h1(body: str) -> str:
+    """去掉正文中与首个一级标题完全相同的重复 H1。
+
+    系统已在正文最前面写入 ``_report_header()``，而提示词又要求模型「必须包含该标题」，
+    模型通常会照抄一遍，导致报告出现两个相同的一级标题。
+    """
+    lines = (body or "").split("\n")
+    title = ""
+    out: list[str] = []
+    for ln in lines:
+        stripped = ln.strip()
+        if stripped.startswith("# ") and not stripped.startswith("## "):
+            if not title:
+                title = stripped
+                out.append(ln)
+                continue
+            if stripped == title:
+                continue
+        out.append(ln)
+    return "\n".join(out)
+
+
 def _polish_report_text(text: str) -> str:
     """清洗提示词/思考链泄漏段落，并统一 Markdown 排版（分段、压缩空行、标题前空行、去行尾空格）。"""
     paras = re.split(r"\n\s*\n", (text or ""))
@@ -528,6 +573,7 @@ def _polish_report_text(text: str) -> str:
     body = re.sub(r"\n{3,}", "\n\n", body)
     body = re.sub(r"[ \t]+\n", "\n", body)
     body = re.sub(r"(?<!^)\n(#{1,4}\s)", r"\n\n\1", body)
+    body = _drop_duplicate_h1(body)
     return body
 
 
@@ -540,12 +586,49 @@ def _apply_sources_footer(text: str, sources_md: str) -> str:
     return body + "\n\n## 信息来源\n\n本次无外部可核验链接来源。\n"
 
 
+# 三类报告共用同一套企业台账流水线，但正文标题要跟着类型走，
+# 否则「碳交易简报」的正文里会自称「履约综合分析报告」
+_REPORT_TYPE_HEADINGS = {
+    "compliance_analysis": "履约综合分析报告",
+    "market_brief": "碳交易市场简报",
+    "policy_digest": "双碳政策动态摘要",
+}
+
+
+def report_heading_of(report_type: str) -> str:
+    """报告类型 → 正文标题后缀（未知类型回退履约综合分析）。"""
+    return _REPORT_TYPE_HEADINGS.get(str(report_type or ""), _REPORT_TYPE_HEADINGS["compliance_analysis"])
+
+
+# 标题去重用的别名：前端默认标题里的类型词与正文标题后缀并不完全一致
+# （如「碳资产管理综合分析」vs「履约综合分析报告」），逐个类型列出可识别的说法
+_REPORT_TYPE_ALIASES = {
+    "compliance_analysis": ("履约综合分析", "综合分析"),
+    "market_brief": ("碳交易", "市场简报"),
+    "policy_digest": ("政策摘要", "政策动态", "政策"),
+}
+
+
+def _report_header(subject: str, year: int, report_type: str) -> str:
+    """正文一级标题。前端默认标题已经带了年份和类型词（如「2026年度 碳交易市场简报」），
+    此时直接用它，避免拼出「…碳交易市场简报」2026 碳交易市场简报」这种重复。"""
+    heading = report_heading_of(report_type)
+    sub = str(subject or "").strip()
+    if not sub:
+        return f"# {year} {heading}"
+    aliases = _REPORT_TYPE_ALIASES.get(str(report_type or ""), ())
+    if heading in sub or heading.replace("报告", "") in sub or any(a in sub for a in aliases):
+        return f"# 「{sub}」"
+    return f"# 「{sub}」{year} {heading}"
+
+
 async def synthesize_compliance_analysis_stream(
     *,
     subject: str,
     compliance_year: int,
     factsheet_md: str,
     sources_md: str = "",
+    report_type: str = "compliance_analysis",
     on_progress: ProgressFn | None = None,
     on_content: ContentFn | None = None,
 ) -> str:
@@ -559,7 +642,7 @@ async def synthesize_compliance_analysis_stream(
     if on_progress:
         on_progress(78, "正在由 AI 综合撰写分析报告…")
 
-    header = f"# 「{subject}」{compliance_year} 履约综合分析报告\n\n"
+    header = _report_header(subject, compliance_year, report_type) + "\n\n"
     buf = [header]
     if on_content:
         on_content("".join(buf))
@@ -569,7 +652,7 @@ async def synthesize_compliance_analysis_stream(
     messages = [
         {
             "role": "system",
-            "content": _analysis_system_prompt(subject=subject, year=compliance_year),
+            "content": _analysis_system_prompt(subject=subject, year=compliance_year, report_type=report_type),
         },
         {
             "role": "user",
@@ -640,7 +723,7 @@ async def synthesize_compliance_analysis_stream(
     if not got or len(text) < len(header) + 80:
         reason = stream_err or "模型未返回有效正文"
         text = (
-            f"# 「{subject}」{compliance_year} 履约综合分析报告\n\n"
+            f"{_report_header(subject, compliance_year, report_type)}\n\n"
             "## 先看结论\n\n"
             f"- 本次未能完成 AI 叙事生成（{reason}）。\n"
             "- 请结合三档策略表与政策摘要审慎决策。\n\n"
@@ -674,6 +757,7 @@ async def run_compliance_analysis_report(
     enterprise_id = str(ent_id_raw)
     year = int(ctx.get("compliance_year") or report.target_year or datetime.now().year)
     method = str(ctx.get("forecast_method") or "rule")
+    report_type = str(ctx.get("report_type") or "compliance_analysis")
 
     pack = await build_compliance_factsheet(
         db,
@@ -685,7 +769,7 @@ async def run_compliance_analysis_report(
     )
     on_progress(72, "事实底稿已就绪，开始综合分析…")
     on_content(
-        f"# 「{report.subject}」{year} 履约综合分析报告\n\n"
+        f"{_report_header(report.subject, year, report_type)}\n\n"
         "## 先看结论\n\n- 正在生成 AI 综合研判…\n\n"
         + pack["factsheet_md"]
     )
@@ -695,6 +779,7 @@ async def run_compliance_analysis_report(
         compliance_year=year,
         factsheet_md=pack["factsheet_md"],
         sources_md=str(pack.get("sources_md") or ""),
+        report_type=report_type,
         on_progress=on_progress,
         on_content=on_content,
     )

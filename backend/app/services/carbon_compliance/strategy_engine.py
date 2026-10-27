@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from app.services.carbon_compliance.accounting import AccountingResult
@@ -22,10 +22,32 @@ from app.services.carbon_compliance.units import (
 )
 
 
+# (key, 标题, 说明, 风险画像, 渠道口径)
+# 三档必须独立计算，否则三张卡片的成本必然一模一样：
+#   画像   决定「允许哪些动作」（保守不外购CCER/不卖富余/不囤存；进取全开）
+#   渠道口径 决定「同一动作的单价假设」（线下撮合有折扣，挂牌没有）
 PLAN_SPECS = (
-    ("min_cost", "最低成本履约方案", "仅 CEA+CCER 满足清缴刚需，优先线下撮合降本"),
-    ("optimized", "成本优化综合方案", "CEA+CCER + 择时窗口，线下优先、线上挂牌兜底"),
-    ("full_compliance", "稳健履约方案", "CEA+CCER 全覆盖，含囤存/出售等画像允许动作"),
+    (
+        "min_cost",
+        "最低成本履约方案",
+        "仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）",
+        "conservative",
+        "offline",
+    ),
+    (
+        "optimized",
+        "成本优化综合方案",
+        "CEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）",
+        "balanced",
+        "hybrid",
+    ),
+    (
+        "full_compliance",
+        "稳健履约方案",
+        "CEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）",
+        "aggressive",
+        "listed",
+    ),
 )
 
 
@@ -52,9 +74,28 @@ def _profile(settings: dict, risk: str) -> dict:
     return deep_merge(base, profiles.get(risk) or {})
 
 
-def _channel_cfg(settings: dict) -> dict:
-    base = (default_settings().get("channel") or {})
-    return deep_merge(base, settings.get("channel") or {})
+def _channel_cfg(settings: dict, mode: str = "offline") -> dict:
+    """渠道口径 → 单价假设。
+
+    - offline：线下撮合为主，用配置的折价（offline_discount_vs_listed）
+    - hybrid：线下为主、线上挂牌兜底，折价按对折计（成交量一半走线下）
+    - listed：按公开日均/预测参考价挂牌成交，不打折（履约确定性最高）
+
+    公开侧无实时挂单，以上折扣是估算假设，不是盘口。
+    """
+    merged = deep_merge(
+        default_settings().get("channel") or {}, settings.get("channel") or {}
+    )
+    prefer = bool(merged.get("prefer_offline", True))
+    discount = max(0.0, min(0.3, float(merged.get("offline_discount_vs_listed") or 0.0)))
+    if not prefer or mode == "listed":
+        return {**merged, "prefer_offline": False, "offline_discount_vs_listed": 0.0}
+    ratio = 0.5 if mode == "hybrid" else 1.0
+    return {
+        **merged,
+        "prefer_offline": True,
+        "offline_discount_vs_listed": round(discount * ratio, 6),
+    }
 
 
 def _ref_price(listed: float, predicted: float | None) -> float:
@@ -103,11 +144,14 @@ def _channel_note(meta: dict, instrument: str) -> str:
     )
 
 
-def _build_core_actions(ctx: StrategyContext) -> list[PlanAction]:
+def _build_core_actions(
+    ctx: StrategyContext, channel: dict | None = None
+) -> list[PlanAction]:
     acc = ctx.accounting
     mkt = ctx.market
     prof = _profile(ctx.settings, ctx.risk_profile)
-    channel = _channel_cfg(ctx.settings)
+    if channel is None:
+        channel = _channel_cfg(ctx.settings)
     listing_fee, block_fee = resolve_fee_rates(ctx.settings.get("cost"))
     actions: list[PlanAction] = []
 
@@ -291,53 +335,96 @@ def _build_core_actions(ctx: StrategyContext) -> list[PlanAction]:
     return [a for a in actions if a.qty > 0 or a.meta.get("informational")]
 
 
+def _plan_cost(
+    actions: list[PlanAction], *, listing_fee: float, block_fee: float
+) -> float:
+    """计划现金成本：买入应付为正、卖出实收为负（净支出口径）。"""
+    total = 0.0
+    for a in actions:
+        rate = float(a.meta.get("fee_rate") or 0)
+        if not rate:
+            rate = fee_rate_for_channel(
+                a.meta.get("channel"),
+                listing_fee_rate=listing_fee,
+                block_fee_rate=block_fee,
+            )
+        if a.action.startswith("sell"):
+            total -= trade_cash_cny(a.qty, a.unit_price, fee_rate=rate, side="sell")
+        else:
+            total += trade_cash_cny(a.qty, a.unit_price, fee_rate=rate, side="buy")
+    return total
+
+
 def generate_plans(ctx: StrategyContext) -> list[dict[str, Any]]:
     compliance_cfg = ctx.settings.get("compliance") or {}
     listing_fee, block_fee = resolve_fee_rates(ctx.settings.get("cost"))
     large_split = float(compliance_cfg.get("large_trade_split_threshold") or 5.0)
     single = float(ctx.single_trade_limit or 0)
     budget = ctx.annual_budget_cap
-    channel = _channel_cfg(ctx.settings)
-
-    # 三套方案目前共享同一 CEA+CCER 动作集；差异体现在画像与文案分层
-    raw_actions = _build_core_actions(ctx)
-    trade_actions = [a for a in raw_actions if not a.meta.get("informational")]
-    info_actions = [a for a in raw_actions if a.meta.get("informational")]
-    filtered = filter_plan_actions(
-        trade_actions,
-        ccer_cap=ctx.accounting.ccer_cap,
-        annual_budget_cap=budget,
-        single_trade_limit=single,
-        large_split_threshold=large_split,
-        listing_fee_rate=listing_fee,
-        block_fee_rate=block_fee,
-    )
-    all_actions = filtered.actions + info_actions
-    net_save = 0.0
-    for a in filtered.actions:
-        rate = float(a.meta.get("fee_rate") or 0)
-        if a.action == "sell_cea":
-            # 卖出实收（成交总额 − 手续费）计入净节约
-            net_save += trade_cash_cny(a.qty, a.unit_price, fee_rate=rate, side="sell")
-        # 线下相对公开参考价的假定节省
-        listed = a.meta.get("listed_ref_price")
-        if (
-            a.action in ("buy_cea", "buy_ccer")
-            and listed is not None
-            and a.meta.get("channel") == "offline_preferred"
-        ):
-            net_save += cash_cny(a.qty, max(0.0, float(listed) - float(a.unit_price)))
 
     plans: list[dict[str, Any]] = []
-    for key, title, desc in PLAN_SPECS:
+    for key, title, desc, profile_name, channel_mode in PLAN_SPECS:
+        # 每一档独立代入「画像 + 渠道口径」重新生成动作并独立过滤，
+        # 这样保守/平衡/进取的动作清单与成本才可能真正不同。
+        plan_ctx = replace(ctx, risk_profile=profile_name) if profile_name else ctx
+        channel = _channel_cfg(ctx.settings, channel_mode)
+
+        raw_actions = _build_core_actions(plan_ctx, channel=channel)
+        trade_actions = [a for a in raw_actions if not a.meta.get("informational")]
+        info_actions = [a for a in raw_actions if a.meta.get("informational")]
+        # 拦截前的全额测算：预算/CCER 上限把动作拦住时，UI 仍能显示「本来要花多少」
+        planned_cost = _plan_cost(
+            trade_actions, listing_fee=listing_fee, block_fee=block_fee
+        )
+        filtered = filter_plan_actions(
+            trade_actions,
+            ccer_cap=ctx.accounting.ccer_cap,
+            annual_budget_cap=budget,
+            single_trade_limit=single,
+            large_split_threshold=large_split,
+            listing_fee_rate=listing_fee,
+            block_fee_rate=block_fee,
+        )
+        all_actions = filtered.actions + info_actions
+
+        net_save = 0.0
+        for a in filtered.actions:
+            rate = float(a.meta.get("fee_rate") or 0)
+            if a.action == "sell_cea":
+                # 卖出实收（成交总额 − 手续费）计入净节约
+                net_save += trade_cash_cny(a.qty, a.unit_price, fee_rate=rate, side="sell")
+            # 线下相对公开参考价的假定节省
+            listed = a.meta.get("listed_ref_price")
+            if (
+                a.action in ("buy_cea", "buy_ccer")
+                and listed is not None
+                and a.meta.get("channel") == "offline_preferred"
+            ):
+                net_save += cash_cny(a.qty, max(0.0, float(listed) - float(a.unit_price)))
+
+        blocked = not filtered.ok and not filtered.actions
+        if not blocked and not any(a.action.startswith("buy") for a in filtered.actions):
+            filtered.notes.append(
+                "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，"
+                "现金成本与净节约均为 0，无需额外支出"
+            )
         plans.append(
             {
                 "key": key,
                 "title": title,
                 "description": desc,
+                "risk_profile": profile_name,
+                "channel_mode": channel_mode,
                 "actions": [a.to_dict() for a in all_actions],
                 "total_cost": filtered.total_cost,
+                # 拦截前的全额计划成本（total_cost 只统计通过合规过滤的动作）
+                "planned_cost": planned_cost,
                 "net_saving": net_save,
+                # 被合规规则整体拦下时明确标记，避免 UI 把 0 元误读成「不花钱」
+                "blocked": blocked,
+                # 整体被拦时仍透出原始动作：用户需要看到「本来要做什么、多少钱」才能
+                # 判断是不是预算/上限填错了，而不是只看到三个 0。
+                "planned_actions": [a.to_dict() for a in trade_actions] if blocked else [],
                 "compliance": {
                     "ok": filtered.ok,
                     "issues": [i.to_dict() for i in filtered.issues],
@@ -350,7 +437,14 @@ def generate_plans(ctx: StrategyContext) -> list[dict[str, Any]]:
                     "offline_discount_vs_listed": float(
                         channel.get("offline_discount_vs_listed") or 0
                     ),
-                    "price_note": "无实时挂单；成本按日均/预测价锚定，并假定线下更优",
+                    "price_note": (
+                        "无实时挂单；成本按日均/预测价锚定，"
+                        + (
+                            "线上挂牌口径不打折"
+                            if channel_mode == "listed"
+                            else "线下撮合按配置折扣估算"
+                        )
+                    ),
                     "listing_fee_rate": listing_fee,
                     "block_fee_rate": block_fee,
                 },

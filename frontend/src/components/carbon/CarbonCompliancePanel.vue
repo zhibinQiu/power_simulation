@@ -45,6 +45,13 @@ async function loadEnterprises() {
     if (selectedId.value) await loadSelected()
   } catch (e) { flashErr(e) }
 }
+// 切换企业：清掉上一次运行的快照，否则指标卡与方案卡会残留别的企业的数字
+function pickEnterprise(id) {
+  if (id === selectedId.value) return
+  selectedId.value = id
+  lastRun.value = null
+  loadSelected()
+}
 async function loadSelected() {
   if (!selectedId.value) return
   const id = selectedId.value
@@ -91,6 +98,13 @@ function tradeSum(rows) {
   }
   return { buy, sell, net: sell - buy }
 }
+// 成交金额（万元）= 数量(万吨) × 单价(元/吨)。1 万吨 = 10000 吨，1 万元 = 10000 元，
+// 两个 10000 正好抵消，所以这里不需要再乘/除 10000 —— 登记表单的即时预览与流水表「金额」列共用这个口径。
+function tradeAmountOf(form) {
+  const q = Number(form && form.qty) || 0
+  const p = Number(form && form.price) || 0
+  return q > 0 && p > 0 ? q * p : 0
+}
 // 流水也跟随年度作用域：否则切到某一年后，表格按年过滤而右上汇总仍是全量，两个数对不上
 const ceaScopedTrades = computed(() => (ceaScopeYear.value === ''
   ? ceaTrades.value
@@ -129,17 +143,39 @@ function ccerCurrentOf(row) {
   const base = Number(row.qty) || 0
   return base + ccerBuyOf(row) - ccerSellOf(row)
 }
-// 当前成本 = (签发量 × 手填成本 + 买入金额) / (签发量 + 买入量)：买入按流水单价加权摊入成本
-function ccerCostOf(row) {
-  const base = Number(row.qty) || 0
-  const buy = ccerBuyOf(row)
-  const agg = ccerTradeByType.value[ccerTradeTypeOf(row)]
-  const buyAmt = agg ? agg.buyAmt : 0
-  const cost0 = Number(row.cost) || 0
+// ---------------- 成本口径（单位必须对齐） ----------------
+// 数量一律「万吨」，单价/成本一律「元/吨」，由此：
+//   买入金额 = 买入量(万吨) × 单价(元/吨) = 万元（1 万吨×1 元/吨 恰好 1 万元，无需再乘 10000，
+//   与后端 units.notional_cny 的「万吨×10000×元/吨 = 元」是同一件事，只是这里用万元记账）
+//   平均成本 = 金额(万元) ÷ 数量(万吨) = 元/吨
+// 免费配额/签发量是「起点持仓」，一律按手填成本计入加权（没填就是 0 元/吨，等于零成本配额），
+// 所以平均成本只会被摊薄、不会凭空变高：210 万吨 0 元/吨 + 13 万吨 80 元/吨 → 4.66 元/吨。
+function blendedCost(baseQty, baseCost, buyQty, buyAmt) {
+  const base = Math.max(0, Number(baseQty) || 0)
+  const cost0 = Number(baseCost) || 0
+  const buy = Math.max(0, Number(buyQty) || 0)
+  const amt = Number(buyAmt) || 0
   const denom = base + buy
   if (denom <= 0) return 0
-  return (base * cost0 + buyAmt) / denom
+  return (base * cost0 + amt) / denom
 }
+// 当前成本 = (签发量 × 手填成本 + 买入金额) / (签发量 + 买入量)：买入按流水单价加权摊入成本
+function ccerCostOf(row) {
+  const agg = ccerTradeByType.value[ccerTradeTypeOf(row)]
+  return blendedCost(Number(row.qty) || 0, Number(row.cost) || 0, ccerBuyOf(row), agg ? agg.buyAmt : 0)
+}
+// 合计成本：按「可抵扣量」加权各行成本，与单行显示同口径
+const ccerScopedCost = computed(() => {
+  let q = 0
+  let c = 0
+  for (const r of ccerRows.value) {
+    const w = Math.max(0, ccerCurrentOf(r))
+    if (w <= 0) continue
+    q += w
+    c += w * ccerCostOf(r)
+  }
+  return q > 0 ? c / q : 0
+})
 // 悬空流水：project_type 没有对应持仓行的流水笔数（卖出/买入都不会体现在任何一行持仓上）
 const ccerOrphanTrades = computed(() => {
   const types = new Set(ccerRows.value.map(r => ccerTradeTypeOf(r)))
@@ -220,16 +256,15 @@ function ceaUsableOf(row) {
   const base = Math.max(free + carry, est > 0 ? est + carry : 0)
   return base - ceaNetSellOf(row).qty
 }
-// 当前平均成本 = (买入前可用量 × 手填成本 + 买入金额) / (买入前可用量 + 买入量)：买入按流水单价加权摊入
+// 当前平均成本（元/吨）= (买入前可用量(万吨) × 手填成本(元/吨) + 买入金额(万元)) ÷ (买入前可用量 + 买入量)(万吨)
+// 口径与 CCER 一致：免费配额（起点持仓）按手填成本计入，没填即 0 元/吨，会摊薄整体成本。
 function ceaCostOf(row) {
   const buy = ceaSellBuyOf(row).buy
   const agg = ceaTradeByYear.value[Number(row.vintage_year)]
   const buyAmt = agg ? agg.buyAmt : 0
   const cost0 = Number(row.avg_cost) || 0
   const baseBeforeBuy = ceaUsableOf(row) - buy  // 不含买入的可用量（买入前基数）
-  const denom = baseBeforeBuy + buy
-  if (denom <= 0) return 0
-  return (baseBeforeBuy * cost0 + buyAmt) / denom
+  return blendedCost(baseBeforeBuy, cost0, buy, buyAmt)
 }
 const ceaScopedUsable = computed(() => ceaScopedRows.value.reduce((s, r) => s + ceaUsableOf(r), 0))
 const ceaScopedFree = computed(() => ceaScopedRows.value.reduce((s, r) => s + (Number(r.free_quota) || 0), 0))
@@ -245,13 +280,15 @@ const ceaScopedBase = computed(() => ceaScopedRows.value.reduce((s, r) => {
 }, 0))
 const ceaScopedEst = computed(() => ceaScopedRows.value.reduce((s, r) => s + (Number(r.estimated_free_quota) || 0), 0))
 const ceaScopedCost = computed(() => {
-  // 平均成本按「可用量」加权：可用量为 0 的行不参与，避免 0 成本把整体拉平
+  // 合计平均成本与单行同口径（ceaCostOf 已含「免费配额起点 + 买入」加权），按该年可用配额加权。
+  // 原来只按手填 avg_cost 加权，有买入时合计恒为 0（显示「—」），与行内数字对不上。
   let q = 0
   let c = 0
   for (const r of ceaScopedRows.value) {
     const w = Math.max(0, ceaUsableOf(r))
+    if (w <= 0) continue
     q += w
-    c += w * (Number(r.avg_cost) || 0)
+    c += w * ceaCostOf(r)
   }
   return q > 0 ? c / q : 0
 })
@@ -666,7 +703,18 @@ async function delGreenCert(row) {
 const runYear = ref('')
 // 年度选择器的显示标签：全年度 / YYYY 年度（策略引擎页与运行按钮复用）
 const runYearLabel = computed(() => (runYear.value === '' ? t('全年度') : `${runYear.value} ${t('年度')}`))
-const planLabels = { conservative: '保守', balanced: '平衡', aggressive: '进取' }
+// 与后端 strategy_engine.PLAN_SPECS 的 key 一一对应：
+// 后端返回 min_cost / optimized / full_compliance，这里若写成 conservative/balanced/aggressive
+// 就会 find() 不到任何方案，三张卡片恒显示 0 元。
+const planLabels = {
+  min_cost: '最低成本履约方案',
+  optimized: '成本优化综合方案',
+  full_compliance: '稳健履约方案',
+}
+// 三档画像（与后端 plan.risk_profile 对应），保留旧的「保守/平衡/进取」说法
+const profileLabels = { conservative: '保守', balanced: '平衡', aggressive: '进取' }
+// 卡片配色沿用原样式类名
+const planClass = { min_cost: 'conservative', optimized: 'balanced', full_compliance: 'aggressive' }
 const actionLabels = { buy_cea: '购入 CEA', sell_cea: '出售 CEA', use_ccer: '使用自有 CCER', buy_ccer: '外购 CCER', hold: '持有不动', stockpile: '低位囤存' }
 async function runStrategy() {
   if (!selectedId.value) return flashErr(new Error(t('请先选择企业')))
@@ -722,12 +770,39 @@ const stats = computed(() => {
     return s + ceaUsableOf(r)
   }, 0)
   const ccer = ccerRows.value.reduce((s, r) => s + ccerCurrentOf(r), 0)
-  return { emissions: em, cea, ccer, gap: lastRun.value?.accounting_snapshot?.compliance_gap ?? null }
+  return { emissions: em, cea, ccer, gap: gapRun.value?.accounting_snapshot?.compliance_gap ?? null }
 })
 const gapClass = computed(() => {
   const g = stats.value.gap
   if (g === null) return ''
   return g > 0 ? 'gap-pos' : 'gap-neg'
+})
+// 缺口取数：优先本次运行的快照；刷新页面后 lastRun 为空，则回退到「当前年度作用域」下最近一次运行，
+// 否则指标卡会一直是「—」，与下方历史记录里已经算出的缺口自相矛盾。
+const gapRun = computed(() => {
+  if (lastRun.value) return lastRun.value
+  const y = runYear.value
+  const list = runs.value || []
+  return (
+    list.find(r =>
+      y === '' ? Number(r.compliance_year) === 0 : Number(r.compliance_year) === Number(y)
+    ) || null
+  )
+})
+// 缺口口径说明：现在缺口已扣除自有 CCER（受 5% 抵销上限约束）
+const gapHint = computed(() =>
+  t('履约缺口 = 应清缴碳排放配额 − 可用 CEA − 本履约可动用 CCER（CCER 抵销上限 = 应清缴配额 × 5%）')
+)
+// CCER 卡片提示：说明「存量 ≠ 可抵扣」——抵销上限是应清缴配额的 5%，且不超过缺口
+const ccerHint = computed(() => {
+  const em = stats.value.emissions
+  const cap = Math.max(0, em * 0.05)
+  const gap = Math.max(0, em - stats.value.cea)
+  const usable = Math.min(Math.max(0, stats.value.ccer), cap, gap)
+  return t(
+    'CCER 抵销上限 = 应清缴配额 {em} × 5% = {cap} 万吨；本履约最多可抵 {usable} 万吨（不超过缺口）',
+    { em: em.toFixed(1), cap: cap.toFixed(2), usable: usable.toFixed(2) }
+  )
 })
 // 当前页签的记录条数：显示在内容卡底部的页脚里，避免「表格上方有内容、下方空一大片」的失衡感
 const tabCount = computed(() => {
@@ -801,7 +876,7 @@ const tabCount = computed(() => {
             v-for="e in enterprises"
             :key="e.id"
             :class="{ active: e.id === selectedId }"
-            @click="selectedId = e.id; loadSelected()"
+            @click="pickEnterprise(e.id)"
           >
             <div class="li-title">{{ e.name }}</div>
             <div class="li-meta">{{ industryLabel(e.industry) }} · {{ e.market_start_year }} {{ t('纳入') }}</div>
@@ -856,12 +931,12 @@ const tabCount = computed(() => {
               </span>
               <span class="v">{{ stats.cea.toFixed(1) }}<em>{{ t('万吨') }}</em></span>
             </div>
-            <div class="stat s-ccer">
+            <div class="stat s-ccer" :title="ccerHint">
               <span class="k"><i class="dot"></i>CCER {{ t('存量') }}</span>
               <span class="v">{{ stats.ccer.toFixed(1) }}<em>{{ t('万吨') }}</em></span>
             </div>
-            <div class="stat s-gap" :class="gapClass || 'gap-na'">
-              <span class="k"><i class="dot"></i>{{ t('履约缺口') }}</span>
+            <div class="stat s-gap" :class="gapClass || 'gap-na'" :title="gapHint">
+              <span class="k"><i class="dot"></i>{{ t('履约缺口') }}<i class="k-scope">{{ t('已扣CCER') }}</i></span>
               <span class="v">{{ stats.gap === null ? '—' : stats.gap.toFixed(1) }}<em v-if="stats.gap !== null">{{ t('万吨') }}</em></span>
             </div>
           </div>
@@ -1012,7 +1087,7 @@ const tabCount = computed(() => {
                     {{ buyTextOf(r) }}<i v-if="ceaSellBuyOf(r).fromTrades && ceaSellBuyOf(r).buy !== 0" class="cea-tag src">{{ t('流水') }}</i>
                   </td>
                   <td class="n strong">{{ ceaUsableOf(r).toFixed(1) }}</td>
-                  <td class="n" :title="t('平均成本 = (买入前可用量 × 手填成本 + 买入金额) ÷ (买入前可用量 + 买入量)')">{{ ceaCostOf(r) > 0 ? ceaCostOf(r).toFixed(2) : '—' }}</td>
+                  <td class="n" :title="t('平均成本(元/吨) = (买入前可用量(万吨) × 手填成本(元/吨) + 买入金额(万元)) ÷ (买入前可用量 + 买入量)(万吨)；免费配额按手填成本计入（未填即 0 元/吨），买入按成交单价加权摊入')">{{ ceaCostOf(r) > 0 ? ceaCostOf(r).toFixed(2) : '—' }}</td>
                   <td class="row-ops">
                     <button class="link" @click="openDlg('cea', r)">{{ t('编辑') }}</button>
                     <button class="link danger" @click="delCea(r)">{{ t('删') }}</button>
@@ -1031,7 +1106,7 @@ const tabCount = computed(() => {
                   <td class="n">{{ numOrDash(ceaScopedSell) }}</td>
                   <td class="n">{{ numOrDash(ceaScopedBuy) }}</td>
                   <td class="n strong">{{ ceaScopedUsable.toFixed(1) }}</td>
-                  <td class="n">{{ ceaScopedCost > 0 ? ceaScopedCost.toFixed(1) : '—' }}</td>
+                  <td class="n">{{ ceaScopedCost > 0 ? ceaScopedCost.toFixed(2) : '—' }}</td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -1059,6 +1134,11 @@ const tabCount = computed(() => {
                 <label class="fld">
                   <span class="fl">{{ t('单价') }}<em>{{ t('元/吨') }}</em></span>
                   <input v-model.number="ceaTradeForm.price" type="number" />
+                  <!-- 单位换算直接显示：数量(万吨) × 单价(元/吨) = 金额(万元)，1 万吨×1 元/吨 = 1 万元 -->
+                  <em v-if="tradeAmountOf(ceaTradeForm) > 0" class="field-hint">
+                    {{ t('成交金额') }} {{ tradeAmountOf(ceaTradeForm).toFixed(1) }} {{ t('万元') }}
+                    <template v-if="ceaTradeForm.side === 'buy'">{{ t('（摊入平均成本）') }}</template>
+                  </em>
                 </label>
                 <label class="fld">
                   <span class="fl">{{ t('备注') }}</span>
@@ -1116,7 +1196,7 @@ const tabCount = computed(() => {
               {{ t('{n} 笔流水的项目类型无对应持仓，未计入', { n: ccerOrphanTrades.length }) }}
             </span>
             <table class="tbl-ops tbl-ccer">
-              <thead><tr><th>{{ t('项目类型') }}</th><th>{{ t('签发年') }}</th><th>{{ t('到期日') }}</th><th class="n">{{ t('签发量') }}</th><th class="n">{{ t('买入') }}</th><th class="n">{{ t('卖出') }}</th><th class="n">{{ t('可抵扣') }}</th><th class="n">{{ t('成本') }}</th><th>{{ t('绿证') }}</th><th></th></tr></thead>
+              <thead><tr><th>{{ t('项目类型') }}</th><th>{{ t('签发年') }}</th><th>{{ t('到期日') }}</th><th class="n">{{ t('签发量') }}</th><th class="n">{{ t('买入') }}</th><th class="n">{{ t('卖出') }}</th><th class="n">{{ t('可抵扣') }}</th><th class="n">{{ t('成本') }}<em>{{ t('元/吨') }}</em></th><th>{{ t('绿证') }}</th><th></th></tr></thead>
               <tbody>
                 <tr v-for="r in ccerRows" :key="r.id">
                   <td>{{ ccerTypeLabel(r.project_type) }}</td><td>{{ r.issue_year }}</td><td>{{ r.expire_at || '—' }}</td>
@@ -1124,7 +1204,7 @@ const tabCount = computed(() => {
                   <td class="n" :title="t('由该类型交易流水汇总')">{{ numOrDash(ccerBuyOf(r)) }}<i v-if="ccerBuyOf(r) !== 0" class="cea-tag src">{{ t('流水') }}</i></td>
                   <td class="n" :title="t('由该类型交易流水汇总')">{{ numOrDash(ccerSellOf(r)) }}<i v-if="ccerSellOf(r) !== 0" class="cea-tag src">{{ t('流水') }}</i></td>
                   <td class="n strong" :title="t('可抵扣 = 签发量 + 买入 − 卖出')">{{ ccerCurrentOf(r).toFixed(1) }}</td>
-                  <td class="n" :title="t('成本 = (签发量 × 手填成本 + 买入金额) ÷ (签发量 + 买入量)')">{{ ccerCostOf(r) > 0 ? ccerCostOf(r).toFixed(2) : '—' }}</td>
+                  <td class="n" :title="t('成本(元/吨) = (签发量(万吨) × 手填成本(元/吨) + 买入金额(万元)) ÷ (签发量 + 买入量)(万吨)；签发量按手填成本计入（未填即 0 元/吨），买入按成交单价加权摊入')">{{ ccerCostOf(r) > 0 ? ccerCostOf(r).toFixed(2) : '—' }}</td>
                   <td>{{ r.linked_green_cert ? t('是') : '—' }}</td>
                   <td class="row-ops">
                     <button class="link" @click="openDlg('ccer', r)">{{ t('编辑') }}</button>
@@ -1140,7 +1220,7 @@ const tabCount = computed(() => {
                   <td class="n">{{ ccerTradeSum.buy.toFixed(1) }}</td>
                   <td class="n">{{ ccerTradeSum.sell.toFixed(1) }}</td>
                   <td class="n strong">{{ ccerRows.reduce((s, r) => s + ccerCurrentOf(r), 0).toFixed(1) }}</td>
-                  <td class="n"></td><td></td><td></td>
+                  <td class="n">{{ ccerScopedCost > 0 ? ccerScopedCost.toFixed(2) : '—' }}</td><td></td><td></td>
                 </tr>
               </tfoot>
             </table>
@@ -1173,6 +1253,11 @@ const tabCount = computed(() => {
                 <label class="fld">
                   <span class="fl">{{ t('单价') }}<em>{{ t('元/吨') }}</em></span>
                   <input v-model.number="ccerTradeForm.price" type="number" />
+                  <!-- 单位换算直接显示：数量(万吨) × 单价(元/吨) = 金额(万元) -->
+                  <em v-if="tradeAmountOf(ccerTradeForm) > 0" class="field-hint">
+                    {{ t('成交金额') }} {{ tradeAmountOf(ccerTradeForm).toFixed(1) }} {{ t('万元') }}
+                    <template v-if="ccerTradeForm.side === 'buy'">{{ t('（摊入成本）') }}</template>
+                  </em>
                 </label>
                 <label class="fld">
                   <span class="fl">{{ t('备注') }}</span>
@@ -1271,24 +1356,45 @@ const tabCount = computed(() => {
                 <span class="chip">{{ t('价格带') }}：{{ lastRun.market_tags?.price_band || '—' }}</span>
                 <span class="chip">{{ t('动作') }}：{{ lastRun.market_tags?.action_tag || '—' }}</span>
                 <span class="chip">CCER {{ t('上限') }}：{{ lastRun.accounting_snapshot?.ccer_cap ?? '—' }}</span>
+                <span class="chip">CCER {{ t('抵扣') }}：{{ Number(lastRun.accounting_snapshot?.own_ccer_usable || 0).toFixed(1) }} {{ t('万吨') }}</span>
                 <span class="chip" :class="(lastRun.accounting_snapshot?.compliance_gap || 0) > 0 ? 'pos' : 'neg'">
-                  {{ t('缺口') }}：{{ Number(lastRun.accounting_snapshot?.compliance_gap || 0).toFixed(1) }} {{ t('万吨') }}
+                  {{ t('缺口(已扣CCER)') }}：{{ Number(lastRun.accounting_snapshot?.compliance_gap || 0).toFixed(1) }} {{ t('万吨') }}
                 </span>
               </div>
               <div class="plans">
-                <div v-for="(label, key) in planLabels" :key="key" class="plan" :class="key">
-                  <h4>{{ t(label) }}{{ t('方案') }}</h4>
+                <div v-for="p in (lastRun.plans || [])" :key="p.key" class="plan" :class="planClass[p.key] || p.key">
+                  <h4>
+                    {{ t(planLabels[p.key] || p.title || p.key) }}
+                    <em v-if="profileLabels[p.risk_profile]" class="prof">{{ t(profileLabels[p.risk_profile]) }}</em>
+                  </h4>
                   <div class="plan-nums">
-                    <span>{{ t('总成本') }} <b>{{ Number((lastRun.plans || []).find(p => p.key === key)?.total_cost || 0).toLocaleString() }}</b> {{ t('元') }}</span>
-                    <span>{{ t('净节约') }} <b class="ok">{{ Number((lastRun.plans || []).find(p => p.key === key)?.net_saving || 0).toLocaleString() }}</b> {{ t('元') }}</span>
+                    <span>{{ t('总成本') }} <b>{{ Number(p.total_cost || 0).toLocaleString() }}</b> {{ t('元') }}</span>
+                    <span>{{ t('净节约') }} <b class="ok">{{ Number(p.net_saving || 0).toLocaleString() }}</b> {{ t('元') }}</span>
                   </div>
+                  <!-- 成本被合规规则拦成 0 时必须说清原因，否则会误读成「不花钱」 -->
+                  <p v-if="p.blocked" class="plan-block">
+                    {{ t('方案被合规规则拦截，可执行成本按 0 元计') }}
+                    <template v-if="Number(p.planned_cost || 0) > 0">
+                      ；{{ t('拦截前计划成本') }} {{ Number(p.planned_cost || 0).toLocaleString() }} {{ t('元') }}
+                    </template>
+                    <span v-for="i in (p.compliance?.issues || [])" :key="i.code" class="why">（{{ t(i.message) }}）</span>
+                  </p>
+                  <!-- 无缺口 / 全额被自有 CCER 覆盖：说明 0 元是结论而不是没算 -->
+                  <p v-else-if="Number(p.total_cost || 0) === 0 && Number(p.net_saving || 0) === 0 && (p.compliance?.notes || []).length" class="plan-none">
+                    {{ t(p.compliance.notes[0]) }}
+                  </p>
                   <ul>
-                    <li v-for="a in ((lastRun.plans || []).find(p => p.key === key)?.actions || [])" :key="a.action + a.window">
+                    <li v-for="(a, ai) in (p.actions || [])" :key="a.action + a.window + ai">
                       {{ t(actionLabels[a.action] || a.action) }}：
                       <b>{{ Number(a.qty).toFixed(1) }} {{ t('万吨') }}</b> @ {{ Number(a.unit_price).toFixed(1) }} {{ t('元/吨') }}
                       <span class="w">({{ a.window }})</span>
                     </li>
-                    <li v-if="!((lastRun.plans || []).find(p => p.key === key)?.actions || []).length" class="dim">—</li>
+                    <!-- 被拦下的动作也列出来，用户才能判断是不是预算/上限填错了 -->
+                    <li v-for="(a, ai) in (p.planned_actions || [])" :key="'b' + a.action + ai" class="dim rejected">
+                      {{ t(actionLabels[a.action] || a.action) }}：
+                      <b>{{ Number(a.qty).toFixed(1) }} {{ t('万吨') }}</b> @ {{ Number(a.unit_price).toFixed(1) }} {{ t('元/吨') }}（{{ t('未通过合规校验') }}）
+                    </li>
+                    <li v-if="!(p.actions || []).length && !(p.planned_actions || []).length" class="dim">—</li>
                   </ul>
                 </div>
               </div>
@@ -1296,7 +1402,7 @@ const tabCount = computed(() => {
             <div v-else-if="runs.length" class="run-history">
               <p class="hint">{{ t('最近一次运行：') }}</p>
               <table>
-                <thead><tr><th>{{ t('运行时间') }}</th><th>{{ t('年度') }}</th><th>{{ t('缺口') }}({{ t('万吨') }})</th><th>{{ t('窗口') }}</th><th>{{ t('价格带') }}</th><th>{{ t('计划数') }}</th><th></th></tr></thead>
+                <thead><tr><th>{{ t('运行时间') }}</th><th>{{ t('年度') }}</th><th>{{ t('缺口(已扣CCER)') }}({{ t('万吨') }})</th><th>{{ t('窗口') }}</th><th>{{ t('价格带') }}</th><th>{{ t('计划数') }}</th><th></th></tr></thead>
                 <tbody>
                   <tr v-for="r in runs.slice(0, 5)" :key="r.id">
                     <td>{{ r.created_at }}</td><td>{{ r.compliance_year ? r.compliance_year : t('全年度') }}</td>
@@ -1988,12 +2094,17 @@ tbody tr:hover td { background: var(--panel-2); }
 .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .plan { padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); }
 .plan h4 { margin: 0 0 10px; font-size: 13px; color: var(--text); }
+.plan h4 .prof { margin-left: 6px; padding: 1px 6px; border-radius: 8px; font-size: 11px; font-style: normal; font-weight: 500; color: var(--muted); border: 1px solid var(--border); }
 .plan.conservative { border-top: 3px solid var(--accent); }
 .plan.balanced { border-top: 3px solid var(--accent); }
 .plan.aggressive { border-top: 3px solid var(--yellow); }
 .plan-nums { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); margin-bottom: 10px; }
 .plan-nums b { color: var(--text); font-weight: 600; }
 .plan-nums b.ok { color: var(--green); }
+.plan-block { margin: 0 0 10px; padding: 6px 8px; border-radius: 6px; font-size: 11.5px; line-height: 1.5; color: var(--red); background: rgba(200, 60, 60, 0.08); }
+.plan-block .why { display: block; opacity: 0.85; }
+.plan-none { margin: 0 0 10px; padding: 6px 8px; border-radius: 6px; font-size: 11.5px; line-height: 1.5; color: var(--muted); background: var(--soft, rgba(128, 128, 128, 0.08)); }
+.plan li.rejected { text-decoration: line-through; opacity: 0.6; }
 .plan ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .plan li { font-size: 12px; color: var(--text); }
 .plan li b { color: var(--text); font-weight: 600; }

@@ -398,12 +398,17 @@ async def research_carbon_market_news(
     *,
     industry_label: str,
     compliance_year: int,
+    industry: str = "",
     max_items: int = 16,
     read_full: int = 10,
     social_max: int = 8,
     official_max: int = 8,
 ) -> dict[str, Any]:
-    """Deep-research：抓取正文后生成面向企业类型的双碳内容级摘要。"""
+    """Deep-research：抓取正文后生成面向企业类型的双碳内容级摘要。
+
+    industry 为行业键（power/steel/cement/aluminum），决定定点数据源与关键词；
+    不传时按 industry_label 反推（兼容旧调用）。
+    """
     from app.services.searxng_service import (
         SearxngNotConfiguredError,
         SearxngSearchError,
@@ -417,6 +422,73 @@ async def research_carbon_market_news(
     social_q_set = set(social_qs)
 
     if not is_enabled(db):
+        # 优先走「四行业定点数据源」（见 industry_sources.py）：
+        # 政策取生态环境部 / 上海环交所 + 行业主管部委与协会，
+        # 情绪取财联社电报 + 行业煤价/水泥价/铝价类新闻。
+        # 中钢协（SPA 门户）与东方财富股吧（需登录 Cookie）实测抓不到，已放弃。
+        # 定点源可用时直接产出摘要，不再走下面的官网回退（回退目前是空垫片）。
+        bundle: dict[str, Any] | None = None
+        try:
+            from app.services.carbon_compliance.industry_sources import fetch_industry_bundle
+
+            bundle = await fetch_industry_bundle(
+                industry=industry,
+                industry_label=industry_label,
+                official_max=max(1, int(official_max)),
+                social_max=max(1, int(social_max)),
+            )
+        except Exception as exc:  # noqa: BLE001 —— 定点源异常不应阻断报告
+            logger.warning("industry fixed sources failed: %s", exc)
+            bundle = None
+
+        if bundle and bundle.get("ok"):
+            official_items = list(bundle.get("official") or [])
+            social_items = list(bundle.get("social") or [])
+            src_errors = list(bundle.get("errors") or [])
+            digest = await _llm_digest_md(
+                industry_label=industry_label,
+                compliance_year=compliance_year,
+                official=official_items,
+                social=social_items,
+            )
+            if not digest:
+                digest = _rule_digest_md(
+                    industry_label=industry_label,
+                    official=official_items,
+                    social=social_items,
+                )
+            rows: list[dict[str, Any]] = []
+            social_rows: list[dict[str, Any]] = []
+            social_ids = {id(x) for x in social_items}
+            for it in official_items + social_items:
+                url = str(it.get("url") or "").strip()
+                if not url:
+                    continue
+                row = {
+                    "title": it.get("title") or url,
+                    "url": url,
+                    "platform": it.get("platform"),
+                }
+                rows.append(row)
+                if id(it) in social_ids:
+                    social_rows.append(row)
+            logger.info(
+                "industry fixed sources[%s]: official=%d social=%d sources=%d errors=%d",
+                bundle.get("industry"), len(official_items), len(social_items),
+                len(rows), len(src_errors),
+            )
+            return {
+                "ok": True,
+                "mode": "industry_fixed_sources",
+                "industry": bundle.get("industry"),
+                "queried_at": queried_at,
+                "queries": queries,
+                "sources": rows,
+                "social_sources": social_rows,
+                "summary_md": digest.strip(),
+                "error": "; ".join(src_errors) if src_errors else None,
+            }
+
         from app.services import carbon_service as carbon
 
         kw = f"全国碳市场 履约 {industry_label} 碳排放权交易"

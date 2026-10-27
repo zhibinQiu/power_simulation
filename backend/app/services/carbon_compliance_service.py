@@ -479,25 +479,63 @@ def cea_net_sell_qty(db: Any = None, enterprise_id: str = "") -> float:
     return sold - bought
 
 
+def cea_trade_net_by_year(db: Any = None, enterprise_id: str = "") -> dict:
+    """按「归属年度」汇总 CEA 流水的卖出/买入量（万吨）：{年: {"sell": x, "buy": y}}。
+
+    归属年度优先取流水自带的 vintage_year（登记时选定），老数据没有这个字段时退回
+    traded_at 的年份 —— 与前端台账面板「可用配额」的归集口径保持一致，
+    否则面板显示可用 27 万吨、策略却按免费配额 10 万吨算缺口。
+    """
+    out: dict = {}
+    for t in list_cea_trades(db, enterprise_id):
+        vy = t.get("vintage_year")
+        if vy in (None, ""):
+            m = re.search(r"(\d{4})", str(t.get("traded_at") or ""))
+            vy = int(m.group(1)) if m else None
+        else:
+            try:
+                vy = int(vy)
+            except (TypeError, ValueError):
+                vy = None
+        if not vy:
+            continue
+        cur = out.setdefault(int(vy), {"sell": 0.0, "buy": 0.0})
+        q = float(t.get("qty") or 0)
+        if t.get("side") == "sell":
+            cur["sell"] += q
+        else:
+            cur["buy"] += q
+    return out
+
+
 def resolve_cea_net_sell(
     db: Any = None, enterprise_id: str = "", compliance_year: int = 0
 ) -> float:
-    """结转测算用净卖出：优先取履约年 CEA 台账手填的「卖出 − 买入」，否则回退交易流水汇总。
+    """净卖出（万吨）= 卖出 − 买入。
 
-    compliance_year == 0 表示「全年度」：累加所有年份台账的净卖出（无台账时回退全量流水汇总）。
+    口径与台账面板「可用 = 配额基准 − 卖出 + 买入」一致：某年度有交易流水时以流水为准，
+    没有流水才回退到台账手填的「卖出 − 买入」；compliance_year == 0（全年度）逐年按同一优先级累加。
     """
+    by_year = cea_trade_net_by_year(db, enterprise_id)
     if int(compliance_year) == 0:
         holdings = list_cea_holdings(db, enterprise_id)
         if holdings:
-            return sum(
-                float(r.get("net_sell_qty") or 0) - float(r.get("buy_qty") or 0)
-                for r in holdings
-            )
+            total = 0.0
+            for r in holdings:
+                y = int(r.get("vintage_year") or 0)
+                agg = by_year.get(y)
+                if agg:
+                    total += agg["sell"] - agg["buy"]
+                else:
+                    total += float(r.get("net_sell_qty") or 0) - float(r.get("buy_qty") or 0)
+            return total
         return cea_net_sell_qty(db, enterprise_id)
+    agg = by_year.get(int(compliance_year))
+    if agg:
+        return agg["sell"] - agg["buy"]
     row = get_cea_holding_for_year(db, enterprise_id, compliance_year)
     if row is not None:
-        # net_sell_qty 是「卖出量」（沿用历史字段名），买入量在 buy_qty；
-        # 台账回退口径必须与前端「可用 = 配额基准 − 卖出 + 买入」保持一致
+        # net_sell_qty 是「卖出量」（沿用历史字段名），买入量在 buy_qty
         return float(row.get("net_sell_qty") or 0) - float(row.get("buy_qty") or 0)
     return cea_net_sell_qty(db, enterprise_id)
 
@@ -981,6 +1019,29 @@ def run_strategy(
     ccer_rows = list_ccer_holdings(db, enterprise_id)
     own_ccer = eligible_ccer_qty([_holding_to_dict(h) for h in ccer_rows])
 
+    # ---------------- 交易流水并入可用量 ----------------
+    # 「可用」= 免费配额 + 结转 + 买入 − 卖出，与台账面板同一口径。
+    # 旧版只认持仓台账的免费配额，登记了买入流水后跑策略仍按免费配额算缺口，
+    # 于是面板上可用配额已是 27 万吨、策略却报「排放 20 − 配额 10 = 缺口 10 万吨」。
+    trade_by_year = cea_trade_net_by_year(db, enterprise_id)
+    traded_buy = 0.0
+    traded_sell = 0.0
+    for _y, _agg in trade_by_year.items():
+        if int(compliance_year) == 0 or int(_y) == int(compliance_year):
+            traded_buy += _agg["buy"]
+            traded_sell += _agg["sell"]
+    net_sell = resolve_cea_net_sell(db, enterprise_id, compliance_year)  # 卖出 − 买入
+    if net_sell:
+        free_cea = max(0.0, free_cea - net_sell)
+        sellable = max(0.0, sellable - net_sell)
+    # CCER 流水同样增减可抵扣量（买入加、卖出减），否则登记了买入也抵扣不了
+    ccer_traded_net = 0.0
+    for t in list_ccer_trades(db, enterprise_id):
+        q = float(t.get("qty") or 0)
+        ccer_traded_net += q if t.get("side") == "buy" else -q
+    if ccer_traded_net:
+        own_ccer = max(0.0, own_ccer + ccer_traded_net)
+
     grid_factor = float(
         industry_params.get("grid_emission_factor")
         or cost.get("grid_emission_factor")
@@ -1067,8 +1128,7 @@ def run_strategy(
     ccer_predicted = current_ccer
 
     # 结转测算：年末持仓≈清缴后盈余；基础默认取当年免费配额；
-    # 净卖出优先取履约年 CEA 台账「当前净卖出」
-    net_sell = resolve_cea_net_sell(db, enterprise_id, compliance_year)
+    # 净卖出沿用上面已算好的值（流水优先、台账手填兜底）
     year_end_holding = max(0.0, -min(0.0, float(acc.compliance_gap)))
     carry_base = float(compliance_cfg.get("carry_base_qty") or 0)
     if carry_base <= 0:
@@ -1107,6 +1167,11 @@ def run_strategy(
         "allocated_free_cea": allocated_free,
         "carry_forward_qty": carry_in,
         "usable_cea_total": float(acc.free_cea_quota),
+        # 流水拆分：让「可用 CEA = 免费 + 买入 − 卖出」在报告里可追溯
+        "traded_buy_qty": traded_buy,
+        "traded_sell_qty": traded_sell,
+        # CCER 抵销比例上限（默认 5%），报告里把「上限 = 排放 × 比例」写清楚
+        "ccer_max_ratio": ccer_ratio,
     }
     tags = dict(payload.get("market_tags") or {})
     tags["carry_forward"] = carry.to_dict()

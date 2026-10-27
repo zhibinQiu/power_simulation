@@ -104,9 +104,9 @@ function syncDefaultTitle() {
   prevDefaultTitle = def
 }
 watch([reportType, period], syncDefaultTitle)
-// 履约综合分析必须选择企业，否则提示
-watch(reportType, (v) => {
-  if (v === 'compliance_analysis' && !enterprises.value.length) loadEnterprises()
+// 企业列表是三类报告的共同前提，切换类型时只需保证列表已加载
+watch(reportType, () => {
+  if (!enterprises.value.length) loadEnterprises()
 })
 function toggleFocus(key) {
   const idx = focus.value.indexOf(key)
@@ -122,15 +122,14 @@ let stopPoll = null   // visiblePoll 返回的停止函数
 
 async function startAnalysis() {
   if (submitting.value) return
-  if (reportType.value === 'compliance_analysis') {
-    if (!enterpriseId.value) {
-      statusMsg.value = t('履约综合分析需要先选择控排企业')
-      return
-    }
-    if (!complianceYear.value) {
-      statusMsg.value = t('该企业暂无排放台账，请先在企业台账中录入排放年度')
-      return
-    }
+  // 三类报告都由企业台账驱动（后端 ai_context.enterprise_id 必填），校验不再区分类型
+  if (!enterpriseId.value) {
+    statusMsg.value = t('请先选择控排企业（碳交易简报 / 政策摘要 / 履约综合分析均需绑定企业台账）')
+    return
+  }
+  if (!complianceYear.value) {
+    statusMsg.value = t('该企业暂无排放台账，请先在企业台账中录入排放年度')
+    return
   }
   submitting.value = true
   statusMsg.value = ''
@@ -142,8 +141,8 @@ async function startAnalysis() {
       forecast_method: forecastMethod.value,
       focus: focus.value,
       extra: extra.value,
-      enterprise_id: reportType.value === 'compliance_analysis' ? enterpriseId.value : '',
-      compliance_year: reportType.value === 'compliance_analysis' ? complianceYear.value : null,
+      enterprise_id: enterpriseId.value,
+      compliance_year: complianceYear.value,
     })
     trackingTask.value = res
     statusMsg.value = t('任务已提交（{task_id}），正在生成…', { task_id: res.task_id })
@@ -347,14 +346,16 @@ onBeforeUnmount(clearPoll)
             <span>{{ t('报告标题') }}</span>
             <input v-model="title" type="text" :placeholder="t('例如：2026年度碳资产管理综合分析报告')" />
           </label>
-          <div v-if="reportType === 'compliance_analysis'" class="field">
-            <span>{{ t('控排企业') }}（{{ t('履约综合分析必选') }}）</span>
+          <!-- 企业台账是三类报告的共同数据源：碳交易简报/政策摘要同样要按企业口径出具，
+               后端 ai_context.enterprise_id 为空会直接报「请选择企业」，因此这里不再按类型隐藏 -->
+          <div class="field">
+            <span>{{ t('控排企业') }}（{{ t('必选') }}）</span>
             <select v-model="enterpriseId">
               <option value="" disabled>{{ t('请选择企业') }}</option>
               <option v-for="e in enterprises" :key="e.id" :value="e.id">{{ e.name }}</option>
             </select>
           </div>
-          <div v-if="reportType === 'compliance_analysis'" class="field">
+          <div class="field">
             <span>{{ t('核算年度') }}</span>
             <select
               :value="complianceYear === null ? '' : complianceYear"

@@ -44,7 +44,8 @@ def build_alerts(
                         "alert_type": "clearance_countdown",
                         "message": (
                             f"距清缴截止（{deadline.isoformat()}）剩 {days_left} 天，"
-                            f"履约缺口约 {compliance_gap:.2f} 万吨，请尽快补足资产"
+                            f"履约缺口约 {compliance_gap:.2f} 万吨（已扣自有 CCER 抵销，"
+                            f"抵销上限 {ccer_cap:.2f} 万吨），请尽快补足资产"
                         ),
                         "due_at": datetime(
                             deadline.year, deadline.month, deadline.day, tzinfo=timezone.utc

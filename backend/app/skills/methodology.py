@@ -126,10 +126,10 @@ def _compute_carbon_accounting(args: Dict[str, Any]) -> Dict[str, Any]:
         steps=[
             f"Scope1 合计 = 燃料燃烧 {scope1_c:.2f} + 工艺过程 {scope1_p:.2f} = {r['scope1_total']:.2f} 万吨",
             f"履约核查总量 = Scope1 合计{'(官方核查覆盖 ' + str(verified_override) + ' 万吨)' if verified_override else ''} = {r['verified_emission']:.2f} 万吨",
-            f"履约缺口 = 核查总量 {r['verified_emission']:.2f} − 免费配额 {quota:.2f} = {r['compliance_gap']:.2f} 万吨",
-            f"CCER 抵扣上限 = 核查总量 × {ratio:.0%} = {r['ccer_cap']:.2f} 万吨",
-            f"自有 CCER 可用 = min(自有可抵扣 {own_ccer:.2f}, 上限 {r['ccer_cap']:.2f}, 缺口 {r['compliance_gap']:.2f}) = {r['own_ccer_usable']:.2f} 万吨",
-            f"扣自有 CCER 后缺口 = {r['compliance_gap']:.2f} − {r['own_ccer_usable']:.2f} = {r['residual_gap_after_own_ccer']:.2f} 万吨",
+            f"抵扣前缺口 = 核查总量 {r['verified_emission']:.2f} − 免费配额 {quota:.2f} = {r['gap_before_ccer']:.2f} 万吨",
+            f"CCER 抵销上限 = 核查总量 × {ratio:.0%} = {r['ccer_cap']:.2f} 万吨",
+            f"自有 CCER 可用 = min(自有可抵扣 {own_ccer:.2f}, 上限 {r['ccer_cap']:.2f}, 抵扣前缺口 {r['gap_before_ccer']:.2f}) = {r['own_ccer_usable']:.2f} 万吨",
+            f"履约缺口(已扣 CCER) = {r['gap_before_ccer']:.2f} − {r['own_ccer_usable']:.2f} = {r['compliance_gap']:.2f} 万吨",
         ],
         assumptions=[
             f"履约核查口径仅计 Scope1（燃料燃烧 + 工艺过程），Scope2 外购电不纳入核查",
@@ -369,9 +369,9 @@ def _evaluate_carbon_compliance(args: Dict[str, Any]) -> Dict[str, Any]:
         steps=[
             f"CCER 可抵扣判定：共 {len(holdings)} 条持仓，剔除过期/未关联绿证 → 可抵扣 {own_ccer:.2f} 万吨",
             f"核查总量 = Scope1 合计（{scope1_c:.2f} + {scope1_p:.2f} 万吨）= {result['verified_emission']:.2f} 万吨",
-            f"履约缺口 = {result['verified_emission']:.2f} − 免费配额 {quota:.2f} = {gap:.2f} 万吨",
-            f"CCER 抵扣上限 = {result['verified_emission']:.2f} × {ratio:.0%} = {result['ccer_cap']:.2f} 万吨",
-            f"扣自有 CCER 后缺口 = {gap:.2f} − {result['own_ccer_usable']:.2f} = {result['residual_gap_after_own_ccer']:.2f} 万吨",
+            f"抵扣前缺口 = {result['verified_emission']:.2f} − 免费配额 {quota:.2f} = {result['gap_before_ccer']:.2f} 万吨",
+            f"CCER 抵销上限 = {result['verified_emission']:.2f} × {ratio:.0%} = {result['ccer_cap']:.2f} 万吨",
+            f"履约缺口(已扣 CCER) = {result['gap_before_ccer']:.2f} − {result['own_ccer_usable']:.2f} = {result['compliance_gap']:.2f} 万吨",
             f"结论：{result['conclusion']}",
         ],
         assumptions=[

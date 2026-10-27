@@ -131,6 +131,8 @@ def _run_report_task(task_id: str, title: str, period: str,
                 "enterprise_id": enterprise_id,
                 "compliance_year": year,
                 "forecast_method": forecast_method,
+                # 报告类型传入流水线：三类报告都以企业台账为底稿，但正文标题/定位不同
+                "report_type": report_type,
             }, ensure_ascii=False),
         )
 
