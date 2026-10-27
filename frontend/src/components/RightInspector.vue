@@ -25,8 +25,10 @@
       <!-- 策略详情（点击左侧「策略 → 自定义」） -->
       <StrategyDetailPanel v-else-if="mode === 'strategyDetail'" />
 
-      <!-- 编辑态：流程编排属性面板；非编辑态下点击工艺节点也展示其编排属性 -->
-      <FlowInspector v-else-if="store.editMode || store.selectedFlowId" />
+      <!-- 编排属性面板只在「编排视图激活」（flowEditing = editMode 且 activeViewId==='flowEdit'）时显示。
+           不能只看 editMode / selectedFlowId：它们跨标签保留（切回三维仿真时编排草稿与节点选中不丢），
+           若按它们渲染，切回三维后右栏仍停留在编排属性。选中态保留给切回编排时恢复。 -->
+      <FlowInspector v-else-if="store.flowEditing" />
 
       <!-- 数字孪生（非编辑态）点击小组：数值展示型小组属性面板（成员工艺列表 + 实测值） -->
       <GroupDetail v-else-if="store.selectedGroupId" />
@@ -306,9 +308,9 @@ const headTitle = computed(() => {
   if (mode.value === 'materials') return t('物料库')
   if (mode.value === 'material') return t('物料属性')
   if (mode.value === 'strategyDetail') return t('策略属性')
-  if (store.editMode) return t('编排属性')
+  if (store.flowEditing) return t('编排属性')
   if (store.selectedGroupId) return t('小组属性')
-  if (store.selectedFlowId) return t('工艺属性')
+  if (store.flowEditing && store.selectedFlowId) return t('工艺属性')
   if (mode.value === 'device') {
     const d = store.deviceDetail
     return (d && d.device && d.device.adjustable) ? t('可调设备') : t('计量设备')
