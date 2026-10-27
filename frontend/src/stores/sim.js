@@ -635,6 +635,9 @@ export const useSimStore = defineStore('sim', {
     appliedScheme: null,
     selectedFlowId: null,   // 画布中选中的节点 id
     selectedGroupId: null,  // 画布中选中的小组 id
+    // 右栏「上一级」导航历史：各 select*/pick/openDeviceDetail 在改变选中前把当前面板快照入栈，
+    // 标题栏 ✕（closeInspector 默认）弹栈恢复上一面板，而不是一律跳回全厂总览
+    inspectorHistory: [],
     flowBackId: null,       // 属性面板跳转来源工艺节点 id（主工艺→分支辅助工艺后，面板显示「返回」）
     // 编排保存状态：手动保存模式下，任何编辑只置 schemeDirty=true（不落盘），
     // 由工具条「保存」按钮 / Ctrl+S 触发 saveScheme() 才写入本地存档 + 服务端 designs/flow。
@@ -1703,6 +1706,7 @@ export const useSimStore = defineStore('sim', {
     // 右侧显示统一的工序实例属性面板（UnitCarbonDetail）；与 selectUnit/openDeviceDetail 一致，
     // 自动展开右栏，避免图上点选后无任何面板反馈（2026-09-09）。
     pickUnit(id) {
+      this._recordUnitNav()
       this._clearBrowse()
       const u = this.model.units.find((x) => x.id === id)
       if (u && PROCESS_MAP[u.type]) this.selectedAssetType = u.type
@@ -1711,9 +1715,10 @@ export const useSimStore = defineStore('sim', {
       this.selectedUnitId = id; this.inspectorView = 'auto'; this.rightOpen = true; this.requestFocus('unit', id)
     },
     // 查看/关闭监测设备详情（3D 图点设备、或工序设备列表触发）
-    openDeviceDetail(devId) { this._clearBrowse(); this.selectedMaterialId = null; this.selectedGroupId = null; this.selectedFlowId = null; this.deviceDetailId = devId; this.inspectorView = 'auto'; this.rightOpen = true; this.requestFocus('device', devId) },
+    openDeviceDetail(devId) { this._recordDeviceNav(); this._clearBrowse(); this.selectedMaterialId = null; this.selectedGroupId = null; this.selectedFlowId = null; this.deviceDetailId = devId; this.inspectorView = 'auto'; this.rightOpen = true; this.requestFocus('device', devId) },
     // 左侧「原料」库点击 -> 右侧显示属性与配置
     selectMaterial(id) {
+      this._recordInspector()
       this._clearBrowse()
       this.selectedMaterialId = id
       this.deviceDetailId = null
@@ -1728,6 +1733,7 @@ export const useSimStore = defineStore('sim', {
     _clearBrowse() { this.selectedAssetType = null; this.selectedStrategyId = null },
     // 点击「工艺」目录中的工序类型 -> 工艺类型无独立属性面板，直接跳转到该类型首个实例的属性面板
     selectAssetType(type) {
+      this._recordInspector()
       this._clearBrowse()
       this.selectedAssetType = type
       this.selectedMaterialId = null
@@ -1996,7 +2002,8 @@ export const useSimStore = defineStore('sim', {
       }
     },
     // 右侧检视器显式视图（左侧资产树/工具栏触发）：park 园区构成 / materials 原料库 / strategy 减排策略
-    setInspectorView(v) { this.inspectorView = v; this.rightOpen = true },
+    // 切到 'overview' 相当于「返回总览」动作，不产生新的历史层级（否则 ✕ 会偶尔跳回某个页签视图）
+    setInspectorView(v) { if (v !== 'overview') this._recordInspector(); this.inspectorView = v; this.rightOpen = true },
     // 「导出报告」：缓存请求载荷并切到右侧报告面板（面板内配置参数后由用户点击「生成报告」）
     openReportPanel(payload) {
       this.reportPayload = payload
@@ -2004,7 +2011,10 @@ export const useSimStore = defineStore('sim', {
       this.setInspectorView('report')
     },
     // 左侧策略库选中策略：打开右侧「策略详情」面板（名称 / 数值调整可编辑 + 底部「策略仿真」按钮）
-    selectStrategy(sid) {
+    selectStrategy(sid, record = true) {
+      // record=false 用于 closeInspector 的 AI 退回列表特判：那是「返回」动作而非新导航，
+      // 若照常入栈会把详情快照推进历史，✕ 就变成「详情 ↔ 列表」来回切换
+      if (record) this._recordInspector()
       this._clearBrowse()
       this.selectedStrategyId = sid
       this.selectedMaterialId = null
@@ -2016,6 +2026,7 @@ export const useSimStore = defineStore('sim', {
     },
     // 左侧策略库点击工艺策略（某工艺对应的绿色策略）：打开右侧「策略属性」面板（只读 + 启用/停用 + 查看工艺）
     selectGreenStrategy(processType, sid) {
+      this._recordInspector()
       this._clearBrowse()
       this.selectedStrategyId = `green::${processType}::${sid}`
       this.selectedMaterialId = null
@@ -2032,10 +2043,95 @@ export const useSimStore = defineStore('sim', {
     closeInspector(full = false) {
       const sid = this.selectedStrategyId
       if (!full && typeof sid === 'string' && sid.startsWith('ai::') && sid !== 'ai::overview') {
-        this.selectStrategy('ai::overview')
+        this.selectStrategy('ai::overview', false)
         return
       }
+      if (full) {
+        this.inspectorHistory = []
+      } else if (this.inspectorHistory.length) {
+        // ✕ = 返回上一级：弹出最近一个「与当前面板不同」的快照并恢复；
+        // 连续重复选中同一面板只算一级（_recordInspector 已按快照去重）
+        const cur = JSON.stringify(this._snapInspector())
+        let snap = null
+        while (this.inspectorHistory.length) {
+          const s = this.inspectorHistory.pop()
+          if (JSON.stringify(s) !== cur) { snap = s; break }
+        }
+        if (snap) { this._restoreInspector(snap); this.rightOpen = true; return }
+      }
       this._clearBrowse(); this.deviceDetailId = null; this.selectedUnitId = null; this.selectedMaterialId = null; this.selectedStrategyId = null; this.selectedGroupId = null; this.selectedFlowId = null; this.inspectorView = 'auto'
+    },
+    // ---- 右栏面板快照：用于「上一级」导航 ----
+    _snapInspector() {
+      return {
+        unit: this.selectedUnitId, asset: this.selectedAssetType, mat: this.selectedMaterialId,
+        strategy: this.selectedStrategyId, group: this.selectedGroupId, flow: this.selectedFlowId,
+        device: this.deviceDetailId, view: this.inspectorView,
+      }
+    },
+    _recordInspector() {
+      // 智能体对话是显式切换的右侧模式，不计入属性面板的导航历史
+      if (this.inspectorView === 'agent') return
+      const snap = this._snapInspector()
+      const top = this.inspectorHistory[this.inspectorHistory.length - 1]
+      if (top && JSON.stringify(top) === JSON.stringify(snap)) return
+      this.inspectorHistory.push(snap)
+      if (this.inspectorHistory.length > 30) this.inspectorHistory.shift()
+    },
+    _restoreInspector(snap) {
+      this.selectedUnitId = snap.unit; this.selectedAssetType = snap.asset
+      this.selectedMaterialId = snap.mat; this.selectedStrategyId = snap.strategy
+      this.selectedGroupId = snap.group; this.selectedFlowId = snap.flow
+      this.deviceDetailId = snap.device; this.inspectorView = snap.view || 'auto'
+    },
+    // 工序名牌（连铸机/热轧机…）是**平级浏览**，点名牌时刷新栈：
+    // ① 清掉栈里的平级工序/设备层 —— 否则 连铸机→热轧机 后 ✕ 会回到连铸机而非总览。
+    //    这里的「设备层」指此前浏览过的设备详情快照，随平级刷新一并清掉；
+    //    openDeviceDetail 走它自己的 _recordDeviceNav：「工序面板 → 关联设备 → 详情」仍按子面板
+    //    入栈（转调 _recordInspector），保证「工序 → 设备详情 → ✕ 回工序」这条层级回退不断；
+    //    总览/小组 → 设备、设备 ↔ 设备互跳则与本函数一样按平级刷新（互跳不再入栈）。
+    //    边界：「工序A → 设备详情 → 点工序B 名牌」时，filter 会把工序A 的快照也一并清掉（!s.unit），
+    //    此时 ✕ 回的是更早的层级（总览/小组），而不是工序A —— 与「点名牌 = 平级刷新」口径自洽，
+    //    不要误读成「设备子面板回退失效」：子面板回退只对「在设备详情上直接点 ✕」成立。
+    // ② 仅当当前面板是层级上下文（总览/小组属性/物料/策略等非平级面板）时才作为来源入栈。
+    // 这样 总览→连铸机→热轧机 后 ✕ 回总览；小组→热风炉→热风炉2 后 ✕ 仍回小组属性。
+    _recordUnitNav() {
+      if (this.inspectorView === 'agent') return
+      // 平级浏览层 = 工序(unit) / 设备详情(device) / 编排节点(flow) 快照，点任一名牌时一并刷新
+      this.inspectorHistory = this.inspectorHistory.filter((s) => !s.unit && !s.device && !s.flow)
+      const cur = this._snapInspector()
+      if (cur.unit || cur.device || cur.flow) return   // 当前已是平级浏览面板：切换不产生新层级
+      const top = this.inspectorHistory[this.inspectorHistory.length - 1]
+      if (top && JSON.stringify(top) === JSON.stringify(cur)) return
+      this.inspectorHistory.push(cur)
+      if (this.inspectorHistory.length > 30) this.inspectorHistory.shift()
+    },
+    // 关联设备名牌（热风炉/鼓风机/供氧系统等可调设备）的点击同样按平级刷新：
+    // ① 「工序面板 → 关联设备列表 → 设备详情」是子面板，仍走 _recordInspector（✕ 回工序）；
+    // ② 其余入口（总览/小组 → 设备、设备 ↔ 设备互跳）按平级浏览处理：
+    //    清掉栈里的平级工序/设备层；当前已是设备详情时不再入栈（互跳不产生新层级）。
+    _recordDeviceNav() {
+      if (this.inspectorView === 'agent') return
+      const cur = this._snapInspector()
+      if (cur.unit && !cur.device) { this._recordInspector(); return }   // 工序 → 设备：子面板
+      this.inspectorHistory = this.inspectorHistory.filter((s) => !s.unit && !s.device && !s.flow)
+      if (cur.device) return   // 设备 ↔ 设备：平级互跳
+      const top = this.inspectorHistory[this.inspectorHistory.length - 1]
+      if (top && JSON.stringify(top) === JSON.stringify(cur)) return
+      this.inspectorHistory.push(cur)
+      if (this.inspectorHistory.length > 30) this.inspectorHistory.shift()
+    },
+    // 小组（热风炉/鼓风机/引风机/供氧系统等关联设备组）互点同样按平级刷新：
+    // 已在某小组时再点另一小组 = 平级切换，清掉栈里的小组层、不再把旧小组入栈；
+    // 从总览/工序等进入小组则照常记录来源，保留「总览 → 小组 → 工序」的层级回退。
+    _recordGroupNav() {
+      if (this.inspectorView === 'agent') return
+      const cur = this._snapInspector()
+      if (cur.group) {
+        this.inspectorHistory = this.inspectorHistory.filter((s) => !s.group)
+        return
+      }
+      this._recordInspector()
     },
     // 切换某个工艺的某项节能减碳策略启用状态
     toggleGreenStrategy(processType, strategyId) {
@@ -2241,6 +2337,7 @@ export const useSimStore = defineStore('sim', {
     // 功能视图 tab 与数据分析数据源（绑定的是上一场景的设备 id）在切换前清空 —— 与重载后的状态等价。
     async openScene(sceneId) {
       if (!sceneId) return false
+      this.inspectorHistory = []   // 右栏「上一级」历史不跨工程保留（快照里的 unit/group id 属于旧场景）
       const sameMode = this.sceneMode === (sceneId === 'steel' ? 'steel' : 'other')
       // 仅在资源已加载时才跳过：初始 sceneId='steel'/sceneMode='steel' 时 scenePack 仍为 null，
       // 否则长/短流程模板等资源不会被填充（编排工具条模板按钮不显示）
@@ -2777,7 +2874,7 @@ export const useSimStore = defineStore('sim', {
     // 发起相机聚焦请求（左栏或 3D 点击选中任意要素时调用）
     requestFocus(kind, id) { this.focusKind = kind; this.focusId = id; this.focusNonce++ },
     viewUnit(id, mode = 'focus') { this.viewId = id; this.viewMode = mode; this.viewNonce++ },
-    selectUnit(id) { this._clearBrowse(); this.selectedMaterialId = null; this.selectedGroupId = null; this.selectedFlowId = null; this.deviceDetailId = null; this.selectedUnitId = id; this.inspectorView = 'auto'; this.rightOpen = true; this.requestFocus('unit', id) },
+    selectUnit(id) { this._recordUnitNav(); this._clearBrowse(); this.selectedMaterialId = null; this.selectedGroupId = null; this.selectedFlowId = null; this.deviceDetailId = null; this.selectedUnitId = id; this.inspectorView = 'auto'; this.rightOpen = true; this.requestFocus('unit', id) },
     setAutoRotate(v) { this.autoRotate = v },
     setBrightness(v) { this.brightness = v },
     // ---- 工艺级策略管理 ----
@@ -3872,6 +3969,7 @@ export const useSimStore = defineStore('sim', {
       if (g && name) g.name = name
     },
     selectFlowGroup(id) {
+      this._recordGroupNav()
       this._clearBrowse()
       this.selectedMaterialId = null
       this.selectedFlowId = null
@@ -3884,6 +3982,7 @@ export const useSimStore = defineStore('sim', {
     // 进入小组子编排：编辑态下画布仅渲染该组成员节点；
     // 非编辑态（数字孪生）下 3D 场景直接进入该小组的子场景（成员展开为独立工序模型）
     enterGroup(id) {
+      this._recordGroupNav()
       const g = this.scheme.groups.find((x) => x.id === id)
       if (!g) return
       this.scheme.activeGroupId = id
@@ -3904,6 +4003,7 @@ export const useSimStore = defineStore('sim', {
     // 退出小组子编排，返回顶层：编辑态返回顶层画布，非编辑态 3D 返回顶层场景
     exitGroup() {
       if (!this.scheme.activeGroupId) return
+      this._recordInspector()
       this.scheme.activeGroupId = null
       if (this.appliedScheme) this.appliedScheme.activeGroupId = null
       this.selectedFlowId = null
@@ -4082,7 +4182,7 @@ export const useSimStore = defineStore('sim', {
       n.ports[dir] = n.ports[dir].filter((p) => p.id !== portId)
       this.scheme.connections = this.scheme.connections.filter((c) => !(c.from === nodeId && c.fromPort === portId) && !(c.to === nodeId && c.toPort === portId))
     },
-    selectFlow(id) { this._clearBrowse(); this.selectedMaterialId = null; this.selectedUnitId = null; this.deviceDetailId = null; this.selectedFlowId = id; this.selectedGroupId = null; this.flowBackId = null; this.inspectorView = 'auto'; this.rightOpen = true },
+    selectFlow(id) { this._recordUnitNav(); this._clearBrowse(); this.selectedMaterialId = null; this.selectedUnitId = null; this.deviceDetailId = null; this.selectedFlowId = id; this.selectedGroupId = null; this.flowBackId = null; this.inspectorView = 'auto'; this.rightOpen = true },
     // 跳转到某工艺节点面板（用于主工艺 → 分支辅助工艺），记录返回目标；
     // 仅切换属性面板，不触发 3D 场景聚焦（数字孪生聚焦对象保持不变）
     jumpToFlow(id, backId) { this.selectFlow(id); this.flowBackId = backId || null },

@@ -6,7 +6,7 @@
     <div v-if="mode !== 'agent'" class="sidebar-head">
       <span class="ttl">{{ headTitle }}</span>
       <span class="spacer"></span>
-      <button v-if="mode !== 'overview' || store.selectedGroupId || store.selectedFlowId" class="x-btn" :title="t('返回总览')" @click="store.closeInspector()">✕</button>
+      <button v-if="mode !== 'overview' || store.selectedGroupId || store.selectedFlowId" class="x-btn" :title="t('返回上一级')" @click="store.closeInspector()">✕</button>
     </div>    <div class="inspector-body" :class="{ scrolling }" @scroll="onScroll">
       <!-- 本析智擎：智能体对话界面（工具栏「本析智擎」切换，替换右侧属性弹窗，中间 3D 场景保持） -->
       <AgentChatView v-if="mode === 'agent'" />

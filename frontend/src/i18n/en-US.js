@@ -1794,6 +1794,7 @@ export default {
   '停机/离线': 'Shutdown/Offline',
   '报警': 'Alarm',
   '返回总览': 'Back to Overview',
+  '返回上一级': 'Back to Previous Level',
   '按 8000h/年折算 · 当前排放': 'Annualized at 8000 h/yr · Current emissions',
   '直接排放 · Scope 1': 'Direct Emissions · Scope 1',
   '间接排放 · Scope 2': 'Indirect Emissions · Scope 2',
