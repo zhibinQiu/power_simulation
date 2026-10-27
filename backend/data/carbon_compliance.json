@@ -802,6 +802,76 @@
           "note": "",
           "traded_at": "2026-01-01T00:00:00",
           "project_type": "methane"
+        },
+        {
+          "id": "e67912c1-f054-4142-852e-b9aa59ac49c1",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "side": "buy",
+          "qty": 15.0,
+          "price": 67.0,
+          "note": "",
+          "traded_at": "2026-01-01T00:00:00",
+          "project_type": "forest"
+        },
+        {
+          "id": "52d87b9a-d593-4973-8358-b362b084891c",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "side": "buy",
+          "qty": 15.0,
+          "price": 67.0,
+          "note": "",
+          "traded_at": "2026-01-01T00:00:00",
+          "project_type": "forest"
+        },
+        {
+          "id": "5d3305cb-aef9-4148-8199-c96dba3d0c9f",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "side": "buy",
+          "qty": 15.0,
+          "price": 67.0,
+          "note": "",
+          "traded_at": "2026-01-01T00:00:00",
+          "project_type": "forest"
+        },
+        {
+          "id": "29bf6fc7-a136-435f-90a4-0a5404e9f41d",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "side": "buy",
+          "qty": 15.0,
+          "price": 67.0,
+          "note": "",
+          "traded_at": "2026-01-01T00:00:00",
+          "project_type": "forest"
+        },
+        {
+          "id": "23f047a9-26ed-4e84-921e-6782068e583a",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "side": "buy",
+          "qty": 15.0,
+          "price": 67.0,
+          "note": "",
+          "traded_at": "2026-01-01T00:00:00",
+          "project_type": "forest"
+        },
+        {
+          "id": "fc5ff885-40a4-4708-8f04-495b71d955cc",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "side": "buy",
+          "qty": 15.0,
+          "price": 67.0,
+          "note": "",
+          "traded_at": "2026-01-01T00:00:00",
+          "project_type": "forest"
+        },
+        {
+          "id": "f6196757-b20e-4f0f-9afb-09579c76cd93",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "side": "buy",
+          "qty": 15.0,
+          "price": 67.0,
+          "note": "",
+          "traded_at": "2026-01-01T00:00:00",
+          "project_type": "forest"
         }
       ],
       "green_power": [
@@ -4257,6 +4327,600 @@
           "status": "completed",
           "report_md": "# 冀东钢铁集团有限公司 全年度碳履约策略推荐\n\n## 核算快照\n\n- 最终核查排放：1630.00 万吨 CO₂e\n- 可用 CEA：1781.00 万吨（免费 1750.00 + 买入 21.00 − 卖出 0.00）\n- 抵扣前缺口：-151.00 万吨（核查排放 − 可用 CEA）\n- CCER 抵销上限：81.50 万吨（应清缴配额 = 核查排放 1630.00 × 5%）\n- 台账可抵扣 CCER：60.00 万吨\n- 本履约可动用 CCER：0.00 万吨\n- 履约缺口/富余（已扣 CCER）：-151.00 万吨\n\n## 市场周期\n\n- 价格带：高位\n- 时间窗口：年末窗口\n- 建议动作：建议出售\n- 说明：年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨，盈余配额可择高位窗口出售\n\n## 分层推荐方案\n\n### 最低成本履约方案\n\n仅 CEA+CCER 满足清缴刚需，优先线下撮合降本\n\n- 总成本测算：-143601000.00 元\n- 净节约：143601000.00 元\n- 操作窗口：年末窗口\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 卖出 CEA | 151.00 | 95.10 | 年末窗口 | 价格高位，分批卖出富余配额；可优先线下撮合寻找买方，公开挂牌作兜底（参考价 95.1 元/吨，非实时挂单） |\n\n### 成本优化综合方案\n\nCEA+CCER + 择时窗口，线下优先、线上挂牌兜底\n\n- 总成本测算：-143601000.00 元\n- 净节约：143601000.00 元\n- 操作窗口：年末窗口\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 卖出 CEA | 151.00 | 95.10 | 年末窗口 | 价格高位，分批卖出富余配额；可优先线下撮合寻找买方，公开挂牌作兜底（参考价 95.1 元/吨，非实时挂单） |\n\n### 稳健履约方案\n\nCEA+CCER 全覆盖，含囤存/出售等画像允许动作\n\n- 总成本测算：-143601000.00 元\n- 净节约：143601000.00 元\n- 操作窗口：年末窗口\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 卖出 CEA | 151.00 | 95.10 | 年末窗口 | 价格高位，分批卖出富余配额；可优先线下撮合寻找买方，公开挂牌作兜底（参考价 95.1 元/吨，非实时挂单） |\n\n---\n\n本报告由确定性规则引擎生成，不构成投资或合规承诺，请结合最新政策复核。",
           "created_at": "2026-10-27T10:14:22+08:00"
+        },
+        {
+          "id": "80b03186-5728-4e8a-9523-6c57b9b6e188",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "user_id": "default",
+          "compliance_year": 0,
+          "accounting_snapshot": {
+            "scope1_total": 1660.0,
+            "scope2_from_power": 0.0,
+            "raw_total": 1660.0,
+            "reducible_power": 0.0,
+            "verified_emission": 1630.0,
+            "free_cea_quota": 1781.0,
+            "compliance_gap": -151.0,
+            "ccer_cap": 81.5,
+            "own_ccer_eligible": 60.0,
+            "own_ccer_usable": 0.0,
+            "residual_gap_after_own_ccer": -151.0,
+            "gap_before_ccer": -151.0,
+            "ccer_offset_used": 0.0,
+            "allocated_free_cea": 1750.0,
+            "carry_forward_qty": 10.0,
+            "usable_cea_total": 1781.0,
+            "traded_buy_qty": 21.0,
+            "traded_sell_qty": 0.0,
+            "ccer_max_ratio": 0.05
+          },
+          "market_tags": {
+            "price_band": "high",
+            "time_window": "late",
+            "action_tag": "sell",
+            "current_price": 97.8,
+            "cea_ccer_spread": 1.4599999999999937,
+            "ccer_supply_tag": "unknown",
+            "rationale": "年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨，盈余配额可择高位窗口出售",
+            "price_forecast": {
+              "as_of": "2026-10-27",
+              "end_date": "2026-12-31",
+              "last_close": 95.08,
+              "year_end_price": 101.11,
+              "year_end_low": 95.52,
+              "year_end_high": 106.69,
+              "peak_price": 101.76,
+              "peak_date": "2026-12-25",
+              "trough_price": 95.1,
+              "trough_date": "2026-10-27",
+              "trading_days": 48,
+              "method": "trend_seasonal_compliance",
+              "note": "算法=规则模型：衰减趋势(均线差日漂移)+去均值同周季节+履约季冲高回落（四季度相对上半年溢价定振幅；约12月初见顶、年底回吐）；波动带=近60日收益标准差×√天数。 CEA 公开侧无实时挂单，输入为历史日均/收盘；仅供履约择机参考，不构成投资建议。"
+            },
+            "carry_forward": {
+              "deadline_md": "06-10",
+              "deadline": "2026-06-10",
+              "base_qty": 1750.0,
+              "net_sell": -21.0,
+              "net_sell_multiplier": 1.5,
+              "year_end_holding": 151.0,
+              "formula_cap": 1750.0,
+              "max_carry": 151.0,
+              "excess": 0.0,
+              "sell_to_expand_cap": 0.0
+            }
+          },
+          "plans": [
+            {
+              "key": "min_cost",
+              "title": "最低成本履约方案",
+              "description": "仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）",
+              "risk_profile": "conservative",
+              "channel_mode": "offline",
+              "actions": [
+                {
+                  "action": "sell_cea",
+                  "qty": 0,
+                  "unit_price": 0,
+                  "window": "",
+                  "note": "富余配额可在结转上限内留存次年；测算最大可结转约 151 万吨（结转日 2026-06-10），请勿超过上限囤积",
+                  "meta": {
+                    "informational": true
+                  }
+                }
+              ],
+              "total_cost": 0.0,
+              "planned_cost": 0.0,
+              "net_saving": 0.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": [
+                  "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出"
+                ]
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.03,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "optimized",
+              "title": "成本优化综合方案",
+              "description": "CEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）",
+              "risk_profile": "balanced",
+              "channel_mode": "hybrid",
+              "actions": [
+                {
+                  "action": "sell_cea",
+                  "qty": 151.0,
+                  "unit_price": 95.1,
+                  "window": "late",
+                  "note": "价格高位，分批卖出富余配额；可优先线下撮合寻找买方，公开挂牌作兜底（参考价 95.1 元/吨，非实时挂单）",
+                  "meta": {
+                    "channel": "offline_preferred_sell",
+                    "listed_ref_price": 95.1,
+                    "offline_assumed_price": 93.6735,
+                    "offline_discount": 0.015,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook",
+                    "fee_rate": 0.0,
+                    "fee_kind": "block"
+                  }
+                }
+              ],
+              "total_cost": -143601000.0,
+              "planned_cost": -143601000.0,
+              "net_saving": 143601000.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": [
+                  "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出"
+                ]
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.015,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "full_compliance",
+              "title": "稳健履约方案",
+              "description": "CEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）",
+              "risk_profile": "aggressive",
+              "channel_mode": "listed",
+              "actions": [
+                {
+                  "action": "sell_cea",
+                  "qty": 151.0,
+                  "unit_price": 95.1,
+                  "window": "late",
+                  "note": "价格高位，分批卖出富余配额；可优先线下撮合寻找买方，公开挂牌作兜底（参考价 95.1 元/吨，非实时挂单）",
+                  "meta": {
+                    "channel": "offline_preferred_sell",
+                    "listed_ref_price": 95.1,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook",
+                    "fee_rate": 0.0,
+                    "fee_kind": "block"
+                  }
+                }
+              ],
+              "total_cost": -143601000.0,
+              "planned_cost": -143601000.0,
+              "net_saving": 143601000.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": [
+                  "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出"
+                ]
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": false,
+                "offline_discount_vs_listed": 0.0,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线上挂牌口径不打折",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            }
+          ],
+          "status": "completed",
+          "report_md": "# 冀东钢铁集团有限公司 全年度碳履约策略推荐\n\n## 核算快照\n\n- 最终核查排放：1630.00 万吨 CO₂e\n- 可用 CEA：1781.00 万吨（免费 1750.00 + 买入 21.00 − 卖出 0.00）\n- 抵扣前缺口：-151.00 万吨（核查排放 − 可用 CEA）\n- CCER 抵销上限：81.50 万吨（应清缴配额 = 核查排放 1630.00 × 5%）\n- 台账可抵扣 CCER：60.00 万吨\n- 本履约可动用 CCER：0.00 万吨\n- 履约缺口/富余（已扣 CCER）：-151.00 万吨\n\n## 市场周期\n\n- 价格带：高位\n- 时间窗口：年末窗口\n- 建议动作：建议出售\n- 说明：年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨，盈余配额可择高位窗口出售\n\n## 分层推荐方案\n\n### 最低成本履约方案\n\n仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）\n\n- 总成本测算：0.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 卖出 CEA | 0.00 | 0.00 | — | 富余配额可在结转上限内留存次年；测算最大可结转约 151 万吨（结转日 2026-06-10），请勿超过上限囤积 |\n\n### 成本优化综合方案\n\nCEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）\n\n- 总成本测算：-143601000.00 元\n- 净节约：143601000.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 卖出 CEA | 151.00 | 95.10 | 年末窗口 | 价格高位，分批卖出富余配额；可优先线下撮合寻找买方，公开挂牌作兜底（参考价 95.1 元/吨，非实时挂单） |\n\n### 稳健履约方案\n\nCEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）\n\n- 总成本测算：-143601000.00 元\n- 净节约：143601000.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 卖出 CEA | 151.00 | 95.10 | 年末窗口 | 价格高位，分批卖出富余配额；可优先线下撮合寻找买方，公开挂牌作兜底（参考价 95.1 元/吨，非实时挂单） |\n\n---\n\n本报告由确定性规则引擎生成，不构成投资或合规承诺，请结合最新政策复核。",
+          "created_at": "2026-10-27T14:07:03+08:00"
+        },
+        {
+          "id": "4ac7060b-a870-44e4-ba99-7df5cbb1790c",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "user_id": "default",
+          "compliance_year": 2027,
+          "accounting_snapshot": {
+            "scope1_total": 40.0,
+            "scope2_from_power": 0.0,
+            "raw_total": 40.0,
+            "reducible_power": 0.0,
+            "verified_emission": 20.0,
+            "free_cea_quota": 1781.0,
+            "compliance_gap": -1761.0,
+            "ccer_cap": 1.0,
+            "own_ccer_eligible": 165.0,
+            "own_ccer_usable": 0.0,
+            "residual_gap_after_own_ccer": -1761.0,
+            "gap_before_ccer": -1761.0,
+            "ccer_offset_used": 0.0,
+            "allocated_free_cea": 0.0,
+            "carry_forward_qty": 0.0,
+            "usable_cea_total": 1781.0,
+            "traded_buy_qty": 0.0,
+            "traded_sell_qty": 0.0,
+            "ccer_max_ratio": 0.05
+          },
+          "market_tags": {
+            "price_band": "high",
+            "time_window": "late",
+            "action_tag": "sell",
+            "current_price": 97.8,
+            "cea_ccer_spread": 1.4599999999999937,
+            "ccer_supply_tag": "unknown",
+            "rationale": "年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨，盈余配额可择高位窗口出售",
+            "price_forecast": {
+              "as_of": "2026-10-27",
+              "end_date": "2026-12-31",
+              "last_close": 95.08,
+              "year_end_price": 101.11,
+              "year_end_low": 95.52,
+              "year_end_high": 106.69,
+              "peak_price": 101.76,
+              "peak_date": "2026-12-25",
+              "trough_price": 95.1,
+              "trough_date": "2026-10-27",
+              "trading_days": 48,
+              "method": "trend_seasonal_compliance",
+              "note": "算法=规则模型：衰减趋势(均线差日漂移)+去均值同周季节+履约季冲高回落（四季度相对上半年溢价定振幅；约12月初见顶、年底回吐）；波动带=近60日收益标准差×√天数。 CEA 公开侧无实时挂单，输入为历史日均/收盘；仅供履约择机参考，不构成投资建议。"
+            },
+            "carry_forward": {
+              "deadline_md": "06-10",
+              "deadline": "2028-06-10",
+              "base_qty": 1781.0,
+              "net_sell": -21.0,
+              "net_sell_multiplier": 1.5,
+              "year_end_holding": 1761.0,
+              "formula_cap": 1781.0,
+              "max_carry": 1761.0,
+              "excess": 0.0,
+              "sell_to_expand_cap": 0.0
+            }
+          },
+          "plans": [
+            {
+              "key": "min_cost",
+              "title": "最低成本履约方案",
+              "description": "仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）",
+              "risk_profile": "conservative",
+              "channel_mode": "offline",
+              "actions": [
+                {
+                  "action": "sell_cea",
+                  "qty": 0,
+                  "unit_price": 0,
+                  "window": "",
+                  "note": "富余配额可在结转上限内留存次年；测算最大可结转约 1761 万吨（结转日 2028-06-10），请勿超过上限囤积",
+                  "meta": {
+                    "informational": true
+                  }
+                }
+              ],
+              "total_cost": 0.0,
+              "planned_cost": 0.0,
+              "net_saving": 0.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": [
+                  "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出"
+                ]
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.03,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "optimized",
+              "title": "成本优化综合方案",
+              "description": "CEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）",
+              "risk_profile": "balanced",
+              "channel_mode": "hybrid",
+              "actions": [
+                {
+                  "action": "sell_cea",
+                  "qty": 1761.0,
+                  "unit_price": 95.1,
+                  "window": "late",
+                  "note": "价格高位，分批卖出富余配额；可优先线下撮合寻找买方，公开挂牌作兜底（参考价 95.1 元/吨，非实时挂单）",
+                  "meta": {
+                    "channel": "offline_preferred_sell",
+                    "listed_ref_price": 95.1,
+                    "offline_assumed_price": 93.6735,
+                    "offline_discount": 0.015,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook",
+                    "fee_rate": 0.0,
+                    "fee_kind": "block"
+                  }
+                }
+              ],
+              "total_cost": -1674711000.0,
+              "planned_cost": -1674711000.0,
+              "net_saving": 1674711000.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": [
+                  "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出"
+                ]
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.015,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "full_compliance",
+              "title": "稳健履约方案",
+              "description": "CEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）",
+              "risk_profile": "aggressive",
+              "channel_mode": "listed",
+              "actions": [
+                {
+                  "action": "sell_cea",
+                  "qty": 1761.0,
+                  "unit_price": 95.1,
+                  "window": "late",
+                  "note": "价格高位，分批卖出富余配额；可优先线下撮合寻找买方，公开挂牌作兜底（参考价 95.1 元/吨，非实时挂单）",
+                  "meta": {
+                    "channel": "offline_preferred_sell",
+                    "listed_ref_price": 95.1,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook",
+                    "fee_rate": 0.0,
+                    "fee_kind": "block"
+                  }
+                }
+              ],
+              "total_cost": -1674711000.0,
+              "planned_cost": -1674711000.0,
+              "net_saving": 1674711000.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": [
+                  "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出"
+                ]
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": false,
+                "offline_discount_vs_listed": 0.0,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线上挂牌口径不打折",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            }
+          ],
+          "status": "completed",
+          "report_md": "# 冀东钢铁集团有限公司 2027 年碳履约策略推荐\n\n## 核算快照\n\n- 最终核查排放：20.00 万吨 CO₂e\n- 可用 CEA：1781.00 万吨\n- 抵扣前缺口：-1761.00 万吨（核查排放 − 可用 CEA）\n- CCER 抵销上限：1.00 万吨（应清缴配额 = 核查排放 20.00 × 5%）\n- 台账可抵扣 CCER：165.00 万吨\n- 本履约可动用 CCER：0.00 万吨\n- 履约缺口/富余（已扣 CCER）：-1761.00 万吨\n\n## 市场周期\n\n- 价格带：高位\n- 时间窗口：年末窗口\n- 建议动作：建议出售\n- 说明：年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨，盈余配额可择高位窗口出售\n\n## 分层推荐方案\n\n### 最低成本履约方案\n\n仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）\n\n- 总成本测算：0.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 卖出 CEA | 0.00 | 0.00 | — | 富余配额可在结转上限内留存次年；测算最大可结转约 1761 万吨（结转日 2028-06-10），请勿超过上限囤积 |\n\n### 成本优化综合方案\n\nCEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）\n\n- 总成本测算：-1674711000.00 元\n- 净节约：1674711000.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 卖出 CEA | 1761.00 | 95.10 | 年末窗口 | 价格高位，分批卖出富余配额；可优先线下撮合寻找买方，公开挂牌作兜底（参考价 95.1 元/吨，非实时挂单） |\n\n### 稳健履约方案\n\nCEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）\n\n- 总成本测算：-1674711000.00 元\n- 净节约：1674711000.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 卖出 CEA | 1761.00 | 95.10 | 年末窗口 | 价格高位，分批卖出富余配额；可优先线下撮合寻找买方，公开挂牌作兜底（参考价 95.1 元/吨，非实时挂单） |\n\n---\n\n本报告由确定性规则引擎生成，不构成投资或合规承诺，请结合最新政策复核。",
+          "created_at": "2026-10-27T14:28:00+08:00"
+        },
+        {
+          "id": "293841ad-bb20-47a8-80d4-021e65261c98",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "user_id": "default",
+          "compliance_year": 0,
+          "accounting_snapshot": {
+            "scope1_total": 1660.0,
+            "scope2_from_power": 0.0,
+            "raw_total": 1660.0,
+            "reducible_power": 0.0,
+            "verified_emission": 1630.0,
+            "free_cea_quota": 1781.0,
+            "compliance_gap": -151.0,
+            "ccer_cap": 81.5,
+            "own_ccer_eligible": 165.0,
+            "own_ccer_usable": 0.0,
+            "residual_gap_after_own_ccer": -151.0,
+            "gap_before_ccer": -151.0,
+            "ccer_offset_used": 0.0,
+            "allocated_free_cea": 1750.0,
+            "carry_forward_qty": 10.0,
+            "usable_cea_total": 1781.0,
+            "traded_buy_qty": 21.0,
+            "traded_sell_qty": 0.0,
+            "ccer_max_ratio": 0.05
+          },
+          "market_tags": {
+            "price_band": "high",
+            "time_window": "late",
+            "action_tag": "sell",
+            "current_price": 97.8,
+            "cea_ccer_spread": 1.4599999999999937,
+            "ccer_supply_tag": "unknown",
+            "rationale": "年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨，盈余配额可择高位窗口出售",
+            "price_forecast": {
+              "as_of": "2026-10-27",
+              "end_date": "2026-12-31",
+              "last_close": 95.08,
+              "year_end_price": 101.11,
+              "year_end_low": 95.52,
+              "year_end_high": 106.69,
+              "peak_price": 101.76,
+              "peak_date": "2026-12-25",
+              "trough_price": 95.1,
+              "trough_date": "2026-10-27",
+              "trading_days": 48,
+              "method": "trend_seasonal_compliance",
+              "note": "算法=规则模型：衰减趋势(均线差日漂移)+去均值同周季节+履约季冲高回落（四季度相对上半年溢价定振幅；约12月初见顶、年底回吐）；波动带=近60日收益标准差×√天数。 CEA 公开侧无实时挂单，输入为历史日均/收盘；仅供履约择机参考，不构成投资建议。"
+            },
+            "carry_forward": {
+              "deadline_md": "06-10",
+              "deadline": "2026-06-10",
+              "base_qty": 1750.0,
+              "net_sell": -21.0,
+              "net_sell_multiplier": 1.5,
+              "year_end_holding": 151.0,
+              "formula_cap": 1750.0,
+              "max_carry": 151.0,
+              "excess": 0.0,
+              "sell_to_expand_cap": 0.0
+            }
+          },
+          "plans": [
+            {
+              "key": "min_cost",
+              "title": "最低成本履约方案",
+              "description": "仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）",
+              "risk_profile": "conservative",
+              "channel_mode": "offline",
+              "actions": [
+                {
+                  "action": "sell_cea",
+                  "qty": 0,
+                  "unit_price": 0,
+                  "window": "",
+                  "note": "富余配额可在结转上限内留存次年；测算最大可结转约 151 万吨（结转日 2026-06-10），请勿超过上限囤积",
+                  "meta": {
+                    "informational": true
+                  }
+                }
+              ],
+              "total_cost": 0.0,
+              "planned_cost": 0.0,
+              "net_saving": 0.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": [
+                  "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出"
+                ]
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.03,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "optimized",
+              "title": "成本优化综合方案",
+              "description": "CEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）",
+              "risk_profile": "balanced",
+              "channel_mode": "hybrid",
+              "actions": [
+                {
+                  "action": "sell_cea",
+                  "qty": 151.0,
+                  "unit_price": 95.1,
+                  "window": "late",
+                  "note": "价格高位，分批卖出富余配额；可优先线下撮合寻找买方，公开挂牌作兜底（参考价 95.1 元/吨，非实时挂单）",
+                  "meta": {
+                    "channel": "offline_preferred_sell",
+                    "listed_ref_price": 95.1,
+                    "offline_assumed_price": 93.6735,
+                    "offline_discount": 0.015,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook",
+                    "fee_rate": 0.0,
+                    "fee_kind": "block"
+                  }
+                }
+              ],
+              "total_cost": -143601000.0,
+              "planned_cost": -143601000.0,
+              "net_saving": 143601000.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": [
+                  "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出"
+                ]
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.015,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "full_compliance",
+              "title": "稳健履约方案",
+              "description": "CEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）",
+              "risk_profile": "aggressive",
+              "channel_mode": "listed",
+              "actions": [
+                {
+                  "action": "sell_cea",
+                  "qty": 151.0,
+                  "unit_price": 95.1,
+                  "window": "late",
+                  "note": "价格高位，分批卖出富余配额；可优先线下撮合寻找买方，公开挂牌作兜底（参考价 95.1 元/吨，非实时挂单）",
+                  "meta": {
+                    "channel": "offline_preferred_sell",
+                    "listed_ref_price": 95.1,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook",
+                    "fee_rate": 0.0,
+                    "fee_kind": "block"
+                  }
+                }
+              ],
+              "total_cost": -143601000.0,
+              "planned_cost": -143601000.0,
+              "net_saving": 143601000.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": [
+                  "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出"
+                ]
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": false,
+                "offline_discount_vs_listed": 0.0,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线上挂牌口径不打折",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            }
+          ],
+          "status": "completed",
+          "report_md": "# 冀东钢铁集团有限公司 全年度碳履约策略推荐\n\n## 核算快照\n\n- 最终核查排放：1630.00 万吨 CO₂e\n- 可用 CEA：1781.00 万吨（免费 1750.00 + 买入 21.00 − 卖出 0.00）\n- 抵扣前缺口：-151.00 万吨（核查排放 − 可用 CEA）\n- CCER 抵销上限：81.50 万吨（应清缴配额 = 核查排放 1630.00 × 5%）\n- 台账可抵扣 CCER：165.00 万吨\n- 本履约可动用 CCER：0.00 万吨\n- 履约缺口/富余（已扣 CCER）：-151.00 万吨\n\n## 市场周期\n\n- 价格带：高位\n- 时间窗口：年末窗口\n- 建议动作：建议出售\n- 说明：年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨，盈余配额可择高位窗口出售\n\n## 分层推荐方案\n\n### 最低成本履约方案\n\n仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）\n\n- 总成本测算：0.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 卖出 CEA | 0.00 | 0.00 | — | 富余配额可在结转上限内留存次年；测算最大可结转约 151 万吨（结转日 2026-06-10），请勿超过上限囤积 |\n\n### 成本优化综合方案\n\nCEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）\n\n- 总成本测算：-143601000.00 元\n- 净节约：143601000.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 卖出 CEA | 151.00 | 95.10 | 年末窗口 | 价格高位，分批卖出富余配额；可优先线下撮合寻找买方，公开挂牌作兜底（参考价 95.1 元/吨，非实时挂单） |\n\n### 稳健履约方案\n\nCEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）\n\n- 总成本测算：-143601000.00 元\n- 净节约：143601000.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 卖出 CEA | 151.00 | 95.10 | 年末窗口 | 价格高位，分批卖出富余配额；可优先线下撮合寻找买方，公开挂牌作兜底（参考价 95.1 元/吨，非实时挂单） |\n\n---\n\n本报告由确定性规则引擎生成，不构成投资或合规承诺，请结合最新政策复核。",
+          "created_at": "2026-10-27T14:28:08+08:00"
         }
       ],
       "alerts": [
@@ -4490,6 +5154,39 @@
           "due_at": null,
           "acked": false,
           "created_at": "2026-10-27T10:14:22+08:00"
+        },
+        {
+          "id": "3b7c667f-ac7d-490c-aed4-25ec39cd253f",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "user_id": "default",
+          "level": "warning",
+          "alert_type": "price_spike",
+          "message": "CEA 价格处于历史高位区间，关注采购成本与卖出窗口",
+          "due_at": null,
+          "acked": false,
+          "created_at": "2026-10-27T14:07:03+08:00"
+        },
+        {
+          "id": "3f40a3eb-e5f0-439d-bab0-a716c3cb94b4",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "user_id": "default",
+          "level": "warning",
+          "alert_type": "price_spike",
+          "message": "CEA 价格处于历史高位区间，关注采购成本与卖出窗口",
+          "due_at": null,
+          "acked": false,
+          "created_at": "2026-10-27T14:28:00+08:00"
+        },
+        {
+          "id": "fbed9023-91c3-4e6a-80b4-9b43dd8776a8",
+          "enterprise_id": "b58fcd82-4cb1-4357-bebb-869d02b795e5",
+          "user_id": "default",
+          "level": "warning",
+          "alert_type": "price_spike",
+          "message": "CEA 价格处于历史高位区间，关注采购成本与卖出窗口",
+          "due_at": null,
+          "acked": false,
+          "created_at": "2026-10-27T14:28:08+08:00"
         }
       ]
     },
@@ -10737,6 +11434,237 @@
           "status": "completed",
           "report_md": "# 模拟钢铁企业 全年度碳履约策略推荐\n\n## 核算快照\n\n- 最终核查排放：30.00 万吨 CO₂e\n- 可用 CEA：27.00 万吨（免费 10.00 + 买入 17.00 − 卖出 0.00）\n- 抵扣前缺口：3.00 万吨（核查排放 − 可用 CEA）\n- CCER 抵销上限：1.50 万吨（应清缴配额 = 核查排放 30.00 × 5%）\n- 台账可抵扣 CCER：15.00 万吨\n- 本履约可动用 CCER：1.50 万吨\n- 履约缺口/富余（已扣 CCER）：1.50 万吨\n\n## 市场周期\n\n- 价格带：高位\n- 时间窗口：年末窗口\n- 建议动作：建议出售\n- 说明：年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨（高于现价），宜评估提前分批采购\n\n## 分层推荐方案\n\n### 最低成本履约方案\n\n仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）\n\n- 总成本测算：1383705.00 元\n- 净节约：42795.00 元\n- 操作窗口：年末窗口\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 1.50 | 0.00 | 年末窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n| 买入 CEA | 1.50 | 92.25 | 年末窗口 | 按履约缺口采购配额；高价采购约 1383705 vs 罚款约 3000000；优先尝试线下撮合采购CEA（假定较公开参考价低约 3.0%：参考 95.1 → 线下估 92.247 元/吨）；公开侧无实时挂单，价格为日均/预测锚定，线上挂牌作兜底 |\n\n### 成本优化综合方案\n\nCEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）\n\n- 总成本测算：1405102.50 元\n- 净节约：21397.50 元\n- 操作窗口：年末窗口\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 1.50 | 0.00 | 年末窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n| 买入 CEA | 1.50 | 93.67 | 年末窗口 | 按履约缺口采购配额；高价采购约 1405102 vs 罚款约 3000000；优先尝试线下撮合采购CEA（假定较公开参考价低约 1.5%：参考 95.1 → 线下估 93.6735 元/吨）；公开侧无实时挂单，价格为日均/预测锚定，线上挂牌作兜底 |\n\n### 稳健履约方案\n\nCEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）\n\n- 总成本测算：1426500.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 1.50 | 0.00 | 年末窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n| 买入 CEA | 1.50 | 95.10 | 年末窗口 | 按履约缺口采购配额；高价采购约 1426500 vs 罚款约 3000000；公开侧无实时挂单，CEA 价格为日均/预测锚定；若无法线下成交再走线上挂牌 |\n\n---\n\n本报告由确定性规则引擎生成，不构成投资或合规承诺，请结合最新政策复核。",
           "created_at": "2026-10-27T11:47:57+08:00"
+        },
+        {
+          "id": "75cd5bc8-84b8-49e5-9010-ef22243f99e1",
+          "enterprise_id": "b9c009e0-2b4b-433e-a74a-d023eb7db853",
+          "user_id": "default",
+          "compliance_year": 0,
+          "accounting_snapshot": {
+            "scope1_total": 20.0,
+            "scope2_from_power": 0.0,
+            "raw_total": 20.0,
+            "reducible_power": 0.0,
+            "verified_emission": 30.0,
+            "free_cea_quota": 27.0,
+            "compliance_gap": 1.5,
+            "ccer_cap": 1.5,
+            "own_ccer_eligible": 15.0,
+            "own_ccer_usable": 1.5,
+            "residual_gap_after_own_ccer": 1.5,
+            "gap_before_ccer": 3.0,
+            "ccer_offset_used": 1.5,
+            "allocated_free_cea": 10.0,
+            "carry_forward_qty": 0.0,
+            "usable_cea_total": 27.0,
+            "traded_buy_qty": 17.0,
+            "traded_sell_qty": 0.0,
+            "ccer_max_ratio": 0.05
+          },
+          "market_tags": {
+            "price_band": "high",
+            "time_window": "late",
+            "action_tag": "sell",
+            "current_price": 97.8,
+            "cea_ccer_spread": 1.4599999999999937,
+            "ccer_supply_tag": "unknown",
+            "rationale": "年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨（高于现价），宜评估提前分批采购",
+            "price_forecast": {
+              "as_of": "2026-10-27",
+              "end_date": "2026-12-31",
+              "last_close": 95.08,
+              "year_end_price": 101.11,
+              "year_end_low": 95.52,
+              "year_end_high": 106.69,
+              "peak_price": 101.76,
+              "peak_date": "2026-12-25",
+              "trough_price": 95.1,
+              "trough_date": "2026-10-27",
+              "trading_days": 48,
+              "method": "trend_seasonal_compliance",
+              "note": "算法=规则模型：衰减趋势(均线差日漂移)+去均值同周季节+履约季冲高回落（四季度相对上半年溢价定振幅；约12月初见顶、年底回吐）；波动带=近60日收益标准差×√天数。 CEA 公开侧无实时挂单，输入为历史日均/收盘；仅供履约择机参考，不构成投资建议。"
+            },
+            "carry_forward": {
+              "deadline_md": "06-10",
+              "deadline": "2026-06-10",
+              "base_qty": 10.0,
+              "net_sell": -17.0,
+              "net_sell_multiplier": 1.5,
+              "year_end_holding": 0.0,
+              "formula_cap": 10.0,
+              "max_carry": 0.0,
+              "excess": 0.0,
+              "sell_to_expand_cap": 0.0
+            }
+          },
+          "plans": [
+            {
+              "key": "min_cost",
+              "title": "最低成本履约方案",
+              "description": "仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）",
+              "risk_profile": "conservative",
+              "channel_mode": "offline",
+              "actions": [
+                {
+                  "action": "use_ccer",
+                  "qty": 1.5,
+                  "unit_price": 0.0,
+                  "window": "late",
+                  "note": "优先全额消耗自有存量 CCER（不涉及市场渠道）",
+                  "meta": {
+                    "fee_rate": 0.0,
+                    "fee_kind": "none"
+                  }
+                },
+                {
+                  "action": "buy_cea",
+                  "qty": 1.5,
+                  "unit_price": 92.247,
+                  "window": "late",
+                  "note": "按履约缺口采购配额；高价采购约 1383705 vs 罚款约 3000000；优先尝试线下撮合采购CEA（假定较公开参考价低约 3.0%：参考 95.1 → 线下估 92.247 元/吨）；公开侧无实时挂单，价格为日均/预测锚定，线上挂牌作兜底",
+                  "meta": {
+                    "channel": "offline_preferred",
+                    "listed_ref_price": 95.1,
+                    "offline_assumed_price": 92.247,
+                    "offline_discount": 0.03,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook",
+                    "fee_rate": 0.0,
+                    "fee_kind": "block"
+                  }
+                }
+              ],
+              "total_cost": 1383705.0,
+              "planned_cost": 1383705.0,
+              "net_saving": 42794.99999999992,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": []
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.03,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "optimized",
+              "title": "成本优化综合方案",
+              "description": "CEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）",
+              "risk_profile": "balanced",
+              "channel_mode": "hybrid",
+              "actions": [
+                {
+                  "action": "use_ccer",
+                  "qty": 1.5,
+                  "unit_price": 0.0,
+                  "window": "late",
+                  "note": "优先全额消耗自有存量 CCER（不涉及市场渠道）",
+                  "meta": {
+                    "fee_rate": 0.0,
+                    "fee_kind": "none"
+                  }
+                },
+                {
+                  "action": "buy_cea",
+                  "qty": 1.5,
+                  "unit_price": 93.6735,
+                  "window": "late",
+                  "note": "按履约缺口采购配额；高价采购约 1405102 vs 罚款约 3000000；优先尝试线下撮合采购CEA（假定较公开参考价低约 1.5%：参考 95.1 → 线下估 93.6735 元/吨）；公开侧无实时挂单，价格为日均/预测锚定，线上挂牌作兜底",
+                  "meta": {
+                    "channel": "offline_preferred",
+                    "listed_ref_price": 95.1,
+                    "offline_assumed_price": 93.6735,
+                    "offline_discount": 0.015,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook",
+                    "fee_rate": 0.0,
+                    "fee_kind": "block"
+                  }
+                }
+              ],
+              "total_cost": 1405102.5,
+              "planned_cost": 1405102.5,
+              "net_saving": 21397.49999999985,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": []
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.015,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "full_compliance",
+              "title": "稳健履约方案",
+              "description": "CEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）",
+              "risk_profile": "aggressive",
+              "channel_mode": "listed",
+              "actions": [
+                {
+                  "action": "use_ccer",
+                  "qty": 1.5,
+                  "unit_price": 0.0,
+                  "window": "late",
+                  "note": "优先全额消耗自有存量 CCER（不涉及市场渠道）",
+                  "meta": {
+                    "fee_rate": 0.0,
+                    "fee_kind": "none"
+                  }
+                },
+                {
+                  "action": "buy_cea",
+                  "qty": 1.5,
+                  "unit_price": 95.1,
+                  "window": "late",
+                  "note": "按履约缺口采购配额；高价采购约 1426500 vs 罚款约 3000000；公开侧无实时挂单，CEA 价格为日均/预测锚定；若无法线下成交再走线上挂牌",
+                  "meta": {
+                    "channel": "listed_fallback",
+                    "listed_ref_price": 95.1,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook",
+                    "fee_rate": 0.0,
+                    "fee_kind": "listing"
+                  }
+                }
+              ],
+              "total_cost": 1426500.0,
+              "planned_cost": 1426500.0,
+              "net_saving": 0.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": []
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": false,
+                "offline_discount_vs_listed": 0.0,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线上挂牌口径不打折",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            }
+          ],
+          "status": "completed",
+          "report_md": "# 模拟钢铁企业 全年度碳履约策略推荐\n\n## 核算快照\n\n- 最终核查排放：30.00 万吨 CO₂e\n- 可用 CEA：27.00 万吨（免费 10.00 + 买入 17.00 − 卖出 0.00）\n- 抵扣前缺口：3.00 万吨（核查排放 − 可用 CEA）\n- CCER 抵销上限：1.50 万吨（应清缴配额 = 核查排放 30.00 × 5%）\n- 台账可抵扣 CCER：15.00 万吨\n- 本履约可动用 CCER：1.50 万吨\n- 履约缺口/富余（已扣 CCER）：1.50 万吨\n\n## 市场周期\n\n- 价格带：高位\n- 时间窗口：年末窗口\n- 建议动作：建议出售\n- 说明：年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨（高于现价），宜评估提前分批采购\n\n## 分层推荐方案\n\n### 最低成本履约方案\n\n仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）\n\n- 总成本测算：1383705.00 元\n- 净节约：42795.00 元\n- 操作窗口：年末窗口\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 1.50 | 0.00 | 年末窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n| 买入 CEA | 1.50 | 92.25 | 年末窗口 | 按履约缺口采购配额；高价采购约 1383705 vs 罚款约 3000000；优先尝试线下撮合采购CEA（假定较公开参考价低约 3.0%：参考 95.1 → 线下估 92.247 元/吨）；公开侧无实时挂单，价格为日均/预测锚定，线上挂牌作兜底 |\n\n### 成本优化综合方案\n\nCEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）\n\n- 总成本测算：1405102.50 元\n- 净节约：21397.50 元\n- 操作窗口：年末窗口\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 1.50 | 0.00 | 年末窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n| 买入 CEA | 1.50 | 93.67 | 年末窗口 | 按履约缺口采购配额；高价采购约 1405102 vs 罚款约 3000000；优先尝试线下撮合采购CEA（假定较公开参考价低约 1.5%：参考 95.1 → 线下估 93.6735 元/吨）；公开侧无实时挂单，价格为日均/预测锚定，线上挂牌作兜底 |\n\n### 稳健履约方案\n\nCEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）\n\n- 总成本测算：1426500.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 1.50 | 0.00 | 年末窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n| 买入 CEA | 1.50 | 95.10 | 年末窗口 | 按履约缺口采购配额；高价采购约 1426500 vs 罚款约 3000000；公开侧无实时挂单，CEA 价格为日均/预测锚定；若无法线下成交再走线上挂牌 |\n\n---\n\n本报告由确定性规则引擎生成，不构成投资或合规承诺，请结合最新政策复核。",
+          "created_at": "2026-10-27T14:06:48+08:00"
         }
       ],
       "alerts": [
@@ -11344,6 +12272,28 @@
           "due_at": null,
           "acked": false,
           "created_at": "2026-10-27T11:47:57+08:00"
+        },
+        {
+          "id": "96dd7504-d61f-48cb-9660-892b4cb76c63",
+          "enterprise_id": "b9c009e0-2b4b-433e-a74a-d023eb7db853",
+          "user_id": "default",
+          "level": "info",
+          "alert_type": "clearance_countdown",
+          "message": "距清缴截止（2026-12-31）剩 65 天，履约缺口约 1.50 万吨（已扣自有 CCER 抵销，抵销上限 1.50 万吨），请尽快补足资产",
+          "due_at": "2026-12-31T00:00:00+00:00",
+          "acked": false,
+          "created_at": "2026-10-27T14:06:48+08:00"
+        },
+        {
+          "id": "244ea790-eb9e-402d-96f6-79f8e8d797e6",
+          "enterprise_id": "b9c009e0-2b4b-433e-a74a-d023eb7db853",
+          "user_id": "default",
+          "level": "warning",
+          "alert_type": "price_spike",
+          "message": "CEA 价格处于历史高位区间，关注采购成本与卖出窗口",
+          "due_at": null,
+          "acked": false,
+          "created_at": "2026-10-27T14:06:48+08:00"
         }
       ]
     },
@@ -12640,6 +13590,388 @@
           "status": "completed",
           "report_md": "# 模拟火电企业 全年度碳履约策略推荐\n\n## 核算快照\n\n- 最终核查排放：300.00 万吨 CO₂e\n- 可用 CEA：290.00 万吨（免费 240.00 + 买入 50.00 − 卖出 0.00）\n- 抵扣前缺口：10.00 万吨（核查排放 − 可用 CEA）\n- CCER 抵销上限：15.00 万吨（应清缴配额 = 核查排放 300.00 × 5%）\n- 台账可抵扣 CCER：100.00 万吨\n- 本履约可动用 CCER：10.00 万吨\n- 履约缺口/富余（已扣 CCER）：0.00 万吨\n\n## 市场周期\n\n- 价格带：高位\n- 时间窗口：年末窗口\n- 建议动作：建议出售\n- 说明：年末履约紧张期且价格高位，盈余企业适合分批卖出\n\n## 分层推荐方案\n\n### 最低成本履约方案\n\n仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）\n\n- 总成本测算：0.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 10.00 | 0.00 | 年末窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n\n### 成本优化综合方案\n\nCEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）\n\n- 总成本测算：0.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 10.00 | 0.00 | 年末窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n\n### 稳健履约方案\n\nCEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）\n\n- 总成本测算：0.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 10.00 | 0.00 | 年末窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n\n---\n\n本报告由确定性规则引擎生成，不构成投资或合规承诺，请结合最新政策复核。",
           "created_at": "2026-10-27T11:47:56+08:00"
+        },
+        {
+          "id": "f1ad444a-4bae-4ad6-a5dd-1c376959f541",
+          "enterprise_id": "be0e6de1-7aa2-4a1e-beb5-fd15dd24bce1",
+          "user_id": "default",
+          "compliance_year": 0,
+          "accounting_snapshot": {
+            "scope1_total": 120.0,
+            "scope2_from_power": 0.0,
+            "raw_total": 120.0,
+            "reducible_power": 0.0,
+            "verified_emission": 300.0,
+            "free_cea_quota": 290.0,
+            "compliance_gap": 0.0,
+            "ccer_cap": 15.0,
+            "own_ccer_eligible": 100.0,
+            "own_ccer_usable": 10.0,
+            "residual_gap_after_own_ccer": 0.0,
+            "gap_before_ccer": 10.0,
+            "ccer_offset_used": 10.0,
+            "allocated_free_cea": 240.0,
+            "carry_forward_qty": 0.0,
+            "usable_cea_total": 290.0,
+            "traded_buy_qty": 50.0,
+            "traded_sell_qty": 0.0,
+            "ccer_max_ratio": 0.05
+          },
+          "market_tags": {
+            "price_band": "high",
+            "time_window": "late",
+            "action_tag": "sell",
+            "current_price": 97.8,
+            "cea_ccer_spread": 1.4599999999999937,
+            "ccer_supply_tag": "unknown",
+            "rationale": "年末履约紧张期且价格高位，盈余企业适合分批卖出",
+            "price_forecast": {
+              "as_of": "2026-10-27",
+              "end_date": "2026-12-31",
+              "last_close": 95.08,
+              "year_end_price": 101.11,
+              "year_end_low": 95.52,
+              "year_end_high": 106.69,
+              "peak_price": 101.76,
+              "peak_date": "2026-12-25",
+              "trough_price": 95.1,
+              "trough_date": "2026-10-27",
+              "trading_days": 48,
+              "method": "trend_seasonal_compliance",
+              "note": "算法=规则模型：衰减趋势(均线差日漂移)+去均值同周季节+履约季冲高回落（四季度相对上半年溢价定振幅；约12月初见顶、年底回吐）；波动带=近60日收益标准差×√天数。 CEA 公开侧无实时挂单，输入为历史日均/收盘；仅供履约择机参考，不构成投资建议。"
+            },
+            "carry_forward": {
+              "deadline_md": "06-10",
+              "deadline": "2026-06-10",
+              "base_qty": 240.0,
+              "net_sell": -50.0,
+              "net_sell_multiplier": 1.5,
+              "year_end_holding": 0.0,
+              "formula_cap": 240.0,
+              "max_carry": 0.0,
+              "excess": 0.0,
+              "sell_to_expand_cap": 0.0
+            }
+          },
+          "plans": [
+            {
+              "key": "min_cost",
+              "title": "最低成本履约方案",
+              "description": "仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）",
+              "risk_profile": "conservative",
+              "channel_mode": "offline",
+              "actions": [
+                {
+                  "action": "use_ccer",
+                  "qty": 10.0,
+                  "unit_price": 0.0,
+                  "window": "late",
+                  "note": "优先全额消耗自有存量 CCER（不涉及市场渠道）",
+                  "meta": {
+                    "fee_rate": 0.0,
+                    "fee_kind": "none"
+                  }
+                }
+              ],
+              "total_cost": 0.0,
+              "planned_cost": 0.0,
+              "net_saving": 0.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": [
+                  "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出"
+                ]
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.03,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "optimized",
+              "title": "成本优化综合方案",
+              "description": "CEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）",
+              "risk_profile": "balanced",
+              "channel_mode": "hybrid",
+              "actions": [
+                {
+                  "action": "use_ccer",
+                  "qty": 10.0,
+                  "unit_price": 0.0,
+                  "window": "late",
+                  "note": "优先全额消耗自有存量 CCER（不涉及市场渠道）",
+                  "meta": {
+                    "fee_rate": 0.0,
+                    "fee_kind": "none"
+                  }
+                }
+              ],
+              "total_cost": 0.0,
+              "planned_cost": 0.0,
+              "net_saving": 0.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": [
+                  "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出"
+                ]
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.015,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "full_compliance",
+              "title": "稳健履约方案",
+              "description": "CEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）",
+              "risk_profile": "aggressive",
+              "channel_mode": "listed",
+              "actions": [
+                {
+                  "action": "use_ccer",
+                  "qty": 10.0,
+                  "unit_price": 0.0,
+                  "window": "late",
+                  "note": "优先全额消耗自有存量 CCER（不涉及市场渠道）",
+                  "meta": {
+                    "fee_rate": 0.0,
+                    "fee_kind": "none"
+                  }
+                }
+              ],
+              "total_cost": 0.0,
+              "planned_cost": 0.0,
+              "net_saving": 0.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": [
+                  "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出"
+                ]
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": false,
+                "offline_discount_vs_listed": 0.0,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线上挂牌口径不打折",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            }
+          ],
+          "status": "completed",
+          "report_md": "# 模拟火电企业 全年度碳履约策略推荐\n\n## 核算快照\n\n- 最终核查排放：300.00 万吨 CO₂e\n- 可用 CEA：290.00 万吨（免费 240.00 + 买入 50.00 − 卖出 0.00）\n- 抵扣前缺口：10.00 万吨（核查排放 − 可用 CEA）\n- CCER 抵销上限：15.00 万吨（应清缴配额 = 核查排放 300.00 × 5%）\n- 台账可抵扣 CCER：100.00 万吨\n- 本履约可动用 CCER：10.00 万吨\n- 履约缺口/富余（已扣 CCER）：0.00 万吨\n\n## 市场周期\n\n- 价格带：高位\n- 时间窗口：年末窗口\n- 建议动作：建议出售\n- 说明：年末履约紧张期且价格高位，盈余企业适合分批卖出\n\n## 分层推荐方案\n\n### 最低成本履约方案\n\n仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）\n\n- 总成本测算：0.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 10.00 | 0.00 | 年末窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n\n### 成本优化综合方案\n\nCEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）\n\n- 总成本测算：0.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 10.00 | 0.00 | 年末窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n\n### 稳健履约方案\n\nCEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）\n\n- 总成本测算：0.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 10.00 | 0.00 | 年末窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n\n---\n\n本报告由确定性规则引擎生成，不构成投资或合规承诺，请结合最新政策复核。",
+          "created_at": "2026-10-27T14:06:42+08:00"
+        },
+        {
+          "id": "970bbcdc-61b2-46f5-b07e-aea0a94b0058",
+          "enterprise_id": "be0e6de1-7aa2-4a1e-beb5-fd15dd24bce1",
+          "user_id": "default",
+          "compliance_year": 0,
+          "accounting_snapshot": {
+            "scope1_total": 120.0,
+            "scope2_from_power": 0.0,
+            "raw_total": 120.0,
+            "reducible_power": 0.0,
+            "verified_emission": 300.0,
+            "free_cea_quota": 290.0,
+            "compliance_gap": 0.0,
+            "ccer_cap": 15.0,
+            "own_ccer_eligible": 100.0,
+            "own_ccer_usable": 10.0,
+            "residual_gap_after_own_ccer": 0.0,
+            "gap_before_ccer": 10.0,
+            "ccer_offset_used": 10.0,
+            "allocated_free_cea": 240.0,
+            "carry_forward_qty": 0.0,
+            "usable_cea_total": 290.0,
+            "traded_buy_qty": 50.0,
+            "traded_sell_qty": 0.0,
+            "ccer_max_ratio": 0.05
+          },
+          "market_tags": {
+            "price_band": "high",
+            "time_window": "late",
+            "action_tag": "sell",
+            "current_price": 97.8,
+            "cea_ccer_spread": 1.4599999999999937,
+            "ccer_supply_tag": "unknown",
+            "rationale": "年末履约紧张期且价格高位，盈余企业适合分批卖出",
+            "price_forecast": {
+              "as_of": "2026-10-27",
+              "end_date": "2026-12-31",
+              "last_close": 95.08,
+              "year_end_price": 101.11,
+              "year_end_low": 95.52,
+              "year_end_high": 106.69,
+              "peak_price": 101.76,
+              "peak_date": "2026-12-25",
+              "trough_price": 95.1,
+              "trough_date": "2026-10-27",
+              "trading_days": 48,
+              "method": "trend_seasonal_compliance",
+              "note": "算法=规则模型：衰减趋势(均线差日漂移)+去均值同周季节+履约季冲高回落（四季度相对上半年溢价定振幅；约12月初见顶、年底回吐）；波动带=近60日收益标准差×√天数。 CEA 公开侧无实时挂单，输入为历史日均/收盘；仅供履约择机参考，不构成投资建议。"
+            },
+            "carry_forward": {
+              "deadline_md": "06-10",
+              "deadline": "2026-06-10",
+              "base_qty": 240.0,
+              "net_sell": -50.0,
+              "net_sell_multiplier": 1.5,
+              "year_end_holding": 0.0,
+              "formula_cap": 240.0,
+              "max_carry": 0.0,
+              "excess": 0.0,
+              "sell_to_expand_cap": 0.0
+            }
+          },
+          "plans": [
+            {
+              "key": "min_cost",
+              "title": "最低成本履约方案",
+              "description": "仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）",
+              "risk_profile": "conservative",
+              "channel_mode": "offline",
+              "actions": [
+                {
+                  "action": "use_ccer",
+                  "qty": 10.0,
+                  "unit_price": 0.0,
+                  "window": "late",
+                  "note": "优先全额消耗自有存量 CCER（不涉及市场渠道）",
+                  "meta": {
+                    "fee_rate": 0.0,
+                    "fee_kind": "none"
+                  }
+                }
+              ],
+              "total_cost": 0.0,
+              "planned_cost": 0.0,
+              "net_saving": 0.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": [
+                  "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出"
+                ]
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.03,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "optimized",
+              "title": "成本优化综合方案",
+              "description": "CEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）",
+              "risk_profile": "balanced",
+              "channel_mode": "hybrid",
+              "actions": [
+                {
+                  "action": "use_ccer",
+                  "qty": 10.0,
+                  "unit_price": 0.0,
+                  "window": "late",
+                  "note": "优先全额消耗自有存量 CCER（不涉及市场渠道）",
+                  "meta": {
+                    "fee_rate": 0.0,
+                    "fee_kind": "none"
+                  }
+                }
+              ],
+              "total_cost": 0.0,
+              "planned_cost": 0.0,
+              "net_saving": 0.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": [
+                  "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出"
+                ]
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.015,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "full_compliance",
+              "title": "稳健履约方案",
+              "description": "CEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）",
+              "risk_profile": "aggressive",
+              "channel_mode": "listed",
+              "actions": [
+                {
+                  "action": "use_ccer",
+                  "qty": 10.0,
+                  "unit_price": 0.0,
+                  "window": "late",
+                  "note": "优先全额消耗自有存量 CCER（不涉及市场渠道）",
+                  "meta": {
+                    "fee_rate": 0.0,
+                    "fee_kind": "none"
+                  }
+                }
+              ],
+              "total_cost": 0.0,
+              "planned_cost": 0.0,
+              "net_saving": 0.0,
+              "blocked": false,
+              "planned_actions": [],
+              "compliance": {
+                "ok": true,
+                "issues": [],
+                "notes": [
+                  "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出"
+                ]
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": false,
+                "offline_discount_vs_listed": 0.0,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线上挂牌口径不打折",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            }
+          ],
+          "status": "completed",
+          "report_md": "# 模拟火电企业 全年度碳履约策略推荐\n\n## 核算快照\n\n- 最终核查排放：300.00 万吨 CO₂e\n- 可用 CEA：290.00 万吨（免费 240.00 + 买入 50.00 − 卖出 0.00）\n- 抵扣前缺口：10.00 万吨（核查排放 − 可用 CEA）\n- CCER 抵销上限：15.00 万吨（应清缴配额 = 核查排放 300.00 × 5%）\n- 台账可抵扣 CCER：100.00 万吨\n- 本履约可动用 CCER：10.00 万吨\n- 履约缺口/富余（已扣 CCER）：0.00 万吨\n\n## 市场周期\n\n- 价格带：高位\n- 时间窗口：年末窗口\n- 建议动作：建议出售\n- 说明：年末履约紧张期且价格高位，盈余企业适合分批卖出\n\n## 分层推荐方案\n\n### 最低成本履约方案\n\n仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）\n\n- 总成本测算：0.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 10.00 | 0.00 | 年末窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n\n### 成本优化综合方案\n\nCEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）\n\n- 总成本测算：0.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 10.00 | 0.00 | 年末窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n\n### 稳健履约方案\n\nCEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）\n\n- 总成本测算：0.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规备注：本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，现金成本与净节约均为 0，无需额外支出\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n| 使用自有 CCER | 10.00 | 0.00 | 年末窗口 | 优先全额消耗自有存量 CCER（不涉及市场渠道） |\n\n---\n\n本报告由确定性规则引擎生成，不构成投资或合规承诺，请结合最新政策复核。",
+          "created_at": "2026-10-27T14:45:52+08:00"
         }
       ],
       "alerts": [
@@ -12719,6 +14051,28 @@
           "due_at": null,
           "acked": false,
           "created_at": "2026-10-27T11:47:56+08:00"
+        },
+        {
+          "id": "295dbd4a-3021-4bf3-9fd8-8b038573a808",
+          "enterprise_id": "be0e6de1-7aa2-4a1e-beb5-fd15dd24bce1",
+          "user_id": "default",
+          "level": "warning",
+          "alert_type": "price_spike",
+          "message": "CEA 价格处于历史高位区间，关注采购成本与卖出窗口",
+          "due_at": null,
+          "acked": false,
+          "created_at": "2026-10-27T14:06:42+08:00"
+        },
+        {
+          "id": "a5df46c9-748e-453f-8484-724be2b6584f",
+          "enterprise_id": "be0e6de1-7aa2-4a1e-beb5-fd15dd24bce1",
+          "user_id": "default",
+          "level": "warning",
+          "alert_type": "price_spike",
+          "message": "CEA 价格处于历史高位区间，关注采购成本与卖出窗口",
+          "due_at": null,
+          "acked": false,
+          "created_at": "2026-10-27T14:45:52+08:00"
         }
       ]
     },
@@ -13283,6 +14637,636 @@
           "status": "completed",
           "report_md": "# 模拟水泥企业 全年度碳履约策略推荐\n\n## 核算快照\n\n- 最终核查排放：122.00 万吨 CO₂e\n- 可用 CEA：0.00 万吨\n- 抵扣前缺口：122.00 万吨（核查排放 − 可用 CEA）\n- CCER 抵销上限：6.10 万吨（应清缴配额 = 核查排放 122.00 × 5%）\n- 台账可抵扣 CCER：0.00 万吨\n- 本履约可动用 CCER：0.00 万吨\n- 履约缺口/富余（已扣 CCER）：122.00 万吨\n\n## 市场周期\n\n- 价格带：高位\n- 时间窗口：年末窗口\n- 建议动作：建议出售\n- 说明：年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨（高于现价），宜评估提前分批采购\n\n## 分层推荐方案\n\n### 最低成本履约方案\n\n仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）\n\n- 总成本测算：0.00 元\n- 拦截前计划成本：112541340.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规提示（block）：采购成本超出年度预算上限 6000.00\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n\n### 成本优化综合方案\n\nCEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）\n\n- 总成本测算：0.00 元\n- 拦截前计划成本：114281670.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规提示（block）：采购成本超出年度预算上限 6000.00\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n\n### 稳健履约方案\n\nCEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）\n\n- 总成本测算：0.00 元\n- 拦截前计划成本：116022000.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规提示（block）：采购成本超出年度预算上限 6000.00\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n\n---\n\n本报告由确定性规则引擎生成，不构成投资或合规承诺，请结合最新政策复核。",
           "created_at": "2026-10-27T11:47:56+08:00"
+        },
+        {
+          "id": "e7ca49da-4164-4148-8b5d-c773a85737d9",
+          "enterprise_id": "c715f360-ce5f-4b87-baed-268b744abea9",
+          "user_id": "default",
+          "compliance_year": 0,
+          "accounting_snapshot": {
+            "scope1_total": 52.0,
+            "scope2_from_power": 0.0,
+            "raw_total": 52.0,
+            "reducible_power": 0.0,
+            "verified_emission": 122.0,
+            "free_cea_quota": 0.0,
+            "compliance_gap": 122.0,
+            "ccer_cap": 6.1000000000000005,
+            "own_ccer_eligible": 0.0,
+            "own_ccer_usable": 0.0,
+            "residual_gap_after_own_ccer": 122.0,
+            "gap_before_ccer": 122.0,
+            "ccer_offset_used": 0.0,
+            "allocated_free_cea": 0.0,
+            "carry_forward_qty": 0.0,
+            "usable_cea_total": 0.0,
+            "traded_buy_qty": 0.0,
+            "traded_sell_qty": 0.0,
+            "ccer_max_ratio": 0.05
+          },
+          "market_tags": {
+            "price_band": "high",
+            "time_window": "late",
+            "action_tag": "sell",
+            "current_price": 97.8,
+            "cea_ccer_spread": 1.4599999999999937,
+            "ccer_supply_tag": "unknown",
+            "rationale": "年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨（高于现价），宜评估提前分批采购",
+            "price_forecast": {
+              "as_of": "2026-10-27",
+              "end_date": "2026-12-31",
+              "last_close": 95.08,
+              "year_end_price": 101.11,
+              "year_end_low": 95.52,
+              "year_end_high": 106.69,
+              "peak_price": 101.76,
+              "peak_date": "2026-12-25",
+              "trough_price": 95.1,
+              "trough_date": "2026-10-27",
+              "trading_days": 48,
+              "method": "trend_seasonal_compliance",
+              "note": "算法=规则模型：衰减趋势(均线差日漂移)+去均值同周季节+履约季冲高回落（四季度相对上半年溢价定振幅；约12月初见顶、年底回吐）；波动带=近60日收益标准差×√天数。 CEA 公开侧无实时挂单，输入为历史日均/收盘；仅供履约择机参考，不构成投资建议。"
+            },
+            "carry_forward": {
+              "deadline_md": "06-10",
+              "deadline": "2026-06-10",
+              "base_qty": 0.0,
+              "net_sell": 0.0,
+              "net_sell_multiplier": 1.5,
+              "year_end_holding": 0.0,
+              "formula_cap": 0.0,
+              "max_carry": 0.0,
+              "excess": 0.0,
+              "sell_to_expand_cap": 0.0
+            }
+          },
+          "plans": [
+            {
+              "key": "min_cost",
+              "title": "最低成本履约方案",
+              "description": "仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）",
+              "risk_profile": "conservative",
+              "channel_mode": "offline",
+              "actions": [],
+              "total_cost": 0.0,
+              "planned_cost": 112541340.0,
+              "net_saving": 0.0,
+              "blocked": true,
+              "planned_actions": [
+                {
+                  "action": "buy_cea",
+                  "qty": 122.0,
+                  "unit_price": 92.247,
+                  "window": "late",
+                  "note": "按履约缺口采购配额；高价采购约 112541340 vs 罚款约 244000000；优先尝试线下撮合采购CEA（假定较公开参考价低约 3.0%：参考 95.1 → 线下估 92.247 元/吨）；公开侧无实时挂单，价格为日均/预测锚定，线上挂牌作兜底",
+                  "meta": {
+                    "channel": "offline_preferred",
+                    "listed_ref_price": 95.1,
+                    "offline_assumed_price": 92.247,
+                    "offline_discount": 0.03,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook"
+                  }
+                }
+              ],
+              "compliance": {
+                "ok": false,
+                "issues": [
+                  {
+                    "code": "budget_cap",
+                    "severity": "block",
+                    "message": "采购成本超出年度预算上限 6000.00"
+                  }
+                ],
+                "notes": []
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.03,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "optimized",
+              "title": "成本优化综合方案",
+              "description": "CEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）",
+              "risk_profile": "balanced",
+              "channel_mode": "hybrid",
+              "actions": [],
+              "total_cost": 0.0,
+              "planned_cost": 114281670.0,
+              "net_saving": 0.0,
+              "blocked": true,
+              "planned_actions": [
+                {
+                  "action": "buy_cea",
+                  "qty": 122.0,
+                  "unit_price": 93.6735,
+                  "window": "late",
+                  "note": "按履约缺口采购配额；高价采购约 114281670 vs 罚款约 244000000；优先尝试线下撮合采购CEA（假定较公开参考价低约 1.5%：参考 95.1 → 线下估 93.6735 元/吨）；公开侧无实时挂单，价格为日均/预测锚定，线上挂牌作兜底",
+                  "meta": {
+                    "channel": "offline_preferred",
+                    "listed_ref_price": 95.1,
+                    "offline_assumed_price": 93.6735,
+                    "offline_discount": 0.015,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook"
+                  }
+                }
+              ],
+              "compliance": {
+                "ok": false,
+                "issues": [
+                  {
+                    "code": "budget_cap",
+                    "severity": "block",
+                    "message": "采购成本超出年度预算上限 6000.00"
+                  }
+                ],
+                "notes": []
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.015,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "full_compliance",
+              "title": "稳健履约方案",
+              "description": "CEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）",
+              "risk_profile": "aggressive",
+              "channel_mode": "listed",
+              "actions": [],
+              "total_cost": 0.0,
+              "planned_cost": 116022000.0,
+              "net_saving": 0.0,
+              "blocked": true,
+              "planned_actions": [
+                {
+                  "action": "buy_cea",
+                  "qty": 122.0,
+                  "unit_price": 95.1,
+                  "window": "late",
+                  "note": "按履约缺口采购配额；高价采购约 116022000 vs 罚款约 244000000；公开侧无实时挂单，CEA 价格为日均/预测锚定；若无法线下成交再走线上挂牌",
+                  "meta": {
+                    "channel": "listed_fallback",
+                    "listed_ref_price": 95.1,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook"
+                  }
+                }
+              ],
+              "compliance": {
+                "ok": false,
+                "issues": [
+                  {
+                    "code": "budget_cap",
+                    "severity": "block",
+                    "message": "采购成本超出年度预算上限 6000.00"
+                  }
+                ],
+                "notes": []
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": false,
+                "offline_discount_vs_listed": 0.0,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线上挂牌口径不打折",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            }
+          ],
+          "status": "completed",
+          "report_md": "# 模拟水泥企业 全年度碳履约策略推荐\n\n## 核算快照\n\n- 最终核查排放：122.00 万吨 CO₂e\n- 可用 CEA：0.00 万吨\n- 抵扣前缺口：122.00 万吨（核查排放 − 可用 CEA）\n- CCER 抵销上限：6.10 万吨（应清缴配额 = 核查排放 122.00 × 5%）\n- 台账可抵扣 CCER：0.00 万吨\n- 本履约可动用 CCER：0.00 万吨\n- 履约缺口/富余（已扣 CCER）：122.00 万吨\n\n## 市场周期\n\n- 价格带：高位\n- 时间窗口：年末窗口\n- 建议动作：建议出售\n- 说明：年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨（高于现价），宜评估提前分批采购\n\n## 分层推荐方案\n\n### 最低成本履约方案\n\n仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）\n\n- 总成本测算：0.00 元\n- 拦截前计划成本：112541340.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规提示（block）：采购成本超出年度预算上限 6000.00\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n\n### 成本优化综合方案\n\nCEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）\n\n- 总成本测算：0.00 元\n- 拦截前计划成本：114281670.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规提示（block）：采购成本超出年度预算上限 6000.00\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n\n### 稳健履约方案\n\nCEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）\n\n- 总成本测算：0.00 元\n- 拦截前计划成本：116022000.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规提示（block）：采购成本超出年度预算上限 6000.00\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n\n---\n\n本报告由确定性规则引擎生成，不构成投资或合规承诺，请结合最新政策复核。",
+          "created_at": "2026-10-27T14:06:29+08:00"
+        },
+        {
+          "id": "1a597c92-6815-4c6e-8695-25f5cacd82a8",
+          "enterprise_id": "c715f360-ce5f-4b87-baed-268b744abea9",
+          "user_id": "default",
+          "compliance_year": 0,
+          "accounting_snapshot": {
+            "scope1_total": 52.0,
+            "scope2_from_power": 0.0,
+            "raw_total": 52.0,
+            "reducible_power": 0.0,
+            "verified_emission": 122.0,
+            "free_cea_quota": 0.0,
+            "compliance_gap": 122.0,
+            "ccer_cap": 6.1000000000000005,
+            "own_ccer_eligible": 0.0,
+            "own_ccer_usable": 0.0,
+            "residual_gap_after_own_ccer": 122.0,
+            "gap_before_ccer": 122.0,
+            "ccer_offset_used": 0.0,
+            "allocated_free_cea": 0.0,
+            "carry_forward_qty": 0.0,
+            "usable_cea_total": 0.0,
+            "traded_buy_qty": 0.0,
+            "traded_sell_qty": 0.0,
+            "ccer_max_ratio": 0.05
+          },
+          "market_tags": {
+            "price_band": "high",
+            "time_window": "late",
+            "action_tag": "sell",
+            "current_price": 97.8,
+            "cea_ccer_spread": 1.4599999999999937,
+            "ccer_supply_tag": "unknown",
+            "rationale": "年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨（高于现价），宜评估提前分批采购",
+            "price_forecast": {
+              "as_of": "2026-10-27",
+              "end_date": "2026-12-31",
+              "last_close": 95.08,
+              "year_end_price": 101.11,
+              "year_end_low": 95.52,
+              "year_end_high": 106.69,
+              "peak_price": 101.76,
+              "peak_date": "2026-12-25",
+              "trough_price": 95.1,
+              "trough_date": "2026-10-27",
+              "trading_days": 48,
+              "method": "trend_seasonal_compliance",
+              "note": "算法=规则模型：衰减趋势(均线差日漂移)+去均值同周季节+履约季冲高回落（四季度相对上半年溢价定振幅；约12月初见顶、年底回吐）；波动带=近60日收益标准差×√天数。 CEA 公开侧无实时挂单，输入为历史日均/收盘；仅供履约择机参考，不构成投资建议。"
+            },
+            "carry_forward": {
+              "deadline_md": "06-10",
+              "deadline": "2026-06-10",
+              "base_qty": 0.0,
+              "net_sell": 0.0,
+              "net_sell_multiplier": 1.5,
+              "year_end_holding": 0.0,
+              "formula_cap": 0.0,
+              "max_carry": 0.0,
+              "excess": 0.0,
+              "sell_to_expand_cap": 0.0
+            }
+          },
+          "plans": [
+            {
+              "key": "min_cost",
+              "title": "最低成本履约方案",
+              "description": "仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）",
+              "risk_profile": "conservative",
+              "channel_mode": "offline",
+              "actions": [],
+              "total_cost": 0.0,
+              "planned_cost": 112541340.0,
+              "net_saving": 0.0,
+              "blocked": true,
+              "planned_actions": [
+                {
+                  "action": "buy_cea",
+                  "qty": 122.0,
+                  "unit_price": 92.247,
+                  "window": "late",
+                  "note": "按履约缺口采购配额；高价采购约 112541340 vs 罚款约 244000000；优先尝试线下撮合采购CEA（假定较公开参考价低约 3.0%：参考 95.1 → 线下估 92.247 元/吨）；公开侧无实时挂单，价格为日均/预测锚定，线上挂牌作兜底",
+                  "meta": {
+                    "channel": "offline_preferred",
+                    "listed_ref_price": 95.1,
+                    "offline_assumed_price": 92.247,
+                    "offline_discount": 0.03,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook"
+                  }
+                }
+              ],
+              "compliance": {
+                "ok": false,
+                "issues": [
+                  {
+                    "code": "budget_cap",
+                    "severity": "block",
+                    "message": "采购成本超出年度预算上限 6000.00"
+                  }
+                ],
+                "notes": []
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.03,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "optimized",
+              "title": "成本优化综合方案",
+              "description": "CEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）",
+              "risk_profile": "balanced",
+              "channel_mode": "hybrid",
+              "actions": [],
+              "total_cost": 0.0,
+              "planned_cost": 114281670.0,
+              "net_saving": 0.0,
+              "blocked": true,
+              "planned_actions": [
+                {
+                  "action": "buy_cea",
+                  "qty": 122.0,
+                  "unit_price": 93.6735,
+                  "window": "late",
+                  "note": "按履约缺口采购配额；高价采购约 114281670 vs 罚款约 244000000；优先尝试线下撮合采购CEA（假定较公开参考价低约 1.5%：参考 95.1 → 线下估 93.6735 元/吨）；公开侧无实时挂单，价格为日均/预测锚定，线上挂牌作兜底",
+                  "meta": {
+                    "channel": "offline_preferred",
+                    "listed_ref_price": 95.1,
+                    "offline_assumed_price": 93.6735,
+                    "offline_discount": 0.015,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook"
+                  }
+                }
+              ],
+              "compliance": {
+                "ok": false,
+                "issues": [
+                  {
+                    "code": "budget_cap",
+                    "severity": "block",
+                    "message": "采购成本超出年度预算上限 6000.00"
+                  }
+                ],
+                "notes": []
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.015,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "full_compliance",
+              "title": "稳健履约方案",
+              "description": "CEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）",
+              "risk_profile": "aggressive",
+              "channel_mode": "listed",
+              "actions": [],
+              "total_cost": 0.0,
+              "planned_cost": 116022000.0,
+              "net_saving": 0.0,
+              "blocked": true,
+              "planned_actions": [
+                {
+                  "action": "buy_cea",
+                  "qty": 122.0,
+                  "unit_price": 95.1,
+                  "window": "late",
+                  "note": "按履约缺口采购配额；高价采购约 116022000 vs 罚款约 244000000；公开侧无实时挂单，CEA 价格为日均/预测锚定；若无法线下成交再走线上挂牌",
+                  "meta": {
+                    "channel": "listed_fallback",
+                    "listed_ref_price": 95.1,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook"
+                  }
+                }
+              ],
+              "compliance": {
+                "ok": false,
+                "issues": [
+                  {
+                    "code": "budget_cap",
+                    "severity": "block",
+                    "message": "采购成本超出年度预算上限 6000.00"
+                  }
+                ],
+                "notes": []
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": false,
+                "offline_discount_vs_listed": 0.0,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线上挂牌口径不打折",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            }
+          ],
+          "status": "completed",
+          "report_md": "# 模拟水泥企业 全年度碳履约策略推荐\n\n## 核算快照\n\n- 最终核查排放：122.00 万吨 CO₂e\n- 可用 CEA：0.00 万吨\n- 抵扣前缺口：122.00 万吨（核查排放 − 可用 CEA）\n- CCER 抵销上限：6.10 万吨（应清缴配额 = 核查排放 122.00 × 5%）\n- 台账可抵扣 CCER：0.00 万吨\n- 本履约可动用 CCER：0.00 万吨\n- 履约缺口/富余（已扣 CCER）：122.00 万吨\n\n## 市场周期\n\n- 价格带：高位\n- 时间窗口：年末窗口\n- 建议动作：建议出售\n- 说明：年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨（高于现价），宜评估提前分批采购\n\n## 分层推荐方案\n\n### 最低成本履约方案\n\n仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）\n\n- 总成本测算：0.00 元\n- 拦截前计划成本：112541340.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规提示（block）：采购成本超出年度预算上限 6000.00\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n\n### 成本优化综合方案\n\nCEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）\n\n- 总成本测算：0.00 元\n- 拦截前计划成本：114281670.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规提示（block）：采购成本超出年度预算上限 6000.00\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n\n### 稳健履约方案\n\nCEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）\n\n- 总成本测算：0.00 元\n- 拦截前计划成本：116022000.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规提示（block）：采购成本超出年度预算上限 6000.00\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n\n---\n\n本报告由确定性规则引擎生成，不构成投资或合规承诺，请结合最新政策复核。",
+          "created_at": "2026-10-27T14:07:14+08:00"
+        },
+        {
+          "id": "765d1abe-5c32-4a85-8480-e70160f20306",
+          "enterprise_id": "c715f360-ce5f-4b87-baed-268b744abea9",
+          "user_id": "default",
+          "compliance_year": 2026,
+          "accounting_snapshot": {
+            "scope1_total": 52.0,
+            "scope2_from_power": 0.0,
+            "raw_total": 52.0,
+            "reducible_power": 0.0,
+            "verified_emission": 122.0,
+            "free_cea_quota": 0.0,
+            "compliance_gap": 122.0,
+            "ccer_cap": 6.1000000000000005,
+            "own_ccer_eligible": 0.0,
+            "own_ccer_usable": 0.0,
+            "residual_gap_after_own_ccer": 122.0,
+            "gap_before_ccer": 122.0,
+            "ccer_offset_used": 0.0,
+            "allocated_free_cea": 0.0,
+            "carry_forward_qty": 0.0,
+            "usable_cea_total": 0.0,
+            "traded_buy_qty": 0.0,
+            "traded_sell_qty": 0.0,
+            "ccer_max_ratio": 0.05
+          },
+          "market_tags": {
+            "price_band": "high",
+            "time_window": "late",
+            "action_tag": "sell",
+            "current_price": 97.8,
+            "cea_ccer_spread": 1.4599999999999937,
+            "ccer_supply_tag": "unknown",
+            "rationale": "年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨（高于现价），宜评估提前分批采购",
+            "price_forecast": {
+              "as_of": "2026-10-27",
+              "end_date": "2026-12-31",
+              "last_close": 95.08,
+              "year_end_price": 101.11,
+              "year_end_low": 95.52,
+              "year_end_high": 106.69,
+              "peak_price": 101.76,
+              "peak_date": "2026-12-25",
+              "trough_price": 95.1,
+              "trough_date": "2026-10-27",
+              "trading_days": 48,
+              "method": "trend_seasonal_compliance",
+              "note": "算法=规则模型：衰减趋势(均线差日漂移)+去均值同周季节+履约季冲高回落（四季度相对上半年溢价定振幅；约12月初见顶、年底回吐）；波动带=近60日收益标准差×√天数。 CEA 公开侧无实时挂单，输入为历史日均/收盘；仅供履约择机参考，不构成投资建议。"
+            },
+            "carry_forward": {
+              "deadline_md": "06-10",
+              "deadline": "2027-06-10",
+              "base_qty": 0.0,
+              "net_sell": 0.0,
+              "net_sell_multiplier": 1.5,
+              "year_end_holding": 0.0,
+              "formula_cap": 0.0,
+              "max_carry": 0.0,
+              "excess": 0.0,
+              "sell_to_expand_cap": 0.0
+            }
+          },
+          "plans": [
+            {
+              "key": "min_cost",
+              "title": "最低成本履约方案",
+              "description": "仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）",
+              "risk_profile": "conservative",
+              "channel_mode": "offline",
+              "actions": [],
+              "total_cost": 0.0,
+              "planned_cost": 112541340.0,
+              "net_saving": 0.0,
+              "blocked": true,
+              "planned_actions": [
+                {
+                  "action": "buy_cea",
+                  "qty": 122.0,
+                  "unit_price": 92.247,
+                  "window": "late",
+                  "note": "按履约缺口采购配额；高价采购约 112541340 vs 罚款约 244000000；优先尝试线下撮合采购CEA（假定较公开参考价低约 3.0%：参考 95.1 → 线下估 92.247 元/吨）；公开侧无实时挂单，价格为日均/预测锚定，线上挂牌作兜底",
+                  "meta": {
+                    "channel": "offline_preferred",
+                    "listed_ref_price": 95.1,
+                    "offline_assumed_price": 92.247,
+                    "offline_discount": 0.03,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook"
+                  }
+                }
+              ],
+              "compliance": {
+                "ok": false,
+                "issues": [
+                  {
+                    "code": "budget_cap",
+                    "severity": "block",
+                    "message": "采购成本超出年度预算上限 6000.00"
+                  }
+                ],
+                "notes": []
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.03,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "optimized",
+              "title": "成本优化综合方案",
+              "description": "CEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）",
+              "risk_profile": "balanced",
+              "channel_mode": "hybrid",
+              "actions": [],
+              "total_cost": 0.0,
+              "planned_cost": 114281670.0,
+              "net_saving": 0.0,
+              "blocked": true,
+              "planned_actions": [
+                {
+                  "action": "buy_cea",
+                  "qty": 122.0,
+                  "unit_price": 93.6735,
+                  "window": "late",
+                  "note": "按履约缺口采购配额；高价采购约 114281670 vs 罚款约 244000000；优先尝试线下撮合采购CEA（假定较公开参考价低约 1.5%：参考 95.1 → 线下估 93.6735 元/吨）；公开侧无实时挂单，价格为日均/预测锚定，线上挂牌作兜底",
+                  "meta": {
+                    "channel": "offline_preferred",
+                    "listed_ref_price": 95.1,
+                    "offline_assumed_price": 93.6735,
+                    "offline_discount": 0.015,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook"
+                  }
+                }
+              ],
+              "compliance": {
+                "ok": false,
+                "issues": [
+                  {
+                    "code": "budget_cap",
+                    "severity": "block",
+                    "message": "采购成本超出年度预算上限 6000.00"
+                  }
+                ],
+                "notes": []
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": true,
+                "offline_discount_vs_listed": 0.015,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线下撮合按配置折扣估算",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            },
+            {
+              "key": "full_compliance",
+              "title": "稳健履约方案",
+              "description": "CEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）",
+              "risk_profile": "aggressive",
+              "channel_mode": "listed",
+              "actions": [],
+              "total_cost": 0.0,
+              "planned_cost": 116022000.0,
+              "net_saving": 0.0,
+              "blocked": true,
+              "planned_actions": [
+                {
+                  "action": "buy_cea",
+                  "qty": 122.0,
+                  "unit_price": 95.1,
+                  "window": "late",
+                  "note": "按履约缺口采购配额；高价采购约 116022000 vs 罚款约 244000000；公开侧无实时挂单，CEA 价格为日均/预测锚定；若无法线下成交再走线上挂牌",
+                  "meta": {
+                    "channel": "listed_fallback",
+                    "listed_ref_price": 95.1,
+                    "price_basis": "predicted_or_daily_avg_not_orderbook"
+                  }
+                }
+              ],
+              "compliance": {
+                "ok": false,
+                "issues": [
+                  {
+                    "code": "budget_cap",
+                    "severity": "block",
+                    "message": "采购成本超出年度预算上限 6000.00"
+                  }
+                ],
+                "notes": []
+              },
+              "time_window": "late",
+              "market_action_tag": "sell",
+              "channel": {
+                "prefer_offline": false,
+                "offline_discount_vs_listed": 0.0,
+                "price_note": "无实时挂单；成本按日均/预测价锚定，线上挂牌口径不打折",
+                "listing_fee_rate": 0.0,
+                "block_fee_rate": 0.0
+              }
+            }
+          ],
+          "status": "completed",
+          "report_md": "# 模拟水泥企业 2026 年碳履约策略推荐\n\n## 核算快照\n\n- 最终核查排放：122.00 万吨 CO₂e\n- 可用 CEA：0.00 万吨\n- 抵扣前缺口：122.00 万吨（核查排放 − 可用 CEA）\n- CCER 抵销上限：6.10 万吨（应清缴配额 = 核查排放 122.00 × 5%）\n- 台账可抵扣 CCER：0.00 万吨\n- 本履约可动用 CCER：0.00 万吨\n- 履约缺口/富余（已扣 CCER）：122.00 万吨\n\n## 市场周期\n\n- 价格带：高位\n- 时间窗口：年末窗口\n- 建议动作：建议出售\n- 说明：年末履约紧张期且价格高位，盈余企业适合分批卖出；日度预测年底约 101.1 元/吨（高于现价），宜评估提前分批采购\n\n## 分层推荐方案\n\n### 最低成本履约方案\n\n仅 CEA+CCER 满足清缴刚需，优先线下撮合降本（保守画像）\n\n- 总成本测算：0.00 元\n- 拦截前计划成本：112541340.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规提示（block）：采购成本超出年度预算上限 6000.00\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n\n### 成本优化综合方案\n\nCEA+CCER + 择时窗口，线下优先、线上挂牌兜底（平衡画像）\n\n- 总成本测算：0.00 元\n- 拦截前计划成本：114281670.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规提示（block）：采购成本超出年度预算上限 6000.00\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n\n### 稳健履约方案\n\nCEA+CCER 全覆盖，按公开参考价即时成交以确保履约（进取画像）\n\n- 总成本测算：0.00 元\n- 拦截前计划成本：116022000.00 元\n- 净节约：0.00 元\n- 操作窗口：年末窗口\n- 合规提示（block）：采购成本超出年度预算上限 6000.00\n\n| 动作 | 数量(万吨) | 单价(元/吨) | 窗口 | 说明 |\n|------|------|------|------|------|\n\n---\n\n本报告由确定性规则引擎生成，不构成投资或合规承诺，请结合最新政策复核。",
+          "created_at": "2026-10-27T14:30:25+08:00"
         }
       ],
       "alerts": [
@@ -13351,6 +15335,72 @@
           "due_at": null,
           "acked": false,
           "created_at": "2026-10-27T11:47:56+08:00"
+        },
+        {
+          "id": "3afbe77b-eeda-4b0f-aafd-9f66b72b0dac",
+          "enterprise_id": "c715f360-ce5f-4b87-baed-268b744abea9",
+          "user_id": "default",
+          "level": "info",
+          "alert_type": "clearance_countdown",
+          "message": "距清缴截止（2026-12-31）剩 65 天，履约缺口约 122.00 万吨（已扣自有 CCER 抵销，抵销上限 6.10 万吨），请尽快补足资产",
+          "due_at": "2026-12-31T00:00:00+00:00",
+          "acked": false,
+          "created_at": "2026-10-27T14:06:29+08:00"
+        },
+        {
+          "id": "1f5f0566-9bd0-4ee5-945d-c3361c3a8ba5",
+          "enterprise_id": "c715f360-ce5f-4b87-baed-268b744abea9",
+          "user_id": "default",
+          "level": "warning",
+          "alert_type": "price_spike",
+          "message": "CEA 价格处于历史高位区间，关注采购成本与卖出窗口",
+          "due_at": null,
+          "acked": false,
+          "created_at": "2026-10-27T14:06:29+08:00"
+        },
+        {
+          "id": "d1dcefcf-4200-4f80-9471-e1383039a4e8",
+          "enterprise_id": "c715f360-ce5f-4b87-baed-268b744abea9",
+          "user_id": "default",
+          "level": "info",
+          "alert_type": "clearance_countdown",
+          "message": "距清缴截止（2026-12-31）剩 65 天，履约缺口约 122.00 万吨（已扣自有 CCER 抵销，抵销上限 6.10 万吨），请尽快补足资产",
+          "due_at": "2026-12-31T00:00:00+00:00",
+          "acked": false,
+          "created_at": "2026-10-27T14:07:14+08:00"
+        },
+        {
+          "id": "0a6830ce-f79a-4c38-bc77-720534f72bd1",
+          "enterprise_id": "c715f360-ce5f-4b87-baed-268b744abea9",
+          "user_id": "default",
+          "level": "warning",
+          "alert_type": "price_spike",
+          "message": "CEA 价格处于历史高位区间，关注采购成本与卖出窗口",
+          "due_at": null,
+          "acked": false,
+          "created_at": "2026-10-27T14:07:14+08:00"
+        },
+        {
+          "id": "4ab5a820-898a-41a0-9dc5-9b021063bafb",
+          "enterprise_id": "c715f360-ce5f-4b87-baed-268b744abea9",
+          "user_id": "default",
+          "level": "info",
+          "alert_type": "clearance_countdown",
+          "message": "距清缴截止（2026-12-31）剩 65 天，履约缺口约 122.00 万吨（已扣自有 CCER 抵销，抵销上限 6.10 万吨），请尽快补足资产",
+          "due_at": "2026-12-31T00:00:00+00:00",
+          "acked": false,
+          "created_at": "2026-10-27T14:30:25+08:00"
+        },
+        {
+          "id": "f6d82865-38e7-4dd1-9995-fcb7b1ac2fa2",
+          "enterprise_id": "c715f360-ce5f-4b87-baed-268b744abea9",
+          "user_id": "default",
+          "level": "warning",
+          "alert_type": "price_spike",
+          "message": "CEA 价格处于历史高位区间，关注采购成本与卖出窗口",
+          "due_at": null,
+          "acked": false,
+          "created_at": "2026-10-27T14:30:25+08:00"
         }
       ]
     }
