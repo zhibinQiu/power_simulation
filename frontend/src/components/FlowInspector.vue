@@ -141,7 +141,15 @@
                    @input="setRecipeRatioForMaterial(p.material, $event.target.value)" />
             <button class="x-btn danger" :title="t('移除')" @click="delNodePort('in', i)">✕</button>
           </div>
-          <button class="add" @click="addNodePort('in')">＋ {{ t('输入项') }}</button>
+          <button class="add" @click="openAddPort('in')">＋ {{ t('输入项') }}</button>
+          <!-- 点击「+ 输入项」后展开物料下拉，选择后再添加（不再直接按默认物料添加） -->
+          <div v-if="addingDir === 'in'" class="gio-row add-port-row">
+            <select v-model="addMat">
+              <option v-for="m in availableAddMats('in')" :key="m.id" :value="m.id">{{ m.name }}</option>
+            </select>
+            <button class="add" @click="confirmAddPort">{{ t('添加') }}</button>
+            <button class="x-btn" :title="t('取消')" @click="addingDir = null">✕</button>
+          </div>
         </div>
         <div class="ports-col">
           <span class="pc-t">{{ t('输出（到下游 / 成品）') }}</span>
@@ -151,7 +159,15 @@
             </select>
             <button class="x-btn danger" :title="t('移除')" @click="delNodePort('out', i)">✕</button>
           </div>
-          <button class="add" @click="addNodePort('out')">＋ {{ t('输出项') }}</button>
+          <button class="add" @click="openAddPort('out')">＋ {{ t('输出项') }}</button>
+          <!-- 点击「+ 输出项」后展开物料下拉，选择后再添加 -->
+          <div v-if="addingDir === 'out'" class="gio-row add-port-row">
+            <select v-model="addMat">
+              <option v-for="m in availableAddMats('out')" :key="m.id" :value="m.id">{{ m.name }}</option>
+            </select>
+            <button class="add" @click="confirmAddPort">{{ t('添加') }}</button>
+            <button class="x-btn" :title="t('取消')" @click="addingDir = null">✕</button>
+          </div>
         </div>
         <div class="pr-hint">{{ t('输入配比（1 = 100%）用于输入物料构成与优化；每端口可连多个节点，同一种类只出现一次。') }}</div>
       </div>
@@ -408,7 +424,7 @@
 <script setup>
 import { computed, reactive, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useSimStore } from '../stores/sim'
-import { MATERIALS, MATERIAL_MAP, PROCESS_MAP, DEVICE_MAP } from '../data/flowLibrary'
+import { MATERIALS, MATERIAL_MAP, PROCESS_MAP, DEVICE_MAP, sceneMaterialList } from '../data/flowLibrary'
 import { ATTACH_GROUPS, ATTACH_MAP, attachUnit, attachPowerSensor } from '../data/attachLibrary'
 import { EDITABLE_PARAMS } from '../data/processMeta'
 import CollapseSection from './CollapseSection.vue'
@@ -598,7 +614,7 @@ function toggleAdd(kind) {
   addOpen.value = kind
   addDraft.kind = ''
 }
-watch(node, () => { addOpen.value = ''; addDraft.kind = ''; nameEditUid.value = '' })
+watch(node, () => { addOpen.value = ''; addDraft.kind = ''; nameEditUid.value = ''; addingDir.value = null; addMat.value = '' })
 function srcTextOf(att) {
   if (att.src === 'param') {
     const o = paramOpts.value.find((x) => x.param === att.param)
@@ -762,15 +778,29 @@ function setNodePortMat(dir, i, mat) {
   }
   store.updatePortMaterial(n.id, dir, p.id, mat)
 }
-function addNodePort(dir) {
-  const n = node.value
-  if (!n || !n.ports) return
-  // 默认取该工艺模板的输入/输出主物料；无则取物料库第一项
-  const t = PROCESS_MAP[n.type]
-  const def = dir === 'out'
-    ? ((t && t.outputs && t.outputs[0]) || (t && t.mainOut) || (MATERIALS[0] && MATERIALS[0].id))
-    : ((t && t.inputs && t.inputs[0]) || (t && t.mainIn) || (MATERIALS[0] && MATERIALS[0].id))
-  store.addPort(n.id, dir, def)   // store 内做同物料去重
+// 添加端口交互：点击「+ 输入项 / + 输出项」先展开物料下拉，选择后再添加（不直接按默认物料添加）。
+// 下拉只列该方向「尚未占用」的物料（避免选到重复项），全部占用时提示。
+const addingDir = ref(null)   // 正在选择添加物料的方向：'in' | 'out' | null
+const addMat = ref('')
+function usedMats(dir) { return new Set((node.value.ports[dir] || []).map((p) => p.material)) }
+function availableAddMats(dir) {
+  const used = usedMats(dir)
+  return sceneMaterialList(store.sceneCtx, store.customSceneOn).filter((m) => !used.has(m.id))
+}
+function openAddPort(dir) {
+  const avail = availableAddMats(dir)
+  if (!avail.length) { store.showToast(t('该方向物料已全部添加，没有可新增的物料'), 'warn'); return }
+  // 与画布端口浮层同口径：优先工艺 mainIn/mainOut（未占用时），再退到未占用列表首项
+  const t = PROCESS_MAP[node.value.type]
+  const preferred = dir === 'out' ? (t && t.mainOut) : (t && t.mainIn)
+  const used = usedMats(dir)
+  addMat.value = (preferred && !used.has(preferred)) ? preferred : avail[0].id
+  addingDir.value = dir
+}
+function confirmAddPort() {
+  if (!addingDir.value || !addMat.value) return
+  store.addPort(node.value.id, addingDir.value, addMat.value)   // store 内做同物料去重
+  addingDir.value = null
 }
 function delNodePort(dir, i) {
   const n = node.value

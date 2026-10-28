@@ -4187,7 +4187,24 @@ export const useSimStore = defineStore('sim', {
       const n = this.scheme.nodes.find((x) => x.id === nodeId)
       if (!n || !n.ports) return
       const port = n.ports[dir].find((p) => p.id === portId)
-      if (port) port.material = material
+      if (port) {
+        const oldMat = port.material
+        port.material = material
+        // 同步输入配比：把旧物料的 recipe 项迁移为新物料（保留原配比），
+        // 否则新物料配比显示为空、旧物料 recipe 项成孤儿
+        if (dir === 'in' && oldMat !== material) {
+          const list = n.recipe || []
+          const oldEntry = list.find((x) => x.material === oldMat)
+          if (list.some((x) => x.material === material)) {
+            // 新物料已有配比项（来自其它输入端口）：只移除旧项，避免重复
+            n.recipe = list.filter((x) => x.material !== oldMat)
+          } else if (oldEntry) {
+            oldEntry.material = material   // 迁移配比到新物料（保留 ratio）
+          } else {
+            n.recipe = [...list, { material, ratio: 1 }]   // 旧物料本无配比项：为新物料补默认 1
+          }
+        }
+      }
     },
     addPort(nodeId, dir, material) {
       this._histCapture('ap_' + uid('h'))
@@ -4201,6 +4218,13 @@ export const useSimStore = defineStore('sim', {
         return
       }
       arr.push({ id: uid(dir === 'in' ? 'in' : 'out'), material })
+      // 新增输入端口：同步初始化该物料的输入配比（默认 1 = 100%）。
+      // 否则 recipe 中无该项，右栏配比显示为空/浅色占位、三维右栏配比为「—」，
+      // 与已有输入项（有默认配比）不一致
+      if (dir === 'in') {
+        if (!n.recipe) n.recipe = []
+        if (!n.recipe.some((x) => x.material === material)) n.recipe.push({ material, ratio: 1 })
+      }
     },
     // 设置工艺/工辅/设备的台数：>1 自动形成小组（同设备多台），=1 解散仅含自身的自动小组
     setFlowCount(id, count) {
@@ -4249,7 +4273,13 @@ export const useSimStore = defineStore('sim', {
       this._histCapture('rp_' + uid('h'))
       const n = this.scheme.nodes.find((x) => x.id === nodeId)
       if (!n || !n.ports) return
+      const removed = (n.ports[dir] || []).find((p) => p.id === portId)
       n.ports[dir] = n.ports[dir].filter((p) => p.id !== portId)
+      // 对称清理输入配比：该方向已无同物料端口时，删掉 recipe 中对应项，
+      // 避免留下「无端口的配比」随存档持久化（与 addPort 的配比初始化对称）
+      if (removed && dir === 'in' && !(n.ports[dir] || []).some((p) => p.material === removed.material)) {
+        n.recipe = (n.recipe || []).filter((x) => x.material !== removed.material)
+      }
       this.scheme.connections = this.scheme.connections.filter((c) => !(c.from === nodeId && c.fromPort === portId) && !(c.to === nodeId && c.toPort === portId))
     },
     selectFlow(id) { this._recordUnitNav(); this._clearBrowse(); this.selectedMaterialId = null; this.selectedUnitId = null; this.deviceDetailId = null; this.selectedFlowId = id; this.selectedGroupId = null; this.flowBackId = null; this.inspectorView = 'auto'; this.rightOpen = true },

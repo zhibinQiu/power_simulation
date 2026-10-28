@@ -118,7 +118,7 @@
           <button :class="{ on: editingPort.dir === 'out' }" @click="setEditDir('out')">{{ t('输出') }}</button>
         </div>
         <select v-model="editingPort.material" @change="applyPortMaterial">
-          <option v-for="m in portMaterials" :key="m.id" :value="m.id">{{ m.name }}（{{ m.cat }}）</option>
+          <option v-for="m in portMaterials" :key="m.id" :value="m.id" :disabled="usedPortMats.has(m.id)">{{ m.name }}（{{ m.cat }}）</option>
           <!-- 历史存档 / 切场景残留：当前端口的物料若不在本场景物料表内，仍要显示出来（否则下拉框空白、看不出这端口是什么） -->
           <option v-if="editingPort.material && !portMaterialIds.has(editingPort.material)" :value="editingPort.material">
             {{ matName(editingPort.material) }}（{{ t('非本场景物料') }}）
@@ -411,27 +411,34 @@ function onAddPort(n, e) {
   editingPort.value = { nodeId: n.id, dir, portDir: null, portId: null, material: defaultPortMaterial(n, dir), dx: c.x + 12 - n.x, dy: c.y + 12 - n.y }
 }
 function setEditDir(dir) {
-  if (editingPort.value) editingPort.value.dir = dir
+  if (!editingPort.value) return
+  editingPort.value.dir = dir
+  // 添加模式（portId 为空）：换方向后按新方向重算默认物料，避免沿用旧方向的值而撞去重
+  if (!editingPort.value.portId) {
+    const n = (store.scheme.nodes || []).find((x) => x.id === editingPort.value.nodeId)
+    if (n) editingPort.value.material = defaultPortMaterial(n, dir)
+  }
 }
 function defaultPortMaterial(n, dir) {
+  // 添加端口时默认选「该方向尚未占用」的物料：主产物/主输入（如高炉铁水）通常已在端口中，
+  // 若直接以其为默认，点「+ 输入项 / + 输出项」必然撞「同一种类不能重复添加」。
+  const used = new Set(((n.ports && n.ports[dir]) || []).map((p) => p.material))
+  const free = (id) => id && !used.has(id)
   // ① 工序字典优先：钢包用 PROCESS_MAP 的 mainIn/mainOut；资源包用包内 processes[] 的 mainOut
   // （包内字典没有 mainIn 字段，输入侧退到该工序的 inputs 清单首项，如 boiler → pulverized_coal）
   const p = procDef(n.type)
   if (p) {
-    if (dir === 'out' && p.mainOut) return p.mainOut
-    if (dir === 'in' && p.mainIn) return p.mainIn
+    if (dir === 'out' && free(p.mainOut)) return p.mainOut
+    if (dir === 'in' && free(p.mainIn)) return p.mainIn
     if (store.customSceneOn) {
       const arr = dir === 'out' ? p.outputs : p.inputs
-      if (Array.isArray(arr) && arr.length) return arr[0]
+      const hit = (arr || []).find(free)
+      if (hit) return hit
     }
   }
-  // ② 兜底取当前场景物料表第一条：资源包场景不能默认塞 'electricity' / 'hot_metal' 这类钢铁物料
-  if (store.customSceneOn) {
-    const list = portMaterials.value
-    return list.length ? list[0].id : ''
-  }
-  if (dir === 'in') return 'electricity'   // 工辅/驱动类常见输入介质
-  return MATERIALS.length ? MATERIALS[0].id : 'hot_metal'
+  // ② 兜底取当前场景物料表中第一个「该方向尚未占用」的物料（全部占用则返回空，由 addPortHere 提示）
+  const hit = portMaterials.value.find((m) => free(m.id))
+  return hit ? hit.id : ''
 }
 function portMaterial(n, dir, portId) {
   const arr = dir === 'in' ? n.ports.in : n.ports.out
@@ -445,11 +452,19 @@ function applyPortMaterial() {
 }
 function addPortHere() {
   if (!editingPort.value) return
-  const mat = editingPort.value.material || (portMaterials.value[0] && portMaterials.value[0].id) || ''
-  // 资源包未提供物料字典时不再兜底塞钢铁物料：宁可不加，也不能往存档里写外场景的物料 id
-  if (!mat) { store.toast = t('当前场景未提供物料字典，无法添加端口'); return }
+  // 兜底也按「该方向未占用」取（与初始化 defaultPortMaterial 同口径）；全部占用时明确提示
+  if (!portMaterials.value.length) { store.toast = t('当前场景未提供物料字典，无法添加端口'); return }
+  const n = (store.scheme.nodes || []).find((x) => x.id === editingPort.value.nodeId)
+  const mat = editingPort.value.material || (n ? defaultPortMaterial(n, editingPort.value.dir) : '')
+  if (!mat) { store.toast = t('该方向物料已全部添加，没有可新增的物料'); return }
   store.addPort(editingPort.value.nodeId, editingPort.value.dir, mat)
 }
+// 添加模式（portId 为空）下，该节点该方向已占用的物料在下拉中禁用，避免手动选到重复项
+const usedPortMats = computed(() => {
+  if (!editingPort.value || editingPort.value.portId) return new Set()
+  const n = (store.scheme.nodes || []).find((x) => x.id === editingPort.value.nodeId)
+  return new Set(((n && n.ports && n.ports[editingPort.value.dir]) || []).map((p) => p.material))
+})
 function removePortHere() {
   if (!editingPort.value || !editingPort.value.portId) return
   store.removePort(editingPort.value.nodeId, editingPort.value.portDir, editingPort.value.portId)
