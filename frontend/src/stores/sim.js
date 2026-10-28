@@ -2357,6 +2357,37 @@ export const useSimStore = defineStore('sim', {
         return false
       }
       if (this.sceneBusy) return false
+      // 打开前的场景状态与地址备份：资源包加载/编译失败时整体回滚，
+      // 避免「URL 与 sceneId 已切到目标场景、model 却仍是旧场景」的错配（场景打开 bug 的根因）。
+      // 必须放在 exitSim/exitEdit/closeAllViews/clearDvSources 等清理动作**之前**：
+      // 否则 openViews/activeViewId/overviewOn/rightOpen/grpRightBackup/dvSources 快照到的都是已清空的值。
+      // 备份覆盖 openScene 全程所有会被改写的字段：标识 / 元数据(factors 等) / 方案与模型 /
+      // 会话数据(baseline、策略等) / 选中态 / UI 态与数据分析数据源。
+      // 地址栏改为**成功后才**更新（见本函数尾部），失败时恢复为打开前的地址。
+      // 注：simMode / editMode 不在回滚范围 —— 失败后停在非仿真/非编排态更安全，不恢复旧仿真/编排态。
+      const prevScene = {
+        sceneId: this.sceneId, sceneMode: this.sceneMode, scenario: this.scenario,
+        scenePack: this.scenePack, sceneCtx: this.sceneCtx, sceneTemplates: this.sceneTemplates,
+        factors: this.factors, factorsDefault: this.factorsDefault,
+        paramSchema: this.paramSchema, deviceLibrary: this.deviceLibrary,
+        processRoute: this.processRoute, scheme: this.scheme, appliedScheme: this.appliedScheme, model: this.model,
+        deviceSetpoints: this.deviceSetpoints,
+        deviceExtraSetpoints: this.deviceExtraSetpoints,
+        baseline: this.baseline, live: this.live, presets: this.presets, strategies: this.strategies,
+        reportPayload: this.reportPayload, flowBackId: this.flowBackId,
+        historyPast: this.historyPast, historyFuture: this.historyFuture, materialOverrides: this.materialOverrides,
+        deviceLive: this.deviceLive, deviceHistory: this.deviceHistory, deviceMeta: this.deviceMeta,
+        strategy: this.strategy, delta: this.delta, parsed: this.parsed, parsedText: this.parsedText,
+        simOps: this.simOps, simCurrent: this.simCurrent, agcRunId: this.agcRunId, agcLast: this.agcLast,
+        selectedUnitId: this.selectedUnitId, selectedGroupId: this.selectedGroupId, selectedFlowId: this.selectedFlowId,
+        deviceDetailId: this.deviceDetailId, selectedMaterialId: this.selectedMaterialId,
+        selectedStrategyId: this.selectedStrategyId, selectedAssetType: this.selectedAssetType,
+        inspectorView: this.inspectorView,
+        openViews: this.openViews, activeViewId: this.activeViewId, overviewOn: this.overviewOn,
+        rightOpen: this.rightOpen, grpRightBackup: this.grpRightBackup,
+        dvSources: this.dvSources,
+        url: window.location.href,
+      }
       // 先退出仿真/编排，避免在切换过程中触发旧场景的后端刷新
       if (this.simMode) this.exitSim()
       if (this.editMode) this.exitEdit()
@@ -2369,12 +2400,6 @@ export const useSimStore = defineStore('sim', {
       // 切换场景 = 换了一个页面：收起右侧属性面板并丢弃恢复备份，避免旧场景的选中态残留
       this.rightOpen = false
       this.grpRightBackup = null
-      // 地址栏带上当前工程：刷新 / 分享链接都能直达这个场景（不触发导航，只改地址）
-      try {
-        const url = new URL(window.location.href)
-        url.searchParams.set('scene', sceneId)
-        window.history.replaceState(window.history.state, '', url)
-      } catch (e) { /* 非浏览器环境忽略 */ }
       this.sceneBusy = true
       const loadSeq = this.beginSceneLoad('data')
       try {
@@ -2477,6 +2502,13 @@ export const useSimStore = defineStore('sim', {
         // 避免 canvas 0x0 导致相机投影矩阵 NaN（与 exitEdit 的处理口径一致）
         await nextTick()
         this.sceneRev++
+        // 场景资源与模型均已就绪，此时才更新地址栏 —— 此前在加载前改写 URL，
+        // 一旦后续步骤失败就会留下「URL 指向目标场景、内容却是旧场景」的错配
+        try {
+          const url = new URL(window.location.href)
+          url.searchParams.set('scene', sceneId)
+          window.history.replaceState(window.history.state, '', url)
+        } catch (e) { /* 非浏览器环境忽略 */ }
         const label = meta.label || pkg.meta.label || sceneId
         this.toast = t('已打开场景「{label}」', { label })
         this.pushCmd(t('已打开场景「{label}」：资源列表、编排方案与孪生模型已切换。', { label }), 'cmd')
@@ -2484,6 +2516,42 @@ export const useSimStore = defineStore('sim', {
         this.finishSceneLoad(loadSeq)
         return true
       } catch (e) {
+        // 整体回滚（不只场景标识）：打开失败 = 停在原场景，
+        // 避免 sceneId 回滚了、scheme/model/factors 却已是失败目标的反向错配。
+        // 这些字段在 openScene 中均为替换赋值（旧对象引用不再被改），直接恢复引用即可。
+        // 例外：openViews 里的 flowEdit 标签不能恢复 —— editMode 按约定不回滚（false），
+        // 而编排画布 pane 以 editMode 为渲染条件（App.vue），恢复了只会留下「有标签、无内容」的空壳；
+        // 激活视图若停在 flowEdit，则回退到剩余标签的最后一项（没有则回三维）。
+        const rv = (prevScene.openViews || []).filter((v) => v !== 'flowEdit')
+        const ra = prevScene.activeViewId === 'flowEdit' ? (rv[rv.length - 1] || null) : prevScene.activeViewId
+        Object.assign(this, {
+          sceneId: prevScene.sceneId, sceneMode: prevScene.sceneMode, scenario: prevScene.scenario,
+          scenePack: prevScene.scenePack, sceneCtx: prevScene.sceneCtx, sceneTemplates: prevScene.sceneTemplates,
+          factors: prevScene.factors, factorsDefault: prevScene.factorsDefault,
+          paramSchema: prevScene.paramSchema, deviceLibrary: prevScene.deviceLibrary,
+          processRoute: prevScene.processRoute, scheme: prevScene.scheme, appliedScheme: prevScene.appliedScheme, model: prevScene.model,
+          deviceSetpoints: prevScene.deviceSetpoints,
+          deviceExtraSetpoints: prevScene.deviceExtraSetpoints,
+          baseline: prevScene.baseline, live: prevScene.live, presets: prevScene.presets, strategies: prevScene.strategies,
+          reportPayload: prevScene.reportPayload, flowBackId: prevScene.flowBackId,
+          historyPast: prevScene.historyPast, historyFuture: prevScene.historyFuture, materialOverrides: prevScene.materialOverrides,
+          deviceLive: prevScene.deviceLive, deviceHistory: prevScene.deviceHistory, deviceMeta: prevScene.deviceMeta,
+          strategy: prevScene.strategy, delta: prevScene.delta, parsed: prevScene.parsed, parsedText: prevScene.parsedText,
+          simOps: prevScene.simOps, simCurrent: prevScene.simCurrent, agcRunId: prevScene.agcRunId, agcLast: prevScene.agcLast,
+          selectedUnitId: prevScene.selectedUnitId, selectedGroupId: prevScene.selectedGroupId, selectedFlowId: prevScene.selectedFlowId,
+          deviceDetailId: prevScene.deviceDetailId, selectedMaterialId: prevScene.selectedMaterialId,
+          selectedStrategyId: prevScene.selectedStrategyId, selectedAssetType: prevScene.selectedAssetType,
+          inspectorView: prevScene.inspectorView,
+          openViews: rv, activeViewId: ra, overviewOn: prevScene.overviewOn,
+          rightOpen: prevScene.rightOpen, grpRightBackup: prevScene.grpRightBackup,
+          dvSources: prevScene.dvSources,
+        })
+        // 全局物料表也按原场景字典重建（registerSceneMaterials 先删本次并入的、再并入原场景物料）
+        registerSceneMaterials(prevScene.sceneCtx)
+        try { window.history.replaceState(window.history.state, '', prevScene.url) } catch (e2) { /* 忽略 */ }
+        // 触发左右栏与 3D 按回滚后的 model 重建（失败前 sceneRev/sceneVersion 可能已推进过一次）
+        this.sceneVersion++
+        this.sceneRev++
         this.failSceneLoad(e && e.message ? e.message : String(e), loadSeq)
         this.toast = t('打开场景失败：') + e.message
         this.notify('error', t('打开场景失败'), e.message)
