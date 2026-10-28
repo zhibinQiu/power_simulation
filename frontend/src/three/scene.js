@@ -2794,7 +2794,10 @@ export class TwinScene {
     // 工业底座顶面安全基准线：一圈低饱和工业黄细线，标识设备安装边界（非工业场景不显示）
     if (industrial) {
       const lineW = Math.max(0.8, pedestalHalf * 0.06)
-      const edgeMat = new THREE.MeshBasicMaterial({ color: 0xb08a2e, transparent: true, opacity: 0.9 })
+      // 底座边框创建色与 industrial 主题覆盖色统一为浅蓝灰（0x9fb3c4）：
+      // 此前创建色是工业黄 0xb08a2e，而 _applyThemeColors('industrial') 会覆盖成浅蓝灰，
+      // 导致「首次加载为黄、切环境后变灰」的跳变；统一后任何阶段都是浅蓝灰。
+      const edgeMat = new THREE.MeshBasicMaterial({ color: 0x9fb3c4, transparent: true, opacity: 0.55 })
       const eGeoX = new THREE.BoxGeometry(pedestalHalf * 2 - lineW * 2, 0.16 / scale, lineW)
       const e1 = new THREE.Mesh(eGeoX, edgeMat)
       e1.position.set(0, 0.08 / scale, pedestalHalf - lineW / 2)

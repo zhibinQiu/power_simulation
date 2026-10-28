@@ -2197,6 +2197,8 @@ export const useSimStore = defineStore('sim', {
       _simSnapshot = null
       _simParamSnapshot = null
       // 退出仿真：数字孪生场景环境固定切换为「工业」
+      // 注意：工业模式下底座边框是浅蓝灰（0x9fb3c4）而非黄色 —— 创建色已统一为浅蓝灰，
+      // 因此切回工业后底座呈灰色（满足「停止仿真后保持灰色」），不是切回黄色
       if (this.envMode !== 'industrial') this.setEnvMode('industrial')
       this.simMode = false
       this.simBaseline = null
