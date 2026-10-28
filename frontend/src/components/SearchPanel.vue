@@ -50,7 +50,7 @@
 
 <script setup>
 import { reactive, ref, computed } from 'vue'
-import { useSimStore } from '../stores/sim'
+import { useSimStore, aiModelsForScene } from '../stores/sim'
 import { ROUTE_GROUPS, PROCESS_TEMPLATES, PROCESS_MAP, sceneMaterialList } from '../data/flowLibrary'
 import Icon from './Icon.vue'
 import { t } from '../i18n'
@@ -83,6 +83,15 @@ function onScroll() {
 function procInScene(type) {
   const units = store.model && store.model.units ? store.model.units : []
   return units.some((u) => u.type === type)
+}
+// AI 模型条目点击与选中态：与左栏 onAiClick / aiModelActive 一致
+function onAiClick(m) {
+  if (m.agc) { store.openAgcMpc(); return }
+  store.selectStrategy(m.id)
+}
+function aiModelActive(m) {
+  if (m.agc) return store.activeViewId === 'aiGroup' && store.agcPage === 'mpc'
+  return m.view ? store.activeViewId === m.view : store.selectedStrategyId === m.id
 }
 // 打开工艺：工辅优先打开其设备详情，普通工艺打开工艺属性面板
 function openProcess(type) {
@@ -155,50 +164,72 @@ const results = computed(() => {
   }
   if (mats.length) out.push({ key: 'material', label: '物料', items: mats })
 
-  // ---- 策略（工艺绿色策略 + 系统预置 + 自定义） ----
-  const strats = []
-  for (const t of PROCESS_TEMPLATES) {
-    for (const gs of t.greenStrategies || []) {
-      if (onlyScene.value && !(store.greenStrategiesFor(t.type) || []).includes(gs.id)) continue
-      if (q && !gs.name.toLowerCase().includes(q)) continue
+  // ---- AI优化模型（与左栏「策略 → AI优化模型」同源：按场景过滤的 aiModelsForScene）。
+  // 此前搜索面板只覆盖工艺策略/系统预置/自定义，AI 模型搜不到；此处补齐。
+  // 行为与左栏点击一致：训练型模型进右侧策略面板，MPC 等内置求解型模型进「AI群控 → 模型库」。
+  const aiModels = []
+  for (const m of aiModelsForScene(store.sceneId)) {
+    if (q && !m.name.toLowerCase().includes(q)) continue
+    aiModels.push({
+      id: 'ai:' + m.id,
+      label: m.name,
+      icon: 'bolt',
+      sub: m.categoryName || 'AI优化模型',
+      active: aiModelActive(m),
+      title: m.agc ? '进入「AI群控 → 模型库」（内置求解型模型）' : '点击查看 AI 优化模型训练面板',
+      action: () => onAiClick(m),
+    })
+  }
+  if (aiModels.length) out.push({ key: 'aiModel', label: 'AI优化模型', items: aiModels })
+
+  // ---- 策略（工艺绿色策略 + 系统预置 + 自定义）：仅钢铁场景显示。
+  // 与左栏策略区同口径（LeftSidebar.vue 的 v-if="!store.customSceneOn"）：
+  // 资源包场景的策略区只有按场景隔离的 AI 模型，这三类钢铁策略不属本场景，整组不显示。
+  if (!store.customSceneOn) {
+    const strats = []
+    for (const t of PROCESS_TEMPLATES) {
+      for (const gs of t.greenStrategies || []) {
+        if (onlyScene.value && !(store.greenStrategiesFor(t.type) || []).includes(gs.id)) continue
+        if (q && !gs.name.toLowerCase().includes(q)) continue
+        strats.push({
+          id: 'strat:' + t.type + ':' + gs.id,
+          label: gs.name,
+          icon: 'bolt',
+          sub: t.label,
+          active: store.selectedStrategyId === `green::${t.type}::${gs.id}`,
+          title: '点击查看策略属性（可在右侧启用/停用）',
+          action: () => store.selectGreenStrategy(t.type, gs.id),
+        })
+      }
+    }
+    for (const p of store.presets || []) {
+      if (onlyScene.value && !p.applied) continue
+      if (q && !(p.name || '').toLowerCase().includes(q)) continue
       strats.push({
-        id: 'strat:' + t.type + ':' + gs.id,
-        label: gs.name,
+        id: 'strat:preset:' + p.id,
+        label: p.name || '未命名预置策略',
         icon: 'bolt',
-        sub: t.label,
-        active: store.selectedStrategyId === `green::${t.type}::${gs.id}`,
-        title: '点击查看策略属性（可在右侧启用/停用）',
-        action: () => store.selectGreenStrategy(t.type, gs.id),
+        sub: '系统预置',
+        active: store.selectedStrategyId === p.id,
+        title: '点击查看策略属性（底部「策略仿真」进入仿真模式测试）',
+        action: () => store.selectStrategy(p.id),
       })
     }
+    for (const s of store.strategies || []) {
+      if (onlyScene.value && !s.applied) continue
+      if (q && !(s.name || '').toLowerCase().includes(q)) continue
+      strats.push({
+        id: 'strat:saved:' + s.id,
+        label: s.name || '未命名策略',
+        icon: 'bolt',
+        sub: '自定义',
+        active: store.selectedStrategyId === s.id,
+        title: '点击查看策略属性（名称/数值调整可编辑）',
+        action: () => store.selectStrategy(s.id),
+      })
+    }
+    if (strats.length) out.push({ key: 'strategy', label: '策略', items: strats })
   }
-  for (const p of store.presets || []) {
-    if (onlyScene.value && !p.applied) continue
-    if (q && !(p.name || '').toLowerCase().includes(q)) continue
-    strats.push({
-      id: 'strat:preset:' + p.id,
-      label: p.name || '未命名预置策略',
-      icon: 'bolt',
-      sub: '系统预置',
-      active: store.selectedStrategyId === p.id,
-      title: '点击查看策略属性（底部「策略仿真」进入仿真模式测试）',
-      action: () => store.selectStrategy(p.id),
-    })
-  }
-  for (const s of store.strategies || []) {
-    if (onlyScene.value && !s.applied) continue
-    if (q && !(s.name || '').toLowerCase().includes(q)) continue
-    strats.push({
-      id: 'strat:saved:' + s.id,
-      label: s.name || '未命名策略',
-      icon: 'bolt',
-      sub: '自定义',
-      active: store.selectedStrategyId === s.id,
-      title: '点击查看策略属性（名称/数值调整可编辑）',
-      action: () => store.selectStrategy(s.id),
-    })
-  }
-  if (strats.length) out.push({ key: 'strategy', label: '策略', items: strats })
 
   return out
 })
