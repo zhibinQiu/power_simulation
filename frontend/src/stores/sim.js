@@ -1092,7 +1092,8 @@ export const useSimStore = defineStore('sim', {
           api.presetModel(), api.presetStrategies(), api.getFactors(), api.getParamSchema(),
           api.getDevices(),
         ])
-        this.model = m
+        // 注意：平台预置模型（钢铁）只在默认钢铁启动路径使用（见下方 !booted 分支），
+        // 资源包场景的模型由 openScene 编译，不能在这里被钢铁默认模型覆盖
         // 首屏场景：上次打开的是资源包场景（如机房温控）时，在初始化阶段**直接装载该场景**，
         // 不再先按钢铁构建默认流程再切换 —— 后者会让首屏先渲染一遍钢铁流程（用户看到「闪一下钢铁」），
         // 还会多打一次钢铁碳引擎仿真、多弹出一次钢铁「系统就绪」提示。
@@ -1100,6 +1101,7 @@ export const useSimStore = defineStore('sim', {
         const booted = bootId ? await this.openScene(bootId) : false
         this.sceneBooted = booted
         if (!booted) {
+          this.model = m   // 仅默认钢铁启动路径使用平台预置模型；资源包启动由 openScene 编译自己的模型
           // 默认钢铁启动路径：_bootSceneId() 对 steel 返回 null，openScene 从未调用，
           // 资源包未装载 → 补装载包元数据（长/短流程模板等），否则编排工具条模板按钮不显示
           await this._loadScenePackMeta(this.sceneId || 'steel')
@@ -2337,13 +2339,24 @@ export const useSimStore = defineStore('sim', {
     // 一律「就地切换」，不整页刷新（此前切场景会 window.location.reload()，表现为打开场景就闪一下重刷）：
     // 资源树 / 检视器按 sceneVersion 重建、3D 按 sceneRev 重建、核算结果等会话态在下面逐项归零，
     // 功能视图 tab 与数据分析数据源（绑定的是上一场景的设备 id）在切换前清空 —— 与重载后的状态等价。
+    // 模型是否属于当前场景：openScene 早退的必要条件。
+    // HMR 热更新 / init 的 api.presetModel() 可能把 model 覆盖为钢铁默认模型，
+    // 此时若因「sceneId/scenePack 已是本场景」而早退，就会把钢铁模型错误地保留在资源包场景中。
+    // 非钢场景要求模型工序类型全部属于本场景包（sceneProcessDict）；钢场景只要求模型非空。
+    _modelMatchesScene(sceneId) {
+      const units = (this.model && this.model.units) || []
+      if (!units.length) return false
+      if (sceneId === 'steel') return true
+      const dict = this.sceneProcessDict || {}
+      return units.every((u) => dict[u.type])
+    },
     async openScene(sceneId) {
       if (!sceneId) return false
       this.inspectorHistory = []   // 右栏「上一级」历史不跨工程保留（快照里的 unit/group id 属于旧场景）
       const sameMode = this.sceneMode === (sceneId === 'steel' ? 'steel' : 'other')
       // 仅在资源已加载时才跳过：初始 sceneId='steel'/sceneMode='steel' 时 scenePack 仍为 null，
       // 否则长/短流程模板等资源不会被填充（编排工具条模板按钮不显示）
-      if (sceneId === this.sceneId && sameMode && this.scenePack && this.scenePack.meta?.id === sceneId) {
+      if (sceneId === this.sceneId && sameMode && this.scenePack && this.scenePack.meta?.id === sceneId && this._modelMatchesScene(sceneId)) {
         // 资源无需重装（早退），但「打开工程」这个动作仍要成立：欢迎页必须进工作区并记入最近，
         // 否则经其它入口（如 setScenario('steel')）打开默认装载的场景同样毫无反应
         this._noteRecentScene(sceneId)
