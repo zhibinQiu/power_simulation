@@ -188,8 +188,25 @@ const activeGroupName = computed(() => {
   return g ? g.name : ''
 })
 
-function matName(id) { return (MATERIAL_MAP[id] && MATERIAL_MAP[id].name) || id }
-function matUnit(id) { return (MATERIAL_MAP[id] && MATERIAL_MAP[id].unit) || '' }
+// 场景字典兜底反查：物料表被 HMR 重建或早退未登记时，从当前场景 dictionary.materials 查物料定义。
+// matName / matUnit / isGasMaterial 共用，避免名称与单位反查同时失效
+function matDictOf(id) {
+  const dict = store.sceneCtx && Array.isArray(store.sceneCtx.materials) ? store.sceneCtx.materials : []
+  return dict.find((x) => x && x.id === id) || null
+}
+function matName(id) {
+  const m = MATERIAL_MAP[id]
+  if (m && m.name) return m.name
+  const hit = matDictOf(id)
+  return hit ? (hit.name || id) : id
+}
+function matUnit(id) {
+  const m = MATERIAL_MAP[id]
+  if (m && m.unit) return m.unit
+  // 与 matName 同口径兜底：单位反查失败时 isGasMaterial 会误判（气体连线被画成实线）
+  const hit = matDictOf(id)
+  return hit ? (hit.unit || '') : ''
+}
 // 端口编辑下拉的物料候选：只列**当前场景**那一份（钢场景 = 内置钢铁表，资源包场景 = 包内 dictionary.materials）。
 // 全局 MATERIALS 是「钢铁表 + 包内物料」的并集，直接遍历会把铁矿石/钢水等钢铁物料带进机房温控场景。
 const portMaterials = computed(() => sceneMaterialList(store.sceneCtx, store.customSceneOn))
@@ -206,8 +223,20 @@ function procDef(type) {
   if (store.customSceneOn) return sceneProcDefs.value[type] || null
   return PROCESS_MAP[type] || null
 }
-const GAS_UNITS = new Set(['Nm³', 'GJ'])
-const GAS_IDS = new Set(['oxygen', 'ngas', 'ldg', 'cog', 'bfg', 'steam', 'waste_heat', 'co2', 'air'])
+// 气体流量单位（kNm³/h / Nm³/h / m³/h）也计入：dc-thermal 的 cold_air 单位为 kNm³/h，
+// 仅靠 Nm³/GJ 会把这类气体流量物料误判为非气体（连线画成实线）
+// 注意：m³/h 不作为气体判据 —— 它是液体/气体通用体积流量单位，水流量同用，
+// 若纳入会把液体误判为气体；烟气已按 id 覆盖（GAS_IDS 含 flue_gas 系列与 emission），无需靠单位
+const GAS_UNITS = new Set(['Nm³', 'GJ', 'kNm³/h', 'Nm³/h'])
+// hot_blast（热风）也是气体：其单位为复合单位「℃·kNm³/h」，无法靠单位集合匹配，
+// 必须按 id 归为气体，否则热风连线会被误判为非气体（画成实线）
+// 火电场景的蒸汽（main_steam/exhaust_steam/heating_steam，水蒸气）与烟气（flue_gas 系列、emission）
+// 也是气体：蒸汽单位为 t/h（与水/煤同单位，不能靠单位判），烟气单位为 m³/h（流量），按 id 归为气体
+const GAS_IDS = new Set([
+  'oxygen', 'ngas', 'ldg', 'cog', 'bfg', 'steam', 'waste_heat', 'co2', 'air', 'cold_air', 'hot_blast',
+  'main_steam', 'exhaust_steam', 'heating_steam', 'aux_steam',
+  'flue_gas', 'flue_gas_deno', 'flue_gas_clean', 'flue_gas_desul', 'emission',
+])
 function isGasMaterial(id) { return GAS_IDS.has(id) || GAS_UNITS.has(matUnit(id)) }
 function devIcon(type) { const d = DEVICE_MAP[type]; return d ? d.icon : 'gauge' }
 function nodeColor(n) {

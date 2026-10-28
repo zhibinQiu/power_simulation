@@ -2359,6 +2359,9 @@ export const useSimStore = defineStore('sim', {
       if (sceneId === this.sceneId && sameMode && this.scenePack && this.scenePack.meta?.id === sceneId && this._modelMatchesScene(sceneId)) {
         // 资源无需重装（早退），但「打开工程」这个动作仍要成立：欢迎页必须进工作区并记入最近，
         // 否则经其它入口（如 setScenario('steel')）打开默认装载的场景同样毫无反应
+        // 早退也要重新登记包内物料：HMR 会重建 flowLibrary 的 MATERIAL_MAP（包内物料被清空），
+        // 若早退不重新登记，端口/连线上的物料名会回退为英文 id
+        registerSceneMaterials(this.sceneCtx)
         this._noteRecentScene(sceneId)
         this._markEntered()
         return true
@@ -3468,7 +3471,13 @@ export const useSimStore = defineStore('sim', {
       // 旧附加设备类型 → 新类型
       const ATT_MAP = { variable_psu: 'tec_psu', frequency_converter: 'pump_transformer' }
       // 旧介质 → 新介质（已删除的「机房回风」）
-      const MAT_MAP = { hot_air: 'cold_air', room_air: 'cold_air', return_air: 'cold_air' }
+      const MAT_MAP = {
+        hot_air: 'cold_air', room_air: 'cold_air', return_air: 'cold_air',
+        // 旧版冷却水 id 带 cool_water_ 前缀（cool_water_cool_water_supply / cool_water_cool_water_return），
+        // 新字典为 cool_water_supply / cool_water_return：归一化，否则 matName 只能回退为该错误 id
+        cool_water_cool_water_supply: 'cool_water_supply',
+        cool_water_cool_water_return: 'cool_water_return',
+      }
       const nodes = (scheme && Array.isArray(scheme.nodes)) ? scheme.nodes : []
       let changed = false
       for (const n of nodes) {
@@ -3476,6 +3485,21 @@ export const useSimStore = defineStore('sim', {
         const ports = [].concat((n.ports && n.ports.in) || [], (n.ports && n.ports.out) || [])
         for (const p of ports) {
           if (p && MAT_MAP[p.material]) { p.material = MAT_MAP[p.material]; changed = true }
+        }
+        // 输入配比同步迁移：与端口/连线同一映射，避免 recipe 残留旧 id 导致右栏「输入配比」为空白；
+        // 迁移后按 material 去重（保留首个），防止旧 id 与新 id 归并出重复配比项。
+        // 仅当节点本就有 recipe 且非空时处理：缺字段节点不补 []，
+        // 否则 _schemeAdoptChanged 会被无意义置真，多写一次存档
+        if (Array.isArray(n.recipe) && n.recipe.length) {
+          const rp = n.recipe
+          for (const r of rp) {
+            if (r && MAT_MAP[r.material]) { r.material = MAT_MAP[r.material]; changed = true }
+          }
+          const seenMat = new Set()
+          n.recipe = rp.filter((r) => {
+            if (!r || seenMat.has(r.material)) return false
+            seenMat.add(r.material); return true
+          })
         }
         for (const a of (n.attached || [])) {
           const nt = a && ATT_MAP[a.type]
