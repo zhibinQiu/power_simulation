@@ -219,7 +219,7 @@
       >
         <p class="sec-desc">{{ t('展示可在线调节的设备参数及当前读数，点击可跳转至设备详情进行调整。') }}</p>
         <div class="card list-card" v-if="adjustable.length">
-          <div v-for="d in adjustable" :key="d.type" class="lrow" :class="{ click: !!d.devId }" @click="d.devId && store.openDeviceDetail(d.devId)">
+          <div v-for="d in adjustable" :key="d.devId" class="lrow" :class="{ click: !!d.devId }" @click="d.devId && store.openDeviceDetail(d.devId)">
             <div class="l-stack">
               <span class="l-tt">{{ d.label }}</span>
               <span class="l-sub">{{ d.measures }}</span>
@@ -227,7 +227,7 @@
             <span class="l-trail">{{ d.reading == null ? '—' : f(d.reading) }} <span class="u">{{ d.unit }}</span></span>
           </div>
         </div>
-        <div class="card note" v-else>{{ t('该工序未登记可调节设备。') }}</div>
+        <div class="card note" v-else>{{ t('暂无可调节设备：在编排中为该工序添加可变设备（或绑定功率传感器）后，这里会显示设备读数并支持在线调整。') }}</div>
       </CollapseSection>
 
       <CollapseSection
@@ -318,7 +318,7 @@
 import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import { energyOf } from '../utils/energy'
 import { useSimStore, UNIT_TYPES } from '../stores/sim'
-import { DEVICE_MAP, PROCESS_ADJUSTABLE, MATERIAL_MAP } from '../data/flowLibrary'
+import { DEVICE_MAP, MATERIAL_MAP } from '../data/flowLibrary'
 import CollapseSection from './CollapseSection.vue'
 import { buildRealtimeTftParams, collectTftContext, DEFAULT_TFT_CONFIG } from '../utils/tft'
 import { calcSlagBasicity } from '../utils/slagBasicity'
@@ -452,11 +452,22 @@ function buildDevRow(dt, u) {
     reading: live != null ? live : (sp != null ? sp : def),
   }
 }
-// 可调节：工序基础清单（变频/除尘风机等非工辅设备），点击跳转对应实例详情进行调整
+// 可调节：只显示编排里添加的可变设备（内置可变设备已弃用，任何情况都不再回退工艺内置清单）。
+// 数据来自运行态设备：附加设备 id 形如 ext::节点id::attUid，adjustable 即可变设备；
+// 其设定值走 deviceSetpoints（附加设备合成时已支持），调节后由功率型传感器读数折碳。
 const adjustable = computed(() => {
   const u = unit.value
   if (!u) return []
-  return (PROCESS_ADJUSTABLE[u.type] || []).map((dt) => buildDevRow(dt, u))
+  return store.allDevices
+    .filter((d) => d.unitId === u.id && d.adjustable && String(d.id).startsWith('ext::'))
+    .map((d) => ({
+      type: d.type,
+      label: d.label,
+      measures: (d.measures && d.measures[0] && d.measures[0].label) || '',
+      unit: d.unit || '',
+      devId: d.id,
+      reading: d.live != null ? d.live : (d.setpoint != null ? d.setpoint : d.reading),
+    }))
 })
 // 关联设备：实际连线绑定的工辅（鼓风机/热风炉等，含上游链路传递，由编排连线动态推导）
 const relatedDevices = computed(() => {

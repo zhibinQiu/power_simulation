@@ -3,7 +3,7 @@ import { watch, nextTick } from 'vue'
 import { t } from '../i18n'
 import { visiblePoll } from '../utils/poll'
 import { api, openFeed } from '../api/client'
-import { buildScheme, makeProcessNode, makeDeviceNode, makeMaterialNode, PROCESS_MAP, MATERIAL_MAP, PROCESS_ADJUSTABLE, DEVICE_MAP, DEVICE_COUPLE_REGISTRY, deriveProcessOpParams, materialFamily, loadCalibrations, registerSceneMaterials, NODE_NW, NODE_HEADER, NODE_PORT_Y0, NODE_GAP, nodeHeight, PROCESS_TEMPLATES, applySetpointResponse, migrateLegacyDevices, treeLayoutNodes } from '../data/flowLibrary'
+import { buildScheme, makeProcessNode, makeDeviceNode, makeMaterialNode, PROCESS_MAP, MATERIAL_MAP, DEVICE_MAP, DEVICE_COUPLE_REGISTRY, deriveProcessOpParams, materialFamily, loadCalibrations, registerSceneMaterials, NODE_NW, NODE_HEADER, NODE_PORT_Y0, NODE_GAP, nodeHeight, PROCESS_TEMPLATES, applySetpointResponse, migrateLegacyDevices, treeLayoutNodes } from '../data/flowLibrary'
 import { computeScheme } from '../flow/compute'
 // 规则执行器（纯函数）：AI 群控运行态策略由本 store 的后台运行器按周期执行时用它求值
 import { evalFlowGraph } from '../utils/ruleFlow'
@@ -368,8 +368,9 @@ function _otherUnitDirect(u, dict, factors) {
   return { t, items }
 }
 
-// 由工序合成其典型"可调设备"条目（按工艺类型 PROCESS_ADJUSTABLE 给出），
-// 与后端下发的"计量设备"区分；用于设备树、3D 标注与详情。id 稳定为 工序::类型。
+// 由工序合成其典型"可调设备"条目（仅兼容旧 devId：工序::类型）。
+// 内置可调设备清单已删除，可调设备统一来自编排附加设备（ext::）；此函数仅保留给
+// findDevice 的旧 devId 查找路径作兼容，新流程不再用它生成设备。
 function _adjDevice(u, dt, setpoints, extraSetpoints) {
   const tmpl = DEVICE_MAP[dt]
   if (!tmpl) return null
@@ -445,17 +446,9 @@ function linkedAuxTypesFor(scheme, unitId) {
   return out
 }
 
-// 某工序实例的可调设备类型 = 基础清单(PROCESS_ADJUSTABLE) + 实际连线供给的工辅类型（含上游链路传递）。
-// 该集合依赖连线图遍历（O(节点数+连线数)），而实时消息处理中每个工序实例每条消息都会调用，
-// 高频数据流下重复全图扫描开销可观。此处按「方案对象 + 节点/连线规模指纹」缓存：
-// 编辑态增删节点/连线会改变规模指纹自动失效；同一方案运行期内跨消息直接命中缓存。
-const _adjTypesCache = new WeakMap()
-function adjustableTypesFor(scheme, unitType, unitId) {
-  const set = new Set(PROCESS_ADJUSTABLE[unitType] || [])
-  // 喷吹系统(喷煤量)已锁定：即使连线供给高炉也不作为可调设备合成（喷吹速率固定为工艺默认值）
-  for (const dt of linkedAuxTypesFor(scheme, unitId)) if (dt !== 'injector') set.add(dt)
-  return [...set]
-}
+// 注意：可调设备类型推导（原 adjustableTypesFor）已删除 —— 可调设备统一来自编排附加设备
+// （node.attached 中 kind='adjustable'），不再有「内置清单 + 连线」的推导；连线工辅由
+// UnitCarbonDetail 的 relatedDevices（关联设备）展示，与可调设备区分。
 
 // 撤销/重做：合并键 + 时间戳（模块级，避免进入响应式 state）
 let _histKey = null
@@ -804,7 +797,8 @@ export const useSimStore = defineStore('sim', {
         const d = (u.devices || []).find((x) => x.id === devId)
         if (d) return { device: d, unitId: u.id, unitName: u.name, unitType: u.type }
       }
-      // 合成可调设备（id = 工序::类型）
+      // 兼容旧 devId（id = 工序::类型）：仅用于旧存档/旧链接的查找路径，新流程不会产生该形态 id；
+      // 可调设备统一来自编排附加设备（ext::），由 allDevices 的附加设备分支合成
       if (devId.includes('::')) {
         const [uid0, dt] = devId.split('::')
         const u = s.baseline.units.find((x) => x.id === uid0)
@@ -908,21 +902,8 @@ export const useSimStore = defineStore('sim', {
             history: s.deviceHistory[d.id] || [],
           })
         }
-        // 合成该工序的可调设备：仅基础清单。鼓风机等工辅不在工艺的设备子项中列出
-        // （工辅仅在「工辅」分组出现；其与工序的绑定关系在工艺属性面板中按连线展示）
-        const adj = PROCESS_ADJUSTABLE[u.type] || []
-        for (const dt of adj) {
-          const ad = _adjDevice(u, dt, s.deviceSetpoints, s.deviceExtraSetpoints)
-          if (!ad) continue
-          out.push({
-            ...ad,
-            unitId: u.id,
-            unitName: u.name,
-            unitType: u.type,
-            live: s.deviceLive[ad.id] != null ? s.deviceLive[ad.id] : ad.reading,
-            history: s.deviceHistory[ad.id] || [],
-          })
-        }
+        // 内置可调设备已弃用：可调设备统一来自编排附加设备（node.attached 中 adjustable），
+        // 不再按工艺内置清单（PROCESS_ADJUSTABLE）合成设备；该清单仅供策略作用对象等其它功能使用
       }
       // 附加设备（传感器 / 可变设备）：挂在具体工艺节点 node.attached[] 上，
       // 附加后该工艺在资源 / 设备树 / 数据分析中即出现对应设备（数值来源可按需解析）
@@ -1336,6 +1317,21 @@ export const useSimStore = defineStore('sim', {
         const overrides = deriveProcessOpParams(u.type, devs, u.params || {})
         if (Object.keys(overrides).length) {
           units[i] = { ...u, params: { ...(u.params || {}), ...overrides } }
+        }
+      }
+      // 3) 编排附加功率传感器（可变设备通过传感器获取电功率）：其读数即该工序的功率来源，
+      //    折算为 electricity（kW → MWh/h）覆盖工序电耗参数，使编排添加的设备/传感器影响真实能耗与碳排。
+      //    仅当该工序存在功率型传感器（_attachedSensorPower 返回读数）时生效，否则保持原电耗/设备耦合。
+      const srcMap = _boxSrcMap(this)
+      const nowMs = Date.now()
+      for (let i = 0; i < units.length; i++) {
+        const u = units[i]
+        // 附加设备（传感器/可变设备）挂在 scheme 节点上，model unit 本身不带 attached，
+        // 需从 nodeById（src.nodes）取 attached 一并传入，否则读不到附加功率传感器
+        const sn = nodeById[u.id]
+        const meas = _attachedSensorPower(sn ? { ...u, attached: sn.attached } : u, srcMap, nowMs, this.deviceSetpoints)
+        if (meas && meas.kW != null && isFinite(meas.kW)) {
+          units[i] = { ...u, params: { ...(u.params || {}), electricity: meas.kW / 1000 } }
         }
       }
       return { ...model, units }
@@ -4846,22 +4842,9 @@ export const useSimStore = defineStore('sim', {
         // 超限批量截断（保留 600 点 ≈ 10 分钟@1Hz），避免逐点 splice 的重复搬移开销
         if (buf.length > 900) buf.splice(0, buf.length - 600)
       }
-      // 可调设备由前端合成、后端不推送其读数：按当前设定值补采样（设定值即工况值，输入框数字即当前值）
-      const baseUnits = (this.baseline && this.baseline.units) || []
-      for (const u of baseUnits) {
-        for (const dt of adjustableTypesFor(this.scheme, u.type, u.id)) {
-          const did = `${u.id}::${dt}`
-          const tpl = DEVICE_MAP[dt]
-          const sp = (this.deviceSetpoints && this.deviceSetpoints[did] != null)
-            ? this.deviceSetpoints[did]
-            : (tpl && tpl.setpoint ? tpl.setpoint.def : null)
-          if (sp == null) continue
-          this.deviceLive[did] = sp
-          const buf = this.deviceHistory[did] || (this.deviceHistory[did] = [])
-          buf.push({ t: now, v: sp })
-          if (buf.length > 900) buf.splice(0, buf.length - 600)
-        }
-      }
+      // 内置可调设备的补采样已弃用：不再按内置清单（adjustableTypesFor/PROCESS_ADJUSTABLE）
+      // 给内置可调设备补实时读数与历史。可调设备的读数与历史统一由下方的
+      // _sampleAttachedDevices（按编排附加设备的设定值/传感器读数）负责，不再回退内置清单。
       // 附加设备（挂 node.attached[] 上的传感器 / 可变设备）同样由前端合成、后端不推送读数：
       // 一并补采样。「随附加可调设备联动」的传感器（如冷却水流速随循环水泵变压器输出电压变化）
       // 读数会随时间进入历史，数据分析 / 趋势曲线里就能直接看出「调压 → 流速」的变化过程。

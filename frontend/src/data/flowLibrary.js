@@ -913,44 +913,9 @@ function feedCoupling(deviceType, nominal, k) {
 // 注：鼓风机/热风炉/引风机/喷吹系统/皮带机/给料机/电极调节器/助燃风机/冷却水泵/空分制氧等
 // 「自身不产碳、只耗能并影响被服务工艺」的设备，已抽离为「工辅」独立节点
 // （route:'aux'，见 PROCESS_TEMPLATES 中对应条目），不再作为挂靠在工艺下的可调设备。
-// 下方仅保留尚未独立成工艺的可调设备（变频/氧枪/燃烧器/除尘风机等），保持向后兼容。
-// 注意：已独立为「工辅」(route:'aux') 的设备（鼓风机/热风炉/引风机/喷吹系统…）
-// 不再写在此表，也不静态并入 PROCESS_ADJUSTABLE。工辅实例与所服务工序实例的绑定
-// 由编排画布中的「物料连线」决定（见 stores/sim.js linkedAuxTypesFor）：只有实际连线
-// 供给某工序的工辅，才作为该工序的可调设备出现——未连线即视为未绑定、不出现在清单中。
-const PROCESS_ADJUSTABLE_BASE = {
-  sinter_plant: ['vfd'],
-  pelletizing: ['vfd'],
-  coke_oven: ['dedust_fan', 'vfd'],
-  blast_furnace: ['dedust_fan', 'vfd'],
-  hot_metal_pretreat: ['oxygen_lance', 'vfd'],
-  bof: ['oxygen_lance', 'dedust_fan', 'vfd'],
-  ladle_furnace: ['vfd'],
-  rh_vacuum: ['vfd', 'pump'],
-  caster: ['vfd', 'pump'],
-  rolling_mill: ['burner', 'vfd'],
-  eaf: ['dedust_fan', 'vfd'],
-  hydrogen_bf: ['dedust_fan', 'vfd'],
-  h2_dri: ['burner', 'vfd'],
-  dri_midrex: ['burner', 'vfd'],
-  smelting_reduction: ['vfd'],
-  biochar_injection: ['vfd'],
-  reheating_furnace: ['burner', 'vfd'],
-}
-
-// 每个工艺的可调设备 = 基础清单（仅变频/除尘风机等非工辅设备）。
-// 工辅不再按工艺类型静态并入：工辅实例与工序实例的绑定关系由编排连线动态推导，
-// 见 stores/sim.js 的 linkedAuxTypesFor（连线存在才作为该工序的可调设备）。
-// 工辅类型自身仍保留为可调设备（以其自身作为可调设备，工辅工艺下可见）。
-export const PROCESS_ADJUSTABLE = (() => {
-  const m = {}
-  for (const t of PROCESS_TEMPLATES) {
-    const set = new Set(PROCESS_ADJUSTABLE_BASE[t.type] || [])
-    if (t.route === 'aux' && t.type !== 'injector') set.add(t.type) // 工辅自身可调（喷吹系统除外：喷煤量已锁定不可调）
-    m[t.type] = [...set]
-  }
-  return Object.freeze(m)
-})()
+// 内置可调设备清单（PROCESS_ADJUSTABLE_BASE / PROCESS_ADJUSTABLE）已彻底删除：
+// 可调设备统一来自编排附加设备（node.attached 中 kind='adjustable'），
+// 该定义已无任何使用方（adjustableTypesFor 已改为从附加设备推导、设备合成与内置补采样均已移除），故下线。
 
 // id 生成统一到 utils/id.js（此前 sim.js 与此处各有一份逐字相同的实现）。
 // 注意：必须写成 import + 再导出，不能写 `export { uid } from ...` ——

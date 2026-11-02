@@ -256,7 +256,7 @@
 <script setup>
 import { reactive, ref, computed, watch, nextTick } from 'vue'
 import { useSimStore, aiModelsForScene } from '../stores/sim'
-import { MATERIALS, PRODUCTS, ROUTE_GROUPS, PROCESS_TEMPLATES, PROCESS_ADJUSTABLE, DEVICE_MAP, PROCESS_MAP, sceneMaterialList } from '../data/flowLibrary'
+import { MATERIALS, PRODUCTS, ROUTE_GROUPS, PROCESS_TEMPLATES, PROCESS_MAP, sceneMaterialList } from '../data/flowLibrary'
 import { SENSOR_TEMPLATES, ADJUSTABLE_TEMPLATES } from '../data/attachLibrary'
 import Icon from './Icon.vue'
 import { openContextMenu, ctxState } from '../composables/contextMenu'
@@ -429,29 +429,8 @@ const devByType = computed(() => {
     if (d.adjustable) { m[k].adjs.push(e); m[k].all.push(e) }
     else { m[k].meters.push(e); m[k].all.push(e) }
   }
-  // 2) 补全每个工艺类型的「典型可调设备」（与右侧属性面板一致）
-  for (const group of Object.values(routeGroups.value)) {
-    for (const t of group) {
-      const adjs = PROCESS_ADJUSTABLE[t.type] || []
-      if (!adjs.length) continue
-      if (!m[t.type]) m[t.type] = { meters: [], adjs: [], all: [] }
-      const seen = new Set(m[t.type].adjs.map((x) => x.type))
-      for (const dt of adjs) {
-        if (seen.has(dt)) continue
-        const tmpl = DEVICE_MAP[dt] || {}
-        m[t.type].adjs.push({
-          id: `tpl::${t.type}::${dt}`,
-          type: dt,
-          label: tmpl.label || dt,
-          measures: tmpl.measures || '',
-          unit: (tmpl.setpoint && tmpl.setpoint.unit) || tmpl.unit || '',
-          adjustable: true,
-          metering: false,
-        })
-        m[t.type].all.push(m[t.type].adjs[m[t.type].adjs.length - 1])
-      }
-    }
-  }
+  // 内置可调设备已弃用：不再补全每个工艺类型的「典型可调设备」，
+  // 左栏设备树只展示实际存在的设备（含编排添加的附加可变设备，来自 allDevices）
   return m
 })
 // 设备子项默认折叠；twisty 点击展开/折叠（未设置的 key 视为折叠）
