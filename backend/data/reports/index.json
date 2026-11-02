@@ -1,5 +1,71 @@
 [
   {
+    "id": "7d0878e6d386",
+    "title": "2026年度 双碳政策动态摘要",
+    "created_at": "2026-11-02 13:59:13",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "policy_digest",
+    "length": 2787,
+    "url": "/report/7d0878e6d386"
+  },
+  {
+    "id": "48752a339c78",
+    "title": "2026年度 双碳政策动态摘要",
+    "created_at": "2026-11-02 11:23:53",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "policy_digest",
+    "length": 3166,
+    "url": "/report/48752a339c78"
+  },
+  {
+    "id": "06f95771e57a",
+    "title": "2026年度 双碳政策动态摘要",
+    "created_at": "2026-11-02 11:15:37",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "policy_digest",
+    "length": 2953,
+    "url": "/report/06f95771e57a"
+  },
+  {
+    "id": "c9ececf55276",
+    "title": "2026年度 双碳政策动态摘要",
+    "created_at": "2026-11-02 11:13:35",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "policy_digest",
+    "length": 3018,
+    "url": "/report/c9ececf55276"
+  },
+  {
+    "id": "0feec405f072",
+    "title": "2026年度 碳交易市场简报",
+    "created_at": "2026-11-02 10:17:08",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "market_brief",
+    "length": 5348,
+    "url": "/report/0feec405f072"
+  },
+  {
+    "id": "6de869acc3cf",
+    "title": "2026年度 碳资产管理综合分析",
+    "created_at": "2026-11-02 09:43:14",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "compliance_analysis",
+    "length": 13050,
+    "url": "/report/6de869acc3cf"
+  },
+  {
     "id": "d64ea3581378",
     "title": "2026年度 碳资产管理综合分析",
     "created_at": "2026-10-27 14:30:28",

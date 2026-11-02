@@ -133,6 +133,8 @@ def _run_report_task(task_id: str, title: str, period: str,
                 "forecast_method": forecast_method,
                 # 报告类型传入流水线：三类报告都以企业台账为底稿，但正文标题/定位不同
                 "report_type": report_type,
+                # 用户补充说明：由流水线做相关性校验后，再决定是否并入提示词
+                "extra": (extra or "").strip(),
             }, ensure_ascii=False),
         )
 

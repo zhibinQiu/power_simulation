@@ -1977,6 +1977,8 @@ export default {
   '刷新台账': 'Refresh Ledger',
   '生成碳资产分析报告（Markdown）': 'Generate carbon-asset analysis report (Markdown)',
   '生成碳资产报告': 'Generate Carbon Asset Report',
+  '生成碳交易简报': 'Generate Carbon Trading Brief',
+  '生成政策摘要': 'Generate Policy Digest',
 
   // ===== RightInspector =====
   '全厂总览': 'Plant Overview',

@@ -361,6 +361,8 @@ def fetch_cneeex_daily_quotes_sync() -> list[dict[str, Any]]:
             "open": q.open,
             "high": q.high,
             "low": q.low,
+            "volume": q.volume,
+            "avg_price": q.avg_price,
         }
         for q in quotes
     ]

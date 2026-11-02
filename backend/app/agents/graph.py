@@ -30,8 +30,8 @@ from app.skills.registry import get_registry
 
 logger = logging.getLogger(__name__)
 
-MAX_TOOL_ROUNDS = 6        # 单轮子智能体内工具调用上限
-MAX_VERIFY_ROUNDS = 3      # 验收迭代上限（超过强制采纳）
+MAX_TOOL_ROUNDS = 30       # 单轮子智能体内工具调用上限
+MAX_VERIFY_ROUNDS = 5      # 验收迭代上限（超过强制采纳）
 MODEL_MISS_MSG = (
     "（模型未配置或未连通：请在后端设置 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL 后重启）"
 )

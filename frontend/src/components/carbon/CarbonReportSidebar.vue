@@ -42,6 +42,15 @@ const forecastMethod = ref('linear')
 const title = ref(t('碳资产管理综合分析报告'))
 const focus = ref(['compliance', 'trading'])
 const extra = ref('')
+// 价格预测方法 / 分析重点 / 补充说明 只对「履约综合分析」有意义：
+// 碳交易简报与政策摘要的生成面板不再展示这三项（提交时仍按默认值带参，后端接口不变）
+const showAnalysisOptions = computed(() => reportType.value === 'compliance_analysis')
+// 生成按钮文案随报告类型变化：三类报告产出的报告名称不同，按钮直接说清楚点什么
+const submitLabel = computed(() => ({
+  compliance_analysis: '生成碳资产报告',
+  market_brief: '生成碳交易简报',
+  policy_digest: '生成政策摘要',
+}[reportType.value] || '生成碳资产报告'))
 // 履约综合分析专属：目标企业 + 履约年度
 // 核算年度只能从该企业「排放台账」已有年份里选，不再允许自由输入 —— 后端按年度精确匹配
 // 台账，选到台账中没有的年度会静默按 0 排放核算，生成「巨额盈余」的错误报告
@@ -329,7 +338,7 @@ onBeforeUnmount(clearPoll)
             </div>
           </div>
 
-          <div class="field">
+          <div v-if="showAnalysisOptions" class="field">
             <span>{{ t('价格预测方法') }}</span>
             <div class="opt-cards inline">
               <button
@@ -371,7 +380,7 @@ onBeforeUnmount(clearPoll)
               {{ t('核算年度取自该企业排放台账') }}<template v-if="ledgerYears.length">（{{ ledgerYears.length }} {{ t('个年度可选') }}）</template>
             </div>
           </div>
-          <div class="field">
+          <div v-if="showAnalysisOptions" class="field">
             <span>{{ t('分析重点') }}</span>
             <div class="tags">
               <button
@@ -382,14 +391,14 @@ onBeforeUnmount(clearPoll)
               >{{ t(opt.label) }}</button>
             </div>
           </div>
-          <label class="field">
+          <label v-if="showAnalysisOptions" class="field">
             <span>{{ t('补充说明') }}</span>
             <textarea v-model="extra" rows="3" :placeholder="t('补充企业背景、减排目标、CCER计划等…')"></textarea>
           </label>
 
           <button class="submit" :disabled="submitting" @click="startAnalysis">
             <span v-if="submitting" class="spinner"></span>
-            {{ submitting ? t('生成中…') : t('生成碳资产报告') }}
+            {{ submitting ? t('生成中…') : t(submitLabel) }}
           </button>
           <div v-if="statusMsg" class="status">{{ statusMsg }}</div>
         </section>

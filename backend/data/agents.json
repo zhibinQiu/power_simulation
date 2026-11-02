@@ -140,7 +140,23 @@
       "builtin": true,
       "created_at": 0.0,
       "updated_at": 0.0
+    },
+    {
+      "id": "custom_c5863804",
+      "name": "测试智能体",
+      "emoji": "🤖",
+      "description": "随便",
+      "system_prompt": "你是一个问题帮助助手，回答用户的问题。",
+      "default_skills": [
+        "compute_carbon_accounting",
+        "query_carbon_enterprise_ledger",
+        "query_device_history"
+      ],
+      "available_skills": null,
+      "builtin": false,
+      "created_at": 1793255637.9433045,
+      "updated_at": 1793255637.9433045
     }
   ],
-  "updated_at": 1788066104.7346292
+  "updated_at": 1793255637.9433045
 }
