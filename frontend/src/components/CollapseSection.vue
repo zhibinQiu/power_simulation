@@ -20,6 +20,10 @@
         <slot name="actions" />
       </span>
     </button>
+    <!-- 标题行下方的常显区（在折叠轨道之外）：放「无论展开还是折叠都要看见」的小节级操作 -->
+    <div v-if="$slots.sub" class="csub">
+      <slot name="sub" />
+    </div>
     <!-- 包豪斯化：grid 轨道 0fr→1fr 平滑展开/折叠（替代 v-show 硬切换），丝滑不跳动 -->
     <div class="cbody" :class="{ on: isOpen }">
       <div class="cbody-in">
@@ -173,6 +177,8 @@ function onDrop(e) {
 .drag-grip:hover { opacity: 1; background: var(--hover); color: var(--text); }
 .drag-grip:active { cursor: grabbing; }
 .chead-actions { display: inline-flex; align-items: center; gap: 4px; }
+/* 标题行下方的常显区：折叠时也保留，故不放进 .cbody 的 0fr 轨道里 */
+.csub { padding: 2px 6px 6px; }
 /* 包豪斯化：内容区用 grid 行轨道 0fr→1fr 实现平滑展开/折叠动画 */
 .cbody { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .24s cubic-bezier(.4, 0, .2, 1); }
 .cbody.on { grid-template-rows: 1fr; }

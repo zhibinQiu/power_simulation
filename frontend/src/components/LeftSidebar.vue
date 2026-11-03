@@ -173,35 +173,34 @@
           </div>
         </div>
 
-        <template v-if="!store.customSceneOn">
-          <!-- 自定义：仿真模式下保存的策略 -->
-          <div class="tnode">
-            <div class="tch sub hdr" @click="toggle('g_strat_custom')">
-              <span class="twisty" :class="{ open: expanded.g_strat_custom }">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-              </span>
-              <span class="tch-tt">{{ t('自定义（仿真保存）') }}</span>
-              <span class="tch-count">{{ customStrategies.length }}</span>
+        <!-- 自定义：仿真模式下保存的策略（各场景通用：资源包场景下同样能保存 / 应用） -->
+        <div class="tnode">
+          <div class="tch sub hdr" @click="toggle('g_strat_custom')">
+            <span class="twisty" :class="{ open: expanded.g_strat_custom }">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </span>
+            <span class="tch-tt">{{ t('自定义（仿真保存）') }}</span>
+            <span class="tch-count">{{ customStrategies.length }}</span>
+          </div>
+          <div class="tchildren" v-show="expanded.g_strat_custom">
+            <div v-for="s in customStrategies" :key="s._key" class="tchild leaf flat click"
+                 :class="{ active: store.selectedStrategyId === s.id }"
+                 @click="onCustomClick(s)"
+                 @contextmenu.prevent="onStratContext($event, s)">
+              <span class="tch-dot" v-if="s.applied"></span>
+              <span class="tc-tt">{{ s.name || t('未命名策略') }}</span>
+              <span class="tc-tag saved">{{ t('自定义') }}</span>
+              <button class="x-btn danger" :title="t('删除策略')" @click.stop="doRemoveStrategy(s)">✕</button>
             </div>
-            <div class="tchildren" v-show="expanded.g_strat_custom">
-              <div v-for="s in customStrategies" :key="s._key" class="tchild leaf flat click"
-                   :class="{ active: store.selectedStrategyId === s.id }"
-                  
-                   @click="onCustomClick(s)"
-                   @contextmenu.prevent="onStratContext($event, s)">
-                <span class="tch-dot" v-if="s.applied"></span>
-                <span class="tc-tt">{{ s.name || t('未命名策略') }}</span>
-                <span class="tc-tag saved">{{ t('自定义') }}</span>
-                <button class="x-btn danger" :title="t('删除策略')" @click.stop="doRemoveStrategy(s)">✕</button>
-              </div>
-              <div v-if="!customStrategies.length" class="empty-hint">
-                {{ t('暂无自定义策略：进入仿真模式调整参数后，点击 3D 场景右上角「保存策略」即可创建') }}
-              </div>
+            <div v-if="!customStrategies.length" class="empty-hint">
+              {{ store.strategies.length ? t('当前场景暂无自定义策略：其它场景保存的策略已按场景隔离，不会在此展示。') : t('暂无自定义策略：进入仿真模式调整参数后，点击 3D 场景底部工具条的「保存策略」即可创建') }}
             </div>
           </div>
+        </div>
 
+        <template v-if="!store.customSceneOn">
           <!-- 工艺流程优化：按工艺分组展示各工艺策略（含系统预置策略，归入对应工艺）；
-               工艺分组默认展开（2级策略条目直接可见），twisty 可折叠 -->
+               工艺分组默认展开（2级策略条目直接可见），twisty 可折叠；仅钢铁场景有该策略库 -->
           <div class="tnode">
             <div class="tch sub hdr" @click="toggle('g_strat_builtin')">
               <span class="twisty" :class="{ open: expanded.g_strat_builtin }">
@@ -239,7 +238,7 @@
             </div>
           </div>
         </template>
-        <div v-else class="empty-hint">{{ t('通用资源包场景暂无策略库：参数调整在编排属性面板，折碳展示见主场景（上方的 AI 优化模型可独立使用）') }}</div>
+        <div v-else class="empty-hint">{{ t('通用资源包场景暂无工艺策略库：参数调整在编排属性面板，折碳展示见主场景（上方的 AI 优化模型与自定义策略可独立使用）') }}</div>
       </div>
     </div>
     </template>
@@ -368,7 +367,8 @@ const presetStrategies = computed(() => (store.presets || []).map((p, i) => ({
   ...p, id: p.id ?? `preset::${i}`, _key: `preset::${i}`, _src: 'preset',
   processType: PRESET_PROCESS[i] || null,
 })))
-const customStrategies = computed(() => (store.strategies || []).map((s) => ({ ...s, _key: `saved::${s.id}`, _src: 'saved' })))
+// 自定义策略按场景隔离（store.sceneStrategies 统一口径：scene_id 为空的历史条目归入默认钢铁场景）
+const customStrategies = computed(() => (store.sceneStrategies || []).map((s) => ({ ...s, _key: `saved::${s.id}`, _src: 'saved' })))
 // 工艺策略：按工艺分组 = 该工艺绿色策略 + 归入该工艺的系统预置策略（preset: true）
 const greenGroups = computed(() => {
   const groups = []
@@ -526,6 +526,17 @@ const viewMap = { process: 'overview', aux: 'park', material: 'materials', strat
 // 切换目录：非编排态时右侧同步显示该类目视图；编排态下保持右侧「编排属性」不被抢占
 function onTab(key) { tab.value = key; expanded[key] = true; if (!store.editMode) store.setInspectorView(viewMap[key]) }
 function toggle(key) { expanded[key] = !expanded[key] }
+// 3D 场景「保存策略」成功后自动定位到该策略：资源面板默认收起、自定义分组默认折叠，
+// 不自动展开的话用户会觉得「点了保存却没出现」，故这里一并打开面板 / 切页签 / 展开分组。
+watch(() => store.revealSavedStrategy, (id) => {
+  if (!id) return
+  // 左栏被用户收起时一并打开：否则「保存成功但看不到」——全屏模式下更要退出全屏后才可见
+  store.leftOpen = true
+  secClosed.explorer = false
+  tab.value = 'strategy'
+  expanded.strategy = true
+  expanded.g_strat_custom = true
+})
 // 「工艺流程优化」下的工艺分组默认折叠（仅显示一级分组标题）；twisty 点击展开/折叠
 function stratGroupOpen(type) { return expanded['g_strat_green_' + type] === true }
 function toggleStratGroup(type) {
@@ -562,7 +573,7 @@ function onGreenClick(g, gs) {
   store.selectGreenStrategy(g.type, gs.id)
   store.toast = t('已打开策略「{name}」', { name: gs.name })
 }
-// 点击自定义策略（仿真模式下保存）：打开右侧「策略属性」面板（名称/数值调整可编辑，底部「策略仿真」按钮加载）
+// 点击自定义策略（仿真模式下保存）：打开右侧「策略属性」面板（参数只读，底部「应用策略」按钮把快照应用到当前场景）
 function onCustomClick(s) {
   if (store.busy) return
   store.selectStrategy(s.id)

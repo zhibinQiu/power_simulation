@@ -22,9 +22,9 @@ class StrategyService:
         return store.get(sid)
 
     def create(self, name: str, description: str, raw_text: str,
-               ops: List[ParsedOp]) -> Strategy:
+               ops: List[ParsedOp], scene_id: str = "") -> Strategy:
         return store.create(name=name, description=description,
-                            raw_text=raw_text, ops=ops)
+                            raw_text=raw_text, ops=ops, scene_id=scene_id)
 
     def update(self, sid: str, name: Optional[str] = None, description: Optional[str] = None,
                raw_text: Optional[str] = None, ops: Optional[list] = None) -> Optional[Strategy]:

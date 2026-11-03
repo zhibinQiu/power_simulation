@@ -85,8 +85,8 @@ export const api = {
   parse: (text, model) => jpost('/parse', { text, model }),
   simulate: (model, ops = [], factors = null) => jpost('/simulate', { model, ops, factors }),
   listStrategies: () => jget('/strategies'),
-  createStrategy: (name, description, raw_text, ops) =>
-    jpost('/strategies', { name, description, raw_text, ops }),
+  createStrategy: (name, description, raw_text, ops, scene_id = '') =>
+    jpost('/strategies', { name, description, raw_text, ops, scene_id }),
   deleteStrategy: (sid) => jdel('/strategies/' + sid),
   applyStrategy: (sid, model, factors = null) => jpost('/strategies/' + sid + '/apply', { model, factors }),
   updateStrategy: (sid, patch) => {

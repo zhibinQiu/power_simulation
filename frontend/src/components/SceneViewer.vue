@@ -17,6 +17,12 @@
       <button type="button" class="twin-tool-btn" :class="{ on: store.autoRotate }" @click="store.setAutoRotate(!store.autoRotate)">
         <Icon name="rotate"/>
       </button>
+      <!-- 保存策略：把当前场景全部工序参数（含附加传感器 / 可变设备设定值）存为策略，
+           由底部工具条触发 → 名称弹窗（SaveStrategyDialog）→ 落库到策略库「自定义（仿真保存）」 -->
+      <button type="button" class="twin-tool-btn" :title="t('保存策略（保存当前场景全部工序参数）')"
+              :disabled="store.busy" @click="store.openSaveStrategyDialog()">
+        <Icon name="save"/>
+      </button>
       <div v-if="showBrightness" class="twin-bright-pop" @click.stop>
         <div class="twin-bp-title">{{ t('画面亮度') }}</div>
         <div class="twin-bp-row">
@@ -345,6 +351,9 @@ onMounted(() => document.addEventListener('click', onBrightDocClick))
 .twin-tool-btn:active { transform: translateY(0); }
 .twin-tool-btn.on { background: var(--accent); color: var(--on-accent); border-color: transparent; }
 .twin-tool-btn.on:hover { background: var(--accent-h); color: var(--on-accent); }
+/* 仿真重算在途（store.busy）：保存按钮置灰不可点，避免存下上一轮参数 */
+.twin-tool-btn:disabled { opacity: .45; cursor: not-allowed; }
+.twin-tool-btn:disabled:hover { background: var(--glass-bg); color: var(--text); }
 /* 亮度弹层：从底部工具组向上弹出 */
 .twin-bright-pop {
   position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); min-width: 190px; z-index: 90;

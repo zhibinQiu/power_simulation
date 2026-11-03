@@ -91,6 +91,8 @@
     <TaskProgress />
     <!-- 全局统一确认弹窗 -->
     <ConfirmDialog />
+    <!-- 「保存策略」名称弹窗（3D 场景底部工具条按钮触发，保存当前场景全部工序参数） -->
+    <SaveStrategyDialog />
   </div>
 </template>
 
@@ -103,6 +105,7 @@ import { lazyDialog, lazyView } from './utils/asyncComp'
 import ToastLayer from './components/ToastLayer.vue'
 import TaskProgress from './components/TaskProgress.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
+import SaveStrategyDialog from './components/SaveStrategyDialog.vue'
 import TopBar from './components/TopBar.vue'
 import RibbonToolbar from './components/RibbonToolbar.vue'
 import CommandConsole from './components/CommandConsole.vue'

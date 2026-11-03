@@ -8,9 +8,9 @@
         <div class="note-box" v-if="strategy.description">{{ strategy.description }}</div>
         </CollapseSection>
         <CollapseSection :title="t('数值调整')" tone="amber" :show-more="false">
-        <div class="note">{{ t('该策略为系统内置，点击「策略仿真」进入仿真模式解析测试。') }}</div>
+        <div class="note">{{ t('该策略为系统内置，点击「应用策略」解析并应用到当前场景。') }}</div>
         <div class="actions">
-          <button class="x" :disabled="store.busy" @click="runSim">{{ t('策略仿真') }}</button>
+          <button class="x" :disabled="store.busy" @click="runSim">{{ t('应用策略') }}</button>
         </div>
         </CollapseSection>
       </template>
@@ -473,45 +473,47 @@
         </CollapseSection>
       </template>
 
-      <!-- 自定义策略：可编辑 -->
+      <!-- 自定义策略（仿真模式保存的参数快照）：全只读，只能查看与应用 -->
       <template v-else>
         <CollapseSection :title="t('策略名称')" tone="blue" :show-more="false">
-        <div class="card"><input v-model="nameDraft" class="inp" @change="markDirty" /></div>
+        <div class="card"><div class="kv2"><span>{{ t('名称') }}</span><b>{{ strategy.name || t('未命名策略') }}</b></div></div>
         </CollapseSection>
         <CollapseSection :title="t('来源')" tone="teal" :show-more="false">
         <div class="card">
           <span class="tag">{{ strategy.applied ? t('已应用') : t('自定义') }}</span>
           <span class="muted src-tip">{{ t('仿真模式下保存') }}</span>
         </div>
-        </CollapseSection>
-        <CollapseSection v-if="strategy.description" :title="t('描述')" tone="teal" :show-more="false">
-        <div class="card">
-          <textarea v-model="descDraft" class="inp" rows="2" @change="markDirty"></textarea>
+        <div class="card" v-if="strategyScene">
+          <div class="kv2"><span>{{ t('所属场景') }}</span><b>{{ strategyScene }}</b></div>
         </div>
         </CollapseSection>
+        <CollapseSection v-if="strategy.description" :title="t('描述')" tone="teal" :show-more="false">
+        <div class="note-box">{{ strategy.description }}</div>
+        </CollapseSection>
 
-        <!-- 数值调整（可编辑） -->
-        <CollapseSection :title="t('数值调整')" tone="amber" :show-more="false">
+        <!-- 参数查看（只读）：快照参数仅供查看，不提供就地修改。
+             「应用策略」只有标题下方这一个：折叠、展开都固定可见，不在列表末尾重复放。 -->
+        <CollapseSection :title="t('参数查看')" tone="amber" :show-more="false">
+        <template #sub>
+          <div class="actions top">
+            <button class="x" :disabled="store.busy" @click="runSim">{{ t('应用策略') }}</button>
+            <button class="x" :disabled="store.busy || !canUndoApply" @click="undoApply">{{ t('取消应用') }}</button>
+          </div>
+        </template>
         <div v-if="opsDraft.length" class="ops">
           <div v-for="(op, i) in opsDraft" :key="i" class="op-row">
             <div class="op-head">
               <span class="op-note">{{ opNote(op) }}</span>
               <span class="op-kind">{{ op.action === 'set_param' ? t('参数') : op.action === 'apply_tech' ? t('技术') : t('操作') }}</span>
             </div>
-            <div v-if="op.action === 'set_param'" class="op-edit">
+            <div v-if="op.action === 'set_param'" class="op-view">
               <span class="op-label">{{ op.target }} {{ opParamLabel(op) }}</span>
-              <input v-model.number="op.value" type="number" class="inp num" @change="markDirty" />
-              <span class="op-unit">{{ opUnit(op) }}</span>
+              <b class="op-value">{{ op.value }}<span class="op-unit" v-if="opUnit(op)"> {{ opUnit(op) }}</span></b>
             </div>
             <div v-else class="op-static muted">{{ opNote(op) }}</div>
           </div>
         </div>
-        <div v-else class="note">{{ t('该策略暂无数值调整项。') }}</div>
-
-        <div class="actions">
-          <button class="x" :disabled="store.busy" @click="save">{{ t('保存修改') }}</button>
-          <button class="x" :disabled="store.busy" @click="runSim">{{ t('策略仿真') }}</button>
-        </div>
+        <div v-else class="note">{{ t('该策略暂无参数记录。') }}</div>
         </CollapseSection>
       </template>
     </template>
@@ -528,8 +530,7 @@ import { t } from '../i18n'
 const store = useSimStore()
 
 const strategy = computed(() => store.selectedStrategy)
-const nameDraft = ref('')
-const descDraft = ref('')
+// 自定义策略（仿真保存的快照）面板为只读：仅展示参数快照，不提供就地编辑与「保存修改」
 const opsDraft = ref([])
 let hpInited = false   // AI 算法超参数草稿是否已初始化（避免轮询覆盖用户编辑）
 let settingsInited = false  // 控制与训练设置草稿是否已初始化
@@ -539,8 +540,6 @@ const winStart = ref('08:00')
 const winEnd = ref('18:00')
 
 watch(strategy, (s) => {
-  nameDraft.value = s ? s.name || '' : ''
-  descDraft.value = s ? s.description || '' : ''
   opsDraft.value = s && s.ops ? JSON.parse(JSON.stringify(s.ops)) : []
   hpInited = false   // 切换条目后重新初始化 AI 算法超参数草稿
   settingsInited = false
@@ -1046,43 +1045,56 @@ onMounted(() => {
   store.syncOptimizerContext().then(() => store.refreshOptimizers())
 })
 
-function opParamLabel(op) {
-  const u = op.target
-  const p = op.param
-  if (!u || !p) return p || ''
-  // 从参数元数据中查找该工序参数的显示名（label），找不到则回退原始 key
-  for (const list of Object.values(EDITABLE_PARAMS)) {
-    const found = list.find((x) => x.key === p)
-    if (found) return found.label || p
+// 参数元数据：先按 op.target 指向的工序类型精确查（可编辑参数表 → 后端参数元数据 schema），
+// 查不到才回退「全表按 key 搜」——纯按 key 全局搜会在不同工序复用同名 key 时显示别人的标签/单位。
+function findParamMeta(op) {
+  const key = op && op.param
+  if (!key) return null
+  const target = op.target
+  const units = (store.model && store.model.units) || []
+  const unit = target
+    ? (units.find((u) => u.id === target || u.name === target) || units.find((u) => u.type === target))
+    : null
+  const type = unit ? unit.type : null
+  const schema = (store.paramSchema && store.paramSchema.schema) || {}
+  const tables = []
+  if (type && EDITABLE_PARAMS[type]) tables.push(EDITABLE_PARAMS[type])
+  if (type && schema[type]) tables.push(schema[type])
+  tables.push(...Object.values(EDITABLE_PARAMS))
+  for (const list of tables) {
+    const found = (list || []).find((x) => x && x.key === key)
+    if (found) return found
   }
-  return p
+  return null
+}
+function opParamLabel(op) {
+  const m = findParamMeta(op)
+  return (m && (m.label || m.key)) || (op && op.param) || ''
 }
 function opUnit(op) {
-  const p = op.param
-  if (!p) return ''
-  for (const list of Object.values(EDITABLE_PARAMS)) {
-    const found = list.find((x) => x.key === p)
-    if (found) return found.unit || ''
-  }
-  return ''
+  const m = findParamMeta(op)
+  return (m && m.unit) || ''
 }
+// 策略归属场景（保存时记录的 scene_id；历史数据未记录则不展示）
+const strategyScene = computed(() => {
+  const id = strategy.value && strategy.value.scene_id
+  if (!id) return ''
+  const hit = (store.sceneIndex || []).find((x) => x.id === id)
+  return (hit && (hit.name || hit.label)) || id   // 注册表里显示名是 label
+})
 function opNote(op) {
   return op.note || (op.action === 'set_param' ? `${op.target || ''} ${op.param || ''} = ${op.value}` : op.action || '')
-}
-function markDirty() {}
-
-async function save() {
-  if (!strategy.value) return
-  await store.updateStrategy(strategy.value.id, {
-    name: nameDraft.value.trim() || t('未命名策略'),
-    description: descDraft.value,
-    ops: opsDraft.value,
-  })
 }
 function runSim() {
   if (!strategy.value) return
   store.runStrategySimulation(strategy.value.id)
 }
+// 「取消应用」只在当前这条策略被应用过、且快照属于当前场景时可用（store.strategyUndo 在应用时记录）
+const canUndoApply = computed(() => {
+  const u = store.strategyUndo
+  return !!(u && u.sid === (strategy.value && strategy.value.id) && u.sceneId === store.sceneId)
+})
+function undoApply() { store.undoStrategy() }
 // 工艺策略：跳转到对应工艺的属性面板
 function goProcess() {
   if (!strategy.value) return
@@ -1115,11 +1127,15 @@ textarea.inp { resize: vertical; font-family: inherit; line-height: 1.5; }
 .op-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .op-note { font-size: 11px; color: var(--text); }
 .op-kind { font-size: 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 6px; }
-.op-edit { display: flex; align-items: center; gap: 8px; }
+/* 参数查看（只读行）：左侧标签 + 右侧数值，不提供输入框 */
+.op-view { display: flex; align-items: center; gap: 8px; }
 .op-label { flex: 1; font-size: 11px; color: var(--muted); }
+.op-value { font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; }
 .op-unit { font-size: 11px; color: var(--muted); }
 .op-static { font-size: 11px; }
 .actions { display: flex; gap: 8px; margin-top: 14px; }
+/* 小节标题下方常显区里的动作行（如「参数查看」的应用按钮）：外边距由 .csub 内边距提供 */
+.actions.top { margin: 0; }
 .actions .x { flex: 1; padding: 9px 0; font-size: 12px; }
 /* ---- AI 优化模型训练面板 ---- */
 .badge { display: inline-block; font-size: 10px; padding: 1px 9px; border-radius: 9px; border: 1px solid var(--line); color: var(--muted); }

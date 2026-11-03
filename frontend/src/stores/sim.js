@@ -140,6 +140,39 @@ function _boxSrcMap(s) {
   }
   return m
 }
+// ---- 「取消应用」撤销快照的本地持久化（localStorage，按场景各存一份）----
+// 记录 { sid, sceneId, params, techs, deviceSetpoints, deviceExtraSetpoints }：
+// 刷新页面 / 重开浏览器后仍能取消应用；取消即删除该场景的记录，避免脏快照长期残留。
+const UNDO_LS_KEY = 'sim.strategyUndo'
+function _undoMapRead() {
+  try {
+    const raw = localStorage.getItem(UNDO_LS_KEY)
+    const m = raw ? JSON.parse(raw) : {}
+    return (m && typeof m === 'object' && !Array.isArray(m)) ? m : {}
+  } catch (e) { return {} }   // 隐私模式 / 存档损坏：当作没有快照
+}
+function _undoMapWrite(map) {
+  try { localStorage.setItem(UNDO_LS_KEY, JSON.stringify(map)) } catch (e) { /* 存储满/受限：退化为仅内存态 */ }
+}
+function _undoPersist(snap) {
+  if (!snap || !snap.sceneId) return
+  const m = _undoMapRead()
+  m[snap.sceneId] = snap
+  _undoMapWrite(m)
+}
+function _undoDrop(sceneId) {
+  const m = _undoMapRead()
+  if (!(sceneId in m)) return
+  delete m[sceneId]
+  _undoMapWrite(m)
+}
+function _undoLoad(sceneId) {
+  if (!sceneId) return null
+  const s = _undoMapRead()[sceneId]
+  // 结构校验：缺 sid/params 或场景对不上的记录一律丢弃，避免脏存档把参数写成 undefined
+  if (!s || !s.sid || s.sceneId !== sceneId || !s.params || typeof s.params !== 'object') return null
+  return s
+}
 // 附加设备当前读数：按「数值来源」解析（只有传感器取数；可变设备的值就是其设定值，不参与取数）
 //  可调设备（kind=adjustable）→ 直接返回当前设定值（deviceSetpoints 优先，其次 att.def / 模板默认），
 //           与其 src 无关：可变设备只用于设定运行工况，不产生读数。
@@ -502,6 +535,14 @@ export const useSimStore = defineStore('sim', {
     toastType: 'info',    // 类型化 Toast：success / info / warn / error（ToastLayer 渲染）
     confirmDialog: { open: false, title: '', message: '', okText: '', cancelText: '', danger: false }, // 确认弹窗（ConfirmDialog 渲染）
     _confirmResolver: null, // confirm() 挂起的 Promise resolve
+    // 「保存策略」弹窗（3D 场景底部工具条按钮触发 / SaveStrategyDialog 渲染）：
+    // 名称留空不可提交；saving 期间按钮置灰防重复落库；error 展示后端失败原因
+    saveStrategyDialog: { open: false, name: '', saving: false, error: '' },
+    revealSavedStrategy: '',   // 刚保存成功的策略 id：左栏「策略 → 自定义（仿真保存）」据此自动切页签 + 展开 + 高亮
+    // 「取消应用」用的撤销快照：{ sid, sceneId, params, techs, deviceSetpoints, deviceExtraSetpoints }
+    // 记录的是**该策略首次应用前**的工序参数与设备设定；重复应用同一条不覆盖，保证取消能回到最初状态。
+    // 同时按场景写入 localStorage（sim.strategyUndo）：刷新 / 重开浏览器后仍可取消应用。
+    strategyUndo: null,
     scenario: 'steel',           // 当前仿真场景行业（四大控排 + 其它）：steel 钢铁(默认) / cement 水泥 / chemical 化工 / nonferrous 有色 / other 其它(资源包场景)
     processRoute: 'short',       // 当前流程：短流程(默认) / 长流程；数字孪生默认展示短流程。资源包场景下为包内模板 id（如 cool）
     // —— 工程选择（欢迎页）——
@@ -655,7 +696,6 @@ export const useSimStore = defineStore('sim', {
     simCurrent: null,      // 仿真模式下的当前结果（供对比浮层 after；随属性/策略变化实时更新，非仿真模式恒为 null）
     simOps: [],            // 仿真模式下当前生效的策略操作集合（属性修改重算时一并携带，使 after 始终反映 参数+策略）
     simChanges: [],        // 仿真模式下的变更记录（右上角「仿真前后对比」窗口左侧展示用户改了哪些内容）
-    pendingSaveStrategy: false,  // 仿真模式：等待命令行输入策略名称
 
     // 左侧「原料」库选中查看（属性/配置），两栏联动
     selectedMaterialId: null,   // 选中的物料库 id
@@ -707,6 +747,10 @@ export const useSimStore = defineStore('sim', {
     currentSceneMeta: (s) => s.sceneIndex.find((x) => x.id === s.sceneId) || null,
     // 非钢铁场景（机房热控等通用资源包）：编排 → 孪生展示模式
     customSceneOn: (s) => s.sceneMode !== 'steel',
+    // 自定义策略按场景隔离：只展示本场景保存的策略（scene_id 由保存时写入）。
+    // 历史数据没有 scene_id 字段，归入默认场景 steel —— 否则「在 A 场景存的策略在 B 场景也能看见」，
+    // 而应用时参数又按工序名称/类型匹配，会改到完全不相关的工序。
+    sceneStrategies: (s) => (s.strategies || []).filter((x) => (x.scene_id || 'steel') === (s.sceneId || 'steel')),
     // 当前场景的「工艺」轻量模板字典（场景包内 scheme 节点 type → 模板），供非钢资源树与拖拽建节点使用
     sceneProcessDict: (s) => {
       const dict = {}
@@ -1049,6 +1093,50 @@ export const useSimStore = defineStore('sim', {
         r(val)
       }
     },
+    // 「保存策略」弹窗：打开（清空上次的输入与错误）
+    openSaveStrategyDialog() {
+      this.saveStrategyDialog = { open: true, name: this._defaultStrategyName(), saving: false, error: '' }
+    },
+    // 关闭（保存中不响应，避免落库请求在途时弹窗被关掉后无处反馈失败原因）
+    closeSaveStrategyDialog() {
+      if (this.saveStrategyDialog.saving) return
+      this.saveStrategyDialog = { open: false, name: '', saving: false, error: '' }
+    },
+    // 策略名称默认值：场景名 + 日期时间，用户可直接回车保存，也可改成本人更能识别的名字
+    _defaultStrategyName() {
+      const packName = this.scenePack && this.scenePack.meta ? this.scenePack.meta.name : ''
+      const scenLabel = ((this.scenarios || []).find((s) => s.id === this.scenario) || {}).label || ''
+      const scen = String(packName || scenLabel || '').trim()
+      const d = new Date()
+      const p = (n) => String(n).padStart(2, '0')
+      const stamp = `${d.getMonth() + 1}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+      return scen ? `${scen}${t('策略')} ${stamp}` : `${t('仿真策略')} ${stamp}`
+    },
+    // 弹窗「确定」：把当前场景全部工序参数（含附加传感器 / 可变设备）存为策略
+    async commitSaveStrategy() {
+      const d = this.saveStrategyDialog
+      if (!d.open || d.saving) return
+      const name = (d.name || '').trim()
+      if (!name) return
+      // 同名不校验会存出两条看起来一模一样的条目（左栏无从区分）：先让用户确认
+      if ((this.strategies || []).some((s) => (s.name || '') === name)) {
+        const go = await this.confirm({
+          title: t('策略名称已存在'),
+          message: t('已存在同名策略「{name}」，仍要再保存一份吗？', { name }),
+          okText: t('仍要保存'),
+        })
+        if (!go) return
+      }
+      this.saveStrategyDialog = { ...d, saving: true, error: '' }
+      try {
+        await this.saveCurrentAsStrategy(name)
+        this.saveStrategyDialog = { open: false, name: '', saving: false, error: '' }
+      } catch (e) {
+        const msg = (e && e.message) || String(e)
+        this.saveStrategyDialog = { ...this.saveStrategyDialog, saving: false, error: msg }
+        this.showToast(`${t('保存策略失败')}：${msg}`, 'error')
+      }
+    },
     markNotificationRead(id) {
       const n = this.notifications.find((x) => x.id === id)
       if (n) n.read = true
@@ -1059,6 +1147,7 @@ export const useSimStore = defineStore('sim', {
     async init() {
       try {
         this._loadWelcomeState()   // 是否停在「工程选择」欢迎页 + 最近工程列表（同步，先于任何场景装载）
+        this.strategyUndo = _undoLoad(this.sceneId)   // 启动即恢复本场景的「取消应用」快照（localStorage）
         if (!this.welcomeOn) this.beginSceneLoad('data')
         loadCalibrations()   // 启动即恢复本厂标定耦合（localStorage），否则用默认机理/经验系数
         this._loadDataSource() // 恢复上次设置的实时数据源（平台 MQTT 实时 / 自定义 WS / HTTP）
@@ -1632,25 +1721,111 @@ export const useSimStore = defineStore('sim', {
       await this.loadStrategies()
     },
     async applyStrategy(sid) {
+      const st = (this.strategies || []).find((s) => s.id === sid)
+      const ops = (st && st.ops) || []
+      // 跨场景策略：ops 里的工序按名称/类型匹配，套到不相关场景会静默改错参数 —— 先让用户确认
+      // （scene_id 为空的旧数据 / 同场景直接放行）
+      if (st && st.scene_id && st.scene_id !== (this.sceneId || '')) {
+        const sceneName = (id) => {
+          const e = (this.sceneIndex || []).find((x) => x.id === id) || {}
+          return e.name || e.label || id   // 注册表里显示名是 label（如「算力中心热控」）
+        }
+        const go = await this.confirm({
+          title: t('跨场景应用策略'),
+          message: t('该策略保存自「{from}」场景，与当前场景「{cur}」不同：参数按工序名称/类型匹配，可能改到不相关的工序。仍要应用吗？', { from: sceneName(st.scene_id), cur: sceneName(this.sceneId) }),
+          okText: t('继续应用'),
+        })
+        if (!go) return
+      }
       // 仿真模式：记录策略应用（退出仿真时恢复，见 exitSim 快照）；同一策略重复应用合并为一条
       if (this.simMode) {
-        const sname = ((this.strategies || []).find((s) => s.id === sid) || {}).name || sid
+        const sname = (st && st.name) || sid
         this._simLog('strategy', t('应用策略'), sname, 'apply_' + sid)
       }
-      const r = await api.applyStrategy(sid, this._applyDeviceOpParams(this.model), this.factors)
-      this.model = r.model
-      this.baseline = r.sim
-      // 仿真模式：策略参数已落地模型，直接以应用后结果刷新「仿真前后对比」after
-      //（此前遗漏：应用策略后对比窗口 after 不更新，该调节内容未纳入对比计算）
-      this.clearExperiment(this.simMode)
-      if (this.simMode) {
-        this.simOps = []   // 参数已落地，清除未落地叠加操作，避免后续重算重复应用
-        this.simCurrent = r.sim ? JSON.parse(JSON.stringify(r.sim)) : null
+      // 撤销快照：记录该策略**首次**应用前的工序参数 / 技术 / 设备设定（含附加可调项），供「取消应用」复原。
+      // 重复应用同一条不覆盖快照，否则第二次应用会把快照写成「已应用后」，取消就复原不回最初状态。
+      const undoSch = this.appliedScheme || this.scheme
+      if (!this.strategyUndo || this.strategyUndo.sid !== sid) {
+        this.strategyUndo = {
+          sid, sceneId: this.sceneId,
+          params: Object.fromEntries(((undoSch && undoSch.nodes) || []).map((n) => [n.id, JSON.parse(JSON.stringify(n.params || {}))])),
+          techs: Object.fromEntries(((undoSch && undoSch.nodes) || []).map((n) => [n.id, [...(n.techs || [])]])),
+          deviceSetpoints: JSON.parse(JSON.stringify(this.deviceSetpoints || {})),
+          deviceExtraSetpoints: JSON.parse(JSON.stringify(this.deviceExtraSetpoints || {})),
+        }
       }
+      _undoPersist(this.strategyUndo)   // 落本地：刷新/重开浏览器后仍能取消应用
+      // 前端应用策略 ops（set_param/apply_tech）：保留前端模型的 3D 坐标（x/z/rot 由编排画布映射，
+      // 后端 model 不含坐标，直接用 r.model 覆盖会让 3D 场景退回默认直线布局）
+      this._applyOpsToModel(ops)
+      // 方案节点已更新：按方案重建模型（保留 3D 坐标）。
+      // 资源包场景的 _otherSceneRefresh 第一步就是 compileSchemeToModel，不先落方案参数会被冲掉
+      this.compileSchemeToModel()
+      // 附加设备 / 附加可调项回写：
+      //  · set_attach 只恢复「可变设备」设定值 —— 传感器读数由联动或数据源决定，
+      //    写进 deviceSetpoints 只是永远不参与计算的脏数据（还会随方案存档越积越多）；
+      //  · set_extra_setpoint（如鼓风机鼓风湿度）必须一起回写，否则重算时会被当前设备设定覆盖。
+      const sch = this.appliedScheme || this.scheme
+      const nodeById = Object.fromEntries(((sch && sch.nodes) || []).map((n) => [n.id, n]))
+      for (const op of ops) {
+        if (!op || op.target == null || op.param == null) continue
+        if (op.action === 'set_extra_setpoint') {
+          const v = Number(op.value)
+          if (!isFinite(v)) continue
+          const cur = (this.deviceExtraSetpoints || {})[op.target] || {}
+          this.deviceExtraSetpoints = { ...(this.deviceExtraSetpoints || {}), [op.target]: { ...cur, [op.param]: v } }
+          continue
+        }
+        if (op.action !== 'set_attach') continue
+        const node = nodeById[op.target]
+        const att = node && ((node.attached || []).find((a) => a && a.uid === op.param))
+        const tpl = att ? _attachTpl(att.kind, att.type) : null
+        if (!att || !tpl || tpl.kind === 'sensor') continue
+        if (op.value != null && isFinite(Number(op.value))) {
+          this.deviceSetpoints = { ...(this.deviceSetpoints || {}), [`ext::${op.target}::${op.param}`]: Number(op.value) }
+        }
+      }
+      // 仿真模式：参数已落地，清除未落地叠加操作，避免后续重算重复应用
+      if (this.simMode) this.simOps = []
+      this.clearExperiment(this.simMode)
       this.parsed = null
+      // 重算（保留坐标）：refresh 按模型参数（含附加功率传感器）重新核算 baseline
+      this.refresh()
+      // 标记「已应用」：左栏自定义策略小点与搜索面板「仅场景」筛选依赖该标记
+      try {
+        await api.markStrategyApplied(sid)
+        await this.loadStrategies()
+      } catch (e) { /* 标记失败不影响参数应用 */ }
       this._pushModelToFeed()
       this.toast = t('策略已应用到当前流程')
       this.sceneRev++
+    },
+    // 「取消应用」：把工序参数 / 技术 / 设备设定（含附加可调项）复原到该策略首次应用前。
+    // 撤销后清空快照，按钮随之置灰，避免连点出不可预期的结果。
+    undoStrategy() {
+      const snap = this.strategyUndo
+      if (!snap) return
+      const sch = this.appliedScheme || this.scheme
+      for (const n of ((sch && sch.nodes) || [])) {
+        if (snap.params && snap.params[n.id]) n.params = { ...snap.params[n.id] }
+        if (snap.techs && snap.techs[n.id]) n.techs = [...snap.techs[n.id]]
+      }
+      this.deviceSetpoints = JSON.parse(JSON.stringify(snap.deviceSetpoints || {}))
+      this.deviceExtraSetpoints = JSON.parse(JSON.stringify(snap.deviceExtraSetpoints || {}))
+      this.strategyUndo = null
+      _undoDrop(snap.sceneId)   // 同步删掉本地快照，否则刷新后按钮又会变成可点
+      // 仿真变更记录同步：该策略的「应用策略」条目已随复原失效，移除它并追加一条「取消应用」，
+      // 否则「本次更改」里仍挂着已复原的条目，与实际参数不符。
+      if (this.simMode) {
+        const sname = ((this.strategies || []).find((s) => s.id === snap.sid) || {}).name || snap.sid
+        this.simChanges = (this.simChanges || []).filter((c) => c.mk !== 'apply_' + snap.sid)
+        this._simLog('strategy', t('取消应用'), sname, 'undo_' + snap.sid)
+      }
+      this.compileSchemeToModel()
+      this.refresh()
+      this._pushModelToFeed()
+      this.sceneRev++
+      this.showToast(t('已取消应用策略：工序参数与设备设定已复原'), 'success')
     },
     // ---- 前端手动编辑流程（后端自适应重算）----
 
@@ -2008,7 +2183,7 @@ export const useSimStore = defineStore('sim', {
       this.reportNonce = (this.reportNonce || 0) + 1
       this.setInspectorView('report')
     },
-    // 左侧策略库选中策略：打开右侧「策略详情」面板（名称 / 数值调整可编辑 + 底部「策略仿真」按钮）
+    // 左侧策略库选中策略：打开右侧「策略详情」面板（自定义策略为只读快照 + 底部「应用策略」按钮）
     selectStrategy(sid, record = true) {
       // record=false 用于 closeInspector 的 AI 退回列表特判：那是「返回」动作而非新导航，
       // 若照常入栈会把详情快照推进历史，✕ 就变成「详情 ↔ 列表」来回切换
@@ -2232,25 +2407,89 @@ export const useSimStore = defineStore('sim', {
       nextTick(() => { this.schemeDirty = _simPrevDirty })
       this.toast = t('已退出仿真模式，恢复仿真前状态')
     },
-    // 一键把当前全部参数保存为策略（供仿真模式「保存策略」按钮调用）
+    // 一键把当前全部参数保存为策略（供 3D 场景底部工具条「保存策略」按钮 + 名称弹窗调用）
     async saveCurrentAsStrategy(name) {
       const sname = (name || '').trim() || '当前参数快照'
       const model = this._applyDeviceOpParams(this.model)
       const ops = []
+      // 工序参数：可编辑参数表（label/unit 齐全）优先，再补齐后端参数元数据里该工序的其余可调参数
+      // （config / optim）。部分工序参数只存在于元数据中（如烧结机、热轧机的电耗 electricity，
+      // 可编辑参数表里没有条目），只按可编辑参数表遍历会漏存，策略回放时这些参数回不到保存值。
+      const schemaMap = (this.paramSchema && this.paramSchema.schema) || {}
       for (const u of (model.units || [])) {
-        const editable = EDITABLE_PARAMS[u.type] || []
-        for (const p of editable) {
-          const v = u.params && u.params[p.key]
-          if (v == null) continue
-          ops.push({ action: 'set_param', target: u.name, param: p.key, value: v, mode: 'absolute', note: `${u.name} ${p.label} = ${v} ${p.unit || ''}` })
+        const meta = []
+        const seen = new Set()
+        for (const p of (EDITABLE_PARAMS[u.type] || [])) {
+          if (!p || !p.key || seen.has(p.key)) continue
+          meta.push({ key: p.key, label: p.label || p.key, unit: p.unit || '' })
+          seen.add(p.key)
         }
-        for (const t of (u.techs || [])) {
-          ops.push({ action: 'apply_tech', target: u.name, tech: t, note: `${u.name} 应用技术 ${t}` })
+        for (const p of (schemaMap[u.type] || [])) {
+          if (!p || !p.key || seen.has(p.key)) continue
+          meta.push({ key: p.key, label: p.label || p.key, unit: p.unit || '' })
+          seen.add(p.key)
+        }
+        for (const p of meta) {
+          const v = u.params && u.params[p.key]
+          if (v == null || !isFinite(Number(v))) continue
+          ops.push({ action: 'set_param', target: u.name, param: p.key, value: Number(v), mode: 'absolute', note: `${u.name} ${p.label} = ${v} ${p.unit}` })
+        }
+        for (const tech of (u.techs || [])) {
+          ops.push({ action: 'apply_tech', target: u.name, tech, note: `${u.name} 应用技术 ${tech}` })  // 备注文案沿用中文（与 set_param 的 note 同风格）
         }
       }
-      const created = await api.createStrategy(sname, `仿真模式保存的当前参数快照 · ${new Date().toLocaleString()}`, sname, ops)
+      // 附加设备：可变设备（adjustable）保存设定值；传感器（sensor）保存当前读数
+      // （如电功率传感器随变频器联动的 1950 kW，而不是模板默认值 2600；
+      //  应用策略时传感器读数仍由联动决定，这里的读数用于快照/策略属性展示）
+      const sch = this.appliedScheme || this.scheme
+      const srcMap = _boxSrcMap(this)
+      const nowMs = Date.now()
+      for (const n of ((sch && sch.nodes) || [])) {
+        const u = (this.baseline && this.baseline.units || []).find((x) => x.id === n.id)
+        for (const a of (n.attached || [])) {
+          if (!a || !a.uid) continue
+          const extId = `ext::${n.id}::${a.uid}`
+          const dev = _extDevice(n, u, a, nowMs, srcMap, this.deviceSetpoints)
+          let v = null
+          if (a.kind === 'adjustable') {
+            v = this.deviceSetpoints && this.deviceSetpoints[extId] != null ? this.deviceSetpoints[extId] : a.def
+          } else {
+            // 传感器：保存当前读数（如电功率传感器 1950 kW），而非模板默认值
+            v = dev && dev.reading != null ? dev.reading : a.def
+          }
+          if (v == null || !isFinite(Number(v))) continue
+          const unitText = dev && dev.unit ? ` ${dev.unit}` : ''
+          ops.push({ action: 'set_attach', target: n.id, param: a.uid, value: Number(v), mode: 'absolute', note: `${n.name || n.id} 附加设备 ${a.label || a.type} = ${v}${unitText}` })
+        }
+      }
+      // 设备「附加可调项」（如鼓风机鼓风湿度）：单独存在 deviceExtraSetpoints 表里，
+      // 既不是工序参数也不是附加设备。它在重算时会反向折算工序参数（见 _applyDeviceOpParams），
+      // 只存参数不存它会表现为「应用策略后参数被当前设备设定覆盖、输入框还是旧值」。
+      const extraMap = this.deviceExtraSetpoints || {}
+      for (const devId of Object.keys(extraMap)) {
+        const sps = extraMap[devId] || {}
+        const [unitId, devType] = String(devId).split('::')
+        const unitName = ((model.units || []).find((x) => x.id === unitId) || {}).name || unitId
+        const tmpl = DEVICE_MAP[devType] || null
+        for (const key of Object.keys(sps)) {
+          const v = sps[key]
+          if (v == null || !isFinite(Number(v))) continue
+          const cfg = ((tmpl && tmpl.extraSetpoints) || []).find((e) => e && e.key === key)
+          const label = (cfg && cfg.label) || key
+          const unitText = cfg && cfg.unit ? ` ${cfg.unit}` : ''
+          ops.push({
+            action: 'set_extra_setpoint', target: devId, param: key, value: Number(v), mode: 'absolute',
+            note: `${unitName} ${(tmpl && tmpl.label) || devType} · ${label} = ${v}${unitText}`,
+          })
+        }
+      }
+      // scene_id：记录策略归属场景，跨场景应用时前端据此提示（历史数据为空串表示未记录）
+      const created = await api.createStrategy(sname, `保存当前场景全部工序参数（含附加传感器与可变设备）· ${new Date().toLocaleString()}`, sname, ops, this.sceneId || '')
       await this.loadStrategies()
-      this.toast = t('策略「{name}」已保存，可在「资源 · 策略」中查看', { name: sname })
+      // 保存后直接把左栏切到「策略」并展开「自定义（仿真保存）」分组，避免用户误以为没保存成功
+      this.revealSavedStrategy = (created && created.id) || ''
+      if (created && created.id) this.selectStrategy(created.id)
+      this.showToast(t('策略「{name}」已保存，可在「资源 · 策略 · 自定义（仿真保存）」中查看', { name: sname }), 'success')
       return created
     },
     // 更新已保存策略（名称/描述/原文/操作），调 PUT /api/strategies/{sid}
@@ -2259,40 +2498,58 @@ export const useSimStore = defineStore('sim', {
       await this.loadStrategies()
       this.toast = t('策略信息已更新')
     },
-    // 策略详情面板「策略仿真」按钮：内置预置策略进入仿真并解析测试；自定义策略加载并应用（退出后自动恢复）
+    // 把策略解析出的操作应用到当前模型（前端）：set_param / apply_tech
+    _applyOpsToModel(ops) {
+      const list = Array.isArray(ops) ? ops : []
+      const scheme = this.appliedScheme || this.scheme
+      const nodes = (scheme && scheme.nodes) || []
+      // 匹配顺序：id → 名称 → 类型；前两者命中单台，类型命中改全部同类型单位（避免多实例只改第一台）
+      const findNodes = (target) => {
+        if (!target) return []
+        const byId = nodes.find((n) => n.id === target)
+        if (byId) return [byId]
+        const byName = nodes.filter((n) => n.name === target)
+        if (byName.length) return byName
+        return nodes.filter((n) => n.type === target)
+      }
+      for (const op of list) {
+        if (!op) continue
+        const targets = findNodes(op.target)
+        if (!targets.length) continue
+        if (op.action === 'set_param' && op.param) {
+          for (const n of targets) n.params = { ...(n.params || {}), [op.param]: op.value }
+        } else if (op.action === 'apply_tech' && op.tech) {
+          for (const n of targets) n.techs = [...new Set([...(n.techs || []), op.tech])]
+        }
+      }
+    },
+    // 策略详情面板「策略仿真」按钮：只应用当前策略的参数（不自动进入仿真、不自动运行），
+    // 应用完成后由用户自行点击「运行仿真」查看效果
     async runStrategySimulation(sid) {
       const st = this.selectedStrategy
       if (!st) { this.toast = t('策略不存在或已删除'); return }
       if (st.source === 'preset') {
-        if (!this.simMode) this.enterSim()
+        // 内置策略：解析文本 → 前端应用 ops → 重算（不进入仿真）
         this.strategyInput = st.raw_text || st.name || ''
-        this.parsedText = ''
-        this.parsed = null
         try {
           await this.parse(this.strategyInput)
-          if (this.parsed && this.parsed.ops.length) {
-            await this.runExperiment()
-            this.toast = t('已对内置策略「{name}」完成仿真，可在右上角对比结果', { name: st.name })
-          } else {
-            this.toast = t('该内置策略解析结果为空')
-          }
+          const ops = (this.parsed && this.parsed.ops) || []
+          if (!ops.length) { this.toast = t('该内置策略解析结果为空'); return }
+          this._applyOpsToModel(ops)
+          this.refresh()
+          this.toast = t('内置策略「{name}」的参数已应用，可点击「运行仿真」查看效果', { name: st.name })
         } catch (e) {
-          this.toast = t('内置策略仿真失败：') + (e.message || e)
+          this.toast = t('内置策略参数应用失败：') + (e.message || e)
         }
         return
       }
-      if (!this.simMode) this.enterSim()
+      // 自定义策略：只应用参数（不自动进入仿真/不自动运行）
       try {
         await this.applyStrategy(sid)
-        this.toast = t('策略「{name}」已加载到仿真模式，可实时对比', { name: st.name || '未命名' })
+        this.toast = t('策略「{name}」的参数已应用，可点击「运行仿真」查看效果', { name: st.name || '未命名' })
       } catch (e) {
-        this.toast = t('策略加载失败：') + (e.message || e)
+        this.toast = t('策略参数应用失败：') + (e.message || e)
       }
-    },
-    // 请求在命令行输入策略名称后保存（仿真模式「保存策略」按钮）
-    requestSaveStrategy() {
-      this.pendingSaveStrategy = true
-      this.toast = t('请在下方命令行输入策略名称后回车保存')
     },
     // 顶栏「重置视图」按钮 -> SceneViewer watch 该计数 -> scene.resetView()
     resetView() { this.viewResetNonce++ },
@@ -2466,7 +2723,11 @@ export const useSimStore = defineStore('sim', {
         this.parsedText = ''
         this.simOps = []
         this.simCurrent = null
+        // 策略库是全局数据（不随场景走）：清掉旧场景的展示后立刻重拉全量。
+        // 少了这一步，资源包场景下左栏「自定义（仿真保存）」永远是 0 条（仿真保存完也看不到）。
         this.strategies = []
+        this.loadStrategies().catch(() => {})
+        this.strategyUndo = _undoLoad(this.sceneId)   // 按场景各存一份：切场景/刷新后仍可取消应用
         // ── AI 群控：群控策略属于具体的场景资源包（引用的可调 / 传感设备是本场景特有的），
         // 切场景时停掉本端执行器并清空运行态与最近一轮结果，避免把上一场景的「运行中」带过来。
         // 服务端运行器仍按各场景自己存档里的 running 继续执行（互不干扰）。

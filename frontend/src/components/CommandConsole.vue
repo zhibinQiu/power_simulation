@@ -189,21 +189,6 @@ async function runCmd() {
   pushCmd(raw, 'cmd')
   hist.value.push(raw); histIdx = hist.value.length
   cmdText.value = ''
-  if (store.pendingSaveStrategy) {        // 仿真模式：等待输入策略名称
-    if (raw.toLowerCase() === 'cancel' || raw === '取消') {
-      store.pendingSaveStrategy = false
-      pushCmd(t('已取消保存策略。'), 'guide')
-    } else {
-      try {
-        const created = await store.saveCurrentAsStrategy(raw)
-        store.pendingSaveStrategy = false
-        pushCmd(`${t('策略')}「${created?.name || raw}」${t('已保存，可在左侧「资源 · 策略」中查看并编辑。')}`, 'guide')
-      } catch (e) {
-        pushCmd(`${t('保存失败')}：${e?.message || e}`, 'err')
-      }
-    }
-    return
-  }
   if (raw.startsWith('/')) { handleSlash(raw); return }
   const first = raw.split(/\s+/)[0].toLowerCase()
   if (KNOWN_CMDS.has(first)) { runTwinCommand(first, raw); return }

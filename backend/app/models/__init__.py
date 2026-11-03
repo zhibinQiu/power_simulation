@@ -149,6 +149,9 @@ class Strategy(BaseModel):
     ops: List[ParsedOp] = Field(default_factory=list)
     applied: bool = False
     created_at: str = ""
+    # 策略归属的场景资源包 id（如 steel / dc-thermal）：空串 = 历史数据未记录。
+    # 跨场景应用时前端据此提示，避免把某场景的快照按工序同名套到另一场景。
+    scene_id: str = ""
 
 
 class ParseRequest(BaseModel):

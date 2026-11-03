@@ -21,7 +21,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted } from 'vue'
+import { onBeforeUnmount, onMounted, watch } from 'vue'
 import { useSimStore } from '../stores/sim'
 import { t } from '../i18n'
 
@@ -30,10 +30,17 @@ const store = useSimStore()
 // 关闭弹窗：确认返回 true，取消/遮罩/Esc 返回 false，并回调挂起的 Promise
 function resolve(val) { store.confirmResolve(val) }
 
+// 弹出时刻：用于挡住「打开确认框的那一次回车」——
+// 例如在名称输入框里按回车触发同名确认，同一个 keydown 冒泡到 window 会把刚弹出的框直接确认掉。
+let openedAt = 0
+watch(() => store.confirmDialog.open, (on) => { if (on) openedAt = Date.now() })
+
 function onKey(e) {
   if (!store.confirmDialog.open) return
-  if (e.key === 'Escape') resolve(false)
-  else if (e.key === 'Enter') resolve(true)
+  if (e.key === 'Escape') { resolve(false); return }
+  if (e.key !== 'Enter') return
+  if (Date.now() - openedAt < 250) return
+  resolve(true)
 }
 
 onMounted(() => window.addEventListener('keydown', onKey))

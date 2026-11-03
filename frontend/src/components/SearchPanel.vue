@@ -211,11 +211,11 @@ const results = computed(() => {
         icon: 'bolt',
         sub: '系统预置',
         active: store.selectedStrategyId === p.id,
-        title: '点击查看策略属性（底部「策略仿真」进入仿真模式测试）',
+        title: '点击查看策略属性（底部「应用策略」应用到当前场景）',
         action: () => store.selectStrategy(p.id),
       })
     }
-    for (const s of store.strategies || []) {
+    for (const s of store.sceneStrategies || []) {   // 自定义策略按场景隔离（与左栏同口径）
       if (onlyScene.value && !s.applied) continue
       if (q && !(s.name || '').toLowerCase().includes(q)) continue
       strats.push({
@@ -224,7 +224,7 @@ const results = computed(() => {
         icon: 'bolt',
         sub: '自定义',
         active: store.selectedStrategyId === s.id,
-        title: '点击查看策略属性（名称/数值调整可编辑）',
+        title: '点击查看策略属性（参数只读，可「应用策略」）',
         action: () => store.selectStrategy(s.id),
       })
     }

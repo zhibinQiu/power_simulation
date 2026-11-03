@@ -97,10 +97,11 @@ def create_strategy(
     description: str = Body("", description="策略描述"),
     raw_text: str = Body("", description="策略原文"),
     ops: List[ParsedOp] = Body(default_factory=list, description="策略操作列表"),
+    scene_id: str = Body("", description="策略归属的场景资源包 id（空 = 未记录）"),
 ):
-    """创建策略。前端以 JSON body 提交 {name, description, raw_text, ops}，故参数需显式声明为 Body。"""
+    """创建策略。前端以 JSON body 提交 {name, description, raw_text, ops, scene_id}，故参数需显式声明为 Body。"""
     return strategy_service.create(name=name, description=description,
-                                   raw_text=raw_text, ops=ops)
+                                   raw_text=raw_text, ops=ops, scene_id=scene_id)
 
 
 @router.get("/api/strategies/{sid}", response_model=Strategy)

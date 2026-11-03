@@ -45,11 +45,13 @@ class StrategyStore:
         self._save()
         return s
 
-    def create(self, name: str, description: str, raw_text: str, ops) -> Strategy:
+    def create(self, name: str, description: str, raw_text: str, ops,
+               scene_id: str = "") -> Strategy:
         s = Strategy(
             id=uuid.uuid4().hex[:10],
             name=name, description=description, raw_text=raw_text,
             ops=ops, applied=False, created_at=datetime.now().isoformat(timespec="seconds"),
+            scene_id=scene_id or "",
         )
         return self.add(s)
 
