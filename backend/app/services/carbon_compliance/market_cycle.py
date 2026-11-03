@@ -15,6 +15,8 @@ class MarketCycleResult:
     cea_ccer_spread: float | None
     ccer_supply_tag: str  # loose | tight | unknown
     rationale: str
+    # 本方仓位方向：gap（缺口，需采购）/ surplus（盈余，有量可售）/ unknown（未指定企业）
+    position_side: str = "unknown"
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -47,6 +49,11 @@ def _time_window(month: int) -> str:
     return "late"
 
 
+def _normalize_side(side: str | None) -> str:
+    key = str(side or "").strip().lower()
+    return key if key in ("gap", "surplus") else "unknown"
+
+
 def judge_market_cycle(
     cea_monthly_prices: list[float],
     current_cea_price: float | None,
@@ -56,7 +63,14 @@ def judge_market_cycle(
     low_percentile: float = 0.30,
     mid_percentile: float = 0.70,
     ccer_issue_trend: float | None = None,
+    side: str | None = None,
 ) -> MarketCycleResult:
+    """判定价格位置与时间窗口，并在已知本方仓位时校正动作方向。
+
+    动作标签本身只回答「这个价位、这个时窗适合做什么」，不含企业方向：
+    高位+年末对盈余企业是卖点，对缺口企业却是追高风险。传 side 后，
+    缺口方不会再拿到 sell、盈余方不会再拿到 buy，避免报告里出现反向建议。
+    """
     today = as_of or date.today()
     window = _time_window(today.month)
     price = current_cea_price
@@ -95,6 +109,21 @@ def judge_market_cycle(
         action = "hold"
         rationale = "价格与时间窗口中性，建议观望或按计划小额执行"
 
+    # 方向校正：按本方实际仓位改写反向标签
+    position_side = _normalize_side(side)
+    if position_side == "gap" and action == "sell":
+        action = "hold"
+        rationale = (
+            "价格处于高位且临近清缴，本方为配额缺口方，不具备出售条件；"
+            "宜先消化自有 CCER，再按市场可承接量分批采购，不追高"
+        )
+    elif position_side == "surplus" and action == "buy":
+        action = "hold"
+        rationale = (
+            "价格处于低位，本方为配额盈余方，无需采购；"
+            "宜保留配额，等待高位或年末窗口择机出售"
+        )
+
     return MarketCycleResult(
         price_band=band,
         time_window=window,
@@ -103,4 +132,5 @@ def judge_market_cycle(
         cea_ccer_spread=spread,
         ccer_supply_tag=supply,
         rationale=rationale,
+        position_side=position_side,
     )

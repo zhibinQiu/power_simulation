@@ -196,7 +196,8 @@ def filter_plan_actions(
                 a.meta["split_suggested"] = True
                 a.meta["split_size"] = large_split_threshold
                 notes.append(
-                    f"大额交易 {a.qty:g} 万吨建议按 {large_split_threshold:g} 万吨拆分以降低流动性冲击"
+                    f"单笔成交 {a.qty:g} 万吨偏大：建议单笔控制在 {large_split_threshold:g} 万吨以内"
+                    "（这是成交流动性口径，与策略的时间批次叠加执行）"
                 )
 
         spend += max(0.0, cost)

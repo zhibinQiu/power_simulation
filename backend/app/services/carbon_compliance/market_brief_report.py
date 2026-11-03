@@ -228,6 +228,13 @@ def _enterprise_pack(
 
     return {
         "enterprise": ccs.enterprise_to_dict(ent),
+        # 各年度的「当年免费分配量」：政策摘要要用它核对预分配口径，
+        # acc.free_cea_quota 是滚动清缴后的可用量，混入了结存与买卖，不能直接比
+        "alloc_by_year": {
+            int(h.get("vintage_year") or 0): float(h.get("free_quota") or 0)
+            for h in (ent.get("cea_holdings") or [])
+            if h.get("vintage_year")
+        },
         "accounting": acc,
         "tags": tags,
         "carry": tags.get("carry_forward") or {},
@@ -244,23 +251,52 @@ def _enterprise_pack(
         ),
         "price_low_pct": compliance_cfg.get("price_low_percentile"),
         "price_mid_pct": compliance_cfg.get("price_mid_percentile"),
+        # 交易粒度约束：简报里「一批买多少」必须落在单笔限额与市场承接量之内
+        "single_trade_limit": float(getattr(ent, "single_trade_limit", 0) or 0),
+        "large_split_threshold": float(
+            compliance_cfg.get("large_trade_split_threshold") or 5.0
+        ),
     }
 
 
-def _deadline_info(md: str, today: date | None = None) -> dict[str, Any]:
-    """把「12-31」这类月日口径换算成本年度清缴截止日与剩余天数。"""
+def _deadline_info(
+    md: str, today: date | None = None, compliance_year: int | None = None
+) -> dict[str, Any]:
+    """把「12-31」这类月日口径换算成清缴截止日与剩余天数。
+
+    `compliance_year` 给出时，截止日固定落在该履约年度，不再向明年顺延：
+    2027 年度的报告写「清缴截止 2026-12-31、剩余 58 天」是把履约年度和
+    自然年混为一谈，读者会据此排错节奏。不传时保持历史行为（当年或次年
+    最近的一个 12-31），旧调用方不受影响。
+    """
     today = today or date.today()
     try:
         month, day = (int(x) for x in str(md).replace("/", "-").split("-")[:2])
-        deadline = date(today.year, month, day)
-        if deadline < today:
-            deadline = date(today.year + 1, month, day)
+        if compliance_year:
+            deadline = date(int(compliance_year), month, day)
+        else:
+            deadline = date(today.year, month, day)
+            if deadline < today:
+                deadline = date(today.year + 1, month, day)
     except Exception:
         return {}
     return {
         "deadline": deadline.isoformat(),
         "days_left": (deadline - today).days,
+        "overdue": deadline < today,
     }
+
+
+def _deadline_text(info: dict[str, Any]) -> str:
+    """清缴截止的统一展示口径，避免「剩余 -12 天」这类负数出现在正文。"""
+    if not info:
+        return "—"
+    days = info.get("days_left")
+    if days is None:
+        return f"{info.get('deadline')}"
+    if days < 0:
+        return f"{info.get('deadline')}（已过期 {abs(int(days))} 天）"
+    return f"{info.get('deadline')}（剩余 {int(days)} 天）"
 
 
 # ---------- 底稿 ----------
@@ -327,10 +363,16 @@ async def build_market_factsheet(
     cycle: dict[str, Any] = {}
     if months_all:
         try:
+            _gap_side = _f((ent_pack.get("accounting") or {}).get("compliance_gap"))
             res = judge_market_cycle(
                 [m["avg"] for m in months_all],
                 current,
                 ccer.get("close") if ccer else None,
+                side=(
+                    "gap"
+                    if _gap_side is not None and _gap_side > 0
+                    else ("surplus" if _gap_side is not None and _gap_side < 0 else None)
+                ),
                 low_percentile=float(ent_pack.get("price_low_pct") or 0.30),
                 mid_percentile=float(ent_pack.get("price_mid_pct") or 0.70),
             )
@@ -506,18 +548,18 @@ def _render_factsheet(
         )
         if cycle.get("rationale"):
             p.append(f"- 判定依据：{cycle['rationale']}\n")
-        # 动作标签是「价格位置 + 时间窗口」的通用判定，不区分盈亏方向：
-        # 缺口企业看到「建议出售」会误读，这里显式点明本方所处方向
+        # 动作标签已在取数时按本方方向校正；这里再给出该方向下可执行的动作，
+        # 避免正文把市场层面的通用判断写成与本方仓位相反的建议
         _gap = _f((ent_pack.get("accounting") or {}).get("compliance_gap")) or 0.0
-        if ent and _gap > 0 and cycle.get("action_tag") == "sell":
+        if ent and _gap > 0:
             p.append(
-                f"- 方向提示：本方为缺口方（{_fmt_wan(_gap)} 万吨），"
-                "上述「建议出售」面向配额盈余企业，不适用于本方采购决策\n"
+                f"- 本方可用动作：本方为缺口方（{_fmt_wan(_gap)} 万吨），"
+                "可执行「自有 CCER 抵销 → 分批买入 CEA」，不存在可出售的盈余\n"
             )
-        elif ent and _gap < 0 and cycle.get("action_tag") == "buy":
+        elif ent and _gap < 0:
             p.append(
-                f"- 方向提示：本方为盈余方（{_fmt_wan(abs(_gap))} 万吨），"
-                "上述「建议采购」面向缺口企业，本方应评估出售节奏\n"
+                f"- 本方可用动作：本方为盈余方（{_fmt_wan(abs(_gap))} 万吨），"
+                "可执行「分批卖出 CEA」或按现行政策全额结转，无需采购\n"
             )
     if fc_summary:
         up = _pct(fc_summary.get("last_close"), fc_summary.get("year_end_price"))
@@ -534,21 +576,93 @@ def _render_factsheet(
         )
 
     # 四、交易窗口
-    deadline = _deadline_info(ent_pack.get("clearance_md") or "12-31") if ent_pack else {}
+    deadline = (
+        _deadline_info(ent_pack.get("clearance_md") or "12-31", compliance_year=year)
+        if ent_pack
+        else {}
+    )
     p.append("\n## 交易窗口\n\n")
     if deadline:
-        p.append(f"- 清缴截止：{deadline.get('deadline')}，剩余 {deadline.get('days_left')} 天\n")
+        p.append(f"- 清缴截止：{_deadline_text(deadline)}\n")
     if ent_pack:
         p.append(
             f"- 价格分档口径：低于 {ent_pack.get('price_low_pct')} 分位视为低位、"
             f"高于 {ent_pack.get('price_mid_pct')} 分位视为高位（当前系统配置）\n"
         )
+        # 分批约束：把「一批能买多少」算清楚，正文不得再给超出承接量的单批数量。
+        # 单批上限只解决「砸盘」问题，还要过「时间可行性」：缺口远大于日均成交时，
+        # 按小单拆批在清缴前根本做不完，此时必须给出时间约束下的单批规模。
+        _daily_wan = _f(win.get("volume_avg"))
+        _daily_wan = _daily_wan / 10000.0 if _daily_wan else None
+        _total_wan = _f(win.get("volume_total"))
+        _total_wan = _total_wan / 10000.0 if _total_wan else None
+        _single = _f(ent_pack.get("single_trade_limit")) or 0.0
+        _split = _f(ent_pack.get("large_split_threshold")) or 0.0
+        if _single > 0:
+            p.append(f"- 单笔交易限额：{_fmt_wan(_single)} 万吨（企业台账设定）\n")
+        if _split > 0:
+            p.append(f"- 大额拆分阈值：{_fmt_wan(_split)} 万吨（超过即建议拆分）\n")
+        _need = abs(_f((ent_pack.get("accounting") or {}).get("compliance_gap")) or 0.0)
+        # 单批上限：台账单笔限额优先；未设限额时按日均成交量的 20% 估算流动性冲击
+        _cap = _daily_wan * 0.2 if _daily_wan else None
+        if _single > 0:
+            _cap = min(_cap, _single) if _cap else _single
+        if _cap:
+            if _daily_wan and _single > 0:
+                basis = f"取「单笔限额」与「日均成交 {_fmt_wan(_daily_wan)} 万吨的 20%」的较小值"
+            elif _daily_wan:
+                basis = (
+                    f"日均成交 {_fmt_wan(_daily_wan)} 万吨的 20%（流动性经验口径，"
+                    "台账未设单笔限额）"
+                )
+            else:
+                basis = "企业台账单笔交易限额"
+            p.append(f"- 建议单批上限：{_fmt_wan(_cap)} 万吨（{basis}）\n")
+            if _need > 0:
+                import math
+
+                _batches = max(1, math.ceil(_need / _cap))
+                p.append(
+                    f"- 分批节奏：需处置 {_fmt_wan(_need)} 万吨，按该上限需拆 {_batches} 批，"
+                    f"每批约 {_fmt_wan(_need / _batches)} 万吨\n"
+                )
+                _trade_days = None
+                if deadline and deadline.get("days_left") is not None:
+                    _trade_days = max(1, int(deadline["days_left"] * 5 / 7))
+                if _trade_days and _batches > _trade_days:
+                    _min_batch = _need / _trade_days
+                    _surge = (
+                        f"，相当于日均成交的 {_min_batch / _daily_wan * 100:.0f}%"
+                        if _daily_wan
+                        else ""
+                    )
+                    _over_limit = (
+                        f"，即突破台账单笔限额 {_fmt_wan(_single)} 万吨，"
+                        "需按大宗交易单笔报备或内部特批"
+                        if _single > 0 and _min_batch > _single
+                        else ""
+                    )
+                    p.append(
+                        f"- 时间约束：距清缴 {deadline.get('days_left')} 天约 {_trade_days} 个交易日，"
+                        f"按上述单批上限需 {_batches} 批，场内竞价承接量与时间都不够；"
+                        f"若要按期清缴，单批须提高到约 {_fmt_wan(_min_batch)} 万吨{_surge}"
+                        f"{_over_limit}，并走大宗/协议转让或分日挂单撮合\n"
+                    )
+                if _total_wan:
+                    p.append(
+                        f"- 流动性压力：需处置量相当于近 {win.get('days')} 个交易日"
+                        f"成交合计 {_fmt_wan(_total_wan)} 万吨的 "
+                        f"{_need / _total_wan * 100:.0f}%\n"
+                    )
 
     # 五、我方仓位
     acc = ent_pack.get("accounting") or {}
     if ent:
         gap = _f(acc.get("compliance_gap")) or 0.0
-        budget = _f(ent.get("annual_budget_cap"))
+        # 台账 annual_budget_cap 单位是「元」，正文按「万元」展示；
+        # 采购成本 cost_now 由「万吨 × 元/吨」得到，本身就是万元，须先对齐再比较
+        _budget_raw = _f(ent.get("annual_budget_cap"))
+        budget = _budget_raw / 10000.0 if _budget_raw is not None else None
         fee = _f(ent_pack.get("fee_rate")) or 0.0
         px_now = _f(win.get("last"))
         px_fc = _f(fc_summary.get("year_end_price"))
@@ -564,7 +678,9 @@ def _render_factsheet(
             f"{'（盈余）' if gap < 0 else ''} |\n"
         )
         carry = ent_pack.get("carry") or {}
-        if carry.get("max_carry") is not None:
+        if str(carry.get("policy") or "") == "unlimited":
+            p.append("| 结转限制 | 无（现行政策取消配额结转数量限制，盈余可全额结转） |\n")
+        elif carry.get("max_carry") is not None:
             p.append(f"| 可结转留存上限（万吨） | {_fmt_wan(carry.get('max_carry'))} |\n")
         if budget is not None:
             p.append(f"| 年度预算上限（万元） | {budget:.2f} |\n")
@@ -689,6 +805,11 @@ def market_brief_system_prompt(*, subject: str, year: int) -> str:
         "11. 「操作建议」每条都要带触发条件（例如「CEA 回落至 92 元/吨以下」）"
         "与数量口径（万吨）；不要写「视情况而定」这类无法执行的建议。"
         "若底稿显示方案因预算约束被阻断，须直接点明资金缺口，并给出分批或先小后大的替代节奏。\n"
+        "11.1 单批数量硬约束：默认采用底稿「建议单批上限」，需要处置的数量大于该上限时"
+        "必须写成拆批方案（批次数、每批吨数、每批间隔），严禁把总量当作单批数量。"
+        "但若底稿给出「时间约束」行（按单批上限在清缴前做不完），则一律采用该行给出的"
+        "单批规模，并写明走大宗/协议转让，不得仍按小单拆批而导致逾期。"
+        "凡底稿给出「流动性压力」，须在风险提示中引用该比例。\n"
         "12. 篇幅 1500–2500 字；每段不超过 4 行；表格与要点列表优先于长段落。\n"
         "13. 「信息来源」放在全文最后，原样使用用户消息中带 http(s) 链接的编号列表，"
         "禁止改写为「底稿第×章」或省略网址；无来源时写「本次无外部可核验链接来源」。"

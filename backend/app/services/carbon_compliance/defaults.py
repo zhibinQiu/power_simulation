@@ -33,8 +33,13 @@ def default_settings() -> dict:
             "large_trade_split_threshold": 5.0,  # 万吨
             # CEA 结转：政策可能调整，默认 6/10
             "carry_forward_deadline_md": "06-10",
-            # 基础结转额度（万吨）；0 表示策略侧用当年免费配额作基础
-            "carry_base_qty": 0.0,
+            # 结转政策口径：auto 按履约年度判定（2025 年度起取消数量限制）；
+            # unlimited 不设限制；legacy_limit 走「基础 + 净卖出 × 倍数」
+            "carry_policy": "auto",
+            # 基础结转量（万吨）：2023、2024 年度方案为每家企业 1 万吨。
+            # 旧版用「当年免费分配量」兜底会把上限放大数百倍，已废弃；
+            # 填 0 或缺失时按政策值 1 万吨处理。
+            "carry_base_qty": 1.0,
             "carry_net_sell_multiplier": 1.5,
         },
         "strategy_profiles": {

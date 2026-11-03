@@ -147,8 +147,8 @@ def industry_strategy_md(
         )
     elif gap < -1e-9:
         lines.append(
-            f"- **当前测算为配额盈余约 {abs(gap):g} 万吨**：技改降碳与卖出/结转策略应联动，"
-            "避免一边继续囤积一边浪费结转额度。"
+            f"- **当前测算为配额盈余约 {abs(gap):g} 万吨**：技改降碳与卖出/结转策略应联动；"
+            "盈余配额可结转至下一年度，但长期囤积仍占用资金并承担价格波动，宜按资金计划择机变现。"
         )
 
     excess = float(carry_excess or 0)

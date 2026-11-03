@@ -142,10 +142,20 @@ def _build_messages(text: str, model_units: Optional[List[dict]]) -> List[dict]:
 
 
 def _call_llm(messages: List[dict], timeout: float = 25.0, response_format=None,
-              max_tokens: int = 1500) -> Optional[str]:
+              max_tokens: int = 1500, want_detail: bool = False):
+    """底层补全调用。
+
+    want_detail=True 时返回 (正文, finish_reason)；否则仍返回 Optional[str]，
+    保持既有调用方不变。
+
+    finish_reason 必须能传出去：deepseek-reasoner 的思维链与正文**共用**
+    max_tokens 预算（实测 max_tokens=50 时 completion_tokens=50 全是
+    reasoning_tokens、正文 0 字符，finish_reason=length），预算被思考过程吃满时
+    正文会在半章处硬截断，而 HTTP 依然是 200 —— 只靠「有没有内容」判断不出来。
+    """
     base_url, api_key, model = _llm_cfg()
     if not api_key:
-        return None
+        return (None, None) if want_detail else None
     url = f"{base_url}/chat/completions"
     is_json = response_format is not None
     payload = {
@@ -159,20 +169,39 @@ def _call_llm(messages: List[dict], timeout: float = 25.0, response_format=None,
         payload["response_format"] = response_format
     try:
         data = post_json(url, payload, headers={"Authorization": f"Bearer {api_key}"}, timeout=timeout)
-        msg = data["choices"][0]["message"]
+        choice = (data.get("choices") or [{}])[0]
+        msg = choice.get("message") or {}
         content = (msg.get("content") or "").strip()
+        finish = choice.get("finish_reason")
+        if finish == "length":
+            usage = data.get("usage") or {}
+            logger.warning(
+                "LLM 输出被截断（max_tokens=%s, completion=%s, reasoning=%s）：正文已写不完",
+                max_tokens,
+                usage.get("completion_tokens"),
+                (usage.get("completion_tokens_details") or {}).get("reasoning_tokens"),
+            )
         # 只返回正式回复 content；reasoning_content（思考过程）可能重述系统提示词，
         # 直接透传给用户会造成提示词泄漏，因此不采用。
-        return content
+        return (content, finish) if want_detail else content
     except (urllib.error.URLError, urllib.error.HTTPError, KeyError, IndexError,
-            ValueError, TimeoutError, OSError):
-        return None
+            ValueError, TimeoutError, OSError) as exc:
+        # 以前这里静默 return None，排障时完全看不出是 401、限流还是超时
+        logger.warning("LLM 调用失败：%s %s", type(exc).__name__, http_error_body(exc))
+        return (None, None) if want_detail else None
 
 
 def chat_completion(messages: List[dict], timeout: float = 30.0,
                     max_tokens: int = 1500) -> Optional[str]:
     """通用聊天补全（OpenAI 兼容接口）。无 key / 网络异常返回 None，由调用方兜底。"""
     return _call_llm(messages, timeout=timeout, response_format=None, max_tokens=max_tokens)
+
+
+def chat_completion_detail(messages: List[dict], timeout: float = 30.0,
+                           max_tokens: int = 1500):
+    """同上，但返回 (正文, finish_reason)，供长文场景识别「被 max_tokens 截断」。"""
+    return _call_llm(messages, timeout=timeout, response_format=None,
+                     max_tokens=max_tokens, want_detail=True)
 
 
 def chat_completion_tools(messages: List[dict], tools: List[dict],

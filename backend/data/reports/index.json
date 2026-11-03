@@ -1,5 +1,115 @@
 [
   {
+    "id": "f898931c4d5f",
+    "title": "2027年度 双碳政策动态摘要",
+    "created_at": "2026-11-03 16:23:17",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "policy_digest",
+    "length": 2627,
+    "url": "/report/f898931c4d5f"
+  },
+  {
+    "id": "30b97aa0ba5c",
+    "title": "2027年度 碳交易市场简报",
+    "created_at": "2026-11-03 16:21:26",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "market_brief",
+    "length": 3482,
+    "url": "/report/30b97aa0ba5c"
+  },
+  {
+    "id": "f777faca881d",
+    "title": "2027年度 碳资产管理综合分析",
+    "created_at": "2026-11-03 16:18:27",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "compliance_analysis",
+    "length": 6641,
+    "url": "/report/f777faca881d"
+  },
+  {
+    "id": "67ddeb2b06e6",
+    "title": "2027年度 碳资产管理综合分析",
+    "created_at": "2026-11-03 16:02:19",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "compliance_analysis",
+    "length": 8425,
+    "url": "/report/67ddeb2b06e6"
+  },
+  {
+    "id": "67b7b6f87cc1",
+    "title": "2027年度 双碳政策动态摘要",
+    "created_at": "2026-11-03 13:52:44",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "policy_digest",
+    "length": 3367,
+    "url": "/report/67b7b6f87cc1"
+  },
+  {
+    "id": "3d9ebcebbf86",
+    "title": "2027年度 双碳政策动态摘要",
+    "created_at": "2026-11-03 13:33:00",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "policy_digest",
+    "length": 2655,
+    "url": "/report/3d9ebcebbf86"
+  },
+  {
+    "id": "7f4d3547d02d",
+    "title": "2027年度 碳资产管理综合分析",
+    "created_at": "2026-11-03 13:29:59",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "compliance_analysis",
+    "length": 7223,
+    "url": "/report/7f4d3547d02d"
+  },
+  {
+    "id": "ce1d4209ab83",
+    "title": "2027年度 碳交易市场简报",
+    "created_at": "2026-11-03 13:26:31",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "market_brief",
+    "length": 3760,
+    "url": "/report/ce1d4209ab83"
+  },
+  {
+    "id": "9a83b4c75291",
+    "title": "2025年度 碳资产管理综合分析",
+    "created_at": "2026-11-03 10:55:39",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "compliance_analysis",
+    "length": 6662,
+    "url": "/report/9a83b4c75291"
+  },
+  {
+    "id": "d873a8ef1743",
+    "title": "2026年度 碳资产管理综合分析",
+    "created_at": "2026-11-02 17:37:29",
+    "engine": "carbon-assistant",
+    "strategy_name": "",
+    "scenario": "",
+    "report_type": "compliance_analysis",
+    "length": 5923,
+    "url": "/report/d873a8ef1743"
+  },
+  {
     "id": "7d0878e6d386",
     "title": "2026年度 双碳政策动态摘要",
     "created_at": "2026-11-02 13:59:13",

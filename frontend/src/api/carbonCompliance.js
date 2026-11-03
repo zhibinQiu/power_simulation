@@ -77,9 +77,28 @@ export const carbonComplianceApi = {
     }),
   deleteEmission: (enterpriseId, year) =>
     jfetch(`${base}/enterprises/${enterpriseId}/emissions/${year}`, { method: 'DELETE' }),
+  // 单月上报：只提交该月的指标，后端自动重算年度值
+  upsertEmissionMonth: (enterpriseId, body) =>
+    jfetch(`${base}/enterprises/${enterpriseId}/emissions/month`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  deleteEmissionMonth: (enterpriseId, year, month) =>
+    jfetch(`${base}/enterprises/${enterpriseId}/emissions/${year}/month/${month}`, {
+      method: 'DELETE',
+    }),
 
   // forecasts
   listForecasts: (enterpriseId) => jfetch(`${base}/enterprises/${enterpriseId}/forecasts`),
+  // 按台账已有月份（或产能计划/生产计划）测算该年度 12 个月排放（不落盘，仅用于弹窗预览）
+  // 月度排产有 12 个数值，走 POST body 而不是 query，避免 URL 过长被代理层截断
+  previewForecast: (enterpriseId, body) =>
+    jfetch(`${base}/enterprises/${enterpriseId}/forecasts/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
   upsertForecast: (enterpriseId, body) =>
     jfetch(`${base}/enterprises/${enterpriseId}/forecasts`, {
       method: 'POST',

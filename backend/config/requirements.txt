@@ -14,3 +14,5 @@ python-docx>=1.1
 langgraph>=1.0
 # MPC 控温优化模型：离散档位动态规划（app/domain/mpc）与合规/价格预测共用
 numpy>=1.26
+# 碳资产台账的 xlsx 模板导出与导入（carbon_compliance_service）
+openpyxl>=3.1

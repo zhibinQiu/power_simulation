@@ -315,20 +315,30 @@ def _build_core_actions(
                 )
             )
         else:
-            cap_note = ""
-            if carry:
-                cap_note = (
-                    f"；测算最大可结转约 {carry.max_carry:g} 万吨"
-                    f"（结转日 {deadline_label}），请勿超过上限囤积"
+            if carry and getattr(carry, "policy", "") == "unlimited":
+                # 现行政策无结转数量限制：盈余不构成强制处置，只在综合方案里给可选动作
+                note = (
+                    "现行政策已取消配额结转数量限制，富余配额可全额结转至下一年度，"
+                    "不存在超额失效，可按价格与资金安排择机出售"
                 )
+                meta = {"informational": True, "carry_policy": "unlimited"}
+            else:
+                cap_note = ""
+                if carry:
+                    cap_note = (
+                        f"；测算最大可结转约 {carry.max_carry:g} 万吨"
+                        f"（结转日 {deadline_label}），请勿超过上限囤积"
+                    )
+                note = "富余配额可在结转上限内留存次年" + cap_note
+                meta = {"informational": True}
             actions.append(
                 PlanAction(
                     action="sell_cea",
                     qty=0,
                     unit_price=0,
                     window="",
-                    note="富余配额可在结转上限内留存次年" + cap_note,
-                    meta={"informational": True},
+                    note=note,
+                    meta=meta,
                 )
             )
 
@@ -353,6 +363,113 @@ def _plan_cost(
         else:
             total += trade_cash_cny(a.qty, a.unit_price, fee_rate=rate, side="buy")
     return total
+
+
+
+# 三档的批次节奏：保守一次性锁量、平衡分两批、进取分三批等价格回落。
+# 以往每档只有一条动作、一个窗口，「分几批、每批多少」全靠撰写模型自己编，
+# 于是报告里的「分 3 批、每批 424 万吨」与引擎算出的成本、吨数对不上。
+PLAN_BATCH_SPEC: dict[str, int] = {
+    "min_cost": 1,
+    "optimized": 2,
+    "full_compliance": 3,
+}
+_WINDOW_ORDER = ("early", "mid", "late")
+_WINDOW_ZH = {"early": "年初窗口", "mid": "年中窗口", "late": "年末窗口"}
+
+
+def _batch_windows(start: str, n: int) -> list[str]:
+    """每批的执行窗口：从当前窗口起逐批向后顺延，不回溯到已经过去的窗口。
+
+    窗口只有年初/年中/年末三档；批次多于剩余窗口时，后续批次沿用最后一个窗口，
+    表示「在同一窗口内分多次成交」。
+    """
+    try:
+        i = _WINDOW_ORDER.index(start)
+    except ValueError:
+        i = 1
+    return [_WINDOW_ORDER[min(i + k, len(_WINDOW_ORDER) - 1)] for k in range(max(n, 1))]
+
+
+def _money_cn(v: float) -> str:
+    """金额中文口径：超过 1 亿用亿元、超过 1 万用万元。"""
+    v = float(v or 0)
+    if abs(v) >= 1e8:
+        return f"{v / 1e8:.2f} 亿元"
+    if abs(v) >= 1e4:
+        return f"{v / 1e4:.2f} 万元"
+    return f"{v:.0f} 元"
+
+
+def _split_action_batches(
+    action: PlanAction, n: int, *, start_window: str
+) -> list[PlanAction]:
+    """把一条买卖动作拆成 n 批，吨数合计与拆分前严格一致（余数落在最后一批）。"""
+    qty = float(action.qty or 0)
+    if n <= 1 or qty <= 0:
+        return [action]
+    per = round(qty / n, 4)
+    windows = _batch_windows(start_window, n)
+    out: list[PlanAction] = []
+    remaining = qty
+    for idx in range(n):
+        take = per if idx < n - 1 else round(remaining, 4)
+        remaining = round(remaining - take, 6)
+        if take <= 0:
+            continue
+        w = windows[idx]
+        when = _WINDOW_ZH.get(w, w)
+        if idx > 0 and windows[idx - 1] == w:
+            when += "内继续分批成交"
+        meta = dict(action.meta or {})
+        meta.update({"batch_seq": idx + 1, "batch_count": n, "batch_qty": take})
+        # 本批金额：拆批后单价不变，按本批吨数单独算应付/实收，
+        # 避免把整笔的成本对比重复写成每一批的成本
+        side = "sell" if action.action.startswith("sell") else "buy"
+        cash = trade_cash_cny(
+            take, action.unit_price, fee_rate=float(action.meta.get("fee_rate") or 0), side=side
+        )
+        money_kind = "实收" if side == "sell" else "应付"
+        head = (
+            f"第 {idx + 1}/{n} 批（{when}，{take:g} 万吨，"
+            f"本批{money_kind}约 {_money_cn(abs(cash))}）"
+        )
+        # 动作原说明里的成本/罚款对比是整笔口径，只在首批保留并显式标注
+        if idx == 0 and action.note:
+            note = f"{head}｜整笔口径：{action.note}"
+        else:
+            note = head
+        out.append(replace(action, qty=take, window=w, note=note, meta=meta))
+    return out
+
+
+def _apply_plan_batches(
+    actions: list[PlanAction], n: int, *, start_window: str
+) -> list[PlanAction]:
+    """按档位节奏拆批：只拆买卖配额/CCER 的动作，提示性动作原样保留。"""
+    out: list[PlanAction] = []
+    for a in actions:
+        if a.meta.get("informational") or a.action not in (
+            "buy_cea",
+            "buy_ccer",
+            "sell_cea",
+        ):
+            out.append(a)
+            continue
+        if n <= 1:
+            tag = (
+                "一次性锁量成交，不分批"
+                if a.action.startswith("buy")
+                else "一次性成交，不分批"
+            )
+            out.append(replace(a, note=(f"{a.note}；{tag}" if a.note else tag)))
+            continue
+        # 起点跟动作自身窗口走：高价档的动作已被引擎放到「年末窗口」，
+        # 分批不能把它拉回当前窗口，否则等于在高位提前买入
+        out.extend(
+            _split_action_batches(a, n, start_window=(a.window or start_window))
+        )
+    return out
 
 
 def generate_plans(ctx: StrategyContext) -> list[dict[str, Any]]:
@@ -385,7 +502,13 @@ def generate_plans(ctx: StrategyContext) -> list[dict[str, Any]]:
             listing_fee_rate=listing_fee,
             block_fee_rate=block_fee,
         )
-        all_actions = filtered.actions + info_actions
+        # 拆批放在合规过滤之后：预算/单笔限额仍按「整笔动作」判定（与改动前一致），
+        # 只有真正通过合规校验、会被执行的动作才排批次，避免「预算只够一批」被写成完整采购计划
+        all_actions = _apply_plan_batches(
+            filtered.actions,
+            PLAN_BATCH_SPEC.get(key, 1),
+            start_window=ctx.market.time_window,
+        ) + info_actions
 
         net_save = 0.0
         for a in filtered.actions:
@@ -408,6 +531,19 @@ def generate_plans(ctx: StrategyContext) -> list[dict[str, Any]]:
                 "本期无采购动作：履约缺口已被可用配额/自有 CCER 覆盖，"
                 "现金成本与净节约均为 0，无需额外支出"
             )
+        # 实际要执行的批次清单：合规过滤后仍存活的买卖动作，供报告与界面直接引用，
+        # 避免撰写侧另行编造「分几批、每批多少」
+        _batch_rows = [
+            {
+                "seq": int(a.meta.get("batch_seq") or 1),
+                "action": a.action,
+                "qty": float(a.qty or 0),
+                "window": a.window,
+                "unit_price": float(a.unit_price or 0),
+            }
+            for a in all_actions
+            if a.action in ("buy_cea", "buy_ccer", "sell_cea")
+        ]
         plans.append(
             {
                 "key": key,
@@ -431,6 +567,8 @@ def generate_plans(ctx: StrategyContext) -> list[dict[str, Any]]:
                     "notes": filtered.notes,
                 },
                 "time_window": ctx.market.time_window,
+                "batch_count": PLAN_BATCH_SPEC.get(key, 1),
+                "batches": _batch_rows,
                 "market_action_tag": ctx.market.action_tag,
                 "channel": {
                     "prefer_offline": bool(channel.get("prefer_offline", True)),

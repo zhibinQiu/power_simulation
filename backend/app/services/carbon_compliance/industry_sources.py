@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """四大控排行业定点数据源（火电 / 钢铁 / 水泥 / 电解铝）。
 
-用途：为「履约综合分析」的「政策与合规要点」「社媒观点与市场情绪」两章提供
-可核验的真实来源，替代不可用的 SearXNG / 官网回退垫片。
+用途：为「履约综合分析」的「政策与合规要点」一章、以及「行情与价格预测解读」
+末尾的市场情绪段提供可核验的真实来源，替代不可用的 SearXNG / 官网回退垫片。
 
 行业键与 defaults.INDUSTRY_LABELS 一致：power / steel / cement / aluminum。
 
@@ -326,7 +326,7 @@ _INDUSTRY_OFFICIAL_EXTRA: dict[str, tuple[PageSource, ...]] = {
     ),
 }
 
-# 情绪/价格侧行业源（与财联社一起构成「社媒观点与市场情绪」章）
+# 情绪/价格侧行业源（与财联社一起供「行情与价格预测解读」末尾的情绪段落引用）
 _INDUSTRY_SENTIMENT_EXTRA: dict[str, tuple[PageSource, ...]] = {
     "power": (
         PageSource(

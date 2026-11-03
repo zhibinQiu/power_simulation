@@ -267,9 +267,8 @@ def _sources_md(items: list[dict[str, Any]], *, limit: int = 12, start: int = 1)
             break
         plat = it.get("platform") or "其他"
         title = _clip(str(it.get("title") or url), 72)
-        # 标题可点开；同时保留纯 URL 便于复制
+        # 标题本身即可点击，不再重复渲染裸 URL
         lines.append(f"[{n}] [{plat}] [{title}]({url})")
-        lines.append(f"    {url}")
     return "\n".join(lines)
 
 

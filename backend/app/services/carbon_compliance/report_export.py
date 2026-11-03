@@ -35,12 +35,25 @@ def strategy_run_to_markdown(
     gap_raw = accounting.get("gap_before_ccer")
     gap_gross = float(gap_raw) if gap_raw is not None else gap_net + ccer_offset
     ccer_ratio = float(accounting.get("ccer_max_ratio") or 0.05)
+    # 排放口径必须跟着数字走：同一份快照里「核查排放」可能来自预测、人工核定值或台账
+    _basis = str(accounting.get("emission_basis") or "")
+    _basis_note = {
+        "forecast": "（按该年度排放预测口径）",
+        "mixed": "（分年度预测 + 台账）",
+        "ledger_override": "（人工核定值）",
+        "ledger": "（按台账核定值）",
+    }.get(_basis, "")
     lines = [
         f"# {enterprise_name} {year_label}碳履约策略推荐",
         "",
         "## 核算快照",
         "",
-        f"- 最终核查排放：{float(accounting.get('verified_emission', 0) or 0):.2f} 万吨 CO₂e",
+        f"- 最终核查排放：{float(accounting.get('verified_emission', 0) or 0):.2f} 万吨 CO₂e{_basis_note}",
+        *(
+            [f"- 口径说明：{accounting.get('emission_basis_text')}"]
+            if accounting.get("emission_basis_text")
+            else []
+        ),
         f"- 可用 CEA：{float(accounting.get('free_cea_quota', 0) or 0):.2f} 万吨{traded_line}",
         f"- 抵扣前缺口：{gap_gross:.2f} 万吨（核查排放 − 可用 CEA）",
         f"- CCER 抵销上限：{float(accounting.get('ccer_cap', 0) or 0):.2f} 万吨"

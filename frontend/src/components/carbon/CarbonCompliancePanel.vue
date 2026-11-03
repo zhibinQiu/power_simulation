@@ -5,6 +5,10 @@ import { t } from '../../i18n'
 
 // ---------------- 状态 ----------------
 const tab = ref('emissions') // emissions|forecasts|cea|ccer|green|strategy|alerts
+// 右上角「年度选择」：'' = 全年度，否则为具体履约年度。
+// 它是整个面板唯一的年度作用域——指标卡（排放累计 / CEA 可用）、CEA 页签、策略运行都读这一个 ref，
+// 所以定义提到脚本顶部，供下方的 CEA「配额年度」代理复用（Vue 的 <script setup> 是顺序执行的）。
+const runYear = ref('')
 const enterprises = ref([])
 const selectedId = ref('')
 const meta = ref({ industries: [], risk_profiles: [] })
@@ -210,8 +214,14 @@ const ceaTradeByYear = computed(() => {
   }
   return map
 })
-// 配额年度作用域：'' = 全部年度（跨年合计），否则只看该年。默认全部，保持与其它三张卡同口径
-const ceaScopeYear = ref('')
+// 配额年度作用域：不再是独立状态，而是右上角「年度选择」的代理。
+// 两套独立年度会造成「卡片按 A 年算、页签表格按 B 年算」，tooltip 里的拆解与卡面数字对不上；
+// 现在 CEA 页签内的下拉与右上角下拉改的是同一个 ref，切任一处都会让「CEA 可用」同步变化。
+const ceaScopeYear = computed({
+  get: () => runYear.value,
+  set: (v) => { runYear.value = v === null || v === undefined ? '' : String(v) },
+})
+// CEA 持仓已有的配额年度：交易登记表的「配额年度」只在这里选，避免登记出无法落账的悬空流水
 const ceaYears = computed(() => {
   const ys = [...new Set(ceaRows.value.map(r => Number(r.vintage_year)).filter(y => !!y))].sort((a, b) => b - a)
   // 还没有任何持仓时也给出当年，避免「配额年度」下拉是空的、登记时无从选择
@@ -362,54 +372,172 @@ async function updateEnterprise(patch) {
 }
 
 // ---------------- 排放台账 ----------------
-// 录入统一走弹窗：新增 / 编辑共用同一个表单（年份是该企业的台账主键）
-const emForm = reactive({ year: new Date().getFullYear(), verified_total: 0, scope1_combustion: 0, scope1_process: 0, scope2_power: 0, purchased_mwh: 0, historical_gap: null, ccer_used: 0, monthly_detail: {} })
+// 一个年度一行，行内可展开成 12 个月逐月上报。年度值默认取月度合计；
+// 与合计不一致的年度值按「核定值」处理（年终核查调整、关停补算等场景）。
+const EM_FIELDS = [
+  { key: 'verified_total', label: '核查排放' },
+  { key: 'scope1_combustion', label: '范畴1燃料' },
+  { key: 'scope1_process', label: '范畴1过程' },
+  { key: 'scope2_power', label: '范畴2电力' },
+  { key: 'purchased_mwh', label: '净购入电量' },
+  { key: 'ccer_used', label: 'CCER已用' },
+]
+const emForm = reactive({
+  year: new Date().getFullYear(), scope: 'year', month: 1,
+  verified_total: 0, scope1_combustion: 0, scope1_process: 0, scope2_power: 0,
+  purchased_mwh: 0, historical_gap: null, ccer_used: 0, monthly_detail: {}, clearOverride: false,
+})
 const emDialogOpen = ref(false)
 const emEditingYear = ref(null) // null 表示新增
+const emEditingMonth = ref(null) // 非空表示正在编辑某个月
+// 该月已有明细：按月保存时只提交「改动过的指标」，
+// 否则用户只填排放量，其余输入框默认 0 会把原本空白的指标写成 0
+const emMonthOrigin = ref({})
+const emHasOverride = ref(false)
 const emSaving = ref(false)
 const emYearInput = ref(null)
+const emExpanded = ref(null) // 展开的年度：同时只展开一年，避免长表格上下跳
 const emIsEdit = computed(() => emEditingYear.value !== null)
-function openEmDialog(row = null) {
+const emDialogTitle = computed(() => {
+  if (emForm.scope === 'month') {
+    const has = Object.keys(emMonthOrigin.value).length > 0
+    return has ? t('编辑 {m} 月排放', { m: emForm.month }) : t('{m} 月排放上报', { m: emForm.month })
+  }
+  return emIsEdit.value ? t('编辑年度排放') : t('新增年度排放')
+})
+
+function emMonths(row) { return row?.monthly_detail || {} }
+function emMonthCell(row, m) { return emMonths(row)[String(m)] || null }
+function emIsOverride(row) { return Object.keys(row?.annual_override || {}).length > 0 }
+function emAutoVal(row, key) {
+  const v = (row?.monthly_auto || {})[key]
+  return v === undefined || v === null ? null : Number(v)
+}
+function emCellText(row, m, key) {
+  const cell = emMonthCell(row, m)
+  if (!cell) return '—'
+  const v = cell[key]
+  return v === undefined || v === null ? '—' : Number(v).toFixed(1)
+}
+function toggleEmExpand(row) {
+  const y = Number(row.year)
+  emExpanded.value = emExpanded.value === y ? null : y
+}
+
+function openEmDialog(row = null, month = null) {
   if (row) {
     emEditingYear.value = Number(row.year)
+    const m = month ? Number(month) : null
+    emEditingMonth.value = m
+    emHasOverride.value = emIsOverride(row)
+    emMonthOrigin.value = m ? { ...(emMonthCell(row, m) || {}) } : {}
+    // 编辑某个月时用该月明细回填，编辑年度时用年度值回填
+    const src = m ? (emMonthCell(row, m) || {}) : row
     Object.assign(emForm, {
       year: Number(row.year),
-      verified_total: Number(row.verified_total || 0),
-      scope1_combustion: Number(row.scope1_combustion || 0),
-      scope1_process: Number(row.scope1_process || 0),
-      scope2_power: Number(row.scope2_power || 0),
-      purchased_mwh: Number(row.purchased_mwh || 0),
-      historical_gap: row.historical_gap ?? null,
-      ccer_used: Number(row.ccer_used || 0),
-      // 弹窗里不编辑月度明细，但必须原样带回去：后端 model_dump 总会带上该字段，
-      // 漏了就会把已有月度数据覆盖成空对象
-      monthly_detail: row.monthly_detail || {},
+      scope: m ? 'month' : 'year',
+      month: m || 1,
+      verified_total: Number(src.verified_total || 0),
+      scope1_combustion: Number(src.scope1_combustion || 0),
+      scope1_process: Number(src.scope1_process || 0),
+      scope2_power: Number(src.scope2_power || 0),
+      purchased_mwh: Number(src.purchased_mwh || 0),
+      historical_gap: m ? null : (row.historical_gap ?? null),
+      ccer_used: Number(src.ccer_used || 0),
+      // 月度明细原样带回去：整年保存时后端靠它判断「年度值是否等于合计」，
+      // 漏掉会误判成人工核定
+      monthly_detail: emMonths(row),
+      clearOverride: false,
     })
   } else {
     emEditingYear.value = null
+    emEditingMonth.value = null
+    emMonthOrigin.value = {}
+    emHasOverride.value = false
     const thisYear = new Date().getFullYear()
     const maxYear = emissions.value.reduce((m, r) => Math.max(m, Number(r.year) || 0), 0)
     Object.assign(emForm, {
       year: maxYear >= thisYear ? maxYear + 1 : thisYear,
+      scope: 'year', month: 1,
       verified_total: 0, scope1_combustion: 0, scope1_process: 0,
-      scope2_power: 0, purchased_mwh: 0, historical_gap: null, ccer_used: 0, monthly_detail: {},
+      scope2_power: 0, purchased_mwh: 0, historical_gap: null, ccer_used: 0,
+      monthly_detail: {}, clearOverride: false,
     })
   }
   emDialogOpen.value = true
   nextTick(() => emYearInput.value?.focus())
 }
-function closeEmDialog() { emDialogOpen.value = false }
+function closeEmDialog() {
+  emDialogOpen.value = false
+  emEditingMonth.value = null
+}
 async function saveEmission() {
   if (!selectedId.value) return flashErr(new Error(t('请先选择企业')))
   if (!Number(emForm.year)) return flashErr(new Error(t('请填写年份')))
+  if (emForm.scope === 'month' && !Number(emForm.month)) return flashErr(new Error(t('请选择月份')))
   emSaving.value = true
   const wasEdit = emIsEdit.value
+  const isMonth = emForm.scope === 'month'
   try {
-    await api.upsertEmission(selectedId.value, { ...emForm })
+    if (isMonth) {
+      const payload = { year: Number(emForm.year), month: Number(emForm.month) }
+      const origin = emMonthOrigin.value || {}
+      let touched = 0
+      for (const f of EM_FIELDS) {
+        const now = Number(emForm[f.key]) || 0
+        const before = origin[f.key] === undefined ? null : Number(origin[f.key])
+        // 原来没值：填了非 0 才算改动；原来有值：值变了才算改动（改回 0 也要提交）
+        if (before === null ? now !== 0 : now !== before) {
+          payload[f.key] = now
+          touched += 1
+        }
+      }
+      if (!touched) {
+        emSaving.value = false
+        return flashErr(new Error(t('本月没有任何指标改动')))
+      }
+      await api.upsertEmissionMonth(selectedId.value, payload)
+      emExpanded.value = Number(emForm.year)
+    } else {
+      await api.upsertEmission(selectedId.value, {
+        year: Number(emForm.year),
+        verified_total: Number(emForm.verified_total) || 0,
+        scope1_combustion: Number(emForm.scope1_combustion) || 0,
+        scope1_process: Number(emForm.scope1_process) || 0,
+        scope2_power: Number(emForm.scope2_power) || 0,
+        purchased_mwh: Number(emForm.purchased_mwh) || 0,
+        historical_gap: emForm.historical_gap ?? null,
+        ccer_used: Number(emForm.ccer_used) || 0,
+        monthly_detail: emForm.monthly_detail || {},
+        clear_override: !!emForm.clearOverride,
+      })
+    }
     emDialogOpen.value = false
+    emEditingMonth.value = null
     await loadSelected()
-    flashOk(wasEdit ? t('排放记录已更新') : t('排放记录已新增'))
+    flashOk(
+      isMonth
+        ? t('{m} 月排放已上报', { m: emForm.month })
+        : (wasEdit ? t('排放记录已更新') : t('排放记录已新增'))
+    )
   } catch (e) { flashErr(e) } finally { emSaving.value = false }
+}
+async function delEmissionMonth(row, month) {
+  if (!confirm(t('删除 {year} 年 {m} 月的上报数据？', { year: row.year, m: month }))) return
+  try {
+    await api.deleteEmissionMonth(selectedId.value, row.year, month)
+    await loadSelected()
+    flashOk(t('{m} 月数据已删除', { m: month }))
+  } catch (e) { flashErr(e) }
+}
+// 解除核定：把年度值改回「12 个月合计」，之后月度填报会自动带动年度值
+async function clearOverride(row) {
+  if (!confirm(t('把 {year} 年的年度值改为 12 个月合计？当前核定值将被清除。', { year: row.year }))) return
+  try {
+    await api.upsertEmission(selectedId.value, { year: Number(row.year), clear_override: true })
+    await loadSelected()
+    flashOk(t('已改用月度合计'))
+  } catch (e) { flashErr(e) }
 }
 // CEA / CCER 的持仓录入已与排放台账统一成「右上角新增 + 行内编辑 + 弹窗录入」（见下方 dlg* 系列）；
 // 这个开关现在只负责展开/收起该页的「交易登记」表单（买卖流水仍走内联表单，不塞进弹窗）
@@ -459,8 +587,8 @@ const dlgMeta = {
   },
   forecast: {
     add: '新增排放预测', edit: '编辑排放预测',
-    tipAdd: '同一企业同一年份只保留一条预测，重复新增会覆盖该年度数据。',
-    tipEdit: '排放预测按年份建档，编辑时年份不可修改；如需换年份请先删掉旧记录。',
+    tipAdd: '先选年份：系统按该年度台账已填月份推算剩余月份，全年值 = 台账实际 + 推算，保存后即为快照。同一企业同一年份只保留一条预测。',
+    tipEdit: '年份建档后不可修改；台账后续补录不会自动改写这条快照，如需更新请点「重新测算」再保存。',
     okAdd: '排放预测已新增', okEdit: '排放预测已更新',
   },
   greenPower: {
@@ -486,7 +614,214 @@ const dlgTip = computed(() => {
 })
 
 // ---------------- 预测 ----------------
-const fcForm = reactive({ year: new Date().getFullYear() + 1, forecast_total: 0, capacity_plan: '', production_plan: '', abatement_projects: [] })
+// 预测不再是「拍一个全年数」，而是「以台账已填月份为基准，推算剩余月份」：
+// 弹窗一打开就按当前台账测算，用户看到 12 个月的构成后再保存快照。
+// 若填了产能计划/生产计划，则改走「计划产量 × 排放强度」的测算口径。
+const fcForm = reactive({
+  year: new Date().getFullYear() + 1,
+  forecast_total: 0,
+  // 产能计划：年计划产量（万吨）。>0 时进入计划测算口径
+  capacity_output: 0,
+  // 生产计划：{月: 计划产量（万吨）}，允许只填部分月份
+  plan_months: {},
+  capacity_plan: '',
+  production_plan: '',
+  abatement_projects: [],
+})
+const fcPreview = ref(null)      // 测算结果（POST /forecasts/preview）
+const fcLoading = ref(false)
+const fcPreviewError = ref('')
+const fcExpanded = ref(null)     // 列表里展开的预测行（按 id，不按年份：老数据可能同年多条）
+// 逐月数值与「是否人工改过」：表格里的输入框直接绑 fcValues，
+// 改过的月份记在 fcManual 里，保存时来源写 manual，重新推算不会覆盖它们
+const fcValues = reactive({})
+const fcManual = reactive({})
+
+function filledPlanMonths() {
+  const out = {}
+  for (let m = 1; m <= 12; m += 1) {
+    const v = Number(fcForm.plan_months[m])
+    if (Number.isFinite(v) && v > 0) out[String(m)] = v
+  }
+  return out
+}
+
+// 产能计划预填只做一次：用户之后主动清空，不要再被自动填回来
+let fcPrefilled = false
+
+async function loadFcPreview(year, { resetManual = false } = {}) {
+  if (resetManual) for (const k of Object.keys(fcManual)) delete fcManual[k]
+  if (!selectedId.value || !Number(year)) { fcPreview.value = null; return }
+  fcLoading.value = true
+  fcPreviewError.value = ''
+  try {
+    fcPreview.value = await api.previewForecast(selectedId.value, {
+      year: Number(year),
+      capacity_output: Number(fcForm.capacity_output) || 0,
+      plan_months: filledPlanMonths(),
+    })
+    // 企业属性里带设计产量时预填产能计划，让用户一进来就看到「产量 × 强度」的口径；
+    // 只填一次（表单已有值或用户主动清空都不再覆盖）
+    if (!Number(fcForm.capacity_output) && Number(fcPreview.value?.default_capacity_output) > 0 && !fcPrefilled) {
+      fcPrefilled = true
+      fcForm.capacity_output = Number(fcPreview.value.default_capacity_output)
+      await loadFcPreview(year, { resetManual: false })
+    }
+  } catch (e) {
+    fcPreview.value = null
+    fcPreviewError.value = (e && e.message) || String(e)
+  } finally {
+    fcLoading.value = false
+  }
+}
+// 预填只做一次：用户清空产能计划后不要再被自动填回来
+// 改年份要重算：新增时年份可改，编辑时锁死所以不会触发
+watch(() => fcForm.year, (y) => { if (dlgKind.value === 'forecast') loadFcPreview(y, { resetManual: true }) })
+// 改产能计划 / 生产计划要重算：计划变了，之前的逐月数就不成立了（人工改的月份也一起重算）
+watch(
+  () => [fcForm.capacity_output, JSON.stringify(fcForm.plan_months)],
+  () => { if (dlgKind.value === 'forecast' && fcPreview.value) loadFcPreview(fcForm.year, { resetManual: true }) }
+)
+// 测算结果变化时把逐月值铺进输入框；人工改过的月份保留
+watch(fcPreview, (p) => {
+  const months = p && Array.isArray(p.months) && p.months.length ? p.months : []
+  if (!months.length) {
+    for (let m = 1; m <= 12; m += 1) if (!fcManual[m]) fcValues[m] = 0
+    return
+  }
+  for (const m of months) {
+    if (!fcManual[m.month]) fcValues[m.month] = Number(m.value)
+  }
+})
+// 逐月明细 = 测算值 + 人工覆盖，合计实时跟着变。
+// 测算不出结果时也渲染 12 行空表：未来年度没有台账、又没有计划时，
+// 用户唯一的录入方式就是直接在这张表里逐月填。
+const fcRows = computed(() => {
+  const p = fcPreview.value
+  const base = p && Array.isArray(p.months) && p.months.length
+    ? p.months
+    : Array.from({ length: 12 }, (_, i) => ({ month: i + 1, value: 0, source: 'forecast', overdue: false }))
+  return base.map((m) => {
+    const manual = !!fcManual[m.month]
+    return {
+      month: m.month,
+      value: Number(manual ? (fcValues[m.month] ?? 0) : m.value) || 0,
+      source: manual ? 'manual' : m.source,
+      overdue: !!m.overdue,
+    }
+  })
+})
+const fcTotals = computed(() => {
+  let actual = 0
+  let rest = 0
+  let manual = 0
+  for (const r of fcRows.value) {
+    if (r.source === 'ledger') actual += r.value
+    else rest += r.value
+    if (r.source === 'manual') manual += 1
+  }
+  return { actual, rest, total: actual + rest, manualMonths: manual }
+})
+function fcSourceLabel(s) {
+  return s === 'ledger' ? t('台账') : s === 'manual' ? t('手填') : t('推算')
+}
+function markFcManual(m) {
+  // 输入框清空时视为「回到测算值」，不再标手填
+  const v = fcValues[m]
+  if (v === '' || v === null || v === undefined) delete fcManual[m]
+  else fcManual[m] = true
+}
+// 生产计划输入框的占位：年产能均分到每月，让用户知道「不填时用的是多少」
+const fcPlanPlaceholder = computed(() => {
+  const cap = Number(fcForm.capacity_output) || 0
+  return cap > 0 ? (cap / 12).toFixed(1) : '—'
+})
+
+// 新增预测的默认年份：优先推到「台账里已有数据、但还没建档」的最近年度。
+// 预测本身就是拿已有实绩往后推，默认给一个空白的未来年度会让人无从下手
+function nextForecastYear() {
+  const used = new Set(forecasts.value.map((r) => Number(r.year)))
+  const candidates = emissions.value
+    .map((r) => Number(r.year))
+    .filter((y) => y && !used.has(y))
+    .sort((a, b) => b - a)
+  return candidates.length ? candidates[0] : nextYear(forecasts.value)
+}
+// 新增 / 编辑预测的可选年份：下拉而不是手输，避免手滑打成 2006、20277 这种脏年份。
+// 候选 = 台账已有年度（能按实绩外推，优先）+ 当前年及未来两年（允许提前建档，此时只能手填全年值）；
+// 新增时剔掉已建过预测的年度（同企业同年度只保留一条），编辑时保留当前这条自己的年份。
+const forecastYearOptions = computed(() => {
+  const ys = new Set()
+  emissions.value.forEach((r) => { const y = Number(r.year); if (y) ys.add(y) })
+  const now = new Date().getFullYear()
+  for (let i = 0; i <= 2; i += 1) ys.add(now + i)
+  if (dlgIsEdit.value) {
+    if (Number(fcForm.year)) ys.add(Number(fcForm.year))
+  } else {
+    forecasts.value.forEach((r) => ys.delete(Number(r.year)))
+  }
+  // 兜底：当前表单值必须在候选里，否则 select 匹配不到 option 会显示空白
+  if (Number(fcForm.year)) ys.add(Number(fcForm.year))
+  // 排序：有台账（能按实绩外推）的年度倒序在前，空白未来年度正序在后——
+  // 否则 2028「无台账，需手填」会排在第一位，用户一开下拉就容易顺手选中
+  const hasLedger = (y) => emissions.value.some((r) => Number(r.year) === y)
+  const withLedger = [...ys].filter(hasLedger).sort((a, b) => b - a)
+  const blank = [...ys].filter((y) => !hasLedger(y)).sort((a, b) => a - b)
+  return [...withLedger, ...blank]
+})
+// 选项中标注「该年度台账有无可外推数据」，用户选之前就能判断哪些年需要手填
+function forecastYearHint(y) {
+  const row = emissions.value.find((r) => Number(r.year) === Number(y))
+  if (!row) return t('无台账，需手填')
+  const months = Object.keys(row.monthly_detail || {}).length
+  if (months) return t('台账 {n} 个月', { n: months })
+  if (Number(row.verified_total || 0) > 0) return t('台账年度值')
+  return t('无台账，需手填')
+}
+
+function toggleFcExpand(r) { fcExpanded.value = fcExpanded.value === r.id ? null : r.id }
+// 列表里的「依据」用短标签：完整那句放展开区和 title，否则列宽撑爆
+function fcBasisLabel(r) {
+  const map = {
+    planned: t('按生产计划测算'),
+    ledger_monthly: t('台账 {n} 个月外推', { n: fcLedgerMonthCount(r) }),
+    ledger_annual: t('年度值均摊'),
+    history_annual: t('历史年度均摊'),
+    history_monthly: t('历史月度均值'),
+    manual: t('逐月手工填写'),
+    none: t('手工填写'),
+  }
+  return map[r.basis] || t('手工填写')
+}
+function fcMonthVal(r, m) {
+  const v = (r.monthly_detail || {})[String(m)]
+  return v === undefined || v === null || v === '' ? null : Number(v)
+}
+// 台账合计 / 剩余月预测：来源在建档时就记在 monthly_source 里，
+// 不能再拿当前台账去反推——台账后续补录会让历史预测的构成"漂移"
+function fcLedgerMonthCount(r) {
+  let n = 0
+  for (let m = 1; m <= 12; m += 1) if (fcMonthVal(r, m) !== null && fcMonthSource(r, m) === 'ledger') n += 1
+  return n
+}
+function fcSplitTotals(r) {
+  let ledger = 0
+  let rest = 0
+  for (let m = 1; m <= 12; m += 1) {
+    const v = fcMonthVal(r, m)
+    if (v === null) continue
+    if (fcMonthSource(r, m) === 'ledger') ledger += v
+    else rest += v
+  }
+  return { ledger, rest }
+}
+function fcMonthSource(r, m) {
+  const src = (r.monthly_source || {})[String(m)]
+  if (src) return src
+  // 老记录没有来源标记：退化成「按当前台账是否存在该月」判断，仅用于展示
+  const em = emissions.value.find(x => Number(x.year) === Number(r.year))
+  return em && (em.monthly_detail || {})[String(m)] ? 'ledger' : 'forecast'
+}
 
 // ---------------- 绿电 / 绿证 ----------------
 const gpForm = reactive({ year: new Date().getFullYear(), market_green_mwh: 0, self_gen_mwh: 0, premium_per_mwh: 0, contract_ref: '' })
@@ -540,17 +875,44 @@ function openDlg(kind, row = null) {
     })
   } else if (kind === 'forecast') {
     dlgEditingKey.value = row ? Number(row.year) : null
+    // 每次开窗都重置逐月输入与人工标记，避免上一份预测的数字串到这一份
+    for (const k of Object.keys(fcValues)) delete fcValues[k]
+    for (const k of Object.keys(fcManual)) delete fcManual[k]
+    fcPrefilled = false
+    // 生产计划按 1~12 月的槽位铺开（后端存的是字符串键）
+    const plan = {}
+    if (row && row.plan_months) {
+      for (let m = 1; m <= 12; m += 1) {
+        const v = Number(row.plan_months[String(m)])
+        plan[m] = Number.isFinite(v) && v > 0 ? v : null
+      }
+    }
     Object.assign(fcForm, row ? {
       year: Number(row.year),
       forecast_total: Number(row.forecast_total || 0),
+      capacity_output: Number(row.capacity_output || 0),
+      plan_months: plan,
       capacity_plan: row.capacity_plan || '',
       production_plan: row.production_plan || '',
       // 弹窗不编辑减排项目清单，但必须原样带回：后端会用传上去的值整体覆盖
       abatement_projects: row.abatement_projects || [],
     } : {
-      year: nextYear(forecasts.value), forecast_total: 0,
+      year: nextForecastYear(), forecast_total: 0,
+      capacity_output: 0, plan_months: {},
       capacity_plan: '', production_plan: '', abatement_projects: [],
     })
+    // 已存快照先铺进输入框：台账实际月与人工调整月保留，其余等测算结果回来再覆盖
+    if (row && row.monthly_detail) {
+      for (let m = 1; m <= 12; m += 1) {
+        const v = row.monthly_detail[String(m)]
+        if (v !== undefined && v !== null) fcValues[m] = Number(v)
+      }
+      for (const [k, s] of Object.entries(row.monthly_source || {})) {
+        if (s === 'manual') fcManual[Number(k)] = true
+      }
+    }
+    fcPreview.value = null
+    loadFcPreview(fcForm.year)
   } else if (kind === 'greenPower') {
     dlgEditingKey.value = row ? Number(row.year) : null
     Object.assign(gpForm, row ? {
@@ -592,7 +954,44 @@ async function saveDlg() {
     } else if (kind === 'ccer') {
       await api.upsertCcer(selectedId.value, { ...ccerForm })
     } else if (kind === 'forecast') {
-      await api.upsertForecast(selectedId.value, { ...fcForm, abatement_projects: (fcForm.abatement_projects || []).filter(Boolean) })
+      // 存快照（12 个月 + 每月来源 + 依据），全年值由后端按 12 个月加总，
+      // 保证「表里的合计」与「逐月明细」永远是同一个口径。
+      // 逐月值取 fcRows（测算值 + 人工覆盖），而不是 fcPreview 原始值——
+      // 否则用户在表格里手改的数字会被静默丢掉。
+      const p = fcPreview.value
+      const rows = fcRows.value
+      // 全年为 0 说明既没计划也没手填，存下去只会得到一条「0 排放」的假预测
+      if (fcTotals.value.total <= 0) {
+        dlgSaving.value = false
+        return flashErr(new Error(t('全年预测为 0：请先填写产能计划，或在下方逐月填写排放')))
+      }
+      const payload = {
+        year: fcForm.year,
+        capacity_plan: fcForm.capacity_plan,
+        production_plan: fcForm.production_plan,
+        abatement_projects: (fcForm.abatement_projects || []).filter(Boolean),
+        // 计划口径一并存档，下次编辑能原样回填
+        capacity_output: Number(fcForm.capacity_output) || 0,
+        plan_months: filledPlanMonths(),
+        plan_intensity: Number(p?.plan_intensity) || 0,
+      }
+      if (rows.length) {
+        payload.monthly_detail = Object.fromEntries(
+          rows.map((r) => [String(r.month), Number(Number(r.value || 0).toFixed(2))])
+        )
+        payload.monthly_source = Object.fromEntries(rows.map((r) => [String(r.month), r.source]))
+        payload.basis = p?.basis || 'manual'
+        let text = p?.basis_text || ''
+        const n = fcTotals.value.manualMonths
+        if (n) text = (text ? text + ' ' : '') + t('其中 {n} 个月为人工调整。', { n })
+        payload.basis_text = text
+      } else {
+        // 台账完全没有数据（未来年度）且还没测算：退回手工填全年值
+        payload.forecast_total = Number(fcForm.forecast_total || 0)
+        payload.basis = 'none'
+        payload.basis_text = '无可用数据，手工填写'
+      }
+      await api.upsertForecast(selectedId.value, payload)
     } else if (kind === 'greenPower') {
       await api.upsertGreenPower(selectedId.value, { ...gpForm })
     } else {
@@ -699,8 +1098,7 @@ async function delGreenCert(row) {
 }
 
 // ---------------- 策略运行 ----------------
-// 右上角「年度选择」：'' = 全年度，否则为具体履约年度。同时作为指标卡（排放累计/CEA 可用）的全局年度作用域。
-const runYear = ref('')
+// 年度作用域 runYear 在脚本顶部已定义（CEA 页签要复用），此处只用它派生出显示标签。
 // 年度选择器的显示标签：全年度 / YYYY 年度（策略引擎页与运行按钮复用）
 const runYearLabel = computed(() => (runYear.value === '' ? t('全年度') : `${runYear.value} ${t('年度')}`))
 // 与后端 strategy_engine.PLAN_SPECS 的 key 一一对应：
@@ -716,6 +1114,16 @@ const profileLabels = { conservative: '保守', balanced: '平衡', aggressive: 
 // 卡片配色沿用原样式类名
 const planClass = { min_cost: 'conservative', optimized: 'balanced', full_compliance: 'aggressive' }
 const actionLabels = { buy_cea: '购入 CEA', sell_cea: '出售 CEA', use_ccer: '使用自有 CCER', buy_ccer: '外购 CCER', hold: '持有不动', stockpile: '低位囤存' }
+// 本次核算用的是哪个排放口径：做了预测按预测，没做预测按台账（后端 emission_basis）
+function emissionBasisChip(snap) {
+  const basis = snap && snap.emission_basis
+  const v = Number((snap && snap.verified_emission) || 0)
+  if (basis === 'forecast') return `${t('预测口径')} ${v.toFixed(1)} ${t('万吨')}`
+  if (basis === 'mixed') return `${t('预测+台账混合')} ${v.toFixed(1)} ${t('万吨')}`
+  if (basis === 'ledger_override') return `${t('台账核定口径')} ${v.toFixed(1)} ${t('万吨')}`
+  if (basis === 'ledger') return `${t('台账口径')} ${v.toFixed(1)} ${t('万吨')}`
+  return ''
+}
 async function runStrategy() {
   if (!selectedId.value) return flashErr(new Error(t('请先选择企业')))
   // ''（全年度）时传 0，后端聚合所有年度数据运行策略
@@ -735,6 +1143,15 @@ async function ackAlert(row) {
 }
 
 // ---------------- 导入导出 ----------------
+// 排放台账各数据页的中文名：与后端模板的 sheet 名一一对应，导入结果按页显示入库行数
+// （模板只负责排放台账；CEA / CCER / 绿电 / 绿证仍走各自的台账页录入）
+const IMPORT_SHEET_LABELS = {
+  emissions_month: '排放月度',
+  emissions: '排放年度',
+}
+// 导入结果常驻（不随 toast 消失）：台账一次几十行，哪一页进了几行、
+// 哪一行因为什么被跳过，都得让用户看得到、看得完
+const importReport = ref(null)
 async function downloadTemplate() {
   try { await api.downloadImportTemplate(selectedId.value) } catch (e) { flashErr(e) }
 }
@@ -743,7 +1160,18 @@ async function importExcel(e) {
   if (!file) return
   try {
     const res = await api.importEnterpriseExcel(selectedId.value, file)
-    flashOk(t('导入完成：{detail}', { detail: JSON.stringify(res.counts || res) }))
+    const counts = res.counts || res
+    const parts = Object.entries(counts)
+      .filter(([, n]) => Number(n) > 0)
+      .map(([k, n]) => `${t(IMPORT_SHEET_LABELS[k] || k)} ${n}`)
+    importReport.value = {
+      ok: parts.length > 0,
+      summary: parts.length
+        ? t('导入完成：{detail}', { detail: parts.join('，') })
+        : t('没有可导入的数据行'),
+      warnings: res.warnings || [],
+      errors: res.errors || [],
+    }
     await loadSelected()
   } catch (err) { flashErr(err) }
   e.target.value = ''
@@ -917,6 +1345,20 @@ const tabCount = computed(() => {
             </div>
           </div>
 
+          <!-- 台账导入结果：常驻到手动关闭，逐页行数 + 逐行问题 -->
+          <div v-if="importReport" class="import-report" :class="{ bad: !importReport.ok }">
+            <div class="ir-head">
+              <b>{{ importReport.summary }}</b>
+              <button class="ir-x" :title="t('关闭')" @click="importReport = null">✕</button>
+            </div>
+            <ul v-if="importReport.warnings.length" class="ir-list warn">
+              <li v-for="(w, i) in importReport.warnings" :key="'w' + i">{{ w }}</li>
+            </ul>
+            <ul v-if="importReport.errors.length" class="ir-list err">
+              <li v-for="(w, i) in importReport.errors" :key="'e' + i">{{ w }}</li>
+            </ul>
+          </div>
+
           <!-- 四张指标卡：各带自己的语义色（左侧色条 + 数值着色 + 右上角柔光），
                履约缺口按正负切换红/绿（gapClass），无数据时走中性灰 -->
           <div class="stats-bar">
@@ -989,52 +1431,178 @@ const tabCount = computed(() => {
 
           <!-- 排放台账 -->
           <div v-show="tab === 'emissions'" class="tab-body">
-            <table class="tbl-num">
-              <thead><tr><th>{{ t('年份') }}</th><th>{{ t('核查排放') }}</th><th>{{ t('范畴1燃料') }}</th><th>{{ t('范畴1过程') }}</th><th>{{ t('范畴2电力') }}</th><th>{{ t('CCER已用') }}</th><th></th></tr></thead>
+            <table class="tbl-num tbl-em">
+              <thead><tr>
+                <th class="em-c-year">{{ t('年份') }}</th>
+                <th>{{ t('核查排放') }}</th><th>{{ t('范畴1燃料') }}</th><th>{{ t('范畴1过程') }}</th>
+                <th>{{ t('范畴2电力') }}</th><th>{{ t('CCER已用') }}</th>
+                <th>{{ t('月度上报') }}</th><th></th>
+              </tr></thead>
               <tbody>
-                <tr v-for="r in emissions" :key="r.id">
-                  <td>{{ r.year }}</td><td>{{ Number(r.verified_total).toFixed(1) }}</td>
-                  <td>{{ Number(r.scope1_combustion || 0).toFixed(1) }}</td>
-                  <td>{{ Number(r.scope1_process || 0).toFixed(1) }}</td>
-                  <td>{{ Number(r.scope2_power || 0).toFixed(1) }}</td>
-                  <td>{{ Number(r.ccer_used || 0).toFixed(1) }}</td>
-                  <td class="row-ops">
-                    <button class="link" @click="openEmDialog(r)">{{ t('编辑') }}</button>
-                    <button class="link danger" @click="delEmission(r)">{{ t('删') }}</button>
-                  </td>
-                </tr>
-                <tr v-if="!emissions.length" class="empty-row"><td colspan="7">{{ t('暂无排放记录，点右上角「新增」录入') }}</td></tr>
+                <template v-for="r in emissions" :key="r.id">
+                  <tr :class="{ 'em-open': emExpanded === Number(r.year) }">
+                    <td class="em-c-year">
+                      <button
+                        class="em-caret"
+                        :title="emExpanded === Number(r.year) ? t('收起月度') : t('展开月度')"
+                        @click="toggleEmExpand(r)"
+                      >{{ emExpanded === Number(r.year) ? '▾' : '▸' }}</button>
+                      <span>{{ r.year }}</span>
+                    </td>
+                    <td>
+                      {{ Number(r.verified_total || 0).toFixed(1) }}
+                      <i v-if="emIsOverride(r)" class="em-tag" :title="t('人工核定值，不随月度合计变化')">{{ t('核定') }}</i>
+                    </td>
+                    <td>{{ Number(r.scope1_combustion || 0).toFixed(1) }}</td>
+                    <td>{{ Number(r.scope1_process || 0).toFixed(1) }}</td>
+                    <td>{{ Number(r.scope2_power || 0).toFixed(1) }}</td>
+                    <td>{{ Number(r.ccer_used || 0).toFixed(1) }}</td>
+                    <td>
+                      <span class="em-prog" :class="{ full: (Number(r.monthly_filled) || 0) >= 12 }">
+                        {{ Number(r.monthly_filled) || 0 }}/12
+                      </span>
+                    </td>
+                    <td class="row-ops">
+                      <button class="link" @click="openEmDialog(r)">{{ t('编辑') }}</button>
+                      <button class="link danger" @click="delEmission(r)">{{ t('删') }}</button>
+                    </td>
+                  </tr>
+                  <!-- 展开行：这一年的 12 个月，逐月填报 / 编辑 / 删除 -->
+                  <tr v-if="emExpanded === Number(r.year)" class="em-month-tr">
+                    <td colspan="8">
+                      <div class="em-month-wrap">
+                        <div class="em-month-head">
+                          <b>{{ t('{year} 年度逐月上报', { year: r.year }) }}</b>
+                          <span class="em-sum">
+                            {{ t('月度合计') }}
+                            <em>{{ emAutoVal(r, 'verified_total') === null ? '—' : emAutoVal(r, 'verified_total').toFixed(1) }}</em>
+                            <span class="em-vs">·</span>
+                            {{ t('年度值') }}
+                            <em>{{ Number(r.verified_total || 0).toFixed(1) }}</em>
+                            <span v-if="emIsOverride(r)" class="em-tag">{{ t('核定') }}</span>
+                          </span>
+                          <button v-if="emIsOverride(r)" class="link" @click="clearOverride(r)">{{ t('改用月度合计') }}</button>
+                        </div>
+                        <table class="tbl-num em-month-tbl">
+                          <thead><tr>
+                            <th>{{ t('月份') }}</th>
+                            <th v-for="f in EM_FIELDS" :key="f.key">{{ t(f.label) }}</th>
+                            <th></th>
+                          </tr></thead>
+                          <tbody>
+                            <tr v-for="m in 12" :key="m" :class="{ 'em-blank': !emMonthCell(r, m) }">
+                              <td class="em-m">{{ m }}{{ t('月') }}</td>
+                              <td v-for="f in EM_FIELDS" :key="f.key">{{ emCellText(r, m, f.key) }}</td>
+                              <td class="row-ops">
+                                <button class="link" @click="openEmDialog(r, m)">
+                                  {{ emMonthCell(r, m) ? t('编辑') : t('填报') }}
+                                </button>
+                                <button
+                                  v-if="emMonthCell(r, m)"
+                                  class="link danger"
+                                  @click="delEmissionMonth(r, m)"
+                                >{{ t('删') }}</button>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+                <tr v-if="!emissions.length" class="empty-row"><td colspan="8">{{ t('暂无排放记录，点右上角「新增」录入') }}</td></tr>
               </tbody>
             </table>
           </div>
 
-          <!-- 排放预测 -->
+          <!-- 排放预测：一条年度预测 = 台账已填月份（实际）+ 剩余月份（推算） -->
           <div v-show="tab === 'forecasts'" class="tab-body" data-tab="forecasts">
             <table class="tbl-ops tbl-fc">
-              <thead><tr><th>{{ t('年份') }}</th><th class="n">{{ t('预测排放') }}</th><th>{{ t('产能计划') }}</th><th>{{ t('生产计划') }}</th><th></th></tr></thead>
+              <thead><tr>
+                <th>{{ t('年份') }}</th>
+                <th>{{ t('预测依据') }}</th>
+                <th class="n">{{ t('台账合计') }}</th>
+                <th class="n">{{ t('剩余月预测') }}</th>
+                <th class="n">{{ t('全年预测') }}</th>
+                <th>{{ t('产能计划') }}</th>
+                <th></th>
+              </tr></thead>
               <tbody>
-                <tr v-for="r in forecasts" :key="r.id">
-                  <td>{{ r.year }}</td><td class="n">{{ Number(r.forecast_total).toFixed(1) }}</td>
-                  <td>{{ r.capacity_plan || '—' }}</td><td>{{ r.production_plan || '—' }}</td>
-                  <td class="row-ops">
-                    <button class="link" @click="openDlg('forecast', r)">{{ t('编辑') }}</button>
-                    <button class="link danger" @click="delForecast(r)">{{ t('删') }}</button>
-                  </td>
-                </tr>
-                <tr v-if="!forecasts.length" class="empty-row"><td colspan="5">{{ t('暂无预测记录，点右上角「新增」录入') }}</td></tr>
+                <template v-for="r in forecasts" :key="r.id">
+                  <tr :class="{ 'em-open': fcExpanded === r.id }">
+                    <td class="fc-c-year">
+                      <button
+                        class="em-caret"
+                        :title="fcExpanded === r.id ? t('收起逐月') : t('展开逐月')"
+                        @click="toggleFcExpand(r)"
+                      >{{ fcExpanded === r.id ? '▾' : '▸' }}</button>
+                      <span>{{ r.year }}</span>
+                    </td>
+                    <td class="fc-basis" :title="r.basis_text">{{ fcBasisLabel(r) }}</td>
+                    <td class="n">{{ fcSplitTotals(r).ledger.toFixed(1) }}</td>
+                    <td class="n">{{ fcSplitTotals(r).rest.toFixed(1) }}</td>
+                    <td class="n"><b>{{ Number(r.forecast_total || 0).toFixed(1) }}</b></td>
+                    <td>{{ r.capacity_plan || '—' }}</td>
+                    <td class="row-ops">
+                      <button class="link" @click="openDlg('forecast', r)">{{ t('编辑') }}</button>
+                      <button class="link danger" @click="delForecast(r)">{{ t('删') }}</button>
+                    </td>
+                  </tr>
+                  <!-- 展开：这一年的 12 个月，标出哪几个月来自台账、哪几个月是推算 -->
+                  <tr v-if="fcExpanded === r.id" class="em-month-tr">
+                    <td colspan="7">
+                      <div class="em-month-wrap">
+                        <div class="em-month-head">
+                          <b>{{ t('{year} 年度逐月排放（实测 + 推算）', { year: r.year }) }}</b>
+                          <span class="em-sum">
+                            {{ t('台账') }} <em>{{ fcSplitTotals(r).ledger.toFixed(1) }}</em>
+                            <span class="em-vs">+</span>
+                            {{ t('推算') }} <em>{{ fcSplitTotals(r).rest.toFixed(1) }}</em>
+                            <span class="em-vs">=</span>
+                            {{ t('全年') }} <em>{{ Number(r.forecast_total || 0).toFixed(1) }}</em>
+                          </span>
+                        </div>
+                        <p v-if="r.basis_text" class="fc-note">{{ r.basis_text }}</p>
+                        <div class="fc-months">
+                          <table v-for="half in [0, 1]" :key="half" class="tbl-num em-month-tbl fc-month-tbl">
+                            <tbody>
+                              <tr
+                                v-for="i in 6" :key="i"
+                                :class="{ 'em-blank': fcMonthVal(r, half * 6 + i) === null }"
+                              >
+                                <td class="em-m">{{ half * 6 + i }}{{ t('月') }}</td>
+                                <td class="fc-src">
+                                  <i
+                                    v-if="fcMonthVal(r, half * 6 + i) !== null"
+                                    class="fc-pill" :class="fcMonthSource(r, half * 6 + i)"
+                                  >{{ fcMonthSource(r, half * 6 + i) === 'ledger' ? t('台账') : t('推算') }}</i>
+                                </td>
+                                <td>
+                                  {{ fcMonthVal(r, half * 6 + i) === null ? '—' : fcMonthVal(r, half * 6 + i).toFixed(1) }}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+                <tr v-if="!forecasts.length" class="empty-row"><td colspan="7">{{ t('暂无预测记录，点右上角「新增」按台账测算') }}</td></tr>
               </tbody>
             </table>
           </div>
 
           <!-- CEA -->
           <div v-show="tab === 'cea'" class="tab-body" data-tab="cea">
-            <!-- 年度作用域：卡片、表格、合计都跟着它走，避免把不同配额年度加成一个数 -->
+            <!-- 年度作用域：与右上角「年度选择」是同一个值，卡片、表格、合计都跟着它走，
+                 避免把不同配额年度加成一个数，也避免两处下拉各选各的、数字对不上 -->
             <div class="cea-scope">
               <label class="fld inline">
                 <span class="fl">{{ t('配额年度') }}</span>
                 <select v-model="ceaScopeYear">
-                  <option value="">{{ t('全部年度') }}</option>
-                  <option v-for="y in ceaYears" :key="y" :value="String(y)">{{ y }}</option>
+                  <option value="">{{ t('全年度') }}</option>
+                  <option v-for="y in runYearOptions" :key="y" :value="String(y)">{{ y }} {{ t('年度') }}</option>
                 </select>
               </label>
               <span class="scope-sum">
@@ -1360,6 +1928,15 @@ const tabCount = computed(() => {
                 <span class="chip" :class="(lastRun.accounting_snapshot?.compliance_gap || 0) > 0 ? 'pos' : 'neg'">
                   {{ t('缺口(已扣CCER)') }}：{{ Number(lastRun.accounting_snapshot?.compliance_gap || 0).toFixed(1) }} {{ t('万吨') }}
                 </span>
+                <!-- 排放口径必须显式标出：做了预测按预测，没做预测按台账，两者结论可能相反 -->
+                <span
+                  v-if="emissionBasisChip(lastRun.accounting_snapshot)"
+                  class="chip"
+                  :class="lastRun.accounting_snapshot?.emission_basis === 'forecast' || lastRun.accounting_snapshot?.emission_basis === 'mixed' ? 'pos' : ''"
+                  :title="lastRun.accounting_snapshot?.emission_basis_text || ''"
+                >
+                  {{ t('排放口径') }}：{{ emissionBasisChip(lastRun.accounting_snapshot) }}
+                </span>
               </div>
               <div class="plans">
                 <div v-for="p in (lastRun.plans || [])" :key="p.key" class="plan" :class="planClass[p.key] || p.key">
@@ -1454,7 +2031,7 @@ const tabCount = computed(() => {
       <div v-if="emDialogOpen" class="em-mask">
         <div class="em-dialog" role="dialog" aria-modal="true" :aria-label="emIsEdit ? t('编辑排放数据') : t('新增排放数据')">
           <div class="em-head">
-            <b>{{ emIsEdit ? t('编辑排放数据') : t('新增排放数据') }}</b>
+            <b>{{ emDialogTitle }}</b>
             <span v-if="selected" class="em-ent">{{ selected.name }}</span>
             <button class="em-x" :aria-label="t('关闭')" @click="closeEmDialog">✕</button>
           </div>
@@ -1463,6 +2040,19 @@ const tabCount = computed(() => {
               <label class="fld">
                 <span class="fl">{{ t('年份') }}</span>
                 <input ref="emYearInput" v-model.number="emForm.year" type="number" :disabled="emIsEdit" />
+              </label>
+              <label class="fld">
+                <span class="fl">{{ t('上报方式') }}</span>
+                <select v-model="emForm.scope" :disabled="emEditingMonth !== null">
+                  <option value="year">{{ t('全年（核定值）') }}</option>
+                  <option value="month">{{ t('按月上报') }}</option>
+                </select>
+              </label>
+              <label v-if="emForm.scope === 'month'" class="fld">
+                <span class="fl">{{ t('月份') }}</span>
+                <select v-model.number="emForm.month">
+                  <option v-for="m in 12" :key="m" :value="m">{{ m }} {{ t('月') }}</option>
+                </select>
               </label>
               <label class="fld">
                 <span class="fl">{{ t('核查排放') }}<em>{{ t('万吨') }}</em></span>
@@ -1489,8 +2079,22 @@ const tabCount = computed(() => {
                 <input v-model.number="emForm.ccer_used" type="number" step="0.01" />
               </label>
             </div>
+            <label v-if="emForm.scope === 'year' && emHasOverride" class="fld em-full">
+              <span class="em-check">
+                <input v-model="emForm.clearOverride" type="checkbox" />
+                {{ t('改用月度合计（清除当前核定值）') }}
+              </span>
+            </label>
             <p class="em-tip">
-              {{ emIsEdit ? t('年份是该企业台账的主键，编辑时不可修改；如需改年份请删掉后重新新增。') : t('同一企业同一年份只保留一条记录，重复新增会覆盖该年度的数据。') }}
+              <template v-if="emForm.scope === 'month'">
+                {{ t('按月上报只覆盖本次填写的指标，同月分次补录不会清空其它字段。年度值默认取 12 个月合计。') }}
+              </template>
+              <template v-else-if="emIsEdit">
+                {{ t('年份是该企业台账的主键，编辑时不可修改。年度值默认取 12 个月合计，手工改过即视为核定值。') }}
+              </template>
+              <template v-else>
+                {{ t('同一企业同一年度只保留一条记录，重复新增会覆盖该年度的数据。') }}
+              </template>
             </p>
           </div>
           <div class="em-foot">
@@ -1590,22 +2194,77 @@ const tabCount = computed(() => {
               </div>
             </div>
             <div v-else-if="dlgKind === 'forecast'" class="em-grid">
-              <label class="fld">
+              <label class="fld" :title="t('年份只列出「台账已有年度」与「当前年及未来两年」；已建过预测的年度不重复列出（同一企业同一年度只保留一条，可在列表里编辑）')">
                 <span class="fl">{{ t('年份') }}</span>
-                <input v-model.number="fcForm.year" type="number" :disabled="dlgYearLocked" />
+                <select v-model.number="fcForm.year" :disabled="dlgYearLocked">
+                  <option v-for="y in forecastYearOptions" :key="y" :value="y">
+                    {{ y }} {{ t('年度') }} · {{ forecastYearHint(y) }}
+                  </option>
+                </select>
               </label>
-              <label class="fld">
-                <span class="fl">{{ t('预测排放') }}<em>{{ t('万吨') }}</em></span>
-                <input v-model.number="fcForm.forecast_total" type="number" step="0.01" />
+              <label class="fld" :title="t('年计划产量。与排放强度相乘得到全年计划排放；留空则退回按台账/历史外推。')">
+                <span class="fl">{{ t('产能计划') }}<em>{{ t('万吨/年') }}</em></span>
+                <input v-model.number="fcForm.capacity_output" type="number" min="0" step="1" :placeholder="t('如 1000')" />
               </label>
-              <label class="fld">
-                <span class="fl">{{ t('产能计划') }}</span>
-                <input v-model="fcForm.capacity_plan" />
+              <div class="fld em-full" :title="t('只填有排产安排的月份，没填的月份按「年计划产量 − 已排产」均分；台账已填月份仍取实际值。')">
+                <span class="fl">
+                  {{ t('生产计划') }}<em>{{ t('月度产量 万吨/月 · 留空按月产能 {v} 均分', { v: fcPlanPlaceholder }) }}</em>
+                </span>
+                <div class="fc-plan-grid">
+                  <label v-for="m in 12" :key="m" class="fc-plan-cell">
+                    <span>{{ m }}{{ t('月') }}</span>
+                    <input v-model.number="fcForm.plan_months[m]" type="number" min="0" step="1" :placeholder="fcPlanPlaceholder" />
+                  </label>
+                </div>
+              </div>
+              <label class="fld em-full">
+                <span class="fl">{{ t('计划说明') }}<em>{{ t('备注，不参与测算') }}</em></span>
+                <input v-model="fcForm.production_plan" :placeholder="t('如：10 月检修、11 月满负荷')" />
               </label>
-              <label class="fld">
-                <span class="fl">{{ t('生产计划') }}</span>
-                <input v-model="fcForm.production_plan" />
-              </label>
+            </div>
+            <!-- 测算区：台账已填月份取实际值，其余按计划排产（或历史外推）；每一格都能手改 -->
+            <div v-if="dlgKind === 'forecast'" class="fc-calc">
+              <div class="fc-calc-head">
+                <b>{{ t('逐月排放（可直接修改）') }}</b>
+                <span v-if="fcLoading" class="fc-loading">{{ t('测算中…') }}</span>
+                <button class="link" :disabled="fcLoading" @click="loadFcPreview(fcForm.year, { resetManual: true })">{{ t('恢复测算值') }}</button>
+              </div>
+              <p v-if="fcPreviewError" class="fc-warn">{{ fcPreviewError }}</p>
+              <p v-if="fcPreview && fcPreview.basis_text" class="fc-note">{{ fcPreview.basis_text }}</p>
+              <p v-else-if="!fcLoading" class="fc-warn">{{ t('台账与计划都没有可用数据：填一个产能计划就能自动测算，也可以直接在下面逐月填写。') }}</p>
+              <table class="tbl-num fc-month-tbl">
+                <thead><tr>
+                  <th>{{ t('月份') }}</th><th>{{ t('来源') }}</th>
+                  <th class="n">{{ t('排放') }}<em>{{ t('万吨') }}</em></th><th></th>
+                </tr></thead>
+                <tbody>
+                  <tr v-for="r in fcRows" :key="r.month" :class="{ 'fc-fc-row': r.source !== 'ledger', 'fc-manual-row': r.source === 'manual' }">
+                    <td class="em-m">{{ r.month }}{{ t('月') }}</td>
+                    <td class="fc-src">
+                      <i class="fc-pill" :class="r.source">{{ fcSourceLabel(r.source) }}</i>
+                    </td>
+                    <td class="n">
+                      <input
+                        class="fc-val"
+                        v-model.number="fcValues[r.month]"
+                        type="number" min="0" step="0.01"
+                        @input="markFcManual(r.month)"
+                      />
+                    </td>
+                    <td class="fc-flag">{{ r.overdue ? t('已过未填') : '' }}</td>
+                  </tr>
+                </tbody>
+                <tfoot><tr>
+                  <td colspan="2" class="fc-sum">
+                    {{ t('台账 {a} + 预测 {b}', { a: fcTotals.actual.toFixed(1), b: fcTotals.rest.toFixed(1) }) }}
+                  </td>
+                  <td class="n"><b>{{ fcTotals.total.toFixed(1) }}</b></td>
+                  <td>
+                    <span v-if="fcTotals.manualMonths" class="fc-manual-tip">{{ t('手改 {n} 月', { n: fcTotals.manualMonths }) }}</span>
+                  </td>
+                </tr></tfoot>
+              </table>
+              <p v-for="(w, i) in (fcPreview?.warnings || [])" :key="i" class="fc-warn">{{ w }}</p>
             </div>
             <div v-else-if="dlgKind === 'greenPower'" class="em-grid">
               <label class="fld">
@@ -1725,6 +2384,20 @@ const tabCount = computed(() => {
 @keyframes flash-in { from { opacity: 0; transform: translate(-50%, 6px); } to { opacity: 1; transform: translate(-50%, 0); } }
 .flash.ok { color: var(--green); border: 1px solid rgba(46, 139, 87, 0.45); }
 .flash.err { color: var(--red); border: 1px solid rgba(188, 59, 48, 0.45); }
+/* 台账导入结果：常驻卡片（区别于 .flash 的一次性 toast），逐页行数 + 逐行问题 */
+.import-report {
+  margin: 0 14px 10px; padding: 8px 12px; border-radius: 8px; font-size: 12px;
+  border: 1px solid rgba(46, 139, 87, 0.35); background: rgba(46, 139, 87, 0.06);
+  max-height: 168px; overflow: auto;
+}
+.import-report.bad { border-color: rgba(188, 59, 48, 0.4); background: rgba(188, 59, 48, 0.06); }
+.ir-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ir-head b { font-weight: 600; }
+.ir-x { border: 0; background: none; cursor: pointer; color: var(--muted); font-size: 12px; line-height: 1; padding: 2px 4px; }
+.ir-x:hover { color: var(--text); }
+.ir-list { margin: 6px 0 0; padding-left: 18px; line-height: 1.65; }
+.ir-list.warn { color: var(--orange); }
+.ir-list.err { color: var(--red); }
 .layout { flex: 1; display: flex; min-height: 0; }
 /* 左侧企业列表：VS Code 资源管理器风格 */
 .ent-list {
@@ -2116,6 +2789,114 @@ tr.medium td:first-child { color: var(--yellow); }
 tr.high td:first-child { color: var(--red); }
 td.msg { max-width: 320px; }
 
+/* ===== 排放台账：年度行 + 可展开的 12 个月子表 ===== */
+.tbl-em .em-c-year { width: 104px; text-align: left; white-space: nowrap; }
+.em-caret {
+  width: 16px; padding: 0; margin-right: 2px; border: none; background: none;
+  color: var(--muted); font-size: 10px; cursor: pointer; line-height: 1;
+}
+.em-caret:hover { color: var(--accent-d); }
+/* 「核定」小标签：提示这个年度值不随月度合计变化 */
+.em-tag {
+  font-style: normal; font-size: 10px; font-weight: 500; line-height: 1.5;
+  padding: 0 4px; margin-left: 4px; border-radius: 3px;
+  color: var(--accent-d); background: var(--accent-l);
+}
+.em-prog { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 11px; }
+.em-prog.full { color: var(--ok, #059669); font-weight: 600; }
+tr.em-open > td { background: var(--panel-2); }
+/* 展开行占满整行，内部再放一张月度表，避免与外层年度表的列宽互相牵制 */
+.em-month-tr > td { padding: 0; background: var(--panel-2); }
+.em-month-wrap { padding: 10px 12px 12px; }
+.em-month-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 8px; font-size: 12px; color: var(--text);
+}
+.em-sum { font-size: 11px; color: var(--muted); }
+.em-sum em { font-style: normal; font-weight: 600; color: var(--text); }
+.em-vs { margin: 0 4px; color: var(--faint); }
+.em-month-tbl { background: var(--panel); }
+.em-month-tbl th:first-child, .em-month-tbl td:first-child { width: 54px; }
+.em-month-tbl th:last-child, .em-month-tbl td:last-child { width: 78px; text-align: right; }
+.em-month-tbl td.em-m { text-align: left; color: var(--muted); }
+/* 未填报的月份整行淡化，一眼看出还差哪几个月 */
+.em-month-tbl tr.em-blank td { color: var(--faint); }
+.em-month-tbl td.row-ops { white-space: nowrap; }
+/* ===== 排放预测：实测 + 推算 ===== */
+.tbl-fc .fc-c-year { width: 96px; text-align: left; white-space: nowrap; }
+/* 三个数值列只占够用的宽度：fixed 布局会把剩余宽度平摊，
+   253px 一个数字列会让整张表散得看不清对应关系 */
+.tbl-fc th:nth-child(3), .tbl-fc td:nth-child(3),
+.tbl-fc th:nth-child(4), .tbl-fc td:nth-child(4),
+.tbl-fc th:nth-child(5), .tbl-fc td:nth-child(5) { width: 116px; }
+.tbl-fc th:nth-child(6), .tbl-fc td:nth-child(6) { width: auto; }
+.tbl-fc .fc-basis { color: var(--muted); font-size: 11px; }
+.fc-note { margin: 0 0 6px; font-size: 11px; color: var(--muted); line-height: 1.6; }
+.fc-warn { margin: 6px 0 0; font-size: 11px; color: var(--yellow, #b45309); line-height: 1.6; }
+/* 推算行淡一点：一眼分出哪几个月是实测，哪几个月是估的 */
+.fc-month-tbl tr.fc-fc-row td { color: var(--muted); }
+.fc-pill {
+  font-style: normal; font-size: 10px; line-height: 1.6; padding: 0 5px;
+  border-radius: 3px; white-space: nowrap;
+}
+.fc-pill.ledger { color: var(--accent-d); background: var(--accent-l); }
+.fc-pill.forecast { color: var(--muted); background: var(--panel-2); }
+.fc-src { text-align: left; }
+.fc-flag { color: var(--yellow, #b45309); font-size: 10px; white-space: nowrap; text-align: left; }
+/* 不做内部滚动：12 行整体展示，滚动条会把「合计」行藏起来，
+   而合计正是读者第一眼要找的数 */
+.fc-month-tbl { background: var(--panel); }
+/* 展开区里只有 3 列，套 table-layout:fixed 会被拉成一整行宽，
+   月份和数值隔着半屏。这里改成按内容收缩 */
+.fc-months { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+.tbl-fc .em-month-tbl { table-layout: auto; width: auto; min-width: 260px; }
+.tbl-fc .em-month-tbl th:first-child, .tbl-fc .em-month-tbl td:first-child { width: 64px; }
+.tbl-fc .em-month-tbl th:nth-child(2), .tbl-fc .em-month-tbl td:nth-child(2) { width: 64px; }
+.tbl-fc .em-month-tbl th:last-child, .tbl-fc .em-month-tbl td:last-child { width: 96px; text-align: right; }
+.fc-calc {
+  margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--panel-2);
+}
+.fc-calc-head {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+  font-size: 12px; color: var(--text);
+}
+.fc-calc-head .link { margin-left: auto; font-size: 11px; }
+.fc-loading { font-size: 11px; color: var(--muted); }
+.fc-calc .fld { max-width: 220px; }
+.fc-sum { font-size: 11px; color: var(--muted); text-align: left; }
+/* 逐月排放输入框：右对齐，行高不变，12 行整体高度与只读时接近 */
+.fc-val {
+  width: 92px; height: 24px; box-sizing: border-box; text-align: right;
+  border: 1px solid var(--border); border-radius: 4px; padding: 0 6px;
+  background: var(--panel); color: var(--text); font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.fc-val:focus { border-color: var(--accent); outline: none; }
+/* 手改过的行：标「手填」并恢复正文色（推算行是灰的，手改行不该跟着灰） */
+.fc-month-tbl tr.fc-manual-row td { color: var(--text); }
+.fc-pill.manual { color: var(--accent-d); background: var(--accent-l); border: 1px dashed var(--accent); }
+.fc-manual-tip { font-size: 10px; color: var(--accent-d); white-space: nowrap; }
+/* 生产计划：12 个月排产，4 列 3 行——6 列时输入框只剩 40px 宽，四位数看不清 */
+.fc-plan-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 10px; margin-top: 2px; }
+.fc-plan-cell { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.fc-plan-cell > span { font-size: 10px; color: var(--faint); white-space: nowrap; width: 22px; flex: none; }
+.fc-plan-cell input {
+  width: 100%; min-width: 0; height: 26px; box-sizing: border-box;
+  border: 1px solid var(--border); border-radius: 5px; padding: 0 6px;
+  background: var(--panel); color: var(--text); font-size: 12px;
+}
+.fc-plan-cell input:focus { border-color: var(--accent); outline: none; }
+
+/* 弹窗里跨两列的一项（如「改用月度合计」勾选框） */
+.em-grid .fld.em-full { grid-column: 1 / -1; }
+.em-grid .fld select {
+  width: 100%; box-sizing: border-box; height: 28px;
+  border: 1px solid var(--border); border-radius: 5px; padding: 0 6px;
+  background: var(--panel); color: var(--text); font-size: 12px;
+}
+.em-grid .fld select:disabled { background: var(--panel-2); color: var(--muted); cursor: not-allowed; }
+
 /* ===== 排放台账录入弹窗（新增 / 编辑共用）=====
    遮罩底色不用自己写：styles/main.css 里 `[class*="-mask"]` 已统一成中性暗场 + 背景模糊
    （浅色 .38 / 深色 .55 且带 !important），这里只需负责位置和层级 */
@@ -2142,7 +2923,7 @@ td.msg { max-width: 320px; }
   border: 1px solid transparent; background: none; color: var(--muted); font-size: 12px; cursor: pointer;
 }
 .em-x:hover { background: var(--panel); border-color: var(--border); color: var(--text); }
-.em-body { padding: 14px; }
+.em-body { padding: 14px; max-height: calc(100vh - 160px); overflow-y: auto; }
 .em-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
 .em-grid .fld > span.fl { font-size: 11px; color: var(--muted); }
 .em-grid .fld > span.fl em { font-style: normal; font-size: 10px; color: var(--faint); margin-left: 4px; }

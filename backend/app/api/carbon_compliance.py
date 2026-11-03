@@ -55,14 +55,59 @@ class EmissionYearIn(BaseModel):
     monthly_detail: dict[str, Any] = Field(default_factory=dict)
     historical_gap: float | None = None
     ccer_used: float = 0
+    # 人工核定值：与 12 个月合计不一致时以它为准（年终核查调整、关停补算等场景）
+    annual_override: dict[str, float] | None = None
+    # 清空核定值，回到「12 个月合计」口径
+    clear_override: bool = False
+
+
+class EmissionMonthIn(BaseModel):
+    """单月上报。字段用 None 默认而不是 0：只覆盖本次填的指标，
+    未填的保留该月原值（月度数据常常分几次补录）。"""
+
+    year: int
+    month: int
+    verified_total: float | None = None
+    scope1_combustion: float | None = None
+    scope1_process: float | None = None
+    scope2_power: float | None = None
+    purchased_mwh: float | None = None
+    ccer_used: float | None = None
 
 
 class ForecastIn(BaseModel):
+    """排放预测建档。
+
+    `monthly_detail` 是「以台账已填月份为基准推算剩余月份」的结果，传了之后
+    全年值由 12 个月加总得出；只有台账完全无数据（未来年度）时才用
+    `forecast_total` 手工填。
+    """
+
     year: int
     forecast_total: float = 0
+    monthly_detail: dict[str, Any] = Field(default_factory=dict)
+    # 每月来源：ledger（台账实际）/ forecast（推算）/ manual（人工改过）
+    monthly_source: dict[str, str] = Field(default_factory=dict)
+    basis: str = ""
+    basis_text: str = ""
     capacity_plan: str = ""
     abatement_projects: list[Any] = Field(default_factory=list)
     production_plan: str = ""
+    # 生产计划口径：年计划产量（万吨）、逐月排产（万吨/月）、测算时用到的强度（吨/吨）
+    capacity_output: float = 0
+    plan_months: dict[str, Any] = Field(default_factory=dict)
+    plan_intensity: float = 0
+
+
+class ForecastPreviewIn(BaseModel):
+    """按生产计划测算全年 12 个月排放（不入库）。
+
+    `plan_months` 允许只填部分月份，未填的由后端按「年计划产量 − 已排产」均分。
+    """
+
+    year: int
+    capacity_output: float = 0
+    plan_months: dict[str, Any] = Field(default_factory=dict)
 
 
 class CeaHoldingIn(BaseModel):
@@ -238,26 +283,34 @@ def delete_enterprise(enterprise_id: str) -> dict:
 
 
 # ---------------------------------------------------------------- emissions
+def _emission_row_dict(r) -> dict:
+    """排放行的统一返回结构：既给年度值，也给月度合计与填写进度。
+
+    前端要靠 monthly_auto / annual_override 区分「这个年度值是月度加出来的」
+    还是「人工核定的」，否则改完某个月会疑惑年度值为什么没动。
+    """
+    return {
+        "id": str(r.id),
+        "year": r.year,
+        "verified_total": r.verified_total,
+        "scope1_combustion": r.scope1_combustion,
+        "scope1_process": r.scope1_process,
+        "scope2_power": r.scope2_power,
+        "purchased_mwh": r.purchased_mwh,
+        "monthly_detail": r.monthly_detail or {},
+        "monthly_auto": r.monthly_auto or {},
+        "monthly_filled": r.monthly_filled or 0,
+        "annual_override": r.annual_override or {},
+        "historical_gap": r.historical_gap,
+        "ccer_used": r.ccer_used,
+    }
+
+
 @router.get("/enterprises/{enterprise_id}/emissions")
 def list_emissions(enterprise_id: str) -> list:
     if not ccs.get_enterprise(None, DEFAULT_USER_ID, enterprise_id):
         raise HTTPException(status_code=404, detail="enterprise not found")
-    rows = ccs.list_emission_years(None, enterprise_id)
-    return [
-        {
-            "id": str(r.id),
-            "year": r.year,
-            "verified_total": r.verified_total,
-            "scope1_combustion": r.scope1_combustion,
-            "scope1_process": r.scope1_process,
-            "scope2_power": r.scope2_power,
-            "purchased_mwh": r.purchased_mwh,
-            "monthly_detail": r.monthly_detail,
-            "historical_gap": r.historical_gap,
-            "ccer_used": r.ccer_used,
-        }
-        for r in rows
-    ]
+    return [_emission_row_dict(r) for r in ccs.list_emission_years(None, enterprise_id)]
 
 
 @router.post("/enterprises/{enterprise_id}/emissions")
@@ -266,7 +319,27 @@ def upsert_emission(enterprise_id: str, body: EmissionYearIn) -> dict:
         row = ccs.upsert_emission_year(None, DEFAULT_USER_ID, enterprise_id, body.model_dump())
     except LookupError as exc:
         raise _err(exc) from exc
-    return {"id": str(row.id), "year": row.year}
+    return _emission_row_dict(row)
+
+
+@router.post("/enterprises/{enterprise_id}/emissions/month")
+def upsert_emission_month(enterprise_id: str, body: EmissionMonthIn) -> dict:
+    try:
+        row = ccs.upsert_emission_month(None, DEFAULT_USER_ID, enterprise_id, body.model_dump())
+    except LookupError as exc:
+        raise _err(exc) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _emission_row_dict(row)
+
+
+@router.delete("/enterprises/{enterprise_id}/emissions/{year}/month/{month}")
+def delete_emission_month(enterprise_id: str, year: int, month: int) -> dict:
+    try:
+        ccs.delete_emission_month(None, DEFAULT_USER_ID, enterprise_id, year, month)
+    except LookupError as exc:
+        raise _err(exc) from exc
+    return {"ok": True, "year": year, "month": month}
 
 
 @router.delete("/enterprises/{enterprise_id}/emissions/{year}")
@@ -289,12 +362,51 @@ def list_forecasts(enterprise_id: str) -> list:
             "id": str(r.id),
             "year": r.year,
             "forecast_total": r.forecast_total,
+            "monthly_detail": r.monthly_detail,
+            "monthly_source": r.monthly_source,
+            "basis": r.basis,
+            "basis_text": r.basis_text,
             "capacity_plan": r.capacity_plan,
             "abatement_projects": r.abatement_projects,
             "production_plan": r.production_plan,
+            "capacity_output": r.capacity_output or 0,
+            "plan_months": r.plan_months or {},
+            "plan_intensity": r.plan_intensity or 0,
         }
         for r in rows
     ]
+
+
+@router.get("/enterprises/{enterprise_id}/forecasts/preview")
+def preview_forecast(enterprise_id: str, year: int = Query(..., description="履约年度")) -> dict:
+    """按台账已有月份测算该年度 12 个月排放（不落盘；不带生产计划）。"""
+    try:
+        return ccs.preview_emission_forecast(None, DEFAULT_USER_ID, enterprise_id, year)
+    except LookupError as exc:
+        raise _err(exc) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/enterprises/{enterprise_id}/forecasts/preview")
+def preview_forecast_with_plan(enterprise_id: str, body: ForecastPreviewIn) -> dict:
+    """按「产能计划 + 生产计划」测算 12 个月排放（不落盘）。
+
+    走 POST 而不是 query：月度排产有 12 个数值，塞进 URL 既长又容易在代理层被截断。
+    """
+    try:
+        return ccs.preview_emission_forecast(
+            None,
+            DEFAULT_USER_ID,
+            enterprise_id,
+            body.year,
+            capacity_output=body.capacity_output or None,
+            plan_months=body.plan_months or None,
+        )
+    except LookupError as exc:
+        raise _err(exc) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/enterprises/{enterprise_id}/forecasts")
@@ -764,10 +876,12 @@ def ack_alert(alert_id: str) -> dict:
 # ---------------------------------------------------------------- import
 @router.get("/enterprises/{enterprise_id}/import/template")
 def import_template(enterprise_id: str):
-    if not ccs.get_enterprise(None, DEFAULT_USER_ID, enterprise_id):
+    ent = ccs.get_enterprise(None, DEFAULT_USER_ID, enterprise_id)
+    if not ent:
         raise HTTPException(status_code=404, detail="enterprise not found")
     try:
-        content = ccs.build_import_template_bytes()
+        # 企业名写进「说明」页：一份模板对应一个企业，回传/归档时不用再猜
+        content = ccs.build_import_template_bytes(enterprise_name=str(ent.get("name") or ""))
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return Response(
@@ -779,9 +893,14 @@ def import_template(enterprise_id: str):
 
 @router.post("/enterprises/{enterprise_id}/import")
 async def import_excel(enterprise_id: str, file: UploadFile = File(...)) -> dict:
+    """返回 {"counts": 各页入库行数, "warnings": [...], "errors": [...], "total": n}。
+
+    逐行问题记进 errors 而不是整体 4xx：几十行的台账因为一格写错就整份失败，
+    用户只能靠猜 —— 前端会把每一行的问题原样列出来。
+    """
     raw = await file.read()
     try:
-        counts = ccs.import_enterprise_excel(None, DEFAULT_USER_ID, enterprise_id, raw)
+        result = ccs.import_enterprise_excel(None, DEFAULT_USER_ID, enterprise_id, raw)
     except (LookupError, RuntimeError, ValueError) as exc:
         raise _err(exc) from exc
-    return counts
+    return result
