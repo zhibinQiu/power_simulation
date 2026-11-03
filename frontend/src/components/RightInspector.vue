@@ -240,23 +240,31 @@
 </template>
 
 <script setup>
-import { computed, ref, reactive, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { computed, ref, reactive, watch, onMounted, onBeforeUnmount } from 'vue'
 import { energyOf } from '../utils/energy'
 import { useSimStore, UNIT_TYPES } from '../stores/sim'
 import { MATERIAL_MAP, PRODUCTS, sceneMaterialList } from '../data/flowLibrary'
 import { t } from '../i18n'
 import { visiblePoll } from '../utils/poll.js'
-const AgentChatView = defineAsyncComponent(() => import('../views/AgentChatView.vue'))
+import { lazyView } from '../utils/asyncComp'
 // 右侧内容面板按需懒加载：首屏默认只显示「总览」，而报告 / 工序详情 / 编排属性 / 原料 /
 // 策略详情 / 设备详情这几个面板合计约 350KB 产物，全部静态 import 会让它们白白躺在首屏主包里。
-// 改为异步组件后主包显著瘦身；这些 chunk 体积很小（多在 10~30KB）且 App.vue 空闲时会预取
-// 最常用的工序/编排面板，实际点开基本无感。
-const ReportPanel = defineAsyncComponent(() => import('./ReportPanel.vue'))
-const UnitCarbonDetail = defineAsyncComponent(() => import('./UnitCarbonDetail.vue'))
-const MaterialInspector = defineAsyncComponent(() => import('./MaterialInspector.vue'))
-const StrategyDetailPanel = defineAsyncComponent(() => import('./StrategyDetailPanel.vue'))
-const FlowInspector = defineAsyncComponent(() => import('./FlowInspector.vue'))
-const DeviceDetail = defineAsyncComponent(() => import('./DeviceDetail.vue'))
+// 这些 chunk 体积很小（多在 10~30KB），且 App.vue 空闲时会预取最常用的工序/编排面板，点开基本无感。
+// 注意：不能用裸 defineAsyncComponent —— 分片请求失败（断网 / 发版后旧 chunk 404 / HMR 缓存失效）时
+// 整块面板会空白且不自愈；lazyView 提供「加载中」占位 + 失败提示 + 自动重试。
+// 分片加载失败后的恢复：动态 import 的失败结果会被浏览器**按模块 URL 缓存**，
+// 仅重挂载组件不会重新发请求（实测点「重试」仍停在错误态），切走再切回也一样。
+// 因此这里的重试直接重载页面 —— 与「发版后旧 chunk 404」的标准恢复方式一致，保证能恢复。
+function lazyPanel(loader, label) {
+  return lazyView(loader, { label, onRetry: () => window.location.reload(), retryLabel: t('重新加载页面') })
+}
+const AgentChatView = lazyPanel(() => import('../views/AgentChatView.vue'), t('本析智擎'))
+const ReportPanel = lazyPanel(() => import('./ReportPanel.vue'), t('报告'))
+const UnitCarbonDetail = lazyPanel(() => import('./UnitCarbonDetail.vue'), t('工序属性'))
+const MaterialInspector = lazyPanel(() => import('./MaterialInspector.vue'), t('原料属性'))
+const StrategyDetailPanel = lazyPanel(() => import('./StrategyDetailPanel.vue'), t('策略属性'))
+const FlowInspector = lazyPanel(() => import('./FlowInspector.vue'), t('编排属性'))
+const DeviceDetail = lazyPanel(() => import('./DeviceDetail.vue'), t('设备详情'))
 // 交互高频、体量很小的面板保持同步，避免频繁切换时出现加载空档
 import OtherUnitPanel from './OtherUnitPanel.vue'
 import GroupDetail from './GroupDetail.vue'

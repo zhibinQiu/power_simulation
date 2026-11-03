@@ -20,7 +20,7 @@ function retryingAsync(loader, {
   })
 }
 
-export function lazyView(loader, { label = '', retries = 2, delay = 80, retryDelay = 250 } = {}) {
+export function lazyView(loader, { label = '', retries = 2, delay = 80, retryDelay = 250, onRetry = null, retryLabel = '' } = {}) {
   const loadingComponent = {
     name: 'LazyViewLoading',
     render() {
@@ -42,6 +42,10 @@ export function lazyView(loader, { label = '', retries = 2, delay = 80, retryDel
       return () => h('div', { class: 'lazy-view-fallback error', role: 'alert' }, [
         h('strong', t('视图加载失败，请重试')),
         h('span', (props.error && props.error.message) || String(props.error || '')),
+        // 自动重试耗尽后，Vue 不会再自己重试（切走再切回也一样）——给一个显式的重试按钮。
+        // 宿主传 onRetry 时渲染重试按钮。注意：动态 import 的失败结果会被浏览器按模块 URL 缓存，
+        // 单纯重挂载组件（改 :key）并不能重新发请求，宿主应给「重新加载页面」这类一定能恢复的动作。
+        onRetry ? h('button', { class: 'lazy-retry-btn', type: 'button', onClick: () => onRetry() }, retryLabel || t('重试')) : null,
       ])
     },
   }

@@ -813,6 +813,10 @@ body.panel-dragging .app { transition: none; }
   gap: var(--sp-3); color: var(--muted); background: var(--panel); font-size: var(--fs-body); font-family: var(--ui); }
 .lazy-view-fallback.error { flex-direction: column; color: var(--red); }
 .lazy-view-fallback.error span { max-width: 70%; color: var(--muted); font-size: var(--fs-caption); word-break: break-word; }
+/* 分片加载失败后的手动重试按钮（Vue 不会自动重试，切走再切回也一样） */
+.lazy-retry-btn { margin-top: var(--sp-3); min-height: var(--btn-h); padding: 0 var(--btn-pad-x); font-family: var(--ui); font-size: var(--fs-s);
+  color: var(--on-accent); background: var(--accent); border: none; border-radius: var(--r); cursor: pointer; }
+.lazy-retry-btn:hover { background: var(--accent-h); color: var(--on-accent); }
 .scene-load-spinner { display: inline-block; flex: none; width: 10px; height: 10px; border: 1.5px solid currentColor; border-right-color: transparent;
   border-radius: 50%; animation: scene-load-spin .72s linear infinite; }
 @keyframes scene-load-spin { to { transform: rotate(360deg); } }
