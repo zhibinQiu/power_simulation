@@ -189,10 +189,34 @@ const sp = computed(() => {
   const at = dev.value && ADJUSTABLE_MAP[dev.value.type]
   return (at && at.setpoint) || null
 })
-// 喂给碳核算引擎的活动数据说明：优先设备自带，其次由耦合目标推断（可调设备无后端 feeds 字段）
+// 附加可调设备（变频器 / 变压器等）本身不产生活动数据：它所在工序的功率来自「电功率传感器」附件。
+// 这里找同节点上的功率型传感器，用于把「活动数据 → 碳引擎」讲清楚（否则该区块只剩一个空灰条）。
+const siblingPowerSensor = computed(() => {
+  const id = dev.value && dev.value.id ? String(dev.value.id) : ''
+  if (!id.startsWith('ext::')) return null
+  const nodeId = id.split('::')[1]
+  const sch = store.appliedScheme || store.scheme
+  const node = ((sch && sch.nodes) || []).find((n) => n.id === nodeId)
+  return ((node && node.attached) || []).find((a) => a && a.kind === 'sensor' && a.type === 'power_sensor') || null
+})
+// 喂给碳核算引擎的活动数据说明：设备自带 feeds → 耦合目标 → 附加设备/传感器的实际口径
 const feedsText = computed(() => {
   if (dev.value && dev.value.feeds) return dev.value.feeds
   if (coupling.value && coupling.value.target) return t('驱动 {target}（经碳引擎折算运行电耗 / 间接排放）', { target: paramLabel(coupling.value.target) })
+  const d = dev.value
+  if (!d) return '—'
+  // 功率型传感器：它的读数就是本工序的活动数据
+  if (d.powerReading) {
+    const v = d.reading != null ? `${f(d.reading)} ${d.readingUnit || 'kW'}` : t('（待接入数据源）')
+    return t('实测功率 {v} → 本工序运行电耗 → 范围二间接排放', { v })
+  }
+  // 附加可调设备：设定值只调运行工况，活动数据取决于同节点是否装了功率传感器
+  if (String(d.id || '').startsWith('ext::')) {
+    const ps = siblingPowerSensor.value
+    return ps
+      ? t('设定值仅调节运行工况；本工序功率由附加传感器「{name}」实测 → 折算运行电耗 → 范围二间接排放', { name: ps.label || t('电功率传感器') })
+      : t('设定值仅调节运行工况，不直接产生活动数据：本工序排放按功率型传感器读数 × 电网排放因子核算 —— 可在「传感器」中添加电功率传感器（数据源可设为随本设备联动）')
+  }
   return '—'
 })
 // 所属工序类型 → 中文标签（避免直接显示英文工序类型键）
