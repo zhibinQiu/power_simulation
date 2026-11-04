@@ -167,7 +167,7 @@ const CalibrationWizard = defineAsyncComponent(() => import('./CalibrationWizard
 const TftAnalysisDialog = lazyDialog(() => import('./TftAnalysisDialog.vue'))
 import { getCoupling, deriveProcessOpParams, paramLabel, PROCESS_MAP, DEVICE_MAP } from '../data/flowLibrary'
 // 附加可调设备的设定范围兜底：类型取自通用附加设备库（如变频器 / 半导体制冷电源）
-import { ADJUSTABLE_MAP } from '../data/attachLibrary'
+import { ADJUSTABLE_MAP, ATTACH_MAP, attachPowerSensor } from '../data/attachLibrary'
 import { buildRealtimeTftParams } from '../utils/tft'
 
 const store = useSimStore()
@@ -189,15 +189,18 @@ const sp = computed(() => {
   const at = dev.value && ADJUSTABLE_MAP[dev.value.type]
   return (at && at.setpoint) || null
 })
-// 附加可调设备（变频器 / 变压器等）本身不产生活动数据：它所在工序的功率来自「电功率传感器」附件。
+// 附加可调设备（变频器 / 变压器等）本身不产生活动数据：它所在工序的功率来自「功率型传感器」附件。
 // 这里找同节点上的功率型传感器，用于把「活动数据 → 碳引擎」讲清楚（否则该区块只剩一个空灰条）。
+// 判定沿用编排面板的同一口径（FlowInspector 的 isPowerAtt）：先取附加设备模板，再按 attachPowerSensor
+// 的「kind=sensor 且 measure.unit=kW」判断 —— 不写死 type，将来加三相功率表 / 能耗表也能识别。
+const attachedTplOf = (att) => (att ? (((ATTACH_MAP[att.kind] || {})[att.type]) || null) : null)
 const siblingPowerSensor = computed(() => {
   const id = dev.value && dev.value.id ? String(dev.value.id) : ''
   if (!id.startsWith('ext::')) return null
   const nodeId = id.split('::')[1]
   const sch = store.appliedScheme || store.scheme
   const node = ((sch && sch.nodes) || []).find((n) => n.id === nodeId)
-  return ((node && node.attached) || []).find((a) => a && a.kind === 'sensor' && a.type === 'power_sensor') || null
+  return ((node && node.attached) || []).find((a) => attachPowerSensor(attachedTplOf(a))) || null
 })
 // 喂给碳核算引擎的活动数据说明：设备自带 feeds → 耦合目标 → 附加设备/传感器的实际口径
 const feedsText = computed(() => {
@@ -210,9 +213,14 @@ const feedsText = computed(() => {
     const v = d.reading != null ? `${f(d.reading)} ${d.readingUnit || 'kW'}` : t('（待接入数据源）')
     return t('实测功率 {v} → 本工序运行电耗 → 范围二间接排放', { v })
   }
-  // 附加可调设备：设定值只调运行工况，活动数据取决于同节点是否装了功率传感器
+  // 附加设备：传感器只取数（非功率型读数不进碳引擎）；可调设备设定值只调工况 —— 两类文案不能混用
   if (String(d.id || '').startsWith('ext::')) {
     const ps = siblingPowerSensor.value
+    if (d.metering) {
+      return ps
+        ? t('该传感器读数仅用于工艺监测；本工序功率由「{name}」实测 → 折算运行电耗 → 范围二间接排放', { name: ps.label || t('电功率传感器') })
+        : t('该传感器读数仅用于工艺监测，不直接作为活动数据：本工序排放按功率型传感器读数 × 电网排放因子核算 —— 需按实测功率核算请在「传感器」中添加电功率传感器')
+    }
     return ps
       ? t('设定值仅调节运行工况；本工序功率由附加传感器「{name}」实测 → 折算运行电耗 → 范围二间接排放', { name: ps.label || t('电功率传感器') })
       : t('设定值仅调节运行工况，不直接产生活动数据：本工序排放按功率型传感器读数 × 电网排放因子核算 —— 可在「传感器」中添加电功率传感器（数据源可设为随本设备联动）')
